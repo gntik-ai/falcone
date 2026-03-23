@@ -41,8 +41,17 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Adapter integration scaffolding
+        run: pnpm test:adapters
+
       - name: Contract tests
         run: pnpm test:contracts
+
+      - name: Console E2E scaffolding
+        run: pnpm test:e2e:console
+
+      - name: Resilience scaffolding
+        run: pnpm test:resilience
 
       - name: Upload control-plane contract artifact
         uses: actions/upload-artifact@v4
