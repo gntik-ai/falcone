@@ -1,0 +1,377 @@
+{
+  "version": "2026-03-23",
+  "scope": "US-ARC-01-T01",
+  "system": "in-atelier-baas-control-plane",
+  "principles": [
+    "Public REST concerns stay in control_api.",
+    "Provisioning side effects are coordinated only through provisioning_orchestrator.",
+    "Provider-specific details stay behind adapter ports.",
+    "Audit evidence is append-only and separately governed from request handling."
+  ],
+  "services": [
+    {
+      "id": "control_api",
+      "package": "apps/control-plane",
+      "layer": "application",
+      "responsibilities": [
+        "Expose the public control-plane REST surface.",
+        "Validate request shape, tenant context, and API version headers.",
+        "Translate accepted operations into internal command envelopes.",
+        "Emit audit evidence for request acceptance and synchronous rejection where required."
+      ],
+      "owned_resources": [
+        "public route contract",
+        "authorization context",
+        "request validation policy"
+      ],
+      "service_dependencies": [
+        "provisioning_orchestrator",
+        "audit_module"
+      ],
+      "adapter_dependencies": [],
+      "inbound_contracts": [],
+      "outbound_contracts": [
+        "control_api_command",
+        "provisioning_request",
+        "audit_record"
+      ]
+    },
+    {
+      "id": "provisioning_orchestrator",
+      "package": "services/provisioning-orchestrator",
+      "layer": "application",
+      "responsibilities": [
+        "Create or reload provisioning runs using stable idempotency keys.",
+        "Sequence provider-facing provisioning steps.",
+        "Aggregate provider outcomes into a shared provisioning result envelope.",
+        "Emit audit evidence for step transitions and final outcomes."
+      ],
+      "owned_resources": [
+        "provisioning run state",
+        "step plan",
+        "retry classification"
+      ],
+      "service_dependencies": [
+        "audit_module"
+      ],
+      "adapter_dependencies": [
+        "keycloak",
+        "postgresql",
+        "mongodb",
+        "kafka",
+        "openwhisk",
+        "storage"
+      ],
+      "inbound_contracts": [
+        "provisioning_request"
+      ],
+      "outbound_contracts": [
+        "provisioning_result",
+        "adapter_call",
+        "audit_record"
+      ]
+    },
+    {
+      "id": "audit_module",
+      "package": "services/audit",
+      "layer": "application",
+      "responsibilities": [
+        "Persist append-only evidence for control and provisioning activity.",
+        "Attach correlation metadata and evidence pointers to audit records.",
+        "Apply redaction and retention policy in later tasks without changing callers."
+      ],
+      "owned_resources": [
+        "audit append log",
+        "evidence pointers",
+        "redaction policy"
+      ],
+      "service_dependencies": [],
+      "adapter_dependencies": [
+        "postgresql",
+        "storage"
+      ],
+      "inbound_contracts": [
+        "audit_record"
+      ],
+      "outbound_contracts": []
+    }
+  ],
+  "adapter_ports": [
+    {
+      "id": "keycloak",
+      "package": "services/adapters",
+      "port": "identity_adapter",
+      "consumers": [
+        "provisioning_orchestrator"
+      ],
+      "capabilities": [
+        "ensure_realm",
+        "ensure_client",
+        "ensure_roles",
+        "suspend_access"
+      ],
+      "request_contract": "adapter_call",
+      "result_contract": "adapter_result",
+      "idempotency_key": "tenant_id + capability + target_ref",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    },
+    {
+      "id": "postgresql",
+      "package": "services/adapters",
+      "port": "relational_data_adapter",
+      "consumers": [
+        "provisioning_orchestrator",
+        "audit_module"
+      ],
+      "capabilities": [
+        "ensure_control_metadata",
+        "ensure_tenant_schema_or_database",
+        "apply_grants",
+        "store_audit_metadata"
+      ],
+      "request_contract": "adapter_call",
+      "result_contract": "adapter_result",
+      "idempotency_key": "tenant_id + capability + placement_ref",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    },
+    {
+      "id": "mongodb",
+      "package": "services/adapters",
+      "port": "document_data_adapter",
+      "consumers": [
+        "provisioning_orchestrator"
+      ],
+      "capabilities": [
+        "ensure_database",
+        "ensure_indexes",
+        "apply_tenant_policy"
+      ],
+      "request_contract": "adapter_call",
+      "result_contract": "adapter_result",
+      "idempotency_key": "tenant_id + capability + database_ref",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    },
+    {
+      "id": "kafka",
+      "package": "services/adapters",
+      "port": "event_bus_adapter",
+      "consumers": [
+        "provisioning_orchestrator"
+      ],
+      "capabilities": [
+        "ensure_topics",
+        "ensure_acls",
+        "publish_lifecycle_event"
+      ],
+      "request_contract": "adapter_call",
+      "result_contract": "adapter_result",
+      "idempotency_key": "tenant_id + capability + topic_ref",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    },
+    {
+      "id": "openwhisk",
+      "package": "services/adapters",
+      "port": "functions_adapter",
+      "consumers": [
+        "provisioning_orchestrator"
+      ],
+      "capabilities": [
+        "ensure_namespace",
+        "ensure_packages",
+        "apply_invocation_policy"
+      ],
+      "request_contract": "adapter_call",
+      "result_contract": "adapter_result",
+      "idempotency_key": "tenant_id + capability + namespace_ref",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    },
+    {
+      "id": "storage",
+      "package": "services/adapters",
+      "port": "object_storage_adapter",
+      "consumers": [
+        "provisioning_orchestrator",
+        "audit_module"
+      ],
+      "capabilities": [
+        "ensure_bucket",
+        "apply_lifecycle_policy",
+        "write_audit_evidence"
+      ],
+      "request_contract": "adapter_call",
+      "result_contract": "adapter_result",
+      "idempotency_key": "tenant_id + capability + bucket_ref",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    }
+  ],
+  "contracts": {
+    "control_api_command": {
+      "owner": "control_api",
+      "version": "2026-03-23",
+      "required_fields": [
+        "command_id",
+        "request_id",
+        "tenant_id",
+        "actor",
+        "command_name",
+        "payload",
+        "idempotency_key",
+        "contract_version",
+        "requested_at"
+      ],
+      "idempotency": "All non-read control-plane commands carry a stable idempotency_key supplied or derived by control_api.",
+      "versioning": "Public REST remains under /v1/ and is translated into this internal contract version until a deliberate migration plan changes it.",
+      "error_classes": [
+        "validation_error",
+        "authorization_error",
+        "conflict",
+        "dependency_failure"
+      ]
+    },
+    "provisioning_request": {
+      "owner": "provisioning_orchestrator",
+      "version": "2026-03-23",
+      "required_fields": [
+        "provisioning_run_id",
+        "tenant_id",
+        "requested_resources",
+        "idempotency_key",
+        "correlation_id",
+        "triggered_by",
+        "contract_version",
+        "requested_at"
+      ],
+      "idempotency": "The orchestrator must create or resume one logical provisioning run per idempotency_key.",
+      "versioning": "Breaking changes require a new contract version and an explicit migration note.",
+      "error_classes": [
+        "invalid_request",
+        "conflict",
+        "dependency_failure"
+      ]
+    },
+    "provisioning_result": {
+      "owner": "provisioning_orchestrator",
+      "version": "2026-03-23",
+      "required_fields": [
+        "provisioning_run_id",
+        "tenant_id",
+        "status",
+        "completed_steps",
+        "failed_steps",
+        "correlation_id",
+        "contract_version",
+        "observed_at"
+      ],
+      "idempotency": "Repeated emissions for the same provisioning_run_id must describe the same durable state progression rather than duplicate side effects.",
+      "versioning": "Status vocabulary evolves deliberately under contract versioning instead of ad hoc field drift.",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure",
+        "recovery_required"
+      ]
+    },
+    "adapter_call": {
+      "owner": "services/adapters",
+      "version": "2026-03-23",
+      "required_fields": [
+        "call_id",
+        "tenant_id",
+        "adapter_id",
+        "capability",
+        "target_ref",
+        "payload",
+        "idempotency_key",
+        "correlation_id",
+        "contract_version",
+        "requested_at"
+      ],
+      "idempotency": "Each adapter call must be safe to retry with the same idempotency_key when the underlying provider supports idempotent upsert semantics.",
+      "versioning": "Provider-specific data lives inside payload while the shared envelope stays stable across adapters.",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure",
+        "invalid_adapter_request"
+      ]
+    },
+    "adapter_result": {
+      "owner": "services/adapters",
+      "version": "2026-03-23",
+      "required_fields": [
+        "call_id",
+        "adapter_id",
+        "status",
+        "provider_reference",
+        "correlation_id",
+        "observed_at",
+        "contract_version"
+      ],
+      "idempotency": "Multiple identical results for the same call_id must be treated as the same adapter observation, not a new side effect.",
+      "versioning": "Status and provider reference shape remain under the shared contract version even as provider payload details expand.",
+      "error_classes": [
+        "retryable_dependency_failure",
+        "terminal_dependency_failure"
+      ]
+    },
+    "audit_record": {
+      "owner": "audit_module",
+      "version": "2026-03-23",
+      "required_fields": [
+        "record_id",
+        "actor",
+        "scope",
+        "action",
+        "outcome",
+        "correlation_id",
+        "occurred_at",
+        "evidence_pointer",
+        "contract_version"
+      ],
+      "idempotency": "Duplicate submissions with the same record_id must be coalesced into one append-only evidence record.",
+      "versioning": "Audit consumers may add derived indexes later, but the canonical evidence envelope is versioned and immutable once written.",
+      "error_classes": [
+        "storage_unavailable",
+        "schema_validation_error"
+      ],
+      "write_mode": "append_only"
+    }
+  },
+  "interaction_flows": [
+    {
+      "id": "tenant_provisioning",
+      "entry_service": "control_api",
+      "steps": [
+        "control_api validates the request and emits control_api_command and provisioning_request envelopes.",
+        "provisioning_orchestrator creates or reloads a provisioning run by idempotency_key.",
+        "provisioning_orchestrator invokes adapter ports for identity, relational, document, event, functions, and storage setup.",
+        "audit_module appends evidence for acceptance, step transitions, and the terminal outcome."
+      ]
+    },
+    {
+      "id": "tenant_suspension",
+      "entry_service": "control_api",
+      "steps": [
+        "control_api accepts the request and emits a versioned control command.",
+        "provisioning_orchestrator coordinates provider-facing suspend and access-revocation capabilities.",
+        "audit_module records requested scope, outcome, and any evidence pointer needed for later review."
+      ]
+    }
+  ]
+}
