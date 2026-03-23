@@ -7,6 +7,7 @@
     "environmentProfile",
     "deployment",
     "platform",
+    "gatewayPolicy",
     "config",
     "bootstrap",
     "apisix",
@@ -1076,6 +1077,111 @@
               "additionalProperties": true
             }
           },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "gatewayPolicy": {
+      "type": "object",
+      "required": [
+        "version",
+        "oidc",
+        "claimsPropagation",
+        "cors",
+        "publicRoutes",
+        "passthrough",
+        "familyPolicies",
+        "accessMatrix"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oidc": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "provider",
+            "realm",
+            "issuerUrl",
+            "discoveryUrl",
+            "clientId",
+            "bearerOnly",
+            "sslVerify"
+          ],
+          "additionalProperties": true
+        },
+        "claimsPropagation": {
+          "type": "object",
+          "required": [
+            "stripIncomingHeaders",
+            "requiredRequestHeaders",
+            "trustedClaimMappings",
+            "headers"
+          ],
+          "additionalProperties": true
+        },
+        "cors": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "allowOrigins",
+            "allowMethods",
+            "allowHeaders",
+            "exposeHeaders",
+            "allowCredentials"
+          ],
+          "additionalProperties": true
+        },
+        "publicRoutes": {
+          "type": "object",
+          "required": [
+            "allowAnonymousOptions",
+            "routes"
+          ],
+          "additionalProperties": true
+        },
+        "passthrough": {
+          "type": "object",
+          "required": [
+            "mode",
+            "audit",
+            "routes"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "enabled",
+                "limited",
+                "disabled"
+              ]
+            },
+            "audit": {
+              "type": "object"
+            },
+            "routes": {
+              "type": "array",
+              "minItems": 2
+            }
+          },
+          "additionalProperties": true
+        },
+        "familyPolicies": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "accessMatrix": {
+          "type": "object",
+          "required": [
+            "personas",
+            "assertions"
+          ],
           "additionalProperties": true
         }
       },

@@ -2,6 +2,12 @@
 
 Version: v1 (header 2026-03-23, OpenAPI 1.0.0)
 
+## Product API vs native passthrough
+
+This document describes the supported product API under `/v1/*`.
+
+Native operator passthrough routes under `/_native/*` are documented separately in `docs/reference/architecture/gateway-authentication-and-passthrough.md` and are intentionally not part of the normal product surface.
+
 ## Versioning strategy
 
 - The URI major version remains pinned at /v1 while additive evolution is announced through the X-API-Version header.

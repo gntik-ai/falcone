@@ -10,6 +10,29 @@ data:
   tlsMode: {{ .Values.publicSurface.tls.mode | quote }}
   apiHostname: {{ .Values.publicSurface.hostnames.api | quote }}
   realtimeHostname: {{ .Values.publicSurface.hostnames.realtime | quote }}
+  oidcIssuerUrl: {{ .Values.gatewayPolicy.oidc.issuerUrl | quote }}
+  oidcDiscoveryUrl: {{ .Values.gatewayPolicy.oidc.discoveryUrl | quote }}
+  passthroughMode: {{ .Values.gatewayPolicy.passthrough.mode | quote }}
+  propagatedAuthHeaders: {{ values .Values.gatewayPolicy.claimsPropagation.headers | join "," | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "in-atelier.fullname" . }}-gateway-policy
+  labels:
+    {{- include "in-atelier.labels" . | nindent 4 }}
+data:
+  gateway-policy.json: |
+{{ toPrettyJson .Values.gatewayPolicy | nindent 4 }}
+  enabled-apisix-routes.json: |
+{{- $mode := .Values.gatewayPolicy.passthrough.mode -}}
+{{- $routes := list -}}
+{{- range .Values.bootstrap.reconcile.apisix.routes }}
+{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
+{{- $routes = append $routes (dict "routeId" .routeId "name" .name "uri" .uri) -}}
+{{- end }}
+{{- end }}
+{{ toPrettyJson $routes | nindent 4 }}
 ---
 apiVersion: v1
 kind: ConfigMap

@@ -1,7 +1,6 @@
 global:
   namespace: in-atelier-sandbox
   environment: sandbox
-
 publicSurface:
   hostnames:
     api: api.sandbox.in-atelier.example.com
@@ -17,7 +16,6 @@ publicSurface:
       console: in-atelier-sandbox-console-tls
       identity: in-atelier-sandbox-identity-tls
       realtime: in-atelier-sandbox-realtime-tls
-
 environmentProfile:
   id: sandbox
   diagnostics:
@@ -27,21 +25,26 @@ environmentProfile:
   demoData:
     enabled: true
   limitsProfile: preview
-
 config:
   secretRefs:
     gatewayTls:
       existingSecret: in-atelier-sandbox-api-tls
       keys:
-        - tls.crt
-        - tls.key
-
+      - tls.crt
+      - tls.key
 deployment:
   topology:
     clusterRef: cluster-sandbox-shared
-
 controlPlane:
   replicas: 2
-
 webConsole:
   replicas: 2
+gatewayPolicy:
+  passthrough:
+    mode: limited
+  cors:
+    allowOrigins:
+    - https://console.sandbox.in-atelier.example.com
+  oidc:
+    issuerUrl: https://iam.sandbox.in-atelier.example.com/auth/realms/in-atelier-platform
+    discoveryUrl: https://iam.sandbox.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration
