@@ -7,6 +7,7 @@
 - `charts/` contains deployment packaging.
 - `tests/e2e/` contains black-box workflow validation.
 - `docs/adr/` stores architecture decision records.
+- `services/internal-contracts/` stores machine-readable internal boundary and contract metadata for shared use across modules.
 
 ## Delivery rules for early bootstrap
 
@@ -25,3 +26,4 @@ Every future feature should preserve at least:
 4. API versioning rules that remain explicit and testable
 5. supply-chain checks for dependencies and declared deployable images
 6. deployability path that remains compatible with Kubernetes and OpenShift
+7. internal boundary and contract metadata that remain machine-checkable as the control plane grows
