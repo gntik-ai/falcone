@@ -1,0 +1,119 @@
+{
+  "tenants": [
+    {
+      "id": "tenant-shared-a",
+      "slug": "atelier-alpha",
+      "placement": "shared_schema",
+      "tier": "growth"
+    },
+    {
+      "id": "tenant-shared-b",
+      "slug": "atelier-beta",
+      "placement": "shared_schema",
+      "tier": "starter"
+    },
+    {
+      "id": "tenant-dedicated-a",
+      "slug": "atelier-gamma",
+      "placement": "dedicated_database",
+      "tier": "regulated"
+    }
+  ],
+  "users": [
+    {
+      "id": "user-platform-admin",
+      "role": "platform_admin",
+      "tenant_ids": []
+    },
+    {
+      "id": "user-tenant-admin-a",
+      "role": "tenant_admin",
+      "tenant_ids": ["tenant-shared-a"]
+    },
+    {
+      "id": "user-tenant-operator-a",
+      "role": "tenant_operator",
+      "tenant_ids": ["tenant-shared-a"]
+    },
+    {
+      "id": "user-auditor-a",
+      "role": "auditor",
+      "tenant_ids": ["tenant-shared-a"]
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "workspace-alpha-dev",
+      "tenant_id": "tenant-shared-a",
+      "environment": "dev"
+    },
+    {
+      "id": "workspace-gamma-prod",
+      "tenant_id": "tenant-dedicated-a",
+      "environment": "prod"
+    }
+  ],
+  "adapters": [
+    {
+      "id": "adapter-control-plane-stub",
+      "kind": "http_stub"
+    },
+    {
+      "id": "adapter-event-bus-stub",
+      "kind": "event_bus_stub"
+    },
+    {
+      "id": "adapter-object-storage-stub",
+      "kind": "object_storage_stub"
+    }
+  ],
+  "api_versions": [
+    {
+      "id": "api-version-current",
+      "header_name": "X-API-Version",
+      "value": "2026-03-23"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-tenant-provision-requested",
+      "type": "tenant.provision.requested"
+    },
+    {
+      "id": "event-tenant-suspended",
+      "type": "tenant.suspended"
+    }
+  ],
+  "resilience_cases": [
+    {
+      "id": "resilience-provider-timeout",
+      "failure_mode": "timeout"
+    },
+    {
+      "id": "resilience-event-replay",
+      "failure_mode": "replay"
+    },
+    {
+      "id": "resilience-tenant-failover",
+      "failure_mode": "placement_recovery"
+    }
+  ],
+  "console_routes": [
+    {
+      "id": "route-login",
+      "path": "/login"
+    },
+    {
+      "id": "route-platform-overview",
+      "path": "/platform"
+    },
+    {
+      "id": "route-tenant-dashboard",
+      "path": "/tenant/:tenantId"
+    },
+    {
+      "id": "route-audit-log",
+      "path": "/tenant/:tenantId/audit"
+    }
+  ]
+}

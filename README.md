@@ -13,6 +13,7 @@ This repository establishes the minimal working structure for:
 - `charts/in-atelier`: Helm chart skeleton for Kubernetes/OpenShift deployments
 - `docs`: architecture and working conventions
 - `tests/e2e`: end-to-end test workspace
+- `tests/reference`: reusable testing strategy package and synthetic reference dataset
 - `.specify`: Spec Kit context and project conventions
 
 ## Monorepo layout
@@ -28,7 +29,12 @@ charts/
   in-atelier/
 docs/
 tests/
+  adapters/
+  contracts/
   e2e/
+  reference/
+  resilience/
+  unit/
 ```
 
 ## Working conventions
@@ -46,10 +52,14 @@ The current baseline quality chain covers:
 
 - repository structure validation
 - PostgreSQL ADR package validation
+- testing-strategy package validation
 - markdown linting
 - OpenAPI validation for the control-plane contract
-- unit tests for CI quality helpers
+- unit tests for helper logic and strategy consistency
+- adapter-integration scaffold tests
 - contract tests for API versioning/error expectations
+- console E2E scaffold tests
+- resilience scaffold tests
 - dependency vulnerability audit
 - immutable image-reference policy checks
 

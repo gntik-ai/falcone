@@ -1,0 +1,239 @@
+pyramid:
+  - level: unit
+    purpose: Validate pure policy logic, fixture builders, and permission reducers with no infrastructure.
+    why_now: Gives the fastest feedback path while runtime stacks are still intentionally open.
+    future_extensions:
+      - tenant-context builders
+      - permission evaluators
+      - event-envelope serializers
+  - level: adapter_integration
+    purpose: Validate adapter behavior against local doubles and stable fixtures.
+    why_now: Preserves payload, tenant-context, and retry semantics before real providers are wired in.
+    future_extensions:
+      - PostgreSQL adapters
+      - object-storage adapters
+      - external HTTP providers
+  - level: api_contract
+    purpose: Validate versioning, headers, error contracts, and schema expectations against the public API boundary.
+    why_now: The repository already stores a control-plane OpenAPI contract that later stories must preserve.
+    future_extensions:
+      - consumer-driven contracts
+      - compatibility snapshots
+      - schema-diff policy gates
+  - level: console_e2e
+    purpose: Validate visible workflows, navigation, and permission boundaries from the user viewpoint.
+    why_now: Console role/state expectations should be explicit before UI implementation begins.
+    future_extensions:
+      - browser automation
+      - accessibility journeys
+      - cross-tenant route protection
+  - level: resilience
+    purpose: Validate degraded behavior, retries, replay safety, tenant-safe recovery, and operator visibility under failure.
+    why_now: Multi-tenant systems need resilience expectations early even before live chaos tooling exists.
+    future_extensions:
+      - queue redelivery tests
+      - dependency fault injection
+      - operator console degradation flows
+
+cross_domain_matrix:
+  domains:
+    - id: multi_tenant
+      description: Tenant placement, context propagation, and boundary safety.
+    - id: security
+      description: Role and permission enforcement, version-header requirements, and unsafe access prevention.
+    - id: data
+      description: Contracted reads/writes, lifecycle transitions, and storage-bound expectations.
+    - id: events
+      description: Event envelopes, retries, replay safety, and downstream integration behavior.
+    - id: console
+      description: UI routes, visible sections, state transitions, and actor-facing feedback.
+  scenarios:
+    - id: UT-TEN-001
+      level: unit
+      domain: multi_tenant
+      taxonomy: negative
+      title: Tenant context builder rejects a request without tenant binding metadata.
+      fixtures:
+        - tenant-shared-a
+        - user-tenant-admin-a
+      expected: Missing tenant context is rejected before any adapter or console flow begins.
+    - id: UT-SEC-001
+      level: unit
+      domain: security
+      taxonomy: permission
+      title: Permission reducer denies tenant operator access to billing-admin actions.
+      fixtures:
+        - user-tenant-operator-a
+        - route-platform-overview
+      expected: Tenant operator permissions remain tenant-scoped and platform-only actions stay blocked.
+    - id: AI-DAT-001
+      level: adapter_integration
+      domain: data
+      taxonomy: contract
+      title: Adapter mapping preserves tenant placement fields for shared and dedicated tenants.
+      fixtures:
+        - tenant-shared-a
+        - tenant-dedicated-a
+        - adapter-control-plane-stub
+      expected: Placement metadata remains canonical across adapter boundaries.
+    - id: AI-EVT-001
+      level: adapter_integration
+      domain: events
+      taxonomy: positive
+      title: Event publisher attaches tenant context and idempotency metadata to outbound lifecycle events.
+      fixtures:
+        - adapter-event-bus-stub
+        - event-tenant-provision-requested
+        - tenant-shared-a
+      expected: Outbound event envelopes are stable and replay-aware before provider integration.
+    - id: AC-DAT-001
+      level: api_contract
+      domain: data
+      taxonomy: contract
+      title: Business routes stay under the v1 URI prefix and return explicit error contracts.
+      fixtures:
+        - api-version-current
+      expected: Contract validation fails if business endpoints leave `/v1/` or lose error responses.
+    - id: AC-SEC-001
+      level: api_contract
+      domain: security
+      taxonomy: contract
+      title: Non-health control-plane operations require the pinned API version header.
+      fixtures:
+        - api-version-current
+      expected: Contract validation fails if `X-API-Version` becomes optional or drifts from the current value.
+    - id: CE-CON-001
+      level: console_e2e
+      domain: console
+      taxonomy: positive
+      title: Unauthenticated users are redirected to login and cannot see tenant or platform navigation.
+      fixtures:
+        - route-login
+        - route-tenant-dashboard
+      states:
+        - unauthenticated
+      expected: Public entry points stay limited to authentication and recovery routes.
+    - id: CE-SEC-001
+      level: console_e2e
+      domain: security
+      taxonomy: permission
+      title: Tenant admin can manage tenant resources but cannot access platform-wide control surfaces.
+      fixtures:
+        - user-tenant-admin-a
+        - route-tenant-dashboard
+        - route-platform-overview
+      states:
+        - tenant_admin
+      expected: Tenant admin workflows stay within the tenant boundary.
+    - id: RS-EVT-001
+      level: resilience
+      domain: events
+      taxonomy: resilience
+      title: Provider timeout reclassifies the operation for retry without duplicating the event envelope.
+      fixtures:
+        - resilience-provider-timeout
+        - event-tenant-provision-requested
+        - adapter-event-bus-stub
+      expected: Retry intent is explicit and duplicate side effects remain suppressed.
+    - id: RS-TEN-001
+      level: resilience
+      domain: multi_tenant
+      taxonomy: recovery
+      title: Tenant placement recovery preserves tenant identity and prevents cross-tenant failover leakage.
+      fixtures:
+        - resilience-tenant-failover
+        - tenant-shared-a
+        - tenant-dedicated-a
+      expected: Recovery paths preserve the logical tenant contract and isolation boundary.
+
+scenario_taxonomy:
+  categories:
+    - id: positive
+      meaning: Expected success path using valid actor, tenant, and contract inputs.
+    - id: negative
+      meaning: Unsafe or incomplete input is rejected before side effects occur.
+    - id: permission
+      meaning: Access control, visibility, or route boundary expectations.
+    - id: contract
+      meaning: Public schema, version, or integration contract expectations.
+    - id: resilience
+      meaning: Failure classification, retry, timeout, or degraded behavior.
+    - id: recovery
+      meaning: Explicit recovery, replay, rollback, or restoration path expectations.
+  naming:
+    format: <layer-code>-<domain-code>-<sequence>
+    examples:
+      - UT-TEN-001
+      - AI-EVT-001
+      - CE-CON-001
+
+console:
+  states:
+    - id: unauthenticated
+      visible_sections:
+        - login
+        - password-recovery
+      blocked_sections:
+        - platform-overview
+        - tenant-dashboard
+        - audit-log
+      allowed_actions:
+        - request-login
+        - request-password-reset
+    - id: platform_admin
+      visible_sections:
+        - platform-overview
+        - tenant-directory
+        - adapter-health
+        - audit-log
+      blocked_sections:
+        - tenant-billing-admin-only-view
+      allowed_actions:
+        - view-all-tenants
+        - suspend-tenant
+        - inspect-adapter-health
+    - id: tenant_admin
+      visible_sections:
+        - tenant-dashboard
+        - tenant-members
+        - tenant-settings
+      blocked_sections:
+        - platform-overview
+        - cross-tenant-directory
+      allowed_actions:
+        - manage-tenant-members
+        - rotate-tenant-secrets-reference
+        - review-tenant-usage
+    - id: tenant_operator
+      visible_sections:
+        - tenant-dashboard
+        - tenant-workflows
+      blocked_sections:
+        - tenant-members
+        - platform-overview
+        - audit-log
+      allowed_actions:
+        - run-tenant-operation
+        - inspect-own-workflow-status
+    - id: auditor
+      visible_sections:
+        - tenant-dashboard
+        - audit-log
+      blocked_sections:
+        - tenant-settings
+        - platform-overview
+      allowed_actions:
+        - view-audit-evidence
+        - export-audit-report
+
+api_contract:
+  uri_prefix: /v1/
+  version_header:
+    name: X-API-Version
+    current_value: '2026-03-23'
+  required_error_contracts: true
+  compatibility_expectations:
+    - Non-health control-plane operations stay under `/v1/` until a deliberate versioning change is introduced.
+    - The current pinned API-version value remains `2026-03-23` for this contract generation.
+    - Backward-compatible additions may add optional fields but must preserve existing required fields and error shapes.
+    - Breaking changes require an explicit versioning plan rather than silent contract drift.
