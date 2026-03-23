@@ -10,7 +10,7 @@
         "tenantId": "ten_01starteralpha",
         "slug": "starter-alpha",
         "displayName": "Starter Alpha",
-        "planId": "plan-starter",
+        "planId": "pln_01starter",
         "placement": "shared_schema",
         "state": "active"
       },
@@ -80,6 +80,40 @@
           "applicationId": "app_01starterportal",
           "state": "active"
         }
+      ],
+      "tenantMemberships": [
+        {
+          "tenantMembershipId": "tmb_01starteralice",
+          "tenantId": "ten_01starteralpha",
+          "userId": "usr_01tenantadmin",
+          "role": "tenant_admin",
+          "membershipStatus": "active",
+          "state": "active"
+        }
+      ],
+      "workspaceMemberships": [
+        {
+          "workspaceMembershipId": "wmb_01starterdiego",
+          "tenantId": "ten_01starteralpha",
+          "workspaceId": "wrk_01starterdev",
+          "userId": "usr_01workspaceadmin",
+          "role": "workspace_admin",
+          "membershipStatus": "active",
+          "state": "active"
+        }
+      ],
+      "invitations": [
+        {
+          "invitationId": "inv_01starterbilling",
+          "tenantId": "ten_01starteralpha",
+          "emailHash": "sha256:starter-billing-admin",
+          "maskedEmail": "bi***@starter.example.com",
+          "targetType": "tenant",
+          "role": "tenant_billing_admin",
+          "invitationStatus": "pending",
+          "expiresAt": "2026-04-01T00:00:00Z",
+          "state": "active"
+        }
       ]
     },
     {
@@ -91,7 +125,7 @@
         "tenantId": "ten_01growthbeta",
         "slug": "growth-beta",
         "displayName": "Growth Beta",
-        "planId": "plan-growth",
+        "planId": "pln_01growth",
         "placement": "shared_schema",
         "state": "active"
       },
@@ -211,6 +245,50 @@
           "serviceAccountId": "svc_01betadeploy",
           "state": "provisioning"
         }
+      ],
+      "tenantMemberships": [
+        {
+          "tenantMembershipId": "tmb_01growthbea",
+          "tenantId": "ten_01growthbeta",
+          "userId": "usr_01betatenantadmin",
+          "role": "tenant_admin",
+          "membershipStatus": "active",
+          "state": "active"
+        }
+      ],
+      "workspaceMemberships": [
+        {
+          "workspaceMembershipId": "wmb_01growthbruno",
+          "tenantId": "ten_01growthbeta",
+          "workspaceId": "wrk_01betadev",
+          "userId": "usr_01betadeveloper",
+          "role": "workspace_developer",
+          "membershipStatus": "active",
+          "state": "active"
+        },
+        {
+          "workspaceMembershipId": "wmb_01growthauditor",
+          "tenantId": "ten_01growthbeta",
+          "workspaceId": "wrk_01betaprod",
+          "userId": "usr_01betaauditor",
+          "role": "workspace_auditor",
+          "membershipStatus": "active",
+          "state": "active"
+        }
+      ],
+      "invitations": [
+        {
+          "invitationId": "inv_01growthops",
+          "tenantId": "ten_01growthbeta",
+          "emailHash": "sha256:growth-ops",
+          "maskedEmail": "op***@growth.example.com",
+          "targetType": "workspace",
+          "workspaceId": "wrk_01betastaging",
+          "role": "workspace_operator",
+          "invitationStatus": "accepted",
+          "expiresAt": "2026-03-28T00:00:00Z",
+          "state": "active"
+        }
       ]
     },
     {
@@ -222,7 +300,7 @@
         "tenantId": "ten_01enterprisedelta",
         "slug": "enterprise-delta",
         "displayName": "Enterprise Delta",
-        "planId": "plan-enterprise",
+        "planId": "pln_01enterprise",
         "placement": "dedicated_database",
         "state": "active"
       },
@@ -354,6 +432,50 @@
           "provider": "openwhisk",
           "serviceAccountId": "svc_01deltaprovisioner",
           "state": "provisioning"
+        }
+      ],
+      "tenantMemberships": [
+        {
+          "tenantMembershipId": "tmb_01deltaemma",
+          "tenantId": "ten_01enterprisedelta",
+          "userId": "usr_01deltatenantadmin",
+          "role": "tenant_admin",
+          "membershipStatus": "active",
+          "state": "active"
+        }
+      ],
+      "workspaceMemberships": [
+        {
+          "workspaceMembershipId": "wmb_01deltanoah",
+          "tenantId": "ten_01enterprisedelta",
+          "workspaceId": "wrk_01deltaprod",
+          "userId": "usr_01deltaworkspaceoperator",
+          "role": "workspace_operator",
+          "membershipStatus": "active",
+          "state": "active"
+        },
+        {
+          "workspaceMembershipId": "wmb_01deltaliam",
+          "tenantId": "ten_01enterprisedelta",
+          "workspaceId": "wrk_01deltastaging",
+          "userId": "usr_01deltaauditor",
+          "role": "workspace_auditor",
+          "membershipStatus": "active",
+          "state": "active"
+        }
+      ],
+      "invitations": [
+        {
+          "invitationId": "inv_01deltareviewer",
+          "tenantId": "ten_01enterprisedelta",
+          "emailHash": "sha256:delta-reviewer",
+          "maskedEmail": "re***@delta.example.com",
+          "targetType": "workspace",
+          "workspaceId": "wrk_01deltastaging",
+          "role": "workspace_viewer",
+          "invitationStatus": "revoked",
+          "expiresAt": "2026-03-25T00:00:00Z",
+          "state": "active"
         }
       ]
     }
