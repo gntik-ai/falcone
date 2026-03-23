@@ -9,6 +9,9 @@ This repository establishes the minimal working structure for:
 - `apps/control-plane`: control plane backend surface
 - `apps/web-console`: web console frontend surface
 - `services/gateway-config`: gateway and runtime configuration assets
+- `services/internal-contracts`: internal service-map and contract baseline
+- `services/provisioning-orchestrator`: control-plane orchestration workspace
+- `services/audit`: audit/evidence workspace
 - `services/adapters`: external service adapter packages
 - `charts/in-atelier`: Helm chart skeleton for Kubernetes/OpenShift deployments
 - `docs`: architecture and working conventions
@@ -24,6 +27,9 @@ apps/
   web-console/
 services/
   gateway-config/
+  internal-contracts/
+  provisioning-orchestrator/
+  audit/
   adapters/
 charts/
   in-atelier/
@@ -53,11 +59,13 @@ The current baseline quality chain covers:
 - repository structure validation
 - PostgreSQL ADR package validation
 - testing-strategy package validation
+- internal service-map validation
 - markdown linting
 - OpenAPI validation for the control-plane contract
 - unit tests for helper logic and strategy consistency
 - adapter-integration scaffold tests
 - contract tests for API versioning/error expectations
+- internal contract/service-map tests
 - console E2E scaffold tests
 - resilience scaffold tests
 - dependency vulnerability audit
