@@ -7,6 +7,7 @@
   },
   "routes": [
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -20,9 +21,36 @@
       "downstreamService": "control_api",
       "family": "auth",
       "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "resolveWorkspaceAccessCheck",
       "path": "/v1/auth/access-checks",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "catalog",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -37,9 +65,12 @@
         "Auth",
         "Authorization"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -55,9 +86,38 @@
       "downstreamService": "control_api",
       "family": "events",
       "familyTitle": "Events",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "event",
       "method": "POST",
       "operationId": "createEvents",
       "path": "/v1/events/topics",
+      "planCapabilityAnyOf": [
+        "data.kafka.topics"
+      ],
       "rateLimitClass": "data-control",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -71,9 +131,12 @@
       "tags": [
         "Events"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -89,9 +152,38 @@
       "downstreamService": "control_api",
       "family": "events",
       "familyTitle": "Events",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "event",
       "method": "GET",
       "operationId": "getEvents",
       "path": "/v1/events/topics/{resourceId}",
+      "planCapabilityAnyOf": [
+        "data.kafka.topics"
+      ],
       "rateLimitClass": "data-read",
       "requiredHeaders": [
         "X-API-Version",
@@ -104,9 +196,12 @@
       "tags": [
         "Events"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -122,9 +217,38 @@
       "downstreamService": "control_api",
       "family": "functions",
       "familyTitle": "Functions",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "functions",
       "method": "POST",
       "operationId": "createFunctions",
       "path": "/v1/functions/actions",
+      "planCapabilityAnyOf": [
+        "data.openwhisk.actions"
+      ],
       "rateLimitClass": "data-control",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -138,9 +262,12 @@
       "tags": [
         "Functions"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -156,9 +283,38 @@
       "downstreamService": "control_api",
       "family": "functions",
       "familyTitle": "Functions",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "functions",
       "method": "GET",
       "operationId": "getFunctions",
       "path": "/v1/functions/actions/{resourceId}",
+      "planCapabilityAnyOf": [
+        "data.openwhisk.actions"
+      ],
       "rateLimitClass": "data-read",
       "requiredHeaders": [
         "X-API-Version",
@@ -171,9 +327,12 @@
       "tags": [
         "Functions"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_operator",
@@ -187,9 +346,38 @@
       "downstreamService": "control_api",
       "family": "metrics",
       "familyTitle": "Metrics",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "observability",
       "method": "GET",
       "operationId": "getWorkspaceMetricSeries",
       "path": "/v1/metrics/workspaces/{workspaceId}/series",
+      "planCapabilityAnyOf": [
+        "observability.metrics.basic"
+      ],
       "rateLimitClass": "observability",
       "requiredHeaders": [
         "X-API-Version",
@@ -202,9 +390,12 @@
       "tags": [
         "Metrics"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -220,9 +411,36 @@
       "downstreamService": "control_api",
       "family": "mongo",
       "familyTitle": "Mongo",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "data-control",
       "method": "POST",
       "operationId": "createMongo",
       "path": "/v1/mongo/databases",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "data-control",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -236,9 +454,12 @@
       "tags": [
         "Mongo"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -254,9 +475,36 @@
       "downstreamService": "control_api",
       "family": "mongo",
       "familyTitle": "Mongo",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "data-control",
       "method": "GET",
       "operationId": "getMongo",
       "path": "/v1/mongo/databases/{resourceId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "data-read",
       "requiredHeaders": [
         "X-API-Version",
@@ -269,9 +517,12 @@
       "tags": [
         "Mongo"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -283,9 +534,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createDeploymentProfileRecord",
       "path": "/v1/platform/deployment-profiles",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -300,9 +578,12 @@
         "Platform",
         "DeploymentProfiles"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -314,9 +595,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getDeploymentProfileRecord",
       "path": "/v1/platform/deployment-profiles/{deploymentProfileId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -330,9 +638,12 @@
         "Platform",
         "DeploymentProfiles"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -344,9 +655,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createCommercialPlan",
       "path": "/v1/platform/plans",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -361,9 +699,12 @@
         "Platform",
         "Plans"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -375,9 +716,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getCommercialPlan",
       "path": "/v1/platform/plans/{planId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -391,9 +759,12 @@
         "Platform",
         "Plans"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -405,9 +776,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createQuotaPolicy",
       "path": "/v1/platform/plans/{planId}/quota-policies",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -422,9 +820,12 @@
         "Platform",
         "Quotas"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -436,9 +837,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getQuotaPolicy",
       "path": "/v1/platform/plans/{planId}/quota-policies/{quotaPolicyId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -452,9 +880,12 @@
         "Platform",
         "Quotas"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -466,9 +897,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createProviderCapabilityRecord",
       "path": "/v1/platform/provider-capabilities",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -483,9 +941,12 @@
         "Platform",
         "ProviderCapabilities"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -497,9 +958,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getProviderCapabilityRecord",
       "path": "/v1/platform/provider-capabilities/{providerCapabilityId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -513,9 +1001,12 @@
         "Platform",
         "ProviderCapabilities"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -527,9 +1018,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getRouteCatalog",
       "path": "/v1/platform/route-catalog",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "catalog",
       "requiredHeaders": [
         "X-API-Version",
@@ -543,9 +1061,12 @@
         "Catalog",
         "Platform"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -557,9 +1078,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createPlatformUser",
       "path": "/v1/platform/users",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -574,9 +1122,12 @@
         "Platform",
         "PlatformUsers"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "platform_team",
         "superadmin"
@@ -588,9 +1139,36 @@
       "downstreamService": "control_api",
       "family": "platform",
       "familyTitle": "Platform",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getPlatformUser",
       "path": "/v1/platform/users/{userId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -604,9 +1182,12 @@
         "Platform",
         "PlatformUsers"
       ],
-      "visibility": "public"
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -622,9 +1203,39 @@
       "downstreamService": "control_api",
       "family": "postgres",
       "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "data-control",
       "method": "POST",
       "operationId": "createPostgres",
       "path": "/v1/postgres/instances",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
       "rateLimitClass": "data-control",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -638,9 +1249,12 @@
       "tags": [
         "Postgres"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -656,9 +1270,39 @@
       "downstreamService": "control_api",
       "family": "postgres",
       "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "data-control",
       "method": "GET",
       "operationId": "getPostgres",
       "path": "/v1/postgres/instances/{resourceId}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
       "rateLimitClass": "data-read",
       "requiredHeaders": [
         "X-API-Version",
@@ -671,9 +1315,12 @@
       "tags": [
         "Postgres"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -689,9 +1336,38 @@
       "downstreamService": "control_api",
       "family": "storage",
       "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "data-control",
       "method": "POST",
       "operationId": "createStorage",
       "path": "/v1/storage/buckets",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
       "rateLimitClass": "data-control",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -705,9 +1381,12 @@
       "tags": [
         "Storage"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -723,9 +1402,38 @@
       "downstreamService": "control_api",
       "family": "storage",
       "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "data-control",
       "method": "GET",
       "operationId": "getStorage",
       "path": "/v1/storage/buckets/{resourceId}",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
       "rateLimitClass": "data-read",
       "requiredHeaders": [
         "X-API-Version",
@@ -738,9 +1446,12 @@
       "tags": [
         "Storage"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -753,9 +1464,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createTenant",
       "path": "/v1/tenants",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -769,9 +1507,12 @@
       "tags": [
         "Tenants"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -784,9 +1525,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getTenant",
       "path": "/v1/tenants/{tenantId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -799,9 +1567,12 @@
       "tags": [
         "Tenants"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -814,9 +1585,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getTenantEffectiveCapabilities",
       "path": "/v1/tenants/{tenantId}/effective-capabilities",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -830,9 +1628,12 @@
         "Tenants",
         "CapabilityResolution"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -845,9 +1646,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createInvitation",
       "path": "/v1/tenants/{tenantId}/invitations",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -862,9 +1690,12 @@
         "Tenants",
         "Invitations"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -877,9 +1708,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getInvitation",
       "path": "/v1/tenants/{tenantId}/invitations/{invitationId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -893,9 +1751,12 @@
         "Tenants",
         "Invitations"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -908,9 +1769,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createTenantMembership",
       "path": "/v1/tenants/{tenantId}/memberships",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -925,9 +1813,12 @@
         "Tenants",
         "Memberships"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "tenant_admin",
@@ -940,9 +1831,36 @@
       "downstreamService": "control_api",
       "family": "tenants",
       "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getTenantMembership",
       "path": "/v1/tenants/{tenantId}/memberships/{tenantMembershipId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -956,9 +1874,12 @@
         "Tenants",
         "Memberships"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -972,9 +1893,36 @@
       "downstreamService": "control_api",
       "family": "websockets",
       "familyTitle": "WebSockets",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "realtime",
       "method": "POST",
       "operationId": "createWebSocketSession",
       "path": "/v1/websockets/sessions",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "realtime",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -988,9 +1936,12 @@
       "tags": [
         "WebSockets"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1004,9 +1955,36 @@
       "downstreamService": "control_api",
       "family": "websockets",
       "familyTitle": "WebSockets",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "realtime",
       "method": "GET",
       "operationId": "getWebSocketSession",
       "path": "/v1/websockets/sessions/{sessionId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "realtime",
       "requiredHeaders": [
         "X-API-Version",
@@ -1019,9 +1997,12 @@
       "tags": [
         "WebSockets"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1035,9 +2016,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createWorkspace",
       "path": "/v1/workspaces",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -1051,9 +2059,12 @@
       "tags": [
         "Workspaces"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1067,9 +2078,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getWorkspace",
       "path": "/v1/workspaces/{workspaceId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -1082,9 +2120,12 @@
       "tags": [
         "Workspaces"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1098,9 +2139,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createExternalApplication",
       "path": "/v1/workspaces/{workspaceId}/applications",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -1115,9 +2183,12 @@
         "Workspaces",
         "Applications"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1131,9 +2202,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getExternalApplication",
       "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -1147,9 +2245,12 @@
         "Workspaces",
         "Applications"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1163,9 +2264,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getWorkspaceEffectiveCapabilities",
       "path": "/v1/workspaces/{workspaceId}/effective-capabilities",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -1179,9 +2307,12 @@
         "Workspaces",
         "CapabilityResolution"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1195,9 +2326,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createManagedResource",
       "path": "/v1/workspaces/{workspaceId}/managed-resources",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -1212,9 +2370,12 @@
         "Workspaces",
         "ManagedResources"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1228,9 +2389,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getManagedResource",
       "path": "/v1/workspaces/{workspaceId}/managed-resources/{resourceId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -1244,9 +2432,12 @@
         "Workspaces",
         "ManagedResources"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1260,9 +2451,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createWorkspaceMembership",
       "path": "/v1/workspaces/{workspaceId}/memberships",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -1277,9 +2495,12 @@
         "Workspaces",
         "Memberships"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1293,9 +2514,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getWorkspaceMembership",
       "path": "/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -1309,9 +2557,12 @@
         "Workspaces",
         "Memberships"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1325,9 +2576,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "POST",
       "operationId": "createServiceAccount",
       "path": "/v1/workspaces/{workspaceId}/service-accounts",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "Idempotency-Key",
@@ -1342,9 +2620,12 @@
         "Workspaces",
         "ServiceAccounts"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     },
     {
+      "allowAnonymousOptions": true,
       "audiences": [
         "developer_external",
         "workspace_admin",
@@ -1358,9 +2639,36 @@
       "downstreamService": "control_api",
       "family": "workspaces",
       "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Actor-Roles",
+        "X-Actor-Username",
+        "X-Auth-Scopes",
+        "X-Auth-Subject",
+        "X-Correlation-Id",
+        "X-Plan-Id",
+        "X-Requested-With",
+        "X-Tenant-Id",
+        "X-Workspace-Id"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayRouteClass": "control",
       "method": "GET",
       "operationId": "getServiceAccount",
       "path": "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}",
+      "planCapabilityAnyOf": [],
       "rateLimitClass": "control-write",
       "requiredHeaders": [
         "X-API-Version",
@@ -1374,7 +2682,9 @@
         "Workspaces",
         "ServiceAccounts"
       ],
-      "visibility": "public"
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
     }
   ],
   "version": "2026-03-23"

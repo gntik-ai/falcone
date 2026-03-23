@@ -56,6 +56,7 @@ const EXPECTED_UPGRADE_GUARDRAILS = {
 const REQUIRED_BOOTSTRAP_SECRET_STRATEGIES = ['kubernetesSecret', 'env', 'externalRef'];
 const REQUIRED_BOOTSTRAP_ONE_SHOT_RESOURCES = ['superadmin', 'platform_realm', 'governance_catalog', 'internal_namespaces'];
 const REQUIRED_BOOTSTRAP_RECONCILE_RESOURCES = ['apisix_routes', 'bootstrap_payload_config'];
+const REQUIRED_BOOTSTRAP_CORE_ROUTES = ['control-plane', 'identity', 'realtime', 'console', 'health'];
 
 export function readDeploymentTopology() {
   return readJson(DEPLOYMENT_TOPOLOGY_PATH);
@@ -442,8 +443,17 @@ function collectValuesViolations(topology) {
         violations.push(`Resolved values for ${environmentId}/${platformId} must expose the APISIX admin service for bootstrap.`);
       }
 
-      if ((bootstrap?.reconcile?.apisix?.routes ?? []).length !== 4) {
-        violations.push(`Resolved values for ${environmentId}/${platformId} must keep the four baseline APISIX routes.`);
+      const routeNames = new Set((bootstrap?.reconcile?.apisix?.routes ?? []).map((route) => route.name));
+      for (const routeName of REQUIRED_BOOTSTRAP_CORE_ROUTES) {
+        if (!routeNames.has(routeName)) {
+          violations.push(`Resolved values for ${environmentId}/${platformId} must keep APISIX route ${routeName}.`);
+        }
+      }
+
+      if (values?.gatewayPolicy?.passthrough?.mode !== profile?.operational_profile?.passthrough_mode) {
+        violations.push(
+          `Resolved values for ${environmentId}/${platformId} must align gatewayPolicy.passthrough.mode with deployment topology passthrough_mode.`
+        );
       }
     }
   }

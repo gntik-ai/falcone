@@ -43,6 +43,18 @@
 {{- if not (has "common" .Values.config.inheritanceOrder) -}}
   {{- fail "config.inheritanceOrder must include the common values layer" -}}
 {{- end -}}
+{{- if not .Values.gatewayPolicy.oidc.enabled -}}
+  {{- fail "gatewayPolicy.oidc.enabled must remain true for APISIX OIDC protection" -}}
+{{- end -}}
+{{- if not (has .Values.gatewayPolicy.passthrough.mode (list "enabled" "limited" "disabled")) -}}
+  {{- fail "gatewayPolicy.passthrough.mode must be one of enabled, limited, or disabled" -}}
+{{- end -}}
+{{- if not .Values.gatewayPolicy.claimsPropagation.stripIncomingHeaders -}}
+  {{- fail "gatewayPolicy.claimsPropagation.stripIncomingHeaders must remain true" -}}
+{{- end -}}
+{{- if eq (len (.Values.gatewayPolicy.cors.allowHeaders | default (list))) 0 -}}
+  {{- fail "gatewayPolicy.cors.allowHeaders must define the approved browser request headers" -}}
+{{- end -}}
 {{- if .Values.bootstrap.enabled -}}
   {{- if eq .Values.bootstrap.lock.name .Values.bootstrap.markers.name -}}
     {{- fail "bootstrap.lock.name and bootstrap.markers.name must be different resources" -}}
