@@ -304,9 +304,12 @@ data:
     }
 
     run_upgrade_reconciliation() {
-{{ range .Values.bootstrap.reconcile.apisix.routes }}
+{{- $mode := .Values.gatewayPolicy.passthrough.mode }}
+{{- range .Values.bootstrap.reconcile.apisix.routes }}
+{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
       ensure_apisix_route "{{ .routeId }}" "$PAYLOAD_DIR/route-{{ .routeId }}.json"
-{{ end }}
+{{- end }}
+{{- end }}
     }
 
     main() {

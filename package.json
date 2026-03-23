@@ -15,7 +15,7 @@
     "validate:deployment-topology": "node ./scripts/validate-deployment-topology.mjs",
     "validate:deployment-chart": "node ./scripts/validate-deployment-chart.mjs",
     "validate:authorization-model": "node ./scripts/validate-authorization-model.mjs",
-    "validate:repo": "npm run validate:structure && npm run validate:adr:postgres && npm run validate:image-policy && npm run validate:testing-strategy && npm run validate:service-map && npm run validate:public-api && npm run validate:deployment-topology && npm run validate:deployment-chart && npm run validate:authorization-model && npm run validate:domain-model",
+    "validate:repo": "npm run validate:structure && npm run validate:adr:postgres && npm run validate:image-policy && npm run validate:testing-strategy && npm run validate:service-map && npm run validate:public-api && npm run validate:gateway-policy && npm run validate:deployment-topology && npm run validate:deployment-chart && npm run validate:authorization-model && npm run validate:domain-model",
     "lint:md": "markdownlint-cli2",
     "lint": "npm run validate:repo && npm run lint:md && npm run validate:openapi",
     "test:unit": "node --test tests/unit/*.test.mjs",
@@ -28,7 +28,8 @@
     "typecheck": "node -e \"console.log('typecheck placeholder: no typed packages yet')\"",
     "security:deps": "corepack pnpm audit --audit-level=high",
     "security:images": "npm run validate:image-policy",
-    "validate:domain-model": "node ./scripts/validate-domain-model.mjs"
+    "validate:domain-model": "node ./scripts/validate-domain-model.mjs",
+    "validate:gateway-policy": "node scripts/validate-gateway-policy.mjs"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "12.1.0",

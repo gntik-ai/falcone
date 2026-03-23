@@ -1,7 +1,6 @@
 global:
   namespace: in-atelier
   environment: prod
-
 publicSurface:
   hostnames:
     api: api.in-atelier.example.com
@@ -15,7 +14,6 @@ publicSurface:
       console: in-atelier-prod-console-tls
       identity: in-atelier-prod-identity-tls
       realtime: in-atelier-prod-realtime-tls
-
 environmentProfile:
   id: prod
   diagnostics:
@@ -25,19 +23,16 @@ environmentProfile:
   demoData:
     enabled: false
   limitsProfile: strict
-
 config:
   secretRefs:
     gatewayTls:
       existingSecret: in-atelier-prod-api-tls
       keys:
-        - tls.crt
-        - tls.key
-
+      - tls.crt
+      - tls.key
 deployment:
   topology:
     clusterRef: cluster-prod-shared
-
 apisix:
   replicas: 4
   resources:
@@ -47,25 +42,28 @@ apisix:
     limits:
       cpu: 2
       memory: 2Gi
-
 postgresql:
   persistence:
     size: 100Gi
-
 mongodb:
   persistence:
     size: 100Gi
-
 kafka:
   persistence:
     size: 200Gi
-
 storage:
   persistence:
     size: 500Gi
-
 controlPlane:
   replicas: 3
-
 webConsole:
   replicas: 3
+gatewayPolicy:
+  passthrough:
+    mode: disabled
+  cors:
+    allowOrigins:
+    - https://console.in-atelier.example.com
+  oidc:
+    issuerUrl: https://iam.in-atelier.example.com/auth/realms/in-atelier-platform
+    discoveryUrl: https://iam.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration

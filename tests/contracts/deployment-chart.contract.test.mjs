@@ -67,7 +67,9 @@ test('bootstrap contract keeps one-shot catalogs and upgrade reconciliation expl
     domainModel.governance_catalogs.deployment_profiles
   );
   assert.deepEqual(
-    values.bootstrap.reconcile.apisix.routes.map((route) => route.uri),
-    ['/control-plane/*', '/auth/*', '/realtime/*', '/*']
+    values.bootstrap.reconcile.apisix.routes.slice(0, 5).map((route) => route.uri),
+    ['/control-plane/*', '/auth/*', '/realtime/*', '/*', '/health']
   );
+  assert.equal(values.bootstrap.reconcile.apisix.routes.some((route) => route.name === 'public-api-functions'), true);
+  assert.equal(values.bootstrap.reconcile.apisix.routes.some((route) => route.name === 'native-keycloak-admin'), true);
 });

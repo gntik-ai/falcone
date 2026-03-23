@@ -187,11 +187,19 @@ function normalizeSecurity(operation) {
   return Array.isArray(operation?.security) && operation.security.length > 0;
 }
 
-export function buildRouteCatalog(document = readJson(OPENAPI_PATH), taxonomy = readPublicApiTaxonomy()) {
+export function buildRouteCatalog(
+  document = readJson(OPENAPI_PATH),
+  taxonomy = readPublicApiTaxonomy(),
+  gatewayRouting = readGatewayRouting()
+) {
+  const routingFamilies = new Map((gatewayRouting?.spec?.families ?? []).map((family) => [family.id, family]));
+  const allowedHeaders = gatewayRouting?.spec?.allowedRequestHeaders ?? [];
+
   const routes = listOperations(document)
     .filter(({ path }) => path !== '/health')
     .map(({ path, method, operation }) => {
       const family = taxonomy.families.find((entry) => entry.id === operation['x-family']);
+      const routing = routingFamilies.get(operation['x-family']) ?? {};
       const requiredHeaders = normalizeRequiredHeaders(document, operation);
 
       return {
@@ -207,6 +215,14 @@ export function buildRouteCatalog(document = readJson(OPENAPI_PATH), taxonomy = 
         audiences: operation['x-audiences'] ?? family?.audiences ?? [],
         authRequired: normalizeSecurity(operation),
         requiredHeaders,
+        gatewayAllowedHeaders: Array.from(new Set([...requiredHeaders, ...allowedHeaders])).sort(),
+        gatewayContextHeaders: routing.propagatedHeaders ?? [],
+        gatewayAuthMode: routing.authMode ?? null,
+        gatewayRouteClass: routing.routeClass ?? null,
+        tenantBinding: routing.tenantBinding ?? null,
+        workspaceBinding: routing.workspaceBinding ?? null,
+        planCapabilityAnyOf: routing.planCapabilityAnyOf ?? [],
+        allowAnonymousOptions: routing.allowAnonymousOptions === true,
         supportsIdempotencyKey: requiredHeaders.includes('Idempotency-Key'),
         downstreamService: operation['x-owning-service'] ?? family?.owning_service ?? null,
         downstreamAdapters: operation['x-downstream-adapters'] ?? family?.downstream_adapters ?? [],
@@ -255,6 +271,12 @@ export function buildPublicApiDocs(
     '# Public API Surface',
     '',
     `Version: ${taxonomy.release.path_version} (header ${taxonomy.release.header_version}, OpenAPI ${taxonomy.release.openapi_semver})`,
+    '',
+    '## Product API vs native passthrough',
+    '',
+    'This document describes the supported product API under `/v1/*`.',
+    '',
+    'Native operator passthrough routes under `/_native/*` are documented separately in `docs/reference/architecture/gateway-authentication-and-passthrough.md` and are intentionally not part of the normal product surface.',
     '',
     '## Versioning strategy',
     '',
@@ -362,8 +384,9 @@ function collectGatewayAlignmentViolations(taxonomy, gatewayRouting, violations)
   }
 }
 
-function collectRouteCatalogViolations(document, taxonomy, routeCatalog, violations) {
+function collectRouteCatalogViolations(document, taxonomy, routeCatalog, gatewayRouting, violations) {
   const routesByOperation = new Map(routeCatalog.routes.map((route) => [route.operationId, route]));
+  const routingById = new Map((gatewayRouting?.spec?.families ?? []).map((family) => [family.id, family]));
 
   for (const { path, method, operation } of listOperations(document)) {
     if (path === '/health') continue;
@@ -380,6 +403,21 @@ function collectRouteCatalogViolations(document, taxonomy, routeCatalog, violati
 
     if (route.path !== path || route.method !== method.toUpperCase()) {
       violations.push(`Route catalog entry ${operation.operationId} must preserve method/path ${method.toUpperCase()} ${path}.`);
+    }
+
+    const routing = routingById.get(route.family);
+    if (!routing) continue;
+
+    if (route.gatewayAuthMode !== routing.authMode) {
+      violations.push(`Route catalog entry ${operation.operationId} must expose gatewayAuthMode ${routing.authMode}.`);
+    }
+
+    if (route.gatewayRouteClass !== routing.routeClass) {
+      violations.push(`Route catalog entry ${operation.operationId} must expose gatewayRouteClass ${routing.routeClass}.`);
+    }
+
+    if (JSON.stringify(route.gatewayContextHeaders ?? []) !== JSON.stringify(routing.propagatedHeaders ?? [])) {
+      violations.push(`Route catalog entry ${operation.operationId} must expose gatewayContextHeaders from routing policy.`);
     }
   }
 
@@ -417,8 +455,8 @@ function collectDomainAndAuthorizationAlignmentViolations(document, taxonomy, vi
 export function collectPublicApiViolations({
   document = readJson(OPENAPI_PATH),
   taxonomy = readPublicApiTaxonomy(),
-  routeCatalog = buildRouteCatalog(document, taxonomy),
-  gatewayRouting = readGatewayRouting()
+  gatewayRouting = readGatewayRouting(),
+  routeCatalog = buildRouteCatalog(document, taxonomy, gatewayRouting)
 } = {}) {
   const violations = [];
 
@@ -428,7 +466,7 @@ export function collectPublicApiViolations({
 
   collectOperationViolations(document, taxonomy, violations);
   collectGatewayAlignmentViolations(taxonomy, gatewayRouting, violations);
-  collectRouteCatalogViolations(document, taxonomy, routeCatalog, violations);
+  collectRouteCatalogViolations(document, taxonomy, routeCatalog, gatewayRouting, violations);
   collectDomainAndAuthorizationAlignmentViolations(document, taxonomy, violations);
 
   return violations;
