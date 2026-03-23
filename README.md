@@ -45,6 +45,7 @@ tests/
 Current bootstrap quality gates are intentionally lightweight:
 
 - repository structure validation
+- PostgreSQL ADR package validation
 - workspace script presence
 - chart file presence
 
