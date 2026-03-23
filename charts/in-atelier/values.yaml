@@ -3,17 +3,17 @@ global:
   namespace: in-atelier-dev
   environment: dev
   createNamespace: true
-  imageRegistry: ""
+  imageRegistry: ''
   imagePullSecrets:
-    - name: ghcr-reader
+  - name: ghcr-reader
   airgap:
     enabled: false
   privateRegistry:
     enabled: false
-    registry: ""
+    registry: ''
     pullSecretNames: []
-    caBundleConfigMap: ""
-  defaultStorageClass: ""
+    caBundleConfigMap: ''
+  defaultStorageClass: ''
   podSecurity:
     runAsNonRoot: true
     fsGroup: 1001
@@ -28,7 +28,7 @@ publicSurface:
     console: /
   optionalWorkspaceSubdomains:
     enabled: false
-    hostTemplate: "{workspaceSlug}.apps.{environment}.in-atelier.example.com"
+    hostTemplate: '{workspaceSlug}.apps.{environment}.in-atelier.example.com'
   hostnames:
     api: api.dev.in-atelier.example.com
     console: console.dev.in-atelier.example.com
@@ -44,22 +44,22 @@ publicSurface:
   bindings:
     api:
       component: apisix
-      serviceName: ""
+      serviceName: ''
       servicePort: http
       path: /control-plane
     identity:
       component: keycloak
-      serviceName: ""
+      serviceName: ''
       servicePort: http
       path: /auth
     realtime:
       component: apisix
-      serviceName: ""
+      serviceName: ''
       servicePort: http
       path: /realtime
     console:
       component: webConsole
-      serviceName: ""
+      serviceName: ''
       servicePort: http
       path: /
   ingress:
@@ -74,7 +74,7 @@ publicSurface:
     mode: clusterManaged
   loadBalancer:
     annotations: {}
-    className: ""
+    className: ''
     ports:
       api: 443
       console: 443
@@ -82,7 +82,7 @@ publicSurface:
       realtime: 443
     sourceRanges: []
     externalTrafficPolicy: Cluster
-    ipFamilyPolicy: ""
+    ipFamilyPolicy: ''
     ipFamilies: []
     allocateLoadBalancerNodePorts: true
 environmentProfile:
@@ -100,8 +100,8 @@ deployment:
     region: eu-west-1
     clusterRef: cluster-dev-shared
     futureScaleVector:
-      - multi_cluster
-      - multi_region
+    - multi_cluster
+    - multi_region
   valuesLayers:
     common: values.yaml
     environment: values/dev.yaml
@@ -114,14 +114,14 @@ deployment:
     default: standard
     pathPattern: values/profiles/{profile}.yaml
     supported:
-      - all-in-one
-      - standard
-      - ha
+    - all-in-one
+    - standard
+    - ha
   upgrade:
     allowInPlace: true
-    currentVersion: ""
+    currentVersion: ''
     supportedPreviousVersions:
-      - 0.2.0
+    - 0.2.0
     allowDowngrade: false
     strategy: rolling
 platform:
@@ -139,13 +139,13 @@ platform:
       type: RuntimeDefault
 config:
   inheritanceOrder:
-    - common
-    - environment
-    - customer
-    - platform
-    - airgap
-    - localOverride
-    - secretRefs
+  - common
+  - environment
+  - customer
+  - platform
+  - airgap
+  - localOverride
+  - secretRefs
   configMapNames:
     gateway: in-atelier-gateway-config
     controlPlane: in-atelier-control-plane-config
@@ -154,41 +154,40 @@ config:
     gatewayTls:
       existingSecret: in-atelier-dev-api-tls
       keys:
-        - tls.crt
-        - tls.key
+      - tls.crt
+      - tls.key
     identityClient:
       existingSecret: in-atelier-identity-client
       keys:
-        - client-id
-        - client-secret
+      - client-id
+      - client-secret
     postgresCredentials:
       existingSecret: in-atelier-postgresql
       keys:
-        - username
-        - password
-        - database
+      - username
+      - password
+      - database
     mongoCredentials:
       existingSecret: in-atelier-mongodb
       keys:
-        - username
-        - password
-        - database
+      - username
+      - password
+      - database
     kafkaCredentials:
       existingSecret: in-atelier-kafka
       keys:
-        - username
-        - password
+      - username
+      - password
     objectStorageCredentials:
       existingSecret: in-atelier-storage
       keys:
-        - access-key
-        - secret-key
-
+      - access-key
+      - secret-key
 bootstrap:
   enabled: true
   serviceAccount:
     create: true
-    name: ""
+    name: ''
   job:
     image:
       repository: docker.io/bitnami/kubectl
@@ -209,7 +208,7 @@ bootstrap:
       runAsNonRoot: true
       capabilities:
         drop:
-          - ALL
+        - ALL
     resources:
       requests:
         cpu: 50m
@@ -228,9 +227,9 @@ bootstrap:
     name: in-atelier-bootstrap-state
   secretResolution:
     supportedStrategies:
-      - kubernetesSecret
-      - env
-      - externalRef
+    - kubernetesSecret
+    - env
+    - externalRef
     sources:
       keycloakAdminUsername:
         strategy: kubernetesSecret
@@ -268,302 +267,302 @@ bootstrap:
         firstName: Platform
         lastName: Admin
         realmRoles:
-          - superadmin
+        - superadmin
     governanceCatalog:
       plans:
-        - planId: pln_01starter
-          slug: starter
-          displayName: Starter
-          planFamily: starter
-          planStatus: active
-          deploymentProfileId: dpf_01sharedstarter
-          quotaPolicyId: qta_01starter
-          billingInterval: monthly
-          capabilityKeys:
-            - identity.sso.oidc
-            - data.postgresql.shared
-            - data.storage.bucket
-            - observability.metrics.basic
-        - planId: pln_01growth
-          slug: growth
-          displayName: Growth
-          planFamily: growth
-          planStatus: active
-          deploymentProfileId: dpf_01sharedgrowth
-          quotaPolicyId: qta_01growth
-          billingInterval: monthly
-          capabilityKeys:
-            - identity.sso.oidc
-            - data.postgresql.shared
-            - data.storage.bucket
-            - data.kafka.topics
-            - data.openwhisk.actions
-            - observability.metrics.basic
-            - observability.logs.extended
-        - planId: pln_01regulated
-          slug: regulated
-          displayName: Regulated
-          planFamily: regulated
-          planStatus: active
-          deploymentProfileId: dpf_01regulateddedicated
-          quotaPolicyId: qta_01regulated
-          billingInterval: annual
-          capabilityKeys:
-            - identity.sso.oidc
-            - data.postgresql.dedicated
-            - data.storage.bucket
-            - data.kafka.topics
-            - observability.metrics.basic
-            - observability.audit.export
-        - planId: pln_01enterprise
-          slug: enterprise
-          displayName: Enterprise
-          planFamily: enterprise
-          planStatus: active
-          deploymentProfileId: dpf_01enterprisefederated
-          quotaPolicyId: qta_01enterprise
-          billingInterval: annual
-          capabilityKeys:
-            - identity.sso.oidc
-            - data.postgresql.dedicated
-            - data.storage.bucket
-            - data.kafka.topics
-            - data.openwhisk.actions
-            - control.federated_clusters
-            - observability.metrics.basic
-            - observability.logs.extended
-            - observability.traces.long_retention
-            - observability.audit.export
+      - planId: pln_01starter
+        slug: starter
+        displayName: Starter
+        planFamily: starter
+        planStatus: active
+        deploymentProfileId: dpf_01sharedstarter
+        quotaPolicyId: qta_01starter
+        billingInterval: monthly
+        capabilityKeys:
+        - identity.sso.oidc
+        - data.postgresql.shared
+        - data.storage.bucket
+        - observability.metrics.basic
+      - planId: pln_01growth
+        slug: growth
+        displayName: Growth
+        planFamily: growth
+        planStatus: active
+        deploymentProfileId: dpf_01sharedgrowth
+        quotaPolicyId: qta_01growth
+        billingInterval: monthly
+        capabilityKeys:
+        - identity.sso.oidc
+        - data.postgresql.shared
+        - data.storage.bucket
+        - data.kafka.topics
+        - data.openwhisk.actions
+        - observability.metrics.basic
+        - observability.logs.extended
+      - planId: pln_01regulated
+        slug: regulated
+        displayName: Regulated
+        planFamily: regulated
+        planStatus: active
+        deploymentProfileId: dpf_01regulateddedicated
+        quotaPolicyId: qta_01regulated
+        billingInterval: annual
+        capabilityKeys:
+        - identity.sso.oidc
+        - data.postgresql.dedicated
+        - data.storage.bucket
+        - data.kafka.topics
+        - observability.metrics.basic
+        - observability.audit.export
+      - planId: pln_01enterprise
+        slug: enterprise
+        displayName: Enterprise
+        planFamily: enterprise
+        planStatus: active
+        deploymentProfileId: dpf_01enterprisefederated
+        quotaPolicyId: qta_01enterprise
+        billingInterval: annual
+        capabilityKeys:
+        - identity.sso.oidc
+        - data.postgresql.dedicated
+        - data.storage.bucket
+        - data.kafka.topics
+        - data.openwhisk.actions
+        - control.federated_clusters
+        - observability.metrics.basic
+        - observability.logs.extended
+        - observability.traces.long_retention
+        - observability.audit.export
       quotaPolicies:
-        - quotaPolicyId: qta_01starter
-          slug: starter-default
-          displayName: Starter default quota policy
-          quotaScope: tenant_and_workspace
-          enforcementMode: hard_stop
-          warningThresholdPercent: 80
-          defaultLimits:
-            - metricKey: tenant.workspaces.max
-              scope: tenant
-              unit: count
-              limit: 1
-            - metricKey: tenant.members.max
-              scope: tenant
-              unit: count
-              limit: 10
-            - metricKey: workspace.managed_resources.max
-              scope: workspace
-              unit: count
-              limit: 8
-            - metricKey: workspace.kafka_topics.max
-              scope: workspace
-              unit: count
-              limit: 0
-            - metricKey: workspace.monthly_function_invocations.max
-              scope: workspace
-              unit: count
-              limit: 100000
-            - metricKey: tenant.audit_retention_days.max
-              scope: tenant
-              unit: days
-              limit: 30
-        - quotaPolicyId: qta_01growth
-          slug: growth-default
-          displayName: Growth default quota policy
-          quotaScope: tenant_and_workspace
-          enforcementMode: hard_stop
-          warningThresholdPercent: 85
-          defaultLimits:
-            - metricKey: tenant.workspaces.max
-              scope: tenant
-              unit: count
-              limit: 3
-            - metricKey: tenant.members.max
-              scope: tenant
-              unit: count
-              limit: 50
-            - metricKey: workspace.managed_resources.max
-              scope: workspace
-              unit: count
-              limit: 24
-            - metricKey: workspace.kafka_topics.max
-              scope: workspace
-              unit: count
-              limit: 20
-            - metricKey: workspace.monthly_function_invocations.max
-              scope: workspace
-              unit: count
-              limit: 1000000
-            - metricKey: tenant.audit_retention_days.max
-              scope: tenant
-              unit: days
-              limit: 90
-        - quotaPolicyId: qta_01regulated
-          slug: regulated-default
-          displayName: Regulated default quota policy
-          quotaScope: tenant_and_workspace
-          enforcementMode: hard_stop
-          warningThresholdPercent: 90
-          defaultLimits:
-            - metricKey: tenant.workspaces.max
-              scope: tenant
-              unit: count
-              limit: 5
-            - metricKey: tenant.members.max
-              scope: tenant
-              unit: count
-              limit: 100
-            - metricKey: workspace.managed_resources.max
-              scope: workspace
-              unit: count
-              limit: 40
-            - metricKey: workspace.kafka_topics.max
-              scope: workspace
-              unit: count
-              limit: 40
-            - metricKey: workspace.monthly_function_invocations.max
-              scope: workspace
-              unit: count
-              limit: 500000
-            - metricKey: tenant.audit_retention_days.max
-              scope: tenant
-              unit: days
-              limit: 365
-        - quotaPolicyId: qta_01enterprise
-          slug: enterprise-default
-          displayName: Enterprise default quota policy
-          quotaScope: tenant_and_workspace
-          enforcementMode: hard_stop
-          warningThresholdPercent: 90
-          defaultLimits:
-            - metricKey: tenant.workspaces.max
-              scope: tenant
-              unit: count
-              limit: 10
-            - metricKey: tenant.members.max
-              scope: tenant
-              unit: count
-              limit: 250
-            - metricKey: workspace.managed_resources.max
-              scope: workspace
-              unit: count
-              limit: 100
-            - metricKey: workspace.kafka_topics.max
-              scope: workspace
-              unit: count
-              limit: 200
-            - metricKey: workspace.monthly_function_invocations.max
-              scope: workspace
-              unit: count
-              limit: 5000000
-            - metricKey: tenant.audit_retention_days.max
-              scope: tenant
-              unit: days
-              limit: 730
+      - quotaPolicyId: qta_01starter
+        slug: starter-default
+        displayName: Starter default quota policy
+        quotaScope: tenant_and_workspace
+        enforcementMode: hard_stop
+        warningThresholdPercent: 80
+        defaultLimits:
+        - metricKey: tenant.workspaces.max
+          scope: tenant
+          unit: count
+          limit: 1
+        - metricKey: tenant.members.max
+          scope: tenant
+          unit: count
+          limit: 10
+        - metricKey: workspace.managed_resources.max
+          scope: workspace
+          unit: count
+          limit: 8
+        - metricKey: workspace.kafka_topics.max
+          scope: workspace
+          unit: count
+          limit: 0
+        - metricKey: workspace.monthly_function_invocations.max
+          scope: workspace
+          unit: count
+          limit: 100000
+        - metricKey: tenant.audit_retention_days.max
+          scope: tenant
+          unit: days
+          limit: 30
+      - quotaPolicyId: qta_01growth
+        slug: growth-default
+        displayName: Growth default quota policy
+        quotaScope: tenant_and_workspace
+        enforcementMode: hard_stop
+        warningThresholdPercent: 85
+        defaultLimits:
+        - metricKey: tenant.workspaces.max
+          scope: tenant
+          unit: count
+          limit: 3
+        - metricKey: tenant.members.max
+          scope: tenant
+          unit: count
+          limit: 50
+        - metricKey: workspace.managed_resources.max
+          scope: workspace
+          unit: count
+          limit: 24
+        - metricKey: workspace.kafka_topics.max
+          scope: workspace
+          unit: count
+          limit: 20
+        - metricKey: workspace.monthly_function_invocations.max
+          scope: workspace
+          unit: count
+          limit: 1000000
+        - metricKey: tenant.audit_retention_days.max
+          scope: tenant
+          unit: days
+          limit: 90
+      - quotaPolicyId: qta_01regulated
+        slug: regulated-default
+        displayName: Regulated default quota policy
+        quotaScope: tenant_and_workspace
+        enforcementMode: hard_stop
+        warningThresholdPercent: 90
+        defaultLimits:
+        - metricKey: tenant.workspaces.max
+          scope: tenant
+          unit: count
+          limit: 5
+        - metricKey: tenant.members.max
+          scope: tenant
+          unit: count
+          limit: 100
+        - metricKey: workspace.managed_resources.max
+          scope: workspace
+          unit: count
+          limit: 40
+        - metricKey: workspace.kafka_topics.max
+          scope: workspace
+          unit: count
+          limit: 40
+        - metricKey: workspace.monthly_function_invocations.max
+          scope: workspace
+          unit: count
+          limit: 500000
+        - metricKey: tenant.audit_retention_days.max
+          scope: tenant
+          unit: days
+          limit: 365
+      - quotaPolicyId: qta_01enterprise
+        slug: enterprise-default
+        displayName: Enterprise default quota policy
+        quotaScope: tenant_and_workspace
+        enforcementMode: hard_stop
+        warningThresholdPercent: 90
+        defaultLimits:
+        - metricKey: tenant.workspaces.max
+          scope: tenant
+          unit: count
+          limit: 10
+        - metricKey: tenant.members.max
+          scope: tenant
+          unit: count
+          limit: 250
+        - metricKey: workspace.managed_resources.max
+          scope: workspace
+          unit: count
+          limit: 100
+        - metricKey: workspace.kafka_topics.max
+          scope: workspace
+          unit: count
+          limit: 200
+        - metricKey: workspace.monthly_function_invocations.max
+          scope: workspace
+          unit: count
+          limit: 5000000
+        - metricKey: tenant.audit_retention_days.max
+          scope: tenant
+          unit: days
+          limit: 730
       deploymentProfiles:
-        - deploymentProfileId: dpf_01sharedstarter
-          slug: shared-starter
-          displayName: Shared starter profile
-          profileClass: shared
-          supportedEnvironments:
-            - dev
-            - sandbox
-          planeBindings:
-            control: shared-control-plane
-            data: shared-schema
-            identity: shared-keycloak-realm
-            observability: shared-30d-retention
-          providerCapabilityIds:
-            - pvc_01keycloakoidc
-            - pvc_01pgshared
-            - pvc_01storagebucket
-            - pvc_01metricsbasic
-        - deploymentProfileId: dpf_01sharedgrowth
-          slug: shared-growth
-          displayName: Shared growth profile
-          profileClass: shared
-          supportedEnvironments:
-            - dev
-            - sandbox
-            - staging
-            - prod
-          planeBindings:
-            control: shared-control-plane
-            data: shared-schema-plus-streams
-            identity: shared-keycloak-realm
-            observability: shared-90d-retention
-          providerCapabilityIds:
-            - pvc_01keycloakoidc
-            - pvc_01pgshared
-            - pvc_01storagebucket
-            - pvc_01kafkatopics
-            - pvc_01openwhiskactions
-            - pvc_01metricsbasic
-            - pvc_01logsextended
-        - deploymentProfileId: dpf_01regulateddedicated
-          slug: regulated-dedicated
-          displayName: Regulated dedicated profile
-          profileClass: dedicated
-          supportedEnvironments:
-            - staging
-            - prod
-          planeBindings:
-            control: dedicated-control-plane-policy-set
-            data: dedicated-database
-            identity: dedicated-keycloak-realm
-            observability: regulated-365d-retention
-          providerCapabilityIds:
-            - pvc_01keycloakoidc
-            - pvc_01pgdedicated
-            - pvc_01storagebucket
-            - pvc_01kafkatopics
-            - pvc_01metricsbasic
-            - pvc_01auditexport
-        - deploymentProfileId: dpf_01enterprisefederated
-          slug: enterprise-federated
-          displayName: Enterprise federated profile
-          profileClass: federated
-          supportedEnvironments:
-            - dev
-            - sandbox
-            - staging
-            - prod
-          planeBindings:
-            control: federated-control-plane
-            data: dedicated-data-plane
-            identity: federated-identity-plane
-            observability: enterprise-730d-retention
-          providerCapabilityIds:
-            - pvc_01keycloakoidc
-            - pvc_01pgdedicated
-            - pvc_01storagebucket
-            - pvc_01kafkatopics
-            - pvc_01openwhiskactions
-            - pvc_01metricsbasic
-            - pvc_01logsextended
-            - pvc_01tracesretention
-            - pvc_01federatedclusters
-            - pvc_01auditexport
+      - deploymentProfileId: dpf_01sharedstarter
+        slug: shared-starter
+        displayName: Shared starter profile
+        profileClass: shared
+        supportedEnvironments:
+        - dev
+        - sandbox
+        planeBindings:
+          control: shared-control-plane
+          data: shared-schema
+          identity: shared-keycloak-realm
+          observability: shared-30d-retention
+        providerCapabilityIds:
+        - pvc_01keycloakoidc
+        - pvc_01pgshared
+        - pvc_01storagebucket
+        - pvc_01metricsbasic
+      - deploymentProfileId: dpf_01sharedgrowth
+        slug: shared-growth
+        displayName: Shared growth profile
+        profileClass: shared
+        supportedEnvironments:
+        - dev
+        - sandbox
+        - staging
+        - prod
+        planeBindings:
+          control: shared-control-plane
+          data: shared-schema-plus-streams
+          identity: shared-keycloak-realm
+          observability: shared-90d-retention
+        providerCapabilityIds:
+        - pvc_01keycloakoidc
+        - pvc_01pgshared
+        - pvc_01storagebucket
+        - pvc_01kafkatopics
+        - pvc_01openwhiskactions
+        - pvc_01metricsbasic
+        - pvc_01logsextended
+      - deploymentProfileId: dpf_01regulateddedicated
+        slug: regulated-dedicated
+        displayName: Regulated dedicated profile
+        profileClass: dedicated
+        supportedEnvironments:
+        - staging
+        - prod
+        planeBindings:
+          control: dedicated-control-plane-policy-set
+          data: dedicated-database
+          identity: dedicated-keycloak-realm
+          observability: regulated-365d-retention
+        providerCapabilityIds:
+        - pvc_01keycloakoidc
+        - pvc_01pgdedicated
+        - pvc_01storagebucket
+        - pvc_01kafkatopics
+        - pvc_01metricsbasic
+        - pvc_01auditexport
+      - deploymentProfileId: dpf_01enterprisefederated
+        slug: enterprise-federated
+        displayName: Enterprise federated profile
+        profileClass: federated
+        supportedEnvironments:
+        - dev
+        - sandbox
+        - staging
+        - prod
+        planeBindings:
+          control: federated-control-plane
+          data: dedicated-data-plane
+          identity: federated-identity-plane
+          observability: enterprise-730d-retention
+        providerCapabilityIds:
+        - pvc_01keycloakoidc
+        - pvc_01pgdedicated
+        - pvc_01storagebucket
+        - pvc_01kafkatopics
+        - pvc_01openwhiskactions
+        - pvc_01metricsbasic
+        - pvc_01logsextended
+        - pvc_01tracesretention
+        - pvc_01federatedclusters
+        - pvc_01auditexport
     internalNamespaces:
       openwhisk:
-        - namespace: platform-system
-          description: Shared control-plane automation namespace
-          packages:
-            - provisioning
-            - observability
-        - namespace: platform-audit
-          description: Audit evidence and export workflows
-          packages:
-            - evidence
+      - namespace: platform-system
+        description: Shared control-plane automation namespace
+        packages:
+        - provisioning
+        - observability
+      - namespace: platform-audit
+        description: Audit evidence and export workflows
+        packages:
+        - evidence
       storage:
         buckets:
-          - name: platform-audit
-            prefixes:
-              - evidence/
-              - exports/
-          - name: platform-artifacts
-            prefixes:
-              - packages/
-              - bundles/
+        - name: platform-audit
+          prefixes:
+          - evidence/
+          - exports/
+        - name: platform-artifacts
+          prefixes:
+          - packages/
+          - bundles/
   reconcile:
     apisix:
       adminService:
@@ -573,35 +572,337 @@ bootstrap:
         portName: admin
         annotations: {}
       routes:
-        - routeId: "1001"
-          name: control-plane
-          uri: /control-plane/*
-          priority: 100
-          upstream:
-            component: controlPlane
-            port: 8080
-        - routeId: "1002"
-          name: identity
-          uri: /auth/*
-          priority: 90
-          upstream:
-            component: keycloak
-            port: 8080
-        - routeId: "1003"
-          name: realtime
-          uri: /realtime/*
-          priority: 80
-          upstream:
-            component: controlPlane
-            port: 8080
-        - routeId: "1004"
-          name: console
-          uri: /*
-          priority: 10
-          upstream:
-            component: webConsole
-            port: 3000
-
+      - routeId: '1001'
+        name: control-plane
+        uri: /control-plane/*
+        priority: 100
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '1002'
+        name: identity
+        uri: /auth/*
+        priority: 90
+        upstream:
+          component: keycloak
+          port: 8080
+      - routeId: '1003'
+        name: realtime
+        uri: /realtime/*
+        priority: 80
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '1004'
+        name: console
+        uri: /*
+        priority: 10
+        upstream:
+          component: webConsole
+          port: 3000
+      - routeId: '1010'
+        name: health
+        uri: /health
+        methods:
+        - GET
+        priority: 300
+        labels:
+          gateway.in-atelier.io/route-kind: public
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins:
+          cors: &id001
+            allow_origins: https://console.dev.in-atelier.example.com
+            allow_methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+            allow_headers: Authorization,Content-Type,Idempotency-Key,X-API-Version,X-Correlation-Id,X-Requested-With,X-Auth-Subject,X-Actor-Username,X-Tenant-Id,X-Workspace-Id,X-Plan-Id,X-Auth-Scopes,X-Actor-Roles
+            expose_headers: X-Correlation-Id,X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset
+            allow_credential: true
+            max_age: 3600
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2001'
+        name: public-api-platform
+        uri: /v1/platform/*
+        methods: &id002
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+        priority: 239
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: platform
+          gateway.in-atelier.io/tenant-binding: none
+          gateway.in-atelier.io/workspace-binding: none
+          gateway.in-atelier.io/plan-capabilities: ''
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: &id003
+          openid-connect: &id004
+            bearer_only: true
+            client_id: in-atelier-gateway
+            discovery: https://iam.dev.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration
+            realm: in-atelier-platform
+            set_access_token_header: false
+            set_id_token_header: false
+            set_userinfo_header: false
+            ssl_verify: true
+            timeout: 3
+          cors: *id001
+          request-validation: &id005
+            header_schema:
+              type: object
+              required:
+              - X-API-Version
+              - X-Correlation-Id
+              properties:
+                X-API-Version:
+                  type: string
+                X-Correlation-Id:
+                  type: string
+          proxy-rewrite:
+            headers: &id006
+              X-Gateway-Managed-Route: 'true'
+              X-Auth-Subject: $jwt_claim_sub
+              X-Actor-Username: $jwt_claim_preferred_username
+              X-Tenant-Id: $jwt_claim_tenant_id
+              X-Workspace-Id: $jwt_claim_workspace_id
+              X-Plan-Id: $jwt_claim_plan_id
+              X-Auth-Scopes: $jwt_claim_scope
+              X-Actor-Roles: $jwt_claim_realm_access_roles
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2002'
+        name: public-api-tenants
+        uri: /v1/tenants/*
+        methods: *id002
+        priority: 238
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: tenants
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: none
+          gateway.in-atelier.io/plan-capabilities: ''
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2003'
+        name: public-api-workspaces
+        uri: /v1/workspaces/*
+        methods: *id002
+        priority: 237
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: workspaces
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: optional
+          gateway.in-atelier.io/plan-capabilities: ''
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2004'
+        name: public-api-auth
+        uri: /v1/auth/*
+        methods: *id002
+        priority: 236
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: auth
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: ''
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2005'
+        name: public-api-postgres
+        uri: /v1/postgres/*
+        methods: *id002
+        priority: 235
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: postgres
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: data.postgresql.shared,data.postgresql.dedicated
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2006'
+        name: public-api-mongo
+        uri: /v1/mongo/*
+        methods: *id002
+        priority: 234
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: mongo
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: ''
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2007'
+        name: public-api-events
+        uri: /v1/events/*
+        methods: *id002
+        priority: 233
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: events
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: data.kafka.topics
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2008'
+        name: public-api-functions
+        uri: /v1/functions/*
+        methods: *id002
+        priority: 232
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: functions
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: data.openwhisk.actions
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2009'
+        name: public-api-storage
+        uri: /v1/storage/*
+        methods: *id002
+        priority: 231
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: storage
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: data.storage.bucket
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2010'
+        name: public-api-metrics
+        uri: /v1/metrics/*
+        methods: *id002
+        priority: 230
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: metrics
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: observability.metrics.basic
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '2011'
+        name: public-api-websockets
+        uri: /v1/websockets/*
+        methods: *id002
+        priority: 229
+        labels:
+          gateway.in-atelier.io/route-kind: product_api
+          gateway.in-atelier.io/family: websockets
+          gateway.in-atelier.io/tenant-binding: required
+          gateway.in-atelier.io/workspace-binding: required
+          gateway.in-atelier.io/plan-capabilities: ''
+          gateway.in-atelier.io/audit-required: 'false'
+        plugins: *id003
+        upstream:
+          component: controlPlane
+          port: 8080
+      - routeId: '3001'
+        name: native-keycloak-admin
+        uri: /_native/keycloak/admin/*
+        methods: *id002
+        priority: 330
+        enabledInModes:
+        - enabled
+        - limited
+        labels:
+          gateway.in-atelier.io/route-kind: passthrough
+          gateway.in-atelier.io/passthrough-id: keycloak_admin
+          gateway.in-atelier.io/audit-required: 'true'
+        plugins:
+          openid-connect: *id004
+          cors: *id001
+          request-validation: *id005
+          proxy-rewrite:
+            headers: *id006
+            regex_uri:
+            - ^/_native/keycloak/admin/(.*)
+            - /auth/admin/$1
+          authz-keycloak:
+            discovery: https://iam.dev.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration
+            client_id: in-atelier-gateway
+            policy_enforcement_mode: ENFORCING
+            permissions:
+            - gateway.native.keycloak.admin
+          http-logger:
+            uri: http://control-plane.{{ .Release.Namespace }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
+            include_req_body: false
+            max_retry_count: 1
+            buffer_duration: 1
+        upstream:
+          component: keycloak
+          port: 8080
+      - routeId: '3002'
+        name: native-openwhisk-admin
+        uri: /_native/openwhisk/api/v1/*
+        methods: *id002
+        priority: 320
+        enabledInModes:
+        - enabled
+        labels:
+          gateway.in-atelier.io/route-kind: passthrough
+          gateway.in-atelier.io/passthrough-id: openwhisk_admin
+          gateway.in-atelier.io/audit-required: 'true'
+        plugins:
+          openid-connect: *id004
+          cors: *id001
+          request-validation: *id005
+          proxy-rewrite:
+            headers: *id006
+            regex_uri:
+            - ^/_native/openwhisk/api/v1/(.*)
+            - /api/v1/$1
+          authz-keycloak:
+            discovery: https://iam.dev.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration
+            client_id: in-atelier-gateway
+            policy_enforcement_mode: ENFORCING
+            permissions:
+            - gateway.native.openwhisk.admin
+          http-logger:
+            uri: http://control-plane.{{ .Release.Namespace }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
+            include_req_body: false
+            max_retry_count: 1
+            buffer_duration: 1
+        upstream:
+          component: openwhisk
+          port: 3233
 apisix:
   enabled: true
   wrapper:
@@ -615,7 +916,7 @@ apisix:
   replicas: 2
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -625,12 +926,12 @@ apisix:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 9080
-      protocol: TCP
-    - name: admin
-      containerPort: 9180
-      protocol: TCP
+  - name: http
+    containerPort: 9080
+    protocol: TCP
+  - name: admin
+    containerPort: 9180
+    protocol: TCP
   resources:
     requests:
       cpu: 200m
@@ -639,18 +940,18 @@ apisix:
       cpu: 1
       memory: 1Gi
   env:
-    - name: APISIX_STAND_ALONE
-      value: "true"
+  - name: APISIX_STAND_ALONE
+    value: 'true'
   envFromSecrets: []
   envFromConfigMaps:
-    - in-atelier-gateway-config
+  - in-atelier-gateway-config
   persistence:
     enabled: false
-    existingClaim: ""
-    size: ""
-    storageClass: ""
+    existingClaim: ''
+    size: ''
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /usr/local/apisix/conf
     annotations: {}
   podAnnotations: {}
@@ -661,7 +962,7 @@ apisix:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -670,7 +971,7 @@ apisix:
   extraVolumeMounts: []
   config:
     inline:
-      APISIX_STAND_ALONE: "true"
+      APISIX_STAND_ALONE: 'true'
   initContainers: []
   volumePermissions:
     enabled: false
@@ -686,7 +987,7 @@ apisix:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 keycloak:
   enabled: true
   wrapper:
@@ -698,15 +999,15 @@ keycloak:
     tag: 26.1.0
     pullPolicy: IfNotPresent
   command:
-    - /opt/keycloak/bin/kc.sh
+  - /opt/keycloak/bin/kc.sh
   args:
-    - start
-    - --http-enabled=true
-    - --hostname-strict=false
+  - start
+  - --http-enabled=true
+  - --hostname-strict=false
   replicas: 1
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -716,9 +1017,9 @@ keycloak:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 8080
-      protocol: TCP
+  - name: http
+    containerPort: 8080
+    protocol: TCP
   resources:
     requests:
       cpu: 250m
@@ -727,20 +1028,20 @@ keycloak:
       cpu: 1
       memory: 1Gi
   env:
-    - name: KC_PROXY_HEADERS
-      value: xforwarded
-    - name: KC_HEALTH_ENABLED
-      value: "true"
+  - name: KC_PROXY_HEADERS
+    value: xforwarded
+  - name: KC_HEALTH_ENABLED
+    value: 'true'
   envFromSecrets:
-    - in-atelier-identity-client
+  - in-atelier-identity-client
   envFromConfigMaps: []
   persistence:
     enabled: false
-    existingClaim: ""
-    size: ""
-    storageClass: ""
+    existingClaim: ''
+    size: ''
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /opt/keycloak/data
     annotations: {}
   podAnnotations: {}
@@ -751,7 +1052,7 @@ keycloak:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -776,7 +1077,7 @@ keycloak:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 postgresql:
   enabled: true
   wrapper:
@@ -790,7 +1091,7 @@ postgresql:
   replicas: 1
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -800,9 +1101,9 @@ postgresql:
     portName: tcp-postgresql
     annotations: {}
   ports:
-    - name: tcp-postgresql
-      containerPort: 5432
-      protocol: TCP
+  - name: tcp-postgresql
+    containerPort: 5432
+    protocol: TCP
   resources:
     requests:
       cpu: 250m
@@ -811,18 +1112,18 @@ postgresql:
       cpu: 1
       memory: 2Gi
   env:
-    - name: POSTGRESQL_DATABASE
-      value: in_atelier
+  - name: POSTGRESQL_DATABASE
+    value: in_atelier
   envFromSecrets:
-    - in-atelier-postgresql
+  - in-atelier-postgresql
   envFromConfigMaps: []
   persistence:
     enabled: true
-    existingClaim: ""
+    existingClaim: ''
     size: 20Gi
-    storageClass: ""
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /bitnami/postgresql
     annotations: {}
   podAnnotations: {}
@@ -834,7 +1135,7 @@ postgresql:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -859,7 +1160,7 @@ postgresql:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 mongodb:
   enabled: true
   wrapper:
@@ -873,7 +1174,7 @@ mongodb:
   replicas: 1
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -883,9 +1184,9 @@ mongodb:
     portName: tcp-mongodb
     annotations: {}
   ports:
-    - name: tcp-mongodb
-      containerPort: 27017
-      protocol: TCP
+  - name: tcp-mongodb
+    containerPort: 27017
+    protocol: TCP
   resources:
     requests:
       cpu: 250m
@@ -894,18 +1195,18 @@ mongodb:
       cpu: 1
       memory: 2Gi
   env:
-    - name: MONGODB_DATABASE
-      value: in_atelier
+  - name: MONGODB_DATABASE
+    value: in_atelier
   envFromSecrets:
-    - in-atelier-mongodb
+  - in-atelier-mongodb
   envFromConfigMaps: []
   persistence:
     enabled: true
-    existingClaim: ""
+    existingClaim: ''
     size: 20Gi
-    storageClass: ""
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /bitnami/mongodb
     annotations: {}
   podAnnotations: {}
@@ -917,7 +1218,7 @@ mongodb:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -942,7 +1243,7 @@ mongodb:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 kafka:
   enabled: true
   wrapper:
@@ -956,7 +1257,7 @@ kafka:
   replicas: 3
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -966,9 +1267,9 @@ kafka:
     portName: tcp-kafka
     annotations: {}
   ports:
-    - name: tcp-kafka
-      containerPort: 9092
-      protocol: TCP
+  - name: tcp-kafka
+    containerPort: 9092
+    protocol: TCP
   resources:
     requests:
       cpu: 300m
@@ -977,18 +1278,18 @@ kafka:
       cpu: 1
       memory: 2Gi
   env:
-    - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
-      value: "false"
+  - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+    value: 'false'
   envFromSecrets:
-    - in-atelier-kafka
+  - in-atelier-kafka
   envFromConfigMaps: []
   persistence:
     enabled: true
-    existingClaim: ""
+    existingClaim: ''
     size: 50Gi
-    storageClass: ""
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /bitnami/kafka
     annotations: {}
   podAnnotations: {}
@@ -1000,7 +1301,7 @@ kafka:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -1025,7 +1326,7 @@ kafka:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 openwhisk:
   enabled: true
   wrapper:
@@ -1039,7 +1340,7 @@ openwhisk:
   replicas: 2
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -1049,9 +1350,9 @@ openwhisk:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 3233
-      protocol: TCP
+  - name: http
+    containerPort: 3233
+    protocol: TCP
   resources:
     requests:
       cpu: 250m
@@ -1060,17 +1361,17 @@ openwhisk:
       cpu: 1
       memory: 1Gi
   env:
-    - name: OPENWHISK_RUNTIME_ENV
-      value: kubernetes
+  - name: OPENWHISK_RUNTIME_ENV
+    value: kubernetes
   envFromSecrets: []
   envFromConfigMaps: []
   persistence:
     enabled: false
-    existingClaim: ""
-    size: ""
-    storageClass: ""
+    existingClaim: ''
+    size: ''
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /openwhisk
     annotations: {}
   podAnnotations: {}
@@ -1081,7 +1382,7 @@ openwhisk:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -1106,7 +1407,7 @@ openwhisk:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 storage:
   enabled: true
   wrapper:
@@ -1118,16 +1419,16 @@ storage:
     tag: 2026.3.23
     pullPolicy: IfNotPresent
   command:
-    - /usr/bin/docker-entrypoint.sh
+  - /usr/bin/docker-entrypoint.sh
   args:
-    - minio
-    - server
-    - /data
-    - --console-address=:9001
+  - minio
+  - server
+  - /data
+  - --console-address=:9001
   replicas: 1
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -1137,12 +1438,12 @@ storage:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 9000
-      protocol: TCP
-    - name: console
-      containerPort: 9001
-      protocol: TCP
+  - name: http
+    containerPort: 9000
+    protocol: TCP
+  - name: console
+    containerPort: 9001
+    protocol: TCP
   resources:
     requests:
       cpu: 250m
@@ -1151,18 +1452,18 @@ storage:
       cpu: 1
       memory: 2Gi
   env:
-    - name: MINIO_BROWSER_REDIRECT_URL
-      value: https://console.dev.in-atelier.example.com
+  - name: MINIO_BROWSER_REDIRECT_URL
+    value: https://console.dev.in-atelier.example.com
   envFromSecrets:
-    - in-atelier-storage
+  - in-atelier-storage
   envFromConfigMaps: []
   persistence:
     enabled: true
-    existingClaim: ""
+    existingClaim: ''
     size: 100Gi
-    storageClass: ""
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /data
     annotations: {}
   podAnnotations: {}
@@ -1174,7 +1475,7 @@ storage:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -1199,7 +1500,7 @@ storage:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 observability:
   enabled: true
   wrapper:
@@ -1213,7 +1514,7 @@ observability:
   replicas: 1
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -1223,9 +1524,9 @@ observability:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 9090
-      protocol: TCP
+  - name: http
+    containerPort: 9090
+    protocol: TCP
   resources:
     requests:
       cpu: 200m
@@ -1234,17 +1535,17 @@ observability:
       cpu: 1
       memory: 1Gi
   env:
-    - name: PROMETHEUS_RETENTION_TIME
-      value: 15d
+  - name: PROMETHEUS_RETENTION_TIME
+    value: 15d
   envFromSecrets: []
   envFromConfigMaps: []
   persistence:
     enabled: true
-    existingClaim: ""
+    existingClaim: ''
     size: 20Gi
-    storageClass: ""
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /prometheus
     annotations: {}
   podAnnotations: {}
@@ -1256,7 +1557,7 @@ observability:
     readOnlyRootFilesystem: false
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -1281,7 +1582,7 @@ observability:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 controlPlane:
   enabled: true
   wrapper:
@@ -1295,7 +1596,7 @@ controlPlane:
   replicas: 2
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -1305,9 +1606,9 @@ controlPlane:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 8080
-      protocol: TCP
+  - name: http
+    containerPort: 8080
+    protocol: TCP
   resources:
     requests:
       cpu: 200m
@@ -1316,20 +1617,20 @@ controlPlane:
       cpu: 1
       memory: 1Gi
   env:
-    - name: NODE_ENV
-      value: production
-    - name: DEPLOYMENT_PROFILE
-      value: dev
+  - name: NODE_ENV
+    value: production
+  - name: DEPLOYMENT_PROFILE
+    value: dev
   envFromSecrets: []
   envFromConfigMaps:
-    - in-atelier-control-plane-config
+  - in-atelier-control-plane-config
   persistence:
     enabled: false
-    existingClaim: ""
-    size: ""
-    storageClass: ""
+    existingClaim: ''
+    size: ''
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /srv/control-plane
     annotations: {}
   podAnnotations: {}
@@ -1340,7 +1641,7 @@ controlPlane:
     readOnlyRootFilesystem: true
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -1365,7 +1666,7 @@ controlPlane:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
 webConsole:
   enabled: true
   wrapper:
@@ -1379,7 +1680,7 @@ webConsole:
   replicas: 2
   serviceAccount:
     create: true
-    name: ""
+    name: ''
     automountToken: false
   service:
     enabled: true
@@ -1389,9 +1690,9 @@ webConsole:
     portName: http
     annotations: {}
   ports:
-    - name: http
-      containerPort: 3000
-      protocol: TCP
+  - name: http
+    containerPort: 3000
+    protocol: TCP
   resources:
     requests:
       cpu: 100m
@@ -1400,20 +1701,20 @@ webConsole:
       cpu: 500m
       memory: 512Mi
   env:
-    - name: NODE_ENV
-      value: production
-    - name: PUBLIC_BASE_PATH
-      value: /
+  - name: NODE_ENV
+    value: production
+  - name: PUBLIC_BASE_PATH
+    value: /
   envFromSecrets: []
   envFromConfigMaps:
-    - in-atelier-web-console-config
+  - in-atelier-web-console-config
   persistence:
     enabled: false
-    existingClaim: ""
-    size: ""
-    storageClass: ""
+    existingClaim: ''
+    size: ''
+    storageClass: ''
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     mountPath: /srv/web-console
     annotations: {}
   podAnnotations: {}
@@ -1424,7 +1725,7 @@ webConsole:
     readOnlyRootFilesystem: true
     capabilities:
       drop:
-        - ALL
+      - ALL
     runAsNonRoot: true
   nodeSelector: {}
   tolerations: []
@@ -1449,4 +1750,243 @@ webConsole:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL
+        - ALL
+gatewayPolicy:
+  version: '2026-03-23'
+  oidc:
+    enabled: true
+    provider: keycloak
+    realm: in-atelier-platform
+    issuerUrl: https://iam.dev.in-atelier.example.com/auth/realms/in-atelier-platform
+    discoveryUrl: https://iam.dev.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration
+    clientId: in-atelier-gateway
+    bearerOnly: true
+    sslVerify: true
+    unauthenticatedPreflight: true
+    clientIdSecretRef:
+      name: in-atelier-identity-client
+      key: client-id
+  claimsPropagation:
+    stripIncomingHeaders: true
+    requiredRequestHeaders:
+    - X-API-Version
+    - X-Correlation-Id
+    trustedClaimMappings:
+      subject: sub
+      username: preferred_username
+      tenantId: tenant_id
+      workspaceId: workspace_id
+      planId: plan_id
+      scopes: scope
+      roles: realm_access.roles
+    headers:
+      subject: X-Auth-Subject
+      username: X-Actor-Username
+      tenantId: X-Tenant-Id
+      workspaceId: X-Workspace-Id
+      planId: X-Plan-Id
+      scopes: X-Auth-Scopes
+      roles: X-Actor-Roles
+  cors:
+    enabled: true
+    allowOrigins:
+    - https://console.dev.in-atelier.example.com
+    allowMethods: *id002
+    allowHeaders:
+    - Authorization
+    - Content-Type
+    - Idempotency-Key
+    - X-API-Version
+    - X-Correlation-Id
+    - X-Requested-With
+    - X-Auth-Subject
+    - X-Actor-Username
+    - X-Tenant-Id
+    - X-Workspace-Id
+    - X-Plan-Id
+    - X-Auth-Scopes
+    - X-Actor-Roles
+    exposeHeaders:
+    - X-Correlation-Id
+    - X-RateLimit-Limit
+    - X-RateLimit-Remaining
+    - X-RateLimit-Reset
+    allowCredentials: true
+    maxAgeSeconds: 3600
+  publicRoutes:
+    allowAnonymousOptions: true
+    routes:
+    - id: health
+      path: /health
+      methods:
+      - GET
+      authMode: none
+      upstreamComponent: controlPlane
+  passthrough:
+    mode: enabled
+    audit:
+      required: true
+      plugin: http-logger
+      endpoint: /control-plane/internal/audit/gateway-passthrough
+      includeRequestBody: false
+      requiredHeaders:
+      - X-Correlation-Id
+      - X-Auth-Subject
+      - X-Auth-Scopes
+    routes:
+    - id: keycloak_admin
+      title: Keycloak admin passthrough
+      enabledInModes:
+      - enabled
+      - limited
+      pathPrefix: /_native/keycloak/admin/*
+      requiredScopes:
+      - gateway.native.keycloak.admin
+      requiredRoles:
+      - superadmin
+      auditAction: keycloak_admin_passthrough
+    - id: openwhisk_admin
+      title: OpenWhisk admin passthrough
+      enabledInModes:
+      - enabled
+      pathPrefix: /_native/openwhisk/api/v1/*
+      requiredScopes:
+      - gateway.native.openwhisk.admin
+      requiredRoles:
+      - superadmin
+      auditAction: openwhisk_admin_passthrough
+  familyPolicies:
+    platform:
+      tenantBinding: none
+      workspaceBinding: none
+      planCapabilityAnyOf: []
+    tenants:
+      tenantBinding: required
+      workspaceBinding: none
+      planCapabilityAnyOf: []
+    workspaces:
+      tenantBinding: required
+      workspaceBinding: optional
+      planCapabilityAnyOf: []
+    auth:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf: []
+    postgres:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf:
+      - data.postgresql.shared
+      - data.postgresql.dedicated
+    mongo:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf: []
+    events:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf:
+      - data.kafka.topics
+    functions:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf:
+      - data.openwhisk.actions
+    storage:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf:
+      - data.storage.bucket
+    metrics:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf:
+      - observability.metrics.basic
+    websockets:
+      tenantBinding: required
+      workspaceBinding: required
+      planCapabilityAnyOf: []
+  accessMatrix:
+    personas:
+    - id: basic_profile
+      audiences:
+      - developer_external
+      - workspace_developer
+      roles:
+      - workspace_developer
+      scopes:
+      - openid
+      - profile
+      - gateway.product.read
+      - gateway.product.write
+      planId: pln_01growth
+    - id: tenant_admin
+      audiences:
+      - tenant_admin
+      - workspace_admin
+      roles:
+      - tenant_admin
+      - workspace_admin
+      scopes:
+      - openid
+      - profile
+      - tenant.admin
+      planId: pln_01regulated
+    - id: superadmin
+      audiences:
+      - superadmin
+      - platform_team
+      roles:
+      - superadmin
+      scopes:
+      - openid
+      - profile
+      - tenant.admin
+      - gateway.native.keycloak.admin
+      - gateway.native.openwhisk.admin
+      planId: pln_01enterprise
+    assertions:
+    - persona: basic_profile
+      routeKind: product_api
+      family: functions
+      expect: allow
+    - persona: basic_profile
+      routeKind: product_api
+      family: platform
+      expect: deny
+    - persona: basic_profile
+      routeKind: passthrough
+      routeId: keycloak_admin
+      expect: deny
+    - persona: tenant_admin
+      routeKind: product_api
+      family: tenants
+      expect: allow
+    - persona: tenant_admin
+      routeKind: product_api
+      family: functions
+      expect: deny
+    - persona: tenant_admin
+      routeKind: product_api
+      family: metrics
+      expect: allow
+    - persona: tenant_admin
+      routeKind: passthrough
+      routeId: keycloak_admin
+      expect: deny
+    - persona: superadmin
+      routeKind: product_api
+      family: platform
+      expect: allow
+    - persona: superadmin
+      routeKind: product_api
+      family: functions
+      expect: allow
+    - persona: superadmin
+      routeKind: passthrough
+      routeId: keycloak_admin
+      expect: allow
+    - persona: superadmin
+      routeKind: passthrough
+      routeId: openwhisk_admin
+      expect: allow

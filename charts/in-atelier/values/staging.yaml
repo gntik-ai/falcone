@@ -1,7 +1,6 @@
 global:
   namespace: in-atelier-staging
   environment: staging
-
 publicSurface:
   hostnames:
     api: api.staging.in-atelier.example.com
@@ -15,7 +14,6 @@ publicSurface:
       console: in-atelier-staging-console-tls
       identity: in-atelier-staging-identity-tls
       realtime: in-atelier-staging-realtime-tls
-
 environmentProfile:
   id: staging
   diagnostics:
@@ -25,24 +23,28 @@ environmentProfile:
   demoData:
     enabled: false
   limitsProfile: production_like
-
 config:
   secretRefs:
     gatewayTls:
       existingSecret: in-atelier-staging-api-tls
       keys:
-        - tls.crt
-        - tls.key
-
+      - tls.crt
+      - tls.key
 deployment:
   topology:
     clusterRef: cluster-staging-shared
-
 apisix:
   replicas: 3
-
 controlPlane:
   replicas: 2
-
 webConsole:
   replicas: 2
+gatewayPolicy:
+  passthrough:
+    mode: disabled
+  cors:
+    allowOrigins:
+    - https://console.staging.in-atelier.example.com
+  oidc:
+    issuerUrl: https://iam.staging.in-atelier.example.com/auth/realms/in-atelier-platform
+    discoveryUrl: https://iam.staging.in-atelier.example.com/auth/realms/in-atelier-platform/.well-known/openid-configuration

@@ -49,7 +49,8 @@ test('resolveValues applies environment and platform overlays deterministically'
   assert.equal(resolved.platform.network.exposureKind, 'Route');
   assert.equal(resolved.publicSurface.hostnames.api, 'api.in-atelier.example.com');
   assert.equal(resolved.bootstrap.enabled, true);
-  assert.equal(resolved.bootstrap.reconcile.apisix.routes.length, 4);
+  assert.equal(resolved.bootstrap.reconcile.apisix.routes.length >= 16, true);
+  assert.equal(resolved.gatewayPolicy.passthrough.mode, 'disabled');
 });
 
 test('deployment topology includes optional profile, exposure, and operational constraint metadata', () => {

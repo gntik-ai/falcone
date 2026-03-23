@@ -26,8 +26,62 @@ data:
 {{ toPrettyJson .Values.bootstrap.oneShot.internalNamespaces | nindent 4 }}
   role-superadmin.json: |
 {{ toPrettyJson (dict "name" "superadmin") | nindent 4 }}
-{{ range .Values.bootstrap.reconcile.apisix.routes }}
+{{- $mode := .Values.gatewayPolicy.passthrough.mode -}}
+{{- range .Values.bootstrap.reconcile.apisix.routes }}
+{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
+{{- $routeBody := dict "name" .name "priority" .priority "uri" .uri "upstream" (dict "type" "roundrobin" "nodes" (dict (printf "%s.%s.svc.cluster.local:%v" (include "in-atelier.componentServiceNameByAlias" (dict "root" $ "component" .upstream.component "serviceName" (.upstream.serviceName | default ""))) $.Release.Namespace .upstream.port) 1)) -}}
+{{- if .methods }}{{- $_ := set $routeBody "methods" .methods -}}{{- end }}
+{{- if .labels }}{{- $_ := set $routeBody "labels" .labels -}}{{- end }}
+{{- if .vars }}{{- $_ := set $routeBody "vars" .vars -}}{{- end }}
+{{- if .plugins }}
+{{- $plugins := fromJson (toJson .plugins) -}}
+{{- if hasKey $plugins "openid-connect" }}
+{{- $oidc := index $plugins "openid-connect" -}}
+{{- $_ := set $oidc "discovery" $.Values.gatewayPolicy.oidc.discoveryUrl -}}
+{{- $_ := set $oidc "client_id" $.Values.gatewayPolicy.oidc.clientId -}}
+{{- $_ := set $oidc "bearer_only" $.Values.gatewayPolicy.oidc.bearerOnly -}}
+{{- $_ := set $oidc "realm" $.Values.gatewayPolicy.oidc.realm -}}
+{{- $_ := set $oidc "ssl_verify" $.Values.gatewayPolicy.oidc.sslVerify -}}
+{{- end }}
+{{- if hasKey $plugins "cors" }}
+{{- $cors := index $plugins "cors" -}}
+{{- $_ := set $cors "allow_origins" (join "," $.Values.gatewayPolicy.cors.allowOrigins) -}}
+{{- $_ := set $cors "allow_methods" (join "," $.Values.gatewayPolicy.cors.allowMethods) -}}
+{{- $_ := set $cors "allow_headers" (join "," $.Values.gatewayPolicy.cors.allowHeaders) -}}
+{{- $_ := set $cors "expose_headers" (join "," $.Values.gatewayPolicy.cors.exposeHeaders) -}}
+{{- $_ := set $cors "allow_credential" $.Values.gatewayPolicy.cors.allowCredentials -}}
+{{- $_ := set $cors "max_age" $.Values.gatewayPolicy.cors.maxAgeSeconds -}}
+{{- end }}
+{{- if hasKey $plugins "request-validation" }}
+{{- $requiredHeaders := $.Values.gatewayPolicy.claimsPropagation.requiredRequestHeaders -}}
+{{- $schemaProps := dict -}}
+{{- range $requiredHeaders }}{{- $_ := set $schemaProps . (dict "type" "string") -}}{{- end }}
+{{- $_ := set (index $plugins "request-validation") "header_schema" (dict "type" "object" "required" $requiredHeaders "properties" $schemaProps) -}}
+{{- end }}
+{{- if hasKey $plugins "proxy-rewrite" }}
+{{- $_ := set (index $plugins "proxy-rewrite") "headers" (dict
+  "X-Gateway-Managed-Route" "true"
+  $.Values.gatewayPolicy.claimsPropagation.headers.subject "$jwt_claim_sub"
+  $.Values.gatewayPolicy.claimsPropagation.headers.username "$jwt_claim_preferred_username"
+  $.Values.gatewayPolicy.claimsPropagation.headers.tenantId "$jwt_claim_tenant_id"
+  $.Values.gatewayPolicy.claimsPropagation.headers.workspaceId "$jwt_claim_workspace_id"
+  $.Values.gatewayPolicy.claimsPropagation.headers.planId "$jwt_claim_plan_id"
+  $.Values.gatewayPolicy.claimsPropagation.headers.scopes "$jwt_claim_scope"
+  $.Values.gatewayPolicy.claimsPropagation.headers.roles "$jwt_claim_realm_access_roles"
+) -}}
+{{- end }}
+{{- if hasKey $plugins "authz-keycloak" }}
+{{- $authz := index $plugins "authz-keycloak" -}}
+{{- $_ := set $authz "discovery" $.Values.gatewayPolicy.oidc.discoveryUrl -}}
+{{- $_ := set $authz "client_id" $.Values.gatewayPolicy.oidc.clientId -}}
+{{- end }}
+{{- if hasKey $plugins "http-logger" }}
+{{- $_ := set (index $plugins "http-logger") "uri" (printf "http://%s.%s.svc.cluster.local:%v/control-plane/internal/audit/gateway-passthrough" (include "in-atelier.componentServiceNameByAlias" (dict "root" $ "component" "controlPlane" "serviceName" "")) $.Release.Namespace $.Values.controlPlane.service.port) -}}
+{{- end }}
+{{- $_ := set $routeBody "plugins" $plugins -}}
+{{- end }}
   route-{{ .routeId }}.json: |
-{{ toPrettyJson (dict "name" .name "priority" .priority "uri" .uri "upstream" (dict "type" "roundrobin" "nodes" (dict (printf "%s.%s.svc.cluster.local:%v" (include "in-atelier.componentServiceNameByAlias" (dict "root" $ "component" .upstream.component "serviceName" (.upstream.serviceName | default ""))) $.Release.Namespace .upstream.port) 1))) | nindent 4 }}
-{{ end }}
+{{ toPrettyJson $routeBody | nindent 4 }}
+{{- end }}
+{{- end }}
 {{- end }}

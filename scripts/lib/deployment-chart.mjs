@@ -41,8 +41,23 @@ const REQUIRED_APISIX_ROUTE_PREFIXES = {
   'control-plane': '/control-plane/*',
   identity: '/auth/*',
   realtime: '/realtime/*',
-  console: '/*'
+  console: '/*',
+  health: '/health'
 };
+const REQUIRED_PUBLIC_API_ROUTE_NAMES = [
+  'public-api-platform',
+  'public-api-tenants',
+  'public-api-workspaces',
+  'public-api-auth',
+  'public-api-postgres',
+  'public-api-mongo',
+  'public-api-events',
+  'public-api-functions',
+  'public-api-storage',
+  'public-api-metrics',
+  'public-api-websockets'
+];
+const REQUIRED_PASSTHROUGH_ROUTE_NAMES = ['native-keycloak-admin', 'native-openwhisk-admin'];
 
 export function readRootChart() {
   return readYaml(ROOT_CHART_PATH);
@@ -257,10 +272,17 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     violations.push('bootstrap.oneShot.internalNamespaces.storage.buckets must define at least one bucket prefix set.');
   }
 
+  if (!values?.gatewayPolicy?.oidc?.enabled) {
+    violations.push('gatewayPolicy.oidc.enabled must remain true in root values.');
+  }
+
   const routeIds = new Set();
   const routes = bootstrap?.reconcile?.apisix?.routes ?? [];
-  if (routes.length !== Object.keys(REQUIRED_APISIX_ROUTE_PREFIXES).length) {
-    violations.push('bootstrap.reconcile.apisix.routes must define the four baseline APISIX routes.');
+  const routeNames = new Set(routes.map((route) => route.name));
+  for (const routeName of [...Object.keys(REQUIRED_APISIX_ROUTE_PREFIXES), ...REQUIRED_PUBLIC_API_ROUTE_NAMES, ...REQUIRED_PASSTHROUGH_ROUTE_NAMES]) {
+    if (!routeNames.has(routeName)) {
+      violations.push(`bootstrap.reconcile.apisix.routes must include ${routeName}.`);
+    }
   }
 
   for (const route of routes) {
@@ -269,7 +291,7 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     }
     routeIds.add(route.routeId);
 
-    if (REQUIRED_APISIX_ROUTE_PREFIXES[route.name] !== route.uri) {
+    if (route.name in REQUIRED_APISIX_ROUTE_PREFIXES && REQUIRED_APISIX_ROUTE_PREFIXES[route.name] !== route.uri) {
       violations.push(`bootstrap APISIX route ${route.name} must use uri ${REQUIRED_APISIX_ROUTE_PREFIXES[route.name]}.`);
     }
 
