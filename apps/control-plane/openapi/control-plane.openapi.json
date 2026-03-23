@@ -2,9 +2,9 @@
   "openapi": "3.1.0",
   "info": {
     "title": "In Atelier Control Plane API",
-    "version": "0.3.0",
-    "summary": "Control-plane contract baseline with contextual authorization and canonical core-domain entity contracts.",
-    "description": "Public control-plane baseline contract used to validate versioning, contextual authorization, and canonical core-domain entity read/write expectations before later runtime implementation tasks.",
+    "version": "0.4.0",
+    "summary": "Control-plane contract baseline with contextual authorization, canonical core-domain entities, and governance-capability resolution contracts.",
+    "description": "Public control-plane baseline contract used to validate versioning, contextual authorization, canonical core-domain entity read/write expectations, and governance/capability-resolution flows before later runtime implementation tasks.",
     "license": {
       "name": "Proprietary",
       "url": "https://in-atelier.example.com/licenses/proprietary"
@@ -51,6 +51,27 @@
     },
     {
       "name": "Authorization"
+    },
+    {
+      "name": "Memberships"
+    },
+    {
+      "name": "Invitations"
+    },
+    {
+      "name": "Plans"
+    },
+    {
+      "name": "Quotas"
+    },
+    {
+      "name": "DeploymentProfiles"
+    },
+    {
+      "name": "ProviderCapabilities"
+    },
+    {
+      "name": "CapabilityResolution"
     }
   ],
   "paths": {
@@ -129,8 +150,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "404": {
+            "description": "The requested entity was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -139,8 +160,8 @@
               }
             }
           },
-          "404": {
-            "description": "The requested entity was not found.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -213,8 +234,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -223,8 +244,8 @@
               }
             }
           },
-          "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -290,8 +311,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "404": {
+            "description": "The requested entity was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -300,8 +321,8 @@
               }
             }
           },
-          "404": {
-            "description": "The requested entity was not found.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -374,8 +395,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -384,8 +405,8 @@
               }
             }
           },
-          "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -454,8 +475,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "404": {
+            "description": "The requested entity was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -464,8 +485,8 @@
               }
             }
           },
-          "404": {
-            "description": "The requested entity was not found.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -541,8 +562,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -551,8 +572,8 @@
               }
             }
           },
-          "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -621,8 +642,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "404": {
+            "description": "The requested entity was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -631,8 +652,8 @@
               }
             }
           },
-          "404": {
-            "description": "The requested entity was not found.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -708,8 +729,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -718,8 +739,8 @@
               }
             }
           },
-          "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -788,8 +809,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "404": {
+            "description": "The requested entity was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -798,8 +819,8 @@
               }
             }
           },
-          "404": {
-            "description": "The requested entity was not found.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -875,8 +896,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -885,8 +906,8 @@
               }
             }
           },
-          "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -955,8 +976,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "404": {
+            "description": "The requested entity was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -965,8 +986,8 @@
               }
             }
           },
-          "404": {
-            "description": "The requested entity was not found.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1042,8 +1063,8 @@
               }
             }
           },
-          "default": {
-            "description": "Unexpected control-plane error.",
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1052,8 +1073,8 @@
               }
             }
           },
-          "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+          "default": {
+            "description": "Unexpected control-plane error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1185,6 +1206,1314 @@
           }
         }
       }
+    },
+    "/v1/tenants/{tenantId}/memberships/{tenantMembershipId}": {
+      "get": {
+        "operationId": "getTenantMembership",
+        "summary": "Fetch one tenant membership record",
+        "tags": [
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantMembershipId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantMembershipRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/memberships": {
+      "post": {
+        "operationId": "createTenantMembership",
+        "summary": "Submit a tenant membership write request",
+        "tags": [
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantMembershipRecordWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}": {
+      "get": {
+        "operationId": "getWorkspaceMembership",
+        "summary": "Fetch one workspace membership record",
+        "tags": [
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceMembershipId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceMembershipRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/memberships": {
+      "post": {
+        "operationId": "createWorkspaceMembership",
+        "summary": "Submit a workspace membership write request",
+        "tags": [
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceMembershipRecordWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/invitations/{invitationId}": {
+      "get": {
+        "operationId": "getInvitation",
+        "summary": "Fetch one invitation record",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/InvitationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/invitations": {
+      "post": {
+        "operationId": "createInvitation",
+        "summary": "Submit an invitation write request",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans/{planId}": {
+      "get": {
+        "operationId": "getCommercialPlan",
+        "summary": "Fetch one commercial plan",
+        "tags": [
+          "Plans"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PlanId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommercialPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans": {
+      "post": {
+        "operationId": "createCommercialPlan",
+        "summary": "Submit a commercial plan write request",
+        "tags": [
+          "Plans"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommercialPlanWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans/{planId}/quota-policies/{quotaPolicyId}": {
+      "get": {
+        "operationId": "getQuotaPolicy",
+        "summary": "Fetch one quota policy",
+        "tags": [
+          "Quotas"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PlanId"
+          },
+          {
+            "$ref": "#/components/parameters/QuotaPolicyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans/{planId}/quota-policies": {
+      "post": {
+        "operationId": "createQuotaPolicy",
+        "summary": "Submit a quota policy write request",
+        "tags": [
+          "Quotas"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PlanId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaPolicyWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/deployment-profiles/{deploymentProfileId}": {
+      "get": {
+        "operationId": "getDeploymentProfileRecord",
+        "summary": "Fetch one deployment profile",
+        "tags": [
+          "DeploymentProfiles"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/DeploymentProfileId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentProfileRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/deployment-profiles": {
+      "post": {
+        "operationId": "createDeploymentProfileRecord",
+        "summary": "Submit a deployment profile write request",
+        "tags": [
+          "DeploymentProfiles"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentProfileRecordWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider-capabilities/{providerCapabilityId}": {
+      "get": {
+        "operationId": "getProviderCapabilityRecord",
+        "summary": "Fetch one provider capability record",
+        "tags": [
+          "ProviderCapabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ProviderCapabilityId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderCapabilityRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider-capabilities": {
+      "post": {
+        "operationId": "createProviderCapabilityRecord",
+        "summary": "Submit a provider capability write request",
+        "tags": [
+          "ProviderCapabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCapabilityRecordWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/effective-capabilities": {
+      "get": {
+        "operationId": "getTenantEffectiveCapabilities",
+        "summary": "Resolve effective capabilities for one tenant",
+        "tags": [
+          "CapabilityResolution"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectiveCapabilityResolution"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/workspaces/{workspaceId}/effective-capabilities": {
+      "get": {
+        "operationId": "getWorkspaceEffectiveCapabilities",
+        "summary": "Resolve effective capabilities for one workspace",
+        "tags": [
+          "CapabilityResolution"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectiveCapabilityResolution"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1278,6 +2607,76 @@
         "schema": {
           "type": "string",
           "pattern": "^res_[0-9a-z]+$"
+        }
+      },
+      "TenantMembershipId": {
+        "name": "tenantMembershipId",
+        "in": "path",
+        "required": true,
+        "description": "Stable tenant membership identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^tmb_[0-9a-z]+$"
+        }
+      },
+      "WorkspaceMembershipId": {
+        "name": "workspaceMembershipId",
+        "in": "path",
+        "required": true,
+        "description": "Stable workspace membership identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^wmb_[0-9a-z]+$"
+        }
+      },
+      "InvitationId": {
+        "name": "invitationId",
+        "in": "path",
+        "required": true,
+        "description": "Stable invitation identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^inv_[0-9a-z]+$"
+        }
+      },
+      "PlanId": {
+        "name": "planId",
+        "in": "path",
+        "required": true,
+        "description": "Stable commercial plan identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^pln_[0-9a-z]+$"
+        }
+      },
+      "QuotaPolicyId": {
+        "name": "quotaPolicyId",
+        "in": "path",
+        "required": true,
+        "description": "Stable quota policy identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^qta_[0-9a-z]+$"
+        }
+      },
+      "DeploymentProfileId": {
+        "name": "deploymentProfileId",
+        "in": "path",
+        "required": true,
+        "description": "Stable deployment profile identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^dpf_[0-9a-z]+$"
+        }
+      },
+      "ProviderCapabilityId": {
+        "name": "providerCapabilityId",
+        "in": "path",
+        "required": true,
+        "description": "Stable provider capability identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^pvc_[0-9a-z]+$"
         }
       }
     },
@@ -1505,12 +2904,7 @@
         "properties": {
           "planId": {
             "type": "string",
-            "enum": [
-              "starter",
-              "growth",
-              "regulated",
-              "enterprise"
-            ]
+            "pattern": "^pln_[0-9a-z]+$"
           },
           "enforced": {
             "type": "boolean"
@@ -1622,16 +3016,55 @@
       "TenantMembership": {
         "type": "object",
         "required": [
+          "entityType",
+          "tenantMembershipId",
           "tenantId",
-          "role"
+          "userId",
+          "role",
+          "membershipStatus",
+          "state",
+          "timestamps",
+          "metadata"
         ],
         "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "tenant_membership"
+          },
+          "tenantMembershipId": {
+            "type": "string",
+            "pattern": "^tmb_[0-9a-z]+$"
+          },
           "tenantId": {
             "type": "string",
             "pattern": "^ten_[0-9a-z]+$"
           },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
           "role": {
             "$ref": "#/components/schemas/TenantRole"
+          },
+          "membershipStatus": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "grantedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
           }
         },
         "additionalProperties": false
@@ -1639,11 +3072,26 @@
       "WorkspaceMembership": {
         "type": "object",
         "required": [
+          "entityType",
+          "workspaceMembershipId",
           "tenantId",
           "workspaceId",
-          "role"
+          "userId",
+          "role",
+          "membershipStatus",
+          "state",
+          "timestamps",
+          "metadata"
         ],
         "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "workspace_membership"
+          },
+          "workspaceMembershipId": {
+            "type": "string",
+            "pattern": "^wmb_[0-9a-z]+$"
+          },
           "tenantId": {
             "type": "string",
             "pattern": "^ten_[0-9a-z]+$"
@@ -1652,8 +3100,32 @@
             "type": "string",
             "pattern": "^wrk_[0-9a-z]+$"
           },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
+          },
+          "membershipStatus": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "grantedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
           }
         },
         "additionalProperties": false
@@ -2500,6 +3972,1127 @@
           "acceptedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MembershipStatus": {
+        "type": "string",
+        "enum": [
+          "pending_activation",
+          "active",
+          "suspended",
+          "revoked"
+        ]
+      },
+      "InvitationTargetType": {
+        "type": "string",
+        "enum": [
+          "tenant",
+          "workspace"
+        ]
+      },
+      "InvitationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "accepted",
+          "revoked",
+          "expired"
+        ]
+      },
+      "PlanStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "active",
+          "grandfathered",
+          "retired"
+        ]
+      },
+      "QuotaScope": {
+        "type": "string",
+        "enum": [
+          "tenant",
+          "workspace",
+          "tenant_and_workspace"
+        ]
+      },
+      "QuotaEnforcementMode": {
+        "type": "string",
+        "enum": [
+          "hard_stop",
+          "throttle",
+          "advisory"
+        ]
+      },
+      "DeploymentProfileClass": {
+        "type": "string",
+        "enum": [
+          "shared",
+          "dedicated",
+          "federated"
+        ]
+      },
+      "CapabilityPlane": {
+        "type": "string",
+        "enum": [
+          "control",
+          "data",
+          "identity",
+          "observability"
+        ]
+      },
+      "ProviderCapabilityStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "limited",
+          "disabled"
+        ]
+      },
+      "TenantMembershipRecord": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "tenantMembershipId",
+          "tenantId",
+          "userId",
+          "role",
+          "membershipStatus",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "tenant_membership"
+          },
+          "tenantMembershipId": {
+            "type": "string",
+            "pattern": "^tmb_[0-9a-z]+$"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "role": {
+            "$ref": "#/components/schemas/TenantRole"
+          },
+          "membershipStatus": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "grantedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TenantMembershipRecordWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "userId",
+          "role",
+          "membershipStatus",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "tenant_membership"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "role": {
+            "$ref": "#/components/schemas/TenantRole"
+          },
+          "membershipStatus": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceMembershipRecord": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "workspaceMembershipId",
+          "tenantId",
+          "workspaceId",
+          "userId",
+          "role",
+          "membershipStatus",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "workspace_membership"
+          },
+          "workspaceMembershipId": {
+            "type": "string",
+            "pattern": "^wmb_[0-9a-z]+$"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceRole"
+          },
+          "membershipStatus": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "grantedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceMembershipRecordWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "tenantId",
+          "userId",
+          "role",
+          "membershipStatus",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "workspace_membership"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceRole"
+          },
+          "membershipStatus": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Invitation": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "invitationId",
+          "tenantId",
+          "emailHash",
+          "targetType",
+          "role",
+          "invitationStatus",
+          "expiresAt",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "invitation"
+          },
+          "invitationId": {
+            "type": "string",
+            "pattern": "^inv_[0-9a-z]+$"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          },
+          "emailHash": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 255
+          },
+          "maskedEmail": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 255
+          },
+          "targetType": {
+            "$ref": "#/components/schemas/InvitationTargetType"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "invitationStatus": {
+            "$ref": "#/components/schemas/InvitationStatus"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvitationWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "emailHash",
+          "targetType",
+          "role",
+          "invitationStatus",
+          "expiresAt",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "invitation"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          },
+          "emailHash": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 255
+          },
+          "maskedEmail": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 255
+          },
+          "targetType": {
+            "$ref": "#/components/schemas/InvitationTargetType"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "invitationStatus": {
+            "$ref": "#/components/schemas/InvitationStatus"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialPlan": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "planId",
+          "slug",
+          "displayName",
+          "planFamily",
+          "planStatus",
+          "deploymentProfileId",
+          "quotaPolicyId",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "plan"
+          },
+          "planId": {
+            "type": "string",
+            "pattern": "^pln_[0-9a-z]+$"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "planFamily": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "deploymentProfileId": {
+            "type": "string",
+            "pattern": "^dpf_[0-9a-z]+$"
+          },
+          "quotaPolicyId": {
+            "type": "string",
+            "pattern": "^qta_[0-9a-z]+$"
+          },
+          "billingInterval": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "annual"
+            ]
+          },
+          "capabilityKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 120
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialPlanWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "slug",
+          "displayName",
+          "planFamily",
+          "planStatus",
+          "deploymentProfileId",
+          "quotaPolicyId",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "plan"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "planFamily": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "deploymentProfileId": {
+            "type": "string",
+            "pattern": "^dpf_[0-9a-z]+$"
+          },
+          "quotaPolicyId": {
+            "type": "string",
+            "pattern": "^qta_[0-9a-z]+$"
+          },
+          "billingInterval": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "annual"
+            ]
+          },
+          "capabilityKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 120
+            }
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QuotaLimit": {
+        "type": "object",
+        "required": [
+          "metricKey",
+          "scope",
+          "unit",
+          "limit"
+        ],
+        "properties": {
+          "metricKey": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "workspace"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "QuotaPolicy": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "quotaPolicyId",
+          "slug",
+          "displayName",
+          "quotaScope",
+          "enforcementMode",
+          "defaultLimits",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "quota_policy"
+          },
+          "quotaPolicyId": {
+            "type": "string",
+            "pattern": "^qta_[0-9a-z]+$"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "quotaScope": {
+            "$ref": "#/components/schemas/QuotaScope"
+          },
+          "enforcementMode": {
+            "$ref": "#/components/schemas/QuotaEnforcementMode"
+          },
+          "warningThresholdPercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "defaultLimits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuotaLimit"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QuotaPolicyWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "slug",
+          "displayName",
+          "quotaScope",
+          "enforcementMode",
+          "defaultLimits",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "quota_policy"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "quotaScope": {
+            "$ref": "#/components/schemas/QuotaScope"
+          },
+          "enforcementMode": {
+            "$ref": "#/components/schemas/QuotaEnforcementMode"
+          },
+          "warningThresholdPercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "defaultLimits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuotaLimit"
+            }
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlaneBindings": {
+        "type": "object",
+        "required": [
+          "control",
+          "data",
+          "identity",
+          "observability"
+        ],
+        "properties": {
+          "control": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "data": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "observability": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeploymentProfileRecord": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "deploymentProfileId",
+          "slug",
+          "displayName",
+          "profileClass",
+          "supportedEnvironments",
+          "planeBindings",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "deployment_profile"
+          },
+          "deploymentProfileId": {
+            "type": "string",
+            "pattern": "^dpf_[0-9a-z]+$"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "profileClass": {
+            "$ref": "#/components/schemas/DeploymentProfileClass"
+          },
+          "supportedEnvironments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceEnvironment"
+            }
+          },
+          "planeBindings": {
+            "$ref": "#/components/schemas/PlaneBindings"
+          },
+          "providerCapabilityIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^pvc_[0-9a-z]+$"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeploymentProfileRecordWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "slug",
+          "displayName",
+          "profileClass",
+          "supportedEnvironments",
+          "planeBindings",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "deployment_profile"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "profileClass": {
+            "$ref": "#/components/schemas/DeploymentProfileClass"
+          },
+          "supportedEnvironments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceEnvironment"
+            }
+          },
+          "planeBindings": {
+            "$ref": "#/components/schemas/PlaneBindings"
+          },
+          "providerCapabilityIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^pvc_[0-9a-z]+$"
+            }
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProviderCapabilityRecord": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "providerCapabilityId",
+          "provider",
+          "capabilityKey",
+          "plane",
+          "capabilityStatus",
+          "allowedEnvironments",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "provider_capability"
+          },
+          "providerCapabilityId": {
+            "type": "string",
+            "pattern": "^pvc_[0-9a-z]+$"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "capabilityKey": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "plane": {
+            "$ref": "#/components/schemas/CapabilityPlane"
+          },
+          "capabilityStatus": {
+            "$ref": "#/components/schemas/ProviderCapabilityStatus"
+          },
+          "supportLevel": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "ga",
+              "deprecated"
+            ]
+          },
+          "allowedEnvironments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceEnvironment"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProviderCapabilityRecordWriteRequest": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "provider",
+          "capabilityKey",
+          "plane",
+          "capabilityStatus",
+          "allowedEnvironments",
+          "desiredState",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "provider_capability"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "capabilityKey": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "plane": {
+            "$ref": "#/components/schemas/CapabilityPlane"
+          },
+          "capabilityStatus": {
+            "$ref": "#/components/schemas/ProviderCapabilityStatus"
+          },
+          "supportLevel": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "ga",
+              "deprecated"
+            ]
+          },
+          "allowedEnvironments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceEnvironment"
+            }
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolvedQuota": {
+        "type": "object",
+        "required": [
+          "metricKey",
+          "scope",
+          "unit",
+          "limit",
+          "enforcementMode"
+        ],
+        "properties": {
+          "metricKey": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "workspace"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enforcementMode": {
+            "$ref": "#/components/schemas/QuotaEnforcementMode"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolvedCapability": {
+        "type": "object",
+        "required": [
+          "capabilityKey",
+          "provider",
+          "plane",
+          "enabled",
+          "capabilityStatus",
+          "allowedEnvironments"
+        ],
+        "properties": {
+          "capabilityKey": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "plane": {
+            "$ref": "#/components/schemas/CapabilityPlane"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "capabilityStatus": {
+            "$ref": "#/components/schemas/ProviderCapabilityStatus"
+          },
+          "supportLevel": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "ga",
+              "deprecated"
+            ]
+          },
+          "allowedEnvironments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceEnvironment"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          }
+        },
+        "additionalProperties": false
+      },
+      "EffectiveCapabilityResolution": {
+        "type": "object",
+        "required": [
+          "scope",
+          "tenantId",
+          "planId",
+          "deploymentProfileId",
+          "quotas",
+          "capabilities",
+          "resolvedAt",
+          "correlationContext"
+        ],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "workspace"
+            ]
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          },
+          "planId": {
+            "type": "string",
+            "pattern": "^pln_[0-9a-z]+$"
+          },
+          "deploymentProfileId": {
+            "type": "string",
+            "pattern": "^dpf_[0-9a-z]+$"
+          },
+          "quotas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedQuota"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedCapability"
+            }
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationContext": {
+            "type": "object",
+            "required": [
+              "contractVersion",
+              "planes"
+            ],
+            "properties": {
+              "contractVersion": {
+                "type": "string",
+                "minLength": 10,
+                "maxLength": 40
+              },
+              "planes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CapabilityPlane"
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

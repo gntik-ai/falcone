@@ -24,4 +24,8 @@ This directory documents architecture baselines that future tasks should extend 
 - Preserve stable public route prefixes and explicit environment overlays when changing deployment topology.
 - Preserve deny-by-default tenant/workspace authorization, explicit delegation limits, and end-to-end correlation when changing the authorization model.
 - Preserve canonical identifier prefixes, parent-child integrity, and soft-delete semantics when changing the core domain model.
+- Preserve auditable membership/invitation records, safe plan-change evaluation, and explicit plane labels when changing the governance model.
+- Add deliberate versioning notes when changing internal contract shapes.
+ when changing the authorization model.
+- Preserve canonical identifier prefixes, parent-child integrity, and soft-delete semantics when changing the core domain model.
 - Add deliberate versioning notes when changing internal contract shapes.
