@@ -209,3 +209,187 @@ export function listLifecycleEvents(entityType) {
 
   return readDomainModel().lifecycle_events.filter((event) => event.entity_type === entityType);
 }
+
+export function listBusinessStateMachines() {
+  return readDomainModel().business_state_machines ?? [];
+}
+
+export function getBusinessStateMachine(stateMachineId) {
+  return listBusinessStateMachines().find((machine) => machine.id === stateMachineId);
+}
+
+export function listCommercialPlans() {
+  return readDomainModel().governance_catalogs?.plans ?? [];
+}
+
+export function getCommercialPlan(planId) {
+  return listCommercialPlans().find((plan) => plan.planId === planId);
+}
+
+export function listQuotaPolicies() {
+  return readDomainModel().governance_catalogs?.quota_policies ?? [];
+}
+
+export function getQuotaPolicy(quotaPolicyId) {
+  return listQuotaPolicies().find((policy) => policy.quotaPolicyId === quotaPolicyId);
+}
+
+export function listDeploymentProfileCatalog() {
+  return readDomainModel().governance_catalogs?.deployment_profiles ?? [];
+}
+
+export function getDeploymentProfileCatalogEntry(deploymentProfileId) {
+  return listDeploymentProfileCatalog().find((profile) => profile.deploymentProfileId === deploymentProfileId);
+}
+
+export function listProviderCapabilityCatalog() {
+  return readDomainModel().governance_catalogs?.provider_capabilities ?? [];
+}
+
+export function getProviderCapabilityCatalogEntry(providerCapabilityId) {
+  return listProviderCapabilityCatalog().find((capability) => capability.providerCapabilityId === providerCapabilityId);
+}
+
+export function getEffectiveCapabilityResolutionContract() {
+  return readDomainModel().contracts?.effective_capability_resolution;
+}
+
+export function getEffectiveCapabilityResolutionDescriptor() {
+  return readDomainModel().effective_capability_resolution;
+}
+
+export function listPlanChangeScenarios() {
+  return readDomainModel().plan_change_scenarios ?? [];
+}
+
+function indexQuotaLimits(quotaPolicy) {
+  return new Map((quotaPolicy?.defaultLimits ?? []).map((limit) => [limit.metricKey, limit]));
+}
+
+function normalizeProviderCapability(providerCapability, enabled) {
+  return {
+    capabilityKey: providerCapability.capabilityKey,
+    provider: providerCapability.provider,
+    plane: providerCapability.plane,
+    enabled,
+    capabilityStatus: providerCapability.capabilityStatus,
+    supportLevel: providerCapability.supportLevel,
+    allowedEnvironments: providerCapability.allowedEnvironments,
+    reason: enabled ? 'enabled_by_plan_and_profile' : 'not_granted_or_unavailable'
+  };
+}
+
+function buildCapabilityResolution({ scope, tenantId, workspaceId, plan, deploymentProfile, quotaPolicy, capabilities, resolvedAt }) {
+  return {
+    scope,
+    tenantId,
+    workspaceId,
+    planId: plan.planId,
+    deploymentProfileId: deploymentProfile.deploymentProfileId,
+    quotas: (quotaPolicy.defaultLimits ?? []).map((limit) => ({
+      metricKey: limit.metricKey,
+      scope: limit.scope,
+      unit: limit.unit,
+      limit: limit.limit,
+      enforcementMode: quotaPolicy.enforcementMode
+    })),
+    capabilities,
+    resolvedAt,
+    correlationContext: {
+      contractVersion: getEffectiveCapabilityResolutionContract()?.version ?? readDomainModel().version,
+      planes: [...new Set(capabilities.map((capability) => capability.plane))]
+    }
+  };
+}
+
+export function resolveTenantEffectiveCapabilities({ tenantId = null, planId, resolvedAt = '2026-03-23T00:00:00Z' }) {
+  const plan = getCommercialPlan(planId);
+  if (!plan) {
+    throw new Error(`Unknown plan ${planId}.`);
+  }
+
+  const quotaPolicy = getQuotaPolicy(plan.quotaPolicyId);
+  const deploymentProfile = getDeploymentProfileCatalogEntry(plan.deploymentProfileId);
+  const providerCapabilities = new Map(
+    listProviderCapabilityCatalog().map((capability) => [capability.providerCapabilityId, capability])
+  );
+
+  if (!quotaPolicy || !deploymentProfile) {
+    throw new Error(`Plan ${planId} is missing quota policy or deployment profile metadata.`);
+  }
+
+  const capabilities = (deploymentProfile.providerCapabilityIds ?? [])
+    .map((providerCapabilityId) => providerCapabilities.get(providerCapabilityId))
+    .filter(Boolean)
+    .map((providerCapability) =>
+      normalizeProviderCapability(providerCapability, plan.capabilityKeys.includes(providerCapability.capabilityKey))
+    )
+    .filter((capability) => capability.enabled);
+
+  return buildCapabilityResolution({
+    scope: 'tenant',
+    tenantId,
+    workspaceId: undefined,
+    plan,
+    deploymentProfile,
+    quotaPolicy,
+    capabilities,
+    resolvedAt
+  });
+}
+
+export function resolveWorkspaceEffectiveCapabilities({
+  tenantId = null,
+  workspaceId,
+  workspaceEnvironment,
+  planId,
+  resolvedAt = '2026-03-23T00:00:00Z'
+}) {
+  const tenantResolution = resolveTenantEffectiveCapabilities({ tenantId, planId, resolvedAt });
+  const capabilities = tenantResolution.capabilities.filter((capability) =>
+    capability.allowedEnvironments.includes(workspaceEnvironment)
+  );
+
+  return {
+    ...tenantResolution,
+    scope: 'workspace',
+    workspaceId,
+    capabilities
+  };
+}
+
+export function evaluatePlanChange({ fromPlanId, toPlanId, currentUsage = {}, resolvedAt = '2026-03-23T00:00:00Z' }) {
+  const fromResolution = resolveTenantEffectiveCapabilities({ planId: fromPlanId, resolvedAt });
+  const toResolution = resolveTenantEffectiveCapabilities({ planId: toPlanId, resolvedAt });
+  const fromCapabilities = new Set(fromResolution.capabilities.map((capability) => capability.capabilityKey));
+  const toCapabilities = new Set(toResolution.capabilities.map((capability) => capability.capabilityKey));
+  const fromQuotaLimits = indexQuotaLimits(getQuotaPolicy(fromResolution.planId ? getCommercialPlan(fromPlanId).quotaPolicyId : undefined));
+  const toQuotaLimits = indexQuotaLimits(getQuotaPolicy(toResolution.planId ? getCommercialPlan(toPlanId).quotaPolicyId : undefined));
+  const addedCapabilities = [...toCapabilities].filter((capability) => !fromCapabilities.has(capability));
+  const removedCapabilities = [...fromCapabilities].filter((capability) => !toCapabilities.has(capability));
+  const blockingMetrics = [];
+  const quotaDelta = [];
+
+  for (const [metricKey, nextLimit] of toQuotaLimits.entries()) {
+    const previousLimit = fromQuotaLimits.get(metricKey);
+    quotaDelta.push({
+      metricKey,
+      previousLimit: previousLimit?.limit ?? null,
+      nextLimit: nextLimit.limit
+    });
+
+    if ((currentUsage[metricKey] ?? 0) > nextLimit.limit) {
+      blockingMetrics.push(metricKey);
+    }
+  }
+
+  return {
+    fromPlanId,
+    toPlanId,
+    status: blockingMetrics.length > 0 ? 'requires_remediation' : 'compatible',
+    addedCapabilities,
+    removedCapabilities,
+    blockingMetrics,
+    quotaDelta
+  };
+}

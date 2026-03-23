@@ -4,14 +4,26 @@ import { readJson } from './quality-gates.mjs';
 
 export const DOMAIN_MODEL_PATH = 'services/internal-contracts/src/domain-model.json';
 export const DOMAIN_SEED_FIXTURES_PATH = 'tests/reference/domain-seed-fixtures.json';
-export const REQUIRED_DOMAIN_CONTRACT_IDS = ['entity_read_model', 'entity_write_model', 'lifecycle_event'];
+export const REQUIRED_DOMAIN_CONTRACT_IDS = [
+  'entity_read_model',
+  'entity_write_model',
+  'lifecycle_event',
+  'effective_capability_resolution'
+];
 export const REQUIRED_ENTITY_IDS = [
   'platform_user',
   'tenant',
   'workspace',
   'external_application',
   'service_account',
-  'managed_resource'
+  'managed_resource',
+  'tenant_membership',
+  'workspace_membership',
+  'invitation',
+  'plan',
+  'quota_policy',
+  'deployment_profile',
+  'provider_capability'
 ];
 export const REQUIRED_TRANSITIONS = ['create', 'activate', 'suspend', 'soft_delete'];
 
@@ -173,6 +185,62 @@ function collectEntityViolations(model, deploymentTopology, authorizationModel, 
         }
       }
     }
+
+    if (entity.id === 'tenant_membership') {
+      for (const field of ['tenantId', 'userId', 'role', 'membershipStatus']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity tenant_membership must require ${field}.`);
+        }
+      }
+    }
+
+    if (entity.id === 'workspace_membership') {
+      for (const field of ['tenantId', 'workspaceId', 'userId', 'role', 'membershipStatus']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity workspace_membership must require ${field}.`);
+        }
+      }
+    }
+
+    if (entity.id === 'invitation') {
+      for (const field of ['tenantId', 'emailHash', 'targetType', 'role', 'invitationStatus', 'expiresAt']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity invitation must require ${field}.`);
+        }
+      }
+    }
+
+    if (entity.id === 'plan') {
+      for (const field of ['planStatus', 'deploymentProfileId', 'quotaPolicyId']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity plan must require ${field}.`);
+        }
+      }
+    }
+
+    if (entity.id === 'quota_policy') {
+      for (const field of ['quotaScope', 'enforcementMode', 'defaultLimits']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity quota_policy must require ${field}.`);
+        }
+      }
+    }
+
+    if (entity.id === 'deployment_profile') {
+      for (const field of ['profileClass', 'supportedEnvironments', 'planeBindings']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity deployment_profile must require ${field}.`);
+        }
+      }
+    }
+
+    if (entity.id === 'provider_capability') {
+      for (const field of ['provider', 'capabilityKey', 'plane', 'capabilityStatus', 'allowedEnvironments']) {
+        if (!entity.required_fields.includes(field)) {
+          violations.push(`Domain entity provider_capability must require ${field}.`);
+        }
+      }
+    }
   }
 
   for (const entityId of REQUIRED_ENTITY_IDS) {
@@ -227,7 +295,13 @@ function collectRelationshipViolations(model, entityIndex, violations) {
     'tenant_workspaces',
     'workspace_external_applications',
     'workspace_service_accounts',
-    'workspace_managed_resources'
+    'workspace_managed_resources',
+    'tenant_tenant_memberships',
+    'workspace_workspace_memberships',
+    'tenant_invitations',
+    'plan_quota_policies',
+    'plan_deployment_profiles',
+    'deployment_profile_provider_capabilities'
   ]) {
     if (!relationshipIds.has(relationshipId)) {
       violations.push(`Domain model must include relationship ${relationshipId}.`);
@@ -284,6 +358,115 @@ function collectLifecycleViolations(model, entityIndex, violations) {
   }
 }
 
+function collectGovernanceViolations(model, deploymentTopology, violations) {
+  const stateMachines = model?.business_state_machines;
+  if (!ensureNonEmptyArray(stateMachines)) {
+    violations.push('Domain model business_state_machines must be a non-empty array.');
+  } else {
+    const stateMachineIds = new Set();
+    for (const machine of stateMachines) {
+      if (!machine?.id) {
+        violations.push('Each business state machine must define id.');
+        continue;
+      }
+      if (stateMachineIds.has(machine.id)) {
+        violations.push(`Duplicate business state machine ${machine.id}.`);
+      }
+      stateMachineIds.add(machine.id);
+      if (!ensureNonEmptyArray(machine.states)) {
+        violations.push(`Business state machine ${machine.id} must define states.`);
+      }
+      if (!ensureNonEmptyArray(machine.allowed_transitions)) {
+        violations.push(`Business state machine ${machine.id} must define allowed_transitions.`);
+      }
+      if (!ensureNonEmptyArray(machine.rules)) {
+        violations.push(`Business state machine ${machine.id} must define rules.`);
+      }
+    }
+  }
+
+  const catalogs = model?.governance_catalogs ?? {};
+  if (!ensureNonEmptyArray(catalogs.plans)) {
+    violations.push('Domain model governance_catalogs.plans must be a non-empty array.');
+  }
+  if (!ensureNonEmptyArray(catalogs.quota_policies)) {
+    violations.push('Domain model governance_catalogs.quota_policies must be a non-empty array.');
+  }
+  if (!ensureNonEmptyArray(catalogs.deployment_profiles)) {
+    violations.push('Domain model governance_catalogs.deployment_profiles must be a non-empty array.');
+  }
+  if (!ensureNonEmptyArray(catalogs.provider_capabilities)) {
+    violations.push('Domain model governance_catalogs.provider_capabilities must be a non-empty array.');
+  }
+
+  const planIds = new Set((catalogs.plans ?? []).map((plan) => plan.planId));
+  const quotaPolicyIds = new Set((catalogs.quota_policies ?? []).map((policy) => policy.quotaPolicyId));
+  const profileIds = new Set((catalogs.deployment_profiles ?? []).map((profile) => profile.deploymentProfileId));
+  const providerCapabilityIds = new Set((catalogs.provider_capabilities ?? []).map((capability) => capability.providerCapabilityId));
+  const knownEnvironments = new Set((deploymentTopology?.environment_profiles ?? []).map((entry) => entry.id));
+
+  for (const plan of catalogs.plans ?? []) {
+    if (!quotaPolicyIds.has(plan.quotaPolicyId)) {
+      violations.push(`Plan ${plan.planId} references unknown quota policy ${plan.quotaPolicyId}.`);
+    }
+    if (!profileIds.has(plan.deploymentProfileId)) {
+      violations.push(`Plan ${plan.planId} references unknown deployment profile ${plan.deploymentProfileId}.`);
+    }
+    if (!ensureNonEmptyArray(plan.capabilityKeys)) {
+      violations.push(`Plan ${plan.planId} must define capabilityKeys.`);
+    }
+  }
+
+  for (const policy of catalogs.quota_policies ?? []) {
+    if (!ensureNonEmptyArray(policy.defaultLimits)) {
+      violations.push(`Quota policy ${policy.quotaPolicyId} must define defaultLimits.`);
+    }
+  }
+
+  for (const profile of catalogs.deployment_profiles ?? []) {
+    if (!ensureNonEmptyArray(profile.supportedEnvironments)) {
+      violations.push(`Deployment profile ${profile.deploymentProfileId} must define supportedEnvironments.`);
+    } else {
+      for (const environment of profile.supportedEnvironments) {
+        if (!knownEnvironments.has(environment)) {
+          violations.push(`Deployment profile ${profile.deploymentProfileId} references unknown environment ${environment}.`);
+        }
+      }
+    }
+
+    for (const providerCapabilityId of profile.providerCapabilityIds ?? []) {
+      if (!providerCapabilityIds.has(providerCapabilityId)) {
+        violations.push(
+          `Deployment profile ${profile.deploymentProfileId} references unknown provider capability ${providerCapabilityId}.`
+        );
+      }
+    }
+  }
+
+  if (!model?.effective_capability_resolution?.paths?.tenant || !model?.effective_capability_resolution?.paths?.workspace) {
+    violations.push('Domain model effective_capability_resolution must define tenant and workspace paths.');
+  }
+
+  if (!ensureNonEmptyArray(model?.plan_change_scenarios)) {
+    violations.push('Domain model plan_change_scenarios must be a non-empty array.');
+  } else {
+    for (const scenario of model.plan_change_scenarios) {
+      if (!planIds.has(scenario.fromPlanId)) {
+        violations.push(`Plan change scenario ${scenario.id} references unknown fromPlanId ${scenario.fromPlanId}.`);
+      }
+      if (!planIds.has(scenario.toPlanId)) {
+        violations.push(`Plan change scenario ${scenario.id} references unknown toPlanId ${scenario.toPlanId}.`);
+      }
+      if (!ensureNonEmptyArray(scenario.expectedOutcome?.blockingMetrics ?? [])) {
+        // allow empty blockingMetrics, but preserve array shape.
+        if (!Array.isArray(scenario.expectedOutcome?.blockingMetrics)) {
+          violations.push(`Plan change scenario ${scenario.id} must define expectedOutcome.blockingMetrics as an array.`);
+        }
+      }
+    }
+  }
+}
+
 function collectSeedFixtureViolations(model, seeds, deploymentTopology, violations) {
   if (seeds?.version !== model.version) {
     violations.push(`Domain seed fixtures version must align with domain-model version ${model.version}.`);
@@ -296,6 +479,7 @@ function collectSeedFixtureViolations(model, seeds, deploymentTopology, violatio
   }
 
   const allowedEnvironments = new Set((deploymentTopology?.environment_profiles ?? []).map((entry) => entry.id));
+  const allowedPlanIds = new Set((model?.governance_catalogs?.plans ?? []).map((plan) => plan.planId));
   const allowedResourceKinds = new Set(
     (model?.entities ?? []).find((entity) => entity.id === 'managed_resource')?.supported_kinds ?? []
   );
@@ -320,9 +504,14 @@ function collectSeedFixtureViolations(model, seeds, deploymentTopology, violatio
     hasSingleWorkspace ||= profile.workspace_count === 1;
     hasMultiWorkspace ||= profile.workspace_count >= 3;
 
+    if (!allowedPlanIds.has(profile.tenant.planId)) {
+      violations.push(`Domain seed profile ${profile.id} references unknown tenant planId ${profile.tenant.planId}.`);
+    }
+
     const workspaceIndex = new Map((profile.workspaces ?? []).map((workspace) => [workspace.workspaceId, workspace]));
     const applicationIds = new Set((profile.externalApplications ?? []).map((application) => application.applicationId));
     const serviceAccountIds = new Set((profile.serviceAccounts ?? []).map((serviceAccount) => serviceAccount.serviceAccountId));
+    const platformUserIds = new Set((profile.platformUsers ?? []).map((user) => user.userId));
 
     if (!Array.isArray(profile.workspaces) || profile.workspaces.length !== profile.workspace_count) {
       violations.push(`Domain seed profile ${profile.id} workspace_count must match the number of workspaces.`);
@@ -370,6 +559,49 @@ function collectSeedFixtureViolations(model, seeds, deploymentTopology, violatio
         violations.push(
           `Domain seed managed resource ${resource.resourceId} references unknown service account ${resource.serviceAccountId}.`
         );
+      }
+    }
+
+    if (!ensureNonEmptyArray(profile.tenantMemberships)) {
+      violations.push(`Domain seed profile ${profile.id} must define tenantMemberships.`);
+    } else {
+      for (const membership of profile.tenantMemberships) {
+        if (membership.tenantId !== profile.tenant.tenantId) {
+          violations.push(`Domain seed tenant membership ${membership.tenantMembershipId} must stay inside tenant ${profile.tenant.tenantId}.`);
+        }
+        if (!platformUserIds.has(membership.userId)) {
+          violations.push(`Domain seed tenant membership ${membership.tenantMembershipId} references unknown user ${membership.userId}.`);
+        }
+      }
+    }
+
+    if (!ensureNonEmptyArray(profile.workspaceMemberships)) {
+      violations.push(`Domain seed profile ${profile.id} must define workspaceMemberships.`);
+    } else {
+      for (const membership of profile.workspaceMemberships) {
+        if (!workspaceIndex.has(membership.workspaceId)) {
+          violations.push(
+            `Domain seed workspace membership ${membership.workspaceMembershipId} references unknown workspace ${membership.workspaceId}.`
+          );
+        }
+        if (!platformUserIds.has(membership.userId)) {
+          violations.push(
+            `Domain seed workspace membership ${membership.workspaceMembershipId} references unknown user ${membership.userId}.`
+          );
+        }
+      }
+    }
+
+    if (!ensureNonEmptyArray(profile.invitations)) {
+      violations.push(`Domain seed profile ${profile.id} must define invitations.`);
+    } else {
+      for (const invitation of profile.invitations) {
+        if (invitation.tenantId !== profile.tenant.tenantId) {
+          violations.push(`Domain seed invitation ${invitation.invitationId} must stay inside tenant ${profile.tenant.tenantId}.`);
+        }
+        if (invitation.workspaceId && !workspaceIndex.has(invitation.workspaceId)) {
+          violations.push(`Domain seed invitation ${invitation.invitationId} references unknown workspace ${invitation.workspaceId}.`);
+        }
       }
     }
   }
@@ -429,6 +661,7 @@ export function collectDomainModelViolations(
   const { entityIndex } = collectEntityViolations(model, deploymentTopology, authorizationModel, violations);
   collectRelationshipViolations(model, entityIndex, violations);
   collectLifecycleViolations(model, entityIndex, violations);
+  collectGovernanceViolations(model, deploymentTopology, violations);
 
   if (!ensureNonEmptyArray(model?.business_invariants)) {
     violations.push('Domain model business_invariants must be a non-empty array.');

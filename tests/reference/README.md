@@ -6,7 +6,7 @@ This directory contains the reusable testing-strategy package for `US-PRG-04-T01
 
 - `testing-strategy.yaml` — the testing pyramid, cross-domain matrix, taxonomy, console-state expectations, and API-versioning expectations
 - `reference-dataset.json` — synthetic fixtures shared across multi-tenant, security, data, event, console, and resilience scenarios
-- `domain-seed-fixtures.json` — canonical tenant/workspace/entity seed profiles for starter, growth, and enterprise demos/tests
+- `domain-seed-fixtures.json` — canonical tenant/workspace/entity seed profiles for starter, growth, and enterprise demos/tests, including memberships, invitations, and plan-governance references
 - `deployment-smoke-matrix.yaml` — environment/platform smoke assertions for Kubernetes/OpenShift public-surface parity
 
 ## Usage rules
