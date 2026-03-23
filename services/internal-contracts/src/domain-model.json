@@ -1,6 +1,6 @@
 {
   "version": "2026-03-23",
-  "scope": "US-DOM-01",
+  "scope": "US-DOM-01, US-DOM-02",
   "system": "in-atelier-core-domain-model",
   "contracts": {
     "entity_read_model": {
@@ -65,6 +65,28 @@
         "projection_failure",
         "correlation_missing"
       ]
+    },
+    "effective_capability_resolution": {
+      "owner": "services/internal-contracts",
+      "version": "2026-03-23",
+      "required_fields": [
+        "scope",
+        "tenant_id",
+        "workspace_id",
+        "plan_id",
+        "deployment_profile_id",
+        "capabilities",
+        "quotas",
+        "resolved_at",
+        "correlation_context"
+      ],
+      "versioning": "Capability-resolution contracts evolve additively while preserving plan, quota, deployment-profile, provider-capability, and correlation semantics for tenant/workspace consumers.",
+      "error_classes": [
+        "plan_not_found",
+        "workspace_scope_mismatch",
+        "provider_capability_unavailable",
+        "quota_catalog_missing"
+      ]
     }
   },
   "shared_baseline": {
@@ -76,7 +98,14 @@
         "workspace": "wrk",
         "external_application": "app",
         "service_account": "svc",
-        "managed_resource": "res"
+        "managed_resource": "res",
+        "tenant_membership": "tmb",
+        "workspace_membership": "wmb",
+        "invitation": "inv",
+        "plan": "pln",
+        "quota_policy": "qta",
+        "deployment_profile": "dpf",
+        "provider_capability": "pvc"
       },
       "slug_pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$",
       "slug_rules": [
@@ -389,6 +418,315 @@
         "read_path": "/v1/workspaces/{workspaceId}/managed-resources/{resourceId}",
         "write_path": "/v1/workspaces/{workspaceId}/managed-resources"
       }
+    },
+    {
+      "id": "tenant_membership",
+      "scope": "tenant",
+      "description": "Auditable binding between one platform user and one tenant role set.",
+      "parent_entity_type": "tenant",
+      "id_prefix": "tmb",
+      "primary_id_field": "tenantMembershipId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "tenantMembershipId",
+        "tenantId",
+        "userId",
+        "role",
+        "membershipStatus",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "slug",
+        "invitationId",
+        "grantedByUserId",
+        "activatedAt",
+        "suspensionReason"
+      ],
+      "business_rules": [
+        "A tenant membership must reference an existing platform user and tenant.",
+        "At most one active tenant membership may exist for the same user, tenant, and role combination.",
+        "Workspace memberships require an active tenant membership unless a platform-level override is explicitly audited."
+      ],
+      "openapi": {
+        "read_schema": "TenantMembershipRecord",
+        "write_schema": "TenantMembershipRecordWriteRequest",
+        "read_path": "/v1/tenants/{tenantId}/memberships/{tenantMembershipId}",
+        "write_path": "/v1/tenants/{tenantId}/memberships"
+      }
+    },
+    {
+      "id": "workspace_membership",
+      "scope": "workspace",
+      "description": "Auditable binding between one platform user and one workspace role set.",
+      "parent_entity_type": "workspace",
+      "id_prefix": "wmb",
+      "primary_id_field": "workspaceMembershipId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "workspaceMembershipId",
+        "tenantId",
+        "workspaceId",
+        "userId",
+        "role",
+        "membershipStatus",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "slug",
+        "invitationId",
+        "grantedByUserId",
+        "activatedAt",
+        "suspensionReason"
+      ],
+      "business_rules": [
+        "A workspace membership must stay inside the tenant boundary of its parent workspace.",
+        "A workspace membership cannot become active while the parent tenant or workspace is suspended.",
+        "Workspace roles cannot widen tenant-wide authority and remain scoped to one workspace."
+      ],
+      "openapi": {
+        "read_schema": "WorkspaceMembershipRecord",
+        "write_schema": "WorkspaceMembershipRecordWriteRequest",
+        "read_path": "/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}",
+        "write_path": "/v1/workspaces/{workspaceId}/memberships"
+      }
+    },
+    {
+      "id": "invitation",
+      "scope": "tenant",
+      "description": "Invitation record used to onboard a human user into tenant or workspace scope without storing raw secrets.",
+      "parent_entity_type": "tenant",
+      "id_prefix": "inv",
+      "primary_id_field": "invitationId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "invitationId",
+        "tenantId",
+        "emailHash",
+        "targetType",
+        "role",
+        "invitationStatus",
+        "expiresAt",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "slug",
+        "workspaceId",
+        "maskedEmail",
+        "invitedByUserId",
+        "acceptedByUserId",
+        "acceptedAt"
+      ],
+      "business_rules": [
+        "Raw invitation emails stay outside the canonical model; only masked or hashed representations are stored here.",
+        "Workspace-targeted invitations must reference a workspace inside the same tenant boundary.",
+        "Only one non-terminal invitation may exist for the same tenant/workspace target, hashed email, and role tuple."
+      ],
+      "openapi": {
+        "read_schema": "Invitation",
+        "write_schema": "InvitationWriteRequest",
+        "read_path": "/v1/tenants/{tenantId}/invitations/{invitationId}",
+        "write_path": "/v1/tenants/{tenantId}/invitations"
+      }
+    },
+    {
+      "id": "plan",
+      "scope": "platform",
+      "description": "Commercial plan that groups entitlements, quota policy, and one default deployment profile.",
+      "parent_entity_type": null,
+      "id_prefix": "pln",
+      "primary_id_field": "planId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "planId",
+        "slug",
+        "displayName",
+        "planFamily",
+        "planStatus",
+        "deploymentProfileId",
+        "quotaPolicyId",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "billingInterval",
+        "successorPlanId",
+        "capabilityKeys"
+      ],
+      "business_rules": [
+        "Every plan must resolve to exactly one default deployment profile and one quota policy.",
+        "Retired plans remain readable for audit and grandfathering but cannot be assigned to new tenants.",
+        "Plan entitlements may only expose capabilities that are backed by the selected deployment profile and provider catalog."
+      ],
+      "openapi": {
+        "read_schema": "CommercialPlan",
+        "write_schema": "CommercialPlanWriteRequest",
+        "read_path": "/v1/plans/{planId}",
+        "write_path": "/v1/plans"
+      }
+    },
+    {
+      "id": "quota_policy",
+      "scope": "platform",
+      "description": "Reusable quota policy that defines default enforced limits and overage behavior.",
+      "parent_entity_type": null,
+      "id_prefix": "qta",
+      "primary_id_field": "quotaPolicyId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "quotaPolicyId",
+        "slug",
+        "displayName",
+        "quotaScope",
+        "enforcementMode",
+        "defaultLimits",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "burstLimits",
+        "gracePeriodHours",
+        "warningThresholdPercent"
+      ],
+      "business_rules": [
+        "Quota policies must declare deterministic default limits for every governed metric.",
+        "Hard-stop quotas block new provisioning or scaling actions but preserve read and audit access.",
+        "Overrides require an audited policy workflow and must never widen another tenant or workspace boundary."
+      ],
+      "openapi": {
+        "read_schema": "QuotaPolicy",
+        "write_schema": "QuotaPolicyWriteRequest",
+        "read_path": "/v1/plans/{planId}/quota-policies/{quotaPolicyId}",
+        "write_path": "/v1/plans/{planId}/quota-policies"
+      }
+    },
+    {
+      "id": "deployment_profile",
+      "scope": "platform",
+      "description": "Technical deployment profile that captures topology, environment support, and plane-specific defaults.",
+      "parent_entity_type": null,
+      "id_prefix": "dpf",
+      "primary_id_field": "deploymentProfileId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "deploymentProfileId",
+        "slug",
+        "displayName",
+        "profileClass",
+        "supportedEnvironments",
+        "planeBindings",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "providerCapabilityIds",
+        "observabilityProfile",
+        "quotaProfileRef"
+      ],
+      "business_rules": [
+        "Deployment profiles must preserve explicit control, data, identity, and observability plane separation.",
+        "Supported environments must align with the deployment-topology catalog.",
+        "Provider capability bindings are additive catalogs only; runtime secrets and credentials stay outside the profile."
+      ],
+      "openapi": {
+        "read_schema": "DeploymentProfileRecord",
+        "write_schema": "DeploymentProfileRecordWriteRequest",
+        "read_path": "/v1/deployment-profiles/{deploymentProfileId}",
+        "write_path": "/v1/deployment-profiles"
+      }
+    },
+    {
+      "id": "provider_capability",
+      "scope": "platform",
+      "description": "Provider-backed technical capability that can be exposed or constrained by deployment profiles and plans.",
+      "parent_entity_type": null,
+      "id_prefix": "pvc",
+      "primary_id_field": "providerCapabilityId",
+      "slug_field": "slug",
+      "state_field": "state",
+      "supported_states": [
+        "draft",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "required_fields": [
+        "providerCapabilityId",
+        "provider",
+        "capabilityKey",
+        "plane",
+        "capabilityStatus",
+        "allowedEnvironments",
+        "state",
+        "timestamps",
+        "metadata"
+      ],
+      "optional_fields": [
+        "resourceType",
+        "supportLevel",
+        "constraints"
+      ],
+      "business_rules": [
+        "A disabled provider capability cannot become effectively enabled even when a commercial plan grants it.",
+        "Capability metadata remains provider-specific but secret-free.",
+        "Provider capability catalogs must surface observable degradation and support level for operators."
+      ],
+      "openapi": {
+        "read_schema": "ProviderCapabilityRecord",
+        "write_schema": "ProviderCapabilityRecordWriteRequest",
+        "read_path": "/v1/provider-capabilities/{providerCapabilityId}",
+        "write_path": "/v1/provider-capabilities"
+      }
     }
   ],
   "relationships": [
@@ -487,6 +825,78 @@
         "Application-to-resource links are explicit and workspace-scoped.",
         "Soft-deleted applications cannot gain new managed-resource bindings."
       ]
+    },
+    {
+      "id": "tenant_tenant_memberships",
+      "source_entity": "tenant",
+      "target_entity": "tenant_membership",
+      "cardinality": "one_to_many",
+      "required": false,
+      "ownership": "governance",
+      "integrity_rules": [
+        "Tenant membership tenantId must equal the parent tenant id.",
+        "Tenant suspension prevents new active tenant memberships until remediation is recorded."
+      ]
+    },
+    {
+      "id": "workspace_workspace_memberships",
+      "source_entity": "workspace",
+      "target_entity": "workspace_membership",
+      "cardinality": "one_to_many",
+      "required": false,
+      "ownership": "governance",
+      "integrity_rules": [
+        "Workspace membership workspaceId must equal the parent workspace id.",
+        "Workspace suspension blocks new active workspace memberships."
+      ]
+    },
+    {
+      "id": "tenant_invitations",
+      "source_entity": "tenant",
+      "target_entity": "invitation",
+      "cardinality": "one_to_many",
+      "required": false,
+      "ownership": "governance",
+      "integrity_rules": [
+        "Invitations inherit tenant scope and cannot target another tenant.",
+        "Workspace-targeted invitations must reference a workspace under the same tenant."
+      ]
+    },
+    {
+      "id": "plan_quota_policies",
+      "source_entity": "plan",
+      "target_entity": "quota_policy",
+      "cardinality": "one_to_one",
+      "required": true,
+      "ownership": "composition",
+      "integrity_rules": [
+        "Every plan must reference one quota policy.",
+        "Quota policy changes for a plan are audited as commercial governance events."
+      ]
+    },
+    {
+      "id": "plan_deployment_profiles",
+      "source_entity": "plan",
+      "target_entity": "deployment_profile",
+      "cardinality": "one_to_one",
+      "required": true,
+      "ownership": "composition",
+      "integrity_rules": [
+        "Every plan must reference one default deployment profile.",
+        "Plan and deployment-profile mappings change only through versioned governance workflows."
+      ]
+    },
+    {
+      "id": "deployment_profile_provider_capabilities",
+      "source_entity": "deployment_profile",
+      "target_entity": "provider_capability",
+      "cardinality": "many_to_many",
+      "required": false,
+      "ownership": "catalog",
+      "integrity_rules": [
+        "Deployment profiles list only provider capabilities that remain valid for their supported environments.",
+        "Capability degradations remain visible even when commercial plans continue to reference the feature."
+      ]
     }
   ],
   "lifecycle_transitions": [
@@ -528,36 +938,1144 @@
     }
   ],
   "lifecycle_events": [
-    { "event_type": "platform_user.created", "entity_type": "platform_user", "transition": "create" },
-    { "event_type": "platform_user.activated", "entity_type": "platform_user", "transition": "activate" },
-    { "event_type": "platform_user.suspended", "entity_type": "platform_user", "transition": "suspend" },
-    { "event_type": "platform_user.soft_deleted", "entity_type": "platform_user", "transition": "soft_delete" },
-    { "event_type": "tenant.created", "entity_type": "tenant", "transition": "create" },
-    { "event_type": "tenant.activated", "entity_type": "tenant", "transition": "activate" },
-    { "event_type": "tenant.suspended", "entity_type": "tenant", "transition": "suspend" },
-    { "event_type": "tenant.soft_deleted", "entity_type": "tenant", "transition": "soft_delete" },
-    { "event_type": "workspace.created", "entity_type": "workspace", "transition": "create" },
-    { "event_type": "workspace.activated", "entity_type": "workspace", "transition": "activate" },
-    { "event_type": "workspace.suspended", "entity_type": "workspace", "transition": "suspend" },
-    { "event_type": "workspace.soft_deleted", "entity_type": "workspace", "transition": "soft_delete" },
-    { "event_type": "external_application.created", "entity_type": "external_application", "transition": "create" },
-    { "event_type": "external_application.activated", "entity_type": "external_application", "transition": "activate" },
-    { "event_type": "external_application.suspended", "entity_type": "external_application", "transition": "suspend" },
-    { "event_type": "external_application.soft_deleted", "entity_type": "external_application", "transition": "soft_delete" },
-    { "event_type": "service_account.created", "entity_type": "service_account", "transition": "create" },
-    { "event_type": "service_account.activated", "entity_type": "service_account", "transition": "activate" },
-    { "event_type": "service_account.suspended", "entity_type": "service_account", "transition": "suspend" },
-    { "event_type": "service_account.soft_deleted", "entity_type": "service_account", "transition": "soft_delete" },
-    { "event_type": "managed_resource.created", "entity_type": "managed_resource", "transition": "create" },
-    { "event_type": "managed_resource.activated", "entity_type": "managed_resource", "transition": "activate" },
-    { "event_type": "managed_resource.suspended", "entity_type": "managed_resource", "transition": "suspend" },
-    { "event_type": "managed_resource.soft_deleted", "entity_type": "managed_resource", "transition": "soft_delete" }
+    {
+      "event_type": "platform_user.created",
+      "entity_type": "platform_user",
+      "transition": "create"
+    },
+    {
+      "event_type": "platform_user.activated",
+      "entity_type": "platform_user",
+      "transition": "activate"
+    },
+    {
+      "event_type": "platform_user.suspended",
+      "entity_type": "platform_user",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "platform_user.soft_deleted",
+      "entity_type": "platform_user",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "tenant.created",
+      "entity_type": "tenant",
+      "transition": "create"
+    },
+    {
+      "event_type": "tenant.activated",
+      "entity_type": "tenant",
+      "transition": "activate"
+    },
+    {
+      "event_type": "tenant.suspended",
+      "entity_type": "tenant",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "tenant.soft_deleted",
+      "entity_type": "tenant",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "workspace.created",
+      "entity_type": "workspace",
+      "transition": "create"
+    },
+    {
+      "event_type": "workspace.activated",
+      "entity_type": "workspace",
+      "transition": "activate"
+    },
+    {
+      "event_type": "workspace.suspended",
+      "entity_type": "workspace",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "workspace.soft_deleted",
+      "entity_type": "workspace",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "external_application.created",
+      "entity_type": "external_application",
+      "transition": "create"
+    },
+    {
+      "event_type": "external_application.activated",
+      "entity_type": "external_application",
+      "transition": "activate"
+    },
+    {
+      "event_type": "external_application.suspended",
+      "entity_type": "external_application",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "external_application.soft_deleted",
+      "entity_type": "external_application",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "service_account.created",
+      "entity_type": "service_account",
+      "transition": "create"
+    },
+    {
+      "event_type": "service_account.activated",
+      "entity_type": "service_account",
+      "transition": "activate"
+    },
+    {
+      "event_type": "service_account.suspended",
+      "entity_type": "service_account",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "service_account.soft_deleted",
+      "entity_type": "service_account",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "managed_resource.created",
+      "entity_type": "managed_resource",
+      "transition": "create"
+    },
+    {
+      "event_type": "managed_resource.activated",
+      "entity_type": "managed_resource",
+      "transition": "activate"
+    },
+    {
+      "event_type": "managed_resource.suspended",
+      "entity_type": "managed_resource",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "managed_resource.soft_deleted",
+      "entity_type": "managed_resource",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "tenant_membership.created",
+      "entity_type": "tenant_membership",
+      "transition": "create"
+    },
+    {
+      "event_type": "tenant_membership.activated",
+      "entity_type": "tenant_membership",
+      "transition": "activate"
+    },
+    {
+      "event_type": "tenant_membership.suspended",
+      "entity_type": "tenant_membership",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "tenant_membership.soft_deleted",
+      "entity_type": "tenant_membership",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "workspace_membership.created",
+      "entity_type": "workspace_membership",
+      "transition": "create"
+    },
+    {
+      "event_type": "workspace_membership.activated",
+      "entity_type": "workspace_membership",
+      "transition": "activate"
+    },
+    {
+      "event_type": "workspace_membership.suspended",
+      "entity_type": "workspace_membership",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "workspace_membership.soft_deleted",
+      "entity_type": "workspace_membership",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "invitation.created",
+      "entity_type": "invitation",
+      "transition": "create"
+    },
+    {
+      "event_type": "invitation.activated",
+      "entity_type": "invitation",
+      "transition": "activate"
+    },
+    {
+      "event_type": "invitation.suspended",
+      "entity_type": "invitation",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "invitation.soft_deleted",
+      "entity_type": "invitation",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "plan.created",
+      "entity_type": "plan",
+      "transition": "create"
+    },
+    {
+      "event_type": "plan.activated",
+      "entity_type": "plan",
+      "transition": "activate"
+    },
+    {
+      "event_type": "plan.suspended",
+      "entity_type": "plan",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "plan.soft_deleted",
+      "entity_type": "plan",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "quota_policy.created",
+      "entity_type": "quota_policy",
+      "transition": "create"
+    },
+    {
+      "event_type": "quota_policy.activated",
+      "entity_type": "quota_policy",
+      "transition": "activate"
+    },
+    {
+      "event_type": "quota_policy.suspended",
+      "entity_type": "quota_policy",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "quota_policy.soft_deleted",
+      "entity_type": "quota_policy",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "deployment_profile.created",
+      "entity_type": "deployment_profile",
+      "transition": "create"
+    },
+    {
+      "event_type": "deployment_profile.activated",
+      "entity_type": "deployment_profile",
+      "transition": "activate"
+    },
+    {
+      "event_type": "deployment_profile.suspended",
+      "entity_type": "deployment_profile",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "deployment_profile.soft_deleted",
+      "entity_type": "deployment_profile",
+      "transition": "soft_delete"
+    },
+    {
+      "event_type": "provider_capability.created",
+      "entity_type": "provider_capability",
+      "transition": "create"
+    },
+    {
+      "event_type": "provider_capability.activated",
+      "entity_type": "provider_capability",
+      "transition": "activate"
+    },
+    {
+      "event_type": "provider_capability.suspended",
+      "entity_type": "provider_capability",
+      "transition": "suspend"
+    },
+    {
+      "event_type": "provider_capability.soft_deleted",
+      "entity_type": "provider_capability",
+      "transition": "soft_delete"
+    }
   ],
   "business_invariants": [
     "tenant_id is the root business boundary for every non-platform entity.",
     "workspace_id is required for external_application, service_account, and managed_resource lifecycle events.",
     "Cross-tenant or cross-workspace references are invalid even if raw identifiers exist.",
     "Platform users are the only human entity type; service accounts represent workload automation only.",
-    "Managed resource kinds map to authorization resource types and stay provider-agnostic at the canonical layer."
+    "Managed resource kinds map to authorization resource types and stay provider-agnostic at the canonical layer.",
+    "Membership and invitation records are first-class auditable entities and never rely on implicit role propagation.",
+    "Commercial plan entitlements must resolve through deployment profiles and provider capabilities before surfacing to tenants or workspaces.",
+    "Quota enforcement is safe-by-default: downgrades cannot silently strand live tenant usage without an explicit remediation path.",
+    "Capability-resolution outputs preserve plane labels so operators can distinguish control, data, identity, and observability effects."
+  ],
+  "business_state_machines": [
+    {
+      "id": "tenant_membership_status",
+      "entity_type": "tenant_membership",
+      "field": "membershipStatus",
+      "initial_state": "pending_activation",
+      "states": [
+        "pending_activation",
+        "active",
+        "suspended",
+        "revoked"
+      ],
+      "terminal_states": [
+        "revoked"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "pending_activation",
+          "to": "active"
+        },
+        {
+          "from": "pending_activation",
+          "to": "revoked"
+        },
+        {
+          "from": "active",
+          "to": "suspended"
+        },
+        {
+          "from": "suspended",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "revoked"
+        },
+        {
+          "from": "suspended",
+          "to": "revoked"
+        }
+      ],
+      "rules": [
+        "Activation requires an existing user, tenant, and auditable grant decision.",
+        "Revoked memberships cannot be reactivated in place; a new grant record must be issued."
+      ]
+    },
+    {
+      "id": "workspace_membership_status",
+      "entity_type": "workspace_membership",
+      "field": "membershipStatus",
+      "initial_state": "pending_activation",
+      "states": [
+        "pending_activation",
+        "active",
+        "suspended",
+        "revoked"
+      ],
+      "terminal_states": [
+        "revoked"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "pending_activation",
+          "to": "active"
+        },
+        {
+          "from": "pending_activation",
+          "to": "revoked"
+        },
+        {
+          "from": "active",
+          "to": "suspended"
+        },
+        {
+          "from": "suspended",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "revoked"
+        },
+        {
+          "from": "suspended",
+          "to": "revoked"
+        }
+      ],
+      "rules": [
+        "Workspace activation requires a tenant-safe parent membership or explicit platform override.",
+        "Workspace revocation does not implicitly revoke tenant membership, but access is removed immediately for the workspace."
+      ]
+    },
+    {
+      "id": "invitation_status",
+      "entity_type": "invitation",
+      "field": "invitationStatus",
+      "initial_state": "pending",
+      "states": [
+        "pending",
+        "accepted",
+        "revoked",
+        "expired"
+      ],
+      "terminal_states": [
+        "accepted",
+        "revoked",
+        "expired"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "pending",
+          "to": "accepted"
+        },
+        {
+          "from": "pending",
+          "to": "revoked"
+        },
+        {
+          "from": "pending",
+          "to": "expired"
+        }
+      ],
+      "rules": [
+        "Acceptance requires the acting identity to match the invitation target email hash or verified alias policy.",
+        "Expired or revoked invitations cannot mint memberships without a new invitation record."
+      ]
+    },
+    {
+      "id": "plan_status",
+      "entity_type": "plan",
+      "field": "planStatus",
+      "initial_state": "draft",
+      "states": [
+        "draft",
+        "active",
+        "grandfathered",
+        "retired"
+      ],
+      "terminal_states": [
+        "retired"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "draft",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "grandfathered"
+        },
+        {
+          "from": "active",
+          "to": "retired"
+        },
+        {
+          "from": "grandfathered",
+          "to": "retired"
+        }
+      ],
+      "rules": [
+        "Grandfathered plans stay assignable only to existing tenants already using the plan.",
+        "Retired plans remain readable for audit, billing reconciliation, and downgrade analysis."
+      ]
+    },
+    {
+      "id": "quota_governance_status",
+      "entity_type": "quota_policy",
+      "field": "governanceStatus",
+      "initial_state": "nominal",
+      "states": [
+        "nominal",
+        "warning",
+        "throttled",
+        "blocked"
+      ],
+      "terminal_states": [
+        "blocked"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "nominal",
+          "to": "warning"
+        },
+        {
+          "from": "warning",
+          "to": "nominal"
+        },
+        {
+          "from": "warning",
+          "to": "throttled"
+        },
+        {
+          "from": "throttled",
+          "to": "nominal"
+        },
+        {
+          "from": "throttled",
+          "to": "blocked"
+        }
+      ],
+      "rules": [
+        "Advisory thresholds emit observability signals before hard stops apply.",
+        "Blocked status prevents new provisioning or scale-out but preserves read-only, billing, and audit flows."
+      ]
+    }
+  ],
+  "governance_catalogs": {
+    "plans": [
+      {
+        "planId": "pln_01starter",
+        "slug": "starter",
+        "displayName": "Starter",
+        "planFamily": "starter",
+        "planStatus": "active",
+        "deploymentProfileId": "dpf_01sharedstarter",
+        "quotaPolicyId": "qta_01starter",
+        "billingInterval": "monthly",
+        "capabilityKeys": [
+          "identity.sso.oidc",
+          "data.postgresql.shared",
+          "data.storage.bucket",
+          "observability.metrics.basic"
+        ]
+      },
+      {
+        "planId": "pln_01growth",
+        "slug": "growth",
+        "displayName": "Growth",
+        "planFamily": "growth",
+        "planStatus": "active",
+        "deploymentProfileId": "dpf_01sharedgrowth",
+        "quotaPolicyId": "qta_01growth",
+        "billingInterval": "monthly",
+        "capabilityKeys": [
+          "identity.sso.oidc",
+          "data.postgresql.shared",
+          "data.storage.bucket",
+          "data.kafka.topics",
+          "data.openwhisk.actions",
+          "observability.metrics.basic",
+          "observability.logs.extended"
+        ]
+      },
+      {
+        "planId": "pln_01regulated",
+        "slug": "regulated",
+        "displayName": "Regulated",
+        "planFamily": "regulated",
+        "planStatus": "active",
+        "deploymentProfileId": "dpf_01regulateddedicated",
+        "quotaPolicyId": "qta_01regulated",
+        "billingInterval": "annual",
+        "capabilityKeys": [
+          "identity.sso.oidc",
+          "data.postgresql.dedicated",
+          "data.storage.bucket",
+          "data.kafka.topics",
+          "observability.metrics.basic",
+          "observability.audit.export"
+        ]
+      },
+      {
+        "planId": "pln_01enterprise",
+        "slug": "enterprise",
+        "displayName": "Enterprise",
+        "planFamily": "enterprise",
+        "planStatus": "active",
+        "deploymentProfileId": "dpf_01enterprisefederated",
+        "quotaPolicyId": "qta_01enterprise",
+        "billingInterval": "annual",
+        "capabilityKeys": [
+          "identity.sso.oidc",
+          "data.postgresql.dedicated",
+          "data.storage.bucket",
+          "data.kafka.topics",
+          "data.openwhisk.actions",
+          "control.federated_clusters",
+          "observability.metrics.basic",
+          "observability.logs.extended",
+          "observability.traces.long_retention",
+          "observability.audit.export"
+        ]
+      }
+    ],
+    "quota_policies": [
+      {
+        "quotaPolicyId": "qta_01starter",
+        "slug": "starter-default",
+        "displayName": "Starter default quota policy",
+        "quotaScope": "tenant_and_workspace",
+        "enforcementMode": "hard_stop",
+        "warningThresholdPercent": 80,
+        "defaultLimits": [
+          {
+            "metricKey": "tenant.workspaces.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 1
+          },
+          {
+            "metricKey": "tenant.members.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 10
+          },
+          {
+            "metricKey": "workspace.managed_resources.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 8
+          },
+          {
+            "metricKey": "workspace.kafka_topics.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 0
+          },
+          {
+            "metricKey": "workspace.monthly_function_invocations.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 100000
+          },
+          {
+            "metricKey": "tenant.audit_retention_days.max",
+            "scope": "tenant",
+            "unit": "days",
+            "limit": 30
+          }
+        ]
+      },
+      {
+        "quotaPolicyId": "qta_01growth",
+        "slug": "growth-default",
+        "displayName": "Growth default quota policy",
+        "quotaScope": "tenant_and_workspace",
+        "enforcementMode": "hard_stop",
+        "warningThresholdPercent": 85,
+        "defaultLimits": [
+          {
+            "metricKey": "tenant.workspaces.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 3
+          },
+          {
+            "metricKey": "tenant.members.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 50
+          },
+          {
+            "metricKey": "workspace.managed_resources.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 24
+          },
+          {
+            "metricKey": "workspace.kafka_topics.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 20
+          },
+          {
+            "metricKey": "workspace.monthly_function_invocations.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 1000000
+          },
+          {
+            "metricKey": "tenant.audit_retention_days.max",
+            "scope": "tenant",
+            "unit": "days",
+            "limit": 90
+          }
+        ]
+      },
+      {
+        "quotaPolicyId": "qta_01regulated",
+        "slug": "regulated-default",
+        "displayName": "Regulated default quota policy",
+        "quotaScope": "tenant_and_workspace",
+        "enforcementMode": "hard_stop",
+        "warningThresholdPercent": 90,
+        "defaultLimits": [
+          {
+            "metricKey": "tenant.workspaces.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 5
+          },
+          {
+            "metricKey": "tenant.members.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 100
+          },
+          {
+            "metricKey": "workspace.managed_resources.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 40
+          },
+          {
+            "metricKey": "workspace.kafka_topics.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 40
+          },
+          {
+            "metricKey": "workspace.monthly_function_invocations.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 500000
+          },
+          {
+            "metricKey": "tenant.audit_retention_days.max",
+            "scope": "tenant",
+            "unit": "days",
+            "limit": 365
+          }
+        ]
+      },
+      {
+        "quotaPolicyId": "qta_01enterprise",
+        "slug": "enterprise-default",
+        "displayName": "Enterprise default quota policy",
+        "quotaScope": "tenant_and_workspace",
+        "enforcementMode": "hard_stop",
+        "warningThresholdPercent": 90,
+        "defaultLimits": [
+          {
+            "metricKey": "tenant.workspaces.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 10
+          },
+          {
+            "metricKey": "tenant.members.max",
+            "scope": "tenant",
+            "unit": "count",
+            "limit": 250
+          },
+          {
+            "metricKey": "workspace.managed_resources.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 100
+          },
+          {
+            "metricKey": "workspace.kafka_topics.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 200
+          },
+          {
+            "metricKey": "workspace.monthly_function_invocations.max",
+            "scope": "workspace",
+            "unit": "count",
+            "limit": 5000000
+          },
+          {
+            "metricKey": "tenant.audit_retention_days.max",
+            "scope": "tenant",
+            "unit": "days",
+            "limit": 730
+          }
+        ]
+      }
+    ],
+    "deployment_profiles": [
+      {
+        "deploymentProfileId": "dpf_01sharedstarter",
+        "slug": "shared-starter",
+        "displayName": "Shared starter profile",
+        "profileClass": "shared",
+        "supportedEnvironments": [
+          "dev",
+          "sandbox"
+        ],
+        "planeBindings": {
+          "control": "shared-control-plane",
+          "data": "shared-schema",
+          "identity": "shared-keycloak-realm",
+          "observability": "shared-30d-retention"
+        },
+        "providerCapabilityIds": [
+          "pvc_01keycloakoidc",
+          "pvc_01pgshared",
+          "pvc_01storagebucket",
+          "pvc_01metricsbasic"
+        ]
+      },
+      {
+        "deploymentProfileId": "dpf_01sharedgrowth",
+        "slug": "shared-growth",
+        "displayName": "Shared growth profile",
+        "profileClass": "shared",
+        "supportedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ],
+        "planeBindings": {
+          "control": "shared-control-plane",
+          "data": "shared-schema-plus-streams",
+          "identity": "shared-keycloak-realm",
+          "observability": "shared-90d-retention"
+        },
+        "providerCapabilityIds": [
+          "pvc_01keycloakoidc",
+          "pvc_01pgshared",
+          "pvc_01storagebucket",
+          "pvc_01kafkatopics",
+          "pvc_01openwhiskactions",
+          "pvc_01metricsbasic",
+          "pvc_01logsextended"
+        ]
+      },
+      {
+        "deploymentProfileId": "dpf_01regulateddedicated",
+        "slug": "regulated-dedicated",
+        "displayName": "Regulated dedicated profile",
+        "profileClass": "dedicated",
+        "supportedEnvironments": [
+          "staging",
+          "prod"
+        ],
+        "planeBindings": {
+          "control": "dedicated-control-plane-policy-set",
+          "data": "dedicated-database",
+          "identity": "dedicated-keycloak-realm",
+          "observability": "regulated-365d-retention"
+        },
+        "providerCapabilityIds": [
+          "pvc_01keycloakoidc",
+          "pvc_01pgdedicated",
+          "pvc_01storagebucket",
+          "pvc_01kafkatopics",
+          "pvc_01metricsbasic",
+          "pvc_01auditexport"
+        ]
+      },
+      {
+        "deploymentProfileId": "dpf_01enterprisefederated",
+        "slug": "enterprise-federated",
+        "displayName": "Enterprise federated profile",
+        "profileClass": "federated",
+        "supportedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ],
+        "planeBindings": {
+          "control": "federated-control-plane",
+          "data": "dedicated-data-plane",
+          "identity": "federated-identity-plane",
+          "observability": "enterprise-730d-retention"
+        },
+        "providerCapabilityIds": [
+          "pvc_01keycloakoidc",
+          "pvc_01pgdedicated",
+          "pvc_01storagebucket",
+          "pvc_01kafkatopics",
+          "pvc_01openwhiskactions",
+          "pvc_01metricsbasic",
+          "pvc_01logsextended",
+          "pvc_01tracesretention",
+          "pvc_01federatedclusters",
+          "pvc_01auditexport"
+        ]
+      }
+    ],
+    "provider_capabilities": [
+      {
+        "providerCapabilityId": "pvc_01keycloakoidc",
+        "slug": "keycloak-oidc",
+        "provider": "keycloak",
+        "capabilityKey": "identity.sso.oidc",
+        "plane": "identity",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01pgshared",
+        "slug": "postgresql-shared-schema",
+        "provider": "postgresql",
+        "capabilityKey": "data.postgresql.shared",
+        "plane": "data",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01pgdedicated",
+        "slug": "postgresql-dedicated",
+        "provider": "postgresql",
+        "capabilityKey": "data.postgresql.dedicated",
+        "plane": "data",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01storagebucket",
+        "slug": "storage-bucket",
+        "provider": "storage",
+        "capabilityKey": "data.storage.bucket",
+        "plane": "data",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01kafkatopics",
+        "slug": "kafka-topics",
+        "provider": "kafka",
+        "capabilityKey": "data.kafka.topics",
+        "plane": "data",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01openwhiskactions",
+        "slug": "openwhisk-actions",
+        "provider": "openwhisk",
+        "capabilityKey": "data.openwhisk.actions",
+        "plane": "data",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01metricsbasic",
+        "slug": "metrics-basic",
+        "provider": "observability",
+        "capabilityKey": "observability.metrics.basic",
+        "plane": "observability",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "dev",
+          "sandbox",
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01logsextended",
+        "slug": "logs-extended",
+        "provider": "observability",
+        "capabilityKey": "observability.logs.extended",
+        "plane": "observability",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01tracesretention",
+        "slug": "traces-long-retention",
+        "provider": "observability",
+        "capabilityKey": "observability.traces.long_retention",
+        "plane": "observability",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01auditexport",
+        "slug": "audit-export",
+        "provider": "audit",
+        "capabilityKey": "observability.audit.export",
+        "plane": "observability",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "staging",
+          "prod"
+        ]
+      },
+      {
+        "providerCapabilityId": "pvc_01federatedclusters",
+        "slug": "federated-clusters",
+        "provider": "kubernetes",
+        "capabilityKey": "control.federated_clusters",
+        "plane": "control",
+        "capabilityStatus": "available",
+        "supportLevel": "ga",
+        "allowedEnvironments": [
+          "staging",
+          "prod"
+        ]
+      }
+    ]
+  },
+  "effective_capability_resolution": {
+    "layers": [
+      {
+        "id": "commercial_plan",
+        "precedence": 1,
+        "contributes": [
+          "capability_entitlements",
+          "quota_policy_id",
+          "deployment_profile_id"
+        ]
+      },
+      {
+        "id": "quota_policy",
+        "precedence": 2,
+        "contributes": [
+          "metric_limits",
+          "enforcement_mode",
+          "warning_thresholds"
+        ]
+      },
+      {
+        "id": "deployment_profile",
+        "precedence": 3,
+        "contributes": [
+          "plane_bindings",
+          "supported_environments",
+          "provider_capability_ids"
+        ]
+      },
+      {
+        "id": "provider_capability",
+        "precedence": 4,
+        "contributes": [
+          "capability_status",
+          "allowed_environments",
+          "support_level"
+        ]
+      }
+    ],
+    "rules": [
+      "A capability is effectively enabled only when it is granted by the plan, present in the deployment profile, and available in the provider capability catalog.",
+      "Workspace capability resolution inherits the tenant plan and may only narrow capabilities or quotas based on environment or provider availability.",
+      "Quota downgrades that would violate current usage must return a remediation-required outcome instead of silently applying destructive limits.",
+      "Control, data, identity, and observability planes remain explicit in the serialized result for operator inspection and audit trails."
+    ],
+    "observable_dimensions": [
+      "tenant_id",
+      "workspace_id",
+      "plan_id",
+      "deployment_profile_id",
+      "capability_key",
+      "resolution_status"
+    ],
+    "paths": {
+      "tenant": "/v1/tenants/{tenantId}/effective-capabilities",
+      "workspace": "/v1/tenants/{tenantId}/workspaces/{workspaceId}/effective-capabilities"
+    }
+  },
+  "plan_change_scenarios": [
+    {
+      "id": "starter-to-growth-upgrade",
+      "tenantProfileId": "starter-single-workspace",
+      "fromPlanId": "pln_01starter",
+      "toPlanId": "pln_01growth",
+      "currentUsage": {
+        "tenant.workspaces.max": 1,
+        "tenant.members.max": 2,
+        "workspace.managed_resources.max": 2,
+        "workspace.kafka_topics.max": 0,
+        "workspace.monthly_function_invocations.max": 0,
+        "tenant.audit_retention_days.max": 14
+      },
+      "expectedOutcome": {
+        "status": "compatible",
+        "addedCapabilities": [
+          "data.kafka.topics",
+          "data.openwhisk.actions",
+          "observability.logs.extended"
+        ],
+        "removedCapabilities": [],
+        "blockingMetrics": []
+      }
+    },
+    {
+      "id": "growth-to-starter-downgrade-blocked",
+      "tenantProfileId": "growth-multi-workspace",
+      "fromPlanId": "pln_01growth",
+      "toPlanId": "pln_01starter",
+      "currentUsage": {
+        "tenant.workspaces.max": 3,
+        "tenant.members.max": 6,
+        "workspace.managed_resources.max": 4,
+        "workspace.kafka_topics.max": 1,
+        "workspace.monthly_function_invocations.max": 240000,
+        "tenant.audit_retention_days.max": 60
+      },
+      "expectedOutcome": {
+        "status": "requires_remediation",
+        "addedCapabilities": [],
+        "removedCapabilities": [
+          "data.kafka.topics",
+          "data.openwhisk.actions",
+          "observability.logs.extended"
+        ],
+        "blockingMetrics": [
+          "tenant.workspaces.max",
+          "workspace.kafka_topics.max",
+          "workspace.monthly_function_invocations.max",
+          "tenant.audit_retention_days.max"
+        ]
+      }
+    },
+    {
+      "id": "regulated-to-enterprise-upgrade",
+      "tenantProfileId": "enterprise-dedicated",
+      "fromPlanId": "pln_01regulated",
+      "toPlanId": "pln_01enterprise",
+      "currentUsage": {
+        "tenant.workspaces.max": 4,
+        "tenant.members.max": 24,
+        "workspace.managed_resources.max": 12,
+        "workspace.kafka_topics.max": 6,
+        "workspace.monthly_function_invocations.max": 120000,
+        "tenant.audit_retention_days.max": 365
+      },
+      "expectedOutcome": {
+        "status": "compatible",
+        "addedCapabilities": [
+          "control.federated_clusters",
+          "data.openwhisk.actions",
+          "observability.logs.extended",
+          "observability.traces.long_retention"
+        ],
+        "removedCapabilities": [],
+        "blockingMetrics": []
+      }
+    }
   ]
 }
