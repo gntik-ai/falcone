@@ -24,6 +24,12 @@ importers:
 
   services/adapters: {}
 
+  services/internal-contracts: {}
+
+  services/provisioning-orchestrator: {}
+
+  services/audit: {}
+
   tests/e2e: {}
 
 packages:
