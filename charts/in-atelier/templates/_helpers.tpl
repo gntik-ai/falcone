@@ -24,6 +24,12 @@ app.kubernetes.io/part-of: in-atelier
 {{- end -}}
 {{- end -}}
 
+{{- define "in-atelier.componentSelectorLabels" -}}
+{{- $component := index .root.Values .component -}}
+app.kubernetes.io/name: {{ $component.wrapper.componentId | default .component }}
+app.kubernetes.io/instance: {{ .root.Release.Name }}
+{{- end -}}
+
 {{- define "in-atelier.componentServiceNameByAlias" -}}
 {{- $root := .root -}}
 {{- $component := .component -}}
