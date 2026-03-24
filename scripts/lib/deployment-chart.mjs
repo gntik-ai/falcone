@@ -292,6 +292,52 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     }
   }
 
+  const keycloakRealmLogin = keycloakBootstrap?.realm?.login ?? {};
+  if (keycloakRealmLogin.registrationAllowed !== true) {
+    violations.push('bootstrap.oneShot.keycloak.realm.login.registrationAllowed must remain true for console self-service signup.');
+  }
+  if (keycloakRealmLogin.verifyEmail !== true) {
+    violations.push('bootstrap.oneShot.keycloak.realm.login.verifyEmail must remain true for activation-aware signup.');
+  }
+  if (keycloakRealmLogin.resetPasswordAllowed !== true) {
+    violations.push('bootstrap.oneShot.keycloak.realm.login.resetPasswordAllowed must remain true for password recovery.');
+  }
+
+  const consoleClient = keycloakClients.find((client) => client?.clientId === 'in-atelier-console') ?? {};
+  if (consoleClient.directAccessGrantsEnabled !== true) {
+    violations.push('bootstrap.oneShot.keycloak.clients[in-atelier-console].directAccessGrantsEnabled must remain true for console login flows.');
+  }
+
+  const webConsoleAuth = values?.webConsole?.auth ?? {};
+  for (const field of ['issuerUrl', 'realm', 'clientId', 'loginPath', 'signupPath', 'pendingActivationPath', 'suspendedPath', 'credentialsExpiredPath', 'passwordRecoveryPath']) {
+    if (typeof webConsoleAuth?.[field] !== 'string' || webConsoleAuth[field].length === 0) {
+      violations.push(`webConsole.auth.${field} must be defined.`);
+    }
+  }
+
+  const policy = webConsoleAuth?.autoSignupPolicy ?? {};
+  if (!['disabled', 'approval_required', 'auto_activate'].includes(policy?.globalMode)) {
+    violations.push('webConsole.auth.autoSignupPolicy.globalMode must use a supported mode.');
+  }
+
+  for (const environment of ['dev', 'sandbox', 'staging', 'prod']) {
+    if (!['disabled', 'approval_required', 'auto_activate'].includes(policy?.environmentModes?.[environment])) {
+      violations.push(`webConsole.auth.autoSignupPolicy.environmentModes.${environment} must use a supported mode.`);
+    }
+  }
+
+  for (const plan of domainCatalog.plans ?? []) {
+    if (!['disabled', 'approval_required', 'auto_activate'].includes(policy?.planModes?.[plan.slug])) {
+      violations.push(`webConsole.auth.autoSignupPolicy.planModes.${plan.slug} must use a supported mode.`);
+    }
+  }
+
+  for (const statusKey of ['pending_activation', 'account_suspended', 'credentials_expired']) {
+    if (typeof webConsoleAuth?.statusMessages?.[statusKey] !== 'string' || webConsoleAuth.statusMessages[statusKey].length === 0) {
+      violations.push(`webConsole.auth.statusMessages.${statusKey} must be defined.`);
+    }
+  }
+
   if (!keycloakBootstrap?.tenantRealmTemplate?.realmIdPattern) {
     violations.push('bootstrap.oneShot.keycloak.tenantRealmTemplate.realmIdPattern must be defined.');
   }

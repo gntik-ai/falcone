@@ -23,7 +23,7 @@ All entities share the following baseline:
 
 - identifier format: `<prefix>_<ulid>`
 - lowercase URL-safe slugs
-- lifecycle states: `draft`, `provisioning`, `active`, `suspended`, `soft_deleted`
+- lifecycle states: `draft`, `provisioning`, `pending_activation`, `active`, `suspended`, `soft_deleted`
 - timestamps: `created_at`, `updated_at`, and optional lifecycle timestamps
 - additive, non-secret metadata
 - logical soft delete before physical purge
