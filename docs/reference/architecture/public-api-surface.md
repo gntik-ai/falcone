@@ -1,6 +1,6 @@
 # Public API Surface
 
-Version: v1 (header 2026-03-24, OpenAPI 1.4.0)
+Version: v1 (header 2026-03-24, OpenAPI 1.5.0)
 
 ## Product API vs native passthrough
 
@@ -78,6 +78,8 @@ Tenant lifecycle, membership, invitation, quota, and tenant-level capability sur
 | GET | `/v1/tenants/{tenantId}/effective-capabilities` | tenant | tenant_capabilities | Resolve effective capabilities for one tenant |
 | POST | `/v1/tenants/{tenantId}/invitations` | tenant | invitation | Submit an invitation write request |
 | GET | `/v1/tenants/{tenantId}/invitations/{invitationId}` | tenant | invitation | Fetch one invitation record |
+| POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance` | tenant | invitation | Accept a tenant or workspace invitation while it is still pending. |
+| POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/revocation` | tenant | invitation | Revoke a pending invitation before it is accepted or expires. |
 | POST | `/v1/tenants/{tenantId}/memberships` | tenant | tenant_membership | Submit a tenant membership write request |
 | GET | `/v1/tenants/{tenantId}/memberships/{tenantMembershipId}` | tenant | tenant_membership | Fetch one tenant membership record |
 
@@ -98,6 +100,9 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | GET | `/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}` | workspace | workspace_membership | Fetch one workspace membership record |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts` | workspace | service_account | Submit a canonical service account write request |
 | GET | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}` | workspace | service_account | Fetch one canonical service account entity |
+| POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance` | workspace | service_account | Issue a new secret-free credential reference for one workspace service account. |
+| POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations` | workspace | service_account | Revoke one or all active credential references for a workspace service account. |
+| POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations` | workspace | service_account | Rotate the active credential reference for one workspace service account. |
 
 ## Auth
 

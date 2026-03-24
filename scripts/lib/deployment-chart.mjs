@@ -277,6 +277,12 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     violations.push('bootstrap.oneShot.keycloak.realmRoles must define the platform and tenant/workspace role baseline.');
   }
 
+  for (const role of ['tenant_owner', 'workspace_owner', 'workspace_viewer', 'workspace_service_account']) {
+    if (!(keycloakBootstrap?.realmRoles ?? []).includes(role)) {
+      violations.push(`bootstrap.oneShot.keycloak.realmRoles must include ${role}.`);
+    }
+  }
+
   const keycloakClientScopes = keycloakBootstrap?.clientScopes ?? [];
   const requiredClientScopeNames = ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles'];
   for (const scopeName of requiredClientScopeNames) {
@@ -335,6 +341,31 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
   for (const statusKey of ['pending_activation', 'account_suspended', 'credentials_expired']) {
     if (typeof webConsoleAuth?.statusMessages?.[statusKey] !== 'string' || webConsoleAuth.statusMessages[statusKey].length === 0) {
       violations.push(`webConsole.auth.statusMessages.${statusKey} must be defined.`);
+    }
+  }
+
+  const expirationPolicies = webConsoleAuth?.expirationPolicies ?? {};
+  for (const field of ['defaultTtl', 'maxTtl']) {
+    if (typeof expirationPolicies?.invitations?.[field] !== 'string' || expirationPolicies.invitations[field].length === 0) {
+      violations.push(`webConsole.auth.expirationPolicies.invitations.${field} must be defined.`);
+    }
+  }
+  if (typeof expirationPolicies?.invitations?.allowOverride !== 'boolean') {
+    violations.push('webConsole.auth.expirationPolicies.invitations.allowOverride must be boolean.');
+  }
+  for (const field of ['passwordMaxAge', 'gracePeriod', 'recoveryTokenTtl']) {
+    if (typeof expirationPolicies?.humanCredentials?.[field] !== 'string' || expirationPolicies.humanCredentials[field].length === 0) {
+      violations.push(`webConsole.auth.expirationPolicies.humanCredentials.${field} must be defined.`);
+    }
+  }
+  for (const field of ['defaultTtl', 'maxTtl', 'rotateBefore']) {
+    if (typeof expirationPolicies?.serviceCredentials?.[field] !== 'string' || expirationPolicies.serviceCredentials[field].length === 0) {
+      violations.push(`webConsole.auth.expirationPolicies.serviceCredentials.${field} must be defined.`);
+    }
+  }
+  for (const field of ['maxLifetime', 'idleTimeout', 'refreshTokenMaxAge']) {
+    if (typeof expirationPolicies?.sessions?.[field] !== 'string' || expirationPolicies.sessions[field].length === 0) {
+      violations.push(`webConsole.auth.expirationPolicies.sessions.${field} must be defined.`);
     }
   }
 

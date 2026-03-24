@@ -78,6 +78,11 @@
         ],
         "type": "string"
       },
+      "DurationString": {
+        "description": "Compact duration string used by in-atelier lifecycle policies.",
+        "pattern": "^[0-9]+(?:s|m|h|d)$",
+        "type": "string"
+      },
       "EffectiveCapabilityResolution": {
         "additionalProperties": false,
         "properties": {
@@ -258,9 +263,40 @@
         ],
         "type": "object"
       },
+      "ExpirationRule": {
+        "additionalProperties": false,
+        "properties": {
+          "allowOverride": {
+            "type": "boolean"
+          },
+          "defaultTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "gracePeriod": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "maxTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          }
+        },
+        "required": [
+          "defaultTtl",
+          "maxTtl",
+          "allowOverride"
+        ],
+        "type": "object"
+      },
       "Invitation": {
         "additionalProperties": false,
         "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "acceptedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
           "emailHash": {
             "maxLength": 255,
             "minLength": 12,
@@ -269,6 +305,9 @@
           "entityType": {
             "const": "invitation",
             "type": "string"
+          },
+          "expirationPolicy": {
+            "$ref": "#/components/schemas/ExpirationRule"
           },
           "expiresAt": {
             "format": "date-time",
@@ -281,6 +320,10 @@
           "invitationStatus": {
             "$ref": "#/components/schemas/InvitationStatus"
           },
+          "issuedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
           "maskedEmail": {
             "maxLength": 255,
             "minLength": 5,
@@ -289,6 +332,14 @@
           "metadata": {
             "$ref": "#/components/schemas/EntityMetadata"
           },
+          "revokedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revokedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
           "role": {
             "maxLength": 80,
             "minLength": 3,
@@ -296,6 +347,13 @@
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
+          },
+          "targetBindings": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationTargetBinding"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "targetType": {
             "$ref": "#/components/schemas/InvitationTargetType"
@@ -323,7 +381,52 @@
           "expiresAt",
           "state",
           "timestamps",
-          "metadata"
+          "metadata",
+          "issuedByUserId",
+          "targetBindings",
+          "expirationPolicy"
+        ],
+        "type": "object"
+      },
+      "InvitationAcceptanceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptanceToken": {
+            "maxLength": 512,
+            "minLength": 12,
+            "type": "string"
+          },
+          "acceptedWorkspaceId": {
+            "pattern": "^wrk_[0-9a-z]+$",
+            "type": "string"
+          },
+          "actorUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "acceptanceToken",
+          "actorUserId"
+        ],
+        "type": "object"
+      },
+      "InvitationRevocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 255,
+            "minLength": 3,
+            "type": "string"
+          },
+          "revokedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "revokedByUserId"
         ],
         "type": "object"
       },
@@ -335,6 +438,30 @@
           "expired"
         ],
         "type": "string"
+      },
+      "InvitationTargetBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "bindingRef": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          },
+          "bindingType": {
+            "enum": [
+              "tenant",
+              "workspace",
+              "user",
+              "group"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "bindingType",
+          "bindingRef"
+        ],
+        "type": "object"
       },
       "InvitationTargetType": {
         "enum": [
@@ -358,12 +485,19 @@
             "const": "invitation",
             "type": "string"
           },
+          "expirationPolicy": {
+            "$ref": "#/components/schemas/ExpirationRule"
+          },
           "expiresAt": {
             "format": "date-time",
             "type": "string"
           },
           "invitationStatus": {
             "$ref": "#/components/schemas/InvitationStatus"
+          },
+          "issuedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
           },
           "maskedEmail": {
             "maxLength": 255,
@@ -377,6 +511,13 @@
             "maxLength": 80,
             "minLength": 3,
             "type": "string"
+          },
+          "targetBindings": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationTargetBinding"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "targetType": {
             "$ref": "#/components/schemas/InvitationTargetType"
@@ -394,7 +535,10 @@
           "invitationStatus",
           "expiresAt",
           "desiredState",
-          "metadata"
+          "metadata",
+          "issuedByUserId",
+          "targetBindings",
+          "expirationPolicy"
         ],
         "type": "object"
       },
@@ -425,6 +569,100 @@
         "required": [
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "MembershipPrincipalBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "clientId": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          },
+          "iamGroupIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 3,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "iamUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "realm": {
+            "maxLength": 120,
+            "minLength": 3,
+            "type": "string"
+          },
+          "sourceType": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceType",
+          "realm"
+        ],
+        "type": "object"
+      },
+      "MembershipRoleMapping": {
+        "additionalProperties": false,
+        "properties": {
+          "assignedRoles": {
+            "items": {
+              "maxLength": 80,
+              "minLength": 3,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "externalPrincipalId": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          },
+          "externalPrincipalType": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "precedence": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "direct_user",
+              "keycloak_group",
+              "invitation"
+            ],
+            "type": "string"
+          },
+          "syncedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalPrincipalType",
+          "externalPrincipalId",
+          "assignedRoles",
+          "source"
         ],
         "type": "object"
       },
@@ -617,6 +855,14 @@
         ],
         "type": "object"
       },
+      "RoleMappingStatus": {
+        "enum": [
+          "pending_sync",
+          "synced",
+          "degraded"
+        ],
+        "type": "string"
+      },
       "Tenant": {
         "additionalProperties": false,
         "properties": {
@@ -756,6 +1002,12 @@
       "TenantMembershipRecord": {
         "additionalProperties": false,
         "properties": {
+          "effectiveRoles": {
+            "items": {
+              "$ref": "#/components/schemas/TenantRole"
+            },
+            "type": "array"
+          },
           "entityType": {
             "const": "tenant_membership",
             "type": "string"
@@ -774,8 +1026,21 @@
           "metadata": {
             "$ref": "#/components/schemas/EntityMetadata"
           },
+          "principalBindings": {
+            "$ref": "#/components/schemas/MembershipPrincipalBinding"
+          },
           "role": {
             "$ref": "#/components/schemas/TenantRole"
+          },
+          "roleMappingStatus": {
+            "$ref": "#/components/schemas/RoleMappingStatus"
+          },
+          "roleMappings": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRoleMapping"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
@@ -805,7 +1070,10 @@
           "membershipStatus",
           "state",
           "timestamps",
-          "metadata"
+          "metadata",
+          "principalBindings",
+          "roleMappings",
+          "roleMappingStatus"
         ],
         "type": "object"
       },
@@ -814,6 +1082,12 @@
         "properties": {
           "desiredState": {
             "$ref": "#/components/schemas/EntityState"
+          },
+          "effectiveRoles": {
+            "items": {
+              "$ref": "#/components/schemas/TenantRole"
+            },
+            "type": "array"
           },
           "entityType": {
             "const": "tenant_membership",
@@ -829,8 +1103,21 @@
           "metadata": {
             "$ref": "#/components/schemas/EntityMetadata"
           },
+          "principalBindings": {
+            "$ref": "#/components/schemas/MembershipPrincipalBinding"
+          },
           "role": {
             "$ref": "#/components/schemas/TenantRole"
+          },
+          "roleMappingStatus": {
+            "$ref": "#/components/schemas/RoleMappingStatus"
+          },
+          "roleMappings": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRoleMapping"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "userId": {
             "pattern": "^usr_[0-9a-z]+$",
@@ -843,7 +1130,9 @@
           "role",
           "membershipStatus",
           "desiredState",
-          "metadata"
+          "metadata",
+          "principalBindings",
+          "roleMappings"
         ],
         "type": "object"
       },
@@ -856,6 +1145,7 @@
       },
       "TenantRole": {
         "enum": [
+          "tenant_owner",
           "tenant_admin",
           "tenant_operator",
           "tenant_billing_admin",
@@ -928,7 +1218,7 @@
     "description": "Tenant lifecycle, membership, invitation, quota, and tenant-level capability surfaces. Generated from the unified public API contract for v1.",
     "summary": "Tenant lifecycle, membership, invitation, quota, and tenant-level capability surfaces.",
     "title": "In Atelier Tenants API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -1178,6 +1468,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
           "platform_team"
         ],
@@ -1297,6 +1588,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
           "platform_team"
         ],
@@ -1439,6 +1731,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
           "platform_team"
         ],
@@ -1561,6 +1854,318 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
+          "tenant_admin",
+          "platform_team"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "invitation",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance": {
+      "post": {
+        "operationId": "acceptInvitation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/InvitationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationAcceptanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            },
+            "description": "Invitation acceptance accepted."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request conflicts with current entity integrity or lifecycle state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Accept a tenant or workspace invitation while it is still pending.",
+        "tags": [
+          "Tenants",
+          "Invitations"
+        ],
+        "x-audiences": [
+          "developer_external",
+          "tenant_owner",
+          "tenant_admin",
+          "platform_team"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "invitation",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/tenants/{tenantId}/invitations/{invitationId}/revocation": {
+      "post": {
+        "operationId": "revokeInvitation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/InvitationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationRevocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            },
+            "description": "Invitation revocation accepted."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request conflicts with current entity integrity or lifecycle state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Revoke a pending invitation before it is accepted or expires.",
+        "tags": [
+          "Tenants",
+          "Invitations"
+        ],
+        "x-audiences": [
+          "tenant_owner",
           "tenant_admin",
           "platform_team"
         ],
@@ -1703,6 +2308,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
           "platform_team"
         ],
@@ -1825,6 +2431,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
           "platform_team"
         ],
