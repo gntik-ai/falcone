@@ -2,7 +2,7 @@
   "generatedFrom": "apps/control-plane/openapi/control-plane.openapi.json",
   "release": {
     "header_version": "2026-03-24",
-    "openapi_semver": "1.11.0",
+    "openapi_semver": "1.12.0",
     "path_version": "v1"
   },
   "routes": [
@@ -4619,6 +4619,750 @@
         "application/json"
       ],
       "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "listPostgresDatabases",
+      "path": "/v1/postgres/databases",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_database",
+      "scope": "tenant",
+      "summary": "List tenant-scoped PostgreSQL databases exposed by the bounded administrative surface",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "createPostgresDatabase",
+      "path": "/v1/postgres/databases",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_database",
+      "scope": "tenant",
+      "summary": "Create one tenant-scoped PostgreSQL database when the placement profile supports database-per-tenant administration",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "DELETE",
+      "operationId": "deletePostgresDatabase",
+      "path": "/v1/postgres/databases/{databaseName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_database",
+      "scope": "tenant",
+      "summary": "Delete one tenant-scoped PostgreSQL database through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "getPostgresDatabase",
+      "path": "/v1/postgres/databases/{databaseName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_database",
+      "scope": "tenant",
+      "summary": "Fetch one tenant-scoped PostgreSQL database contract",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "PUT",
+      "operationId": "updatePostgresDatabase",
+      "path": "/v1/postgres/databases/{databaseName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_database",
+      "scope": "tenant",
+      "summary": "Update one tenant-scoped PostgreSQL database through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "listPostgresSchemas",
+      "path": "/v1/postgres/databases/{databaseName}/schemas",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_schema",
+      "scope": "workspace",
+      "summary": "List workspace-scoped PostgreSQL schemas inside one managed database",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "createPostgresSchema",
+      "path": "/v1/postgres/databases/{databaseName}/schemas",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_schema",
+      "scope": "workspace",
+      "summary": "Create one workspace-scoped PostgreSQL schema inside a managed database",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "DELETE",
+      "operationId": "deletePostgresSchema",
+      "path": "/v1/postgres/databases/{databaseName}/schemas/{schemaName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_schema",
+      "scope": "workspace",
+      "summary": "Delete one workspace-scoped PostgreSQL schema through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "getPostgresSchema",
+      "path": "/v1/postgres/databases/{databaseName}/schemas/{schemaName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_schema",
+      "scope": "workspace",
+      "summary": "Fetch one workspace-scoped PostgreSQL schema contract",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "PUT",
+      "operationId": "updatePostgresSchema",
+      "path": "/v1/postgres/databases/{databaseName}/schemas/{schemaName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_schema",
+      "scope": "workspace",
+      "summary": "Update one workspace-scoped PostgreSQL schema through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
         "developer_external",
         "workspace_owner",
         "workspace_admin",
@@ -4758,6 +5502,824 @@
       "resourceType": "database",
       "scope": "workspace",
       "summary": "Fetch one workspace-scoped PostgreSQL instance contract under the postgres family",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "listPostgresRoles",
+      "path": "/v1/postgres/roles",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_role",
+      "scope": "workspace",
+      "summary": "List workspace-scoped PostgreSQL roles through the normalized administrative surface",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "createPostgresRole",
+      "path": "/v1/postgres/roles",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_role",
+      "scope": "workspace",
+      "summary": "Create one workspace-scoped PostgreSQL role through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "DELETE",
+      "operationId": "deletePostgresRole",
+      "path": "/v1/postgres/roles/{postgresRoleName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_role",
+      "scope": "workspace",
+      "summary": "Delete one workspace-scoped PostgreSQL role through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "getPostgresRole",
+      "path": "/v1/postgres/roles/{postgresRoleName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_role",
+      "scope": "workspace",
+      "summary": "Fetch one workspace-scoped PostgreSQL role contract",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "PUT",
+      "operationId": "updatePostgresRole",
+      "path": "/v1/postgres/roles/{postgresRoleName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_role",
+      "scope": "workspace",
+      "summary": "Update one workspace-scoped PostgreSQL role through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "listPostgresUsers",
+      "path": "/v1/postgres/users",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_user",
+      "scope": "workspace",
+      "summary": "List workspace-scoped PostgreSQL users through the normalized administrative surface",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "createPostgresUser",
+      "path": "/v1/postgres/users",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_user",
+      "scope": "workspace",
+      "summary": "Create one workspace-scoped PostgreSQL user through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "DELETE",
+      "operationId": "deletePostgresUser",
+      "path": "/v1/postgres/users/{postgresUserName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_user",
+      "scope": "workspace",
+      "summary": "Delete one workspace-scoped PostgreSQL user through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "getPostgresUser",
+      "path": "/v1/postgres/users/{postgresUserName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_user",
+      "scope": "workspace",
+      "summary": "Fetch one workspace-scoped PostgreSQL user contract",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "PUT",
+      "operationId": "updatePostgresUser",
+      "path": "/v1/postgres/users/{postgresUserName}",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_user",
+      "scope": "workspace",
+      "summary": "Update one workspace-scoped PostgreSQL user through the bounded administrative surface",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Postgres"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "postgres",
+      "familyTitle": "Postgres",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "GET",
+      "operationId": "getPostgresInventory",
+      "path": "/v1/postgres/workspaces/{workspaceId}/inventory",
+      "planCapabilityAnyOf": [
+        "data.postgresql.shared",
+        "data.postgresql.dedicated"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-read",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "postgres_inventory",
+      "scope": "workspace",
+      "summary": "Fetch the persisted PostgreSQL administrative inventory projection for one workspace",
       "supportsIdempotencyKey": false,
       "tags": [
         "Postgres"

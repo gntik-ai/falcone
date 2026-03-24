@@ -5,7 +5,7 @@
   "release": {
     "path_version": "v1",
     "header_version": "2026-03-24",
-    "openapi_semver": "1.11.0"
+    "openapi_semver": "1.12.0"
   },
   "versioning": {
     "uri_prefix": "/v1",
@@ -241,27 +241,31 @@
       "id": "postgres",
       "title": "Postgres",
       "prefix": "/v1/postgres",
-      "summary": "Workspace-scoped relational data control and discovery routes exposed through the public gateway.",
+      "summary": "Workspace- and tenant-aware PostgreSQL control, structural administration, and inventory routes exposed through safe BaaS contracts.",
       "owning_service": "control_api",
       "downstream_contracts": [
         "provisioning_request",
         "adapter_call",
+        "postgres_admin_request",
+        "postgres_admin_result",
+        "postgres_inventory_snapshot",
         "audit_record"
       ],
       "downstream_adapters": [
         "postgresql"
       ],
       "resource_scopes": [
+        "tenant",
         "workspace",
         "database"
       ],
       "audiences": [
-        "developer_external",
+        "tenant_owner",
+        "tenant_admin",
         "workspace_owner",
         "workspace_admin",
         "workspace_developer",
         "workspace_viewer",
-        "workspace_service_account",
         "platform_team"
       ],
       "visibility": "public",
@@ -604,6 +608,36 @@
     {
       "resource_type": "authorization_decision",
       "family": "auth",
+      "scope": "workspace",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "postgres_role",
+      "family": "postgres",
+      "scope": "workspace",
+      "authorization_resource": "database"
+    },
+    {
+      "resource_type": "postgres_user",
+      "family": "postgres",
+      "scope": "workspace",
+      "authorization_resource": "database"
+    },
+    {
+      "resource_type": "postgres_database",
+      "family": "postgres",
+      "scope": "tenant",
+      "authorization_resource": "database"
+    },
+    {
+      "resource_type": "postgres_schema",
+      "family": "postgres",
+      "scope": "workspace",
+      "authorization_resource": "database"
+    },
+    {
+      "resource_type": "postgres_inventory",
+      "family": "postgres",
       "scope": "workspace",
       "authorization_resource": null
     }

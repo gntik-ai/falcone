@@ -25,7 +25,7 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
 
   assert.equal(taxonomy.release.path_version, 'v1');
   assert.equal(taxonomy.release.header_version, '2026-03-24');
-  assert.equal(taxonomy.release.openapi_semver, '1.11.0');
+  assert.equal(taxonomy.release.openapi_semver, '1.12.0');
   assert.equal(listFamilyDocumentPaths().length, taxonomy.families.length);
   assert.deepEqual(routeCatalog.routes, regeneratedCatalog.routes);
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/events/topics/{resourceId}/publish'));
@@ -35,6 +35,10 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/login-sessions'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/signups'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/password-recovery-requests'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/postgres/roles'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/postgres/users/{postgresUserName}'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/postgres/databases/{databaseName}/schemas/{schemaName}'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/postgres/workspaces/{workspaceId}/inventory'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/tenants/{tenantId}/ownership-transfers'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}'));
