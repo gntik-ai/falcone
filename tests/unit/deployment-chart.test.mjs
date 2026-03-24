@@ -71,7 +71,10 @@ test('deployment chart keeps the Keycloak platform and tenant IAM bootstrap base
   const keycloakBootstrap = values.bootstrap.oneShot.keycloak;
 
   assert.ok(keycloakBootstrap.realmRoles.includes('platform_admin'));
+  assert.ok(keycloakBootstrap.realmRoles.includes('tenant_owner'));
+  assert.ok(keycloakBootstrap.realmRoles.includes('workspace_owner'));
   assert.ok(keycloakBootstrap.realmRoles.includes('workspace_admin'));
+  assert.ok(keycloakBootstrap.realmRoles.includes('workspace_service_account'));
   assert.ok(keycloakBootstrap.clientScopes.some((scope) => scope.name === 'tenant-context'));
   assert.ok(keycloakBootstrap.clientScopes.some((scope) => scope.name === 'workspace-context'));
   assert.ok(keycloakBootstrap.clients.some((client) => client.clientId === 'in-atelier-gateway'));
@@ -90,6 +93,10 @@ test('deployment chart keeps the Keycloak platform and tenant IAM bootstrap base
   assert.equal(values.webConsole.auth.autoSignupPolicy.globalMode, 'approval_required');
   assert.equal(values.webConsole.auth.autoSignupPolicy.environmentModes.dev, 'auto_activate');
   assert.equal(values.webConsole.auth.autoSignupPolicy.planModes.enterprise, 'auto_activate');
+  assert.equal(values.webConsole.auth.expirationPolicies.invitations.defaultTtl, '72h');
+  assert.equal(values.webConsole.auth.expirationPolicies.humanCredentials.passwordMaxAge, '90d');
+  assert.equal(values.webConsole.auth.expirationPolicies.serviceCredentials.rotateBefore, '7d');
+  assert.equal(values.webConsole.auth.expirationPolicies.sessions.idleTimeout, '30m');
 });
 
 test('all expected component aliases are present in the root chart dependencies', () => {

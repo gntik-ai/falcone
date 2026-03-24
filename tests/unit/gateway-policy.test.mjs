@@ -44,11 +44,39 @@ test('access matrix evaluation differentiates product and passthrough access', (
   const domainModel = readDomainModel();
 
   assert.equal(
-    evaluateAccessAssertion({ persona: 'basic_profile', routeKind: 'product_api', family: 'functions' }, values, routeCatalog, domainModel).decision,
+    evaluateAccessAssertion(
+      { persona: 'workspace_developer', routeKind: 'product_api', path: '/v1/functions/actions', method: 'POST' },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
     'allow'
   );
   assert.equal(
-    evaluateAccessAssertion({ persona: 'tenant_admin', routeKind: 'product_api', family: 'functions' }, values, routeCatalog, domainModel).decision,
+    evaluateAccessAssertion(
+      { persona: 'workspace_viewer', routeKind: 'product_api', path: '/v1/functions/actions', method: 'POST' },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
+    'deny'
+  );
+  assert.equal(
+    evaluateAccessAssertion(
+      { persona: 'workspace_service_account', routeKind: 'product_api', path: '/v1/events/topics/{resourceId}/publish', method: 'POST' },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
+    'allow'
+  );
+  assert.equal(
+    evaluateAccessAssertion(
+      { persona: 'tenant_admin', routeKind: 'product_api', path: '/v1/functions/actions', method: 'POST' },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
     'deny'
   );
   assert.equal(
@@ -56,7 +84,7 @@ test('access matrix evaluation differentiates product and passthrough access', (
     'allow'
   );
   assert.equal(
-    evaluateAccessAssertion({ persona: 'basic_profile', routeKind: 'passthrough', routeId: 'keycloak_admin' }, values, routeCatalog, domainModel).decision,
+    evaluateAccessAssertion({ persona: 'workspace_developer', routeKind: 'passthrough', routeId: 'keycloak_admin' }, values, routeCatalog, domainModel).decision,
     'deny'
   );
 });

@@ -64,6 +64,8 @@ test('domain model preserves deployment, authorization, and governance alignment
   assert.equal(tenantEntity.business_rules.some((rule) => rule.includes('identityContext')), true);
   assert.equal(applicationEntity.business_rules.some((rule) => rule.includes('iamClient.clientId')), true);
   assert.equal(serviceAccountEntity.business_rules.some((rule) => rule.includes('confidential Keycloak client')), true);
+  assert.equal(serviceAccountEntity.required_fields.includes('credentialPolicy'), true);
+  assert.equal(managedResourceEntity.required_fields.includes('accessPolicy'), true);
   assert.equal(
     deploymentProfileEntity.business_rules.some((rule) => rule.includes('control, data, identity, and observability plane separation')),
     true
@@ -82,5 +84,5 @@ test('domain model preserves deployment, authorization, and governance alignment
     }
   }
 
-  assert.equal(listBusinessStateMachines().length >= 5, true);
+  assert.equal(listBusinessStateMachines().length >= 6, true);
 });

@@ -534,7 +534,7 @@
     "description": "Workspace-scoped event topics with controlled HTTP publish, SSE delivery, replay windows, and audit-friendly gateway semantics. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped event topics with controlled HTTP publish, SSE delivery, replay windows, and audit-friendly gateway semantics.",
     "title": "In Atelier Events API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -656,6 +656,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "workspace_owner",
           "workspace_admin",
           "workspace_operator",
           "platform_team"
@@ -778,8 +779,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "workspace_owner",
           "workspace_admin",
           "workspace_operator",
+          "workspace_viewer",
+          "workspace_service_account",
           "platform_team"
         ],
         "x-downstream-adapters": [
@@ -928,8 +932,10 @@
         ],
         "x-audiences": [
           "developer_external",
+          "workspace_owner",
           "workspace_admin",
           "workspace_operator",
+          "workspace_service_account",
           "platform_team"
         ],
         "x-downstream-adapters": [
@@ -1083,8 +1089,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "workspace_owner",
           "workspace_admin",
           "workspace_operator",
+          "workspace_viewer",
+          "workspace_service_account",
           "platform_team"
         ],
         "x-downstream-adapters": [

@@ -15,6 +15,9 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.paths['/v1/workspaces/{workspaceId}']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/applications/{applicationId}']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}']);
+  assert.ok(document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance']);
+  assert.ok(document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations']);
+  assert.ok(document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/managed-resources/{resourceId}']);
   assert.ok(document.paths['/v1/auth/access-checks']);
   assert.ok(document.paths['/v1/auth/login-sessions']);
@@ -39,6 +42,8 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.paths['/v1/platform/deployment-profiles/{deploymentProfileId}']);
   assert.ok(document.paths['/v1/platform/provider-capabilities/{providerCapabilityId}']);
   assert.ok(document.paths['/v1/tenants/{tenantId}/effective-capabilities']);
+  assert.ok(document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance']);
+  assert.ok(document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/revocation']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/effective-capabilities']);
   assert.ok(document.paths['/v1/postgres/instances/{resourceId}']);
   assert.ok(document.paths['/v1/mongo/databases/{resourceId}']);
@@ -72,6 +77,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const resetIamUserCredentials = document.paths['/v1/iam/realms/{realmId}/users/{iamUserId}/credential-resets'].post;
   const getWorkspaceCapabilities = document.paths['/v1/workspaces/{workspaceId}/effective-capabilities'].get;
   const createInvitation = document.paths['/v1/tenants/{tenantId}/invitations'].post;
+  const acceptInvitation = document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance'].post;
+  const revokeInvitation = document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/revocation'].post;
+  const issueServiceAccountCredential = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance'].post;
+  const rotateServiceAccountCredential = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations'].post;
+  const revokeServiceAccountCredential = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations'].post;
   const getRouteCatalog = document.paths['/v1/platform/route-catalog'].get;
   const createPostgres = document.paths['/v1/postgres/instances'].post;
   const publishEvent = document.paths['/v1/events/topics/{resourceId}/publish'].post;
@@ -80,7 +90,7 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const createWebSocketSession = document.paths['/v1/websockets/sessions'].post;
 
   assert.deepEqual(collectContractViolations(document), []);
-  assert.equal(document.info.version, '1.4.0');
+  assert.equal(document.info.version, '1.5.0');
   assert.equal(document.components.parameters.XApiVersion.schema.const, '2026-03-24');
   assert.deepEqual(document.components.schemas.ErrorResponse.required, [
     'status',
@@ -109,6 +119,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const iamCredentialResetParameters = resolveParameters(document, resetIamUserCredentials);
   const workspaceCapabilitiesParameters = resolveParameters(document, getWorkspaceCapabilities);
   const invitationParameters = resolveParameters(document, createInvitation);
+  const invitationAcceptanceParameters = resolveParameters(document, acceptInvitation);
+  const invitationRevocationParameters = resolveParameters(document, revokeInvitation);
+  const serviceAccountCredentialIssuanceParameters = resolveParameters(document, issueServiceAccountCredential);
+  const serviceAccountCredentialRotationParameters = resolveParameters(document, rotateServiceAccountCredential);
+  const serviceAccountCredentialRevocationParameters = resolveParameters(document, revokeServiceAccountCredential);
   const routeCatalogParameters = resolveParameters(document, getRouteCatalog);
   const postgresParameters = resolveParameters(document, createPostgres);
   const publishEventParameters = resolveParameters(document, publishEvent);
@@ -230,17 +245,40 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.equal(invitationParameters.some((parameter) => parameter.name === 'X-API-Version'), true);
   assert.equal(invitationParameters.some((parameter) => parameter.name === 'X-Correlation-Id'), true);
   assert.equal(invitationParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(acceptInvitation['x-family'], 'tenants');
+  assert.equal(invitationAcceptanceParameters.some((parameter) => parameter.name === 'invitationId'), true);
+  assert.ok(acceptInvitation.responses['202']);
+  assert.equal(revokeInvitation['x-family'], 'tenants');
+  assert.equal(invitationRevocationParameters.some((parameter) => parameter.name === 'invitationId'), true);
+  assert.ok(revokeInvitation.responses['202']);
+  assert.equal(issueServiceAccountCredential['x-family'], 'workspaces');
+  assert.equal(serviceAccountCredentialIssuanceParameters.some((parameter) => parameter.name === 'serviceAccountId'), true);
+  assert.ok(issueServiceAccountCredential.responses['202']);
+  assert.equal(rotateServiceAccountCredential['x-family'], 'workspaces');
+  assert.equal(serviceAccountCredentialRotationParameters.some((parameter) => parameter.name === 'serviceAccountId'), true);
+  assert.ok(rotateServiceAccountCredential.responses['202']);
+  assert.equal(revokeServiceAccountCredential['x-family'], 'workspaces');
+  assert.equal(serviceAccountCredentialRevocationParameters.some((parameter) => parameter.name === 'serviceAccountId'), true);
+  assert.ok(revokeServiceAccountCredential.responses['202']);
   assert.ok(document.components.schemas.Invitation);
+  assert.ok(document.components.schemas.InvitationAcceptanceRequest);
+  assert.ok(document.components.schemas.InvitationRevocationRequest);
+  assert.ok(document.components.schemas.ExpirationRule);
   assert.ok(document.components.schemas.CommercialPlan);
   assert.ok(document.components.schemas.ProviderCapabilityRecord);
   assert.ok(document.components.schemas.TenantIdentityContext);
   assert.ok(document.components.schemas.WorkspaceIamBoundary);
   assert.ok(document.components.schemas.ExternalApplicationIamClient);
   assert.ok(document.components.schemas.ServiceAccountIamBinding);
+  assert.ok(document.components.schemas.ServiceAccountCredentialPolicy);
+  assert.ok(document.components.schemas.ServiceAccountCredentialReference);
+  assert.ok(document.components.schemas.ConsoleSessionExpirationPolicy);
   assert.ok(document.components.schemas.KeycloakProtocolMapper);
   assert.ok(document.components.schemas.Tenant.properties.identityContext);
   assert.ok(document.components.schemas.ExternalApplication.properties.iamClient);
   assert.ok(document.components.schemas.ServiceAccount.properties.iamBinding);
+  assert.ok(document.components.schemas.ServiceAccount.properties.credentialPolicy);
+  assert.ok(document.components.schemas.ManagedResource.properties.accessPolicy);
 
   assert.equal(getRouteCatalog['x-family'], 'platform');
   assert.equal(routeCatalogParameters.some((parameter) => parameter.name === 'family'), true);

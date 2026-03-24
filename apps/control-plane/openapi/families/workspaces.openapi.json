@@ -106,6 +106,11 @@
         ],
         "type": "string"
       },
+      "DurationString": {
+        "description": "Compact duration string used by in-atelier lifecycle policies.",
+        "pattern": "^[0-9]+(?:s|m|h|d)$",
+        "type": "string"
+      },
       "EffectiveCapabilityResolution": {
         "additionalProperties": false,
         "properties": {
@@ -551,6 +556,9 @@
       "ManagedResource": {
         "additionalProperties": false,
         "properties": {
+          "accessPolicy": {
+            "$ref": "#/components/schemas/ManagedResourceAccessPolicy"
+          },
           "applicationId": {
             "pattern": "^app_[0-9a-z]+$",
             "type": "string"
@@ -628,7 +636,52 @@
           "provider",
           "state",
           "timestamps",
-          "metadata"
+          "metadata",
+          "accessPolicy"
+        ],
+        "type": "object"
+      },
+      "ManagedResourceAccessPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "adminRoles": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRole"
+            },
+            "type": "array"
+          },
+          "developerRoles": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRole"
+            },
+            "type": "array"
+          },
+          "ownerRoles": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRole"
+            },
+            "type": "array"
+          },
+          "serviceAccountIds": {
+            "items": {
+              "pattern": "^svc_[0-9a-z]+$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "viewerRoles": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRole"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ownerRoles",
+          "adminRoles",
+          "developerRoles",
+          "viewerRoles",
+          "serviceAccountIds"
         ],
         "type": "object"
       },
@@ -644,6 +697,9 @@
       "ManagedResourceWriteRequest": {
         "additionalProperties": false,
         "properties": {
+          "accessPolicy": {
+            "$ref": "#/components/schemas/ManagedResourceAccessPolicy"
+          },
           "applicationId": {
             "pattern": "^app_[0-9a-z]+$",
             "type": "string"
@@ -692,7 +748,102 @@
           "kind",
           "provider",
           "desiredState",
-          "metadata"
+          "metadata",
+          "accessPolicy"
+        ],
+        "type": "object"
+      },
+      "MembershipPrincipalBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "clientId": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          },
+          "iamGroupIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 3,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "iamUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "realm": {
+            "maxLength": 120,
+            "minLength": 3,
+            "type": "string"
+          },
+          "sourceType": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceType",
+          "realm"
+        ],
+        "type": "object"
+      },
+      "MembershipRoleMapping": {
+        "additionalProperties": false,
+        "properties": {
+          "assignedRoles": {
+            "items": {
+              "maxLength": 80,
+              "minLength": 3,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "externalPrincipalId": {
+            "maxLength": 160,
+            "minLength": 3,
+            "type": "string"
+          },
+          "externalPrincipalType": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "precedence": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "direct_user",
+              "keycloak_group",
+              "invitation"
+            ],
+            "type": "string"
+          },
+          "syncedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalPrincipalType",
+          "externalPrincipalId",
+          "assignedRoles",
+          "source"
         ],
         "type": "object"
       },
@@ -885,9 +1036,29 @@
         ],
         "type": "object"
       },
+      "RoleMappingStatus": {
+        "enum": [
+          "pending_sync",
+          "synced",
+          "degraded"
+        ],
+        "type": "string"
+      },
       "ServiceAccount": {
         "additionalProperties": false,
         "properties": {
+          "credentialPolicy": {
+            "$ref": "#/components/schemas/ServiceAccountCredentialPolicy"
+          },
+          "credentialStatus": {
+            "$ref": "#/components/schemas/ServiceAccountCredentialStatus"
+          },
+          "credentials": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceAccountCredentialReference"
+            },
+            "type": "array"
+          },
           "displayName": {
             "maxLength": 120,
             "minLength": 1,
@@ -958,9 +1129,175 @@
           "roleBindings",
           "state",
           "timestamps",
-          "metadata"
+          "metadata",
+          "credentialStatus",
+          "credentialPolicy",
+          "credentials"
         ],
         "type": "object"
+      },
+      "ServiceAccountCredentialIssuanceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 255,
+            "minLength": 3,
+            "type": "string"
+          },
+          "requestedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "requestedTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "revokeOutstandingCredentials": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requestedByUserId"
+        ],
+        "type": "object"
+      },
+      "ServiceAccountCredentialPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "defaultTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "maxActiveCredentials": {
+            "maximum": 3,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "rotateBefore": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "secretBackend": {
+            "enum": [
+              "keycloak_secret_store",
+              "vault",
+              "kubernetes_secret"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "defaultTtl",
+          "maxTtl",
+          "rotateBefore",
+          "secretBackend"
+        ],
+        "type": "object"
+      },
+      "ServiceAccountCredentialReference": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "pattern": "^sac_[0-9a-z]+$",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fingerprint": {
+            "maxLength": 255,
+            "minLength": 6,
+            "type": "string"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastRotatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "secretRef": {
+            "maxLength": 255,
+            "minLength": 3,
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ServiceAccountCredentialStatus"
+          }
+        },
+        "required": [
+          "credentialId",
+          "status",
+          "issuedAt",
+          "secretRef"
+        ],
+        "type": "object"
+      },
+      "ServiceAccountCredentialRevocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "pattern": "^sac_[0-9a-z]+$",
+            "type": "string"
+          },
+          "immediate": {
+            "type": "boolean"
+          },
+          "requestedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "revocationReason": {
+            "maxLength": 255,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestedByUserId",
+          "revocationReason"
+        ],
+        "type": "object"
+      },
+      "ServiceAccountCredentialRotationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "requestedByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "requestedTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "revokePreviousCredential": {
+            "type": "boolean"
+          },
+          "rotateReason": {
+            "maxLength": 255,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestedByUserId",
+          "rotateReason"
+        ],
+        "type": "object"
+      },
+      "ServiceAccountCredentialStatus": {
+        "enum": [
+          "active",
+          "rotation_due",
+          "revoked",
+          "expired"
+        ],
+        "type": "string"
       },
       "ServiceAccountIamBinding": {
         "additionalProperties": false,
@@ -998,6 +1335,9 @@
       "ServiceAccountWriteRequest": {
         "additionalProperties": false,
         "properties": {
+          "credentialPolicy": {
+            "$ref": "#/components/schemas/ServiceAccountCredentialPolicy"
+          },
           "desiredState": {
             "$ref": "#/components/schemas/EntityState"
           },
@@ -1024,6 +1364,9 @@
           "iamBinding": {
             "$ref": "#/components/schemas/ServiceAccountIamBinding"
           },
+          "issueCredentialOnCreate": {
+            "type": "boolean"
+          },
           "metadata": {
             "$ref": "#/components/schemas/EntityMetadata"
           },
@@ -1049,7 +1392,8 @@
           "displayName",
           "roleBindings",
           "desiredState",
-          "metadata"
+          "metadata",
+          "credentialPolicy"
         ],
         "type": "object"
       },
@@ -1163,6 +1507,12 @@
       "WorkspaceMembershipRecord": {
         "additionalProperties": false,
         "properties": {
+          "effectiveRoles": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRole"
+            },
+            "type": "array"
+          },
           "entityType": {
             "const": "workspace_membership",
             "type": "string"
@@ -1181,8 +1531,21 @@
           "metadata": {
             "$ref": "#/components/schemas/EntityMetadata"
           },
+          "principalBindings": {
+            "$ref": "#/components/schemas/MembershipPrincipalBinding"
+          },
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
+          },
+          "roleMappingStatus": {
+            "$ref": "#/components/schemas/RoleMappingStatus"
+          },
+          "roleMappings": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRoleMapping"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
@@ -1217,7 +1580,10 @@
           "membershipStatus",
           "state",
           "timestamps",
-          "metadata"
+          "metadata",
+          "principalBindings",
+          "roleMappings",
+          "roleMappingStatus"
         ],
         "type": "object"
       },
@@ -1226,6 +1592,12 @@
         "properties": {
           "desiredState": {
             "$ref": "#/components/schemas/EntityState"
+          },
+          "effectiveRoles": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRole"
+            },
+            "type": "array"
           },
           "entityType": {
             "const": "workspace_membership",
@@ -1241,8 +1613,21 @@
           "metadata": {
             "$ref": "#/components/schemas/EntityMetadata"
           },
+          "principalBindings": {
+            "$ref": "#/components/schemas/MembershipPrincipalBinding"
+          },
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
+          },
+          "roleMappingStatus": {
+            "$ref": "#/components/schemas/RoleMappingStatus"
+          },
+          "roleMappings": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRoleMapping"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "tenantId": {
             "pattern": "^ten_[0-9a-z]+$",
@@ -1260,7 +1645,9 @@
           "role",
           "membershipStatus",
           "desiredState",
-          "metadata"
+          "metadata",
+          "principalBindings",
+          "roleMappings"
         ],
         "type": "object"
       },
@@ -1270,7 +1657,9 @@
           "workspace_developer",
           "workspace_operator",
           "workspace_auditor",
-          "workspace_viewer"
+          "workspace_viewer",
+          "workspace_owner",
+          "workspace_service_account"
         ],
         "type": "string"
       },
@@ -1329,7 +1718,7 @@
     "description": "Workspace lifecycle, application inventory, workload identities, and managed-resource control surfaces. Generated from the unified public API contract for v1.",
     "summary": "Workspace lifecycle, application inventory, workload identities, and managed-resource control surfaces.",
     "title": "In Atelier Workspaces API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -1461,8 +1850,10 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -1580,8 +1971,11 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -1723,8 +2117,10 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -1846,8 +2242,11 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -1966,8 +2365,11 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -2109,8 +2511,10 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -2232,8 +2636,12 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
+          "workspace_service_account",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -2375,8 +2783,10 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -2498,8 +2908,10 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -2641,8 +3053,10 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "workspaces",
@@ -2764,8 +3178,483 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
+          "platform_team"
+        ],
+        "x-family": "workspaces",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "service_account",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance": {
+      "post": {
+        "operationId": "issueServiceAccountCredential",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ServiceAccountId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceAccountCredentialIssuanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            },
+            "description": "Credential issuance accepted."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request conflicts with current entity integrity or lifecycle state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Issue a new secret-free credential reference for one workspace service account.",
+        "tags": [
+          "Workspaces",
+          "ServiceAccounts"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-family": "workspaces",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "service_account",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations": {
+      "post": {
+        "operationId": "revokeServiceAccountCredential",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ServiceAccountId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceAccountCredentialRevocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            },
+            "description": "Credential revocation accepted."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request conflicts with current entity integrity or lifecycle state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Revoke one or all active credential references for a workspace service account.",
+        "tags": [
+          "Workspaces",
+          "ServiceAccounts"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-family": "workspaces",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "service_account",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations": {
+      "post": {
+        "operationId": "rotateServiceAccountCredential",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ServiceAccountId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceAccountCredentialRotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            },
+            "description": "Credential rotation accepted."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request conflicts with current entity integrity or lifecycle state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Rotate the active credential reference for one workspace service account.",
+        "tags": [
+          "Workspaces",
+          "ServiceAccounts"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_operator",
           "platform_team"
         ],
         "x-family": "workspaces",

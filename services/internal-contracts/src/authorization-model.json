@@ -127,6 +127,11 @@
         "scope": "tenant",
         "inherits": [],
         "summary": "Read-only tenant audit and evidence review."
+      },
+      {
+        "id": "tenant_owner",
+        "scope": "tenant",
+        "summary": "Owns tenant IAM, invitations, workspace governance, and elevated BaaS policy decisions within one tenant."
       }
     ],
     "workspace": [
@@ -159,6 +164,16 @@
         "scope": "workspace",
         "inherits": [],
         "summary": "Read-only visibility for workspace metadata and runtime inventory."
+      },
+      {
+        "id": "workspace_owner",
+        "scope": "workspace",
+        "summary": "Owns workspace IAM, managed-resource policies, service-account credentials, and elevated delivery decisions inside one workspace."
+      },
+      {
+        "id": "workspace_service_account",
+        "scope": "workspace",
+        "summary": "Machine identity bound to one workspace for scoped runtime access without human administration privileges."
       }
     ]
   },
@@ -426,13 +441,18 @@
       "tenant.workspaces.create",
       "tenant.audit.read",
       "tenant.usage.read",
-      "tenant.suspend"
+      "tenant.suspend",
+      "tenant.invitations.manage",
+      "tenant.role_mappings.manage"
     ],
     "workspace": [
       "workspace.read",
       "workspace.update",
       "workspace.members.manage",
-      "workspace.delete"
+      "workspace.delete",
+      "workspace.invitations.manage",
+      "workspace.role_mappings.manage",
+      "workspace.policy.manage"
     ],
     "database": [
       "database.read",
@@ -445,11 +465,13 @@
       "bucket.admin"
     ],
     "topic": [
+      "topic.read",
       "topic.publish",
       "topic.consume",
       "topic.admin"
     ],
     "function": [
+      "function.read",
       "function.invoke",
       "function.deploy",
       "function.admin"
@@ -464,7 +486,9 @@
     "service_account": [
       "service_account.read",
       "service_account.rotate",
-      "service_account.admin"
+      "service_account.admin",
+      "service_account.credentials.issue",
+      "service_account.credentials.revoke"
     ]
   },
   "resource_semantics": [
@@ -479,7 +503,9 @@
       "delegable_actions": [
         "tenant.members.manage",
         "tenant.workspaces.create",
-        "tenant.usage.read"
+        "tenant.usage.read",
+        "tenant.invitations.manage",
+        "tenant.role_mappings.manage"
       ],
       "forbidden_actions": [
         "cross_tenant.impersonate",
@@ -498,7 +524,10 @@
       "delegable_actions": [
         "workspace.read",
         "workspace.update",
-        "workspace.members.manage"
+        "workspace.members.manage",
+        "workspace.invitations.manage",
+        "workspace.role_mappings.manage",
+        "workspace.policy.manage"
       ],
       "forbidden_actions": [
         "workspace.delete_without_tenant_admin",
@@ -548,6 +577,7 @@
         "workspace_roles"
       ],
       "delegable_actions": [
+        "topic.read",
         "topic.publish",
         "topic.consume"
       ],
@@ -565,6 +595,7 @@
         "workspace_roles"
       ],
       "delegable_actions": [
+        "function.read",
         "function.invoke",
         "function.deploy"
       ],
@@ -597,11 +628,14 @@
       "ownership_scope": "workspace",
       "delegable_actions": [
         "service_account.read",
-        "service_account.rotate"
+        "service_account.rotate",
+        "service_account.credentials.issue",
+        "service_account.credentials.revoke"
       ],
       "forbidden_actions": [
         "service_account.admin_without_workspace_scope",
-        "service_account.rotate_cross_workspace"
+        "service_account.rotate_cross_workspace",
+        "tenant.suspend"
       ],
       "parent_scope": "workspace",
       "workspace_scoped": true,
@@ -667,6 +701,38 @@
     ],
     "tenant": [
       {
+        "role": "tenant_owner",
+        "allowed_actions": [
+          "tenant.read",
+          "tenant.update",
+          "tenant.members.manage",
+          "tenant.workspaces.create",
+          "tenant.audit.read",
+          "tenant.usage.read",
+          "tenant.invitations.manage",
+          "tenant.role_mappings.manage",
+          "workspace.read",
+          "workspace.update",
+          "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
+          "database.admin",
+          "bucket.admin",
+          "topic.read",
+          "topic.admin",
+          "function.read",
+          "function.admin",
+          "app.admin",
+          "app.credentials.rotate",
+          "service_account.admin",
+          "service_account.rotate",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
+        ],
+        "denied_actions": []
+      },
+      {
         "role": "tenant_admin",
         "allowed_actions": [
           "tenant.read",
@@ -675,17 +741,26 @@
           "tenant.workspaces.create",
           "tenant.audit.read",
           "tenant.usage.read",
+          "tenant.invitations.manage",
+          "tenant.role_mappings.manage",
           "workspace.read",
           "workspace.update",
           "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
           "database.admin",
           "bucket.admin",
+          "topic.read",
           "topic.admin",
+          "function.read",
           "function.admin",
           "app.admin",
           "app.credentials.rotate",
           "service_account.admin",
-          "service_account.rotate"
+          "service_account.rotate",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ],
         "denied_actions": [
           "tenant.suspend"
@@ -701,21 +776,30 @@
           "database.write",
           "bucket.read",
           "bucket.write",
+          "topic.read",
           "topic.publish",
           "topic.consume",
+          "function.read",
           "function.invoke",
           "app.read",
           "service_account.read"
         ],
         "denied_actions": [
           "tenant.members.manage",
+          "tenant.invitations.manage",
+          "tenant.role_mappings.manage",
           "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
           "database.admin",
           "bucket.admin",
           "topic.admin",
           "function.admin",
           "app.admin",
-          "service_account.admin"
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       },
       {
@@ -732,7 +816,9 @@
           "function.admin",
           "app.admin",
           "service_account.admin",
-          "app.credentials.rotate"
+          "app.credentials.rotate",
+          "tenant.invitations.manage",
+          "tenant.role_mappings.manage"
         ]
       },
       {
@@ -743,38 +829,79 @@
           "workspace.read",
           "database.read",
           "bucket.read",
+          "topic.read",
+          "function.read",
           "app.read",
           "service_account.read"
         ],
         "denied_actions": [
           "tenant.update",
           "tenant.members.manage",
+          "tenant.invitations.manage",
           "database.write",
           "bucket.write",
           "topic.publish",
           "function.deploy",
           "app.deploy",
-          "service_account.rotate"
+          "service_account.rotate",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       }
     ],
     "workspace": [
       {
-        "role": "workspace_admin",
+        "role": "workspace_owner",
         "allowed_actions": [
           "workspace.read",
           "workspace.update",
           "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
           "database.admin",
           "bucket.admin",
+          "topic.read",
           "topic.admin",
+          "function.read",
           "function.admin",
           "app.admin",
           "app.credentials.rotate",
           "app.redirect_uris.manage",
           "service_account.read",
           "service_account.rotate",
-          "service_account.admin"
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
+        ],
+        "denied_actions": [
+          "tenant.members.manage",
+          "tenant.suspend"
+        ]
+      },
+      {
+        "role": "workspace_admin",
+        "allowed_actions": [
+          "workspace.read",
+          "workspace.update",
+          "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
+          "database.admin",
+          "bucket.admin",
+          "topic.read",
+          "topic.admin",
+          "function.read",
+          "function.admin",
+          "app.admin",
+          "app.credentials.rotate",
+          "app.redirect_uris.manage",
+          "service_account.read",
+          "service_account.rotate",
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ],
         "denied_actions": [
           "tenant.members.manage",
@@ -789,8 +916,10 @@
           "database.write",
           "bucket.read",
           "bucket.write",
+          "topic.read",
           "topic.publish",
           "topic.consume",
+          "function.read",
           "function.invoke",
           "function.deploy",
           "app.read",
@@ -800,13 +929,18 @@
         ],
         "denied_actions": [
           "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
           "database.admin",
           "bucket.admin",
           "topic.admin",
           "function.admin",
           "app.admin",
           "service_account.rotate",
-          "service_account.admin"
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       },
       {
@@ -815,7 +949,9 @@
           "workspace.read",
           "database.read",
           "bucket.read",
+          "topic.read",
           "topic.consume",
+          "function.read",
           "function.invoke",
           "app.read",
           "service_account.read",
@@ -823,12 +959,17 @@
         ],
         "denied_actions": [
           "workspace.update",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
           "database.write",
           "bucket.write",
           "topic.admin",
           "function.deploy",
           "app.deploy",
-          "service_account.admin"
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       },
       {
@@ -837,6 +978,8 @@
           "workspace.read",
           "database.read",
           "bucket.read",
+          "topic.read",
+          "function.read",
           "app.read",
           "service_account.read"
         ],
@@ -848,24 +991,70 @@
           "function.deploy",
           "app.deploy",
           "service_account.rotate",
-          "service_account.admin"
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       },
       {
         "role": "workspace_viewer",
         "allowed_actions": [
           "workspace.read",
-          "app.read"
+          "database.read",
+          "bucket.read",
+          "topic.read",
+          "function.read",
+          "app.read",
+          "service_account.read"
         ],
         "denied_actions": [
           "workspace.update",
+          "workspace.members.manage",
           "database.write",
           "bucket.write",
           "topic.publish",
           "function.deploy",
+          "function.invoke",
           "app.deploy",
           "service_account.rotate",
-          "service_account.admin"
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
+        ]
+      },
+      {
+        "role": "workspace_service_account",
+        "allowed_actions": [
+          "workspace.read",
+          "database.read",
+          "database.write",
+          "bucket.read",
+          "bucket.write",
+          "topic.read",
+          "topic.publish",
+          "topic.consume",
+          "function.read",
+          "function.invoke",
+          "app.read",
+          "service_account.read"
+        ],
+        "denied_actions": [
+          "workspace.update",
+          "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
+          "database.admin",
+          "bucket.admin",
+          "topic.admin",
+          "function.deploy",
+          "function.admin",
+          "app.deploy",
+          "app.admin",
+          "service_account.rotate",
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       }
     ]
@@ -1031,6 +1220,20 @@
       "surface": "control_api",
       "expected_effect": "deny",
       "summary": "Tenant-realm tokens cannot impersonate platform-realm console users or rotate service-account credentials outside their workspace namespace."
+    },
+    {
+      "id": "AUTHZ-INV-008",
+      "surface": "control_api",
+      "category": "invitation_replay",
+      "expected_effect": "deny",
+      "summary": "Expired or revoked invitations cannot be accepted again, even when a stale token is replayed inside the same tenant."
+    },
+    {
+      "id": "AUTHZ-SVC-009",
+      "surface": "data_api",
+      "category": "service_account_boundary",
+      "expected_effect": "deny",
+      "summary": "Workspace service-account identities cannot administer credentials or access managed resources outside the policy bindings of their own workspace."
     }
   ]
 }

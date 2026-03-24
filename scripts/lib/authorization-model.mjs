@@ -23,7 +23,7 @@ export const REQUIRED_AUTHORIZATION_CONTEXT_FIELDS = [
   'effective_roles',
   'correlation_id'
 ];
-export const REQUIRED_RESOURCE_TYPES = ['tenant', 'workspace', 'database', 'bucket', 'topic', 'function', 'app'];
+export const REQUIRED_RESOURCE_TYPES = ['tenant', 'workspace', 'database', 'bucket', 'topic', 'function', 'app', 'service_account'];
 export const REQUIRED_ROLE_SCOPES = ['platform', 'tenant', 'workspace'];
 export const REQUIRED_PROPAGATION_TARGETS = [
   'control_api_command',

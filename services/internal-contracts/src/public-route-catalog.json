@@ -2,7 +2,7 @@
   "generatedFrom": "apps/control-plane/openapi/control-plane.openapi.json",
   "release": {
     "header_version": "2026-03-24",
-    "openapi_semver": "1.4.0",
+    "openapi_semver": "1.5.0",
     "path_version": "v1"
   },
   "routes": [
@@ -13,8 +13,12 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -84,8 +88,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -156,8 +163,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -228,8 +238,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -300,8 +313,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -372,8 +388,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -444,8 +463,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -516,8 +538,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -656,8 +681,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -727,8 +755,11 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
         "workspace_admin",
+        "workspace_viewer",
         "platform_team",
         "superadmin"
       ],
@@ -799,6 +830,7 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_operator",
         "platform_team"
@@ -874,8 +906,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_operator",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -948,8 +983,10 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_operator",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -1023,8 +1060,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_operator",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -1096,6 +1136,7 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
         "platform_team"
@@ -1170,8 +1211,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -3377,8 +3421,11 @@
       "allowedContentTypes": [],
       "audiences": [
         "developer_external",
-        "workspace_operator",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_operator",
+        "workspace_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -3448,8 +3495,11 @@
       "allowedContentTypes": [],
       "audiences": [
         "developer_external",
-        "workspace_operator",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_operator",
+        "workspace_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -3519,6 +3569,7 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
         "platform_team"
@@ -3591,8 +3642,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -4415,6 +4469,7 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
         "platform_team"
@@ -4490,8 +4545,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -4564,6 +4622,7 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
         "platform_team"
@@ -4638,8 +4697,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -4780,6 +4842,7 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
         "platform_team"
       ],
@@ -4848,6 +4911,7 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
         "platform_team"
       ],
@@ -4917,6 +4981,7 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
         "platform_team"
       ],
@@ -4987,6 +5052,7 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
         "platform_team"
       ],
@@ -5056,6 +5122,148 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
+        "tenant_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "tenants",
+      "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "acceptInvitation",
+      "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "invitation",
+      "scope": "tenant",
+      "summary": "Accept a tenant or workspace invitation while it is still pending.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Tenants",
+        "Invitations"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "tenants",
+      "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "revokeInvitation",
+      "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/revocation",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "invitation",
+      "scope": "tenant",
+      "summary": "Revoke a pending invitation before it is accepted or expires.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Tenants",
+        "Invitations"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_owner",
         "tenant_admin",
         "platform_team"
       ],
@@ -5126,6 +5334,7 @@
       ],
       "audiences": [
         "developer_external",
+        "tenant_owner",
         "tenant_admin",
         "platform_team"
       ],
@@ -5195,8 +5404,10 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -5269,8 +5480,11 @@
       ],
       "audiences": [
         "developer_external",
+        "workspace_owner",
         "workspace_admin",
         "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -5342,8 +5556,10 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -5412,8 +5628,11 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -5481,8 +5700,10 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -5552,8 +5773,11 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -5622,8 +5846,11 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -5692,8 +5919,10 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -5763,8 +5992,12 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
+        "workspace_service_account",
         "platform_team"
       ],
       "authRequired": true,
@@ -5833,8 +6066,10 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -5904,8 +6139,10 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -5974,8 +6211,10 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -6045,8 +6284,11 @@
       ],
       "audiences": [
         "developer_external",
-        "workspace_admin",
+        "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -6100,6 +6342,223 @@
       "scope": "workspace",
       "summary": "Fetch one canonical service account entity",
       "supportsIdempotencyKey": false,
+      "tags": [
+        "Workspaces",
+        "ServiceAccounts"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "workspaces",
+      "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "workspace_control",
+      "gatewayRequestValidationProfile": "workspace_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "issueServiceAccountCredential",
+      "path": "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "service_account",
+      "scope": "workspace",
+      "summary": "Issue a new secret-free credential reference for one workspace service account.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Workspaces",
+        "ServiceAccounts"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "workspaces",
+      "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "workspace_control",
+      "gatewayRequestValidationProfile": "workspace_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "revokeServiceAccountCredential",
+      "path": "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "service_account",
+      "scope": "workspace",
+      "summary": "Revoke one or all active credential references for a workspace service account.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Workspaces",
+        "ServiceAccounts"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_operator",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "workspaces",
+      "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "workspace_control",
+      "gatewayRequestValidationProfile": "workspace_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "rotateServiceAccountCredential",
+      "path": "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "service_account",
+      "scope": "workspace",
+      "summary": "Rotate the active credential reference for one workspace service account.",
+      "supportsIdempotencyKey": true,
       "tags": [
         "Workspaces",
         "ServiceAccounts"
