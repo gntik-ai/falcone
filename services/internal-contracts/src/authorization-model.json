@@ -105,33 +105,27 @@
     ],
     "tenant": [
       {
+        "id": "tenant_owner",
+        "scope": "tenant",
+        "summary": "Owns tenant governance, membership administration, invitations, and secure ownership transfer inside one tenant."
+      },
+      {
         "id": "tenant_admin",
         "scope": "tenant",
         "inherits": [],
-        "summary": "Tenant-wide administration excluding platform-only operations."
+        "summary": "Administers tenant settings, memberships, invitations, and workspace governance without inheriting workspace runtime access."
       },
       {
-        "id": "tenant_operator",
+        "id": "tenant_developer",
         "scope": "tenant",
         "inherits": [],
-        "summary": "Operate tenant workloads and inspect tenant usage without membership or billing administration."
+        "summary": "Reads tenant and workspace directory context for collaboration without gaining workspace runtime permissions."
       },
       {
-        "id": "tenant_billing_admin",
+        "id": "tenant_viewer",
         "scope": "tenant",
         "inherits": [],
-        "summary": "Manage plan and quota workflows without workspace runtime administration."
-      },
-      {
-        "id": "auditor",
-        "scope": "tenant",
-        "inherits": [],
-        "summary": "Read-only tenant audit and evidence review."
-      },
-      {
-        "id": "tenant_owner",
-        "scope": "tenant",
-        "summary": "Owns tenant IAM, invitations, workspace governance, and elevated BaaS policy decisions within one tenant."
+        "summary": "Read-only tenant observer for dashboards, audit evidence, and effective-permission visibility."
       }
     ],
     "workspace": [
@@ -443,7 +437,11 @@
       "tenant.usage.read",
       "tenant.suspend",
       "tenant.invitations.manage",
-      "tenant.role_mappings.manage"
+      "tenant.role_mappings.manage",
+      "tenant.ownership.transfer",
+      "tenant.ownership_transfers.read",
+      "tenant.effective_permissions.read",
+      "tenant.effective_permissions.recalculate"
     ],
     "workspace": [
       "workspace.read",
@@ -452,7 +450,9 @@
       "workspace.delete",
       "workspace.invitations.manage",
       "workspace.role_mappings.manage",
-      "workspace.policy.manage"
+      "workspace.policy.manage",
+      "workspace.effective_permissions.read",
+      "workspace.effective_permissions.recalculate"
     ],
     "database": [
       "database.read",
@@ -501,7 +501,7 @@
       "resource_type": "tenant",
       "parent_scope": "platform",
       "workspace_scoped": false,
-      "ownership_model": "tenant-owned with audited platform override",
+      "ownership_model": "tenant-owned collaboration boundary with owner-mediated transfer and audited platform override",
       "membership_bindings": [
         "tenant_roles"
       ],
@@ -510,7 +510,11 @@
         "tenant.workspaces.create",
         "tenant.usage.read",
         "tenant.invitations.manage",
-        "tenant.role_mappings.manage"
+        "tenant.role_mappings.manage",
+        "tenant.ownership.transfer",
+        "tenant.ownership_transfers.read",
+        "tenant.effective_permissions.read",
+        "tenant.effective_permissions.recalculate"
       ],
       "forbidden_actions": [
         "cross_tenant.impersonate",
@@ -521,9 +525,8 @@
       "resource_type": "workspace",
       "parent_scope": "tenant",
       "workspace_scoped": true,
-      "ownership_model": "tenant-owned workspace with workspace-level delegates",
+      "ownership_model": "tenant-owned workspace boundary with independently granted workspace memberships",
       "membership_bindings": [
-        "tenant_roles",
         "workspace_roles"
       ],
       "delegable_actions": [
@@ -532,7 +535,9 @@
         "workspace.members.manage",
         "workspace.invitations.manage",
         "workspace.role_mappings.manage",
-        "workspace.policy.manage"
+        "workspace.policy.manage",
+        "workspace.effective_permissions.read",
+        "workspace.effective_permissions.recalculate"
       ],
       "forbidden_actions": [
         "workspace.delete_without_tenant_admin",
@@ -720,31 +725,37 @@
           "tenant.usage.read",
           "tenant.invitations.manage",
           "tenant.role_mappings.manage",
+          "tenant.ownership.transfer",
+          "tenant.ownership_transfers.read",
+          "tenant.effective_permissions.read",
+          "tenant.effective_permissions.recalculate",
           "workspace.read",
           "workspace.update",
           "workspace.members.manage",
           "workspace.invitations.manage",
           "workspace.role_mappings.manage",
           "workspace.policy.manage",
+          "workspace.effective_permissions.read",
+          "workspace.effective_permissions.recalculate"
+        ],
+        "denied_actions": [
           "database.admin",
           "bucket.admin",
-          "topic.read",
           "topic.admin",
-          "function.read",
           "function.admin",
+          "function.deploy",
+          "function.invoke",
           "app.admin",
+          "app.deploy",
           "app.credentials.rotate",
-          "service_account.admin",
-          "service_account.rotate",
-          "service_account.credentials.issue",
-          "service_account.credentials.revoke",
-          "app.federation.read",
           "app.federation.manage",
           "app.attribute_mappers.manage",
           "app.logout.manage",
-          "app.templates.read"
-        ],
-        "denied_actions": []
+          "service_account.admin",
+          "service_account.rotate",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
+        ]
       },
       {
         "role": "tenant_admin",
@@ -757,124 +768,130 @@
           "tenant.usage.read",
           "tenant.invitations.manage",
           "tenant.role_mappings.manage",
+          "tenant.ownership_transfers.read",
+          "tenant.effective_permissions.read",
+          "tenant.effective_permissions.recalculate",
           "workspace.read",
           "workspace.update",
           "workspace.members.manage",
           "workspace.invitations.manage",
           "workspace.role_mappings.manage",
           "workspace.policy.manage",
+          "workspace.effective_permissions.read",
+          "workspace.effective_permissions.recalculate"
+        ],
+        "denied_actions": [
+          "tenant.suspend",
+          "tenant.ownership.transfer",
           "database.admin",
           "bucket.admin",
-          "topic.read",
           "topic.admin",
-          "function.read",
           "function.admin",
+          "function.deploy",
+          "function.invoke",
           "app.admin",
+          "app.deploy",
           "app.credentials.rotate",
-          "service_account.admin",
-          "service_account.rotate",
-          "service_account.credentials.issue",
-          "service_account.credentials.revoke",
-          "app.federation.read",
           "app.federation.manage",
           "app.attribute_mappers.manage",
           "app.logout.manage",
-          "app.templates.read"
-        ],
-        "denied_actions": [
-          "tenant.suspend"
+          "service_account.admin",
+          "service_account.rotate",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       },
       {
-        "role": "tenant_operator",
+        "role": "tenant_developer",
         "allowed_actions": [
           "tenant.read",
           "tenant.usage.read",
+          "tenant.effective_permissions.read",
+          "tenant.ownership_transfers.read",
           "workspace.read",
-          "database.read",
-          "database.write",
-          "bucket.read",
-          "bucket.write",
-          "topic.read",
-          "topic.publish",
-          "topic.consume",
-          "function.read",
-          "function.invoke",
-          "app.read",
-          "service_account.read",
-          "app.federation.read",
-          "app.templates.read"
-        ],
-        "denied_actions": [
-          "tenant.members.manage",
-          "tenant.invitations.manage",
-          "tenant.role_mappings.manage",
-          "workspace.members.manage",
-          "workspace.invitations.manage",
-          "workspace.role_mappings.manage",
-          "workspace.policy.manage",
-          "database.admin",
-          "bucket.admin",
-          "topic.admin",
-          "function.admin",
-          "app.admin",
-          "service_account.admin",
-          "service_account.credentials.issue",
-          "service_account.credentials.revoke",
-          "app.federation.manage",
-          "app.attribute_mappers.manage",
-          "app.logout.manage"
-        ]
-      },
-      {
-        "role": "tenant_billing_admin",
-        "allowed_actions": [
-          "tenant.read",
-          "tenant.usage.read"
-        ],
-        "denied_actions": [
-          "workspace.update",
-          "database.admin",
-          "bucket.admin",
-          "topic.admin",
-          "function.admin",
-          "app.admin",
-          "service_account.admin",
-          "app.credentials.rotate",
-          "tenant.invitations.manage",
-          "tenant.role_mappings.manage"
-        ]
-      },
-      {
-        "role": "auditor",
-        "allowed_actions": [
-          "tenant.read",
-          "tenant.audit.read",
-          "workspace.read",
-          "database.read",
-          "bucket.read",
-          "topic.read",
-          "function.read",
-          "app.read",
-          "service_account.read",
-          "app.federation.read",
           "app.templates.read"
         ],
         "denied_actions": [
           "tenant.update",
           "tenant.members.manage",
+          "tenant.workspaces.create",
           "tenant.invitations.manage",
+          "tenant.role_mappings.manage",
+          "tenant.ownership.transfer",
+          "tenant.effective_permissions.recalculate",
+          "workspace.update",
+          "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
+          "workspace.effective_permissions.recalculate",
+          "database.admin",
           "database.write",
+          "bucket.admin",
           "bucket.write",
+          "topic.admin",
           "topic.publish",
+          "topic.consume",
+          "function.admin",
           "function.deploy",
+          "function.invoke",
+          "app.admin",
           "app.deploy",
-          "service_account.rotate",
-          "service_account.credentials.issue",
-          "service_account.credentials.revoke",
+          "app.credentials.rotate",
           "app.federation.manage",
           "app.attribute_mappers.manage",
-          "app.logout.manage"
+          "app.logout.manage",
+          "service_account.admin",
+          "service_account.rotate",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
+        ]
+      },
+      {
+        "role": "tenant_viewer",
+        "allowed_actions": [
+          "tenant.read",
+          "tenant.audit.read",
+          "tenant.usage.read",
+          "tenant.effective_permissions.read",
+          "tenant.ownership_transfers.read",
+          "workspace.read",
+          "app.templates.read"
+        ],
+        "denied_actions": [
+          "tenant.update",
+          "tenant.members.manage",
+          "tenant.workspaces.create",
+          "tenant.invitations.manage",
+          "tenant.role_mappings.manage",
+          "tenant.ownership.transfer",
+          "tenant.effective_permissions.recalculate",
+          "workspace.update",
+          "workspace.members.manage",
+          "workspace.invitations.manage",
+          "workspace.role_mappings.manage",
+          "workspace.policy.manage",
+          "workspace.effective_permissions.recalculate",
+          "database.write",
+          "database.admin",
+          "bucket.write",
+          "bucket.admin",
+          "topic.publish",
+          "topic.consume",
+          "topic.admin",
+          "function.deploy",
+          "function.invoke",
+          "function.admin",
+          "app.deploy",
+          "app.admin",
+          "app.credentials.rotate",
+          "app.federation.manage",
+          "app.attribute_mappers.manage",
+          "app.logout.manage",
+          "service_account.rotate",
+          "service_account.admin",
+          "service_account.credentials.issue",
+          "service_account.credentials.revoke"
         ]
       }
     ],
@@ -1283,6 +1300,13 @@
       "category": "service_account_boundary",
       "expected_effect": "deny",
       "summary": "Workspace service-account identities cannot administer credentials or access managed resources outside the policy bindings of their own workspace."
+    },
+    {
+      "id": "AUTHZ-OWN-009",
+      "surface": "control_api",
+      "category": "ownership_transfer",
+      "expected_effect": "deny",
+      "summary": "Tenant ownership transfer is denied unless the acting owner initiates it, the designated target accepts it, and effective permissions are recalculated inside the same tenant boundary."
     }
   ]
 }

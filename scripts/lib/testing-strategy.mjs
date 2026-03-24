@@ -9,8 +9,8 @@ export const REQUIRED_CONSOLE_STATES = [
   'unauthenticated',
   'platform_admin',
   'tenant_admin',
-  'tenant_operator',
-  'auditor'
+  'tenant_developer',
+  'tenant_viewer'
 ];
 export const REQUIRED_CONSOLE_STATUS_STATES = [
   'pending_activation',

@@ -53,6 +53,7 @@ This keeps the decision vocabulary stable even when enforcement differs by plane
 
 - tenant-owned resource with workspace delegates
 - workspace membership is not interchangeable across workspaces in the same tenant
+- tenant roles and workspace roles are evaluated independently; tenant collaboration access does not imply workspace runtime access without an explicit workspace membership
 
 ### Workspace-owned resources
 
@@ -74,10 +75,10 @@ The following resource types inherit the workspace boundary and must never be ac
 
 ### Tenant roles
 
+- `tenant_owner`
 - `tenant_admin`
-- `tenant_operator`
-- `tenant_billing_admin`
-- `auditor`
+- `tenant_developer`
+- `tenant_viewer`
 
 ### Workspace roles
 
@@ -115,3 +116,7 @@ The repository now requires coverage for at least these abuse classes:
 - plan guardrail violations
 
 Later stories may add more scenarios, but they should extend the baseline rather than weaken it.
+
+## Membership lifecycle extensions
+
+The current baseline also treats invitation acceptance, invitation revocation, tenant ownership transfer, and membership mutation as authorization-relevant events. Each of those events must trigger effective-permission recalculation for already provisioned resources in the affected tenant or workspace scope.

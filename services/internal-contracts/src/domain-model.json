@@ -515,12 +515,14 @@
         "invitationId",
         "grantedByUserId",
         "activatedAt",
-        "suspensionReason"
+        "suspensionReason",
+        "effectivePermissionRecalculationId",
+        "effectivePermissionStatus"
       ],
       "business_rules": [
-        "Tenant memberships bind one canonical platform user to one tenant role while preserving auditable Keycloak user/group provenance.",
-        "PrincipalBindings and roleMappings must resolve only to identities inside the tenant realm selected by the tenant identity context.",
-        "Group-based mappings may elevate roles only within the tenant namespace and never across tenant boundaries without a fresh grant decision."
+        "Tenant memberships bind one canonical platform user to exactly one tenant collaboration role (tenant_owner, tenant_admin, tenant_developer, or tenant_viewer) while preserving auditable Keycloak user/group provenance.",
+        "Tenant memberships never grant workspace runtime permissions on their own; workspace access must be resolved from independent workspace memberships inside the same tenant boundary.",
+        "PrincipalBindings and roleMappings must resolve only to identities inside the tenant realm selected by the tenant identity context, and any membership change must enqueue effective-permission recalculation for existing tenant-scoped resources."
       ],
       "openapi": {
         "read_schema": "TenantMembershipRecord",
@@ -563,12 +565,14 @@
         "invitationId",
         "grantedByUserId",
         "activatedAt",
-        "suspensionReason"
+        "suspensionReason",
+        "effectivePermissionRecalculationId",
+        "effectivePermissionStatus"
       ],
       "business_rules": [
-        "Workspace memberships inherit tenant-safe provenance and may be sourced from direct user bindings, approved invitations, or Keycloak groups within the same tenant realm.",
-        "Resolved workspace roles must stay inside the owning workspace namespace even when group names overlap across workspaces.",
-        "RoleMappings capture precedence and sync status so operator-visible access changes remain auditable and reversible."
+        "Workspace memberships are granted independently from tenant memberships and may be sourced from direct user bindings, approved invitations, or Keycloak groups within the same tenant realm.",
+        "Resolved workspace roles must stay inside the owning workspace namespace even when group names overlap across workspaces, and tenant-wide roles must not be treated as implicit workspace grants.",
+        "RoleMappings capture precedence and sync status so operator-visible access changes remain auditable, reversible, and able to trigger effective-permission recalculation for existing workspace resources."
       ],
       "openapi": {
         "read_schema": "WorkspaceMembershipRecord",
@@ -613,13 +617,17 @@
         "maskedEmail",
         "invitedByUserId",
         "acceptedByUserId",
-        "acceptedAt"
+        "acceptedAt",
+        "revokedByUserId",
+        "revokedAt",
+        "effectivePermissionRecalculationId",
+        "effectivePermissionStatus"
       ],
       "business_rules": [
-        "Invitation acceptance is valid only while invitationStatus=pending and the target binding matches the verified user or group identity presented by Keycloak.",
-        "Workspace-target invitations must resolve to one tenant-safe workspaceId and must not mint cross-tenant memberships.",
-        "Revocation or expiration permanently invalidates the invitation token; replay requires issuing a new canonical invitation record.",
-        "ExpirationPolicy drives default TTL, override eligibility, and audit evidence for tenant/workspace invitation decisions."
+        "Invitation acceptance is valid only while invitationStatus=pending, the acceptance token is still valid, and the verified actor matches the intended tenant or workspace target binding.",
+        "Workspace-target invitations must resolve to one tenant-safe workspaceId and must not mint cross-tenant memberships or substitute tenant-scoped roles for workspace-scoped grants.",
+        "Revocation or expiration permanently invalidates the invitation token; replay requires issuing a new canonical invitation record, and successful acceptance must enqueue effective-permission recalculation for the affected scope.",
+        "ExpirationPolicy drives default TTL, override eligibility, and audit evidence for tenant/workspace invitation decisions surfaced in the console and control API."
       ],
       "openapi": {
         "read_schema": "Invitation",
@@ -1286,7 +1294,10 @@
     "Tenant activation is not complete until the Keycloak realm/client-scope/mapper baseline required by the control plane has been reconciled.",
     "Workspace application clients and service accounts are namespaced per workspace even when multiple workspaces share one tenant realm cluster.",
     "Console signup, activation, suspension, and password-recovery flows must preserve the platform_user identity boundary and remain auditable under the platform realm.",
-    "Auto-signup behavior is policy-driven by global, environment, and plan overrides; rejection or approval decisions must be explainable to the operator."
+    "Auto-signup behavior is policy-driven by global, environment, and plan overrides; rejection or approval decisions must be explainable to the operator.",
+    "Tenant ownership transfer requires a current tenant_owner to initiate the handoff, a designated target user to accept it before expiration, and no automatic superadmin escalation during the routine path.",
+    "Membership grants at tenant scope and workspace scope are evaluated independently; mixed-role access must be resolved by combining both scopes without leaking permissions across tenants or workspaces.",
+    "Any accepted invitation, membership mutation, revocation, suspension, or ownership transfer must enqueue effective-permission recalculation for already-provisioned resources in the affected scope."
   ],
   "business_state_machines": [
     {
@@ -1649,6 +1660,75 @@
       "rules": [
         "Activation requires the parent tenant to be active and all mandatory bootstrap resources to have converged.",
         "Soft-deleted workspaces keep slug uniqueness reservations and clone lineage for auditability."
+      ]
+    },
+    {
+      "id": "tenant_ownership_transfer_status",
+      "entity_type": "tenant",
+      "field": "ownershipTransferStatus",
+      "initial_state": "pending_acceptance",
+      "states": [
+        "pending_acceptance",
+        "accepted",
+        "cancelled",
+        "expired"
+      ],
+      "terminal_states": [
+        "accepted",
+        "cancelled",
+        "expired"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "pending_acceptance",
+          "to": "accepted"
+        },
+        {
+          "from": "pending_acceptance",
+          "to": "cancelled"
+        },
+        {
+          "from": "pending_acceptance",
+          "to": "expired"
+        }
+      ],
+      "rules": [
+        "Only the current tenant owner may initiate the transfer, and only the designated target may accept it.",
+        "Accepted or expired ownership transfers cannot be replayed; a new transfer record must be issued for another attempt."
+      ]
+    },
+    {
+      "id": "effective_permission_recalculation_status",
+      "entity_type": "tenant",
+      "field": "effectivePermissionStatus",
+      "initial_state": "pending",
+      "states": [
+        "pending",
+        "running",
+        "applied",
+        "failed"
+      ],
+      "terminal_states": [
+        "applied",
+        "failed"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "pending",
+          "to": "running"
+        },
+        {
+          "from": "running",
+          "to": "applied"
+        },
+        {
+          "from": "running",
+          "to": "failed"
+        }
+      ],
+      "rules": [
+        "Any membership, invitation, or ownership mutation that changes access must enqueue recalculation before affected resources are considered converged.",
+        "Failed recalculations require an explicit retry or compensating grant decision before stale permissions may be considered remediated."
       ]
     }
   ],

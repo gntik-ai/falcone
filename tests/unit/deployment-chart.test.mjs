@@ -72,6 +72,8 @@ test('deployment chart keeps the Keycloak platform and tenant IAM bootstrap base
 
   assert.ok(keycloakBootstrap.realmRoles.includes('platform_admin'));
   assert.ok(keycloakBootstrap.realmRoles.includes('tenant_owner'));
+  assert.ok(keycloakBootstrap.realmRoles.includes('tenant_developer'));
+  assert.ok(keycloakBootstrap.realmRoles.includes('tenant_viewer'));
   assert.ok(keycloakBootstrap.realmRoles.includes('workspace_owner'));
   assert.ok(keycloakBootstrap.realmRoles.includes('workspace_admin'));
   assert.ok(keycloakBootstrap.realmRoles.includes('workspace_service_account'));
