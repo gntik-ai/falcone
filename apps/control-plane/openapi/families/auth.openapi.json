@@ -805,6 +805,38 @@
         "pattern": "^[0-9]+(?:s|m|h|d)$",
         "type": "string"
       },
+      "EffectivePermissionRecalculationReference": {
+        "additionalProperties": false,
+        "properties": {
+          "permissionRecalculationId": {
+            "pattern": "^epr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EffectivePermissionScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PermissionRecalculationStatus"
+          },
+          "workspaceId": {
+            "pattern": "^wrk_[0-9a-z]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permissionRecalculationId",
+          "scope",
+          "status"
+        ],
+        "type": "object"
+      },
+      "EffectivePermissionScope": {
+        "enum": [
+          "tenant",
+          "workspace"
+        ],
+        "type": "string"
+      },
       "EntityMetadata": {
         "additionalProperties": {
           "maxLength": 1024,
@@ -1274,6 +1306,15 @@
         ],
         "type": "object"
       },
+      "PermissionRecalculationStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "applied",
+          "failed"
+        ],
+        "type": "string"
+      },
       "PlatformRole": {
         "enum": [
           "platform_admin",
@@ -1739,6 +1780,9 @@
       "TenantMembershipRecord": {
         "additionalProperties": false,
         "properties": {
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
+          },
           "effectiveRoles": {
             "items": {
               "$ref": "#/components/schemas/TenantRole"
@@ -1825,9 +1869,8 @@
         "enum": [
           "tenant_owner",
           "tenant_admin",
-          "tenant_operator",
-          "tenant_billing_admin",
-          "auditor"
+          "tenant_developer",
+          "tenant_viewer"
         ],
         "type": "string"
       },
@@ -2238,6 +2281,9 @@
       "WorkspaceMembershipRecord": {
         "additionalProperties": false,
         "properties": {
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
+          },
           "effectiveRoles": {
             "items": {
               "$ref": "#/components/schemas/WorkspaceRole"
@@ -2367,7 +2413,7 @@
     "description": "Console login, signup, activation, password recovery, and contextual authorization decisions. Generated from the unified public API contract for v1.",
     "summary": "Console login, signup, activation, password recovery, and contextual authorization decisions.",
     "title": "In Atelier Auth API",
-    "version": "1.9.0"
+    "version": "1.10.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

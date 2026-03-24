@@ -277,7 +277,7 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     violations.push('bootstrap.oneShot.keycloak.realmRoles must define the platform and tenant/workspace role baseline.');
   }
 
-  for (const role of ['tenant_owner', 'workspace_owner', 'workspace_viewer', 'workspace_service_account']) {
+  for (const role of ['tenant_owner', 'tenant_developer', 'tenant_viewer', 'workspace_owner', 'workspace_viewer', 'workspace_service_account']) {
     if (!(keycloakBootstrap?.realmRoles ?? []).includes(role)) {
       violations.push(`bootstrap.oneShot.keycloak.realmRoles must include ${role}.`);
     }

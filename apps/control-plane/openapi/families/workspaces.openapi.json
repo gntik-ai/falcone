@@ -105,6 +105,16 @@
           "type": "integer"
         }
       },
+      "PermissionRecalculationId": {
+        "description": "Effective permission recalculation identifier.",
+        "in": "path",
+        "name": "permissionRecalculationId",
+        "required": true,
+        "schema": {
+          "pattern": "^epr_[0-9a-z]+$",
+          "type": "string"
+        }
+      },
       "ResourceId": {
         "description": "Stable managed resource identifier.",
         "in": "path",
@@ -290,6 +300,119 @@
           "correlationContext"
         ],
         "type": "object"
+      },
+      "EffectivePermissionRecalculation": {
+        "additionalProperties": false,
+        "properties": {
+          "affectedResourceCount": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityType": {
+            "const": "effective_permission_recalculation",
+            "type": "string"
+          },
+          "failureCode": {
+            "maxLength": 80,
+            "minLength": 3,
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          },
+          "permissionRecalculationId": {
+            "pattern": "^epr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EffectivePermissionScope"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PermissionRecalculationStatus"
+          },
+          "tenantId": {
+            "pattern": "^ten_[0-9a-z]+$",
+            "type": "string"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "triggeredByEntityId": {
+            "maxLength": 80,
+            "minLength": 3,
+            "type": "string"
+          },
+          "triggeredByEntityType": {
+            "enum": [
+              "tenant_membership",
+              "workspace_membership",
+              "invitation",
+              "ownership_transfer"
+            ],
+            "type": "string"
+          },
+          "triggeredByUserId": {
+            "pattern": "^usr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "workspaceId": {
+            "pattern": "^wrk_[0-9a-z]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityType",
+          "permissionRecalculationId",
+          "tenantId",
+          "scope",
+          "status",
+          "triggeredByEntityType",
+          "triggeredByEntityId",
+          "triggeredByUserId",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "EffectivePermissionRecalculationReference": {
+        "additionalProperties": false,
+        "properties": {
+          "permissionRecalculationId": {
+            "pattern": "^epr_[0-9a-z]+$",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EffectivePermissionScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PermissionRecalculationStatus"
+          },
+          "workspaceId": {
+            "pattern": "^wrk_[0-9a-z]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permissionRecalculationId",
+          "scope",
+          "status"
+        ],
+        "type": "object"
+      },
+      "EffectivePermissionScope": {
+        "enum": [
+          "tenant",
+          "workspace"
+        ],
+        "type": "string"
       },
       "EntityMetadata": {
         "additionalProperties": {
@@ -1775,6 +1898,15 @@
         ],
         "type": "object"
       },
+      "PermissionRecalculationStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "applied",
+          "failed"
+        ],
+        "type": "string"
+      },
       "ProviderCapabilityStatus": {
         "enum": [
           "available",
@@ -3045,6 +3177,9 @@
       "WorkspaceMembershipRecord": {
         "additionalProperties": false,
         "properties": {
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
+          },
           "effectiveRoles": {
             "items": {
               "$ref": "#/components/schemas/WorkspaceRole"
@@ -3291,7 +3426,7 @@
     "description": "Workspace lifecycle, application inventory, workload identities, and managed-resource control surfaces. Generated from the unified public API contract for v1.",
     "summary": "Workspace lifecycle, application inventory, workload identities, and managed-resource control surfaces.",
     "title": "In Atelier Workspaces API",
-    "version": "1.9.0"
+    "version": "1.10.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -6221,6 +6356,130 @@
         "x-visibility": "public"
       }
     },
+    "/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}": {
+      "get": {
+        "operationId": "getWorkspaceEffectivePermissionRecalculation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/PermissionRecalculationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionRecalculation"
+                }
+              }
+            },
+            "description": "Entity returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Fetch one workspace-scoped effective-permission recalculation record.",
+        "tags": [
+          "Workspaces",
+          "Authorization"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-family": "workspaces",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "workspace",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
     "/v1/workspaces/{workspaceId}/service-accounts": {
       "post": {
         "operationId": "createServiceAccount",
@@ -6993,6 +7252,9 @@
     },
     {
       "name": "ManagedResources"
+    },
+    {
+      "name": "Authorization"
     },
     {
       "name": "Memberships"

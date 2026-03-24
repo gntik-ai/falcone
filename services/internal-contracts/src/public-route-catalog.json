@@ -2,7 +2,7 @@
   "generatedFrom": "apps/control-plane/openapi/control-plane.openapi.json",
   "release": {
     "header_version": "2026-03-24",
-    "openapi_semver": "1.9.0",
+    "openapi_semver": "1.10.0",
     "path_version": "v1"
   },
   "routes": [
@@ -3424,7 +3424,7 @@
       "audiences": [
         "tenant_owner",
         "tenant_admin",
-        "auditor",
+        "tenant_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -3498,7 +3498,7 @@
       "audiences": [
         "tenant_owner",
         "tenant_admin",
-        "auditor",
+        "tenant_viewer",
         "workspace_owner",
         "workspace_admin",
         "workspace_auditor",
@@ -4995,6 +4995,8 @@
         "developer_external",
         "tenant_owner",
         "tenant_admin",
+        "tenant_developer",
+        "tenant_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -5064,6 +5066,8 @@
         "developer_external",
         "tenant_owner",
         "tenant_admin",
+        "tenant_developer",
+        "tenant_viewer",
         "platform_team"
       ],
       "authRequired": true,
@@ -5615,6 +5619,285 @@
       "tags": [
         "Tenants",
         "Memberships"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "tenants",
+      "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "createTenantOwnershipTransfer",
+      "path": "/v1/tenants/{tenantId}/ownership-transfers",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "tenant",
+      "scope": "tenant",
+      "summary": "Initiate a secure tenant ownership transfer that requires acceptance by the designated target owner.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Tenants",
+        "Memberships"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "tenants",
+      "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "GET",
+      "operationId": "getTenantOwnershipTransfer",
+      "path": "/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "tenant",
+      "scope": "tenant",
+      "summary": "Fetch one tenant ownership transfer record.",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Tenants",
+        "Memberships"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_owner",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "tenants",
+      "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "acceptTenantOwnershipTransfer",
+      "path": "/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}/acceptance",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "tenant",
+      "scope": "tenant",
+      "summary": "Accept a pending tenant ownership transfer before it expires.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Tenants",
+        "Memberships"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "tenant_developer",
+        "tenant_viewer",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "tenants",
+      "familyTitle": "Tenants",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "GET",
+      "operationId": "getTenantEffectivePermissionRecalculation",
+      "path": "/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "tenant",
+      "scope": "tenant",
+      "summary": "Fetch one tenant-scoped effective-permission recalculation record.",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Tenants",
+        "Authorization"
       ],
       "tenantBinding": "required",
       "visibility": "public",
@@ -7289,6 +7572,77 @@
       "tags": [
         "Workspaces",
         "Memberships"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "workspaces",
+      "familyTitle": "Workspaces",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "workspace_control",
+      "gatewayRequestValidationProfile": "workspace_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "GET",
+      "operationId": "getWorkspaceEffectivePermissionRecalculation",
+      "path": "/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "workspace",
+      "scope": "workspace",
+      "summary": "Fetch one workspace-scoped effective-permission recalculation record.",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Workspaces",
+        "Authorization"
       ],
       "tenantBinding": "required",
       "visibility": "public",

@@ -5,7 +5,7 @@
   "release": {
     "path_version": "v1",
     "header_version": "2026-03-24",
-    "openapi_semver": "1.9.0"
+    "openapi_semver": "1.10.0"
   },
   "versioning": {
     "uri_prefix": "/v1",
@@ -150,6 +150,8 @@
         "developer_external",
         "tenant_owner",
         "tenant_admin",
+        "tenant_developer",
+        "tenant_viewer",
         "platform_team"
       ],
       "visibility": "public",

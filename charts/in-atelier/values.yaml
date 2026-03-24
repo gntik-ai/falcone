@@ -278,9 +278,8 @@ bootstrap:
         - platform_auditor
         - tenant_owner
         - tenant_admin
-        - tenant_operator
-        - tenant_billing_admin
-        - auditor
+        - tenant_developer
+        - tenant_viewer
         - workspace_owner
         - workspace_admin
         - workspace_developer
@@ -410,9 +409,8 @@ bootstrap:
         requiredRealmRoles:
           - tenant_owner
           - tenant_admin
-          - tenant_operator
-          - tenant_billing_admin
-          - auditor
+          - tenant_developer
+          - tenant_viewer
           - workspace_owner
           - workspace_admin
           - workspace_developer
@@ -2567,16 +2565,59 @@ gatewayPolicy:
         audiences:
           - tenant_owner
           - tenant_admin
-          - workspace_admin
         roles:
           - tenant_owner
           - tenant_admin
-          - workspace_admin
         scopes:
           - openid
           - profile
           - tenant.admin
         planId: pln_01regulated
+      - id: tenant_developer
+        audiences:
+          - tenant_developer
+        roles:
+          - tenant_developer
+        scopes:
+          - openid
+          - profile
+          - gateway.product.read
+        planId: pln_01growth
+      - id: tenant_viewer
+        audiences:
+          - tenant_viewer
+        roles:
+          - tenant_viewer
+        scopes:
+          - openid
+          - profile
+          - gateway.product.read
+        planId: pln_01enterprise
+      - id: mixed_tenant_viewer_workspace_developer
+        audiences:
+          - tenant_viewer
+          - workspace_developer
+        roles:
+          - tenant_viewer
+          - workspace_developer
+        scopes:
+          - openid
+          - profile
+          - gateway.product.read
+          - gateway.product.write
+        planId: pln_01growth
+      - id: mixed_tenant_developer_workspace_viewer
+        audiences:
+          - tenant_developer
+          - workspace_viewer
+        roles:
+          - tenant_developer
+          - workspace_viewer
+        scopes:
+          - openid
+          - profile
+          - gateway.product.read
+        planId: pln_01enterprise
       - id: superadmin
         audiences:
           - superadmin
@@ -2703,17 +2744,97 @@ gatewayPolicy:
         expect: allow
       - persona: tenant_admin
         routeKind: product_api
+        path: /v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}
+        method: GET
+        expect: allow
+      - persona: tenant_admin
+        routeKind: product_api
         path: /v1/functions/actions
         method: POST
         expect: deny
       - persona: tenant_admin
-        routeKind: product_api
-        path: /v1/metrics/workspaces/{workspaceId}/series
-        method: GET
-        expect: allow
-      - persona: tenant_admin
         routeKind: passthrough
         routeId: keycloak_admin
+        expect: deny
+      - persona: tenant_developer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/effective-capabilities
+        method: GET
+        expect: allow
+      - persona: tenant_developer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}
+        method: GET
+        expect: allow
+      - persona: tenant_developer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/memberships
+        method: POST
+        expect: deny
+      - persona: tenant_developer
+        routeKind: product_api
+        path: /v1/functions/actions
+        method: POST
+        expect: deny
+      - persona: tenant_viewer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}
+        method: GET
+        expect: allow
+      - persona: tenant_viewer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/effective-capabilities
+        method: GET
+        expect: allow
+      - persona: tenant_viewer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/ownership-transfers
+        method: POST
+        expect: deny
+      - persona: tenant_viewer
+        routeKind: product_api
+        path: /v1/functions/actions/{resourceId}
+        method: GET
+        expect: deny
+      - persona: mixed_tenant_viewer_workspace_developer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}
+        method: GET
+        expect: allow
+      - persona: mixed_tenant_viewer_workspace_developer
+        routeKind: product_api
+        path: /v1/functions/actions/{resourceId}
+        method: GET
+        expect: allow
+      - persona: mixed_tenant_viewer_workspace_developer
+        routeKind: product_api
+        path: /v1/functions/actions
+        method: POST
+        expect: allow
+      - persona: mixed_tenant_viewer_workspace_developer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/ownership-transfers
+        method: POST
+        expect: deny
+      - persona: mixed_tenant_developer_workspace_viewer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/effective-capabilities
+        method: GET
+        expect: allow
+      - persona: mixed_tenant_developer_workspace_viewer
+        routeKind: product_api
+        path: /v1/functions/actions/{resourceId}
+        method: GET
+        expect: allow
+      - persona: mixed_tenant_developer_workspace_viewer
+        routeKind: product_api
+        path: /v1/functions/actions
+        method: POST
+        expect: deny
+      - persona: mixed_tenant_developer_workspace_viewer
+        routeKind: product_api
+        path: /v1/tenants/{tenantId}/memberships
+        method: POST
         expect: deny
       - persona: superadmin
         routeKind: product_api

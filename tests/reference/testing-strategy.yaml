@@ -75,11 +75,11 @@ cross_domain_matrix:
       level: unit
       domain: security
       taxonomy: permission
-      title: Permission reducer denies tenant operator access to billing-admin actions.
+      title: Tenant developer permissions stay tenant-scoped and do not imply workspace runtime access.
       fixtures:
-        - user-tenant-operator-a
-        - route-platform-overview
-      expected: Tenant operator permissions remain tenant-scoped and platform-only actions stay blocked.
+        - user-tenant-developer-a
+        - route-tenant-dashboard
+      expected: Tenant developer access remains limited to tenant-level collaboration visibility unless an independent workspace membership also exists.
     - id: UT-SEC-002
       level: unit
       domain: security
@@ -401,27 +401,32 @@ console:
         - rotate-tenant-secrets-reference
         - review-tenant-usage
         - create-workspace
-    - id: tenant_operator
+    - id: tenant_developer
       visible_sections:
         - tenant-dashboard
-        - tenant-workflows
+        - workspace-directory
+        - tenant-permission-overview
       blocked_sections:
         - tenant-members
-        - platform-overview
-        - audit-log
-      allowed_actions:
-        - run-tenant-operation
-        - inspect-own-workflow-status
-    - id: auditor
-      visible_sections:
-        - tenant-dashboard
-        - audit-log
-      blocked_sections:
         - tenant-settings
         - platform-overview
       allowed_actions:
+        - inspect-tenant-capabilities
+        - review-workspace-directory
+        - inspect-effective-permissions
+    - id: tenant_viewer
+      visible_sections:
+        - tenant-dashboard
+        - audit-log
+        - tenant-permission-overview
+      blocked_sections:
+        - tenant-settings
+        - tenant-members
+        - platform-overview
+      allowed_actions:
         - view-audit-evidence
-        - export-audit-report
+        - inspect-effective-permissions
+        - review-tenant-usage
     - id: workspace_admin
       visible_sections:
         - workspace-dashboard
