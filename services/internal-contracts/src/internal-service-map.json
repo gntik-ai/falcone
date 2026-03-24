@@ -22,7 +22,9 @@
         "Normalize signup-activation approvals into initial tenant bootstrap commands with owner binding context.",
         "Accept BaaS-native IAM administrative operations for realms, clients, roles, scopes, and users while keeping provider payload normalization stable.",
         "Emit audit evidence for request acceptance and synchronous rejection where required.",
-        "Emit IAM lifecycle events with actor context for audit persistence and Kafka-compatible downstream delivery."
+        "Emit IAM lifecycle events with actor context for audit persistence and Kafka-compatible downstream delivery.",
+        "Accept BaaS-native PostgreSQL administrative operations for roles, users, databases, and schemas while preserving placement-aware validation and secret-free payload normalization.",
+        "Expose PostgreSQL administrative inventory projections and minimum-privilege operational guidance without leaking unsafe engine details."
       ],
       "owned_resources": [
         "public route contract",
@@ -30,7 +32,9 @@
         "request validation policy",
         "authorization decision",
         "iam administrative request envelope",
-        "iam lifecycle event envelope"
+        "iam lifecycle event envelope",
+        "postgres administrative request envelope",
+        "postgres administrative inventory projection"
       ],
       "service_dependencies": [
         "provisioning_orchestrator",
@@ -44,7 +48,8 @@
         "provisioning_request",
         "audit_record",
         "iam_admin_request",
-        "iam_lifecycle_event"
+        "iam_lifecycle_event",
+        "postgres_admin_request"
       ]
     },
     {
@@ -60,7 +65,9 @@
         "Emit audit evidence for step transitions and final outcomes.",
         "Preserve suspension/reactivation semantics for tenant-scoped users and service accounts when IAM access state changes.",
         "Persist per-resource provisioning state for bootstrap visibility across API and console surfaces.",
-        "Resume partially failed tenant bootstrap runs without replaying resources that already converged successfully."
+        "Resume partially failed tenant bootstrap runs without replaying resources that already converged successfully.",
+        "Coordinate PostgreSQL administrative operations for roles, users, databases, and schemas without letting control_api call adapters directly.",
+        "Persist PostgreSQL metadata and inventory snapshots for console-safe reads and profile-aware validation."
       ],
       "owned_resources": [
         "provisioning run state",
@@ -68,7 +75,9 @@
         "step plan",
         "retry classification",
         "propagated authorization context",
-        "iam admin orchestration result"
+        "iam admin orchestration result",
+        "postgres admin orchestration result",
+        "postgres metadata inventory snapshot"
       ],
       "service_dependencies": [
         "audit_module"
@@ -83,14 +92,17 @@
       ],
       "inbound_contracts": [
         "provisioning_request",
-        "iam_admin_request"
+        "iam_admin_request",
+        "postgres_admin_request"
       ],
       "outbound_contracts": [
         "provisioning_result",
         "adapter_call",
         "audit_record",
         "iam_admin_result",
-        "iam_lifecycle_event"
+        "iam_lifecycle_event",
+        "postgres_admin_result",
+        "postgres_inventory_snapshot"
       ]
     },
     {
@@ -237,11 +249,33 @@
         "ensure_control_metadata",
         "ensure_tenant_schema_or_database",
         "apply_grants",
-        "store_audit_metadata"
+        "store_audit_metadata",
+        "postgres_role_list",
+        "postgres_role_get",
+        "postgres_role_create",
+        "postgres_role_update",
+        "postgres_role_delete",
+        "postgres_user_list",
+        "postgres_user_get",
+        "postgres_user_create",
+        "postgres_user_update",
+        "postgres_user_delete",
+        "postgres_database_list",
+        "postgres_database_get",
+        "postgres_database_create",
+        "postgres_database_update",
+        "postgres_database_delete",
+        "postgres_schema_list",
+        "postgres_schema_get",
+        "postgres_schema_create",
+        "postgres_schema_update",
+        "postgres_schema_delete",
+        "postgres_inventory_upsert",
+        "postgres_inventory_get"
       ],
       "request_contract": "adapter_call",
       "result_contract": "adapter_result",
-      "idempotency_key": "tenant_id + capability + placement_ref",
+      "idempotency_key": "tenant_id + workspace_id + capability + target_ref + placement_mode + idempotency_key",
       "error_classes": [
         "retryable_dependency_failure",
         "terminal_dependency_failure"
@@ -725,6 +759,96 @@
         "audit_unavailable",
         "dependency_failure"
       ]
+    },
+    "postgres_admin_request": {
+      "owner": "control_api",
+      "version": "2026-03-24",
+      "required_fields": [
+        "command_id",
+        "request_id",
+        "tenant_id",
+        "workspace_id",
+        "plan_id",
+        "resource_kind",
+        "action",
+        "target_ref",
+        "placement_mode",
+        "deployment_profile_id",
+        "payload",
+        "provider_version",
+        "idempotency_key",
+        "correlation_id",
+        "authorization_decision_id",
+        "effective_roles",
+        "scopes",
+        "contract_version",
+        "requested_at",
+        "actor_id",
+        "actor_type",
+        "origin_surface",
+        "target_tenant_id",
+        "target_workspace_id"
+      ],
+      "idempotency": "PostgreSQL admin mutations coalesce by target_ref, placement_mode, action, and idempotency_key so safe retries do not duplicate structural engine changes or inventory writes.",
+      "versioning": "The BaaS PostgreSQL administrative request envelope stays stable while provider payloads and supported engine versions evolve inside the compatibility matrix.",
+      "error_classes": [
+        "validation_error",
+        "conflict",
+        "dependency_failure",
+        "unsupported_profile",
+        "unsupported_provider_version",
+        "quota_exceeded"
+      ]
+    },
+    "postgres_admin_result": {
+      "owner": "provisioning_orchestrator",
+      "version": "2026-03-24",
+      "required_fields": [
+        "request_id",
+        "resource_kind",
+        "action",
+        "status",
+        "provider_reference",
+        "normalized_resource",
+        "metadata_record",
+        "inventory_projection",
+        "correlation_id",
+        "contract_version",
+        "observed_at",
+        "audit_record_id"
+      ],
+      "idempotency": "Repeated reads of the same PostgreSQL admin result describe one logical structural change and one inventory projection update.",
+      "versioning": "Result contracts expose normalized, secret-free PostgreSQL resource shapes while inventory and provider compatibility metadata expand additively.",
+      "error_classes": [
+        "not_found",
+        "conflict",
+        "retryable_dependency_failure",
+        "terminal_dependency_failure",
+        "unsupported_profile",
+        "unsupported_provider_version",
+        "quota_exceeded"
+      ]
+    },
+    "postgres_inventory_snapshot": {
+      "owner": "provisioning_orchestrator",
+      "version": "2026-03-24",
+      "required_fields": [
+        "snapshot_id",
+        "tenant_id",
+        "workspace_id",
+        "placement_mode",
+        "counts",
+        "quotas",
+        "minimum_engine_policy",
+        "observed_at",
+        "contract_version"
+      ],
+      "idempotency": "Inventory refreshes for the same tenant/workspace/placement combination replace the previous durable projection instead of multiplying console-visible records.",
+      "versioning": "Inventory snapshots remain additive and secret-free so console queries can expand without exposing unsafe engine metadata.",
+      "error_classes": [
+        "storage_unavailable",
+        "schema_validation_error"
+      ]
     }
   },
   "interaction_flows": [
@@ -836,6 +960,17 @@
         "control_api accepts IAM lifecycle-producing actions such as login, logout, signup activation, invitation changes, credential resets, and tenant access suspension with stable actor and correlation metadata.",
         "audit_module appends one actor-rich evidence record that preserves tenant/workspace scope, target resource identifiers, and the resulting lifecycle disposition.",
         "event_gateway forwards one iam_lifecycle_event envelope into the Kafka-compatible stream topology without dropping partitioning, audit linkage, or replay-safe identifiers."
+      ]
+    },
+    {
+      "id": "postgres_administration",
+      "entry_service": "control_api",
+      "steps": [
+        "control_api validates the PostgreSQL administrative request, resolves contextual tenant/workspace authorization, and emits one postgres_admin_request envelope with placement metadata, idempotency, and audit linkage.",
+        "provisioning_orchestrator resolves the deployment profile, applies naming and quota guardrails for schema-per-tenant or database-per-tenant mode, and translates the normalized intent into one postgresql adapter_call.",
+        "services/adapters performs role, user, database, or schema operations through the bounded PostgreSQL administrative surface, then returns normalized secret-free resources and inventory metadata.",
+        "provisioning_orchestrator persists a postgres_inventory_snapshot so console surfaces can answer fast inventory queries without live engine enumeration for every read.",
+        "audit_module records actor, scope, target resource, placement mode, and minimum-privilege evidence without persisting raw credentials or unrestricted engine detail."
       ]
     }
   ]
