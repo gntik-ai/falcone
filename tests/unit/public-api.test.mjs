@@ -25,7 +25,7 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
 
   assert.equal(taxonomy.release.path_version, 'v1');
   assert.equal(taxonomy.release.header_version, '2026-03-24');
-  assert.equal(taxonomy.release.openapi_semver, '1.9.0');
+  assert.equal(taxonomy.release.openapi_semver, '1.10.0');
   assert.equal(listFamilyDocumentPaths().length, taxonomy.families.length);
   assert.deepEqual(routeCatalog.routes, regeneratedCatalog.routes);
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/events/topics/{resourceId}/publish'));
@@ -36,6 +36,9 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/signups'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/password-recovery-requests'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/tenants/{tenantId}/ownership-transfers'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}'));
+  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/workspaces/{workspaceId}/clone'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/workspaces/{workspaceId}/api-surface'));

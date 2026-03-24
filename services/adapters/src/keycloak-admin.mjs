@@ -24,15 +24,17 @@ export const RESERVED_ROLE_NAMES = Object.freeze([
   'platform_admin',
   'platform_operator',
   'platform_auditor',
+  'tenant_owner',
   'tenant_admin',
-  'tenant_operator',
-  'tenant_billing_admin',
-  'auditor',
+  'tenant_developer',
+  'tenant_viewer',
+  'workspace_owner',
   'workspace_admin',
   'workspace_developer',
   'workspace_operator',
   'workspace_auditor',
-  'workspace_viewer'
+  'workspace_viewer',
+  'workspace_service_account'
 ]);
 export const RESERVED_SCOPE_NAMES = Object.freeze(['openid', 'profile', 'email', 'roles', 'web-origins']);
 export const SUPPORTED_CLIENT_PROTOCOLS = Object.freeze(['openid-connect', 'saml']);

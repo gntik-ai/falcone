@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "In Atelier Public API",
-    "version": "1.9.0",
+    "version": "1.10.0",
     "summary": "Unified, versioned, and documented public API surface grouped into coherent /v1 families.",
     "description": "Unified public gateway contract for the In Atelier BaaS platform. The surface is exposed through APISIX, versioned under /v1, pinned with X-API-Version, and organized into stable families for platform, tenants, workspaces, authorization, data, events, functions, storage, metrics, and realtime routes.",
     "license": {
@@ -7827,6 +7827,8 @@
           "developer_external",
           "tenant_owner",
           "tenant_admin",
+          "tenant_developer",
+          "tenant_viewer",
           "platform_team"
         ],
         "x-visibility": "public",
@@ -7947,6 +7949,8 @@
           "developer_external",
           "tenant_owner",
           "tenant_admin",
+          "tenant_developer",
+          "tenant_viewer",
           "platform_team"
         ],
         "x-visibility": "public",
@@ -14068,7 +14072,7 @@
         "x-audiences": [
           "tenant_owner",
           "tenant_admin",
-          "auditor",
+          "tenant_viewer",
           "platform_team"
         ],
         "x-visibility": "public",
@@ -14251,7 +14255,7 @@
         "x-audiences": [
           "tenant_owner",
           "tenant_admin",
-          "auditor",
+          "tenant_viewer",
           "workspace_owner",
           "workspace_admin",
           "workspace_auditor",
@@ -14524,6 +14528,672 @@
         ],
         "x-visibility": "public",
         "x-rate-limit-class": "control-read",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/tenants/{tenantId}/ownership-transfers": {
+      "post": {
+        "operationId": "createTenantOwnershipTransfer",
+        "summary": "Initiate a secure tenant ownership transfer that requires acceptance by the designated target owner.",
+        "tags": [
+          "Tenants",
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantOwnershipTransferWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Mutation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "tenants",
+        "x-scope": "tenant",
+        "x-resource-type": "tenant",
+        "x-audiences": [
+          "tenant_owner",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-write",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}": {
+      "get": {
+        "operationId": "getTenantOwnershipTransfer",
+        "summary": "Fetch one tenant ownership transfer record.",
+        "tags": [
+          "Tenants",
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnershipTransferId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantOwnershipTransfer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "tenants",
+        "x-scope": "tenant",
+        "x-resource-type": "tenant",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-write",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}/acceptance": {
+      "post": {
+        "operationId": "acceptTenantOwnershipTransfer",
+        "summary": "Accept a pending tenant ownership transfer before it expires.",
+        "tags": [
+          "Tenants",
+          "Memberships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnershipTransferId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantOwnershipTransferAcceptanceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Ownership transfer acceptance accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with current entity integrity or lifecycle state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "tenants",
+        "x-scope": "tenant",
+        "x-resource-type": "tenant",
+        "x-audiences": [
+          "developer_external",
+          "tenant_owner",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-write",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}": {
+      "get": {
+        "operationId": "getTenantEffectivePermissionRecalculation",
+        "summary": "Fetch one tenant-scoped effective-permission recalculation record.",
+        "tags": [
+          "Tenants",
+          "Authorization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/PermissionRecalculationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionRecalculation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "tenants",
+        "x-scope": "tenant",
+        "x-resource-type": "tenant",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "tenant_developer",
+          "tenant_viewer",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-write",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}": {
+      "get": {
+        "operationId": "getWorkspaceEffectivePermissionRecalculation",
+        "summary": "Fetch one workspace-scoped effective-permission recalculation record.",
+        "tags": [
+          "Workspaces",
+          "Authorization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/PermissionRecalculationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionRecalculation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested entity was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-write",
         "x-owning-service": "control_api"
       }
     }
@@ -15014,6 +15684,26 @@
         "schema": {
           "$ref": "#/components/schemas/EntityState"
         }
+      },
+      "OwnershipTransferId": {
+        "name": "ownershipTransferId",
+        "in": "path",
+        "required": true,
+        "description": "Ownership transfer identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^otf_[0-9a-z]+$"
+        }
+      },
+      "PermissionRecalculationId": {
+        "name": "permissionRecalculationId",
+        "in": "path",
+        "required": true,
+        "description": "Effective permission recalculation identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^epr_[0-9a-z]+$"
+        }
       }
     },
     "schemas": {
@@ -15374,9 +16064,8 @@
         "enum": [
           "tenant_owner",
           "tenant_admin",
-          "tenant_operator",
-          "tenant_billing_admin",
-          "auditor"
+          "tenant_developer",
+          "tenant_viewer"
         ]
       },
       "WorkspaceRole": {
@@ -16742,6 +17431,9 @@
             "items": {
               "$ref": "#/components/schemas/TenantRole"
             }
+          },
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
           }
         },
         "additionalProperties": false
@@ -16884,6 +17576,9 @@
             "items": {
               "$ref": "#/components/schemas/WorkspaceRole"
             }
+          },
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
           }
         },
         "additionalProperties": false
@@ -17050,6 +17745,9 @@
           },
           "expirationPolicy": {
             "$ref": "#/components/schemas/ExpirationRule"
+          },
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
           }
         },
         "additionalProperties": false
@@ -23561,6 +24259,283 @@
             "items": {
               "$ref": "#/components/schemas/Workspace"
             }
+          }
+        }
+      },
+      "EffectivePermissionScope": {
+        "type": "string",
+        "enum": [
+          "tenant",
+          "workspace"
+        ]
+      },
+      "PermissionRecalculationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "applied",
+          "failed"
+        ]
+      },
+      "EffectivePermissionRecalculationReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "permissionRecalculationId",
+          "scope",
+          "status"
+        ],
+        "properties": {
+          "permissionRecalculationId": {
+            "type": "string",
+            "pattern": "^epr_[0-9a-z]+$"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EffectivePermissionScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PermissionRecalculationStatus"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          }
+        }
+      },
+      "EffectivePermissionRecalculation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entityType",
+          "permissionRecalculationId",
+          "tenantId",
+          "scope",
+          "status",
+          "triggeredByEntityType",
+          "triggeredByEntityId",
+          "triggeredByUserId",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "effective_permission_recalculation"
+          },
+          "permissionRecalculationId": {
+            "type": "string",
+            "pattern": "^epr_[0-9a-z]+$"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EffectivePermissionScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PermissionRecalculationStatus"
+          },
+          "triggeredByEntityType": {
+            "type": "string",
+            "enum": [
+              "tenant_membership",
+              "workspace_membership",
+              "invitation",
+              "ownership_transfer"
+            ]
+          },
+          "triggeredByEntityId": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "triggeredByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "affectedResourceCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          }
+        }
+      },
+      "OwnershipTransferStatus": {
+        "type": "string",
+        "enum": [
+          "pending_acceptance",
+          "accepted",
+          "cancelled",
+          "expired"
+        ]
+      },
+      "TenantOwnershipTransfer": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entityType",
+          "ownershipTransferId",
+          "tenantId",
+          "currentOwnerUserId",
+          "targetUserId",
+          "ownershipTransferStatus",
+          "initiatedByUserId",
+          "expiresAt",
+          "state",
+          "timestamps",
+          "metadata"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "ownership_transfer"
+          },
+          "ownershipTransferId": {
+            "type": "string",
+            "pattern": "^otf_[0-9a-z]+$"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "currentOwnerUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "targetUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "currentOwnerMembershipId": {
+            "type": "string",
+            "pattern": "^tmb_[0-9a-z]+$"
+          },
+          "targetMembershipId": {
+            "type": "string",
+            "pattern": "^tmb_[0-9a-z]+$"
+          },
+          "ownershipTransferStatus": {
+            "$ref": "#/components/schemas/OwnershipTransferStatus"
+          },
+          "initiatedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "acceptedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          },
+          "effectivePermissionRecalculation": {
+            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
+          }
+        }
+      },
+      "TenantOwnershipTransferWriteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entityType",
+          "currentOwnerUserId",
+          "targetUserId",
+          "ownershipTransferStatus",
+          "expiresAt",
+          "desiredState",
+          "metadata",
+          "initiatedByUserId"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "ownership_transfer"
+          },
+          "currentOwnerUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "targetUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "targetMembershipId": {
+            "type": "string",
+            "pattern": "^tmb_[0-9a-z]+$"
+          },
+          "ownershipTransferStatus": {
+            "$ref": "#/components/schemas/OwnershipTransferStatus"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/EntityMetadata"
+          },
+          "initiatedByUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          }
+        }
+      },
+      "TenantOwnershipTransferAcceptanceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "acceptanceToken",
+          "actorUserId"
+        ],
+        "properties": {
+          "acceptanceToken": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 512
+          },
+          "actorUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
           }
         }
       }

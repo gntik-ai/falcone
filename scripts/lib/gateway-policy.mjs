@@ -18,7 +18,7 @@ export const REQUIRED_PASSTHROUGH_PLUGINS = [
   'authz-keycloak',
   'http-logger'
 ];
-export const REQUIRED_PERSONAS = ['workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_viewer', 'workspace_service_account', 'tenant_admin', 'superadmin'];
+export const REQUIRED_PERSONAS = ['workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_viewer', 'workspace_service_account', 'tenant_admin', 'tenant_developer', 'tenant_viewer', 'mixed_tenant_viewer_workspace_developer', 'mixed_tenant_developer_workspace_viewer', 'superadmin'];
 export const REQUIRED_SPOOFED_HEADERS = ['X-Auth-Subject', 'X-Actor-Username', 'X-Tenant-Id', 'X-Workspace-Id', 'X-Plan-Id', 'X-Auth-Scopes', 'X-Actor-Roles'];
 export const REQUIRED_INTERNAL_REQUEST_HEADERS = [
   'X-Gateway-Managed-Route',
