@@ -321,7 +321,7 @@
     "description": "Workspace-scoped usage, quota, gateway-stream, and observability series exposed through the unified gateway. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped usage, quota, gateway-stream, and observability series exposed through the unified gateway.",
     "title": "In Atelier Metrics API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -436,8 +436,11 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_operator",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_operator",
+          "workspace_viewer",
           "platform_team"
         ],
         "x-downstream-adapters": [
@@ -573,8 +576,11 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_operator",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_operator",
+          "workspace_viewer",
           "platform_team"
         ],
         "x-family": "metrics",

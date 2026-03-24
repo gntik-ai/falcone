@@ -624,7 +624,8 @@
             "credentialsExpiredPath",
             "passwordRecoveryPath",
             "autoSignupPolicy",
-            "statusMessages"
+            "statusMessages",
+            "expirationPolicies"
           ],
           "properties": {
             "issuerUrl": {
@@ -726,6 +727,101 @@
                 },
                 "credentials_expired": {
                   "type": "string"
+                }
+              }
+            },
+            "expirationPolicies": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "invitations",
+                "humanCredentials",
+                "serviceCredentials",
+                "sessions"
+              ],
+              "properties": {
+                "invitations": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "defaultTtl",
+                    "maxTtl",
+                    "allowOverride"
+                  ],
+                  "properties": {
+                    "defaultTtl": {
+                      "type": "string"
+                    },
+                    "maxTtl": {
+                      "type": "string"
+                    },
+                    "allowOverride": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "humanCredentials": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "passwordMaxAge",
+                    "gracePeriod",
+                    "recoveryTokenTtl"
+                  ],
+                  "properties": {
+                    "passwordMaxAge": {
+                      "type": "string"
+                    },
+                    "gracePeriod": {
+                      "type": "string"
+                    },
+                    "recoveryTokenTtl": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "serviceCredentials": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "defaultTtl",
+                    "maxTtl",
+                    "rotateBefore"
+                  ],
+                  "properties": {
+                    "defaultTtl": {
+                      "type": "string"
+                    },
+                    "maxTtl": {
+                      "type": "string"
+                    },
+                    "rotateBefore": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "sessions": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "maxLifetime",
+                    "idleTimeout",
+                    "refreshTokenMaxAge"
+                  ],
+                  "properties": {
+                    "maxLifetime": {
+                      "type": "string"
+                    },
+                    "idleTimeout": {
+                      "type": "string"
+                    },
+                    "refreshTokenMaxAge": {
+                      "type": "string"
+                    },
+                    "rememberMeMaxLifetime": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

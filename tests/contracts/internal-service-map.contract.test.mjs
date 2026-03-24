@@ -86,13 +86,19 @@ test('consumer scaffolding exposes the expected provider and flow slices', () =>
 
   assert.deepEqual([...auditProviderIds].sort(), ['postgresql', 'storage']);
   assert.ok(keycloakAdapter.capabilities.includes('ensure_protocol_mappers'));
+  assert.ok(keycloakAdapter.capabilities.includes('ensure_group_role_mappings'));
   assert.ok(keycloakAdapter.capabilities.includes('ensure_service_account'));
+  assert.ok(keycloakAdapter.capabilities.includes('issue_service_account_credentials'));
+  assert.ok(keycloakAdapter.capabilities.includes('rotate_service_account_credentials'));
+  assert.ok(keycloakAdapter.capabilities.includes('revoke_service_account_credentials'));
   assert.ok(keycloakAdapter.capabilities.includes('iam_realm_create'));
   assert.ok(keycloakAdapter.capabilities.includes('iam_client_update'));
   assert.ok(keycloakAdapter.capabilities.includes('iam_user_reset_credentials'));
   assert.ok(interactionFlowIds.has('tenant_provisioning'));
   assert.ok(interactionFlowIds.has('tenant_suspension'));
   assert.ok(interactionFlowIds.has('workspace_identity_registration'));
+  assert.ok(interactionFlowIds.has('invitation_membership_reconciliation'));
+  assert.ok(interactionFlowIds.has('service_account_credential_rotation'));
   assert.ok(interactionFlowIds.has('iam_administration'));
   assert.ok(interactionFlowIds.has('event_publish_gateway'));
   assert.ok(interactionFlowIds.has('realtime_subscription_gateway'));

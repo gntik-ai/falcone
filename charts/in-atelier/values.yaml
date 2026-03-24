@@ -276,15 +276,18 @@ bootstrap:
         - platform_admin
         - platform_operator
         - platform_auditor
+        - tenant_owner
         - tenant_admin
         - tenant_operator
         - tenant_billing_admin
         - auditor
+        - workspace_owner
         - workspace_admin
         - workspace_developer
         - workspace_operator
         - workspace_auditor
         - workspace_viewer
+        - workspace_service_account
       clientScopes:
         - name: tenant-context
           protocol: openid-connect
@@ -405,15 +408,18 @@ bootstrap:
           in-atelier.realm-type: tenant
           in-atelier.control-plane.platform-realm: in-atelier-platform
         requiredRealmRoles:
+          - tenant_owner
           - tenant_admin
           - tenant_operator
           - tenant_billing_admin
           - auditor
+          - workspace_owner
           - workspace_admin
           - workspace_developer
           - workspace_operator
           - workspace_auditor
           - workspace_viewer
+          - workspace_service_account
         requiredClientScopes:
           - tenant-context
           - workspace-context
@@ -2071,6 +2077,24 @@ webConsole:
       pending_activation: Your account is pending activation by a platform superadmin.
       account_suspended: Your account is suspended. Contact support or a platform administrator.
       credentials_expired: Your credentials expired. Complete password recovery to continue.
+    expirationPolicies:
+      invitations:
+        defaultTtl: 72h
+        maxTtl: 168h
+        allowOverride: true
+      humanCredentials:
+        passwordMaxAge: 90d
+        gracePeriod: 7d
+        recoveryTokenTtl: 2h
+      serviceCredentials:
+        defaultTtl: 30d
+        maxTtl: 90d
+        rotateBefore: 7d
+      sessions:
+        maxLifetime: 12h
+        idleTimeout: 30m
+        refreshTokenMaxAge: 7d
+        rememberMeMaxLifetime: 30d
 gatewayPolicy:
   version: 2026-03-24
   oidc:
@@ -2486,9 +2510,29 @@ gatewayPolicy:
         - data.kafka.topics
   accessMatrix:
     personas:
-      - id: basic_profile
+      - id: workspace_owner
         audiences:
-          - developer_external
+          - workspace_owner
+        roles:
+          - workspace_owner
+        scopes:
+          - openid
+          - profile
+          - gateway.product.read
+          - gateway.product.write
+        planId: pln_01enterprise
+      - id: workspace_admin
+        audiences:
+          - workspace_admin
+        roles:
+          - workspace_admin
+        scopes:
+          - openid
+          - profile
+          - tenant.admin
+        planId: pln_01growth
+      - id: workspace_developer
+        audiences:
           - workspace_developer
         roles:
           - workspace_developer
@@ -2498,11 +2542,32 @@ gatewayPolicy:
           - gateway.product.read
           - gateway.product.write
         planId: pln_01growth
+      - id: workspace_viewer
+        audiences:
+          - workspace_viewer
+        roles:
+          - workspace_viewer
+        scopes:
+          - openid
+          - profile
+          - gateway.product.read
+        planId: pln_01enterprise
+      - id: workspace_service_account
+        audiences:
+          - workspace_service_account
+        roles:
+          - workspace_service_account
+        scopes:
+          - gateway.product.read
+          - gateway.product.write
+        planId: pln_01growth
       - id: tenant_admin
         audiences:
+          - tenant_owner
           - tenant_admin
           - workspace_admin
         roles:
+          - tenant_owner
           - tenant_admin
           - workspace_admin
         scopes:
@@ -2524,45 +2589,125 @@ gatewayPolicy:
           - gateway.native.openwhisk.admin
         planId: pln_01enterprise
     assertions:
-      - persona: basic_profile
+      - persona: workspace_owner
         routeKind: product_api
-        family: functions
+        path: /v1/workspaces/{workspaceId}
+        method: GET
         expect: allow
-      - persona: basic_profile
+      - persona: workspace_owner
         routeKind: product_api
-        family: platform
+        path: /v1/functions/actions
+        method: POST
+        expect: allow
+      - persona: workspace_owner
+        routeKind: product_api
+        path: /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations
+        method: POST
+        expect: allow
+      - persona: workspace_admin
+        routeKind: product_api
+        path: /v1/workspaces/{workspaceId}
+        method: GET
+        expect: allow
+      - persona: workspace_admin
+        routeKind: product_api
+        path: /v1/functions/actions
+        method: POST
+        expect: allow
+      - persona: workspace_admin
+        routeKind: product_api
+        path: /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations
+        method: POST
+        expect: allow
+      - persona: workspace_developer
+        routeKind: product_api
+        path: /v1/functions/actions/{resourceId}
+        method: GET
+        expect: allow
+      - persona: workspace_developer
+        routeKind: product_api
+        path: /v1/functions/actions
+        method: POST
+        expect: allow
+      - persona: workspace_developer
+        routeKind: product_api
+        path: /v1/storage/buckets/{resourceId}
+        method: GET
+        expect: allow
+      - persona: workspace_developer
+        routeKind: product_api
+        path: /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations
+        method: POST
         expect: deny
-      - persona: basic_profile
+      - persona: workspace_viewer
         routeKind: product_api
-        family: events
+        path: /v1/functions/actions/{resourceId}
+        method: GET
         expect: allow
-      - persona: basic_profile
+      - persona: workspace_viewer
         routeKind: product_api
-        family: websockets
+        path: /v1/functions/actions
+        method: POST
+        expect: deny
+      - persona: workspace_viewer
+        routeKind: product_api
+        path: /v1/storage/buckets/{resourceId}
+        method: GET
         expect: allow
-      - persona: basic_profile
-        routeKind: passthrough
-        routeId: keycloak_admin
+      - persona: workspace_viewer
+        routeKind: product_api
+        path: /v1/events/topics/{resourceId}/publish
+        method: POST
+        expect: deny
+      - persona: workspace_viewer
+        routeKind: product_api
+        path: /v1/metrics/workspaces/{workspaceId}/series
+        method: GET
+        expect: allow
+      - persona: workspace_service_account
+        routeKind: product_api
+        path: /v1/functions/actions/{resourceId}
+        method: GET
+        expect: allow
+      - persona: workspace_service_account
+        routeKind: product_api
+        path: /v1/events/topics/{resourceId}/publish
+        method: POST
+        expect: allow
+      - persona: workspace_service_account
+        routeKind: product_api
+        path: /v1/events/topics/{resourceId}/stream
+        method: GET
+        expect: allow
+      - persona: workspace_service_account
+        routeKind: product_api
+        path: /v1/functions/actions
+        method: POST
+        expect: deny
+      - persona: workspace_service_account
+        routeKind: product_api
+        path: /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations
+        method: POST
         expect: deny
       - persona: tenant_admin
         routeKind: product_api
-        family: tenants
+        path: /v1/tenants/{tenantId}
+        method: GET
         expect: allow
       - persona: tenant_admin
         routeKind: product_api
-        family: events
+        path: /v1/tenants/{tenantId}/invitations/{invitationId}/revocation
+        method: POST
         expect: allow
       - persona: tenant_admin
         routeKind: product_api
-        family: websockets
-        expect: allow
-      - persona: tenant_admin
-        routeKind: product_api
-        family: functions
+        path: /v1/functions/actions
+        method: POST
         expect: deny
       - persona: tenant_admin
         routeKind: product_api
-        family: metrics
+        path: /v1/metrics/workspaces/{workspaceId}/series
+        method: GET
         expect: allow
       - persona: tenant_admin
         routeKind: passthrough

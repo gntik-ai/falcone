@@ -300,7 +300,7 @@
     "description": "Workspace-scoped object storage discovery, bucket control, and presign-safe surfaces. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped object storage discovery, bucket control, and presign-safe surfaces.",
     "title": "In Atelier Storage API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -422,6 +422,7 @@
         ],
         "x-audiences": [
           "developer_external",
+          "workspace_owner",
           "workspace_admin",
           "workspace_developer",
           "platform_team"
@@ -544,8 +545,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "workspace_owner",
           "workspace_admin",
           "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
           "platform_team"
         ],
         "x-downstream-adapters": [
