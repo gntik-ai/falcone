@@ -12,6 +12,11 @@ export const REQUIRED_CONSOLE_STATES = [
   'tenant_operator',
   'auditor'
 ];
+export const REQUIRED_CONSOLE_STATUS_STATES = [
+  'pending_activation',
+  'account_suspended',
+  'credentials_expired'
+];
 export const REQUIRED_TAXONOMY_CATEGORIES = [
   'positive',
   'negative',
@@ -306,7 +311,7 @@ export function collectTestingStrategyViolations(
     violations.push('Testing strategy console.states must be a non-empty array.');
   } else {
     const stateIds = new Set(consoleStates.map((state) => state?.id));
-    for (const state of REQUIRED_CONSOLE_STATES) {
+    for (const state of [...REQUIRED_CONSOLE_STATES, ...REQUIRED_CONSOLE_STATUS_STATES]) {
       if (!stateIds.has(state)) {
         violations.push(`Testing strategy console states are missing ${state}.`);
       }

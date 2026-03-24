@@ -76,11 +76,20 @@ test('deployment chart keeps the Keycloak platform and tenant IAM bootstrap base
   assert.ok(keycloakBootstrap.clientScopes.some((scope) => scope.name === 'workspace-context'));
   assert.ok(keycloakBootstrap.clients.some((client) => client.clientId === 'in-atelier-gateway'));
   assert.ok(keycloakBootstrap.clients.some((client) => client.clientId === 'in-atelier-console'));
+  assert.equal(keycloakBootstrap.realm.login.registrationAllowed, true);
+  assert.equal(keycloakBootstrap.realm.login.resetPasswordAllowed, true);
+  assert.equal(keycloakBootstrap.clients.find((client) => client.clientId === 'in-atelier-console').directAccessGrantsEnabled, true);
   assert.equal(keycloakBootstrap.tenantRealmTemplate.realmIdPattern, 'tenant-{tenantSlug}');
   assert.equal(
     keycloakBootstrap.tenantRealmTemplate.serviceAccountTemplate.credentialRefPattern,
     'secret://iam/{tenantId}/{workspaceId}/service-accounts/{serviceAccountId}'
   );
+
+  assert.equal(values.webConsole.auth.loginPath, '/login');
+  assert.equal(values.webConsole.auth.signupPath, '/signup');
+  assert.equal(values.webConsole.auth.autoSignupPolicy.globalMode, 'approval_required');
+  assert.equal(values.webConsole.auth.autoSignupPolicy.environmentModes.dev, 'auto_activate');
+  assert.equal(values.webConsole.auth.autoSignupPolicy.planModes.enterprise, 'auto_activate');
 });
 
 test('all expected component aliases are present in the root chart dependencies', () => {

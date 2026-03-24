@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "In Atelier Public API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "summary": "Unified, versioned, and documented public API surface grouped into coherent /v1 families.",
     "description": "Unified public gateway contract for the In Atelier BaaS platform. The surface is exposed through APISIX, versioned under /v1, pinned with X-API-Version, and organized into stable families for platform, tenants, workspaces, authorization, data, events, functions, storage, metrics, and realtime routes.",
     "license": {
@@ -10146,6 +10146,1252 @@
         "x-rate-limit-class": "control-write",
         "x-owning-service": "control_api"
       }
+    },
+    "/v1/auth/login-sessions": {
+      "post": {
+        "operationId": "createConsoleLoginSession",
+        "summary": "Authenticate a console operator with username/password and mint the SPA session envelope.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication evaluated and the current session envelope is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleLoginSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The login payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The credentials are invalid or the account is not allowed to enter the console.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The account requires a non-happy-path status view such as activation or credential recovery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "auth_session",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-login",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/login-sessions/{sessionId}/refresh": {
+      "post": {
+        "operationId": "refreshConsoleLoginSession",
+        "summary": "Rotate the console access token set from a refresh token without replaying username/password.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/sessionId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleTokenRefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session was refreshed and the rotated token set is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleLoginSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The refresh payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The refresh token is invalid or no longer usable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "auth_session",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-refresh",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/login-sessions/{sessionId}": {
+      "delete": {
+        "operationId": "terminateConsoleLoginSession",
+        "summary": "Invalidate an active console session and revoke its refresh lifecycle.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/sessionId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The session termination was accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionTerminationAccepted"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not authorized to terminate the requested session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "auth_session",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-logout",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/signups": {
+      "post": {
+        "operationId": "createConsoleSignup",
+        "summary": "Create a self-service console signup and return whether activation is automatic or pending approval.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleSignupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The signup was accepted and normalized into a platform-user registration envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSignupRegistration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The signup payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The effective signup policy rejects self-service registration for this environment or plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The username or email already belongs to an existing platform user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "console_signup",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-signup",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/signups/policy": {
+      "get": {
+        "operationId": "getConsoleSignupPolicy",
+        "summary": "Resolve the effective self-service signup mode across global, environment, and plan overrides.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The effective signup policy is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSignupPolicy"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot inspect signup policy resolution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "signup_policy",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "catalog",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/signups/{registrationId}": {
+      "get": {
+        "operationId": "getConsoleSignup",
+        "summary": "Inspect the current signup registration status for pending activation, activation, or rejection messaging.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/registrationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The normalized signup registration envelope is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSignupRegistration"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot inspect the requested signup registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The signup registration was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "console_signup",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "catalog",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/signups/{registrationId}/activation-decisions": {
+      "post": {
+        "operationId": "decideConsoleSignupActivation",
+        "summary": "Approve or reject a pending self-service signup as a platform superadmin workflow.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/registrationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleSignupActivationDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The activation decision was accepted and normalized for downstream reconciliation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSignupActivationDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The activation decision payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not authorized to approve or reject self-service signups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The signup registration was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "console_signup",
+        "x-audiences": [
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-activation",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/password-recovery-requests": {
+      "post": {
+        "operationId": "createPasswordRecoveryRequest",
+        "summary": "Start password recovery for a console operator without leaking whether the account exists.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordRecoveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The recovery request was accepted and normalized into a delivery-safe ticket envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordRecoveryTicket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The password-recovery payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot start password recovery for the requested account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "password_recovery",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-recovery",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/password-recovery-requests/{recoveryRequestId}/confirmations": {
+      "post": {
+        "operationId": "confirmPasswordRecovery",
+        "summary": "Confirm a password-reset token and return the next status view for the console account.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/recoveryRequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The password-reset confirmation was processed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetConfirmation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The password-reset confirmation payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The reset token is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The recovery request was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "password_recovery",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "auth-recovery",
+        "x-owning-service": "control_api"
+      }
+    },
+    "/v1/auth/status-views/{statusViewId}": {
+      "get": {
+        "operationId": "getConsoleAccountStatusView",
+        "summary": "Resolve the canonical status-screen copy and next actions for console auth edge states.",
+        "tags": [
+          "Auth",
+          "Console"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/statusViewId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested console status view contract is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAccountStatusView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot inspect the requested status view.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested status view was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream identity or control-plane response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "auth",
+        "x-scope": "platform",
+        "x-resource-type": "account_status_view",
+        "x-audiences": [
+          "developer_external",
+          "tenant_admin",
+          "workspace_admin",
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "catalog",
+        "x-owning-service": "control_api"
+      }
     }
   },
   "components": {
@@ -10536,6 +11782,45 @@
             "saml"
           ]
         }
+      },
+      "sessionId": {
+        "name": "sessionId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^ses_[0-9a-z]+$"
+        },
+        "description": "Stable console session identifier."
+      },
+      "registrationId": {
+        "name": "registrationId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^reg_[0-9a-z]+$"
+        },
+        "description": "Stable self-service signup registration identifier."
+      },
+      "recoveryRequestId": {
+        "name": "recoveryRequestId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^prr_[0-9a-z]+$"
+        },
+        "description": "Stable password-recovery request identifier."
+      },
+      "statusViewId": {
+        "name": "statusViewId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ConsoleStatusViewId"
+        },
+        "description": "Named console status-view contract."
       }
     },
     "schemas": {
@@ -10839,6 +12124,7 @@
         "enum": [
           "draft",
           "provisioning",
+          "pending_activation",
           "active",
           "suspended",
           "soft_deleted"
@@ -15970,6 +17256,602 @@
           },
           "compatibility": {
             "$ref": "#/components/schemas/IamProviderCompatibility"
+          }
+        }
+      },
+      "ConsoleAuthenticationState": {
+        "type": "string",
+        "enum": [
+          "active",
+          "pending_activation",
+          "suspended",
+          "credentials_expired"
+        ]
+      },
+      "ConsoleLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 256
+          },
+          "rememberMe": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConsoleTokenSet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresIn",
+          "refreshExpiresIn",
+          "scope"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "minLength": 16
+          },
+          "refreshToken": {
+            "type": "string",
+            "minLength": 16
+          },
+          "tokenType": {
+            "type": "string",
+            "const": "Bearer"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "minimum": 60
+          },
+          "refreshExpiresIn": {
+            "type": "integer",
+            "minimum": 60
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ConsoleSessionPrincipal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "username",
+          "displayName",
+          "primaryEmail",
+          "state",
+          "platformRoles"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "primaryEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConsoleAuthenticationState"
+          },
+          "platformRoles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformRole"
+            }
+          },
+          "tenantIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^ten_[0-9a-z]+$"
+            }
+          },
+          "workspaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^wrk_[0-9a-z]+$"
+            }
+          }
+        }
+      },
+      "ConsoleStatusViewId": {
+        "type": "string",
+        "enum": [
+          "login",
+          "signup",
+          "pending_activation",
+          "account_suspended",
+          "credentials_expired",
+          "password_recovery"
+        ]
+      },
+      "ConsoleLoginSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sessionId",
+          "authenticationState",
+          "statusView",
+          "issuedAt",
+          "lastActivityAt"
+        ],
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "pattern": "^ses_[0-9a-z]+$"
+          },
+          "authenticationState": {
+            "$ref": "#/components/schemas/ConsoleAuthenticationState"
+          },
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tokenSet": {
+            "$ref": "#/components/schemas/ConsoleTokenSet"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/ConsoleSessionPrincipal"
+          },
+          "nextAction": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          }
+        }
+      },
+      "ConsoleTokenRefreshRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 16
+          }
+        }
+      },
+      "ConsoleSessionTerminationAccepted": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sessionId",
+          "status",
+          "acceptedAt"
+        ],
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "pattern": "^ses_[0-9a-z]+$"
+          },
+          "status": {
+            "type": "string",
+            "const": "accepted"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SignupPolicyMode": {
+        "type": "string",
+        "enum": [
+          "disabled",
+          "approval_required",
+          "auto_activate"
+        ]
+      },
+      "ConsoleSignupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "displayName",
+          "primaryEmail",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "primaryEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 256
+          },
+          "requestedPlanId": {
+            "type": "string",
+            "pattern": "^pln_[0-9a-z]+$"
+          },
+          "requestedEnvironment": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "sandbox",
+              "staging",
+              "prod"
+            ]
+          }
+        }
+      },
+      "ConsoleSignupState": {
+        "type": "string",
+        "enum": [
+          "pending_activation",
+          "active",
+          "rejected"
+        ]
+      },
+      "ConsoleSignupRegistration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "registrationId",
+          "userId",
+          "activationMode",
+          "state",
+          "statusView",
+          "createdAt",
+          "message"
+        ],
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "pattern": "^reg_[0-9a-z]+$"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "activationMode": {
+            "$ref": "#/components/schemas/SignupPolicyMode"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConsoleSignupState"
+          },
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 280
+          }
+        }
+      },
+      "ConsoleSignupActivationDecisionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "activate",
+              "reject"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 280
+          },
+          "platformRoles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformRole"
+            }
+          }
+        }
+      },
+      "ConsoleSignupActivationDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "registrationId",
+          "userId",
+          "decision",
+          "resultingState",
+          "actedAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "pattern": "^reg_[0-9a-z]+$"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "activate",
+              "reject"
+            ]
+          },
+          "resultingState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "actedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-z]+$"
+          }
+        }
+      },
+      "ConsoleSignupPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "globalMode",
+          "environmentModes",
+          "planModes",
+          "effectiveMode",
+          "allowed",
+          "approvalRequired"
+        ],
+        "properties": {
+          "globalMode": {
+            "$ref": "#/components/schemas/SignupPolicyMode"
+          },
+          "environmentModes": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SignupPolicyMode"
+            }
+          },
+          "planModes": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SignupPolicyMode"
+            }
+          },
+          "effectiveMode": {
+            "$ref": "#/components/schemas/SignupPolicyMode"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "approvalRequired": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 280
+          }
+        }
+      },
+      "PasswordRecoveryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "usernameOrEmail"
+        ],
+        "properties": {
+          "usernameOrEmail": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          },
+          "deliveryChannel": {
+            "type": "string",
+            "enum": [
+              "email"
+            ],
+            "default": "email"
+          }
+        }
+      },
+      "PasswordRecoveryStatus": {
+        "type": "string",
+        "enum": [
+          "pending_delivery",
+          "delivered",
+          "completed",
+          "expired"
+        ]
+      },
+      "PasswordRecoveryTicket": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recoveryRequestId",
+          "status",
+          "statusView",
+          "requestedAt",
+          "expiresAt",
+          "maskedDestination"
+        ],
+        "properties": {
+          "recoveryRequestId": {
+            "type": "string",
+            "pattern": "^prr_[0-9a-z]+$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PasswordRecoveryStatus"
+          },
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maskedDestination": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          }
+        }
+      },
+      "PasswordResetConfirmationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resetToken",
+          "newPassword"
+        ],
+        "properties": {
+          "resetToken": {
+            "type": "string",
+            "minLength": 16
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 256
+          }
+        }
+      },
+      "PasswordResetConfirmation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recoveryRequestId",
+          "status",
+          "statusView",
+          "completedAt"
+        ],
+        "properties": {
+          "recoveryRequestId": {
+            "type": "string",
+            "pattern": "^prr_[0-9a-z]+$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "pending_activation"
+            ]
+          },
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConsoleActionLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actionId",
+          "label",
+          "target"
+        ],
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "label": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        }
+      },
+      "ConsoleAccountStatusView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "statusView",
+          "title",
+          "message",
+          "allowedActions"
+        ],
+        "properties": {
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "message": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 280
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsoleActionLink"
+            }
           }
         }
       }
