@@ -80,6 +80,52 @@ test('access matrix evaluation differentiates product and passthrough access', (
     'deny'
   );
   assert.equal(
+    evaluateAccessAssertion(
+      { persona: 'tenant_developer', routeKind: 'product_api', path: '/v1/tenants/{tenantId}/effective-capabilities', method: 'GET' },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
+    'allow'
+  );
+  assert.equal(
+    evaluateAccessAssertion(
+      { persona: 'tenant_viewer', routeKind: 'product_api', path: '/v1/functions/actions/{resourceId}', method: 'GET' },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
+    'deny'
+  );
+  assert.equal(
+    evaluateAccessAssertion(
+      {
+        persona: 'mixed_tenant_viewer_workspace_developer',
+        routeKind: 'product_api',
+        path: '/v1/functions/actions',
+        method: 'POST'
+      },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
+    'allow'
+  );
+  assert.equal(
+    evaluateAccessAssertion(
+      {
+        persona: 'mixed_tenant_developer_workspace_viewer',
+        routeKind: 'product_api',
+        path: '/v1/functions/actions',
+        method: 'POST'
+      },
+      values,
+      routeCatalog,
+      domainModel
+    ).decision,
+    'deny'
+  );
+  assert.equal(
     evaluateAccessAssertion({ persona: 'superadmin', routeKind: 'passthrough', routeId: 'keycloak_admin' }, values, routeCatalog, domainModel).decision,
     'allow'
   );

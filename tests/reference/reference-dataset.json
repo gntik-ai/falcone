@@ -49,15 +49,15 @@
       ]
     },
     {
-      "id": "user-tenant-operator-a",
-      "role": "tenant_operator",
+      "id": "user-tenant-developer-a",
+      "role": "tenant_developer",
       "tenant_ids": [
         "tenant-shared-a"
       ]
     },
     {
-      "id": "user-auditor-a",
-      "role": "auditor",
+      "id": "user-tenant-viewer-a",
+      "role": "tenant_viewer",
       "tenant_ids": [
         "tenant-shared-a"
       ]
@@ -93,8 +93,8 @@
       ]
     },
     {
-      "id": "user-cross-tenant-operator-b",
-      "role": "tenant_operator",
+      "id": "user-cross-tenant-developer-b",
+      "role": "tenant_developer",
       "tenant_ids": [
         "tenant-shared-b"
       ],
@@ -104,7 +104,7 @@
     },
     {
       "id": "user-bootstrap-owner",
-      "role": "tenant_admin",
+      "role": "tenant_owner",
       "tenant_ids": [
         "tenant-bootstrap-starter"
       ]

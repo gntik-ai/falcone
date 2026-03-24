@@ -1867,7 +1867,7 @@
     "description": "Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, and users through normalized BaaS contracts. Generated from the unified public API contract for v1.",
     "summary": "Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, and users through normalized BaaS contracts.",
     "title": "In Atelier IAM API",
-    "version": "1.9.0"
+    "version": "1.10.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -6041,7 +6041,7 @@
         "x-audiences": [
           "tenant_owner",
           "tenant_admin",
-          "auditor",
+          "tenant_viewer",
           "platform_team"
         ],
         "x-family": "iam",
@@ -6224,7 +6224,7 @@
         "x-audiences": [
           "tenant_owner",
           "tenant_admin",
-          "auditor",
+          "tenant_viewer",
           "workspace_owner",
           "workspace_admin",
           "workspace_auditor",

@@ -1,6 +1,6 @@
 # Public API Surface
 
-Version: v1 (header 2026-03-24, OpenAPI 1.9.0)
+Version: v1 (header 2026-03-24, OpenAPI 1.10.0)
 
 ## Product API vs native passthrough
 
@@ -83,6 +83,10 @@ Tenant lifecycle, membership, invitation, quota, and tenant-level capability sur
 | POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/revocation` | tenant | invitation | Revoke a pending invitation before it is accepted or expires. |
 | POST | `/v1/tenants/{tenantId}/memberships` | tenant | tenant_membership | Submit a tenant membership write request |
 | GET | `/v1/tenants/{tenantId}/memberships/{tenantMembershipId}` | tenant | tenant_membership | Fetch one tenant membership record |
+| POST | `/v1/tenants/{tenantId}/ownership-transfers` | tenant | tenant | Initiate a secure tenant ownership transfer that requires acceptance by the designated target owner. |
+| GET | `/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}` | tenant | tenant | Fetch one tenant ownership transfer record. |
+| POST | `/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}/acceptance` | tenant | tenant | Accept a pending tenant ownership transfer before it expires. |
+| GET | `/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}` | tenant | tenant | Fetch one tenant-scoped effective-permission recalculation record. |
 
 ## Workspaces
 
@@ -111,6 +115,7 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | GET | `/v1/workspaces/{workspaceId}/managed-resources/{resourceId}` | workspace | managed_resource | Fetch one canonical managed resource entity |
 | POST | `/v1/workspaces/{workspaceId}/memberships` | workspace | workspace_membership | Submit a workspace membership write request |
 | GET | `/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}` | workspace | workspace_membership | Fetch one workspace membership record |
+| GET | `/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}` | workspace | workspace | Fetch one workspace-scoped effective-permission recalculation record. |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts` | workspace | service_account | Submit a canonical service account write request |
 | GET | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}` | workspace | service_account | Fetch one canonical service account entity |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance` | workspace | service_account | Issue a new secret-free credential reference for one workspace service account. |

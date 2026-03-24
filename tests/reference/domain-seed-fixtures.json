@@ -808,7 +808,7 @@
           "emailHash": "sha256:starter-billing-admin",
           "maskedEmail": "bi***@starter.example.com",
           "targetType": "tenant",
-          "role": "tenant_billing_admin",
+          "role": "tenant_viewer",
           "invitationStatus": "pending",
           "expiresAt": "2026-04-01T00:00:00Z",
           "state": "active",
@@ -1146,7 +1146,7 @@
         {
           "userId": "usr_01betaauditor",
           "username": "bianca-audit",
-          "role": "auditor",
+          "role": "tenant_viewer",
           "iamBinding": {
             "realm": "in-atelier-platform",
             "subjectType": "console_user",

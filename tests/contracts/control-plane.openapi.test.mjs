@@ -53,7 +53,12 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.paths['/v1/tenants/{tenantId}/effective-capabilities']);
   assert.ok(document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance']);
   assert.ok(document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/revocation']);
+  assert.ok(document.paths['/v1/tenants/{tenantId}/ownership-transfers']);
+  assert.ok(document.paths['/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}']);
+  assert.ok(document.paths['/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}/acceptance']);
+  assert.ok(document.paths['/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/effective-capabilities']);
+  assert.ok(document.paths['/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}']);
   assert.ok(document.paths['/v1/postgres/instances/{resourceId}']);
   assert.ok(document.paths['/v1/mongo/databases/{resourceId}']);
   assert.ok(document.paths['/v1/events/topics/{resourceId}']);
@@ -97,6 +102,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const createInvitation = document.paths['/v1/tenants/{tenantId}/invitations'].post;
   const acceptInvitation = document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance'].post;
   const revokeInvitation = document.paths['/v1/tenants/{tenantId}/invitations/{invitationId}/revocation'].post;
+  const createTenantOwnershipTransfer = document.paths['/v1/tenants/{tenantId}/ownership-transfers'].post;
+  const getTenantOwnershipTransfer = document.paths['/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}'].get;
+  const acceptTenantOwnershipTransfer = document.paths['/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}/acceptance'].post;
+  const getTenantPermissionRecalculation = document.paths['/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}'].get;
+  const getWorkspacePermissionRecalculation = document.paths['/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}'].get;
   const issueServiceAccountCredential = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance'].post;
   const rotateServiceAccountCredential = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations'].post;
   const revokeServiceAccountCredential = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations'].post;
@@ -112,7 +122,7 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const createWebSocketSession = document.paths['/v1/websockets/sessions'].post;
 
   assert.deepEqual(collectContractViolations(document), []);
-  assert.equal(document.info.version, '1.9.0');
+  assert.equal(document.info.version, '1.10.0');
   assert.equal(document.components.parameters.XApiVersion.schema.const, '2026-03-24');
   assert.deepEqual(document.components.schemas.ErrorResponse.required, [
     'status',
@@ -152,6 +162,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const invitationParameters = resolveParameters(document, createInvitation);
   const invitationAcceptanceParameters = resolveParameters(document, acceptInvitation);
   const invitationRevocationParameters = resolveParameters(document, revokeInvitation);
+  const tenantOwnershipTransferParameters = resolveParameters(document, createTenantOwnershipTransfer);
+  const getTenantOwnershipTransferParameters = resolveParameters(document, getTenantOwnershipTransfer);
+  const acceptTenantOwnershipTransferParameters = resolveParameters(document, acceptTenantOwnershipTransfer);
+  const tenantPermissionRecalculationParameters = resolveParameters(document, getTenantPermissionRecalculation);
+  const workspacePermissionRecalculationParameters = resolveParameters(document, getWorkspacePermissionRecalculation);
   const serviceAccountCredentialIssuanceParameters = resolveParameters(document, issueServiceAccountCredential);
   const serviceAccountCredentialRotationParameters = resolveParameters(document, rotateServiceAccountCredential);
   const serviceAccountCredentialRevocationParameters = resolveParameters(document, revokeServiceAccountCredential);
@@ -333,6 +348,23 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.equal(revokeInvitation['x-family'], 'tenants');
   assert.equal(invitationRevocationParameters.some((parameter) => parameter.name === 'invitationId'), true);
   assert.ok(revokeInvitation.responses['202']);
+  assert.equal(createTenantOwnershipTransfer['x-family'], 'tenants');
+  assert.equal(tenantOwnershipTransferParameters.some((parameter) => parameter.name === 'tenantId'), true);
+  assert.equal(tenantOwnershipTransferParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.ok(createTenantOwnershipTransfer.responses['202']);
+  assert.equal(getTenantOwnershipTransfer['x-family'], 'tenants');
+  assert.equal(getTenantOwnershipTransferParameters.some((parameter) => parameter.name === 'ownershipTransferId'), true);
+  assert.ok(getTenantOwnershipTransfer.responses['200']);
+  assert.equal(acceptTenantOwnershipTransfer['x-family'], 'tenants');
+  assert.equal(acceptTenantOwnershipTransferParameters.some((parameter) => parameter.name === 'ownershipTransferId'), true);
+  assert.equal(acceptTenantOwnershipTransferParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.ok(acceptTenantOwnershipTransfer.responses['202']);
+  assert.equal(getTenantPermissionRecalculation['x-family'], 'tenants');
+  assert.equal(tenantPermissionRecalculationParameters.some((parameter) => parameter.name === 'permissionRecalculationId'), true);
+  assert.ok(getTenantPermissionRecalculation.responses['200']);
+  assert.equal(getWorkspacePermissionRecalculation['x-family'], 'workspaces');
+  assert.equal(workspacePermissionRecalculationParameters.some((parameter) => parameter.name === 'permissionRecalculationId'), true);
+  assert.ok(getWorkspacePermissionRecalculation.responses['200']);
   assert.equal(issueServiceAccountCredential['x-family'], 'workspaces');
   assert.equal(serviceAccountCredentialIssuanceParameters.some((parameter) => parameter.name === 'serviceAccountId'), true);
   assert.ok(issueServiceAccountCredential.responses['202']);
@@ -355,6 +387,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.ok(document.components.schemas.Invitation);
   assert.ok(document.components.schemas.InvitationAcceptanceRequest);
   assert.ok(document.components.schemas.InvitationRevocationRequest);
+  assert.ok(document.components.schemas.TenantOwnershipTransfer);
+  assert.ok(document.components.schemas.TenantOwnershipTransferWriteRequest);
+  assert.ok(document.components.schemas.TenantOwnershipTransferAcceptanceRequest);
+  assert.ok(document.components.schemas.EffectivePermissionRecalculation);
+  assert.ok(document.components.schemas.EffectivePermissionRecalculationReference);
   assert.ok(document.components.schemas.ExpirationRule);
   assert.ok(document.components.schemas.CommercialPlan);
   assert.ok(document.components.schemas.ProviderCapabilityRecord);
