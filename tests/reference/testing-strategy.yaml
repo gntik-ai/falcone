@@ -39,7 +39,6 @@ pyramid:
       - dependency fault injection
       - operator console degradation flows
       - privilege-escalation replay guards
-
 cross_domain_matrix:
   domains:
     - id: multi_tenant
@@ -248,7 +247,39 @@ cross_domain_matrix:
         - tenant-shared-a
         - workspace-alpha-dev
       expected: Body-size enforcement fails fast, returns the standard error envelope, and preserves tenant-safe retry guidance.
-
+    - id: CE-CON-002
+      level: console_e2e
+      domain: console
+      taxonomy: positive
+      title: Pending-activation accounts only see the activation waiting room until a superadmin approves the signup.
+      fixtures:
+        - route-pending-activation
+        - route-login
+      states:
+        - pending_activation
+      expected: Pending-activation users stay blocked from tenant and platform navigation until approval resolves the account.
+    - id: CE-CON-003
+      level: console_e2e
+      domain: console
+      taxonomy: recovery
+      title: Expired credentials route the operator into password recovery instead of silently failing login loops.
+      fixtures:
+        - route-credentials-expired
+        - route-password-recovery
+      states:
+        - credentials_expired
+      expected: Credential-expiry states expose recovery-only actions until the password reset completes.
+    - id: CE-CON-004
+      level: console_e2e
+      domain: console
+      taxonomy: negative
+      title: Suspended accounts render an explicit blocked status screen and never regain navigation by refreshing the SPA.
+      fixtures:
+        - route-account-suspended
+        - route-login
+      states:
+        - account_suspended
+      expected: Suspended accounts stay blocked from every tenant and platform surface until an operator reactivates them.
 scenario_taxonomy:
   categories:
     - id: positive
@@ -269,12 +300,12 @@ scenario_taxonomy:
       - UT-TEN-001
       - AI-EVT-001
       - CE-CON-001
-
 console:
   states:
     - id: unauthenticated
       visible_sections:
         - login
+        - signup
         - password-recovery
       blocked_sections:
         - platform-overview
@@ -283,6 +314,7 @@ console:
         - audit-log
       allowed_actions:
         - request-login
+        - request-signup
         - request-password-reset
     - id: platform_admin
       visible_sections:
@@ -344,12 +376,45 @@ console:
         - manage-workspace-members
         - deploy-workspace-app
         - rotate-workspace-secrets-reference
-
+    - id: pending_activation
+      visible_sections:
+        - pending-activation
+      blocked_sections:
+        - platform-overview
+        - tenant-dashboard
+        - workspace-dashboard
+        - audit-log
+      allowed_actions:
+        - poll-activation-status
+        - sign-out
+    - id: account_suspended
+      visible_sections:
+        - account-suspended
+      blocked_sections:
+        - platform-overview
+        - tenant-dashboard
+        - workspace-dashboard
+        - audit-log
+      allowed_actions:
+        - contact-support
+        - sign-out
+    - id: credentials_expired
+      visible_sections:
+        - credentials-expired
+        - password-recovery
+      blocked_sections:
+        - platform-overview
+        - tenant-dashboard
+        - workspace-dashboard
+        - audit-log
+      allowed_actions:
+        - request-password-reset
+        - complete-password-reset
 api_contract:
   uri_prefix: /v1/
   version_header:
     name: X-API-Version
-    current_value: '2026-03-24'
+    current_value: 2026-03-24
   required_error_contracts: true
   compatibility_expectations:
     - Non-health control-plane operations stay under `/v1/` until a deliberate versioning change is introduced.

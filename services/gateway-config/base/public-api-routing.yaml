@@ -248,12 +248,12 @@ spec:
       pathPrefix: /v1/auth
       upstreamService: control_api
       routeClass: control
-      authMode: bearer_oidc
+      authMode: delegated_oidc
       discoveryEnabled: false
       corsProfile: product_api
       allowAnonymousOptions: true
-      tenantBinding: required
-      workspaceBinding: required
+      tenantBinding: none
+      workspaceBinding: none
       propagatedHeaders: *a1
       qosProfile: auth_control
       requestValidationProfile: auth_control

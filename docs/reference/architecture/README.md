@@ -17,6 +17,7 @@ This directory documents architecture baselines that future tasks should extend 
 - `docs/adr/0006-core-domain-entity-model.md` records the canonical entity, relationship, and lifecycle decision baseline introduced by `US-DOM-01`.
 - `services/internal-contracts/src/domain-model.json` is the machine-readable source of truth for shared identifiers, entity relationships, lifecycle events, and OpenAPI mapping metadata.
 - `docs/reference/architecture/core-domain-model.md` is the human-readable architecture companion for the core domain model.
+- `docs/reference/architecture/console-authentication.md` records the console login, signup, activation, and password-recovery baseline introduced by `US-IAM-03`.
 
 ## Usage rules
 

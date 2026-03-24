@@ -117,6 +117,7 @@
     "supported_states": [
       "draft",
       "provisioning",
+      "pending_activation",
       "active",
       "suspended",
       "soft_deleted"
@@ -162,6 +163,7 @@
       "state_field": "state",
       "supported_states": [
         "draft",
+        "pending_activation",
         "active",
         "suspended",
         "soft_deleted"
@@ -185,7 +187,9 @@
         "identitySubject is globally unique across credential sources.",
         "Workspace memberships must point to workspaces inside one of the user's tenant memberships unless the actor holds a platform role.",
         "Suspended or soft-deleted users cannot receive new membership grants.",
-        "platform_user.iamBinding.realm must stay bound to the platform realm and cannot be reused as a tenant end-user identity."
+        "platform_user.iamBinding.realm must stay bound to the platform realm and cannot be reused as a tenant end-user identity.",
+        "Self-service signup creates platform_user records in pending_activation until the effective signup policy resolves to auto_activate or a superadmin approves the account.",
+        "Password-recovery and credential-expiry UX may block console access even when the canonical platform_user state remains active."
       ],
       "openapi": {
         "read_schema": "PlatformUser",
@@ -1224,7 +1228,9 @@
     "Capability-resolution outputs preserve plane labels so operators can distinguish control, data, identity, and observability effects.",
     "Console operators authenticate in the platform realm while tenant end users, workspace clients, and machine identities resolve through tenant IAM contexts.",
     "Tenant activation is not complete until the Keycloak realm/client-scope/mapper baseline required by the control plane has been reconciled.",
-    "Workspace application clients and service accounts are namespaced per workspace even when multiple workspaces share one tenant realm cluster."
+    "Workspace application clients and service accounts are namespaced per workspace even when multiple workspaces share one tenant realm cluster.",
+    "Console signup, activation, suspension, and password-recovery flows must preserve the platform_user identity boundary and remain auditable under the platform realm.",
+    "Auto-signup behavior is policy-driven by global, environment, and plan overrides; rejection or approval decisions must be explainable to the operator."
   ],
   "business_state_machines": [
     {
@@ -1428,6 +1434,55 @@
       "rules": [
         "Advisory thresholds emit observability signals before hard stops apply.",
         "Blocked status prevents new provisioning or scale-out but preserves read-only, billing, and audit flows."
+      ]
+    },
+    {
+      "id": "platform_user_access_status",
+      "entity_type": "platform_user",
+      "field": "state",
+      "initial_state": "pending_activation",
+      "states": [
+        "pending_activation",
+        "active",
+        "suspended",
+        "soft_deleted"
+      ],
+      "terminal_states": [
+        "soft_deleted"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "pending_activation",
+          "to": "active"
+        },
+        {
+          "from": "pending_activation",
+          "to": "suspended"
+        },
+        {
+          "from": "pending_activation",
+          "to": "soft_deleted"
+        },
+        {
+          "from": "active",
+          "to": "suspended"
+        },
+        {
+          "from": "suspended",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "soft_deleted"
+        },
+        {
+          "from": "suspended",
+          "to": "soft_deleted"
+        }
+      ],
+      "rules": [
+        "Pending activations represent self-service signups that still require policy evaluation or superadmin approval before console tokens can be minted.",
+        "Credential expiry is modeled as an authentication status overlay and does not bypass canonical suspension or soft-delete decisions."
       ]
     }
   ],

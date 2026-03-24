@@ -17,6 +17,16 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/managed-resources/{resourceId}']);
   assert.ok(document.paths['/v1/auth/access-checks']);
+  assert.ok(document.paths['/v1/auth/login-sessions']);
+  assert.ok(document.paths['/v1/auth/login-sessions/{sessionId}']);
+  assert.ok(document.paths['/v1/auth/login-sessions/{sessionId}/refresh']);
+  assert.ok(document.paths['/v1/auth/signups']);
+  assert.ok(document.paths['/v1/auth/signups/policy']);
+  assert.ok(document.paths['/v1/auth/signups/{registrationId}']);
+  assert.ok(document.paths['/v1/auth/signups/{registrationId}/activation-decisions']);
+  assert.ok(document.paths['/v1/auth/password-recovery-requests']);
+  assert.ok(document.paths['/v1/auth/password-recovery-requests/{recoveryRequestId}/confirmations']);
+  assert.ok(document.paths['/v1/auth/status-views/{statusViewId}']);
   assert.ok(document.paths['/v1/iam/realms']);
   assert.ok(document.paths['/v1/iam/realms/{realmId}']);
   assert.ok(document.paths['/v1/iam/realms/{realmId}/clients/{clientId}']);
@@ -47,6 +57,15 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
 test('control-plane contract enforces versioning, authorization, family metadata, idempotent mutation expectations, and gateway hardening responses', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
   const accessCheck = document.paths['/v1/auth/access-checks'].post;
+  const createConsoleLoginSession = document.paths['/v1/auth/login-sessions'].post;
+  const refreshConsoleLoginSession = document.paths['/v1/auth/login-sessions/{sessionId}/refresh'].post;
+  const terminateConsoleLoginSession = document.paths['/v1/auth/login-sessions/{sessionId}'].delete;
+  const createConsoleSignup = document.paths['/v1/auth/signups'].post;
+  const getConsoleSignupPolicy = document.paths['/v1/auth/signups/policy'].get;
+  const decideConsoleSignupActivation = document.paths['/v1/auth/signups/{registrationId}/activation-decisions'].post;
+  const createPasswordRecoveryRequest = document.paths['/v1/auth/password-recovery-requests'].post;
+  const confirmPasswordRecovery = document.paths['/v1/auth/password-recovery-requests/{recoveryRequestId}/confirmations'].post;
+  const getConsoleAccountStatusView = document.paths['/v1/auth/status-views/{statusViewId}'].get;
   const createManagedResource = document.paths['/v1/workspaces/{workspaceId}/managed-resources'].post;
   const createIamRealm = document.paths['/v1/iam/realms'].post;
   const listIamClients = document.paths['/v1/iam/realms/{realmId}/clients'].get;
@@ -61,7 +80,7 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const createWebSocketSession = document.paths['/v1/websockets/sessions'].post;
 
   assert.deepEqual(collectContractViolations(document), []);
-  assert.equal(document.info.version, '1.3.0');
+  assert.equal(document.info.version, '1.4.0');
   assert.equal(document.components.parameters.XApiVersion.schema.const, '2026-03-24');
   assert.deepEqual(document.components.schemas.ErrorResponse.required, [
     'status',
@@ -75,6 +94,15 @@ test('control-plane contract enforces versioning, authorization, family metadata
   ]);
 
   const accessCheckParameters = resolveParameters(document, accessCheck);
+  const createConsoleLoginSessionParameters = resolveParameters(document, createConsoleLoginSession);
+  const refreshConsoleLoginSessionParameters = resolveParameters(document, refreshConsoleLoginSession);
+  const terminateConsoleLoginSessionParameters = resolveParameters(document, terminateConsoleLoginSession);
+  const createConsoleSignupParameters = resolveParameters(document, createConsoleSignup);
+  const getConsoleSignupPolicyParameters = resolveParameters(document, getConsoleSignupPolicy);
+  const decideConsoleSignupActivationParameters = resolveParameters(document, decideConsoleSignupActivation);
+  const createPasswordRecoveryRequestParameters = resolveParameters(document, createPasswordRecoveryRequest);
+  const confirmPasswordRecoveryParameters = resolveParameters(document, confirmPasswordRecovery);
+  const getConsoleAccountStatusViewParameters = resolveParameters(document, getConsoleAccountStatusView);
   const managedResourceParameters = resolveParameters(document, createManagedResource);
   const iamRealmParameters = resolveParameters(document, createIamRealm);
   const iamClientListParameters = resolveParameters(document, listIamClients);
@@ -97,6 +125,67 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.ok(accessCheck.responses['429']);
   assert.ok(accessCheck.responses['431']);
   assert.ok(accessCheck.responses['504']);
+
+  assert.equal(createConsoleLoginSession['x-family'], 'auth');
+  assert.equal(createConsoleLoginSessionParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.ok(createConsoleLoginSession.responses['200']);
+  assert.ok(createConsoleLoginSession.responses['409']);
+  assert.ok(document.components.schemas.ConsoleLoginRequest);
+  assert.ok(document.components.schemas.ConsoleLoginSession);
+  assert.ok(document.components.schemas.ConsoleTokenSet);
+  assert.ok(document.components.schemas.ConsoleAuthenticationState);
+
+  assert.equal(refreshConsoleLoginSession['x-family'], 'auth');
+  assert.equal(refreshConsoleLoginSessionParameters.some((parameter) => parameter.name === 'sessionId'), true);
+  assert.ok(refreshConsoleLoginSession.responses['200']);
+  assert.ok(document.components.schemas.ConsoleTokenRefreshRequest);
+
+  assert.equal(terminateConsoleLoginSession['x-family'], 'auth');
+  assert.equal(terminateConsoleLoginSession.security?.[0]?.bearerAuth?.length ?? 0, 0);
+  assert.equal(terminateConsoleLoginSessionParameters.some((parameter) => parameter.name === 'sessionId'), true);
+  assert.ok(terminateConsoleLoginSession.responses['202']);
+  assert.ok(document.components.schemas.ConsoleSessionTerminationAccepted);
+
+  assert.equal(createConsoleSignup['x-family'], 'auth');
+  assert.equal(createConsoleSignupParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.ok(createConsoleSignup.responses['202']);
+  assert.ok(createConsoleSignup.responses['409']);
+  assert.ok(document.components.schemas.ConsoleSignupRequest);
+  assert.ok(document.components.schemas.ConsoleSignupRegistration);
+  assert.ok(document.components.schemas.ConsoleSignupState);
+
+  assert.equal(getConsoleSignupPolicy['x-family'], 'auth');
+  assert.equal(getConsoleSignupPolicyParameters.some((parameter) => parameter.name === 'X-API-Version'), true);
+  assert.ok(getConsoleSignupPolicy.responses['200']);
+  assert.ok(document.components.schemas.ConsoleSignupPolicy);
+  assert.ok(document.components.schemas.SignupPolicyMode);
+
+  assert.equal(decideConsoleSignupActivation['x-family'], 'auth');
+  assert.equal(decideConsoleSignupActivation.security?.[0]?.bearerAuth?.length ?? 0, 0);
+  assert.equal(decideConsoleSignupActivationParameters.some((parameter) => parameter.name === 'registrationId'), true);
+  assert.ok(decideConsoleSignupActivation.responses['202']);
+  assert.ok(document.components.schemas.ConsoleSignupActivationDecisionRequest);
+  assert.ok(document.components.schemas.ConsoleSignupActivationDecision);
+
+  assert.equal(createPasswordRecoveryRequest['x-family'], 'auth');
+  assert.equal(createPasswordRecoveryRequestParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.ok(createPasswordRecoveryRequest.responses['202']);
+  assert.ok(document.components.schemas.PasswordRecoveryRequest);
+  assert.ok(document.components.schemas.PasswordRecoveryTicket);
+  assert.ok(document.components.schemas.PasswordRecoveryStatus);
+
+  assert.equal(confirmPasswordRecovery['x-family'], 'auth');
+  assert.equal(confirmPasswordRecoveryParameters.some((parameter) => parameter.name === 'recoveryRequestId'), true);
+  assert.ok(confirmPasswordRecovery.responses['200']);
+  assert.ok(document.components.schemas.PasswordResetConfirmationRequest);
+  assert.ok(document.components.schemas.PasswordResetConfirmation);
+
+  assert.equal(getConsoleAccountStatusView['x-family'], 'auth');
+  assert.equal(getConsoleAccountStatusViewParameters.some((parameter) => parameter.name === 'statusViewId'), true);
+  assert.ok(getConsoleAccountStatusView.responses['200']);
+  assert.ok(document.components.schemas.ConsoleStatusViewId);
+  assert.ok(document.components.schemas.ConsoleAccountStatusView);
+  assert.ok(document.components.schemas.ConsoleActionLink);
 
   assert.equal(createManagedResource['x-family'], 'workspaces');
   assert.equal(managedResourceParameters.some((parameter) => parameter.name === 'X-API-Version'), true);
