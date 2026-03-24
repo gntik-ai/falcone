@@ -20,7 +20,7 @@ test('control-plane and console route-catalog helpers expose the same generated 
   const consoleSections = buildConsoleRouteSections();
 
   assert.equal(publicApiFamilies.length, 12);
-  assert.equal(controlPlanePostgresRoutes.length, 2);
+  assert.equal(controlPlanePostgresRoutes.length >= 20, true);
   assert.equal(controlPlanePostgresRoutes.every((route) => route.family === 'postgres'), true);
   assert.equal(controlPlaneIamRoutes.length >= 20, true);
 
@@ -36,6 +36,10 @@ test('control-plane and console route-catalog helpers expose the same generated 
   assert.ok(controlPlaneIamRoutes.some((route) => route.path === '/v1/iam/realms/{realmId}/users/{iamUserId}/credential-resets'));
   assert.ok(controlPlaneIamRoutes.some((route) => route.path === '/v1/iam/tenants/{tenantId}/activity'));
   assert.ok(controlPlaneIamRoutes.some((route) => route.path === '/v1/iam/workspaces/{workspaceId}/activity'));
+  assert.ok(controlPlanePostgresRoutes.some((route) => route.path === '/v1/postgres/roles'));
+  assert.ok(controlPlanePostgresRoutes.some((route) => route.path === '/v1/postgres/users'));
+  assert.ok(controlPlanePostgresRoutes.some((route) => route.path === '/v1/postgres/databases/{databaseName}/schemas/{schemaName}'));
+  assert.ok(controlPlanePostgresRoutes.some((route) => route.path === '/v1/postgres/workspaces/{workspaceId}/inventory'));
   assert.ok(controlPlaneAuthRoutes.some((route) => route.path === '/v1/auth/login-sessions'));
   assert.ok(controlPlaneAuthRoutes.some((route) => route.path === '/v1/auth/signups'));
   assert.ok(controlPlaneAuthRoutes.some((route) => route.path === '/v1/auth/password-recovery-requests'));

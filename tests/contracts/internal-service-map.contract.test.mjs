@@ -75,6 +75,9 @@ test('internal contract baseline preserves versioning and dependency expectation
   assert.ok(eventGatewaySubscriptionRequestContract.required_fields.includes('transport'));
   assert.ok(eventGatewayPublishResultContract.required_fields.includes('audit_record_id'));
   assert.ok(eventGatewaySubscriptionStatusContract.required_fields.includes('lag_snapshot'));
+  assert.ok(getContract('postgres_admin_request').required_fields.includes('placement_mode'));
+  assert.ok(getContract('postgres_admin_result').required_fields.includes('inventory_projection'));
+  assert.ok(getContract('postgres_inventory_snapshot').required_fields.includes('minimum_engine_policy'));
   assert.equal(auditRecordContract.write_mode, 'append_only');
   assert.ok(auditRecordContract.required_fields.includes('evidence_pointer'));
   assert.ok(auditRecordContract.required_fields.includes('authorization_decision_id'));
@@ -100,6 +103,7 @@ test('consumer scaffolding exposes the expected provider and flow slices', () =>
   }
 
   const keycloakAdapter = provisioningAdapterPorts.find((adapter) => adapter.id === 'keycloak');
+  const postgresqlAdapter = provisioningAdapterPorts.find((adapter) => adapter.id === 'postgresql');
 
   assert.deepEqual([...auditProviderIds].sort(), ['postgresql', 'storage']);
   assert.ok(keycloakAdapter.capabilities.includes('ensure_protocol_mappers'));
@@ -115,6 +119,9 @@ test('consumer scaffolding exposes the expected provider and flow slices', () =>
   assert.ok(keycloakAdapter.capabilities.includes('iam_realm_create'));
   assert.ok(keycloakAdapter.capabilities.includes('iam_client_update'));
   assert.ok(keycloakAdapter.capabilities.includes('iam_user_reset_credentials'));
+  assert.ok(postgresqlAdapter.capabilities.includes('postgres_role_create'));
+  assert.ok(postgresqlAdapter.capabilities.includes('postgres_database_delete'));
+  assert.ok(postgresqlAdapter.capabilities.includes('postgres_inventory_upsert'));
   assert.equal(getContract('adapter_call').required_fields.includes('provisioning_run_id'), true);
   assert.equal(getContract('adapter_call').required_fields.includes('resource_key'), true);
   assert.equal(getContract('adapter_result').required_fields.includes('resource_key'), true);
@@ -127,6 +134,7 @@ test('consumer scaffolding exposes the expected provider and flow slices', () =>
   assert.ok(interactionFlowIds.has('invitation_membership_reconciliation'));
   assert.ok(interactionFlowIds.has('service_account_credential_rotation'));
   assert.ok(interactionFlowIds.has('iam_administration'));
+  assert.ok(interactionFlowIds.has('postgres_administration'));
   assert.ok(interactionFlowIds.has('iam_lifecycle_traceability'));
   assert.ok(interactionFlowIds.has('event_publish_gateway'));
   assert.ok(interactionFlowIds.has('realtime_subscription_gateway'));
