@@ -1,6 +1,6 @@
 # Public API Surface
 
-Version: v1 (header 2026-03-24, OpenAPI 1.11.0)
+Version: v1 (header 2026-03-24, OpenAPI 1.12.0)
 
 ## Product API vs native passthrough
 
@@ -188,12 +188,33 @@ Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, an
 
 ## Postgres
 
-Workspace-scoped relational data control and discovery routes exposed through the public gateway.
+Workspace- and tenant-aware PostgreSQL control, structural administration, and inventory routes exposed through safe BaaS contracts.
 
 | Method | Path | Scope | Resource | Summary |
 | --- | --- | --- | --- | --- |
+| GET | `/v1/postgres/databases` | tenant | postgres_database | List tenant-scoped PostgreSQL databases exposed by the bounded administrative surface |
+| POST | `/v1/postgres/databases` | tenant | postgres_database | Create one tenant-scoped PostgreSQL database when the placement profile supports database-per-tenant administration |
+| DELETE | `/v1/postgres/databases/{databaseName}` | tenant | postgres_database | Delete one tenant-scoped PostgreSQL database through the bounded administrative surface |
+| GET | `/v1/postgres/databases/{databaseName}` | tenant | postgres_database | Fetch one tenant-scoped PostgreSQL database contract |
+| PUT | `/v1/postgres/databases/{databaseName}` | tenant | postgres_database | Update one tenant-scoped PostgreSQL database through the bounded administrative surface |
+| GET | `/v1/postgres/databases/{databaseName}/schemas` | workspace | postgres_schema | List workspace-scoped PostgreSQL schemas inside one managed database |
+| POST | `/v1/postgres/databases/{databaseName}/schemas` | workspace | postgres_schema | Create one workspace-scoped PostgreSQL schema inside a managed database |
+| DELETE | `/v1/postgres/databases/{databaseName}/schemas/{schemaName}` | workspace | postgres_schema | Delete one workspace-scoped PostgreSQL schema through the bounded administrative surface |
+| GET | `/v1/postgres/databases/{databaseName}/schemas/{schemaName}` | workspace | postgres_schema | Fetch one workspace-scoped PostgreSQL schema contract |
+| PUT | `/v1/postgres/databases/{databaseName}/schemas/{schemaName}` | workspace | postgres_schema | Update one workspace-scoped PostgreSQL schema through the bounded administrative surface |
 | POST | `/v1/postgres/instances` | workspace | database | Submit a workspace-scoped PostgreSQL instance provisioning request through the unified postgres family |
 | GET | `/v1/postgres/instances/{resourceId}` | workspace | database | Fetch one workspace-scoped PostgreSQL instance contract under the postgres family |
+| GET | `/v1/postgres/roles` | workspace | postgres_role | List workspace-scoped PostgreSQL roles through the normalized administrative surface |
+| POST | `/v1/postgres/roles` | workspace | postgres_role | Create one workspace-scoped PostgreSQL role through the bounded administrative surface |
+| DELETE | `/v1/postgres/roles/{postgresRoleName}` | workspace | postgres_role | Delete one workspace-scoped PostgreSQL role through the bounded administrative surface |
+| GET | `/v1/postgres/roles/{postgresRoleName}` | workspace | postgres_role | Fetch one workspace-scoped PostgreSQL role contract |
+| PUT | `/v1/postgres/roles/{postgresRoleName}` | workspace | postgres_role | Update one workspace-scoped PostgreSQL role through the bounded administrative surface |
+| GET | `/v1/postgres/users` | workspace | postgres_user | List workspace-scoped PostgreSQL users through the normalized administrative surface |
+| POST | `/v1/postgres/users` | workspace | postgres_user | Create one workspace-scoped PostgreSQL user through the bounded administrative surface |
+| DELETE | `/v1/postgres/users/{postgresUserName}` | workspace | postgres_user | Delete one workspace-scoped PostgreSQL user through the bounded administrative surface |
+| GET | `/v1/postgres/users/{postgresUserName}` | workspace | postgres_user | Fetch one workspace-scoped PostgreSQL user contract |
+| PUT | `/v1/postgres/users/{postgresUserName}` | workspace | postgres_user | Update one workspace-scoped PostgreSQL user through the bounded administrative surface |
+| GET | `/v1/postgres/workspaces/{workspaceId}/inventory` | workspace | postgres_inventory | Fetch the persisted PostgreSQL administrative inventory projection for one workspace |
 
 ## Mongo
 

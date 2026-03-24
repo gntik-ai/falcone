@@ -66,6 +66,15 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/effective-capabilities']);
   assert.ok(document.paths['/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}']);
   assert.ok(document.paths['/v1/postgres/instances/{resourceId}']);
+  assert.ok(document.paths['/v1/postgres/roles']);
+  assert.ok(document.paths['/v1/postgres/roles/{postgresRoleName}']);
+  assert.ok(document.paths['/v1/postgres/users']);
+  assert.ok(document.paths['/v1/postgres/users/{postgresUserName}']);
+  assert.ok(document.paths['/v1/postgres/databases']);
+  assert.ok(document.paths['/v1/postgres/databases/{databaseName}']);
+  assert.ok(document.paths['/v1/postgres/databases/{databaseName}/schemas']);
+  assert.ok(document.paths['/v1/postgres/databases/{databaseName}/schemas/{schemaName}']);
+  assert.ok(document.paths['/v1/postgres/workspaces/{workspaceId}/inventory']);
   assert.ok(document.paths['/v1/mongo/databases/{resourceId}']);
   assert.ok(document.paths['/v1/events/topics/{resourceId}']);
   assert.ok(document.paths['/v1/events/topics/{resourceId}/publish']);
@@ -132,13 +141,19 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const updateExternalApplication = document.paths['/v1/workspaces/{workspaceId}/applications/{applicationId}'].put;
   const getRouteCatalog = document.paths['/v1/platform/route-catalog'].get;
   const createPostgres = document.paths['/v1/postgres/instances'].post;
+  const listPostgresRoles = document.paths['/v1/postgres/roles'].get;
+  const createPostgresRole = document.paths['/v1/postgres/roles'].post;
+  const getPostgresUser = document.paths['/v1/postgres/users/{postgresUserName}'].get;
+  const createPostgresDatabase = document.paths['/v1/postgres/databases'].post;
+  const createPostgresSchema = document.paths['/v1/postgres/databases/{databaseName}/schemas'].post;
+  const getPostgresInventory = document.paths['/v1/postgres/workspaces/{workspaceId}/inventory'].get;
   const publishEvent = document.paths['/v1/events/topics/{resourceId}/publish'].post;
   const streamTopicEvents = document.paths['/v1/events/topics/{resourceId}/stream'].get;
   const getGatewayStreamMetrics = document.paths['/v1/metrics/workspaces/{workspaceId}/gateway-streams'].get;
   const createWebSocketSession = document.paths['/v1/websockets/sessions'].post;
 
   assert.deepEqual(collectContractViolations(document), []);
-  assert.equal(document.info.version, '1.11.0');
+  assert.equal(document.info.version, '1.12.0');
   assert.equal(document.components.parameters.XApiVersion.schema.const, '2026-03-24');
   assert.deepEqual(document.components.schemas.ErrorResponse.required, [
     'status',
@@ -202,6 +217,12 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const externalApplicationUpdateParameters = resolveParameters(document, updateExternalApplication);
   const routeCatalogParameters = resolveParameters(document, getRouteCatalog);
   const postgresParameters = resolveParameters(document, createPostgres);
+  const listPostgresRolesParameters = resolveParameters(document, listPostgresRoles);
+  const createPostgresRoleParameters = resolveParameters(document, createPostgresRole);
+  const getPostgresUserParameters = resolveParameters(document, getPostgresUser);
+  const createPostgresDatabaseParameters = resolveParameters(document, createPostgresDatabase);
+  const createPostgresSchemaParameters = resolveParameters(document, createPostgresSchema);
+  const getPostgresInventoryParameters = resolveParameters(document, getPostgresInventory);
   const publishEventParameters = resolveParameters(document, publishEvent);
   const streamTopicParameters = resolveParameters(document, streamTopicEvents);
   const gatewayMetricParameters = resolveParameters(document, getGatewayStreamMetrics);
@@ -520,6 +541,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.ok(document.components.schemas.ManagedResource.properties.sharingScope);
   assert.ok(document.components.schemas.ManagedResource.properties.consumerWorkspaceIds);
   assert.ok(document.components.schemas.PostgresInstance.properties.provisioning);
+  assert.ok(document.components.schemas.PostgresRole.properties.providerCompatibility);
+  assert.ok(document.components.schemas.PostgresUser.properties.credentialBinding);
+  assert.ok(document.components.schemas.PostgresDatabase.properties.placementMode);
+  assert.ok(document.components.schemas.PostgresSchema.properties.accessPolicy);
+  assert.ok(document.components.schemas.PostgresAdminInventory.properties.minimumEnginePolicy);
   assert.ok(document.components.schemas.MongoDatabase.properties.provisioning);
   assert.ok(document.components.schemas.EventTopic.properties.provisioning);
   assert.ok(document.components.schemas.FunctionAction.properties.provisioning);
@@ -538,6 +564,18 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.equal(createPostgres['x-family'], 'postgres');
   assert.equal(postgresParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
   assert.ok(document.components.schemas.PostgresInstance);
+  assert.equal(listPostgresRoles['x-family'], 'postgres');
+  assert.equal(listPostgresRolesParameters.some((parameter) => parameter.name === 'page[size]'), true);
+  assert.equal(createPostgresRoleParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(getPostgresUserParameters.some((parameter) => parameter.name === 'postgresUserName'), true);
+  assert.equal(createPostgresDatabase['x-scope'], 'tenant');
+  assert.equal(createPostgresDatabaseParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(createPostgresSchemaParameters.some((parameter) => parameter.name === 'databaseName'), true);
+  assert.equal(getPostgresInventory['x-resource-type'], 'postgres_inventory');
+  assert.equal(getPostgresInventoryParameters.some((parameter) => parameter.name === 'workspaceId'), true);
+  assert.ok(document.components.schemas.PostgresProviderCompatibility);
+  assert.ok(document.components.schemas.PostgresAdminEnginePolicy);
+  assert.ok(document.components.schemas.PostgresAdminMutationAccepted);
 
   assert.equal(publishEvent['x-family'], 'events');
   assert.equal(publishEvent['x-owning-service'], 'event_gateway');
