@@ -218,6 +218,26 @@
     {
       "id": "route-workspace-settings",
       "path": "/tenant/:tenantId/workspaces/:workspaceId/settings"
+    },
+    {
+      "id": "route-signup",
+      "path": "/signup"
+    },
+    {
+      "id": "route-password-recovery",
+      "path": "/password-recovery"
+    },
+    {
+      "id": "route-pending-activation",
+      "path": "/pending-activation"
+    },
+    {
+      "id": "route-account-suspended",
+      "path": "/account-suspended"
+    },
+    {
+      "id": "route-credentials-expired",
+      "path": "/credentials-expired"
     }
   ]
 }

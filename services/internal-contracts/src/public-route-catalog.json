@@ -2,7 +2,7 @@
   "generatedFrom": "apps/control-plane/openapi/control-plane.openapi.json",
   "release": {
     "header_version": "2026-03-24",
-    "openapi_semver": "1.3.0",
+    "openapi_semver": "1.4.0",
     "path_version": "v1"
   },
   "routes": [
@@ -35,7 +35,7 @@
         "X-Correlation-Id",
         "X-Requested-With"
       ],
-      "gatewayAuthMode": "bearer_oidc",
+      "gatewayAuthMode": "delegated_oidc",
       "gatewayContextHeaders": [
         "X-Auth-Subject",
         "X-Actor-Username",
@@ -73,9 +73,723 @@
         "Auth",
         "Authorization"
       ],
-      "tenantBinding": "required",
+      "tenantBinding": "none",
       "visibility": "public",
-      "workspaceBinding": "required"
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "POST",
+      "operationId": "createConsoleLoginSession",
+      "path": "/v1/auth/login-sessions",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-login",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "auth_session",
+      "scope": "platform",
+      "summary": "Authenticate a console operator with username/password and mint the SPA session envelope.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "DELETE",
+      "operationId": "terminateConsoleLoginSession",
+      "path": "/v1/auth/login-sessions/{sessionId}",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-logout",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "auth_session",
+      "scope": "platform",
+      "summary": "Invalidate an active console session and revoke its refresh lifecycle.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "POST",
+      "operationId": "refreshConsoleLoginSession",
+      "path": "/v1/auth/login-sessions/{sessionId}/refresh",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-refresh",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "auth_session",
+      "scope": "platform",
+      "summary": "Rotate the console access token set from a refresh token without replaying username/password.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "POST",
+      "operationId": "createPasswordRecoveryRequest",
+      "path": "/v1/auth/password-recovery-requests",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-recovery",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "password_recovery",
+      "scope": "platform",
+      "summary": "Start password recovery for a console operator without leaking whether the account exists.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "POST",
+      "operationId": "confirmPasswordRecovery",
+      "path": "/v1/auth/password-recovery-requests/{recoveryRequestId}/confirmations",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-recovery",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "password_recovery",
+      "scope": "platform",
+      "summary": "Confirm a password-reset token and return the next status view for the console account.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "POST",
+      "operationId": "createConsoleSignup",
+      "path": "/v1/auth/signups",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-signup",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "console_signup",
+      "scope": "platform",
+      "summary": "Create a self-service console signup and return whether activation is automatic or pending approval.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "GET",
+      "operationId": "getConsoleSignup",
+      "path": "/v1/auth/signups/{registrationId}",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "catalog",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "console_signup",
+      "scope": "platform",
+      "summary": "Inspect the current signup registration status for pending activation, activation, or rejection messaging.",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": true,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "POST",
+      "operationId": "decideConsoleSignupActivation",
+      "path": "/v1/auth/signups/{registrationId}/activation-decisions",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "auth-activation",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "console_signup",
+      "scope": "platform",
+      "summary": "Approve or reject a pending self-service signup as a platform superadmin workflow.",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "GET",
+      "operationId": "getConsoleSignupPolicy",
+      "path": "/v1/auth/signups/policy",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "catalog",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "signup_policy",
+      "scope": "platform",
+      "summary": "Resolve the effective self-service signup mode across global, environment, and plan overrides.",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
+    },
+    {
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team",
+        "superadmin"
+      ],
+      "authRequired": false,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "family": "auth",
+      "familyTitle": "Auth",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "delegated_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "auth_control",
+      "gatewayRequestValidationProfile": "auth_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "GET",
+      "operationId": "getConsoleAccountStatusView",
+      "path": "/v1/auth/status-views/{statusViewId}",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 40,
+      "rateLimitClass": "catalog",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "resourceType": "account_status_view",
+      "scope": "platform",
+      "summary": "Resolve the canonical status-screen copy and next actions for console auth edge states.",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Auth",
+        "Console"
+      ],
+      "tenantBinding": "none",
+      "visibility": "public",
+      "workspaceBinding": "none"
     },
     {
       "allowAnonymousOptions": true,

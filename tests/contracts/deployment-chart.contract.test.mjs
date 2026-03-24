@@ -72,6 +72,15 @@ test('bootstrap contract keeps one-shot catalogs and upgrade reconciliation expl
   );
   assert.equal(values.bootstrap.oneShot.keycloak.clientScopes.some((scope) => scope.name === 'tenant-context'), true);
   assert.equal(values.bootstrap.oneShot.keycloak.clients.some((client) => client.clientId === 'in-atelier-gateway'), true);
+  assert.equal(values.bootstrap.oneShot.keycloak.realm.login.registrationAllowed, true);
+  assert.equal(values.bootstrap.oneShot.keycloak.realm.login.resetPasswordAllowed, true);
+  assert.equal(
+    values.bootstrap.oneShot.keycloak.clients.find((client) => client.clientId === 'in-atelier-console').directAccessGrantsEnabled,
+    true
+  );
+  assert.equal(values.webConsole.auth.autoSignupPolicy.globalMode, 'approval_required');
+  assert.equal(values.webConsole.auth.autoSignupPolicy.environmentModes.prod, 'disabled');
+  assert.equal(values.webConsole.auth.autoSignupPolicy.planModes.growth, 'approval_required');
   assert.equal(values.bootstrap.oneShot.keycloak.tenantRealmTemplate.realmIdPattern, 'tenant-{tenantSlug}');
   assert.equal(values.bootstrap.reconcile.apisix.routes.some((route) => route.name === 'public-api-functions'), true);
   assert.equal(values.bootstrap.reconcile.apisix.routes.some((route) => route.name === 'native-keycloak-admin'), true);

@@ -5,7 +5,7 @@
   "release": {
     "path_version": "v1",
     "header_version": "2026-03-24",
-    "openapi_semver": "1.3.0"
+    "openapi_semver": "1.4.0"
   },
   "versioning": {
     "uri_prefix": "/v1",
@@ -181,13 +181,14 @@
       "id": "auth",
       "title": "Auth",
       "prefix": "/v1/auth",
-      "summary": "Contextual authorization checks, scope resolution, and token-safe gateway decisions.",
+      "summary": "Console login, signup, activation, password recovery, and contextual authorization decisions.",
       "owning_service": "control_api",
       "downstream_contracts": [
         "control_api_command",
         "audit_record"
       ],
       "resource_scopes": [
+        "platform",
         "tenant",
         "workspace"
       ],
@@ -195,7 +196,8 @@
         "developer_external",
         "tenant_admin",
         "workspace_admin",
-        "platform_team"
+        "platform_team",
+        "superadmin"
       ],
       "visibility": "public",
       "apisix_route_class": "control"
@@ -537,6 +539,42 @@
       "resource_type": "iam_user",
       "family": "iam",
       "scope": "tenant",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "auth_session",
+      "family": "auth",
+      "scope": "platform",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "console_signup",
+      "family": "auth",
+      "scope": "platform",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "signup_policy",
+      "family": "auth",
+      "scope": "platform",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "password_recovery",
+      "family": "auth",
+      "scope": "platform",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "account_status_view",
+      "family": "auth",
+      "scope": "platform",
+      "authorization_resource": null
+    },
+    {
+      "resource_type": "authorization_decision",
+      "family": "auth",
+      "scope": "workspace",
       "authorization_resource": null
     }
   ]

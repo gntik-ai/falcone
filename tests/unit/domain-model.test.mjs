@@ -53,12 +53,15 @@ test('domain model remains internally consistent', () => {
 
 test('managed resource kinds, governance catalogs, and seed profiles preserve downstream reuse guarantees', () => {
   const managedResource = getDomainEntity('managed_resource');
+  const platformUser = getDomainEntity('platform_user');
   const invitationStateMachine = getBusinessStateMachine('invitation_status');
+  const platformUserStateMachine = getBusinessStateMachine('platform_user_access_status');
   const seedFixtures = readDomainSeedFixtures();
   const profileIds = seedFixtures.profiles.map((profile) => profile.id);
   const growthProfile = seedFixtures.profiles.find((profile) => profile.id === 'growth-multi-workspace');
 
   assert.deepEqual(managedResource.supported_kinds, ['database', 'bucket', 'topic', 'function']);
+  assert.equal(platformUser.supported_states.includes('pending_activation'), true);
   assert.deepEqual(profileIds, ['starter-single-workspace', 'growth-multi-workspace', 'enterprise-dedicated']);
   assert.equal(seedFixtures.profiles.find((profile) => profile.id === 'starter-single-workspace').workspace_count, 1);
   assert.equal(seedFixtures.profiles.find((profile) => profile.id === 'enterprise-dedicated').tenant.placement, 'dedicated_database');
@@ -71,6 +74,8 @@ test('managed resource kinds, governance catalogs, and seed profiles preserve do
   assert.equal(growthProfile.externalApplications.filter((application) => application.workspaceId === 'wrk_01betaprod').length >= 2, true);
   assert.equal(growthProfile.serviceAccounts.some((account) => account.iamBinding.clientId === 'beta-prod-svc-mobile-api'), true);
   assert.deepEqual(invitationStateMachine.states, ['pending', 'accepted', 'revoked', 'expired']);
+  assert.ok(platformUserStateMachine);
+  assert.deepEqual(platformUserStateMachine.states, ['pending_activation', 'active', 'suspended', 'soft_deleted']);
   assert.deepEqual(
     listCommercialPlans().map((plan) => plan.slug),
     ['starter', 'growth', 'regulated', 'enterprise']

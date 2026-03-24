@@ -1,6 +1,6 @@
 # Public API Surface
 
-Version: v1 (header 2026-03-24, OpenAPI 1.3.0)
+Version: v1 (header 2026-03-24, OpenAPI 1.4.0)
 
 ## Product API vs native passthrough
 
@@ -101,11 +101,21 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 
 ## Auth
 
-Contextual authorization checks, scope resolution, and token-safe gateway decisions.
+Console login, signup, activation, password recovery, and contextual authorization decisions.
 
 | Method | Path | Scope | Resource | Summary |
 | --- | --- | --- | --- | --- |
 | POST | `/v1/auth/access-checks` | workspace | authorization_decision | Resolve a contextual authorization decision under the auth family |
+| POST | `/v1/auth/login-sessions` | platform | auth_session | Authenticate a console operator with username/password and mint the SPA session envelope. |
+| DELETE | `/v1/auth/login-sessions/{sessionId}` | platform | auth_session | Invalidate an active console session and revoke its refresh lifecycle. |
+| POST | `/v1/auth/login-sessions/{sessionId}/refresh` | platform | auth_session | Rotate the console access token set from a refresh token without replaying username/password. |
+| POST | `/v1/auth/password-recovery-requests` | platform | password_recovery | Start password recovery for a console operator without leaking whether the account exists. |
+| POST | `/v1/auth/password-recovery-requests/{recoveryRequestId}/confirmations` | platform | password_recovery | Confirm a password-reset token and return the next status view for the console account. |
+| POST | `/v1/auth/signups` | platform | console_signup | Create a self-service console signup and return whether activation is automatic or pending approval. |
+| GET | `/v1/auth/signups/{registrationId}` | platform | console_signup | Inspect the current signup registration status for pending activation, activation, or rejection messaging. |
+| POST | `/v1/auth/signups/{registrationId}/activation-decisions` | platform | console_signup | Approve or reject a pending self-service signup as a platform superadmin workflow. |
+| GET | `/v1/auth/signups/policy` | platform | signup_policy | Resolve the effective self-service signup mode across global, environment, and plan overrides. |
+| GET | `/v1/auth/status-views/{statusViewId}` | platform | account_status_view | Resolve the canonical status-screen copy and next actions for console auth edge states. |
 
 ## IAM
 

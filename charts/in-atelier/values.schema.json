@@ -606,7 +606,132 @@
       "$ref": "#/definitions/component"
     },
     "webConsole": {
-      "$ref": "#/definitions/component"
+      "$ref": "#/definitions/component",
+      "properties": {
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuerUrl",
+            "realm",
+            "clientId",
+            "grantType",
+            "tokenStorage",
+            "loginPath",
+            "signupPath",
+            "pendingActivationPath",
+            "suspendedPath",
+            "credentialsExpiredPath",
+            "passwordRecoveryPath",
+            "autoSignupPolicy",
+            "statusMessages"
+          ],
+          "properties": {
+            "issuerUrl": {
+              "type": "string"
+            },
+            "realm": {
+              "type": "string"
+            },
+            "clientId": {
+              "type": "string"
+            },
+            "grantType": {
+              "type": "string",
+              "enum": [
+                "password"
+              ]
+            },
+            "tokenStorage": {
+              "type": "string",
+              "enum": [
+                "memory_with_refresh_rotation"
+              ]
+            },
+            "loginPath": {
+              "type": "string"
+            },
+            "signupPath": {
+              "type": "string"
+            },
+            "pendingActivationPath": {
+              "type": "string"
+            },
+            "suspendedPath": {
+              "type": "string"
+            },
+            "credentialsExpiredPath": {
+              "type": "string"
+            },
+            "passwordRecoveryPath": {
+              "type": "string"
+            },
+            "autoSignupPolicy": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "globalMode",
+                "environmentModes",
+                "planModes"
+              ],
+              "properties": {
+                "globalMode": {
+                  "type": "string",
+                  "enum": [
+                    "disabled",
+                    "approval_required",
+                    "auto_activate"
+                  ]
+                },
+                "environmentModes": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "approval_required",
+                      "auto_activate"
+                    ]
+                  }
+                },
+                "planModes": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "approval_required",
+                      "auto_activate"
+                    ]
+                  }
+                }
+              }
+            },
+            "statusMessages": {
+              "type": "object",
+              "required": [
+                "pending_activation",
+                "account_suspended",
+                "credentials_expired"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              },
+              "properties": {
+                "pending_activation": {
+                  "type": "string"
+                },
+                "account_suspended": {
+                  "type": "string"
+                },
+                "credentials_expired": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "bootstrap": {
       "type": "object",
@@ -890,6 +1015,34 @@
                     },
                     "enabled": {
                       "type": "boolean"
+                    },
+                    "login": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "loginWithEmailAllowed",
+                        "registrationAllowed",
+                        "rememberMe",
+                        "verifyEmail",
+                        "resetPasswordAllowed"
+                      ],
+                      "properties": {
+                        "loginWithEmailAllowed": {
+                          "type": "boolean"
+                        },
+                        "registrationAllowed": {
+                          "type": "boolean"
+                        },
+                        "rememberMe": {
+                          "type": "boolean"
+                        },
+                        "verifyEmail": {
+                          "type": "boolean"
+                        },
+                        "resetPasswordAllowed": {
+                          "type": "boolean"
+                        }
+                      }
                     }
                   },
                   "additionalProperties": true
