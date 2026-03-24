@@ -116,7 +116,28 @@
             "clientId": "alpha-dev-svc-ci-bot",
             "credentialRef": "secret://iam/ten_01starteralpha/wrk_01starterdev/service-accounts/svc_01starterci",
             "rotationPolicy": "manual-30d"
-          }
+          },
+          "tenantId": "ten_01starteralpha",
+          "displayName": "Ci Bot",
+          "credentialStatus": "active",
+          "credentialPolicy": {
+            "defaultTtl": "30d",
+            "maxTtl": "90d",
+            "rotateBefore": "7d",
+            "secretBackend": "keycloak_secret_store",
+            "maxActiveCredentials": 2
+          },
+          "credentials": [
+            {
+              "credentialId": "sac_01starterci",
+              "status": "active",
+              "issuedAt": "2026-03-24T00:00:00Z",
+              "lastRotatedAt": "2026-03-24T00:00:00Z",
+              "expiresAt": "2026-04-23T00:00:00Z",
+              "secretRef": "secret://iam/ten_01starteralpha/wrk_01starterdev/service-accounts/svc_01starterci",
+              "fingerprint": "fp-tarterci"
+            }
+          ]
         }
       ],
       "managedResources": [
@@ -127,7 +148,26 @@
           "kind": "database",
           "provider": "postgresql",
           "serviceAccountId": "svc_01starterci",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01starteralpha",
+          "displayName": "Alpha Db",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_viewer"
+            ],
+            "serviceAccountIds": [
+              "svc_01starterci"
+            ]
+          }
         },
         {
           "resourceId": "res_01starterbucket",
@@ -136,7 +176,26 @@
           "kind": "bucket",
           "provider": "storage",
           "applicationId": "app_01starterportal",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01starteralpha",
+          "displayName": "Alpha Assets",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_viewer"
+            ],
+            "serviceAccountIds": [
+              "svc_01starterci"
+            ]
+          }
         }
       ],
       "tenantMemberships": [
@@ -146,7 +205,30 @@
           "userId": "usr_01tenantadmin",
           "role": "tenant_admin",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01tenantadmin",
+            "iamGroupIds": [
+              "grp_ten_01starteralpha_tenant_admin"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_ten_01starteralpha_tenant_admin",
+              "assignedRoles": [
+                "tenant_admin"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "tenant_admin"
+          ]
         }
       ],
       "workspaceMemberships": [
@@ -157,7 +239,30 @@
           "userId": "usr_01workspaceadmin",
           "role": "workspace_admin",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01workspaceadmin",
+            "iamGroupIds": [
+              "grp_wrk_01starterdev_workspace_admin"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_wrk_01starterdev_workspace_admin",
+              "assignedRoles": [
+                "workspace_admin"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "workspace_admin"
+          ]
         }
       ],
       "invitations": [
@@ -170,7 +275,19 @@
           "role": "tenant_billing_admin",
           "invitationStatus": "pending",
           "expiresAt": "2026-04-01T00:00:00Z",
-          "state": "active"
+          "state": "active",
+          "issuedByUserId": "usr_01tenantadmin",
+          "targetBindings": [
+            {
+              "bindingType": "tenant",
+              "bindingRef": "ten_01starteralpha"
+            }
+          ],
+          "expirationPolicy": {
+            "defaultTtl": "72h",
+            "maxTtl": "168h",
+            "allowOverride": true
+          }
         }
       ]
     },
@@ -384,7 +501,28 @@
             "clientId": "beta-staging-svc-deploy-bot",
             "credentialRef": "secret://iam/ten_01growthbeta/wrk_01betastaging/service-accounts/svc_01betadeploy",
             "rotationPolicy": "manual-30d"
-          }
+          },
+          "tenantId": "ten_01growthbeta",
+          "displayName": "Deploy Bot",
+          "credentialStatus": "active",
+          "credentialPolicy": {
+            "defaultTtl": "30d",
+            "maxTtl": "90d",
+            "rotateBefore": "7d",
+            "secretBackend": "keycloak_secret_store",
+            "maxActiveCredentials": 2
+          },
+          "credentials": [
+            {
+              "credentialId": "sac_01betadeploy",
+              "status": "active",
+              "issuedAt": "2026-03-24T00:00:00Z",
+              "lastRotatedAt": "2026-03-24T00:00:00Z",
+              "expiresAt": "2026-04-23T00:00:00Z",
+              "secretRef": "secret://iam/ten_01growthbeta/wrk_01betastaging/service-accounts/svc_01betadeploy",
+              "fingerprint": "fp-tadeploy"
+            }
+          ]
         },
         {
           "serviceAccountId": "svc_01betaanalytics",
@@ -399,7 +537,28 @@
             "clientId": "beta-prod-svc-analytics-bot",
             "credentialRef": "secret://iam/ten_01growthbeta/wrk_01betaprod/service-accounts/svc_01betaanalytics",
             "rotationPolicy": "manual-30d"
-          }
+          },
+          "tenantId": "ten_01growthbeta",
+          "displayName": "Analytics Bot",
+          "credentialStatus": "active",
+          "credentialPolicy": {
+            "defaultTtl": "30d",
+            "maxTtl": "90d",
+            "rotateBefore": "7d",
+            "secretBackend": "keycloak_secret_store",
+            "maxActiveCredentials": 2
+          },
+          "credentials": [
+            {
+              "credentialId": "sac_01betaanalyt",
+              "status": "active",
+              "issuedAt": "2026-03-24T00:00:00Z",
+              "lastRotatedAt": "2026-03-24T00:00:00Z",
+              "expiresAt": "2026-04-23T00:00:00Z",
+              "secretRef": "secret://iam/ten_01growthbeta/wrk_01betaprod/service-accounts/svc_01betaanalytics",
+              "fingerprint": "fp-nalytics"
+            }
+          ]
         },
         {
           "serviceAccountId": "svc_01betamobileapi",
@@ -418,7 +577,27 @@
             "clientId": "beta-prod-svc-mobile-api",
             "credentialRef": "secret://iam/ten_01growthbeta/wrk_01betaprod/service-accounts/svc_01betamobileapi",
             "rotationPolicy": "manual-30d"
-          }
+          },
+          "tenantId": "ten_01growthbeta",
+          "credentialStatus": "active",
+          "credentialPolicy": {
+            "defaultTtl": "30d",
+            "maxTtl": "90d",
+            "rotateBefore": "7d",
+            "secretBackend": "keycloak_secret_store",
+            "maxActiveCredentials": 2
+          },
+          "credentials": [
+            {
+              "credentialId": "sac_01betamobile",
+              "status": "active",
+              "issuedAt": "2026-03-24T00:00:00Z",
+              "lastRotatedAt": "2026-03-24T00:00:00Z",
+              "expiresAt": "2026-04-23T00:00:00Z",
+              "secretRef": "secret://iam/ten_01growthbeta/wrk_01betaprod/service-accounts/svc_01betamobileapi",
+              "fingerprint": "fp-obileapi"
+            }
+          ]
         }
       ],
       "managedResources": [
@@ -429,7 +608,26 @@
           "kind": "database",
           "provider": "postgresql",
           "serviceAccountId": "svc_01betadeploy",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01growthbeta",
+          "displayName": "Beta Db",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01betadeploy"
+            ]
+          }
         },
         {
           "resourceId": "res_01betatopic",
@@ -438,7 +636,26 @@
           "kind": "topic",
           "provider": "kafka",
           "applicationId": "app_01betaadmin",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01growthbeta",
+          "displayName": "Events Topic",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01betadeploy"
+            ]
+          }
         },
         {
           "resourceId": "res_01betabucket",
@@ -447,7 +664,26 @@
           "kind": "bucket",
           "provider": "storage",
           "applicationId": "app_01betashop",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01growthbeta",
+          "displayName": "Beta Assets",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01betadeploy"
+            ]
+          }
         },
         {
           "resourceId": "res_01betafn",
@@ -456,7 +692,26 @@
           "kind": "function",
           "provider": "openwhisk",
           "serviceAccountId": "svc_01betadeploy",
-          "state": "provisioning"
+          "state": "provisioning",
+          "tenantId": "ten_01growthbeta",
+          "displayName": "Preview Functions",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01betadeploy"
+            ]
+          }
         }
       ],
       "tenantMemberships": [
@@ -466,7 +721,30 @@
           "userId": "usr_01betatenantadmin",
           "role": "tenant_admin",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01betatenantadmin",
+            "iamGroupIds": [
+              "grp_ten_01growthbeta_tenant_admin"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_ten_01growthbeta_tenant_admin",
+              "assignedRoles": [
+                "tenant_admin"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "tenant_admin"
+          ]
         }
       ],
       "workspaceMemberships": [
@@ -477,7 +755,30 @@
           "userId": "usr_01betadeveloper",
           "role": "workspace_developer",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01betadeveloper",
+            "iamGroupIds": [
+              "grp_wrk_01betadev_workspace_developer"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_wrk_01betadev_workspace_developer",
+              "assignedRoles": [
+                "workspace_developer"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "workspace_developer"
+          ]
         },
         {
           "workspaceMembershipId": "wmb_01growthauditor",
@@ -486,7 +787,30 @@
           "userId": "usr_01betaauditor",
           "role": "workspace_auditor",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01betaauditor",
+            "iamGroupIds": [
+              "grp_wrk_01betaprod_workspace_auditor"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_wrk_01betaprod_workspace_auditor",
+              "assignedRoles": [
+                "workspace_auditor"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "workspace_auditor"
+          ]
         }
       ],
       "invitations": [
@@ -500,7 +824,20 @@
           "role": "workspace_operator",
           "invitationStatus": "accepted",
           "expiresAt": "2026-03-28T00:00:00Z",
-          "state": "active"
+          "state": "active",
+          "issuedByUserId": "usr_01betatenantadmin",
+          "targetBindings": [
+            {
+              "bindingType": "workspace",
+              "bindingRef": "wrk_01betastaging"
+            }
+          ],
+          "expirationPolicy": {
+            "defaultTtl": "72h",
+            "maxTtl": "168h",
+            "allowOverride": true
+          },
+          "acceptedByUserId": "usr_01betatenantadmin"
         }
       ]
     },
@@ -719,7 +1056,28 @@
             "clientId": "delta-prod-svc-provisioner",
             "credentialRef": "secret://iam/ten_01enterprisedelta/wrk_01deltaprod/service-accounts/svc_01deltaprovisioner",
             "rotationPolicy": "manual-30d"
-          }
+          },
+          "tenantId": "ten_01enterprisedelta",
+          "displayName": "Provisioner",
+          "credentialStatus": "active",
+          "credentialPolicy": {
+            "defaultTtl": "30d",
+            "maxTtl": "90d",
+            "rotateBefore": "7d",
+            "secretBackend": "keycloak_secret_store",
+            "maxActiveCredentials": 2
+          },
+          "credentials": [
+            {
+              "credentialId": "sac_01deltaprovi",
+              "status": "active",
+              "issuedAt": "2026-03-24T00:00:00Z",
+              "lastRotatedAt": "2026-03-24T00:00:00Z",
+              "expiresAt": "2026-04-23T00:00:00Z",
+              "secretRef": "secret://iam/ten_01enterprisedelta/wrk_01deltaprod/service-accounts/svc_01deltaprovisioner",
+              "fingerprint": "fp-visioner"
+            }
+          ]
         },
         {
           "serviceAccountId": "svc_01deltareporter",
@@ -734,7 +1092,28 @@
             "clientId": "delta-staging-svc-reporter",
             "credentialRef": "secret://iam/ten_01enterprisedelta/wrk_01deltastaging/service-accounts/svc_01deltareporter",
             "rotationPolicy": "manual-30d"
-          }
+          },
+          "tenantId": "ten_01enterprisedelta",
+          "displayName": "Reporter",
+          "credentialStatus": "active",
+          "credentialPolicy": {
+            "defaultTtl": "30d",
+            "maxTtl": "90d",
+            "rotateBefore": "7d",
+            "secretBackend": "keycloak_secret_store",
+            "maxActiveCredentials": 2
+          },
+          "credentials": [
+            {
+              "credentialId": "sac_01deltarepor",
+              "status": "active",
+              "issuedAt": "2026-03-24T00:00:00Z",
+              "lastRotatedAt": "2026-03-24T00:00:00Z",
+              "expiresAt": "2026-04-23T00:00:00Z",
+              "secretRef": "secret://iam/ten_01enterprisedelta/wrk_01deltastaging/service-accounts/svc_01deltareporter",
+              "fingerprint": "fp-reporter"
+            }
+          ]
         }
       ],
       "managedResources": [
@@ -745,7 +1124,26 @@
           "kind": "database",
           "provider": "postgresql",
           "serviceAccountId": "svc_01deltaprovisioner",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01enterprisedelta",
+          "displayName": "Primary Db",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01deltaprovisioner"
+            ]
+          }
         },
         {
           "resourceId": "res_01deltaauditbucket",
@@ -754,7 +1152,26 @@
           "kind": "bucket",
           "provider": "storage",
           "serviceAccountId": "svc_01deltareporter",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01enterprisedelta",
+          "displayName": "Audit Bucket",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01deltaprovisioner"
+            ]
+          }
         },
         {
           "resourceId": "res_01deltabus",
@@ -763,7 +1180,26 @@
           "kind": "topic",
           "provider": "kafka",
           "applicationId": "app_01deltagateway",
-          "state": "active"
+          "state": "active",
+          "tenantId": "ten_01enterprisedelta",
+          "displayName": "Event Bus",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01deltaprovisioner"
+            ]
+          }
         },
         {
           "resourceId": "res_01deltaworkers",
@@ -772,7 +1208,26 @@
           "kind": "function",
           "provider": "openwhisk",
           "serviceAccountId": "svc_01deltaprovisioner",
-          "state": "provisioning"
+          "state": "provisioning",
+          "tenantId": "ten_01enterprisedelta",
+          "displayName": "Worker Functions",
+          "accessPolicy": {
+            "ownerRoles": [
+              "workspace_admin"
+            ],
+            "adminRoles": [
+              "workspace_admin"
+            ],
+            "developerRoles": [
+              "workspace_developer"
+            ],
+            "viewerRoles": [
+              "workspace_auditor"
+            ],
+            "serviceAccountIds": [
+              "svc_01deltaprovisioner"
+            ]
+          }
         }
       ],
       "tenantMemberships": [
@@ -782,7 +1237,30 @@
           "userId": "usr_01deltatenantadmin",
           "role": "tenant_admin",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01deltatenantadmin",
+            "iamGroupIds": [
+              "grp_ten_01enterprisedelta_tenant_admin"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_ten_01enterprisedelta_tenant_admin",
+              "assignedRoles": [
+                "tenant_admin"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "tenant_admin"
+          ]
         }
       ],
       "workspaceMemberships": [
@@ -793,7 +1271,30 @@
           "userId": "usr_01deltaworkspaceoperator",
           "role": "workspace_operator",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01deltaworkspaceoperator",
+            "iamGroupIds": [
+              "grp_wrk_01deltaprod_workspace_operator"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_wrk_01deltaprod_workspace_operator",
+              "assignedRoles": [
+                "workspace_operator"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "workspace_operator"
+          ]
         },
         {
           "workspaceMembershipId": "wmb_01deltaliam",
@@ -802,7 +1303,30 @@
           "userId": "usr_01deltaauditor",
           "role": "workspace_auditor",
           "membershipStatus": "active",
-          "state": "active"
+          "state": "active",
+          "principalBindings": {
+            "sourceType": "user",
+            "realm": "in-atelier-platform",
+            "iamUserId": "usr_01deltaauditor",
+            "iamGroupIds": [
+              "grp_wrk_01deltastaging_workspace_auditor"
+            ]
+          },
+          "roleMappings": [
+            {
+              "externalPrincipalType": "group",
+              "externalPrincipalId": "grp_wrk_01deltastaging_workspace_auditor",
+              "assignedRoles": [
+                "workspace_auditor"
+              ],
+              "source": "keycloak_group",
+              "precedence": 10
+            }
+          ],
+          "roleMappingStatus": "synced",
+          "effectiveRoles": [
+            "workspace_auditor"
+          ]
         }
       ],
       "invitations": [
@@ -816,7 +1340,20 @@
           "role": "workspace_viewer",
           "invitationStatus": "revoked",
           "expiresAt": "2026-03-25T00:00:00Z",
-          "state": "active"
+          "state": "active",
+          "issuedByUserId": "usr_01deltatenantadmin",
+          "targetBindings": [
+            {
+              "bindingType": "workspace",
+              "bindingRef": "wrk_01deltastaging"
+            }
+          ],
+          "expirationPolicy": {
+            "defaultTtl": "72h",
+            "maxTtl": "168h",
+            "allowOverride": true
+          },
+          "revokedByUserId": "usr_01deltatenantadmin"
         }
       ]
     }

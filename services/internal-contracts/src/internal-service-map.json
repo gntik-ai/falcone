@@ -193,7 +193,11 @@
         "iam_user_activate",
         "iam_user_deactivate",
         "iam_user_reset_credentials",
-        "iam_user_reconcile_groups"
+        "iam_user_reconcile_groups",
+        "ensure_group_role_mappings",
+        "issue_service_account_credentials",
+        "rotate_service_account_credentials",
+        "revoke_service_account_credentials"
       ],
       "request_contract": "adapter_call",
       "result_contract": "adapter_result",
@@ -707,6 +711,26 @@
         "provisioning_orchestrator validates the requested Keycloak version against the supported compatibility matrix, preserves tenant/workspace boundaries, and translates the normalized resource intent into one keycloak adapter_call.",
         "services/adapters performs realm, client, role, scope, or user operations through the Keycloak Admin API, then normalizes provider payloads and error classes back into the stable iam_admin_result contract.",
         "audit_module records the actor, tenant/workspace scope, resource target, resulting provider reference, and any reset/deactivation evidence without storing raw credentials."
+      ]
+    },
+    {
+      "id": "invitation_membership_reconciliation",
+      "entry_service": "control_api",
+      "steps": [
+        "control_api accepts tenant/workspace invitation decisions only after contextual authorization, invitation expiry checks, and target binding validation succeed.",
+        "provisioning_orchestrator resolves Keycloak user or group bindings into canonical tenant/workspace memberships and records any precedence or sync-status changes.",
+        "services/adapters performs Keycloak lookup and group reconciliation without crossing tenant realm boundaries or leaking raw invitation tokens into downstream evidence.",
+        "audit_module records issuer, acceptor or revoker, resolved bindings, and resulting membership state transitions for later review."
+      ]
+    },
+    {
+      "id": "service_account_credential_rotation",
+      "entry_service": "control_api",
+      "steps": [
+        "control_api validates workspace-scoped service-account credential issuance, rotation, or revocation requests after contextual authorization and policy checks pass.",
+        "provisioning_orchestrator translates the canonical credential intent into idempotent adapter calls while preserving workspace isolation and grace-overlap rules.",
+        "services/adapters rotates or revokes Keycloak-backed credentials, updates secret references, and returns secret-free evidence pointers to the orchestrator.",
+        "audit_module records the actor, workspace namespace, previous and next credential references, and the revocation evidence without storing raw secrets."
       ]
     }
   ]

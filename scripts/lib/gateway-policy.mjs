@@ -18,7 +18,7 @@ export const REQUIRED_PASSTHROUGH_PLUGINS = [
   'authz-keycloak',
   'http-logger'
 ];
-export const REQUIRED_PERSONAS = ['basic_profile', 'tenant_admin', 'superadmin'];
+export const REQUIRED_PERSONAS = ['workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_viewer', 'workspace_service_account', 'tenant_admin', 'superadmin'];
 export const REQUIRED_SPOOFED_HEADERS = ['X-Auth-Subject', 'X-Actor-Username', 'X-Tenant-Id', 'X-Workspace-Id', 'X-Plan-Id', 'X-Auth-Scopes', 'X-Actor-Roles'];
 export const REQUIRED_INTERNAL_REQUEST_HEADERS = [
   'X-Gateway-Managed-Route',
@@ -65,6 +65,10 @@ function routeCatalogByFamily(routeCatalog) {
   );
 }
 
+function normalizeMethod(method) {
+  return typeof method === 'string' ? method.toUpperCase() : undefined;
+}
+
 function findPersona(values, personaId) {
   return (values?.gatewayPolicy?.accessMatrix?.personas ?? []).find((persona) => persona.id === personaId);
 }
@@ -97,17 +101,31 @@ export function evaluateAccessAssertion(assertion, values = readGatewayPolicyVal
   }
 
   if (assertion?.routeKind === 'product_api') {
-    const family = assertion.family;
-    const familyRoutes = routeCatalogByFamily(routeCatalog).get(family) ?? [];
-    if (familyRoutes.length === 0) {
-      return { decision: 'deny', reason: `unknown_family:${String(family)}` };
+    const requestedMethod = normalizeMethod(assertion.method);
+    const routesByFamily = routeCatalogByFamily(routeCatalog);
+    const candidateRoutes = assertion.path
+      ? (routeCatalog?.routes ?? []).filter(
+          (route) => route.path === assertion.path && (!requestedMethod || normalizeMethod(route.method) === requestedMethod)
+        )
+      : routesByFamily.get(assertion.family) ?? [];
+
+    if (candidateRoutes.length === 0) {
+      return {
+        decision: 'deny',
+        reason: assertion.path
+          ? `unknown_route:${String(assertion.path)}${requestedMethod ? `#${requestedMethod}` : ''}`
+          : `unknown_family:${String(assertion.family)}`
+      };
     }
 
-    const familyPolicy = values?.gatewayPolicy?.familyPolicies?.[family] ?? {};
+    const policyFamily = assertion.family ?? candidateRoutes[0]?.family;
+    const familyPolicy = values?.gatewayPolicy?.familyPolicies?.[policyFamily] ?? {};
     const planCapabilities = resolvePlanCapabilities(persona.planId, domainModel);
     const planCapabilityAnyOf = familyPolicy.planCapabilityAnyOf ?? [];
     const planSatisfied = planCapabilityAnyOf.length === 0 || planCapabilityAnyOf.some((capability) => planCapabilities.has(capability));
-    const audienceSatisfied = familyRoutes.some((route) => (route.audiences ?? []).some((audience) => (persona.audiences ?? []).includes(audience)));
+    const audienceSatisfied = candidateRoutes.some((route) =>
+      (route.audiences ?? []).some((audience) => (persona.audiences ?? []).includes(audience))
+    );
 
     return {
       decision: audienceSatisfied && planSatisfied ? 'allow' : 'deny',
@@ -450,7 +468,7 @@ function collectAccessMatrixViolations(values, routeCatalog, domainModel, violat
     const result = evaluateAccessAssertion(assertion, values, routeCatalog, domainModel);
     if (result.decision !== assertion.expect) {
       violations.push(
-        `Access assertion ${assertion.persona}/${assertion.routeKind}/${assertion.family ?? assertion.routeId} expected ${assertion.expect} but evaluated ${result.decision} (${result.reason}).`
+        `Access assertion ${assertion.persona}/${assertion.routeKind}/${assertion.path ?? assertion.family ?? assertion.routeId} expected ${assertion.expect} but evaluated ${result.decision} (${result.reason}).`
       );
     }
   }

@@ -1480,6 +1480,7 @@
       },
       "TenantRole": {
         "enum": [
+          "tenant_owner",
           "tenant_admin",
           "tenant_operator",
           "tenant_billing_admin",
@@ -1563,7 +1564,9 @@
           "workspace_developer",
           "workspace_operator",
           "workspace_auditor",
-          "workspace_viewer"
+          "workspace_viewer",
+          "workspace_owner",
+          "workspace_service_account"
         ],
         "type": "string"
       }
@@ -1573,7 +1576,7 @@
     "description": "Cross-tenant platform governance, catalog, and operator discovery surfaces. Generated from the unified public API contract for v1.",
     "summary": "Cross-tenant platform governance, catalog, and operator discovery surfaces.",
     "title": "In Atelier Platform API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

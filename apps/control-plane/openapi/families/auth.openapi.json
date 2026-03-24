@@ -337,6 +337,14 @@
           "authenticationState": {
             "$ref": "#/components/schemas/ConsoleAuthenticationState"
           },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "idleExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "issuedAt": {
             "format": "date-time",
             "type": "string"
@@ -353,9 +361,16 @@
           "principal": {
             "$ref": "#/components/schemas/ConsoleSessionPrincipal"
           },
+          "refreshExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "sessionId": {
             "pattern": "^ses_[0-9a-z]+$",
             "type": "string"
+          },
+          "sessionPolicy": {
+            "$ref": "#/components/schemas/ConsoleSessionExpirationPolicy"
           },
           "statusView": {
             "$ref": "#/components/schemas/ConsoleStatusViewId"
@@ -369,7 +384,34 @@
           "authenticationState",
           "statusView",
           "issuedAt",
-          "lastActivityAt"
+          "lastActivityAt",
+          "expiresAt",
+          "idleExpiresAt",
+          "refreshExpiresAt",
+          "sessionPolicy"
+        ],
+        "type": "object"
+      },
+      "ConsoleSessionExpirationPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "idleTimeout": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "maxLifetime": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "refreshTokenMaxAge": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "rememberMeMaxLifetime": {
+            "$ref": "#/components/schemas/DurationString"
+          }
+        },
+        "required": [
+          "maxLifetime",
+          "idleTimeout",
+          "refreshTokenMaxAge"
         ],
         "type": "object"
       },
@@ -683,9 +725,17 @@
             "minLength": 16,
             "type": "string"
           },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "expiresIn": {
             "minimum": 60,
             "type": "integer"
+          },
+          "refreshExpiresAt": {
+            "format": "date-time",
+            "type": "string"
           },
           "refreshExpiresIn": {
             "minimum": 60,
@@ -710,9 +760,16 @@
           "tokenType",
           "expiresIn",
           "refreshExpiresIn",
-          "scope"
+          "scope",
+          "expiresAt",
+          "refreshExpiresAt"
         ],
         "type": "object"
+      },
+      "DurationString": {
+        "description": "Compact duration string used by in-atelier lifecycle policies.",
+        "pattern": "^[0-9]+(?:s|m|h|d)$",
+        "type": "string"
       },
       "EntityState": {
         "enum": [
@@ -810,6 +867,26 @@
         ],
         "type": "object"
       },
+      "HumanCredentialExpirationPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "gracePeriod": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "passwordMaxAge": {
+            "$ref": "#/components/schemas/DurationString"
+          },
+          "recoveryTokenTtl": {
+            "$ref": "#/components/schemas/DurationString"
+          }
+        },
+        "required": [
+          "passwordMaxAge",
+          "gracePeriod",
+          "recoveryTokenTtl"
+        ],
+        "type": "object"
+      },
       "OwnershipContext": {
         "additionalProperties": false,
         "properties": {
@@ -876,6 +953,9 @@
       "PasswordRecoveryTicket": {
         "additionalProperties": false,
         "properties": {
+          "credentialPolicy": {
+            "$ref": "#/components/schemas/HumanCredentialExpirationPolicy"
+          },
           "expiresAt": {
             "format": "date-time",
             "type": "string"
@@ -1001,7 +1081,7 @@
     "description": "Console login, signup, activation, password recovery, and contextual authorization decisions. Generated from the unified public API contract for v1.",
     "summary": "Console login, signup, activation, password recovery, and contextual authorization decisions.",
     "title": "In Atelier Auth API",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -1134,8 +1214,12 @@
         ],
         "x-audiences": [
           "developer_external",
-          "workspace_admin",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
+          "workspace_service_account",
           "platform_team"
         ],
         "x-family": "auth",
@@ -1269,8 +1353,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -1393,8 +1480,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -1532,8 +1622,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -1658,8 +1751,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -1797,8 +1893,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -1933,8 +2032,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -2026,8 +2128,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -2132,8 +2237,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],
@@ -2379,8 +2487,11 @@
         ],
         "x-audiences": [
           "developer_external",
+          "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
           "workspace_admin",
+          "workspace_viewer",
           "platform_team",
           "superadmin"
         ],

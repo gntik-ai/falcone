@@ -359,6 +359,9 @@
         "slug",
         "displayName",
         "roleBindings",
+        "credentialStatus",
+        "credentialPolicy",
+        "credentials",
         "state",
         "timestamps",
         "metadata"
@@ -370,11 +373,10 @@
         "iamBinding"
       ],
       "business_rules": [
-        "Role bindings must be a subset of permissions delegable inside the parent workspace.",
-        "Credentials rotate outside the canonical model; the entity stores only rotation policy and references.",
-        "A service account cannot outlive its parent workspace activation window.",
-        "service_account.iamBinding must resolve to a confidential Keycloak client or native service-account user inside the same tenant realm and workspace boundary.",
-        "service account credential references must point to secret metadata only; raw machine credentials remain outside the canonical domain entity."
+        "Service accounts represent confidential Keycloak clients tied to one workspace and must never outlive the tenant/workspace namespace they belong to.",
+        "CredentialPolicy governs issuance, rotation windows, maximum concurrent credentials, and revocation evidence without exposing raw secrets in the canonical model.",
+        "Credential references are secret-free handles; only secret backends store raw material, and revocation must take effect before replacement credentials become active outside grace overlap.",
+        "Role bindings for machine identities may grant runtime BaaS access but cannot grant membership-administration privileges."
       ],
       "openapi": {
         "read_schema": "ServiceAccount",
@@ -407,6 +409,7 @@
         "displayName",
         "kind",
         "provider",
+        "accessPolicy",
         "state",
         "timestamps",
         "metadata"
@@ -419,9 +422,9 @@
         "specVersion"
       ],
       "business_rules": [
-        "kind is immutable after activation and must map to an authorization resource type.",
-        "applicationId and serviceAccountId, when present, must point to entities inside the same workspace.",
-        "A managed resource cannot become active until its parent workspace is active and provider placement metadata is assigned."
+        "Managed resources represent tenant-safe canonical records for workspace-scoped BaaS assets and their provider references.",
+        "AccessPolicy must reference only workspace roles and service-account ids from the same workspace namespace.",
+        "Cross-product authorization for database, bucket, topic, and function resources is enforced by the shared accessPolicy plus the contextual authorization model."
       ],
       "supported_kinds": [
         "database",
@@ -457,6 +460,9 @@
         "userId",
         "role",
         "membershipStatus",
+        "principalBindings",
+        "roleMappings",
+        "roleMappingStatus",
         "state",
         "timestamps",
         "metadata"
@@ -469,9 +475,9 @@
         "suspensionReason"
       ],
       "business_rules": [
-        "A tenant membership must reference an existing platform user and tenant.",
-        "At most one active tenant membership may exist for the same user, tenant, and role combination.",
-        "Workspace memberships require an active tenant membership unless a platform-level override is explicitly audited."
+        "Tenant memberships bind one canonical platform user to one tenant role while preserving auditable Keycloak user/group provenance.",
+        "PrincipalBindings and roleMappings must resolve only to identities inside the tenant realm selected by the tenant identity context.",
+        "Group-based mappings may elevate roles only within the tenant namespace and never across tenant boundaries without a fresh grant decision."
       ],
       "openapi": {
         "read_schema": "TenantMembershipRecord",
@@ -502,6 +508,9 @@
         "userId",
         "role",
         "membershipStatus",
+        "principalBindings",
+        "roleMappings",
+        "roleMappingStatus",
         "state",
         "timestamps",
         "metadata"
@@ -514,9 +523,9 @@
         "suspensionReason"
       ],
       "business_rules": [
-        "A workspace membership must stay inside the tenant boundary of its parent workspace.",
-        "A workspace membership cannot become active while the parent tenant or workspace is suspended.",
-        "Workspace roles cannot widen tenant-wide authority and remain scoped to one workspace."
+        "Workspace memberships inherit tenant-safe provenance and may be sourced from direct user bindings, approved invitations, or Keycloak groups within the same tenant realm.",
+        "Resolved workspace roles must stay inside the owning workspace namespace even when group names overlap across workspaces.",
+        "RoleMappings capture precedence and sync status so operator-visible access changes remain auditable and reversible."
       ],
       "openapi": {
         "read_schema": "WorkspaceMembershipRecord",
@@ -548,6 +557,9 @@
         "role",
         "invitationStatus",
         "expiresAt",
+        "issuedByUserId",
+        "targetBindings",
+        "expirationPolicy",
         "state",
         "timestamps",
         "metadata"
@@ -561,9 +573,10 @@
         "acceptedAt"
       ],
       "business_rules": [
-        "Raw invitation emails stay outside the canonical model; only masked or hashed representations are stored here.",
-        "Workspace-targeted invitations must reference a workspace inside the same tenant boundary.",
-        "Only one non-terminal invitation may exist for the same tenant/workspace target, hashed email, and role tuple."
+        "Invitation acceptance is valid only while invitationStatus=pending and the target binding matches the verified user or group identity presented by Keycloak.",
+        "Workspace-target invitations must resolve to one tenant-safe workspaceId and must not mint cross-tenant memberships.",
+        "Revocation or expiration permanently invalidates the invitation token; replay requires issuing a new canonical invitation record.",
+        "ExpirationPolicy drives default TTL, override eligibility, and audit evidence for tenant/workspace invitation decisions."
       ],
       "openapi": {
         "read_schema": "Invitation",
@@ -1483,6 +1496,53 @@
       "rules": [
         "Pending activations represent self-service signups that still require policy evaluation or superadmin approval before console tokens can be minted.",
         "Credential expiry is modeled as an authentication status overlay and does not bypass canonical suspension or soft-delete decisions."
+      ]
+    },
+    {
+      "id": "service_account_credential_status",
+      "entity_type": "service_account",
+      "field": "credentialStatus",
+      "initial_state": "active",
+      "states": [
+        "active",
+        "rotation_due",
+        "revoked",
+        "expired"
+      ],
+      "terminal_states": [
+        "revoked",
+        "expired"
+      ],
+      "allowed_transitions": [
+        {
+          "from": "active",
+          "to": "rotation_due"
+        },
+        {
+          "from": "active",
+          "to": "revoked"
+        },
+        {
+          "from": "active",
+          "to": "expired"
+        },
+        {
+          "from": "rotation_due",
+          "to": "active"
+        },
+        {
+          "from": "rotation_due",
+          "to": "revoked"
+        },
+        {
+          "from": "rotation_due",
+          "to": "expired"
+        }
+      ],
+      "rules": [
+        "CredentialStatus becomes rotation_due before hard expiry so a replacement credential can be issued and audited.",
+        "Revoked or expired credentials cannot be reactivated in place; issuance creates a new credential reference.",
+        "Rotation windows must respect workspace isolation and the configured credential policy."
       ]
     }
   ],
