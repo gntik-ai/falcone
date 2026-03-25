@@ -39766,6 +39766,560 @@
         "x-scope": "workspace",
         "x-visibility": "public"
       }
+    },
+    "/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials": {
+      "get": {
+        "operationId": "listMongoDataCredentials",
+        "summary": "List scoped MongoDB Data API credentials for one logical database",
+        "tags": [
+          "Mongo"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/XOriginSurface"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/DatabaseName"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential collection returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MongoDataCredentialCollection"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller lacks permission to inspect scoped MongoDB credentials for this workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested logical database was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-audiences": [
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "platform_team"
+        ],
+        "x-downstream-adapters": [
+          "keycloak",
+          "mongodb"
+        ],
+        "x-family": "mongo",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-resource-type": "mongo_data_credential",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      },
+      "post": {
+        "operationId": "createMongoDataCredential",
+        "summary": "Create one scoped MongoDB Data API credential limited to declared database and collection scope",
+        "tags": [
+          "Mongo"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/XOriginSurface"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/DatabaseName"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Scoped credential created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MongoDataCredentialSecretEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The scoped credential request is malformed or declares an invalid database or collection surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller lacks permission to create scoped MongoDB credentials for this workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested logical database or scoped collection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested credential scope conflicts with an existing record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The credential scope is structurally valid but violates governance policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-audiences": [
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "platform_team"
+        ],
+        "x-downstream-adapters": [
+          "keycloak",
+          "mongodb"
+        ],
+        "x-family": "mongo",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-resource-type": "mongo_data_credential",
+        "x-scope": "workspace",
+        "x-visibility": "public",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MongoDataCredentialCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials/{credentialId}": {
+      "get": {
+        "operationId": "getMongoDataCredential",
+        "summary": "Fetch one scoped MongoDB Data API credential definition without reissuing the secret value",
+        "tags": [
+          "Mongo"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/XOriginSurface"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/DatabaseName"
+          },
+          {
+            "$ref": "#/components/parameters/CredentialId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MongoDataCredentialRecord"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller lacks permission to inspect this scoped MongoDB credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested scoped credential was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-audiences": [
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "platform_team"
+        ],
+        "x-downstream-adapters": [
+          "keycloak",
+          "mongodb"
+        ],
+        "x-family": "mongo",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-resource-type": "mongo_data_credential",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      },
+      "delete": {
+        "operationId": "revokeMongoDataCredential",
+        "summary": "Revoke one scoped MongoDB Data API credential",
+        "tags": [
+          "Mongo"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/XOriginSurface"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/DatabaseName"
+          },
+          {
+            "$ref": "#/components/parameters/CredentialId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MongoDataCredentialRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The credential selector is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller lacks permission to revoke this scoped MongoDB credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested scoped credential was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-audiences": [
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "platform_team"
+        ],
+        "x-downstream-adapters": [
+          "keycloak",
+          "mongodb"
+        ],
+        "x-family": "mongo",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-resource-type": "mongo_data_credential",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
     }
   },
   "components": {
@@ -60411,6 +60965,40 @@
           },
           "contractVersion": {
             "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "actorType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256
+          },
+          "effectiveRoleName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         },
         "additionalProperties": false
@@ -60485,7 +61073,9 @@
         "required": [
           "document",
           "tenantScope",
-          "trace"
+          "trace",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "document": {
@@ -60499,6 +61089,14 @@
           },
           "validation": {
             "$ref": "#/components/schemas/MongoDataValidationSummary"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -60508,7 +61106,9 @@
           "documents",
           "page",
           "tenantScope",
-          "trace"
+          "trace",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "documents": {
@@ -60528,6 +61128,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -60602,7 +61210,9 @@
           "status",
           "counts",
           "tenantScope",
-          "trace"
+          "trace",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "status": {
@@ -60626,6 +61236,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -60759,7 +61377,9 @@
           "counts",
           "bulkSummary",
           "tenantScope",
-          "trace"
+          "trace",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "status": {
@@ -60789,6 +61409,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -60980,7 +61608,9 @@
           "counts",
           "page",
           "summary",
-          "compatibility"
+          "compatibility",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "documents": {
@@ -61003,6 +61633,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -61111,7 +61749,9 @@
           "documentCount",
           "ordered",
           "validationSummary",
-          "compatibility"
+          "compatibility",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "status": {
@@ -61153,6 +61793,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -61208,7 +61856,9 @@
           "format",
           "documentCount",
           "documents",
-          "compatibility"
+          "compatibility",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "format": {
@@ -61235,6 +61885,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -61367,7 +62025,9 @@
         "required": [
           "status",
           "summary",
-          "compatibility"
+          "compatibility",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "status": {
@@ -61391,6 +62051,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -61531,7 +62199,9 @@
           "streamId",
           "compatibility",
           "bridge",
-          "summary"
+          "summary",
+          "auditRecordId",
+          "auditSummary"
         ],
         "properties": {
           "status": {
@@ -61555,6 +62225,14 @@
           },
           "trace": {
             "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditRecordId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
           }
         }
       },
@@ -61576,6 +62254,223 @@
             "format": "date-time"
           }
         }
+      },
+      "MongoDataAuditSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationClass": {
+            "type": "string",
+            "enum": [
+              "document_read",
+              "document_write",
+              "bulk_write",
+              "aggregation",
+              "transfer",
+              "transaction",
+              "change_stream",
+              "credential",
+              "document_operation"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "capturesActorContext": {
+            "type": "boolean"
+          },
+          "capturesTenantContext": {
+            "type": "boolean"
+          },
+          "capturesWorkspaceContext": {
+            "type": "boolean"
+          },
+          "capturesOriginContext": {
+            "type": "boolean"
+          },
+          "capturesErrorMetadata": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operationClass",
+          "action",
+          "capturesActorContext",
+          "capturesTenantContext",
+          "capturesWorkspaceContext",
+          "capturesOriginContext",
+          "capturesErrorMetadata"
+        ]
+      },
+      "MongoDataCredentialScope": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "databaseName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "allowedOperations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": [
+                "list",
+                "get",
+                "insert",
+                "update",
+                "replace",
+                "delete",
+                "bulk_write",
+                "aggregate",
+                "import",
+                "export",
+                "transaction",
+                "change_stream"
+              ]
+            }
+          }
+        },
+        "required": [
+          "databaseName",
+          "allowedOperations"
+        ]
+      },
+      "MongoDataCredentialCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "credentialType": {
+            "type": "string",
+            "enum": [
+              "api_key",
+              "token"
+            ]
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 60
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/MongoDataCredentialScope"
+            }
+          }
+        },
+        "required": [
+          "displayName",
+          "credentialType",
+          "scopes"
+        ]
+      },
+      "MongoDataCredentialRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "credentialType": {
+            "type": "string",
+            "enum": [
+              "api_key",
+              "token"
+            ]
+          },
+          "databaseName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MongoDataCredentialScope"
+            }
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 60
+          },
+          "trace": {
+            "$ref": "#/components/schemas/MongoDataTraceContext"
+          },
+          "auditSummary": {
+            "$ref": "#/components/schemas/MongoDataAuditSummary"
+          }
+        },
+        "required": [
+          "credentialId",
+          "displayName",
+          "credentialType",
+          "databaseName",
+          "scopes",
+          "ttlSeconds",
+          "auditSummary"
+        ]
+      },
+      "MongoDataCredentialCollection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MongoDataCredentialRecord"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "MongoDataCredentialSecretEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "credential": {
+            "$ref": "#/components/schemas/MongoDataCredentialRecord"
+          },
+          "secretValue": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 512
+          },
+          "secretDelivery": {
+            "type": "string",
+            "enum": [
+              "one_time"
+            ]
+          }
+        },
+        "required": [
+          "credential",
+          "secretValue",
+          "secretDelivery"
+        ]
       }
     }
   }

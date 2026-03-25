@@ -11,20 +11,26 @@ import {
   summarizeMongoDataApiSurface
 } from '../../apps/control-plane/src/mongo-data-api.mjs';
 import {
+  MONGO_DATA_AGGREGATION_STAGES,
   MONGO_DATA_API_CAPABILITIES,
-  MONGO_DATA_DEFAULT_BULK_LIMITS,
-  MongoDataApiError,
-  applyMongoDataUpdateDocument,
-  applyTenantScopeToFilter,
-  buildMongoDataApiPlan,
-  encodeMongoDataCursor,
-  normalizeMongoDataError,
-  normalizeMongoDataFilter,
-  normalizeMongoDataProjection,
-  normalizeMongoDataSort
+  MONGO_DATA_API_OPERATIONS,
+  MONGO_DATA_BULK_ACTIONS,
+  MONGO_DATA_CHANGE_STREAM_STAGES,
+  MONGO_DATA_EXPORT_FORMATS,
+  MONGO_DATA_FILTER_OPERATORS,
+  MONGO_DATA_IMPORT_MODES,
+  MONGO_DATA_MANAGEMENT_CAPABILITIES,
+  MONGO_DATA_SCOPED_CREDENTIAL_TYPES,
+  MONGO_DATA_SORT_DIRECTIONS,
+  MONGO_DATA_SUPPORTED_TOPOLOGIES,
+  MONGO_DATA_TRANSACTION_ACTIONS,
+  MONGO_DATA_UPDATE_OPERATORS,
+  buildMongoDataAuditSummary,
+  buildMongoDataScopedCredential,
+  summarizeMongoDataApiCapabilityMatrix
 } from '../../services/adapters/src/mongodb-data-api.mjs';
 
-test('mongo data API surface publishes the expected family, contracts, and route inventory', () => {
+test('mongo data API public surface publishes CRUD, advanced operations, and scoped credential governance routes', () => {
   const summary = summarizeMongoDataApiSurface({
     topology: { clusterTopology: 'replica_set', supportsTransactions: true, supportsChangeStreams: true },
     bridge: { available: true, provider: 'event_gateway' }
@@ -33,302 +39,88 @@ test('mongo data API surface publishes the expected family, contracts, and route
   assert.equal(mongoDataApiFamily?.id, 'mongo');
   assert.equal(mongoDataRequestContract?.owner, 'control_api');
   assert.equal(mongoDataResultContract?.owner, 'provisioning_orchestrator');
-  assert.equal(mongoDataApiRoutes.length, 12);
-  assert.equal(listMongoDataApiRoutes({ method: 'GET' }).length, 2);
+  assert.equal(mongoDataApiRoutes.length, 16);
+  assert.equal(listMongoDataApiRoutes({ method: 'GET' }).length, 4);
   assert.equal(getMongoDataApiRoute('bulkWriteMongoDataDocuments')?.resourceType, 'mongo_data_bulk');
   assert.equal(getMongoDataApiRoute('aggregateMongoDataDocuments')?.resourceType, 'mongo_data_aggregation');
   assert.equal(getMongoDataApiRoute('executeMongoDataTransaction')?.resourceType, 'mongo_data_transaction');
-  assert.equal(summary.routeCount, 12);
+  assert.equal(getMongoDataApiRoute('createMongoDataCredential')?.resourceType, 'mongo_data_credential');
+  assert.equal(getMongoDataApiRoute('revokeMongoDataCredential')?.resourceType, 'mongo_data_credential');
+  assert.equal(summary.routeCount, 16);
   assert.equal(summary.operations.find((entry) => entry.operation === 'bulk_write')?.routeCount, 1);
   assert.equal(summary.operations.find((entry) => entry.operation === 'aggregate')?.routeCount, 1);
-  assert.equal(summary.operations.find((entry) => entry.operation === 'change_stream')?.compatibility.supported, true);
-  assert.deepEqual(summary.filterOperators.slice(0, 4), ['$eq', '$ne', '$gt', '$gte']);
-  assert.ok(summary.aggregationStages.includes('$lookup'));
-  assert.ok(summary.changeStreamStages.includes('$match'));
+  assert.equal(summary.operations.find((entry) => entry.operation === 'scoped_credential')?.routeCount, 4);
+  assert.deepEqual(summary.credentialTypes, ['api_key', 'token']);
 });
 
-test('mongo data API normalizes nested filters, projection, sort, and cursor pagination', () => {
-  const filter = normalizeMongoDataFilter({
-    status: { $in: ['active', 'paused'] },
-    'profile.address.city': 'Madrid',
-    $or: [{ score: { $gte: 10 } }, { priority: 'high' }]
-  });
-  const projection = normalizeMongoDataProjection({ _id: 1, status: true, 'profile.address.city': 1 });
-  const sort = normalizeMongoDataSort({ updatedAt: 'desc' });
-  const cursor = encodeMongoDataCursor({ values: { updatedAt: '2026-03-25T00:00:00.000Z', _id: 'doc_100' } });
-  const plan = buildMongoDataApiPlan({
-    operation: 'list',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    collectionName: 'profiles',
-    tenantId: 'ten_alpha',
-    filter,
-    projection,
-    sort,
-    page: { size: 40, after: cursor },
-    correlationId: 'corr-123'
-  });
+test('mongo data API surface helpers expose supported operators and compatibility metadata', () => {
+  assert.deepEqual(MONGO_DATA_API_OPERATIONS, [
+    'list',
+    'get',
+    'insert',
+    'update',
+    'replace',
+    'delete',
+    'bulk_write',
+    'aggregate',
+    'import',
+    'export',
+    'transaction',
+    'change_stream'
+  ]);
+  assert.equal(MONGO_DATA_API_CAPABILITIES.aggregate, 'mongo_data_aggregate');
+  assert.equal(MONGO_DATA_MANAGEMENT_CAPABILITIES.scoped_credential, 'mongo_data_scoped_credential');
+  assert.deepEqual(MONGO_DATA_FILTER_OPERATORS, ['$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin', '$exists', '$regex', '$elemMatch', '$and', '$or']);
+  assert.deepEqual(MONGO_DATA_UPDATE_OPERATORS, ['$set', '$unset', '$inc', '$push', '$pull']);
+  assert.deepEqual(MONGO_DATA_BULK_ACTIONS, ['insertOne', 'updateOne', 'updateMany', 'replaceOne', 'deleteOne', 'deleteMany']);
+  assert.deepEqual(MONGO_DATA_SORT_DIRECTIONS, ['asc', 'desc']);
+  assert.deepEqual(MONGO_DATA_IMPORT_MODES, ['insert', 'replace', 'upsert']);
+  assert.deepEqual(MONGO_DATA_EXPORT_FORMATS, ['json']);
+  assert.deepEqual(MONGO_DATA_TRANSACTION_ACTIONS, ['insert', 'update', 'replace', 'delete']);
+  assert.deepEqual(MONGO_DATA_SCOPED_CREDENTIAL_TYPES, ['api_key', 'token']);
+  assert.equal(MONGO_DATA_AGGREGATION_STAGES.includes('$lookup'), true);
+  assert.equal(MONGO_DATA_CHANGE_STREAM_STAGES.includes('$project'), true);
+  assert.deepEqual(MONGO_DATA_SUPPORTED_TOPOLOGIES, ['replica_set', 'sharded_cluster']);
 
-  assert.deepEqual(filter.status.$in, ['active', 'paused']);
-  assert.equal(projection['profile.address.city'], 1);
-  assert.equal(sort.updatedAt, -1);
-  assert.equal(sort._id, 1);
-  assert.equal(plan.capability, MONGO_DATA_API_CAPABILITIES.list);
-  assert.equal(plan.query.limit, 40);
-  assert.equal(plan.query.filter.$and[0].$and[0].tenantId, 'ten_alpha');
-  assert.ok(plan.query.cursorPredicate.$or);
+  const compatibility = summarizeMongoDataApiCapabilityMatrix({
+    topology: { clusterTopology: 'replica_set', supportsTransactions: true, supportsChangeStreams: true },
+    bridge: { available: true, provider: 'event_gateway' }
+  });
+  assert.equal(compatibility.length, 12);
+  assert.equal(compatibility.find((entry) => entry.operation === 'transaction')?.compatibility.supported, true);
+  assert.equal(compatibility.find((entry) => entry.operation === 'change_stream')?.compatibility.bridge.status, 'ready');
 });
 
-test('mongo data API injects tenant scope into write payloads and validates collection rules for updates', () => {
-  const plan = buildMongoDataApiPlan({
-    operation: 'update',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    collectionName: 'profiles',
-    documentId: 'doc_001',
+test('mongo data API governance helpers support scoped credentials and audit summaries', () => {
+  const scopedCredential = buildMongoDataScopedCredential({
+    workspaceId: 'wrk_01alphaprod',
+    databaseName: 'tenant_alpha_main',
+    credentialId: 'cred_orders_reader',
+    credentialType: 'api_key',
+    displayName: 'Orders reader',
+    ttlSeconds: 7200,
+    actorId: 'usr_admin_01',
+    actorType: 'user',
     tenantId: 'ten_alpha',
-    payload: {
-      existingDocument: {
-        _id: 'doc_001',
-        tenantId: 'ten_alpha',
-        profile: {
-          name: 'Andrea',
-          address: { city: 'Barcelona' }
-        },
-        status: 'active'
-      },
-      update: {
-        $set: {
-          'profile.address.city': 'Madrid',
-          status: 'paused'
-        }
+    originSurface: 'admin_console',
+    correlationId: 'corr_mongo_credential_001',
+    requestId: 'req_mongo_credential_001',
+    scopes: [
+      {
+        databaseName: 'tenant_alpha_main',
+        collectionName: 'customer_orders',
+        allowedOperations: ['list', 'get', 'aggregate', 'export']
       }
-    },
-    collectionMetadata: {
-      validationRules: {
-        $jsonSchema: {
-          bsonType: 'object',
-          required: ['tenantId', 'status', 'profile'],
-          properties: {
-            tenantId: { bsonType: 'string' },
-            status: { enum: ['active', 'paused'] },
-            profile: {
-              bsonType: 'object',
-              required: ['name', 'address'],
-              properties: {
-                name: { bsonType: 'string', minLength: 1 },
-                address: {
-                  bsonType: 'object',
-                  required: ['city'],
-                  properties: {
-                    city: { bsonType: 'string', minLength: 1 }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    ]
   });
+  const auditSummary = buildMongoDataAuditSummary({ operation: 'aggregate' });
 
-  assert.equal(plan.query.filter.$and[1]._id, 'doc_001');
-  assert.equal(plan.write.update.$set['profile.address.city'], 'Madrid');
-  assert.equal(plan.write.validation.applied, true);
-
-  assert.throws(
-    () =>
-      buildMongoDataApiPlan({
-        operation: 'insert',
-        workspaceId: 'ws_analytics',
-        databaseName: 'tenant_shared',
-        collectionName: 'profiles',
-        tenantId: 'ten_alpha',
-        payload: {
-          document: {
-            _id: 'doc_002',
-            tenantId: 'ten_alpha',
-            status: 'archived'
-          }
-        },
-        collectionMetadata: {
-          validationRules: {
-            $jsonSchema: {
-              bsonType: 'object',
-              required: ['tenantId', 'status'],
-              properties: {
-                tenantId: { bsonType: 'string' },
-                status: { enum: ['active', 'paused'] }
-              }
-            }
-          }
-        }
-      }),
-    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_validation_failed'
-  );
-});
-
-test('mongo data API guards tenant overrides and supports update document helpers', () => {
-  const scoped = applyTenantScopeToFilter({
-    filter: { status: 'active' },
-    tenantId: 'ten_alpha'
-  });
-  const updated = applyMongoDataUpdateDocument(
-    {
-      tenantId: 'ten_alpha',
-      metrics: { count: 2 },
-      tags: ['a']
-    },
-    {
-      $inc: { 'metrics.count': 3 },
-      $push: { tags: 'b' },
-      $set: { status: 'active' }
-    }
-  );
-
-  assert.equal(scoped.filter.$and[0].tenantId, 'ten_alpha');
-  assert.equal(updated.metrics.count, 5);
-  assert.deepEqual(updated.tags, ['a', 'b']);
-  assert.equal(updated.status, 'active');
-
-  assert.throws(
-    () => applyTenantScopeToFilter({ filter: { tenantId: 'ten_beta' }, tenantId: 'ten_alpha' }),
-    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_tenant_scope_violation'
-  );
-});
-
-test('mongo data API builds aggregation, import/export, transaction, and change stream plans', () => {
-  const aggregationPlan = buildMongoDataApiPlan({
-    operation: 'aggregate',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    collectionName: 'profiles',
-    tenantId: 'ten_alpha',
-    payload: {
-      pipeline: [
-        { $match: { status: 'active' } },
-        { $group: { _id: '$status', total: { $sum: 1 } } },
-        { $limit: 10 }
-      ],
-      maxTimeMs: 5000
-    }
-  });
-  const importPlan = buildMongoDataApiPlan({
-    operation: 'import',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    collectionName: 'profiles',
-    tenantId: 'ten_alpha',
-    payload: {
-      format: 'json',
-      mode: 'upsert',
-      documents: [
-        { _id: 'doc_001', status: 'active' },
-        { _id: 'doc_002', status: 'paused' }
-      ]
-    }
-  });
-  const exportPlan = buildMongoDataApiPlan({
-    operation: 'export',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    collectionName: 'profiles',
-    tenantId: 'ten_alpha',
-    filter: { status: 'active' },
-    sort: { updatedAt: 'desc' },
-    payload: {
-      format: 'json',
-      limit: 20,
-      consistency: 'snapshot',
-      includeRestoreManifest: true
-    }
-  });
-  const transactionPlan = buildMongoDataApiPlan({
-    operation: 'transaction',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    tenantId: 'ten_alpha',
-    topology: { clusterTopology: 'replica_set', supportsTransactions: true },
-    payload: {
-      operations: [
-        {
-          kind: 'insert',
-          collectionName: 'profiles',
-          document: { _id: 'doc_003', status: 'active' }
-        },
-        {
-          kind: 'update',
-          collectionName: 'profiles',
-          documentId: 'doc_001',
-          update: { $set: { status: 'paused' } },
-          existingDocument: { _id: 'doc_001', tenantId: 'ten_alpha', status: 'active' }
-        }
-      ]
-    }
-  });
-  const changeStreamPlan = buildMongoDataApiPlan({
-    operation: 'change_stream',
-    workspaceId: 'ws_analytics',
-    databaseName: 'tenant_shared',
-    collectionName: 'profiles',
-    tenantId: 'ten_alpha',
-    topology: { clusterTopology: 'replica_set', supportsChangeStreams: true },
-    bridge: { available: true, provider: 'event_gateway' },
-    payload: {
-      transport: 'event_gateway',
-      pipeline: [{ $project: { fullDocument: 1, operationType: 1 } }],
-      replayWindowSeconds: 900
-    }
-  });
-
-  assert.equal(aggregationPlan.aggregation.summary.maxTimeMs, 5000);
-  assert.equal(aggregationPlan.aggregation.pipeline[0].$match.$and[0].tenantId, 'ten_alpha');
-  assert.equal(importPlan.transfer.direction, 'import');
-  assert.equal(importPlan.transfer.documentCount, 2);
-  assert.equal(importPlan.transfer.operationPreview[0].kind, 'replaceOne');
-  assert.equal(exportPlan.transfer.direction, 'export');
-  assert.equal(exportPlan.transfer.query.filter.$and[0].tenantId, 'ten_alpha');
-  assert.equal(transactionPlan.transaction.operationCount, 2);
-  assert.equal(transactionPlan.transaction.collections[0], 'profiles');
-  assert.equal(changeStreamPlan.changeStream.bridge.status, 'ready');
-  assert.match(changeStreamPlan.changeStream.bridge.topicRef, /^mongo\.change-stream\./);
-});
-
-test('mongo data API blocks unsupported topology- or bridge-dependent operations', () => {
-  assert.throws(
-    () =>
-      buildMongoDataApiPlan({
-        operation: 'transaction',
-        workspaceId: 'ws_analytics',
-        databaseName: 'tenant_shared',
-        tenantId: 'ten_alpha',
-        payload: { operations: [{ kind: 'delete', collectionName: 'profiles', documentId: 'doc_001' }] }
-      }),
-    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_capability_unavailable'
-  );
-
-  assert.throws(
-    () =>
-      buildMongoDataApiPlan({
-        operation: 'change_stream',
-        workspaceId: 'ws_analytics',
-        databaseName: 'tenant_shared',
-        collectionName: 'profiles',
-        tenantId: 'ten_alpha',
-        topology: { clusterTopology: 'replica_set', supportsChangeStreams: true },
-        payload: { pipeline: [{ $project: { fullDocument: 1 } }] }
-      }),
-    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_capability_unavailable'
-  );
-});
-
-test('mongo data API normalizes provider errors and bulk limits', () => {
-  const conflict = normalizeMongoDataError({ code: 11000, message: 'E11000 duplicate key error' });
-  const validation = normalizeMongoDataError({ code: 121, codeName: 'DocumentValidationFailure', message: 'failed validation' });
-  const generic = normalizeMongoDataError(new Error('network timeout'));
-
-  assert.equal(conflict.status, 409);
-  assert.equal(validation.status, 422);
-  assert.equal(generic.status, 502);
-  assert.equal(MONGO_DATA_DEFAULT_BULK_LIMITS.maxPayloadBytes > 0, true);
+  assert.equal(scopedCredential.capability, 'mongo_data_scoped_credential');
+  assert.equal(scopedCredential.scopes[0].collectionName, 'customer_orders');
+  assert.deepEqual(scopedCredential.scopes[0].allowedOperations, ['list', 'get', 'aggregate', 'export']);
+  assert.equal(scopedCredential.trace.actorType, 'user');
+  assert.equal(scopedCredential.trace.workspaceId, 'wrk_01alphaprod');
+  assert.equal(scopedCredential.auditSummary.operationClass, 'credential');
+  assert.equal(auditSummary.operationClass, 'aggregation');
+  assert.equal(auditSummary.capturesTenantContext, true);
 });
