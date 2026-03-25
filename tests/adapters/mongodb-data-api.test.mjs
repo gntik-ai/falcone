@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 
 import {
   MONGO_DATA_DEFAULT_BULK_LIMITS,
+  MONGO_DATA_MANAGEMENT_CAPABILITIES,
   MongoDataApiError,
   buildMongoDataApiPlan,
+  buildMongoDataScopedCredential,
   detectMongoRequestUniqueIndexConflicts,
   mongodbDataAdapterPort,
+  normalizeMongoDataError,
   summarizeMongoDataApiCapabilityMatrix,
   validateMongoDocumentAgainstCollectionRules
 } from '../../services/adapters/src/mongodb-data-api.mjs';
@@ -93,6 +96,11 @@ test('mongodb data adapter builds a controlled bulk-write plan with tenant scopi
     databaseName: 'tenant_shared',
     collectionName: 'orders',
     tenantId: 'ten_alpha',
+    actorId: 'svc_orders',
+    actorType: 'service_account',
+    originSurface: 'backend_service',
+    requestId: 'req_bulk_001',
+    correlationId: 'corr_bulk_001',
     payload: {
       limits: { maxOperations: 3, maxPayloadBytes: 2048, ordered: false },
       operations: [
@@ -144,6 +152,8 @@ test('mongodb data adapter builds a controlled bulk-write plan with tenant scopi
   assert.equal(plan.bulk.operations[0].document.tenantId, 'ten_alpha');
   assert.equal(plan.bulk.operations[1].filter.$and[0].tenantId, 'ten_alpha');
   assert.equal(plan.bulk.payloadBytes > 0, true);
+  assert.equal(plan.auditContext.actorType, 'service_account');
+  assert.equal(plan.trace.workspaceId, 'ws_orders');
 
   assert.throws(
     () =>
@@ -166,13 +176,37 @@ test('mongodb data adapter builds a controlled bulk-write plan with tenant scopi
   );
 });
 
-test('mongodb data adapter validates aggregation, transfer, transaction, and change-stream planners', () => {
+test('mongodb data adapter validates aggregation, transfer, transaction, and change-stream planners with plan policy limits', () => {
   const aggregationPlan = buildMongoDataApiPlan({
     operation: 'aggregate',
     workspaceId: 'ws_orders',
     databaseName: 'tenant_shared',
     collectionName: 'orders',
     tenantId: 'ten_alpha',
+    requestId: 'req_agg_001',
+    correlationId: 'corr_agg_001',
+    actorId: 'svc_orders',
+    actorType: 'service_account',
+    originSurface: 'backend_service',
+    planPolicy: {
+      planId: 'growth',
+      aggregation: {
+        maxStages: 4,
+        maxResultWindow: 200,
+        maxTimeMs: 5000,
+        maxLookupStages: 0,
+        allowDiskUse: false
+      },
+      transaction: {
+        maxOperations: 2,
+        maxPayloadBytes: 4096,
+        maxCommitTimeMs: 3000,
+        readConcern: 'majority',
+        writeConcern: 'majority',
+        allowedReadConcerns: ['majority'],
+        allowedWriteConcerns: ['majority']
+      }
+    },
     payload: {
       pipeline: [
         { $match: { status: 'open' } },
@@ -187,7 +221,24 @@ test('mongodb data adapter validates aggregation, transfer, transaction, and cha
     databaseName: 'tenant_shared',
     tenantId: 'ten_alpha',
     topology: { clusterTopology: 'replica_set', supportsTransactions: true },
+    planPolicy: {
+      planId: 'growth',
+      transaction: {
+        maxOperations: 2,
+        maxPayloadBytes: 4096,
+        maxCommitTimeMs: 3000,
+        readConcern: 'majority',
+        writeConcern: 'majority',
+        allowedReadConcerns: ['majority'],
+        allowedWriteConcerns: ['majority']
+      }
+    },
     payload: {
+      options: {
+        maxOperations: 2,
+        readConcern: 'majority',
+        writeConcern: 'majority'
+      },
       operations: [
         {
           kind: 'insert',
@@ -211,8 +262,50 @@ test('mongodb data adapter validates aggregation, transfer, transaction, and cha
   });
 
   assert.equal(aggregationPlan.aggregation.summary.stageNames.includes('$group'), true);
+  assert.equal(aggregationPlan.planPolicy.planId, 'growth');
+  assert.equal(aggregationPlan.planPolicy.aggregation.limits.maxStages, 4);
   assert.equal(transactionPlan.transaction.operationCount, 1);
+  assert.equal(transactionPlan.planPolicy.transaction.limits.maxOperations, 2);
   assert.equal(changeStreamPlan.changeStream.bridge.status, 'ready');
+
+  assert.throws(
+    () =>
+      buildMongoDataApiPlan({
+        operation: 'aggregate',
+        workspaceId: 'ws_orders',
+        databaseName: 'tenant_shared',
+        collectionName: 'orders',
+        tenantId: 'ten_alpha',
+        planPolicy: {
+          planId: 'starter',
+          aggregation: { enabled: false }
+        },
+        payload: {
+          pipeline: [{ $match: { status: 'open' } }]
+        }
+      }),
+    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_plan_policy_violation'
+  );
+
+  assert.throws(
+    () =>
+      buildMongoDataApiPlan({
+        operation: 'aggregate',
+        workspaceId: 'ws_orders',
+        databaseName: 'tenant_shared',
+        collectionName: 'orders',
+        tenantId: 'ten_alpha',
+        planPolicy: {
+          planId: 'growth',
+          aggregation: { maxStages: 2 }
+        },
+        payload: {
+          limits: { maxStages: 3 },
+          pipeline: [{ $match: { status: 'open' } }]
+        }
+      }),
+    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_invalid_limit'
+  );
 
   assert.throws(
     () =>
@@ -227,6 +320,92 @@ test('mongodb data adapter validates aggregation, transfer, transaction, and cha
         }
       }),
     (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_pipeline_stage_blocked'
+  );
+});
+
+test('mongodb data adapter normalizes provider failures into safe structured errors', () => {
+  const duplicate = normalizeMongoDataError(
+    {
+      code: 11000,
+      codeName: 'DuplicateKey',
+      message: 'E11000 duplicate key error collection: tenant_shared.orders index: uniq_email dup key: { email: "dup@example.com" }'
+    },
+    {
+      operation: 'insert',
+      databaseName: 'tenant_shared',
+      collectionName: 'orders',
+      documentId: 'ord_001',
+      workspaceId: 'ws_orders',
+      tenantId: 'ten_alpha',
+      actorId: 'svc_orders',
+      actorType: 'service_account',
+      originSurface: 'backend_service',
+      correlationId: 'corr_err_001',
+      requestId: 'req_err_001'
+    }
+  );
+  const permission = normalizeMongoDataError(
+    { message: 'not authorized on tenant_shared to execute command { find: "orders" }' },
+    { operation: 'list', databaseName: 'tenant_shared', collectionName: 'orders' }
+  );
+  const notFound = normalizeMongoDataError(
+    { message: 'document not found' },
+    { operation: 'get', databaseName: 'tenant_shared', collectionName: 'orders', documentId: 'ord_missing' }
+  );
+
+  assert.equal(duplicate.code, 'mongo_data_conflict_unique_index');
+  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.meta.indexName, 'uniq_email');
+  assert.equal(duplicate.meta.audit.actorId, 'svc_orders');
+  assert.equal(duplicate.meta.correctiveAction.includes('unique field value'), true);
+  assert.equal(permission.code, 'mongo_data_permission_denied');
+  assert.equal(permission.status, 403);
+  assert.equal(permission.meta.reason, 'permission_denied');
+  assert.equal(notFound.code, 'mongo_data_document_not_found');
+  assert.equal(notFound.status, 404);
+});
+
+test('mongodb data adapter supports scoped credential planning and scope validation', () => {
+  const credential = buildMongoDataScopedCredential({
+    workspaceId: 'ws_orders',
+    databaseName: 'tenant_shared',
+    credentialId: 'cred_orders_reader',
+    displayName: 'Orders reader',
+    credentialType: 'token',
+    ttlSeconds: 1800,
+    actorId: 'usr_admin_01',
+    actorType: 'user',
+    tenantId: 'ten_alpha',
+    originSurface: 'admin_console',
+    correlationId: 'corr_cred_001',
+    requestId: 'req_cred_001',
+    scopes: [
+      {
+        databaseName: 'tenant_shared',
+        collectionName: 'orders',
+        allowedOperations: ['list', 'get', 'export']
+      }
+    ]
+  });
+
+  assert.equal(credential.capability, MONGO_DATA_MANAGEMENT_CAPABILITIES.scoped_credential);
+  assert.equal(credential.trace.requestId, 'req_cred_001');
+  assert.equal(credential.auditSummary.operationClass, 'credential');
+
+  assert.throws(
+    () =>
+      buildMongoDataScopedCredential({
+        workspaceId: 'ws_orders',
+        databaseName: 'tenant_shared',
+        scopes: [
+          {
+            databaseName: 'other_db',
+            collectionName: 'orders',
+            allowedOperations: ['list']
+          }
+        ]
+      }),
+    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_scope_violation'
   );
 });
 

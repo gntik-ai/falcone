@@ -55,7 +55,7 @@ test('mongodb data API rejects write payloads that attempt to switch tenant owne
   );
 });
 
-test('mongodb data API rejects blocked aggregation stages and missing bridge support for change streams', () => {
+test('mongodb data API rejects blocked aggregation stages, disabled plan capabilities, and missing bridge support for change streams', () => {
   assert.throws(
     () =>
       buildMongoDataApiPlan({
@@ -69,6 +69,31 @@ test('mongodb data API rejects blocked aggregation stages and missing bridge sup
         }
       }),
     (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_pipeline_stage_blocked'
+  );
+
+  assert.throws(
+    () =>
+      buildMongoDataApiPlan({
+        operation: 'transaction',
+        workspaceId: 'ws_profiles',
+        databaseName: 'tenant_shared',
+        tenantId: 'ten_alpha',
+        topology: { clusterTopology: 'replica_set', supportsTransactions: true },
+        planPolicy: {
+          planId: 'starter',
+          transaction: { enabled: false }
+        },
+        payload: {
+          operations: [
+            {
+              kind: 'insert',
+              collectionName: 'profiles',
+              document: { _id: 'doc_001', status: 'active' }
+            }
+          ]
+        }
+      }),
+    (error) => error instanceof MongoDataApiError && error.code === 'mongo_data_plan_policy_violation'
   );
 
   assert.throws(

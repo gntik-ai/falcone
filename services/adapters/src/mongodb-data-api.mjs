@@ -132,6 +132,11 @@ export const MONGO_DATA_API_CAPABILITIES = Object.freeze({
   transaction: 'mongo_data_transaction',
   change_stream: 'mongo_data_change_stream'
 });
+export const MONGO_DATA_MANAGEMENT_CAPABILITIES = Object.freeze({
+  scoped_credential: 'mongo_data_scoped_credential'
+});
+export const MONGO_DATA_SCOPED_CREDENTIAL_TYPES = Object.freeze(['api_key', 'token']);
+export const MONGO_DATA_SCOPED_CREDENTIAL_OPERATIONS = Object.freeze([...MONGO_DATA_API_OPERATIONS]);
 
 export class MongoDataApiError extends Error {
   constructor({ message, code, status = 400, details = [], meta = {} }) {
@@ -1112,16 +1117,45 @@ function assertCapabilityCompatibility(compatibility) {
 }
 
 function normalizeAggregationLimits(limits = {}, defaults = MONGO_DATA_DEFAULT_AGGREGATION_LIMITS) {
+  const normalizedDefaults = {
+    ...MONGO_DATA_DEFAULT_AGGREGATION_LIMITS,
+    ...cloneJson(defaults ?? {})
+  };
+
   return {
-    maxStages: normalizePositiveInteger(limits.maxStages ?? defaults.maxStages, { fieldName: 'aggregation.maxStages' }),
-    maxPayloadBytes: normalizePositiveInteger(limits.maxPayloadBytes ?? defaults.maxPayloadBytes, { fieldName: 'aggregation.maxPayloadBytes' }),
-    maxTimeMs: normalizePositiveInteger(limits.maxTimeMs ?? defaults.maxTimeMs, { fieldName: 'aggregation.maxTimeMs' }),
-    maxResultWindow: normalizePositiveInteger(limits.maxResultWindow ?? defaults.maxResultWindow, { fieldName: 'aggregation.maxResultWindow' }),
-    maxSkip: normalizeNonNegativeInteger(limits.maxSkip ?? defaults.maxSkip, { fieldName: 'aggregation.maxSkip' }),
-    maxLookupStages: normalizeNonNegativeInteger(limits.maxLookupStages ?? defaults.maxLookupStages, { fieldName: 'aggregation.maxLookupStages' }),
-    maxFacetBranches: normalizePositiveInteger(limits.maxFacetBranches ?? defaults.maxFacetBranches, { fieldName: 'aggregation.maxFacetBranches' }),
-    maxSortKeys: normalizePositiveInteger(limits.maxSortKeys ?? defaults.maxSortKeys, { fieldName: 'aggregation.maxSortKeys' }),
-    allowDiskUse: limits.allowDiskUse ?? defaults.allowDiskUse ?? false
+    maxStages: normalizePositiveInteger(limits.maxStages ?? normalizedDefaults.maxStages, {
+      fieldName: 'aggregation.maxStages',
+      maximum: normalizedDefaults.maxStages
+    }),
+    maxPayloadBytes: normalizePositiveInteger(limits.maxPayloadBytes ?? normalizedDefaults.maxPayloadBytes, {
+      fieldName: 'aggregation.maxPayloadBytes',
+      maximum: normalizedDefaults.maxPayloadBytes
+    }),
+    maxTimeMs: normalizePositiveInteger(limits.maxTimeMs ?? normalizedDefaults.maxTimeMs, {
+      fieldName: 'aggregation.maxTimeMs',
+      maximum: normalizedDefaults.maxTimeMs
+    }),
+    maxResultWindow: normalizePositiveInteger(limits.maxResultWindow ?? normalizedDefaults.maxResultWindow, {
+      fieldName: 'aggregation.maxResultWindow',
+      maximum: normalizedDefaults.maxResultWindow
+    }),
+    maxSkip: normalizeNonNegativeInteger(limits.maxSkip ?? normalizedDefaults.maxSkip, {
+      fieldName: 'aggregation.maxSkip',
+      maximum: normalizedDefaults.maxSkip
+    }),
+    maxLookupStages: normalizeNonNegativeInteger(limits.maxLookupStages ?? normalizedDefaults.maxLookupStages, {
+      fieldName: 'aggregation.maxLookupStages',
+      maximum: normalizedDefaults.maxLookupStages
+    }),
+    maxFacetBranches: normalizePositiveInteger(limits.maxFacetBranches ?? normalizedDefaults.maxFacetBranches, {
+      fieldName: 'aggregation.maxFacetBranches',
+      maximum: normalizedDefaults.maxFacetBranches
+    }),
+    maxSortKeys: normalizePositiveInteger(limits.maxSortKeys ?? normalizedDefaults.maxSortKeys, {
+      fieldName: 'aggregation.maxSortKeys',
+      maximum: normalizedDefaults.maxSortKeys
+    }),
+    allowDiskUse: limits.allowDiskUse ?? normalizedDefaults.allowDiskUse ?? false
   };
 }
 
@@ -1479,12 +1513,30 @@ function normalizeMongoExportPayload({ payload = {}, filter, projection, sort, p
 }
 
 function normalizeTransactionLimits(limits = {}, defaults = MONGO_DATA_DEFAULT_TRANSACTION_LIMITS) {
+  const normalizedDefaults = {
+    ...MONGO_DATA_DEFAULT_TRANSACTION_LIMITS,
+    ...cloneJson(defaults ?? {})
+  };
+  const allowedReadConcerns = normalizedDefaults.allowedReadConcerns ?? ['local', 'majority', 'snapshot'];
+  const allowedWriteConcerns = normalizedDefaults.allowedWriteConcerns ?? ['majority', 'journaled', 'w1'];
+
   return {
-    maxOperations: normalizePositiveInteger(limits.maxOperations ?? defaults.maxOperations, { fieldName: 'transaction.maxOperations' }),
-    maxPayloadBytes: normalizePositiveInteger(limits.maxPayloadBytes ?? defaults.maxPayloadBytes, { fieldName: 'transaction.maxPayloadBytes' }),
-    maxCommitTimeMs: normalizePositiveInteger(limits.maxCommitTimeMs ?? defaults.maxCommitTimeMs, { fieldName: 'transaction.maxCommitTimeMs' }),
-    readConcern: normalizeEnumValue(limits.readConcern ?? defaults.readConcern, ['local', 'majority', 'snapshot'], 'transaction.readConcern'),
-    writeConcern: normalizeEnumValue(limits.writeConcern ?? defaults.writeConcern, ['majority', 'journaled', 'w1'], 'transaction.writeConcern')
+    maxOperations: normalizePositiveInteger(limits.maxOperations ?? normalizedDefaults.maxOperations, {
+      fieldName: 'transaction.maxOperations',
+      maximum: normalizedDefaults.maxOperations
+    }),
+    maxPayloadBytes: normalizePositiveInteger(limits.maxPayloadBytes ?? normalizedDefaults.maxPayloadBytes, {
+      fieldName: 'transaction.maxPayloadBytes',
+      maximum: normalizedDefaults.maxPayloadBytes
+    }),
+    maxCommitTimeMs: normalizePositiveInteger(limits.maxCommitTimeMs ?? normalizedDefaults.maxCommitTimeMs, {
+      fieldName: 'transaction.maxCommitTimeMs',
+      maximum: normalizedDefaults.maxCommitTimeMs
+    }),
+    readConcern: normalizeEnumValue(limits.readConcern ?? normalizedDefaults.readConcern, allowedReadConcerns, 'transaction.readConcern'),
+    writeConcern: normalizeEnumValue(limits.writeConcern ?? normalizedDefaults.writeConcern, allowedWriteConcerns, 'transaction.writeConcern'),
+    allowedReadConcerns,
+    allowedWriteConcerns
   };
 }
 
@@ -1571,8 +1623,13 @@ function normalizeTransactionOperation({ operation, tenantScope, collectionMetad
   }
 }
 
-function normalizeMongoTransactionPayload({ payload = {}, tenantScope, collectionMetadataByName = {} }) {
-  const limits = normalizeTransactionLimits(payload.options, payload.limits);
+function normalizeMongoTransactionPayload({
+  payload = {},
+  tenantScope,
+  collectionMetadataByName = {},
+  defaults = MONGO_DATA_DEFAULT_TRANSACTION_LIMITS
+}) {
+  const limits = normalizeTransactionLimits(payload.options ?? payload.limits, defaults);
   const operations = payload.operations;
   if (!Array.isArray(operations) || operations.length === 0) {
     throw new MongoDataApiError({
@@ -1718,7 +1775,10 @@ function buildBasePlan({
   documentId,
   tenantScope,
   trace,
-  compatibility
+  compatibility,
+  auditContext,
+  auditSummary,
+  planPolicy
 }) {
   return {
     adapterId: mongodbDataAdapterPort?.id ?? 'mongodb',
@@ -1732,7 +1792,244 @@ function buildBasePlan({
     },
     tenantScope,
     trace,
-    compatibility
+    compatibility,
+    auditContext,
+    auditSummary,
+    planPolicy
+  };
+}
+
+function buildMongoDataAuditContext(context = {}) {
+  return compactDefined({
+    requestId: context.requestId,
+    correlationId: context.correlationId,
+    actorId: context.actorId,
+    actorType: context.actorType,
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    originSurface: context.originSurface,
+    requestedAt: context.requestedAt,
+    idempotencyKey: context.idempotencyKey,
+    effectiveRoleName: context.effectiveRoleName
+  });
+}
+
+export function buildMongoDataAuditSummary({ operation, capturesErrorMetadata = true } = {}) {
+  const operationClass = {
+    list: 'document_read',
+    get: 'document_read',
+    insert: 'document_write',
+    update: 'document_write',
+    replace: 'document_write',
+    delete: 'document_write',
+    bulk_write: 'bulk_write',
+    aggregate: 'aggregation',
+    import: 'transfer',
+    export: 'transfer',
+    transaction: 'transaction',
+    change_stream: 'change_stream',
+    scoped_credential: 'credential'
+  }[operation] ?? 'document_operation';
+
+  return {
+    operationClass,
+    action: operation,
+    capturesActorContext: true,
+    capturesTenantContext: true,
+    capturesWorkspaceContext: true,
+    capturesOriginContext: true,
+    capturesErrorMetadata
+  };
+}
+
+function buildMongoDataTraceContext(context = {}) {
+  return compactDefined({
+    requestId: context.requestId,
+    correlationId: context.correlationId,
+    originSurface: context.originSurface,
+    actorId: context.actorId,
+    actorType: context.actorType,
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    requestedAt: context.requestedAt,
+    idempotencyKey: context.idempotencyKey,
+    effectiveRoleName: context.effectiveRoleName,
+    contractVersion: mongoDataRequestContract?.version
+  });
+}
+
+function parseDuplicateIndexName(message = '') {
+  return message.match(/index:\s*([^\s]+)\s+dup key/i)?.[1];
+}
+
+function buildMongoSafeErrorMeta({
+  context = {},
+  category,
+  reason,
+  correctiveAction,
+  correctiveActions = [],
+  retryable = false,
+  provider = {},
+  extra = {}
+} = {}) {
+  const audit = buildMongoDataAuditContext(context);
+  const resource = compactDefined({
+    databaseName: context.databaseName,
+    collectionName: context.collectionName,
+    documentId: context.documentId,
+    operation: context.operation
+  });
+
+  return compactDefined({
+    category,
+    reason,
+    retryable,
+    safeToExpose: true,
+    correctiveAction,
+    correctiveActions: correctiveActions.length > 0 ? correctiveActions : undefined,
+    provider: Object.keys(provider).length > 0 ? compactDefined(provider) : undefined,
+    audit: Object.keys(audit).length > 0 ? audit : undefined,
+    resource: Object.keys(resource).length > 0 ? resource : undefined,
+    ...extra
+  });
+}
+
+function normalizeMongoDataPlanPolicy(policy = {}) {
+  const planId = typeof policy.planId === 'string' && policy.planId.trim().length > 0
+    ? policy.planId.trim()
+    : 'default';
+  const aggregationInput = isPlainObject(policy.aggregation) ? policy.aggregation : {};
+  const transactionInput = isPlainObject(policy.transaction) ? policy.transaction : {};
+
+  return {
+    planId,
+    aggregation: {
+      enabled: aggregationInput.enabled !== false,
+      ...normalizeAggregationLimits(aggregationInput, MONGO_DATA_DEFAULT_AGGREGATION_LIMITS)
+    },
+    transaction: {
+      enabled: transactionInput.enabled !== false,
+      ...normalizeTransactionLimits(transactionInput, {
+        ...MONGO_DATA_DEFAULT_TRANSACTION_LIMITS,
+        allowedReadConcerns: ['local', 'majority', 'snapshot'],
+        allowedWriteConcerns: ['majority', 'journaled', 'w1']
+      })
+    }
+  };
+}
+
+function applyAggregationPlanPolicy(defaults = {}, policy = {}) {
+  const base = normalizeAggregationLimits(defaults, MONGO_DATA_DEFAULT_AGGREGATION_LIMITS);
+  return {
+    maxStages: Math.min(base.maxStages, policy.maxStages ?? base.maxStages),
+    maxPayloadBytes: Math.min(base.maxPayloadBytes, policy.maxPayloadBytes ?? base.maxPayloadBytes),
+    maxTimeMs: Math.min(base.maxTimeMs, policy.maxTimeMs ?? base.maxTimeMs),
+    maxResultWindow: Math.min(base.maxResultWindow, policy.maxResultWindow ?? base.maxResultWindow),
+    maxSkip: Math.min(base.maxSkip, policy.maxSkip ?? base.maxSkip),
+    maxLookupStages: Math.min(base.maxLookupStages, policy.maxLookupStages ?? base.maxLookupStages),
+    maxFacetBranches: Math.min(base.maxFacetBranches, policy.maxFacetBranches ?? base.maxFacetBranches),
+    maxSortKeys: Math.min(base.maxSortKeys, policy.maxSortKeys ?? base.maxSortKeys),
+    allowDiskUse: base.allowDiskUse === true && policy.allowDiskUse === true
+  };
+}
+
+function applyTransactionPlanPolicy(policy = {}) {
+  const base = normalizeTransactionLimits({}, MONGO_DATA_DEFAULT_TRANSACTION_LIMITS);
+  return {
+    maxOperations: Math.min(base.maxOperations, policy.maxOperations ?? base.maxOperations),
+    maxPayloadBytes: Math.min(base.maxPayloadBytes, policy.maxPayloadBytes ?? base.maxPayloadBytes),
+    maxCommitTimeMs: Math.min(base.maxCommitTimeMs, policy.maxCommitTimeMs ?? base.maxCommitTimeMs),
+    readConcern: policy.readConcern ?? base.readConcern,
+    writeConcern: policy.writeConcern ?? base.writeConcern,
+    allowedReadConcerns: policy.allowedReadConcerns ?? base.allowedReadConcerns,
+    allowedWriteConcerns: policy.allowedWriteConcerns ?? base.allowedWriteConcerns
+  };
+}
+
+function assertMongoPlanPolicyEnabled(enabled, operation, planId) {
+  if (enabled !== false) {
+    return;
+  }
+
+  throw new MongoDataApiError({
+    code: 'mongo_data_plan_policy_violation',
+    status: 403,
+    message: `${operation} is not enabled for the ${planId} plan.`,
+    meta: buildMongoSafeErrorMeta({
+      context: { operation },
+      category: 'policy',
+      reason: 'plan_policy_violation',
+      correctiveAction: 'Upgrade the workspace plan or use a lower-cost MongoDB operation.',
+      correctiveActions: ['Use CRUD or export routes for simpler access patterns.', 'Upgrade the workspace plan to enable this advanced MongoDB capability.']
+    })
+  });
+}
+
+function normalizeMongoCredentialScopeDefinition(scope = {}, defaultDatabaseName) {
+  const databaseName = normalizeScopedName(scope.databaseName ?? defaultDatabaseName, 'scope.databaseName');
+  const collectionName = scope.collectionName ? normalizeScopedName(scope.collectionName, 'scope.collectionName') : undefined;
+  const allowedOperations = Array.from(new Set((scope.allowedOperations ?? []).map((operation, index) =>
+    normalizeEnumValue(operation, MONGO_DATA_SCOPED_CREDENTIAL_OPERATIONS, `scope.allowedOperations[${index}]`)
+  )));
+
+  if (allowedOperations.length === 0) {
+    throw new MongoDataApiError({
+      code: 'mongo_data_invalid_scope',
+      status: 400,
+      message: 'Scoped MongoDB Data API credentials must declare at least one allowed operation.'
+    });
+  }
+
+  return compactDefined({
+    databaseName,
+    collectionName,
+    allowedOperations
+  });
+}
+
+export function buildMongoDataScopedCredential(request = {}) {
+  const workspaceId = normalizeNonEmptyString(request.workspaceId, 'workspaceId');
+  const databaseName = normalizeScopedName(request.databaseName, 'databaseName');
+  const credentialId = normalizeScopedName(request.credentialId ?? request.id ?? 'credential', 'credentialId');
+  const credentialType = normalizeEnumValue(
+    request.credentialType ?? 'api_key',
+    MONGO_DATA_SCOPED_CREDENTIAL_TYPES,
+    'credentialType'
+  );
+  const scopes = (request.scopes ?? []).map((scope) => normalizeMongoCredentialScopeDefinition(scope, databaseName));
+
+  if (scopes.length === 0) {
+    throw new MongoDataApiError({
+      code: 'mongo_data_invalid_scope',
+      status: 400,
+      message: 'Scoped MongoDB Data API credentials must define at least one scope entry.'
+    });
+  }
+
+  if (scopes.some((scope) => scope.databaseName !== databaseName)) {
+    throw new MongoDataApiError({
+      code: 'mongo_data_scope_violation',
+      status: 400,
+      message: 'Scoped credential entries must stay within the requested MongoDB database.',
+      meta: { databaseName }
+    });
+  }
+
+  return {
+    capability: MONGO_DATA_MANAGEMENT_CAPABILITIES.scoped_credential,
+    credentialId,
+    credentialType,
+    workspaceId,
+    databaseName,
+    displayName: request.displayName ?? credentialId,
+    ttlSeconds: Math.max(60, Number(request.ttlSeconds ?? 3600)),
+    scopes,
+    trace: buildMongoDataTraceContext({
+      ...request,
+      workspaceId,
+      databaseName
+    }),
+    auditSummary: buildMongoDataAuditSummary({ operation: 'scoped_credential' })
   };
 }
 
@@ -1757,22 +2054,72 @@ export function normalizeMongoDataError(error, context = {}) {
   }
 
   if (error?.code === 11000 || /duplicate key/i.test(error?.message ?? '')) {
+    const indexName = parseDuplicateIndexName(error?.message ?? '');
     return new MongoDataApiError({
-      code: 'mongo_data_conflict',
+      code: 'mongo_data_conflict_unique_index',
       status: 409,
       message: 'MongoDB unique index conflict.',
-      details: [error.message],
-      meta: context
+      details: [indexName ? `Unique index ${indexName} rejected the document.` : 'A unique index rejected the document.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'conflict',
+        reason: 'unique_index_conflict',
+        correctiveAction: 'Use a unique field value or update the existing document instead of inserting a duplicate.',
+        correctiveActions: ['Change the value that participates in the unique index.', 'Use update or replace if the logical record already exists.'],
+        provider: { code: error?.code, codeName: error?.codeName },
+        extra: compactDefined({ indexName })
+      })
     });
   }
 
-  if (error?.code === 121 || /DocumentValidationFailure/i.test(error?.codeName ?? '')) {
+  if (error?.code === 121 || /DocumentValidationFailure/i.test(error?.codeName ?? '') || /document failed validation/i.test(error?.message ?? '')) {
     return new MongoDataApiError({
       code: 'mongo_data_validation_failed',
       status: 422,
       message: 'MongoDB collection validation rejected the document payload.',
-      details: [error.message],
-      meta: context
+      details: ['The document shape does not satisfy the collection validation rules.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'validation',
+        reason: 'schema_validation_failed',
+        correctiveAction: 'Align the document payload with the collection validation schema before retrying.',
+        correctiveActions: ['Review required fields and BSON-compatible value types.', 'Retry after fixing the payload rather than sending the same document again.'],
+        provider: { code: error?.code, codeName: error?.codeName }
+      })
+    });
+  }
+
+  if (/not authorized|unauthorized|requires authentication|permission denied/i.test(error?.message ?? '')) {
+    return new MongoDataApiError({
+      code: 'mongo_data_permission_denied',
+      status: 403,
+      message: 'MongoDB denied the document operation for the current credential or role.',
+      details: ['The current role or scoped credential does not allow this MongoDB operation.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'permission',
+        reason: 'permission_denied',
+        correctiveAction: 'Use a credential, role, or collection scope that includes the requested operation.',
+        correctiveActions: ['Confirm the database and collection are inside the scoped credential.', 'Grant the required MongoDB Data API action to the effective role.'],
+        provider: { code: error?.code, codeName: error?.codeName }
+      })
+    });
+  }
+
+  if (/document not found|no matching document|no document/i.test(error?.message ?? '')) {
+    return new MongoDataApiError({
+      code: 'mongo_data_document_not_found',
+      status: 404,
+      message: 'MongoDB could not find the requested document.',
+      details: ['The requested document does not exist inside the effective tenant scope.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'not_found',
+        reason: 'document_not_found',
+        correctiveAction: 'Confirm the document identifier and tenant scope before retrying.',
+        correctiveActions: ['Check whether the document was already deleted.', 'Retry with the correct document identifier or collection scope.'],
+        provider: { code: error?.code, codeName: error?.codeName }
+      })
     });
   }
 
@@ -1781,8 +2128,14 @@ export function normalizeMongoDataError(error, context = {}) {
       code: 'mongo_data_capability_unavailable',
       status: 409,
       message: 'MongoDB transactions are not available for the current deployment topology.',
-      details: [error.message],
-      meta: context
+      details: ['This deployment profile does not expose MongoDB transactions for the requested operation.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'capability',
+        reason: 'transaction_topology_unsupported',
+        correctiveAction: 'Run the request against a transaction-capable topology or fall back to non-transactional writes.',
+        provider: { code: error?.code, codeName: error?.codeName }
+      })
     });
   }
 
@@ -1791,8 +2144,14 @@ export function normalizeMongoDataError(error, context = {}) {
       code: 'mongo_data_capability_unavailable',
       status: 409,
       message: 'MongoDB change streams are not available for the current deployment topology.',
-      details: [error.message],
-      meta: context
+      details: ['This deployment profile does not expose MongoDB change streams for the requested operation.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'capability',
+        reason: 'change_stream_topology_unsupported',
+        correctiveAction: 'Run the request against a change-stream-capable topology with a ready event bridge.',
+        provider: { code: error?.code, codeName: error?.codeName }
+      })
     });
   }
 
@@ -1801,8 +2160,14 @@ export function normalizeMongoDataError(error, context = {}) {
       code: 'mongo_data_payload_too_large',
       status: 413,
       message: 'MongoDB payload exceeds the configured size limit.',
-      details: [error.message],
-      meta: context
+      details: ['The document or batch is larger than the configured payload ceiling.'],
+      meta: buildMongoSafeErrorMeta({
+        context,
+        category: 'payload',
+        reason: 'payload_too_large',
+        correctiveAction: 'Reduce the document size or split the batch into smaller operations.',
+        provider: { code: error?.code, codeName: error?.codeName }
+      })
     });
   }
 
@@ -1811,7 +2176,14 @@ export function normalizeMongoDataError(error, context = {}) {
     status: 502,
     message: error?.message ?? 'MongoDB adapter request failed.',
     details: error?.details ?? [],
-    meta: context
+    meta: buildMongoSafeErrorMeta({
+      context,
+      category: 'dependency_failure',
+      reason: 'adapter_failure',
+      correctiveAction: 'Retry after the downstream MongoDB adapter or provider recovers.',
+      retryable: false,
+      provider: { code: error?.code, codeName: error?.codeName }
+    })
   });
 }
 
@@ -1834,8 +2206,11 @@ export function buildMongoDataApiPlan({
   correlationId,
   originSurface,
   actorId,
+  actorType,
   requestedAt,
+  requestId,
   idempotencyKey,
+  planPolicy = {},
   topology = {},
   bridge = {}
 }) {
@@ -1858,25 +2233,54 @@ export function buildMongoDataApiPlan({
   const cursorPredicate = buildMongoCursorPredicate(normalizedSort, cursor);
   const queryFilter = cursorPredicate ? mergeFilters(scopedFilter, cursorPredicate) : scopedFilter;
   const compatibility = resolveMongoDataCapabilityCompatibility({ operation, topology, bridge });
-  const trace = compactDefined({
+  const normalizedPlanPolicy = normalizeMongoDataPlanPolicy(planPolicy);
+  const trace = buildMongoDataTraceContext({
+    requestId,
     correlationId,
     originSurface,
     actorId,
+    actorType,
+    tenantId,
+    workspaceId: normalizedWorkspaceId,
     requestedAt,
     idempotencyKey,
-    effectiveRoleName,
-    contractVersion: mongoDataRequestContract?.version
+    effectiveRoleName
   });
-
+  const auditContext = buildMongoDataAuditContext({
+    requestId,
+    correlationId,
+    actorId,
+    actorType,
+    tenantId,
+    workspaceId: normalizedWorkspaceId,
+    originSurface,
+    requestedAt,
+    idempotencyKey,
+    effectiveRoleName
+  });
+  const normalizedDocumentId = ['get', 'delete', 'replace', 'update'].includes(operation)
+    ? normalizeNonEmptyString(documentId, 'documentId')
+    : documentId ? normalizeNonEmptyString(documentId, 'documentId') : undefined;
   const basePlan = buildBasePlan({
     operation,
     workspaceId: normalizedWorkspaceId,
     databaseName: normalizedDatabaseName,
     collectionName: normalizedCollectionName,
-    documentId: documentId ? normalizeNonEmptyString(documentId, 'documentId') : undefined,
+    documentId: normalizedDocumentId,
     tenantScope,
     trace,
-    compatibility
+    compatibility,
+    auditContext,
+    auditSummary: buildMongoDataAuditSummary({ operation }),
+    planPolicy: compactDefined({
+      planId: normalizedPlanPolicy.planId,
+      aggregation: operation === 'aggregate'
+        ? compactDefined({ enabled: normalizedPlanPolicy.aggregation.enabled, limits: applyAggregationPlanPolicy(collectionMetadata.aggregationLimits, normalizedPlanPolicy.aggregation) })
+        : undefined,
+      transaction: operation === 'transaction'
+        ? compactDefined({ enabled: normalizedPlanPolicy.transaction.enabled, limits: applyTransactionPlanPolicy(normalizedPlanPolicy.transaction) })
+        : undefined
+    })
   });
 
   if (operation === 'list') {
@@ -1894,7 +2298,7 @@ export function buildMongoDataApiPlan({
   }
 
   if (operation === 'get' || operation === 'delete') {
-    const documentFilter = mergeFilters(queryFilter, { _id: normalizeNonEmptyString(documentId, 'documentId') });
+    const documentFilter = mergeFilters(queryFilter, { _id: normalizedDocumentId });
     return {
       ...basePlan,
       query: compactDefined({
@@ -1932,7 +2336,7 @@ export function buildMongoDataApiPlan({
     return {
       ...basePlan,
       query: {
-        filter: mergeFilters(queryFilter, { _id: normalizeNonEmptyString(documentId, 'documentId') }),
+        filter: mergeFilters(queryFilter, { _id: normalizedDocumentId }),
         limit: 1
       },
       write: {
@@ -1955,7 +2359,7 @@ export function buildMongoDataApiPlan({
     return {
       ...basePlan,
       query: {
-        filter: mergeFilters(queryFilter, { _id: normalizeNonEmptyString(documentId, 'documentId') }),
+        filter: mergeFilters(queryFilter, { _id: normalizedDocumentId }),
         limit: 1
       },
       write: {
@@ -2032,7 +2436,9 @@ export function buildMongoDataApiPlan({
   }
 
   if (operation === 'aggregate') {
-    const limits = normalizeAggregationLimits(payload.limits, collectionMetadata.aggregationLimits);
+    assertMongoPlanPolicyEnabled(normalizedPlanPolicy.aggregation.enabled, 'aggregate', normalizedPlanPolicy.planId);
+    const governedAggregationDefaults = applyAggregationPlanPolicy(collectionMetadata.aggregationLimits, normalizedPlanPolicy.aggregation);
+    const limits = normalizeAggregationLimits(payload.limits, governedAggregationDefaults);
     const pipelineNormalization = normalizeMongoDataPipeline(payload.pipeline, {
       kind: 'aggregation',
       tenantScope,
@@ -2093,10 +2499,12 @@ export function buildMongoDataApiPlan({
 
   if (operation === 'transaction') {
     assertCapabilityCompatibility(compatibility);
+    assertMongoPlanPolicyEnabled(normalizedPlanPolicy.transaction.enabled, 'transaction', normalizedPlanPolicy.planId);
     const transaction = normalizeMongoTransactionPayload({
       payload,
       tenantScope,
-      collectionMetadataByName
+      collectionMetadataByName,
+      defaults: applyTransactionPlanPolicy(normalizedPlanPolicy.transaction)
     });
     return {
       ...basePlan,

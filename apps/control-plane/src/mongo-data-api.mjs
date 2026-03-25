@@ -13,6 +13,8 @@ import {
   MONGO_DATA_EXPORT_FORMATS,
   MONGO_DATA_FILTER_OPERATORS,
   MONGO_DATA_IMPORT_MODES,
+  MONGO_DATA_MANAGEMENT_CAPABILITIES,
+  MONGO_DATA_SCOPED_CREDENTIAL_TYPES,
   MONGO_DATA_SORT_DIRECTIONS,
   MONGO_DATA_SUPPORTED_TOPOLOGIES,
   MONGO_DATA_TRANSACTION_ACTIONS,
@@ -28,7 +30,8 @@ const MONGO_DATA_RESOURCE_TYPES = [
   'mongo_data_import',
   'mongo_data_export',
   'mongo_data_transaction',
-  'mongo_data_change_stream'
+  'mongo_data_change_stream',
+  'mongo_data_credential'
 ];
 
 export const mongoDataApiFamily = getApiFamily('mongo');
@@ -66,14 +69,39 @@ const ROUTE_MATCHERS_BY_OPERATION = {
   import: (route) => route.operationId === 'importMongoDataDocuments',
   export: (route) => route.operationId === 'exportMongoDataDocuments',
   transaction: (route) => route.operationId === 'executeMongoDataTransaction',
-  change_stream: (route) => route.operationId === 'createMongoDataChangeStream'
+  change_stream: (route) => route.operationId === 'createMongoDataChangeStream',
+  scoped_credential: (route) => route.resourceType === 'mongo_data_credential'
 };
 
 export function summarizeMongoDataApiSurface(options = {}) {
+  const operations = [
+    ...summarizeMongoDataApiCapabilityMatrix(options),
+    {
+      operation: 'scoped_credential',
+      capability: MONGO_DATA_MANAGEMENT_CAPABILITIES.scoped_credential,
+      filterable: false,
+      idempotentMutation: true,
+      topologyDependent: false,
+      bridgeDependent: false,
+      compatibility: {
+        supported: true,
+        status: 'available',
+        reason: 'Scoped MongoDB Data API credentials are managed by the control plane.',
+        topology: {
+          clusterTopology: 'logical',
+          supportedTopologies: MONGO_DATA_SUPPORTED_TOPOLOGIES
+        },
+        bridge: {
+          status: 'not_required'
+        }
+      }
+    }
+  ];
+
   return {
     familyId: mongoDataApiFamily?.id,
     routeCount: mongoDataApiRoutes.length,
-    operations: summarizeMongoDataApiCapabilityMatrix(options).map((entry) => ({
+    operations: operations.map((entry) => ({
       ...entry,
       routeCount: mongoDataApiRoutes.filter((route) => ROUTE_MATCHERS_BY_OPERATION[entry.operation]?.(route)).length
     })),
@@ -86,6 +114,7 @@ export function summarizeMongoDataApiSurface(options = {}) {
     importModes: MONGO_DATA_IMPORT_MODES,
     exportFormats: MONGO_DATA_EXPORT_FORMATS,
     transactionActions: MONGO_DATA_TRANSACTION_ACTIONS,
+    credentialTypes: MONGO_DATA_SCOPED_CREDENTIAL_TYPES,
     supportedTopologies: MONGO_DATA_SUPPORTED_TOPOLOGIES
   };
 }
@@ -95,6 +124,8 @@ export {
   MONGO_DATA_API_OPERATIONS,
   MONGO_DATA_BULK_ACTIONS,
   MONGO_DATA_FILTER_OPERATORS,
+  MONGO_DATA_MANAGEMENT_CAPABILITIES,
+  MONGO_DATA_SCOPED_CREDENTIAL_TYPES,
   MONGO_DATA_SORT_DIRECTIONS,
   MONGO_DATA_UPDATE_OPERATORS,
   MONGO_DATA_AGGREGATION_STAGES,

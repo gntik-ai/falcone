@@ -1306,10 +1306,11 @@
         "actor_id",
         "actor_type",
         "origin_surface",
+        "plan_policy",
         "trace_context"
       ],
       "idempotency": "MongoDB Data API mutations coalesce by workspace_id, database_name, collection_name, action, tenant_scope, document selector, and idempotency_key so safe retries do not duplicate writes or bulk batches.",
-      "versioning": "The MongoDB Data API request envelope remains additive while CRUD verbs, validated JSON query controls, bounded bulk write guardrails, controlled aggregation/import/export semantics, topology-aware transaction and change-stream metadata, tenant segregation metadata, and collection-validation hints evolve behind stable field names.",
+      "versioning": "The MongoDB Data API request envelope remains additive while CRUD verbs, validated JSON query controls, scoped credential metadata, bounded bulk write guardrails, normalized error context, controlled aggregation/import/export semantics, plan-based aggregation and transaction policy metadata, topology-aware transaction and change-stream metadata, tenant segregation metadata, and collection-validation hints evolve behind stable field names.",
       "error_classes": [
         "validation_error",
         "forbidden",
@@ -1346,7 +1347,7 @@
         "audit_summary"
       ],
       "idempotency": "Repeated reads of the same MongoDB Data API result describe one logical document query or mutation outcome under one tenant scope and selector set.",
-      "versioning": "The MongoDB Data API result contract stays secret-free and additive while document projections, aggregation summaries, import/export metadata, transaction results, change-stream bridge readiness, bulk summaries, validation metadata, pagination state, and audit traceability expand.",
+      "versioning": "The MongoDB Data API result contract stays secret-free and additive while document projections, scoped-credential governance, normalized safe error metadata, aggregation summaries, import/export metadata, transaction results, change-stream bridge readiness, bulk summaries, validation metadata, pagination state, and audit traceability expand.",
       "error_classes": [
         "forbidden",
         "not_found",
