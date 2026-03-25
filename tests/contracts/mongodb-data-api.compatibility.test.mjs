@@ -33,6 +33,7 @@ test('mongo data API service contracts and adapter capability baseline are publi
   assert.ok(mongoDataRequest.required_fields.includes('change_stream'));
   assert.ok(mongoDataRequest.required_fields.includes('capability_compatibility'));
   assert.ok(mongoDataRequest.required_fields.includes('trace_context'));
+  assert.ok(mongoDataRequest.required_fields.includes('plan_policy'));
   assert.ok(mongoDataResult.required_fields.includes('documents'));
   assert.ok(mongoDataResult.required_fields.includes('counts'));
   assert.ok(mongoDataResult.required_fields.includes('page'));
@@ -59,7 +60,7 @@ test('mongo data API service contracts and adapter capability baseline are publi
   assert.ok(mongodbDataAdapterPort.capabilities.includes('mongo_data_change_stream'));
 });
 
-test('mongo data API public routes publish CRUD/query, transfer, transaction, and topology-aware change-stream metadata', () => {
+test('mongo data API public routes publish CRUD/query, transfer, transaction, change-stream, and scoped-credential metadata', () => {
   const document = readJson(OPENAPI_PATH);
   const listDocumentsRoute = getPublicRoute('listMongoDataDocuments');
   const createDocumentRoute = getPublicRoute('createMongoDataDocument');
@@ -73,6 +74,10 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   const exportRoute = getPublicRoute('exportMongoDataDocuments');
   const transactionRoute = getPublicRoute('executeMongoDataTransaction');
   const changeStreamRoute = getPublicRoute('createMongoDataChangeStream');
+  const listCredentialsRoute = getPublicRoute('listMongoDataCredentials');
+  const createCredentialRoute = getPublicRoute('createMongoDataCredential');
+  const getCredentialRoute = getPublicRoute('getMongoDataCredential');
+  const revokeCredentialRoute = getPublicRoute('revokeMongoDataCredential');
 
   const listOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/documents'].get;
   const createOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/documents'].post;
@@ -85,6 +90,10 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   const exportOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/exports'].post;
   const transactionOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/transactions'].post;
   const changeStreamOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/change-streams'].post;
+  const listCredentialsOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials'].get;
+  const createCredentialOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials'].post;
+  const getCredentialOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials/{credentialId}'].get;
+  const revokeCredentialOperation = document.paths['/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials/{credentialId}'].delete;
   const listParameters = resolveParameters(document, listOperation);
   const createParameters = resolveParameters(document, createOperation);
   const getParameters = resolveParameters(document, getOperation);
@@ -96,6 +105,9 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   const exportParameters = resolveParameters(document, exportOperation);
   const transactionParameters = resolveParameters(document, transactionOperation);
   const changeStreamParameters = resolveParameters(document, changeStreamOperation);
+  const createCredentialParameters = resolveParameters(document, createCredentialOperation);
+  const getCredentialParameters = resolveParameters(document, getCredentialOperation);
+  const revokeCredentialParameters = resolveParameters(document, revokeCredentialOperation);
 
   assert.equal(listDocumentsRoute.family, 'mongo');
   assert.equal(listDocumentsRoute.resourceType, 'mongo_data_documents');
@@ -116,6 +128,10 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   assert.equal(transactionRoute.supportsIdempotencyKey, true);
   assert.equal(changeStreamRoute.resourceType, 'mongo_data_change_stream');
   assert.equal(changeStreamRoute.supportsIdempotencyKey, true);
+  assert.equal(listCredentialsRoute.resourceType, 'mongo_data_credential');
+  assert.equal(createCredentialRoute.supportsIdempotencyKey, true);
+  assert.equal(getCredentialRoute.resourceType, 'mongo_data_credential');
+  assert.equal(revokeCredentialRoute.supportsIdempotencyKey, true);
 
   assert.equal(listOperation['x-resource-type'], 'mongo_data_documents');
   assert.equal(createOperation['x-resource-type'], 'mongo_data_documents');
@@ -128,6 +144,10 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   assert.equal(exportOperation['x-resource-type'], 'mongo_data_export');
   assert.equal(transactionOperation['x-resource-type'], 'mongo_data_transaction');
   assert.equal(changeStreamOperation['x-resource-type'], 'mongo_data_change_stream');
+  assert.equal(listCredentialsOperation['x-resource-type'], 'mongo_data_credential');
+  assert.equal(createCredentialOperation['x-resource-type'], 'mongo_data_credential');
+  assert.equal(getCredentialOperation['x-resource-type'], 'mongo_data_credential');
+  assert.equal(revokeCredentialOperation['x-resource-type'], 'mongo_data_credential');
 
   assert.equal(listParameters.some((parameter) => parameter.name === 'filter'), true);
   assert.equal(listParameters.some((parameter) => parameter.name === 'projection'), true);
@@ -143,6 +163,9 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   assert.equal(exportParameters.some((parameter) => parameter.name === 'collectionName'), true);
   assert.equal(transactionParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
   assert.equal(changeStreamParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(createCredentialParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(getCredentialParameters.some((parameter) => parameter.name === 'credentialId'), true);
+  assert.equal(revokeCredentialParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
 
   assert.ok(document.components.schemas.MongoDataDocumentCollection);
   assert.ok(document.components.schemas.MongoDataDocumentEnvelope);
@@ -156,6 +179,7 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   assert.ok(document.components.schemas.MongoDataTenantScope);
   assert.ok(document.components.schemas.MongoDataValidationSummary);
   assert.ok(document.components.schemas.MongoDataTraceContext);
+  assert.ok(document.components.schemas.MongoDataAuditSummary);
   assert.ok(document.components.schemas.MongoDataFeatureCompatibility);
   assert.ok(document.components.schemas.MongoDataAggregationRequest);
   assert.ok(document.components.schemas.MongoDataAggregationResult);
@@ -167,4 +191,13 @@ test('mongo data API public routes publish CRUD/query, transfer, transaction, an
   assert.ok(document.components.schemas.MongoDataTransactionResult);
   assert.ok(document.components.schemas.MongoDataChangeStreamRequest);
   assert.ok(document.components.schemas.MongoDataChangeStreamResult);
+  assert.ok(document.components.schemas.MongoDataCredentialScope);
+  assert.ok(document.components.schemas.MongoDataCredentialCreateRequest);
+  assert.ok(document.components.schemas.MongoDataCredentialRecord);
+  assert.ok(document.components.schemas.MongoDataCredentialCollection);
+  assert.ok(document.components.schemas.MongoDataCredentialSecretEnvelope);
+
+  assert.equal(document.components.schemas.MongoDataTraceContext.properties.workspaceId.type, 'string');
+  assert.equal(document.components.schemas.MongoDataMutationResult.required.includes('auditRecordId'), true);
+  assert.equal(document.components.schemas.MongoDataTransactionResult.required.includes('auditSummary'), true);
 });

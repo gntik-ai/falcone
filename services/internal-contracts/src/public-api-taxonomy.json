@@ -862,6 +862,12 @@
       "family": "mongo",
       "scope": "workspace",
       "authorization_resource": "database"
+    },
+    {
+      "resource_type": "mongo_data_credential",
+      "family": "mongo",
+      "scope": "workspace",
+      "authorization_resource": "database"
     }
   ]
 }
