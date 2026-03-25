@@ -351,6 +351,10 @@ Workspace-scoped document database control, discovery, and tenant-safe Data API 
 | PUT | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/documents/{documentId}` | workspace | mongo_data_document | Replace one tenant-scoped MongoDB document with full collection-validation-aware payload checks |
 | POST | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/exports` | workspace | mongo_data_export | Export one bounded JSON document set from a MongoDB collection with restore-ready manifest metadata |
 | POST | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/imports` | workspace | mongo_data_import | Import one bounded JSON document batch into a MongoDB collection with validation-first restore semantics |
+| GET | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials` | workspace | mongo_data_credential | List scoped MongoDB Data API credentials for one logical database |
+| POST | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials` | workspace | mongo_data_credential | Create one scoped MongoDB Data API credential limited to declared database and collection scope |
+| DELETE | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials/{credentialId}` | workspace | mongo_data_credential | Revoke one scoped MongoDB Data API credential |
+| GET | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/credentials/{credentialId}` | workspace | mongo_data_credential | Fetch one scoped MongoDB Data API credential definition without reissuing the secret value |
 | POST | `/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/transactions` | workspace | mongo_data_transaction | Execute one topology-aware MongoDB multi-collection transaction with bounded tenant-safe document operations |
 | GET | `/v1/mongo/workspaces/{workspaceId}/inventory` | workspace | mongo_inventory | Fetch the persisted MongoDB administrative inventory projection for one workspace |
 | GET | `/v1/mongo/workspaces/{workspaceId}/templates` | workspace | mongo_template | List MongoDB collection onboarding templates for one workspace |
