@@ -9,6 +9,7 @@ import {
   getPublicRoute,
   summarizeTenantGovernanceDashboard
 } from '../../../services/internal-contracts/src/index.mjs';
+import { buildTenantStorageContextIntrospection } from '../../../services/adapters/src/storage-tenant-context.mjs';
 
 export const tenantApiFamily = getApiFamily('tenants');
 export const tenantLifecycleStateMachine = getBusinessStateMachine('tenant_lifecycle');
@@ -24,6 +25,7 @@ export function summarizeTenantManagementSurface({
   externalApplications = [],
   serviceAccounts = [],
   managedResources = [],
+  storageContext = null,
   generatedAt
 }) {
   const dashboard = summarizeTenantGovernanceDashboard({
@@ -39,7 +41,14 @@ export function summarizeTenantManagementSurface({
     family: tenantApiFamily,
     lifecycle: tenantLifecycleStateMachine,
     dashboard,
-    routes: tenantManagementRoutes
+    routes: tenantManagementRoutes,
+    storageContext: storageContext
+      ? buildTenantStorageContextIntrospection(
+          storageContext?.entityType === 'tenant_storage_context'
+            ? storageContext
+            : { tenant, ...storageContext, now: generatedAt }
+        )
+      : null
   };
 }
 

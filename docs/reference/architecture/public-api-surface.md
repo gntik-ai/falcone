@@ -96,6 +96,8 @@ Tenant lifecycle, membership, invitation, quota, and tenant-level capability sur
 | GET | `/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}` | tenant | tenant | Fetch one tenant-scoped effective-permission recalculation record. |
 | POST | `/v1/tenants/{tenantId}/purge` | tenant | tenant_purge | Definitively purge one logically deleted tenant after retention and elevated confirmation checks |
 | POST | `/v1/tenants/{tenantId}/reactivation` | tenant | tenant | Reactivate one suspended tenant and restore descendant access controls under audit |
+| GET | `/v1/tenants/{tenantId}/storage-context` | tenant | tenant_storage_context | Fetch the tenant-scoped logical storage context used for workspace bucket bootstrap. |
+| POST | `/v1/tenants/{tenantId}/storage-context/credential-rotations` | tenant | tenant_storage_context | Rotate the active tenant-scoped storage credential reference without recreating the namespace. |
 
 ## Workspaces
 
