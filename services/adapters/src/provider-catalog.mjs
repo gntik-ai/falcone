@@ -5,6 +5,12 @@ import {
 } from '../../internal-contracts/src/index.mjs';
 import {
   SUPPORTED_STORAGE_PROVIDER_TYPES,
+  STORAGE_PROVIDER_CAPABILITY_BASELINE_VERSION,
+  STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES,
+  STORAGE_PROVIDER_CAPABILITY_IDS,
+  STORAGE_PROVIDER_CAPABILITY_MANIFEST_VERSION,
+  buildStorageCapabilityBaseline,
+  buildStorageCapabilityDetails,
   buildStorageProviderProfile,
   listSupportedStorageProviders,
   summarizeStorageProviderCompatibility
@@ -36,13 +42,28 @@ import {
   buildStorageObjectOrganization,
   isStorageReservedPrefix
 } from './storage-logical-organization.mjs';
+import {
+  STORAGE_ERROR_RETRYABILITY,
+  STORAGE_NORMALIZED_ERROR_CODES,
+  buildNormalizedStorageError,
+  buildStorageErrorAuditEvent,
+  buildStorageErrorEnvelope,
+  buildStorageInternalErrorRecord,
+  listStorageNormalizedErrorDefinitions
+} from './storage-error-taxonomy.mjs';
 
 export const providerAdapterCatalog = listAdapterPorts();
 export const adapterCallContract = getContract('adapter_call');
 export const adapterResultContract = getContract('adapter_result');
 export const supportedStorageProviderTypes = SUPPORTED_STORAGE_PROVIDER_TYPES;
+export const storageProviderCapabilityIds = STORAGE_PROVIDER_CAPABILITY_IDS;
+export const storageProviderCapabilityManifestVersion = STORAGE_PROVIDER_CAPABILITY_MANIFEST_VERSION;
+export const storageProviderCapabilityBaselineVersion = STORAGE_PROVIDER_CAPABILITY_BASELINE_VERSION;
+export const storageProviderCapabilityEntryStates = STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES;
 export const storageBucketObjectErrorCodes = STORAGE_BUCKET_OBJECT_ERROR_CODES;
 export const storageLogicalOrganizationErrorCodes = STORAGE_LOGICAL_ORGANIZATION_ERROR_CODES;
+export const storageNormalizedErrorCodes = STORAGE_NORMALIZED_ERROR_CODES;
+export const storageErrorRetryabilityModes = STORAGE_ERROR_RETRYABILITY;
 
 export function listProvisioningAdapters() {
   return listAdapterPortsForConsumer('provisioning_orchestrator');
@@ -62,6 +83,14 @@ export function getStorageProviderProfile(input = {}) {
 
 export function getStorageProviderCompatibilitySummary(input = {}) {
   return summarizeStorageProviderCompatibility(input);
+}
+
+export function getStorageProviderCapabilityDetails(input = {}) {
+  return buildStorageCapabilityDetails(input.providerType ?? input);
+}
+
+export function getStorageProviderCapabilityBaseline(input = {}) {
+  return buildStorageCapabilityBaseline(input.providerType ?? input);
 }
 
 export function getTenantStorageContextRecord(input = {}) {
@@ -138,4 +167,24 @@ export function deleteStorageObjectPreview(input = {}) {
 
 export function buildStorageOperationEvent(input = {}) {
   return buildStorageMutationEvent(input);
+}
+
+export function listStorageNormalizedErrors() {
+  return listStorageNormalizedErrorDefinitions();
+}
+
+export function getStorageNormalizedError(input = {}) {
+  return buildNormalizedStorageError(input);
+}
+
+export function getStorageErrorEnvelope(input = {}) {
+  return buildStorageErrorEnvelope(input);
+}
+
+export function getStorageInternalErrorRecord(input = {}) {
+  return buildStorageInternalErrorRecord(input);
+}
+
+export function buildStorageErrorEvent(input = {}) {
+  return buildStorageErrorAuditEvent(input);
 }

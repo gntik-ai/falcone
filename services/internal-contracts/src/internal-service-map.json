@@ -46,7 +46,8 @@
         "Accept workspace-scoped storage bucket inventory, metadata, creation, and deletion requests through the unified storage family while preserving tenant/workspace isolation, quota guardrails, and audit context.",
         "Accept workspace-scoped storage object upload, download, metadata, list, and delete requests through the unified storage family without leaking provider-native semantics.",
         "Return canonical tenant/workspace/application storage-organization metadata on storage bucket and object surfaces without exposing provider-native namespace internals.",
-        "Accept optional application-aware storage placement hints while keeping workspace-shared storage and reserved platform prefixes governed under the same unified storage family."
+        "Accept optional application-aware storage placement hints while keeping workspace-shared storage and reserved platform prefixes governed under the same unified storage family.",
+        "Expose normalized storage provider capability-baseline introspection and stable storage error semantics without leaking provider-native diagnostics."
       ],
       "owned_resources": [
         "public route contract",
@@ -125,7 +126,9 @@
         "Provision and reconcile one tenant-scoped storage context per entitled tenant, including namespace, credential-reference lifecycle, quota assignment, and workspace bucket bootstrap dependencies.",
         "Coordinate workspace-scoped storage bucket lifecycle and object operations without letting control_api call storage adapters directly.",
         "Resolve canonical workspace-shared and application-owned storage placement metadata through the storage adapter without coupling orchestration to provider-native prefixes.",
-        "Preserve reserved storage keyspace boundaries for platform-managed presigned, multipart, and event-oriented flows when coordinating future storage capabilities."
+        "Preserve reserved storage keyspace boundaries for platform-managed presigned, multipart, and event-oriented flows when coordinating future storage capabilities.",
+        "Gate tenant storage context activation on provider capability baseline validation and persist provider capability metadata for downstream consumers.",
+        "Normalize storage provider failures into stable platform error classifications before emitting tenant-visible storage audit context."
       ],
       "owned_resources": [
         "provisioning run state",
@@ -670,7 +673,11 @@
         "delete_object",
         "resolve_logical_organization",
         "resolve_workspace_storage_root",
-        "resolve_application_storage_root"
+        "resolve_application_storage_root",
+        "get_capability_details",
+        "validate_capability_baseline",
+        "normalize_storage_error",
+        "emit_normalized_storage_error_event"
       ],
       "request_contract": "adapter_call",
       "result_contract": "adapter_result",
