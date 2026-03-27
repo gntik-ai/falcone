@@ -118,6 +118,17 @@
           "type": "string"
         }
       },
+      "TenantId": {
+        "description": "Stable tenant identifier.",
+        "in": "path",
+        "name": "tenantId",
+        "required": true,
+        "schema": {
+          "minLength": 3,
+          "pattern": "^ten_[0-9a-z]+$",
+          "type": "string"
+        }
+      },
       "TriggerId": {
         "description": "Stable managed Kafka function-trigger identifier.",
         "in": "path",
@@ -1645,9 +1656,126 @@
         ],
         "type": "object"
       },
+      "FunctionQuotaDimensionStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "type": "boolean"
+          },
+          "limit": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "metricKey": {
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "function_count",
+              "invocation_count",
+              "compute_time_ms",
+              "memory_mb"
+            ],
+            "type": "string"
+          },
+          "remaining": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "used": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "used",
+          "limit",
+          "remaining",
+          "blocked"
+        ],
+        "type": "object"
+      },
+      "FunctionQuotaEvaluation": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "effectiveDimension": {
+            "enum": [
+              "function_count",
+              "invocation_count",
+              "compute_time_ms",
+              "memory_mb"
+            ],
+            "type": "string"
+          },
+          "effectiveScope": {
+            "enum": [
+              "tenant",
+              "workspace"
+            ],
+            "type": "string"
+          },
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/FunctionQuotaViolation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed",
+          "violations"
+        ],
+        "type": "object"
+      },
+      "FunctionQuotaScopeStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "computeTimeMs": {
+            "$ref": "#/components/schemas/FunctionQuotaDimensionStatus"
+          },
+          "functionCount": {
+            "$ref": "#/components/schemas/FunctionQuotaDimensionStatus"
+          },
+          "invocationCount": {
+            "$ref": "#/components/schemas/FunctionQuotaDimensionStatus"
+          },
+          "memoryMb": {
+            "$ref": "#/components/schemas/FunctionQuotaDimensionStatus"
+          },
+          "scope": {
+            "enum": [
+              "tenant",
+              "workspace"
+            ],
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "scopeId",
+          "functionCount",
+          "invocationCount",
+          "computeTimeMs",
+          "memoryMb"
+        ],
+        "type": "object"
+      },
       "FunctionQuotaStatus": {
         "additionalProperties": false,
         "properties": {
+          "effectiveViolation": {
+            "$ref": "#/components/schemas/FunctionQuotaViolation"
+          },
+          "lastEvaluation": {
+            "$ref": "#/components/schemas/FunctionQuotaEvaluation"
+          },
           "maxActionsPerWorkspace": {
             "maximum": 5000,
             "minimum": 0,
@@ -1672,6 +1800,15 @@
             "maximum": 5000,
             "minimum": 0,
             "type": "integer"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/FunctionQuotaScopeStatus"
+            },
+            "type": "array"
+          },
+          "tenantScope": {
+            "$ref": "#/components/schemas/FunctionQuotaScopeStatus"
           },
           "usedActions": {
             "maximum": 5000,
@@ -1700,6 +1837,9 @@
           },
           "visibleInConsole": {
             "type": "boolean"
+          },
+          "workspaceScope": {
+            "$ref": "#/components/schemas/FunctionQuotaScopeStatus"
           }
         },
         "required": [
@@ -1713,7 +1853,61 @@
           "usedTriggers",
           "usedRules",
           "usedHttpExposures",
-          "visibleInConsole"
+          "visibleInConsole",
+          "tenantScope",
+          "workspaceScope",
+          "scopes"
+        ],
+        "type": "object"
+      },
+      "FunctionQuotaViolation": {
+        "additionalProperties": false,
+        "properties": {
+          "dimension": {
+            "enum": [
+              "function_count",
+              "invocation_count",
+              "compute_time_ms",
+              "memory_mb"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "metricKey": {
+            "type": "string"
+          },
+          "remaining": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "scope": {
+            "enum": [
+              "tenant",
+              "workspace"
+            ],
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "used": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scope",
+          "dimension",
+          "used",
+          "limit",
+          "remaining",
+          "message"
         ],
         "type": "object"
       },
@@ -6325,6 +6519,118 @@
         "x-visibility": "public"
       }
     },
+    "/v1/functions/tenants/{tenantId}/quota": {
+      "get": {
+        "operationId": "getFunctionTenantQuota",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionQuotaStatus"
+                }
+              }
+            },
+            "description": "Function quota posture returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected gateway error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Fetch governed function quota posture for one tenant",
+        "tags": [
+          "Functions"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-downstream-adapters": [
+          "openwhisk"
+        ],
+        "x-family": "functions",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-resource-type": "function_quota",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
     "/v1/functions/workspaces/{workspaceId}/actions": {
       "get": {
         "operationId": "listFunctionActions",
@@ -7295,6 +7601,118 @@
         "x-owning-service": "control_api",
         "x-rate-limit-class": "provisioning",
         "x-resource-type": "function_package",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/functions/workspaces/{workspaceId}/quota": {
+      "get": {
+        "operationId": "getFunctionWorkspaceQuota",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionQuotaStatus"
+                }
+              }
+            },
+            "description": "Function quota posture returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected gateway error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Fetch governed function quota posture for one workspace",
+        "tags": [
+          "Functions"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-downstream-adapters": [
+          "openwhisk"
+        ],
+        "x-family": "functions",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-resource-type": "function_quota",
         "x-scope": "workspace",
         "x-visibility": "public"
       }

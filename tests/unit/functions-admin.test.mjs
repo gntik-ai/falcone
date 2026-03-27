@@ -24,6 +24,8 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
   const storageTriggerRoute = getFunctionsAdminRoute('getFunctionStorageTrigger');
   const cronTriggerRoute = getFunctionsAdminRoute('getFunctionCronTrigger');
   const inventoryRoute = getFunctionsAdminRoute('getFunctionInventory');
+  const tenantQuotaRoute = getFunctionsAdminRoute('getFunctionTenantQuota');
+  const workspaceQuotaRoute = getFunctionsAdminRoute('getFunctionWorkspaceQuota');
   const listSecretsRoute = getFunctionsAdminRoute('listFunctionWorkspaceSecrets');
   const createSecretRoute = getFunctionsAdminRoute('createFunctionWorkspaceSecret');
   const getSecretRoute = getFunctionsAdminRoute('getFunctionWorkspaceSecret');
@@ -60,6 +62,8 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
     'listFunctionTriggers',
     'listFunctionRules',
     'getFunctionInventory',
+    'getFunctionTenantQuota',
+    'getFunctionWorkspaceQuota',
     'listFunctionWorkspaceSecrets',
     'createFunctionWorkspaceSecret',
     'getFunctionWorkspaceSecret',
@@ -78,6 +82,8 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
   assert.equal(storageTriggerRoute.resourceType, 'function_storage_trigger');
   assert.equal(cronTriggerRoute.resourceType, 'function_cron_trigger');
   assert.equal(inventoryRoute.path, '/v1/functions/workspaces/{workspaceId}/inventory');
+  assert.equal(tenantQuotaRoute.resourceType, 'function_quota');
+  assert.equal(workspaceQuotaRoute.path, '/v1/functions/workspaces/{workspaceId}/quota');
   assert.equal(listSecretsRoute.resourceType, 'function_workspace_secret');
   assert.equal(createSecretRoute.resourceType, 'function_workspace_secret');
   assert.equal(getSecretRoute.resourceType, 'function_workspace_secret');
@@ -91,6 +97,7 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
   assert.equal(surface.find((entry) => entry.resourceKind === 'http_exposure').routeCount, 4);
   assert.equal(surface.find((entry) => entry.resourceKind === 'storage_trigger').routeCount, 2);
   assert.equal(surface.find((entry) => entry.resourceKind === 'cron_trigger').routeCount, 2);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'quota').routeCount, 2);
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'workspace_secret').actions, ['list', 'create', 'get', 'update', 'delete']);
   assert.equal(surface.find((entry) => entry.resourceKind === 'workspace_secret').routeCount, 5);
 });
@@ -121,6 +128,8 @@ test('functions admin helper summarizes governed OpenWhisk compatibility, runtim
   assert.equal(growthSummary.namingPolicy.actionPrefix, 'act-alpha-dev-dev');
   assert.equal(growthSummary.quotaGuardrails.maxActionsPerWorkspace, 24);
   assert.equal(growthSummary.quotaGuardrails.maxHttpExposuresPerWorkspace, 12);
+  assert.deepEqual(growthSummary.quotaSupport.scopes, ['tenant', 'workspace']);
+  assert.equal(growthSummary.quotaSupport.routeIds.includes('getFunctionWorkspaceQuota'), true);
   assert.equal(growthSummary.minimumEnginePolicy.nativeAdminCrudExposed, false);
   assert.equal(growthSummary.auditCoverage.capturesHttpExposure, true);
   assert.equal(growthSummary.actionMutationsSupported, true);
