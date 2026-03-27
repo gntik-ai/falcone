@@ -53,3 +53,85 @@ test('initial tenant bootstrap resolution stays idempotent and plan/profile awar
   assert.equal(enterprise.resourceStates.some((state) => state.resourceKey === 'default_function_action' && state.status === 'pending'), true);
   assert.equal(enterprise.retry.idempotencyKey.includes('signup-activation-ten_01enterprise'), true);
 });
+
+test('workspace bootstrap records storage dependency wait when tenant storage context is not active', () => {
+  const waiting = resolveInitialTenantBootstrap({
+    tenantId: 'ten_01storagewait',
+    ownerUserId: 'usr_01storagewaitowner',
+    workspaceId: 'wrk_01storagewaitdev',
+    workspaceEnvironment: 'dev',
+    planId: 'pln_01starter',
+    tenantStorageContext: {
+      tenantId: 'ten_01storagewait',
+      state: 'draft',
+      namespace: 'tctx-storage-wait-abcd1234',
+      providerType: 'minio',
+      bucketProvisioningAllowed: false,
+      provisioning: {
+        reasonCode: 'CONTEXT_PENDING'
+      }
+    }
+  });
+  const blocked = resolveInitialTenantBootstrap({
+    tenantId: 'ten_01storageblocked',
+    ownerUserId: 'usr_01storageblockedowner',
+    workspaceId: 'wrk_01storageblockeddev',
+    workspaceEnvironment: 'dev',
+    planId: 'pln_01starter',
+    tenantStorageContext: {
+      tenantId: 'ten_01storageblocked',
+      state: 'suspended',
+      namespace: 'tctx-storage-blocked-abcd1234',
+      providerType: 'minio',
+      bucketProvisioningAllowed: false,
+      provisioning: {
+        reasonCode: 'CONTEXT_SUSPENDED'
+      }
+    }
+  });
+  const ready = resolveInitialTenantBootstrap({
+    tenantId: 'ten_01storageready',
+    ownerUserId: 'usr_01storagereadyowner',
+    workspaceId: 'wrk_01storagereadydev',
+    workspaceEnvironment: 'dev',
+    planId: 'pln_01starter',
+    tenantStorageContext: {
+      tenantId: 'ten_01storageready',
+      state: 'active',
+      namespace: 'tctx-storage-ready-abcd1234',
+      providerType: 'minio',
+      bucketProvisioningAllowed: true,
+      provisioning: {
+        reasonCode: null
+      }
+    }
+  });
+
+  assert.equal(
+    waiting.resourceStates.some(
+      (state) =>
+        state.resourceKey === 'default_storage_bucket' &&
+        state.status === 'dependency_wait' &&
+        state.dependency.reasonCode === 'CONTEXT_PENDING'
+    ),
+    true
+  );
+  assert.equal(
+    blocked.resourceStates.some(
+      (state) =>
+        state.resourceKey === 'default_storage_bucket' &&
+        state.status === 'blocked' &&
+        state.dependency.reasonCode === 'CONTEXT_SUSPENDED'
+    ),
+    true
+  );
+  assert.equal(
+    ready.resourceStates.some(
+      (state) =>
+        state.resourceKey === 'default_storage_bucket' &&
+        state.status === 'pending' &&
+        state.namespace === 'tctx-storage-ready-abcd1234'
+    ),
+    true
+  );
+});

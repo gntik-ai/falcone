@@ -7,23 +7,41 @@ import {
   getPublicRoute
 } from '../../services/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { summarizeStorageProviderIntrospection } from '../../apps/control-plane/src/storage-admin.mjs';
+import {
+  previewTenantStorageContext,
+  summarizeStorageProviderIntrospection,
+  summarizeTenantStorageContext
+} from '../../apps/control-plane/src/storage-admin.mjs';
 
 test('storage provider OpenAPI contract exposes additive provider introspection route and schemas', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
   const providerRoute = document.paths['/v1/platform/storage/provider']?.get;
+  const tenantContextRoute = document.paths['/v1/tenants/{tenantId}/storage-context']?.get;
+  const tenantRotationRoute = document.paths['/v1/tenants/{tenantId}/storage-context/credential-rotations']?.post;
   const manifestSchema = document.components.schemas.StorageCapabilityManifest;
   const providerSchema = document.components.schemas.StorageProviderIntrospection;
   const limitationSchema = document.components.schemas.StorageProviderLimitation;
+  const tenantContextSchema = document.components.schemas.TenantStorageContext;
+  const tenantQuotaSchema = document.components.schemas.TenantStorageQuotaAssignment;
+  const tenantCredentialSchema = document.components.schemas.TenantStorageCredentialStatus;
 
   assert.ok(providerRoute);
+  assert.ok(tenantContextRoute);
+  assert.ok(tenantRotationRoute);
   assert.equal(providerRoute['x-family'], 'platform');
   assert.equal(providerRoute['x-resource-type'], 'storage_provider');
   assert.equal(providerRoute['x-scope'], 'platform');
+  assert.equal(tenantContextRoute['x-family'], 'tenants');
+  assert.equal(tenantContextRoute['x-resource-type'], 'tenant_storage_context');
+  assert.equal(tenantRotationRoute['x-resource-type'], 'tenant_storage_context');
   assert.ok(manifestSchema);
   assert.ok(providerSchema);
   assert.ok(limitationSchema);
+  assert.ok(tenantContextSchema);
+  assert.ok(tenantQuotaSchema);
+  assert.ok(tenantCredentialSchema);
   assert.deepEqual(providerSchema.required.includes('capabilityManifest'), true);
+  assert.deepEqual(tenantContextSchema.required.includes('credential'), true);
   assert.deepEqual(Object.keys(manifestSchema.properties), [
     'bucketOperations',
     'objectCrud',
@@ -35,8 +53,26 @@ test('storage provider OpenAPI contract exposes additive provider introspection 
 
 test('storage provider contracts preserve public-route discoverability and adapter capability coverage', () => {
   const publicRoute = getPublicRoute('getStorageProviderIntrospection');
+  const tenantContextRoute = getPublicRoute('getTenantStorageContext');
+  const tenantRotationRoute = getPublicRoute('rotateTenantStorageContextCredential');
   const storageAdapter = getAdapterPort('storage');
   const introspection = summarizeStorageProviderIntrospection({ providerType: 'garage' });
+  const tenantContext = summarizeTenantStorageContext({
+    tenant: {
+      tenantId: 'ten_01contract',
+      slug: 'contract',
+      state: 'active',
+      planId: 'pln_01growth'
+    },
+    storage: {
+      config: {
+        inline: {
+          providerType: 'garage'
+        }
+      }
+    },
+    now: '2026-03-27T21:00:00Z'
+  });
 
   assert.equal(publicRoute.family, 'platform');
   assert.equal(publicRoute.path, '/v1/platform/storage/provider');
@@ -45,12 +81,26 @@ test('storage provider contracts preserve public-route discoverability and adapt
   assert.equal(publicRoute.workspaceBinding, 'none');
   assert.deepEqual(publicRoute.audiences, ['platform_team']);
 
+  assert.equal(tenantContextRoute.family, 'tenants');
+  assert.equal(tenantContextRoute.path, '/v1/tenants/{tenantId}/storage-context');
+  assert.equal(tenantContextRoute.resourceType, 'tenant_storage_context');
+  assert.equal(tenantRotationRoute.path, '/v1/tenants/{tenantId}/storage-context/credential-rotations');
+  assert.equal(tenantRotationRoute.supportsIdempotencyKey, true);
+  assert.equal(tenantContextRoute.tenantBinding, 'required');
+
   assert.ok(storageAdapter.capabilities.includes('ensure_bucket'));
   assert.ok(storageAdapter.capabilities.includes('resolve_provider_profile'));
   assert.ok(storageAdapter.capabilities.includes('get_capability_manifest'));
   assert.ok(storageAdapter.capabilities.includes('get_provider_status'));
+  assert.ok(storageAdapter.capabilities.includes('ensure_tenant_context'));
+  assert.ok(storageAdapter.capabilities.includes('get_tenant_context_status'));
+  assert.ok(storageAdapter.capabilities.includes('rotate_tenant_context_credentials'));
+  assert.ok(storageAdapter.capabilities.includes('revoke_tenant_context_credentials'));
 
   assert.equal(introspection.profile.providerType, 'garage');
   assert.equal(introspection.profile.status, 'ready');
   assert.equal(introspection.supportedProviders.length >= 2, true);
+  assert.equal(tenantContext.route.operationId, 'getTenantStorageContext');
+  assert.equal(tenantContext.context.credential.secretReferencePresent, true);
+  assert.equal(JSON.stringify(tenantContext).includes('secret://tenants/'), false);
 });

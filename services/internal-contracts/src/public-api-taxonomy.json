@@ -916,6 +916,12 @@
       "family": "functions",
       "scope": "platform",
       "authorization_resource": "function_audit_coverage"
+    },
+    {
+      "resource_type": "tenant_storage_context",
+      "family": "tenants",
+      "scope": "tenant",
+      "authorization_resource": "tenant"
     }
   ]
 }
