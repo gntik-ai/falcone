@@ -5,7 +5,13 @@ import {
 } from '../../../services/internal-contracts/src/index.mjs';
 import {
   STORAGE_PROVIDER_ERROR_CODES,
+  STORAGE_PROVIDER_CAPABILITY_BASELINE_VERSION,
+  STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES,
   STORAGE_PROVIDER_CAPABILITY_FIELDS,
+  STORAGE_PROVIDER_CAPABILITY_IDS,
+  STORAGE_PROVIDER_CAPABILITY_MANIFEST_VERSION,
+  buildStorageCapabilityBaseline,
+  buildStorageCapabilityDetails,
   buildStorageProviderProfile,
   listSupportedStorageProviders,
   summarizeStorageProviderCompatibility
@@ -38,6 +44,15 @@ import {
   buildStorageObjectOrganization,
   isStorageReservedPrefix
 } from '../../../services/adapters/src/storage-logical-organization.mjs';
+import {
+  STORAGE_ERROR_RETRYABILITY,
+  STORAGE_NORMALIZED_ERROR_CODES,
+  buildNormalizedStorageError,
+  buildStorageErrorAuditEvent,
+  buildStorageErrorEnvelope,
+  buildStorageInternalErrorRecord,
+  listStorageNormalizedErrorDefinitions
+} from '../../../services/adapters/src/storage-error-taxonomy.mjs';
 
 export const storageApiFamily = getApiFamily('storage');
 export const STORAGE_ADMIN_ERROR_CODES = STORAGE_PROVIDER_ERROR_CODES;
@@ -45,6 +60,12 @@ export const TENANT_STORAGE_ERROR_CODES = TENANT_STORAGE_CONTEXT_ERROR_CODES;
 export const STORAGE_BUCKET_OBJECT_ERRORS = STORAGE_BUCKET_OBJECT_ERROR_CODES;
 export const STORAGE_LOGICAL_ORGANIZATION_ERRORS = STORAGE_LOGICAL_ORGANIZATION_ERROR_CODES;
 export const STORAGE_PROVIDER_CAPABILITIES = STORAGE_PROVIDER_CAPABILITY_FIELDS;
+export const STORAGE_PROVIDER_CAPABILITY_IDS_CATALOG = STORAGE_PROVIDER_CAPABILITY_IDS;
+export const STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG = STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES;
+export const STORAGE_PROVIDER_CAPABILITY_MANIFEST_SCHEMA_VERSION = STORAGE_PROVIDER_CAPABILITY_MANIFEST_VERSION;
+export const STORAGE_PROVIDER_CAPABILITY_BASELINE_SCHEMA_VERSION = STORAGE_PROVIDER_CAPABILITY_BASELINE_VERSION;
+export const STORAGE_NORMALIZED_ERROR_CATALOG = STORAGE_NORMALIZED_ERROR_CODES;
+export const STORAGE_ERROR_RETRYABILITY_CATALOG = STORAGE_ERROR_RETRYABILITY;
 
 function matchesRouteFilters(route, filters = {}) {
   return Object.entries(filters).every(([key, value]) => route?.[key] === value);
@@ -104,6 +125,34 @@ export function getStorageCompatibilitySummary(input = {}) {
       .filter((route) => route.resourceType === 'bucket_object')
       .map((route) => route.operationId)
   };
+}
+
+export function summarizeStorageCapabilityBaseline(input = {}) {
+  return buildStorageCapabilityBaseline(input.providerType ?? input);
+}
+
+export function summarizeStorageCapabilityDetails(input = {}) {
+  return buildStorageCapabilityDetails(input.providerType ?? input);
+}
+
+export function listStorageNormalizedErrors() {
+  return listStorageNormalizedErrorDefinitions();
+}
+
+export function previewStorageNormalizedError(input = {}) {
+  return buildNormalizedStorageError(input);
+}
+
+export function previewStorageErrorEnvelope(input = {}) {
+  return buildStorageErrorEnvelope(input);
+}
+
+export function previewStorageInternalErrorRecord(input = {}) {
+  return buildStorageInternalErrorRecord(input);
+}
+
+export function buildStorageErrorEvent(input = {}) {
+  return buildStorageErrorAuditEvent(input);
 }
 
 export function previewTenantStorageContext(input = {}) {
