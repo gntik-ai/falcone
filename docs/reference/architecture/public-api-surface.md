@@ -409,6 +409,7 @@ Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, a
 | GET | `/v1/functions/actions/{resourceId}/storage-triggers/{triggerId}` | workspace | function_storage_trigger | Fetch one storage trigger bound to a governed function action |
 | GET | `/v1/functions/actions/{resourceId}/versions` | workspace | function_version | List immutable versions for one governed function action within its tenant and workspace lifecycle scope |
 | GET | `/v1/functions/actions/{resourceId}/versions/{versionId}` | workspace | function_version | Fetch one immutable version for a governed function action |
+| GET | `/v1/functions/tenants/{tenantId}/quota` | tenant | function_quota | Fetch governed function quota posture for one tenant |
 | GET | `/v1/functions/workspaces/{workspaceId}/actions` | workspace | function_action | List governed function actions for one workspace including runtime, source, policy, and exposure summaries |
 | GET | `/v1/functions/workspaces/{workspaceId}/inventory` | workspace | function_inventory | Fetch one workspace OpenWhisk serverless inventory with logical namespace, subject, package, trigger, and rule visibility |
 | GET | `/v1/functions/workspaces/{workspaceId}/packages` | workspace | function_package | List governed OpenWhisk packages for one workspace logical serverless context |
@@ -416,6 +417,7 @@ Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, a
 | DELETE | `/v1/functions/workspaces/{workspaceId}/packages/{packageName}` | workspace | function_package | Delete one governed OpenWhisk package from the workspace logical serverless context |
 | GET | `/v1/functions/workspaces/{workspaceId}/packages/{packageName}` | workspace | function_package | Fetch one governed OpenWhisk package for the workspace logical serverless context |
 | PATCH | `/v1/functions/workspaces/{workspaceId}/packages/{packageName}` | workspace | function_package | Update one governed OpenWhisk package without exposing native namespace or subject administration |
+| GET | `/v1/functions/workspaces/{workspaceId}/quota` | workspace | function_quota | Fetch governed function quota posture for one workspace |
 | GET | `/v1/functions/workspaces/{workspaceId}/rules` | workspace | function_rule | List governed OpenWhisk rules for one workspace logical serverless context |
 | POST | `/v1/functions/workspaces/{workspaceId}/rules` | workspace | function_rule | Create one governed OpenWhisk rule that binds a workspace trigger to a workspace action |
 | DELETE | `/v1/functions/workspaces/{workspaceId}/rules/{ruleName}` | workspace | function_rule | Delete one governed OpenWhisk rule from the workspace logical serverless context |

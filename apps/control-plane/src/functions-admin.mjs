@@ -85,6 +85,11 @@ export function summarizeFunctionsAdminSurface() {
       routeCount: functionsAdminRoutes.filter((route) => route.resourceType === 'function_inventory').length
     },
     {
+      resourceKind: 'quota',
+      actions: ['get'],
+      routeCount: functionsAdminRoutes.filter((route) => route.resourceType === 'function_quota').length
+    },
+    {
       resourceKind: 'workspace_secret',
       actions: ['list', 'create', 'get', 'update', 'delete'],
       routeCount: functionsAdminRoutes.filter((route) => route.resourceType === 'function_workspace_secret').length
@@ -117,6 +122,12 @@ export function getOpenWhiskCompatibilitySummary(context = {}) {
     namingPolicy: serverlessContext.namingPolicy,
     serverlessContext,
     quotaGuardrails: profile.quotaGuardrails,
+    quotaSupport: {
+      supported: true,
+      scopes: ['tenant', 'workspace'],
+      dimensions: ['function_count', 'invocation_count', 'compute_time_ms', 'memory_mb'],
+      routeIds: ['getFunctionTenantQuota', 'getFunctionWorkspaceQuota']
+    },
     minimumEnginePolicy: profile.minimumEnginePolicy,
     auditCoverage: profile.auditCoverage,
     actionMutationsSupported: profile.actionMutationsSupported,

@@ -30,6 +30,7 @@ import {
   normalizeOpenWhiskAdminError,
   normalizeOpenWhiskAdminResource,
   resolveOpenWhiskAdminProfile,
+  validateFunctionQuotaGuardrails,
   validateFunctionSecretReferences,
   validateFunctionWorkspaceSecretRequest,
   validateOpenWhiskAdminRequest,
@@ -189,6 +190,9 @@ test('openwhisk admin adapter normalizes governed actions, packages, triggers, a
   assert.equal(trigger.physicalTriggerName, 'trg-alpha-dev-dev-billing-events');
   assert.equal(trigger.sourceType, 'event_topic');
   assert.equal(trigger.tenantIsolation.crossTenantAccessPrevented, true);
+  assert.equal(action.quotaStatus.workspaceScope.scope, 'workspace');
+  assert.equal(action.quotaStatus.tenantScope.scope, 'tenant');
+  assert.equal(action.quotaStatus.workspaceScope.functionCount.limit, 24);
 
   assert.equal(rule.resourceType, 'function_rule');
   assert.equal(rule.physicalRuleName, 'rul-alpha-dev-dev-billing-dispatch');
@@ -283,7 +287,7 @@ test('openwhisk admin adapter blocks unsafe native admin fields and respects quo
     true
   );
   assert.equal(
-    badValidation.violations.includes('Quota workspace.functions.actions.max would be exceeded by creating another action.'),
+    badValidation.violations.includes('Quota workspace.functions.function_count.max would be exceeded by create action.'),
     true
   );
   assert.equal(
@@ -306,6 +310,45 @@ test('openwhisk admin adapter blocks unsafe native admin fields and respects quo
     badValidation.violations.includes('OpenWhisk provider version 1.26.0 is outside the supported compatibility matrix.'),
     true
   );
+});
+
+test('openwhisk admin adapter resolves strictest tenant and workspace quota guardrails by dimension', () => {
+  const blockedCreate = validateFunctionQuotaGuardrails({
+    context: {
+      tenantId: 'ten_01growthalpha',
+      workspaceId: 'wrk_01alphadev',
+      planId: 'pln_01growth',
+      currentInventory: { counts: { actions: 5 } },
+      tenantQuotaUsage: { function_count: 9 },
+      tenantQuotaLimits: { function_count: 10, invocation_count: 100, compute_time_ms: 1000, memory_mb: 1024 },
+      workspaceQuotaUsage: { function_count: 5, invocation_count: 10, compute_time_ms: 100, memory_mb: 128 },
+      workspaceQuotaLimits: { function_count: 20, invocation_count: 50, compute_time_ms: 500, memory_mb: 512 }
+    },
+    action: 'create action',
+    delta: { function_count: 2 }
+  });
+  const blockedInvoke = validateFunctionQuotaGuardrails({
+    context: {
+      tenantId: 'ten_01growthalpha',
+      workspaceId: 'wrk_01alphadev',
+      planId: 'pln_01growth',
+      tenantQuotaUsage: { function_count: 1, invocation_count: 20, compute_time_ms: 100, memory_mb: 100 },
+      tenantQuotaLimits: { function_count: 10, invocation_count: 200, compute_time_ms: 500, memory_mb: 1024 },
+      workspaceQuotaUsage: { function_count: 1, invocation_count: 49, compute_time_ms: 490, memory_mb: 500 },
+      workspaceQuotaLimits: { function_count: 10, invocation_count: 50, compute_time_ms: 500, memory_mb: 512 }
+    },
+    action: 'invoke action',
+    delta: { invocation_count: 2, compute_time_ms: 20, memory_mb: 20 }
+  });
+
+  assert.equal(blockedCreate.allowed, false);
+  assert.equal(blockedCreate.effectiveScope, 'tenant');
+  assert.equal(blockedCreate.effectiveDimension, 'function_count');
+  assert.equal(blockedCreate.violations.some((entry) => entry.scope === 'tenant' && entry.dimension === 'function_count'), true);
+  assert.equal(blockedInvoke.allowed, false);
+  assert.equal(blockedInvoke.violations.some((entry) => entry.scope === 'workspace' && entry.dimension === 'invocation_count'), true);
+  assert.equal(blockedInvoke.violations.some((entry) => entry.dimension === 'compute_time_ms'), true);
+  assert.equal(blockedInvoke.violations.some((entry) => entry.dimension === 'memory_mb'), true);
 });
 
 test('openwhisk admin adapter builds contract-rich adapter calls, metadata, inventory snapshots, and execution projections', () => {
