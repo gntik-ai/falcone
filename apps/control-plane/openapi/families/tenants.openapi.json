@@ -1443,6 +1443,203 @@
         ],
         "type": "string"
       },
+      "StorageCapabilityBaseline": {
+        "additionalProperties": false,
+        "properties": {
+          "checkedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "insufficientCapabilities": {
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityGap"
+            },
+            "type": "array"
+          },
+          "missingCapabilities": {
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityGap"
+            },
+            "type": "array"
+          },
+          "optionalCapabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "requiredCapabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "checkedAt",
+          "requiredCapabilities",
+          "optionalCapabilities",
+          "eligible",
+          "missingCapabilities",
+          "insufficientCapabilities"
+        ],
+        "type": "object"
+      },
+      "StorageCapabilityConstraint": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "integer",
+              "boolean"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "operator",
+          "value"
+        ],
+        "type": "object"
+      },
+      "StorageCapabilityEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilityId": {
+            "type": "string"
+          },
+          "constraints": {
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityConstraint"
+            },
+            "type": "array"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "satisfied",
+              "partially_satisfied",
+              "unsatisfied"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capabilityId",
+          "required",
+          "state",
+          "summary",
+          "constraints"
+        ],
+        "type": "object"
+      },
+      "StorageCapabilityGap": {
+        "additionalProperties": false,
+        "properties": {
+          "actualState": {
+            "type": "string"
+          },
+          "capabilityId": {
+            "type": "string"
+          },
+          "constraints": {
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityConstraint"
+            },
+            "type": "array"
+          },
+          "expectedState": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capabilityId",
+          "expectedState",
+          "actualState"
+        ],
+        "type": "object"
+      },
+      "StorageCapabilityManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "bucketOperations": {
+            "type": "boolean"
+          },
+          "multipartUpload": {
+            "type": "boolean"
+          },
+          "objectCrud": {
+            "type": "boolean"
+          },
+          "objectVersioning": {
+            "type": "boolean"
+          },
+          "presignedUrls": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bucketOperations",
+          "objectCrud",
+          "presignedUrls",
+          "multipartUpload",
+          "objectVersioning"
+        ],
+        "type": "object"
+      },
+      "StorageProviderCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/StorageCapabilityBaseline"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityEntry"
+            },
+            "type": "array"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/StorageCapabilityManifest"
+          },
+          "manifestVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "manifestVersion",
+          "manifest",
+          "details",
+          "baseline"
+        ],
+        "type": "object"
+      },
       "Tenant": {
         "additionalProperties": false,
         "properties": {
@@ -2766,6 +2963,9 @@
             "format": "date-time",
             "type": "string"
           },
+          "providerCapabilities": {
+            "$ref": "#/components/schemas/StorageProviderCapabilities"
+          },
           "providerDisplayName": {
             "type": "string"
           },
@@ -2812,7 +3012,8 @@
           "quotaAssignment",
           "credential",
           "managedResourceDependency",
-          "observedAt"
+          "observedAt",
+          "providerCapabilities"
         ],
         "type": "object"
       },
@@ -2897,7 +3098,8 @@
               "retryable_failure",
               "capability_unavailable",
               "suspended",
-              "soft_deleted"
+              "soft_deleted",
+              "blocked"
             ],
             "type": "string"
           },
