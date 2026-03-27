@@ -107,6 +107,22 @@ const ERROR_CODE_MAP = new Map([
   ['dependency_failure', { status: 502, code: 'FN_OW_DEPENDENCY_FAILURE', retryable: true }]
 ]);
 
+const FUNCTION_QUOTA_DIMENSIONS = Object.freeze(['function_count', 'invocation_count', 'compute_time_ms', 'memory_mb']);
+const FUNCTION_QUOTA_METRIC_KEYS = Object.freeze({
+  tenant: Object.freeze({
+    function_count: 'tenant.functions.function_count.max',
+    invocation_count: 'tenant.functions.invocation_count.max',
+    compute_time_ms: 'tenant.functions.compute_time_ms.max',
+    memory_mb: 'tenant.functions.memory_mb.max'
+  }),
+  workspace: Object.freeze({
+    function_count: 'workspace.functions.function_count.max',
+    invocation_count: 'workspace.functions.invocation_count.max',
+    compute_time_ms: 'workspace.functions.compute_time_ms.max',
+    memory_mb: 'workspace.functions.memory_mb.max'
+  })
+});
+
 function compactDefined(value) {
   if (Array.isArray(value)) {
     return value
@@ -204,6 +220,121 @@ function getOpenWhiskQuotaGuardrails(planTier, resolution, context = {}) {
     usedTriggers: triggerQuota?.used ?? currentCounts.triggers ?? context.currentTriggerCount ?? 0,
     usedRules: ruleQuota?.used ?? currentCounts.rules ?? context.currentRuleCount ?? 0,
     usedHttpExposures: httpExposureQuota?.used ?? currentCounts.httpExposures ?? context.currentHttpExposureCount ?? 0
+  };
+}
+
+function getQuotaDimensionValue(source = {}, dimension, fallback = 0) {
+  return source?.[dimension] ?? source?.[camelizeQuotaDimension(dimension)] ?? fallback;
+}
+
+function camelizeQuotaDimension(dimension) {
+  return String(dimension).replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+}
+
+function buildQuotaDimensionStatus({ name, used = 0, limit = 0, metricKey }) {
+  const normalizedLimit = Math.max(Number(limit ?? 0), 0);
+  const normalizedUsed = Math.max(Number(used ?? 0), 0);
+  return {
+    name,
+    used: normalizedUsed,
+    limit: normalizedLimit,
+    remaining: Math.max(normalizedLimit - normalizedUsed, 0),
+    blocked: normalizedUsed >= normalizedLimit,
+    metricKey
+  };
+}
+
+function buildQuotaScopeStatus({ scope, scopeId, usage = {}, limits = {} }) {
+  return {
+    scope,
+    scopeId,
+    functionCount: buildQuotaDimensionStatus({
+      name: 'function_count',
+      used: getQuotaDimensionValue(usage, 'function_count'),
+      limit: getQuotaDimensionValue(limits, 'function_count'),
+      metricKey: FUNCTION_QUOTA_METRIC_KEYS[scope].function_count
+    }),
+    invocationCount: buildQuotaDimensionStatus({
+      name: 'invocation_count',
+      used: getQuotaDimensionValue(usage, 'invocation_count'),
+      limit: getQuotaDimensionValue(limits, 'invocation_count'),
+      metricKey: FUNCTION_QUOTA_METRIC_KEYS[scope].invocation_count
+    }),
+    computeTimeMs: buildQuotaDimensionStatus({
+      name: 'compute_time_ms',
+      used: getQuotaDimensionValue(usage, 'compute_time_ms'),
+      limit: getQuotaDimensionValue(limits, 'compute_time_ms'),
+      metricKey: FUNCTION_QUOTA_METRIC_KEYS[scope].compute_time_ms
+    }),
+    memoryMb: buildQuotaDimensionStatus({
+      name: 'memory_mb',
+      used: getQuotaDimensionValue(usage, 'memory_mb'),
+      limit: getQuotaDimensionValue(limits, 'memory_mb'),
+      metricKey: FUNCTION_QUOTA_METRIC_KEYS[scope].memory_mb
+    })
+  };
+}
+
+function buildFunctionQuotaModel(profile, context = {}) {
+  const tenantUsage = context.tenantQuotaUsage ?? {};
+  const workspaceUsage = {
+    function_count: context.currentInventory?.counts?.actions ?? context.currentActionCount ?? context.workspaceQuotaUsage?.function_count ?? profile.quotaGuardrails.usedActions ?? 0,
+    invocation_count: context.workspaceQuotaUsage?.invocation_count ?? 0,
+    compute_time_ms: context.workspaceQuotaUsage?.compute_time_ms ?? 0,
+    memory_mb: context.workspaceQuotaUsage?.memory_mb ?? 0
+  };
+  const tenantLimits = context.tenantQuotaLimits ?? {
+    function_count: context.tenantQuotaLimit ?? profile.quotaGuardrails.maxActionsPerWorkspace,
+    invocation_count: 100000,
+    compute_time_ms: 3600000,
+    memory_mb: 262144
+  };
+  const workspaceLimits = context.workspaceQuotaLimits ?? {
+    function_count: profile.quotaGuardrails.maxActionsPerWorkspace,
+    invocation_count: 10000,
+    compute_time_ms: 600000,
+    memory_mb: 65536
+  };
+
+  return {
+    tenantScope: buildQuotaScopeStatus({ scope: 'tenant', scopeId: context.tenantId, usage: tenantUsage, limits: tenantLimits }),
+    workspaceScope: buildQuotaScopeStatus({ scope: 'workspace', scopeId: context.workspaceId, usage: workspaceUsage, limits: workspaceLimits })
+  };
+}
+
+export function validateFunctionQuotaGuardrails({ context = {}, profile, action = 'invoke', delta = {} } = {}) {
+  const resolvedProfile = profile ?? resolveOpenWhiskAdminProfile(context);
+  const quotaModel = buildFunctionQuotaModel(resolvedProfile, context);
+  const scopeStatuses = [quotaModel.tenantScope, quotaModel.workspaceScope];
+  const violations = [];
+
+  for (const scopeStatus of scopeStatuses) {
+    for (const dimension of FUNCTION_QUOTA_DIMENSIONS) {
+      const status = scopeStatus[camelizeQuotaDimension(dimension)];
+      const nextUsed = status.used + Math.max(Number(delta[dimension] ?? 0), 0);
+      if (nextUsed > status.limit) {
+        violations.push({
+          scope: scopeStatus.scope,
+          scopeId: scopeStatus.scopeId,
+          dimension,
+          used: status.used,
+          limit: status.limit,
+          remaining: Math.max(status.limit - status.used, 0),
+          metricKey: status.metricKey,
+          message: `Quota ${status.metricKey} would be exceeded by ${action}.`
+        });
+      }
+    }
+  }
+
+  const effectiveViolation = violations.slice().sort((left, right) => left.remaining - right.remaining)[0];
+  return {
+    allowed: violations.length === 0,
+    violations,
+    effectiveScope: effectiveViolation?.scope,
+    effectiveDimension: effectiveViolation?.dimension,
+    effectiveViolation,
+    quotaModel
   };
 }
 
@@ -468,8 +599,28 @@ function validateActionRequest(action, payload, context, profile) {
     violations.push('actionName must stay logical; the physical OpenWhisk action prefix is generated by the control plane.');
   }
 
-  if (action === 'create' && profile.quotaGuardrails.usedActions >= profile.quotaGuardrails.maxActionsPerWorkspace) {
-    violations.push(`Quota ${profile.quotaGuardrails.metricKeys.actions} would be exceeded by creating another action.`);
+  if (action === 'create') {
+    const quotaEvaluation = validateFunctionQuotaGuardrails({
+      context,
+      profile,
+      action: 'create action',
+      delta: { function_count: 1 }
+    });
+    violations.push(...quotaEvaluation.violations.filter((violation) => violation.dimension === 'function_count').map((violation) => violation.message));
+  }
+
+  if (action === 'invoke') {
+    const quotaEvaluation = validateFunctionQuotaGuardrails({
+      context,
+      profile,
+      action: 'invoke action',
+      delta: {
+        invocation_count: 1,
+        compute_time_ms: context.requestedComputeTimeMs ?? payload.execution?.limits?.timeoutSeconds ?? 0,
+        memory_mb: context.requestedMemoryMb ?? payload.execution?.limits?.memoryMb ?? 0
+      }
+    });
+    violations.push(...quotaEvaluation.violations.map((violation) => violation.message));
   }
 
   if (!runtime && action !== 'list') {
@@ -776,7 +927,9 @@ function buildPhysicalName(prefix, logicalName, resourcePrefix) {
   return trimSegment(`${prefix}-${normalizeLogicalName(logicalName, resourcePrefix)}`, 80);
 }
 
-function buildQuotaStatus(profile) {
+function buildQuotaStatus(profile, context = {}) {
+  const evaluation = validateFunctionQuotaGuardrails({ context, profile, action: 'observe quota posture', delta: {} });
+
   return {
     maxActionsPerWorkspace: profile.quotaGuardrails.maxActionsPerWorkspace,
     maxPackagesPerWorkspace: profile.quotaGuardrails.maxPackagesPerWorkspace,
@@ -788,6 +941,16 @@ function buildQuotaStatus(profile) {
     usedTriggers: profile.quotaGuardrails.usedTriggers,
     usedRules: profile.quotaGuardrails.usedRules,
     usedHttpExposures: profile.quotaGuardrails.usedHttpExposures,
+    tenantScope: evaluation.quotaModel.tenantScope,
+    workspaceScope: evaluation.quotaModel.workspaceScope,
+    scopes: [evaluation.quotaModel.tenantScope, evaluation.quotaModel.workspaceScope],
+    effectiveViolation: evaluation.effectiveViolation,
+    lastEvaluation: {
+      allowed: evaluation.allowed,
+      effectiveScope: evaluation.effectiveScope,
+      effectiveDimension: evaluation.effectiveDimension,
+      violations: evaluation.violations
+    },
     visibleInConsole: true
   };
 }
@@ -866,7 +1029,7 @@ export function normalizeOpenWhiskAdminResource(resourceKind, payload = {}, cont
   });
   const serverlessContext = profile.serverlessContext;
   const providerCompatibility = buildProviderCompatibility(profile);
-  const quotaStatus = buildQuotaStatus(profile);
+  const quotaStatus = buildQuotaStatus(profile, context);
 
   if (resourceKind === 'action') {
     const actionName = normalizeLogicalName(payload.actionName ?? context.actionName, 'action');
@@ -1155,7 +1318,7 @@ export function buildOpenWhiskAdminAdapterCall({
         namespaceName: serverlessContext.namespaceName,
         exposure: 'internal_only'
       },
-      quotaSnapshot: buildQuotaStatus(validation.profile),
+      quotaSnapshot: buildQuotaStatus(validation.profile, context),
       provisioningState,
       auditSummary,
       context: compactDefined({
@@ -1247,7 +1410,7 @@ export function buildOpenWhiskInventorySnapshot({
       rules: rules.length,
       httpExposures: httpExposures.length
     },
-    quotas: buildQuotaStatus(profile),
+    quotas: buildQuotaStatus(profile, { ...context, tenantId, workspaceId }),
     namingPolicy: profile.serverlessContext.namingPolicy,
     serverlessContext: profile.serverlessContext,
     minimumEnginePolicy: profile.minimumEnginePolicy,
