@@ -4,12 +4,17 @@ import assert from 'node:assert/strict';
 import {
   adapterCallContract,
   adapterResultContract,
+  buildTenantStorageEvent,
   getStorageProviderCompatibilitySummary,
   getStorageProviderProfile,
+  getTenantStorageContextRecord,
+  getTenantStorageContextSummary,
+  getWorkspaceStorageBootstrapPreview,
   listAuditAdapters,
   listProvisioningAdapters,
   listStorageProviderProfiles,
   providerAdapterCatalog,
+  rotateTenantStorageCredential,
   supportedStorageProviderTypes
 } from '../../services/adapters/src/provider-catalog.mjs';
 import {
@@ -65,4 +70,41 @@ test('adapter authorization policy exposes scoped enforcement targets', () => {
   assert.ok(resourceTypes.has('topic'));
   assert.ok(resourceTypes.has('function'));
   assert.ok(resourceTypes.has('app'));
+});
+
+test('provider catalog exposes tenant storage context helpers without leaking secret material', () => {
+  const record = getTenantStorageContextRecord({
+    tenant: {
+      tenantId: 'ten_01catalog',
+      slug: 'catalog',
+      state: 'active',
+      planId: 'pln_01growth'
+    },
+    storage: {
+      config: {
+        inline: {
+          providerType: 'minio'
+        }
+      }
+    },
+    now: '2026-03-27T20:50:00Z'
+  });
+  const summary = getTenantStorageContextSummary(record);
+  const rotated = rotateTenantStorageCredential({ storageContext: record, requestedAt: '2026-03-27T20:55:00Z', actorUserId: 'usr_01catalog' });
+  const bootstrap = getWorkspaceStorageBootstrapPreview({
+    tenantId: 'ten_01catalog',
+    workspaceId: 'wrk_01catalog',
+    workspaceSlug: 'catalog-dev',
+    storageContext: rotated,
+    now: '2026-03-27T20:55:00Z'
+  });
+  const event = buildTenantStorageEvent({ storageContext: rotated, transition: 'reactivated', occurredAt: '2026-03-27T20:56:00Z' });
+
+  assert.equal(record.state, 'active');
+  assert.equal(record.quotaAssignment.capabilityAvailable, true);
+  assert.equal(summary.credential.secretReferencePresent, true);
+  assert.equal(JSON.stringify(summary).includes('secret://tenants/'), false);
+  assert.equal(rotated.credentialReference.version, 2);
+  assert.equal(bootstrap.requestedState, 'pending');
+  assert.equal(event.entityType, 'tenant_storage_context');
 });
