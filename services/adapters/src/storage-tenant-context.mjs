@@ -31,7 +31,8 @@ export const TENANT_STORAGE_CONTEXT_ERROR_CODES = Object.freeze({
   CONTEXT_PENDING: 'CONTEXT_PENDING',
   CONTEXT_SUSPENDED: 'CONTEXT_SUSPENDED',
   CONTEXT_SOFT_DELETED: 'CONTEXT_SOFT_DELETED',
-  PROVIDER_UNAVAILABLE: 'PROVIDER_UNAVAILABLE'
+  PROVIDER_UNAVAILABLE: 'PROVIDER_UNAVAILABLE',
+  PROVIDER_BASELINE_UNSATISFIED: 'PROVIDER_BASELINE_UNSATISFIED'
 });
 
 function slugify(value, fallback = 'tenant') {
@@ -77,7 +78,7 @@ function normalizeCredentialHealth(state, provisioningStatus) {
   return 'healthy';
 }
 
-function normalizeProvisioningStatus({ capabilityAvailable, providerStatus, tenantState }) {
+function normalizeProvisioningStatus({ capabilityAvailable, providerStatus, providerBaselineEligible, tenantState }) {
   if (!capabilityAvailable) {
     return { status: 'capability_unavailable', retryable: false, reasonCode: TENANT_STORAGE_CONTEXT_ERROR_CODES.CAPABILITY_NOT_AVAILABLE };
   }
@@ -87,6 +88,14 @@ function normalizeProvisioningStatus({ capabilityAvailable, providerStatus, tena
       status: 'retryable_failure',
       retryable: true,
       reasonCode: TENANT_STORAGE_CONTEXT_ERROR_CODES.PROVIDER_UNAVAILABLE
+    };
+  }
+
+  if (providerBaselineEligible === false) {
+    return {
+      status: 'blocked',
+      retryable: false,
+      reasonCode: TENANT_STORAGE_CONTEXT_ERROR_CODES.PROVIDER_BASELINE_UNSATISFIED
     };
   }
 
@@ -158,9 +167,11 @@ export function buildTenantStorageContextRecord({
   const providerProfile = buildStorageProviderProfile({ ...storage, storage });
   const quotaAssignment = buildTenantStorageQuotaAssignment({ tenantId: tenant.tenantId, planId, resolvedAt: now });
   const capabilityAvailable = quotaAssignment.capabilityAvailable;
+  const providerBaselineEligible = providerProfile.capabilityBaseline?.eligible !== false;
   const provisioning = normalizeProvisioningStatus({
     capabilityAvailable,
     providerStatus: providerProfile.status,
+    providerBaselineEligible,
     tenantState: tenant.state
   });
   const namespace = deriveTenantStorageNamespace({
@@ -175,7 +186,7 @@ export function buildTenantStorageContextRecord({
       ? 'suspended'
       : tenant.state === 'deleted'
         ? 'soft_deleted'
-        : tenant.state === 'active' && providerProfile.status === 'ready'
+        : tenant.state === 'active' && providerProfile.status === 'ready' && providerBaselineEligible
           ? 'active'
           : tenant.state === 'pending_activation'
             ? 'draft'
@@ -192,7 +203,30 @@ export function buildTenantStorageContextRecord({
     providerStatus: providerProfile.status,
     providerConfiguredVia: providerProfile.configuredVia,
     providerRouteId: 'getStorageProviderIntrospection',
-    bucketProvisioningAllowed: state === 'active' && capabilityAvailable && providerProfile.status === 'ready',
+    providerCapabilities: {
+      manifestVersion: providerProfile.capabilityManifestVersion,
+      manifest: { ...providerProfile.capabilityManifest },
+      details: providerProfile.capabilityDetails.map((entry) => ({
+        capabilityId: entry.capabilityId,
+        required: entry.required,
+        state: entry.state,
+        summary: entry.summary,
+        constraints: entry.constraints.map((constraint) => ({ ...constraint }))
+      })),
+      baseline: {
+        version: providerProfile.capabilityBaseline.version,
+        checkedAt: providerProfile.capabilityBaseline.checkedAt,
+        eligible: providerProfile.capabilityBaseline.eligible,
+        requiredCapabilities: [...providerProfile.capabilityBaseline.requiredCapabilities],
+        optionalCapabilities: [...providerProfile.capabilityBaseline.optionalCapabilities],
+        missingCapabilities: providerProfile.capabilityBaseline.missingCapabilities.map((entry) => ({ ...entry })),
+        insufficientCapabilities: providerProfile.capabilityBaseline.insufficientCapabilities.map((entry) => ({
+          ...entry,
+          constraints: (entry.constraints ?? []).map((constraint) => ({ ...constraint }))
+        }))
+      }
+    },
+    bucketProvisioningAllowed: state === 'active' && capabilityAvailable && providerProfile.status === 'ready' && providerBaselineEligible,
     quotaAssignment,
     credentialReference: {
       secretRef: existingContext?.credentialReference?.secretRef ?? `secret://tenants/${tenant.tenantId}/storage/context`,
@@ -219,7 +253,7 @@ export function buildTenantStorageContextRecord({
     managedResourceDependency: {
       resourceKey: 'default_storage_bucket',
       requiredState: 'active',
-      satisfied: state === 'active' && capabilityAvailable && providerProfile.status === 'ready'
+      satisfied: state === 'active' && capabilityAvailable && providerProfile.status === 'ready' && providerBaselineEligible
     },
     observedAt: now
   };
@@ -237,6 +271,29 @@ export function buildTenantStorageContextIntrospection(input) {
     providerDisplayName: context.providerDisplayName,
     providerStatus: context.providerStatus,
     providerRouteId: context.providerRouteId,
+    providerCapabilities: {
+      manifestVersion: context.providerCapabilities.manifestVersion,
+      manifest: { ...context.providerCapabilities.manifest },
+      details: context.providerCapabilities.details.map((entry) => ({
+        capabilityId: entry.capabilityId,
+        required: entry.required,
+        state: entry.state,
+        summary: entry.summary,
+        constraints: entry.constraints.map((constraint) => ({ ...constraint }))
+      })),
+      baseline: {
+        version: context.providerCapabilities.baseline.version,
+        checkedAt: context.providerCapabilities.baseline.checkedAt,
+        eligible: context.providerCapabilities.baseline.eligible,
+        requiredCapabilities: [...context.providerCapabilities.baseline.requiredCapabilities],
+        optionalCapabilities: [...context.providerCapabilities.baseline.optionalCapabilities],
+        missingCapabilities: context.providerCapabilities.baseline.missingCapabilities.map((entry) => ({ ...entry })),
+        insufficientCapabilities: context.providerCapabilities.baseline.insufficientCapabilities.map((entry) => ({
+          ...entry,
+          constraints: (entry.constraints ?? []).map((constraint) => ({ ...constraint }))
+        }))
+      }
+    },
     bucketProvisioningAllowed: context.bucketProvisioningAllowed,
     provisioning: { ...context.provisioning },
     quotaAssignment: { ...context.quotaAssignment },
@@ -377,12 +434,16 @@ export function previewWorkspaceStorageBootstrap({
       ? TENANT_STORAGE_CONTEXT_ERROR_CODES.CONTEXT_SOFT_DELETED
       : storageContext.provisioning?.reasonCode === TENANT_STORAGE_CONTEXT_ERROR_CODES.CAPABILITY_NOT_AVAILABLE
         ? TENANT_STORAGE_CONTEXT_ERROR_CODES.CAPABILITY_NOT_AVAILABLE
-        : TENANT_STORAGE_CONTEXT_ERROR_CODES.CONTEXT_PENDING;
+        : storageContext.provisioning?.reasonCode === TENANT_STORAGE_CONTEXT_ERROR_CODES.PROVIDER_BASELINE_UNSATISFIED
+          ? TENANT_STORAGE_CONTEXT_ERROR_CODES.PROVIDER_BASELINE_UNSATISFIED
+          : TENANT_STORAGE_CONTEXT_ERROR_CODES.CONTEXT_PENDING;
 
   return {
     tenantId: storageContext.tenantId ?? tenantId,
     workspaceId,
-    requestedState: ['suspended', 'soft_deleted'].includes(currentState) || reasonCode === TENANT_STORAGE_CONTEXT_ERROR_CODES.CAPABILITY_NOT_AVAILABLE
+    requestedState: ['suspended', 'soft_deleted'].includes(currentState)
+      || reasonCode === TENANT_STORAGE_CONTEXT_ERROR_CODES.CAPABILITY_NOT_AVAILABLE
+      || reasonCode === TENANT_STORAGE_CONTEXT_ERROR_CODES.PROVIDER_BASELINE_UNSATISFIED
       ? 'blocked'
       : 'dependency_wait',
     reasonCode,

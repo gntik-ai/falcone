@@ -77698,6 +77698,18 @@
               "string",
               "null"
             ]
+          },
+          "capabilityManifestVersion": {
+            "type": "string"
+          },
+          "capabilityDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityEntry"
+            }
+          },
+          "capabilityBaseline": {
+            "$ref": "#/components/schemas/StorageCapabilityBaseline"
           }
         },
         "required": [
@@ -77709,7 +77721,10 @@
           "selectionMode",
           "supportedProviderTypes",
           "capabilityManifest",
-          "limitations"
+          "limitations",
+          "capabilityManifestVersion",
+          "capabilityDetails",
+          "capabilityBaseline"
         ],
         "type": "object"
       },
@@ -77813,7 +77828,8 @@
               "retryable_failure",
               "capability_unavailable",
               "suspended",
-              "soft_deleted"
+              "soft_deleted",
+              "blocked"
             ]
           },
           "retryable": {
@@ -77876,7 +77892,8 @@
           "quotaAssignment",
           "credential",
           "managedResourceDependency",
-          "observedAt"
+          "observedAt",
+          "providerCapabilities"
         ],
         "properties": {
           "tenantId": {
@@ -77928,6 +77945,9 @@
           "observedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "providerCapabilities": {
+            "$ref": "#/components/schemas/StorageProviderCapabilities"
           }
         }
       },
@@ -78402,6 +78422,272 @@
             "type": "string",
             "minLength": 3,
             "maxLength": 255
+          }
+        }
+      },
+      "StorageCapabilityConstraint": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "operator",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "integer",
+              "boolean"
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "StorageCapabilityEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capabilityId",
+          "required",
+          "state",
+          "summary",
+          "constraints"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "satisfied",
+              "partially_satisfied",
+              "unsatisfied"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityConstraint"
+            }
+          }
+        }
+      },
+      "StorageCapabilityGap": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capabilityId",
+          "expectedState",
+          "actualState"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string"
+          },
+          "expectedState": {
+            "type": "string"
+          },
+          "actualState": {
+            "type": "string"
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityConstraint"
+            }
+          }
+        }
+      },
+      "StorageCapabilityBaseline": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "checkedAt",
+          "requiredCapabilities",
+          "optionalCapabilities",
+          "eligible",
+          "missingCapabilities",
+          "insufficientCapabilities"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requiredCapabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optionalCapabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "missingCapabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityGap"
+            }
+          },
+          "insufficientCapabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityGap"
+            }
+          }
+        }
+      },
+      "StorageProviderCapabilities": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "manifestVersion",
+          "manifest",
+          "details",
+          "baseline"
+        ],
+        "properties": {
+          "manifestVersion": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/StorageCapabilityManifest"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageCapabilityEntry"
+            }
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/StorageCapabilityBaseline"
+          }
+        }
+      },
+      "StorageNormalizedErrorOperationContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "tenantId",
+          "workspaceId",
+          "operation",
+          "bucketName",
+          "objectKey"
+        ],
+        "properties": {
+          "requestId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenantId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "bucketName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "objectKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "StorageNormalizedError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "httpStatus",
+          "retryability",
+          "operationContext",
+          "observedAt"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "httpStatus": {
+            "type": "integer"
+          },
+          "retryability": {
+            "type": "string",
+            "enum": [
+              "retryable",
+              "not_retryable",
+              "conditionally_retryable"
+            ]
+          },
+          "operationContext": {
+            "$ref": "#/components/schemas/StorageNormalizedErrorOperationContext"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StorageNormalizedErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/StorageNormalizedError"
           }
         }
       }

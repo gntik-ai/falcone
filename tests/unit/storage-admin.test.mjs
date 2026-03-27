@@ -5,8 +5,15 @@ import {
   STORAGE_ADMIN_ERROR_CODES,
   STORAGE_BUCKET_OBJECT_ERRORS,
   STORAGE_LOGICAL_ORGANIZATION_ERRORS,
+  STORAGE_NORMALIZED_ERROR_CATALOG,
   STORAGE_PROVIDER_CAPABILITIES,
+  STORAGE_PROVIDER_CAPABILITY_BASELINE_SCHEMA_VERSION,
+  STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG,
+  STORAGE_PROVIDER_CAPABILITY_IDS_CATALOG,
+  STORAGE_PROVIDER_CAPABILITY_MANIFEST_SCHEMA_VERSION,
+  STORAGE_ERROR_RETRYABILITY_CATALOG,
   TENANT_STORAGE_ERROR_CODES,
+  buildStorageErrorEvent,
   buildStorageOperationEvent,
   buildTenantStorageEvent,
   deleteStorageBucketPreview,
@@ -19,13 +26,18 @@ import {
   listStorageObjectsPreview,
   previewReservedStoragePrefix,
   previewStorageBucket,
+  previewStorageErrorEnvelope,
+  previewStorageInternalErrorRecord,
   previewStorageLogicalOrganization,
   previewStorageObject,
+  previewStorageNormalizedError,
   previewStorageObjectOrganization,
   previewTenantStorageContext,
   previewWorkspaceStorageBootstrapContext,
   rotateTenantStorageCredentialPreview,
   summarizeStorageBucket,
+  summarizeStorageCapabilityBaseline,
+  summarizeStorageCapabilityDetails,
   summarizeStorageObjectMetadata,
   summarizeStorageProviderIntrospection,
   summarizeStorageProviderSupport,
@@ -87,17 +99,26 @@ test('storage provider support normalizes explicit provider selection into a rea
       }
     }
   });
+  const baseline = summarizeStorageCapabilityBaseline({ providerType: 'minio' });
+  const details = summarizeStorageCapabilityDetails({ providerType: 'ceph-rgw' });
 
   assert.equal(profile.providerType, 'ceph-rgw');
   assert.equal(profile.status, 'ready');
   assert.equal(profile.configured, true);
   assert.equal(profile.configuredVia, 'storage.config.inline.providerType');
   assert.deepEqual(Object.keys(profile.capabilityManifest), STORAGE_PROVIDER_CAPABILITIES);
+  assert.equal(profile.capabilityManifestVersion, STORAGE_PROVIDER_CAPABILITY_MANIFEST_SCHEMA_VERSION);
   assert.equal(profile.capabilityManifest.bucketOperations, true);
   assert.equal(profile.capabilityManifest.objectCrud, true);
+  assert.equal(profile.capabilityBaseline.version, STORAGE_PROVIDER_CAPABILITY_BASELINE_SCHEMA_VERSION);
+  assert.equal(profile.capabilityBaseline.eligible, true);
+  assert.equal(profile.capabilityDetails.length, STORAGE_PROVIDER_CAPABILITY_IDS_CATALOG.length);
   assert.equal(profile.supportedProviderTypes.includes('minio'), true);
   assert.equal(profile.supportedProviderTypes.includes('ceph-rgw'), true);
   assert.equal(JSON.stringify(profile).includes('should-not-leak'), false);
+
+  assert.equal(baseline.eligible, true);
+  assert.equal(details.find((entry) => entry.capabilityId === 'object.versioning').state, STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG.PARTIALLY_SATISFIED);
 
   assert.equal(compatibility.providerType, 'minio');
   assert.equal(compatibility.status, 'ready');
@@ -139,6 +160,8 @@ test('storage provider support fails safely for missing, unknown, and ambiguous 
 
   assert.equal(introspection.route.operationId, 'getStorageProviderIntrospection');
   assert.equal(introspection.supportedProviders.length >= 2, true);
+  assert.equal(introspection.profile.capabilityManifestVersion, STORAGE_PROVIDER_CAPABILITY_MANIFEST_SCHEMA_VERSION);
+  assert.equal(introspection.profile.capabilityBaseline.version, STORAGE_PROVIDER_CAPABILITY_BASELINE_SCHEMA_VERSION);
   assert.deepEqual(introspection.capabilityFields, STORAGE_PROVIDER_CAPABILITIES);
 });
 
@@ -191,6 +214,8 @@ test('tenant storage context summary is tenant-isolated, introspectable, and sec
   assert.equal(preview.namespace.startsWith('tctx-atelier-'), true);
   assert.equal(summary.route.operationId, 'getTenantStorageContext');
   assert.equal(summary.context.quotaAssignment.capabilityAvailable, true);
+  assert.equal(summary.context.providerCapabilities.manifestVersion, STORAGE_PROVIDER_CAPABILITY_MANIFEST_SCHEMA_VERSION);
+  assert.equal(summary.context.providerCapabilities.baseline.eligible, true);
   assert.equal(summary.context.credential.secretReferencePresent, true);
   assert.equal(JSON.stringify(summary).includes('secret://tenants/'), false);
   assert.equal(event.eventType, 'tenant_storage_context.succeeded');
@@ -327,6 +352,64 @@ test('bucket and object previews stay scope-bound and expose bounded metadata/do
   assert.equal(objectDelete.accepted, true);
   assert.equal(event.entityType, 'bucket_object');
   assert.equal(event.objectKey, 'avatars/logo.png');
+});
+
+test('storage error previews normalize provider failures without leaking provider secrets', () => {
+  const normalized = previewStorageNormalizedError({
+    providerCode: 'NoSuchBucket',
+    providerMessage: 'NoSuchBucket returned from https://minio.internal for secret://tenants/ten_01unit/storage/context',
+    requestId: 'req_unit_storage_01',
+    tenantId: 'ten_01unit',
+    workspaceId: 'wrk_01unit',
+    operation: 'bucket.get',
+    bucketName: 'missing-bucket',
+    observedAt: '2026-03-27T20:47:00Z'
+  });
+  const envelope = previewStorageErrorEnvelope({
+    providerCode: 'AccessDenied',
+    providerMessage: 'Access denied by https://garage.internal using accessKey=abc123',
+    requestId: 'req_unit_storage_02',
+    tenantId: 'ten_01unit',
+    workspaceId: 'wrk_01unit',
+    operation: 'object.delete',
+    bucketName: 'missing-bucket',
+    objectKey: 'private/file.txt',
+    observedAt: '2026-03-27T20:47:01Z'
+  });
+  const internal = previewStorageInternalErrorRecord({
+    providerCode: 'TimeoutError',
+    providerMessage: 'timeout against https://garage.internal using sessionKey=xyz123',
+    requestId: 'req_unit_storage_03',
+    tenantId: 'ten_01unit',
+    workspaceId: 'wrk_01unit',
+    operation: 'object.put',
+    bucketName: 'missing-bucket',
+    objectKey: 'private/file.txt',
+    observedAt: '2026-03-27T20:47:02Z'
+  });
+  const event = buildStorageErrorEvent({
+    providerCode: 'Quota_Exceeded',
+    requestId: 'req_unit_storage_04',
+    tenantId: 'ten_01unit',
+    workspaceId: 'wrk_01unit',
+    operation: 'object.put',
+    bucketName: 'missing-bucket',
+    objectKey: 'private/file.txt',
+    observedAt: '2026-03-27T20:47:03Z'
+  });
+
+  assert.equal(STORAGE_NORMALIZED_ERROR_CATALOG.BUCKET_NOT_FOUND, 'BUCKET_NOT_FOUND');
+  assert.equal(STORAGE_ERROR_RETRYABILITY_CATALOG.CONDITIONALLY_RETRYABLE, 'conditionally_retryable');
+  assert.equal(normalized.code, STORAGE_NORMALIZED_ERROR_CATALOG.BUCKET_NOT_FOUND);
+  assert.equal(normalized.httpStatus, 404);
+  assert.equal(envelope.error.code, STORAGE_NORMALIZED_ERROR_CATALOG.STORAGE_ACCESS_DENIED);
+  assert.equal(JSON.stringify(envelope).includes('https://garage.internal'), false);
+  assert.equal(JSON.stringify(envelope).includes('accessKey=abc123'), false);
+  assert.equal(internal.code, STORAGE_NORMALIZED_ERROR_CATALOG.STORAGE_PROVIDER_TIMEOUT);
+  assert.equal(internal.diagnostics.providerMessage.includes('[redacted-url]'), true);
+  assert.equal(internal.diagnostics.providerMessage.includes('[redacted]'), true);
+  assert.equal(event.eventType, 'storage.error.normalized');
+  assert.equal(event.errorCode, STORAGE_NORMALIZED_ERROR_CATALOG.STORAGE_QUOTA_EXCEEDED);
 });
 
 test('tenant storage context lifecycle gating and bucket deletion rules block unsafe operations', () => {

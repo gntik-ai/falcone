@@ -9,10 +9,13 @@ import {
 } from '../../services/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
 import {
+  buildStorageErrorEvent,
   downloadStorageObjectPreviewResult,
   listStorageObjectsPreview,
   previewStorageBucket,
+  previewStorageErrorEnvelope,
   previewStorageObject,
+  previewStorageNormalizedError,
   previewTenantStorageContext,
   summarizeStorageProviderIntrospection,
   summarizeTenantStorageContext
@@ -33,6 +36,13 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
   const deleteObjectRoute = document.paths['/v1/storage/buckets/{resourceId}/objects/{objectKey}']?.delete;
   const metadataRoute = document.paths['/v1/storage/buckets/{resourceId}/objects/{objectKey}/metadata']?.get;
   const manifestSchema = document.components.schemas.StorageCapabilityManifest;
+  const capabilityConstraintSchema = document.components.schemas.StorageCapabilityConstraint;
+  const capabilityEntrySchema = document.components.schemas.StorageCapabilityEntry;
+  const capabilityBaselineSchema = document.components.schemas.StorageCapabilityBaseline;
+  const capabilityGapSchema = document.components.schemas.StorageCapabilityGap;
+  const providerCapabilitiesSchema = document.components.schemas.StorageProviderCapabilities;
+  const normalizedErrorSchema = document.components.schemas.StorageNormalizedError;
+  const normalizedErrorEnvelopeSchema = document.components.schemas.StorageNormalizedErrorEnvelope;
   const providerSchema = document.components.schemas.StorageProviderIntrospection;
   const limitationSchema = document.components.schemas.StorageProviderLimitation;
   const tenantContextSchema = document.components.schemas.TenantStorageContext;
@@ -77,6 +87,13 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
   assert.equal(metadataRoute['x-resource-type'], 'bucket_object');
 
   assert.ok(manifestSchema);
+  assert.ok(capabilityConstraintSchema);
+  assert.ok(capabilityEntrySchema);
+  assert.ok(capabilityBaselineSchema);
+  assert.ok(capabilityGapSchema);
+  assert.ok(providerCapabilitiesSchema);
+  assert.ok(normalizedErrorSchema);
+  assert.ok(normalizedErrorEnvelopeSchema);
   assert.ok(providerSchema);
   assert.ok(limitationSchema);
   assert.ok(tenantContextSchema);
@@ -94,7 +111,11 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
   assert.ok(objectKeyParam);
 
   assert.deepEqual(providerSchema.required.includes('capabilityManifest'), true);
+  assert.deepEqual(providerSchema.required.includes('capabilityManifestVersion'), true);
+  assert.deepEqual(providerSchema.required.includes('capabilityDetails'), true);
+  assert.deepEqual(providerSchema.required.includes('capabilityBaseline'), true);
   assert.deepEqual(tenantContextSchema.required.includes('credential'), true);
+  assert.deepEqual(tenantContextSchema.required.includes('providerCapabilities'), true);
   assert.deepEqual(bucketCollectionSchema.required, ['items', 'page']);
   assert.deepEqual(logicalOrganizationSchema.required, [
     'strategy',
@@ -134,6 +155,15 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
     'multipartUpload',
     'objectVersioning'
   ]);
+  assert.deepEqual(capabilityConstraintSchema.required, ['key', 'operator', 'value']);
+  assert.deepEqual(capabilityEntrySchema.required, ['capabilityId', 'required', 'state', 'summary', 'constraints']);
+  assert.deepEqual(capabilityBaselineSchema.required, ['version', 'checkedAt', 'requiredCapabilities', 'optionalCapabilities', 'eligible', 'missingCapabilities', 'insufficientCapabilities']);
+  assert.deepEqual(capabilityGapSchema.required, ['capabilityId', 'expectedState', 'actualState']);
+  assert.deepEqual(normalizedErrorSchema.required, ['code', 'message', 'httpStatus', 'retryability', 'operationContext', 'observedAt']);
+  assert.deepEqual(normalizedErrorEnvelopeSchema.required, ['error']);
+  assert.ok(providerSchema.properties.capabilityDetails.items.properties.capabilityId);
+  assert.ok(providerSchema.properties.capabilityBaseline.properties.eligible);
+  assert.ok(tenantContextSchema.properties.providerCapabilities.properties.baseline.properties.insufficientCapabilities);
 });
 
 test('storage contracts preserve route discoverability, taxonomy, service-map coverage, and bounded previews', () => {
@@ -236,11 +266,16 @@ test('storage contracts preserve route discoverability, taxonomy, service-map co
   assert.ok(storageAdapter.capabilities.includes('get_object_metadata'));
   assert.ok(storageAdapter.capabilities.includes('list_objects'));
   assert.ok(storageAdapter.capabilities.includes('delete_object'));
+  assert.ok(storageAdapter.capabilities.includes('get_capability_manifest'));
+  assert.ok(storageAdapter.capabilities.includes('normalize_storage_error'));
+  assert.ok(storageAdapter.capabilities.includes('validate_capability_baseline'));
 
   assert.equal(introspection.profile.providerType, 'garage');
   assert.equal(introspection.profile.status, 'ready');
+  assert.equal(introspection.profile.capabilityBaseline.eligible, true);
   assert.equal(introspection.supportedProviders.length >= 2, true);
   assert.equal(tenantContext.route.operationId, 'getTenantStorageContext');
+  assert.equal(tenantContext.context.providerCapabilities.baseline.eligible, true);
   assert.equal(tenantContext.context.credential.secretReferencePresent, true);
   assert.equal(JSON.stringify(tenantContext).includes('secret://tenants/'), false);
   assert.equal(bucket.organization.workspaceSharedPrefix, 'tenants/ten_01contract/workspaces/wrk_01contract/shared/');
@@ -252,6 +287,43 @@ test('storage contracts preserve route discoverability, taxonomy, service-map co
   assert.equal(download.metadata.objectKey, 'files/report.txt');
   assert.equal(download.metadata.organization.canonicalObjectPath, 'tenants/ten_01contract/workspaces/wrk_01contract/apps/app_01contract/data/files/report.txt');
   assert.equal(typeof download.payload.contentBase64, 'string');
+
+  const normalizedError = previewStorageNormalizedError({
+    providerCode: 'NoSuchKey',
+    requestId: 'req_contract_storage_01',
+    tenantId: 'ten_01contract',
+    workspaceId: 'wrk_01contract',
+    operation: 'object.get',
+    bucketName: 'contract-assets',
+    objectKey: 'files/missing.txt',
+    observedAt: '2026-03-27T21:00:07Z'
+  });
+  const errorEnvelope = previewStorageErrorEnvelope({
+    providerCode: 'AccessDenied',
+    providerMessage: 'https://garage.internal denied using secret://tenants/ten_01contract/storage/context',
+    requestId: 'req_contract_storage_02',
+    tenantId: 'ten_01contract',
+    workspaceId: 'wrk_01contract',
+    operation: 'object.delete',
+    bucketName: 'contract-assets',
+    objectKey: 'files/report.txt',
+    observedAt: '2026-03-27T21:00:08Z'
+  });
+  const errorEvent = buildStorageErrorEvent({
+    providerCode: 'Quota_Exceeded',
+    requestId: 'req_contract_storage_03',
+    tenantId: 'ten_01contract',
+    workspaceId: 'wrk_01contract',
+    operation: 'object.put',
+    bucketName: 'contract-assets',
+    objectKey: 'files/report.txt',
+    observedAt: '2026-03-27T21:00:09Z'
+  });
+
+  assert.equal(normalizedError.code, 'OBJECT_NOT_FOUND');
+  assert.equal(errorEnvelope.error.code, 'STORAGE_ACCESS_DENIED');
+  assert.equal(JSON.stringify(errorEnvelope).includes('https://garage.internal'), false);
+  assert.equal(errorEvent.errorCode, 'STORAGE_QUOTA_EXCEEDED');
 
   assert.ok(bucketObjectTaxonomy);
   assert.equal(bucketObjectTaxonomy.family, 'storage');
