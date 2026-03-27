@@ -35,5 +35,10 @@
     "@apidevtools/swagger-parser": "12.1.0",
     "markdownlint-cli2": "0.22.0",
     "yaml": "2.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "picomatch": ">=2.3.2"
+    }
   }
 }
