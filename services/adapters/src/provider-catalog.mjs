@@ -9,6 +9,13 @@ import {
   listSupportedStorageProviders,
   summarizeStorageProviderCompatibility
 } from './storage-provider-profile.mjs';
+import {
+  buildTenantStorageContextIntrospection,
+  buildTenantStorageContextRecord,
+  buildTenantStorageProvisioningEvent,
+  previewWorkspaceStorageBootstrap,
+  rotateTenantStorageContextCredential
+} from './storage-tenant-context.mjs';
 
 export const providerAdapterCatalog = listAdapterPorts();
 export const adapterCallContract = getContract('adapter_call');
@@ -33,4 +40,24 @@ export function getStorageProviderProfile(input = {}) {
 
 export function getStorageProviderCompatibilitySummary(input = {}) {
   return summarizeStorageProviderCompatibility(input);
+}
+
+export function getTenantStorageContextRecord(input = {}) {
+  return buildTenantStorageContextRecord(input);
+}
+
+export function getTenantStorageContextSummary(input = {}) {
+  return buildTenantStorageContextIntrospection(input);
+}
+
+export function buildTenantStorageEvent(input = {}) {
+  return buildTenantStorageProvisioningEvent(input);
+}
+
+export function getWorkspaceStorageBootstrapPreview(input = {}) {
+  return previewWorkspaceStorageBootstrap(input);
+}
+
+export function rotateTenantStorageCredential(input = {}) {
+  return rotateTenantStorageContextCredential(input);
 }

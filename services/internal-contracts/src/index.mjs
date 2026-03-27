@@ -900,6 +900,7 @@ export function resolveInitialTenantBootstrap({
   workspaceId,
   workspaceEnvironment = 'dev',
   planId,
+  tenantStorageContext,
   provisioningRunId = 'prn_bootstrappreview',
   lifecycleTrigger = 'signup_activation',
   resolvedAt = '2026-03-24T00:00:00Z'
@@ -921,7 +922,7 @@ export function resolveInitialTenantBootstrap({
       template.provisioningMode === 'always' ||
       (template.requiredCapabilityKey ? capabilityKeys.has(template.requiredCapabilityKey) : false);
 
-    return {
+    const baseState = {
       resourceKey: template.resourceKey,
       resourceType: template.resourceType,
       scope: template.scope,
@@ -932,6 +933,52 @@ export function resolveInitialTenantBootstrap({
       status: enabled ? 'pending' : 'skipped',
       attemptCount: 0,
       visibleInConsole: template.visibleInConsole === true
+    };
+
+    if (template.resourceKey !== 'default_storage_bucket' || tenantStorageContext === undefined) {
+      return baseState;
+    }
+
+    if (!tenantStorageContext) {
+      return {
+        ...baseState,
+        status: 'dependency_wait',
+        dependency: {
+          entityType: 'tenant_storage_context',
+          tenantId,
+          requiredState: 'active',
+          currentState: 'missing',
+          reasonCode: 'CONTEXT_MISSING'
+        }
+      };
+    }
+
+    const currentState = tenantStorageContext.state ?? 'draft';
+    const currentReasonCode = tenantStorageContext?.provisioning?.reasonCode ?? null;
+    const bucketReady = currentState === 'active' && tenantStorageContext.bucketProvisioningAllowed !== false;
+
+    return {
+      ...baseState,
+      status: bucketReady
+        ? 'pending'
+        : currentReasonCode === 'CAPABILITY_NOT_AVAILABLE' || ['suspended', 'soft_deleted'].includes(currentState)
+          ? 'blocked'
+          : 'dependency_wait',
+      dependency: {
+        entityType: 'tenant_storage_context',
+        tenantId,
+        requiredState: 'active',
+        currentState,
+        reasonCode:
+          currentReasonCode
+          ?? (currentState === 'suspended'
+            ? 'CONTEXT_SUSPENDED'
+            : currentState === 'soft_deleted'
+              ? 'CONTEXT_SOFT_DELETED'
+              : 'CONTEXT_PENDING')
+      },
+      namespace: tenantStorageContext.namespace ?? null,
+      providerType: tenantStorageContext.providerType ?? null
     };
   });
 

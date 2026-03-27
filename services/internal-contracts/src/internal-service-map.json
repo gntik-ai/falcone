@@ -41,7 +41,8 @@
         "Enforce public/private managed web-action visibility policy during function definition import before downstream orchestration dispatch.",
         "Accept authorized audit query requests scoped to the caller's tenant and workspace, apply mandatory pagination, and return audit records without crossing scope boundaries.",
         "Emit structured audit events to the function.audit.events Kafka topic for each governed deployment, administrative, rollback, and quota enforcement action.",
-        "Expose platform-level storage provider identity and capability introspection without leaking provider secrets or bypassing the unified storage family."
+        "Expose platform-level storage provider identity and capability introspection without leaking provider secrets or bypassing the unified storage family.",
+        "Expose tenant-scoped storage context status and credential-rotation initiation without leaking secret references or bypassing tenant authorization boundaries."
       ],
       "owned_resources": [
         "public route contract",
@@ -114,7 +115,8 @@
         "Coordinate Kafka topic and ACL administrative operations without letting control_api call adapters directly.",
         "Persist Kafka metadata and inventory snapshots for console-safe reads across shared and dedicated KRaft isolation modes.",
         "Emit correlation-rich Kafka admin events with naming, ACL, quota, and KRaft metadata for audit and stream consumers.",
-        "Emit PostgreSQL change envelopes, storage object-event envelopes, and OpenWhisk activation envelopes toward event_gateway when workspace-managed Kafka bridges are enabled."
+        "Emit PostgreSQL change envelopes, storage object-event envelopes, and OpenWhisk activation envelopes toward event_gateway when workspace-managed Kafka bridges are enabled.",
+        "Provision and reconcile one tenant-scoped storage context per entitled tenant, including namespace, credential-reference lifecycle, quota assignment, and workspace bucket bootstrap dependencies."
       ],
       "owned_resources": [
         "provisioning run state",
@@ -642,7 +644,11 @@
         "publish_object_event",
         "resolve_provider_profile",
         "get_capability_manifest",
-        "get_provider_status"
+        "get_provider_status",
+        "ensure_tenant_context",
+        "get_tenant_context_status",
+        "rotate_tenant_context_credentials",
+        "revoke_tenant_context_credentials"
       ],
       "request_contract": "adapter_call",
       "result_contract": "adapter_result",

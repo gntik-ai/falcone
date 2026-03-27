@@ -550,6 +550,14 @@ bootstrap:
               scope: tenant
               unit: days
               limit: 30
+            - metricKey: tenant.storage.bytes.max
+              scope: tenant
+              unit: bytes
+              limit: 10737418240
+            - metricKey: tenant.storage.buckets.max
+              scope: tenant
+              unit: count
+              limit: 8
         - quotaPolicyId: qta_01growth
           slug: growth-default
           displayName: Growth default quota policy
@@ -581,6 +589,14 @@ bootstrap:
               scope: tenant
               unit: days
               limit: 90
+            - metricKey: tenant.storage.bytes.max
+              scope: tenant
+              unit: bytes
+              limit: 107374182400
+            - metricKey: tenant.storage.buckets.max
+              scope: tenant
+              unit: count
+              limit: 32
         - quotaPolicyId: qta_01regulated
           slug: regulated-default
           displayName: Regulated default quota policy
@@ -612,6 +628,14 @@ bootstrap:
               scope: tenant
               unit: days
               limit: 365
+            - metricKey: tenant.storage.bytes.max
+              scope: tenant
+              unit: bytes
+              limit: 1099511627776
+            - metricKey: tenant.storage.buckets.max
+              scope: tenant
+              unit: count
+              limit: 256
         - quotaPolicyId: qta_01enterprise
           slug: enterprise-default
           displayName: Enterprise default quota policy
@@ -643,6 +667,14 @@ bootstrap:
               scope: tenant
               unit: days
               limit: 730
+            - metricKey: tenant.storage.bytes.max
+              scope: tenant
+              unit: bytes
+              limit: 1099511627776
+            - metricKey: tenant.storage.buckets.max
+              scope: tenant
+              unit: count
+              limit: 256
       deploymentProfiles:
         - deploymentProfileId: dpf_01sharedstarter
           slug: shared-starter
@@ -1145,7 +1177,8 @@ bootstrap:
               permissions:
                 - gateway.native.keycloak.admin
             http-logger:
-              uri: http://control-plane.{{ .Release.Namespace }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
+              uri: http://control-plane.{{ .Release.Namespace
+                }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
               include_req_body: false
               max_retry_count: 1
               buffer_duration: 1
@@ -1188,7 +1221,8 @@ bootstrap:
               permissions:
                 - gateway.native.openwhisk.admin
             http-logger:
-              uri: http://control-plane.{{ .Release.Namespace }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
+              uri: http://control-plane.{{ .Release.Namespace
+                }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
               include_req_body: false
               max_retry_count: 1
               buffer_duration: 1
