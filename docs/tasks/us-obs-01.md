@@ -298,3 +298,41 @@ npm run validate:observability-console-alerts
 ## Residual implementation note for `US-OBS-01-T05`
 
 `US-OBS-01-T01` through `US-OBS-01-T05` now define the canonical metrics-plane, dashboard-plane, health-probe, business-metrics, console-summary, and internal-alert semantics for observability. Remaining work still includes `US-OBS-01-T06`, which should smoke-test and verify runtime behavior against these contracts rather than introducing alternate summary or alert semantics.
+
+## Scope delivered in `US-OBS-01-T06`
+
+This increment establishes the **canonical observability smoke-verification baseline** for the platform.
+
+Delivered artifacts:
+
+- `tests/reference/observability-smoke-matrix.yaml` as the smoke matrix for scraping, dashboard, and health-state coverage
+- `tests/e2e/observability/observability-smoke.test.mjs` as the executable smoke suite
+- `tests/reference/README.md` and `tests/e2e/README.md` updates so the smoke baseline is discoverable
+- `package.json` test wiring so `npm test` includes the observability smoke suite
+
+## Main decisions in `US-OBS-01-T06`
+
+### Smoke verification is derivative, not a new observability contract
+
+The smoke layer does not invent new observability semantics. It consumes the T01–T05 contracts and verifies that their runtime-facing surfaces are still intact.
+
+### Coverage is explicitly scoped to scraping, dashboards, and health states
+
+The smoke matrix names one scraping scenario, three dashboard scope scenarios, and three health scenarios so the suite can catch drift in any of the three observable surfaces without broadening the task into browser automation or live operator workflows.
+
+### Freshness and masking stay aligned with the upstream contracts
+
+The smoke suite reuses the existing freshness threshold and masking policy rather than introducing new thresholds or exposing sensitive fields.
+
+## Validation for `US-OBS-01-T06`
+
+Primary validation entry points for the smoke baseline:
+
+```bash
+node --test tests/e2e/observability/observability-smoke.test.mjs
+npm test
+```
+
+## Residual implementation note for `US-OBS-01-T06`
+
+`US-OBS-01-T01` through `US-OBS-01-T06` now define the canonical observability metrics, dashboards, health checks, business metrics, console summaries, internal alerts, and smoke verification semantics for the platform. Remaining work still includes any live runtime consumers that execute the smoke matrix against deployed environments instead of the checked-in contract baseline.
