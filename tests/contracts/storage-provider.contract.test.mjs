@@ -180,7 +180,11 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
     'objectCrud',
     'presignedUrls',
     'multipartUpload',
-    'objectVersioning'
+    'objectVersioning',
+    'bucketPolicies',
+    'bucketLifecycle',
+    'objectLock',
+    'eventNotifications'
   ]);
   assert.deepEqual(capabilityConstraintSchema.required, ['key', 'operator', 'value']);
   assert.deepEqual(capabilityEntrySchema.required, ['capabilityId', 'required', 'state', 'summary', 'constraints']);
@@ -299,6 +303,14 @@ test('storage contracts preserve route discoverability, taxonomy, service-map co
 
   assert.equal(introspection.profile.providerType, 'garage');
   assert.equal(introspection.profile.status, 'ready');
+  assert.equal(introspection.profile.capabilityManifest.bucketPolicies, true);
+  assert.equal(introspection.profile.capabilityManifest.bucketLifecycle, false);
+  assert.equal(introspection.profile.capabilityManifest.objectLock, false);
+  assert.equal(introspection.profile.capabilityManifest.eventNotifications, false);
+  assert.equal(introspection.profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.policy'), true);
+  assert.equal(introspection.profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.lifecycle'), true);
+  assert.equal(introspection.profile.capabilityDetails.some((entry) => entry.capabilityId === 'object.lock'), true);
+  assert.equal(introspection.profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.event_notifications'), true);
   assert.equal(introspection.profile.capabilityBaseline.eligible, true);
   assert.equal(introspection.supportedProviders.length >= 2, true);
   assert.equal(tenantContext.route.operationId, 'getTenantStorageContext');

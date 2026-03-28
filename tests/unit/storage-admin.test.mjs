@@ -110,18 +110,32 @@ test('storage provider support normalizes explicit provider selection into a rea
   assert.equal(profile.capabilityManifestVersion, STORAGE_PROVIDER_CAPABILITY_MANIFEST_SCHEMA_VERSION);
   assert.equal(profile.capabilityManifest.bucketOperations, true);
   assert.equal(profile.capabilityManifest.objectCrud, true);
+  assert.equal(profile.capabilityManifest.bucketPolicies, true);
+  assert.equal(profile.capabilityManifest.bucketLifecycle, false);
+  assert.equal(profile.capabilityManifest.objectLock, false);
+  assert.equal(profile.capabilityManifest.eventNotifications, false);
   assert.equal(profile.capabilityBaseline.version, STORAGE_PROVIDER_CAPABILITY_BASELINE_SCHEMA_VERSION);
   assert.equal(profile.capabilityBaseline.eligible, true);
   assert.equal(profile.capabilityDetails.length, STORAGE_PROVIDER_CAPABILITY_IDS_CATALOG.length);
+  assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.policy'), true);
+  assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.lifecycle'), true);
+  assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'object.lock'), true);
+  assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.event_notifications'), true);
   assert.equal(profile.supportedProviderTypes.includes('minio'), true);
   assert.equal(profile.supportedProviderTypes.includes('ceph-rgw'), true);
   assert.equal(JSON.stringify(profile).includes('should-not-leak'), false);
 
   assert.equal(baseline.eligible, true);
   assert.equal(details.find((entry) => entry.capabilityId === 'object.versioning').state, STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG.PARTIALLY_SATISFIED);
+  assert.equal(details.find((entry) => entry.capabilityId === 'bucket.event_notifications').state, STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG.PARTIALLY_SATISFIED);
+  assert.equal(details.find((entry) => entry.capabilityId === 'object.lock').state, STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG.PARTIALLY_SATISFIED);
 
   assert.equal(compatibility.providerType, 'minio');
   assert.equal(compatibility.status, 'ready');
+  assert.equal(compatibility.capabilityManifest.bucketPolicies, true);
+  assert.equal(compatibility.capabilityManifest.bucketLifecycle, true);
+  assert.equal(compatibility.capabilityManifest.objectLock, true);
+  assert.equal(compatibility.capabilityManifest.eventNotifications, true);
   assert.equal(compatibility.routeIds.includes('getStorageProviderIntrospection'), true);
   assert.equal(compatibility.publicBucketRoutes.includes('createStorage'), true);
   assert.equal(compatibility.publicBucketRoutes.includes('listStorage'), true);

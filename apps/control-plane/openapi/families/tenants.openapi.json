@@ -1588,13 +1588,25 @@
       "StorageCapabilityManifest": {
         "additionalProperties": false,
         "properties": {
+          "bucketLifecycle": {
+            "type": "boolean"
+          },
           "bucketOperations": {
+            "type": "boolean"
+          },
+          "bucketPolicies": {
+            "type": "boolean"
+          },
+          "eventNotifications": {
             "type": "boolean"
           },
           "multipartUpload": {
             "type": "boolean"
           },
           "objectCrud": {
+            "type": "boolean"
+          },
+          "objectLock": {
             "type": "boolean"
           },
           "objectVersioning": {
@@ -1609,7 +1621,11 @@
           "objectCrud",
           "presignedUrls",
           "multipartUpload",
-          "objectVersioning"
+          "objectVersioning",
+          "bucketPolicies",
+          "bucketLifecycle",
+          "objectLock",
+          "eventNotifications"
         ],
         "type": "object"
       },
