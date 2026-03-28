@@ -73,6 +73,7 @@ test('consumer-specific adapter views remain separated', () => {
   const auditIds = new Set(listAuditAdapters().map((adapter) => adapter.id));
   const storageProfiles = listStorageProviderProfiles();
   const minioProfile = getStorageProviderProfile({ providerType: 'minio' });
+  const garageProfile = getStorageProviderProfile({ providerType: 'garage' });
   const unavailableProfile = getStorageProviderProfile({ providerType: 'unsupported' });
   const compatibility = getStorageProviderCompatibilitySummary({ providerType: 'garage' });
   const garageBaseline = getStorageProviderCapabilityBaseline({ providerType: 'garage' });
@@ -90,15 +91,28 @@ test('consumer-specific adapter views remain separated', () => {
   assert.equal(minioProfile.status, 'ready');
   assert.equal(minioProfile.capabilityManifestVersion, storageProviderCapabilityManifestVersion);
   assert.equal(minioProfile.capabilityManifest.bucketOperations, true);
+  assert.equal(minioProfile.capabilityManifest.bucketPolicies, true);
+  assert.equal(minioProfile.capabilityManifest.bucketLifecycle, true);
+  assert.equal(minioProfile.capabilityManifest.objectLock, true);
+  assert.equal(minioProfile.capabilityManifest.eventNotifications, true);
   assert.equal(minioProfile.capabilityBaseline.version, storageProviderCapabilityBaselineVersion);
   assert.equal(minioProfile.capabilityBaseline.eligible, true);
   assert.equal(minioProfile.capabilityDetails.length, storageProviderCapabilityIds.length);
+  assert.equal(minioProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.policy').state, storageProviderCapabilityEntryStates.SATISFIED);
+  assert.equal(minioProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.lifecycle').state, storageProviderCapabilityEntryStates.SATISFIED);
   assert.equal(unavailableProfile.status, 'unavailable');
   assert.equal(compatibility.providerType, 'garage');
   assert.equal(compatibility.capabilityCount >= 4, true);
   assert.equal(garageBaseline.eligible, true);
   assert.equal(garageBaseline.optionalCapabilities.includes('object.versioning'), true);
+  assert.equal(garageBaseline.optionalCapabilities.includes('bucket.lifecycle'), true);
+  assert.equal(garageBaseline.optionalCapabilities.includes('object.lock'), true);
+  assert.equal(garageBaseline.optionalCapabilities.includes('bucket.event_notifications'), true);
+  assert.equal(garageProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.lifecycle').state, storageProviderCapabilityEntryStates.UNSATISFIED);
+  assert.equal(garageProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.policy').state, storageProviderCapabilityEntryStates.SATISFIED);
   assert.equal(cephDetails.find((entry) => entry.capabilityId === 'object.versioning').state, storageProviderCapabilityEntryStates.PARTIALLY_SATISFIED);
+  assert.equal(cephDetails.find((entry) => entry.capabilityId === 'bucket.event_notifications').state, storageProviderCapabilityEntryStates.PARTIALLY_SATISFIED);
+  assert.equal(cephDetails.find((entry) => entry.capabilityId === 'object.lock').state, storageProviderCapabilityEntryStates.PARTIALLY_SATISFIED);
 });
 
 test('adapter authorization policy exposes scoped enforcement targets', () => {

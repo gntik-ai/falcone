@@ -77607,6 +77607,18 @@
           },
           "objectVersioning": {
             "type": "boolean"
+          },
+          "bucketPolicies": {
+            "type": "boolean"
+          },
+          "bucketLifecycle": {
+            "type": "boolean"
+          },
+          "objectLock": {
+            "type": "boolean"
+          },
+          "eventNotifications": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -77614,7 +77626,11 @@
           "objectCrud",
           "presignedUrls",
           "multipartUpload",
-          "objectVersioning"
+          "objectVersioning",
+          "bucketPolicies",
+          "bucketLifecycle",
+          "objectLock",
+          "eventNotifications"
         ],
         "type": "object"
       },
