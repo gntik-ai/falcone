@@ -19,22 +19,20 @@ import { STORAGE_NORMALIZED_ERROR_CODES } from '../../services/adapters/src/stor
 import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
 
 function makeSupportedProfile() {
-  const profile = buildStorageProviderProfile({ providerType: 'minio' });
-  profile.capabilityDetails = [
-    ...profile.capabilityDetails,
-    {
-      capabilityId: STORAGE_EVENT_NOTIFICATION_CAPABILITY_ID,
-      required: false,
-      state: 'satisfied',
-      summary: 'Storage event notifications are supported.',
-      constraints: []
-    }
-  ];
-  return profile;
+  return buildStorageProviderProfile({ providerType: 'minio' });
 }
 
 function makeUnsupportedProfile() {
-  return buildStorageProviderProfile({ providerType: 'minio' });
+  const profile = buildStorageProviderProfile({ providerType: 'garage' });
+  profile.capabilityDetails = profile.capabilityDetails.map((entry) => entry.capabilityId === STORAGE_EVENT_NOTIFICATION_CAPABILITY_ID
+    ? {
+        ...entry,
+        state: 'unsatisfied',
+        summary: 'Storage event notifications are not supported.',
+        constraints: []
+      }
+    : entry);
+  return profile;
 }
 
 test('storage event notification catalogs are frozen and additive', () => {

@@ -3,7 +3,11 @@ const STORAGE_PROVIDER_CAPABILITY_TEMPLATE = Object.freeze({
   objectCrud: false,
   presignedUrls: false,
   multipartUpload: false,
-  objectVersioning: false
+  objectVersioning: false,
+  bucketPolicies: false,
+  bucketLifecycle: false,
+  objectLock: false,
+  eventNotifications: false
 });
 
 export const STORAGE_PROVIDER_CAPABILITY_FIELDS = Object.freeze(
@@ -47,7 +51,11 @@ const REQUIRED_BASELINE_CAPABILITIES = Object.freeze([
 const OPTIONAL_EXTENDED_CAPABILITIES = Object.freeze([
   'bucket.presigned_urls',
   'object.multipart_upload',
-  'object.versioning'
+  'object.versioning',
+  'bucket.policy',
+  'bucket.lifecycle',
+  'object.lock',
+  'bucket.event_notifications'
 ]);
 
 export const STORAGE_PROVIDER_CAPABILITY_IDS = Object.freeze([
@@ -110,7 +118,11 @@ function deriveBooleanManifestFromEntries(entries) {
     objectCrud: ['object.put', 'object.get', 'object.delete', 'object.list', 'object.metadata.get'].every(isSatisfied),
     presignedUrls: isSatisfied('bucket.presigned_urls'),
     multipartUpload: isSatisfied('object.multipart_upload'),
-    objectVersioning: isSatisfied('object.versioning')
+    objectVersioning: isSatisfied('object.versioning'),
+    bucketPolicies: isSatisfied('bucket.policy'),
+    bucketLifecycle: isSatisfied('bucket.lifecycle'),
+    objectLock: isSatisfied('object.lock'),
+    eventNotifications: isSatisfied('bucket.event_notifications')
   });
 }
 
@@ -203,6 +215,23 @@ const STANDARD_IF_NONE_MATCH_CONSTRAINTS = Object.freeze([
   buildCapabilityConstraint({ key: 'header', value: 'if-none-match' })
 ]);
 
+const STANDARD_BUCKET_POLICY_CONSTRAINTS = Object.freeze([
+  buildCapabilityConstraint({ key: 'evaluationMode', value: 'platform_governed' })
+]);
+
+const STANDARD_BUCKET_LIFECYCLE_CONSTRAINTS = Object.freeze([
+  buildCapabilityConstraint({ key: 'ruleEvaluation', value: 'declarative_profile' })
+]);
+
+const STANDARD_OBJECT_LOCK_CONSTRAINTS = Object.freeze([
+  buildCapabilityConstraint({ key: 'requiresVersioning', value: true }),
+  buildCapabilityConstraint({ key: 'retentionMode', value: 'governed_or_compliance' })
+]);
+
+const STANDARD_EVENT_NOTIFICATION_CONSTRAINTS = Object.freeze([
+  buildCapabilityConstraint({ key: 'deliveryTargets', value: 'kafka_or_openwhisk' })
+]);
+
 const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
   minio: buildProviderDefinition({
     providerType: 'minio',
@@ -227,7 +256,11 @@ const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
       'object.conditional.if_none_match': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports If-None-Match conditional requests.', constraints: STANDARD_IF_NONE_MATCH_CONSTRAINTS },
       'bucket.presigned_urls': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports presigned URL flows for future storage increments.' },
       'object.multipart_upload': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports multipart upload flows.', constraints: [buildCapabilityConstraint({ key: 'maxParts', operator: '<=', value: 10000 })] },
-      'object.versioning': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports object versioning.' }
+      'object.versioning': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports object versioning.' },
+      'bucket.policy': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports declarative bucket policy exposure through the common platform surface.', constraints: STANDARD_BUCKET_POLICY_CONSTRAINTS },
+      'bucket.lifecycle': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports bucket lifecycle policy exposure for governed retention workflows.', constraints: STANDARD_BUCKET_LIFECYCLE_CONSTRAINTS },
+      'object.lock': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports object lock and immutability controls when versioning is enabled.', constraints: STANDARD_OBJECT_LOCK_CONSTRAINTS },
+      'bucket.event_notifications': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports governed storage event notification integrations.', constraints: STANDARD_EVENT_NOTIFICATION_CONSTRAINTS }
     }
   }),
   'ceph-rgw': buildProviderDefinition({
@@ -257,6 +290,22 @@ const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
         state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.PARTIALLY_SATISFIED,
         summary: 'Object versioning may depend on the Ceph RGW deployment policy.',
         constraints: [buildCapabilityConstraint({ key: 'deploymentPolicy', value: 'environment_specific' })]
+      },
+      'bucket.policy': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports declarative bucket policy exposure through the common platform surface.', constraints: STANDARD_BUCKET_POLICY_CONSTRAINTS },
+      'bucket.lifecycle': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.PARTIALLY_SATISFIED,
+        summary: 'Bucket lifecycle behavior may vary with the Ceph RGW deployment profile.',
+        constraints: [buildCapabilityConstraint({ key: 'deploymentPolicy', value: 'environment_specific' })]
+      },
+      'object.lock': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.PARTIALLY_SATISFIED,
+        summary: 'Object lock support can depend on deployment-specific retention configuration.',
+        constraints: [buildCapabilityConstraint({ key: 'retentionPolicy', value: 'environment_specific' })]
+      },
+      'bucket.event_notifications': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.PARTIALLY_SATISFIED,
+        summary: 'Storage event notification support may depend on enabled gateway integration components.',
+        constraints: [buildCapabilityConstraint({ key: 'integrationMode', value: 'deployment_specific' })]
       }
     },
     limitations: [
@@ -264,6 +313,21 @@ const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
         code: 'PROVIDER_VERSIONING_POLICY_DEPLOYMENT_SPECIFIC',
         summary: 'Object versioning support may depend on the Ceph RGW deployment policy.',
         affectsCapabilities: ['object.versioning']
+      }),
+      buildStorageProviderLimitation({
+        code: 'PROVIDER_LIFECYCLE_POLICY_DEPLOYMENT_SPECIFIC',
+        summary: 'Bucket lifecycle support may depend on the Ceph RGW deployment profile.',
+        affectsCapabilities: ['bucket.lifecycle']
+      }),
+      buildStorageProviderLimitation({
+        code: 'PROVIDER_OBJECT_LOCK_DEPLOYMENT_SPECIFIC',
+        summary: 'Object lock support may depend on deployment-specific retention configuration.',
+        affectsCapabilities: ['object.lock']
+      }),
+      buildStorageProviderLimitation({
+        code: 'PROVIDER_EVENT_NOTIFICATION_DEPLOYMENT_SPECIFIC',
+        summary: 'Bucket event notification support may depend on enabled integration components.',
+        affectsCapabilities: ['bucket.event_notifications']
       })
     ]
   }),
@@ -293,6 +357,19 @@ const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
       'object.versioning': {
         state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
         summary: 'Object versioning is not assumed in the common abstraction profile for Garage.'
+      },
+      'bucket.policy': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports declarative bucket policy exposure through the common platform surface.', constraints: STANDARD_BUCKET_POLICY_CONSTRAINTS },
+      'bucket.lifecycle': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
+        summary: 'Bucket lifecycle rules are not assumed in the common abstraction profile for Garage.'
+      },
+      'object.lock': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
+        summary: 'Object lock and immutability controls are not assumed in the common abstraction profile for Garage.'
+      },
+      'bucket.event_notifications': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
+        summary: 'Bucket event notifications are not assumed in the common abstraction profile for Garage.'
       }
     },
     limitations: [
@@ -300,6 +377,21 @@ const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
         code: 'OBJECT_VERSIONING_NOT_ASSUMED',
         summary: 'Object versioning is not assumed in the common abstraction profile for Garage.',
         affectsCapabilities: ['object.versioning']
+      }),
+      buildStorageProviderLimitation({
+        code: 'BUCKET_LIFECYCLE_NOT_ASSUMED',
+        summary: 'Bucket lifecycle rules are not assumed in the common abstraction profile for Garage.',
+        affectsCapabilities: ['bucket.lifecycle']
+      }),
+      buildStorageProviderLimitation({
+        code: 'OBJECT_LOCK_NOT_ASSUMED',
+        summary: 'Object lock and immutability controls are not assumed in the common abstraction profile for Garage.',
+        affectsCapabilities: ['object.lock']
+      }),
+      buildStorageProviderLimitation({
+        code: 'BUCKET_EVENT_NOTIFICATIONS_NOT_ASSUMED',
+        summary: 'Bucket event notifications are not assumed in the common abstraction profile for Garage.',
+        affectsCapabilities: ['bucket.event_notifications']
       })
     ]
   })
