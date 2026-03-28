@@ -25,14 +25,18 @@ import {
   buildStorageMultipartSession,
   buildStoragePolicyAttachmentSummary,
   buildStoragePresignedUrlRecord,
+  buildStorageQuotaProfile,
   buildTenantStoragePermissionTemplate,
   buildWorkspaceStoragePermissionSet,
   checkStorageMultipartCapability,
   evaluateStorageAccessDecision,
   getStorageBucketRecord,
+  previewStorageBucketQuotaAdmission,
+  previewStorageObjectQuotaAdmission,
   storageMultipartNormalizedErrorCodes,
   storageNormalizedErrorCodes,
-  storagePolicyNormalizedErrorCodes
+  storagePolicyNormalizedErrorCodes,
+  storageQuotaGuardrailErrorCodes
 } from '../../services/adapters/src/provider-catalog.mjs';
 import {
   VERIFICATION_VERDICT,
@@ -397,6 +401,65 @@ test('storage multipart and presigned URL schemas are additive and structurally 
   assert.equal(new Set(multipartCodes).size, 6);
   assert.equal(multipartCodes.some((code) => existingCodes.includes(code)), false);
   assert.equal(Object.isFrozen(storageMultipartNormalizedErrorCodes), true);
+});
+
+test('storage quota guardrail contracts are additive and structurally valid', () => {
+  const quotaProfile = buildStorageQuotaProfile({
+    tenantStorageContext: previewTenantStorageContext({
+      tenant: {
+        tenantId: 'ten_01contractquota',
+        slug: 'contract-quota',
+        state: 'active',
+        planId: 'pln_01growth'
+      },
+      storage: {
+        config: {
+          inline: {
+            providerType: 'minio'
+          }
+        }
+      },
+      now: '2026-03-28T00:15:00Z'
+    }),
+    workspaceId: 'wrk_01contractquota',
+    workspaceUsage: {
+      totalBytes: 100,
+      bucketCount: 1,
+      objectCount: 1
+    },
+    workspaceLimits: {
+      totalBytes: 256,
+      maxBuckets: 2,
+      maxObjects: 3,
+      maxObjectSizeBytes: 64
+    }
+  });
+  const bucketDecision = previewStorageBucketQuotaAdmission({
+    quotaProfile,
+    requestedAt: '2026-03-28T00:15:05Z'
+  });
+  const objectDecision = previewStorageObjectQuotaAdmission({
+    quotaProfile,
+    byteDelta: 32,
+    objectDelta: 1,
+    requestedObjectSizeBytes: 32,
+    requestedAt: '2026-03-28T00:15:10Z'
+  });
+  const guardrailCodes = Object.values(storageQuotaGuardrailErrorCodes).map((entry) => entry.code);
+  const normalizedCodes = new Set(Object.values(storageNormalizedErrorCodes));
+
+  assert.equal(Array.isArray(quotaProfile.scopes), true);
+  assert.equal(quotaProfile.scopes.length >= 1, true);
+  assert.equal('allowed' in bucketDecision, true);
+  assert.equal('violations' in bucketDecision, true);
+  assert.equal('quotaProfile' in bucketDecision, true);
+  assert.equal('allowed' in objectDecision, true);
+  assert.equal('violations' in objectDecision, true);
+  assert.equal('quotaProfile' in objectDecision, true);
+  assert.equal(Object.isFrozen(storageQuotaGuardrailErrorCodes), true);
+  assert.equal(new Set(guardrailCodes).size, 5);
+  assert.equal(Object.values(storageQuotaGuardrailErrorCodes).every((entry) => normalizedCodes.has(entry.normalizedCode)), true);
+  assert.equal(guardrailCodes.some((code) => normalizedCodes.has(code)), false);
 });
 
 test('storage policy contracts are additive and structurally valid', () => {

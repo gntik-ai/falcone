@@ -110,6 +110,21 @@ import {
   validateStoragePolicyDocument as validateStoragePolicyDocumentImpl,
   validateStoragePolicyStatement as validateStoragePolicyStatementImpl
 } from './storage-access-policy.mjs';
+import {
+  STORAGE_QUOTA_DIMENSIONS,
+  STORAGE_QUOTA_GUARDRAIL_ERROR_CODES,
+  STORAGE_QUOTA_OPERATION_TYPES,
+  STORAGE_QUOTA_SCOPE_TYPES,
+  STORAGE_QUOTA_SOURCES,
+  buildStorageQuotaAuditEvent as buildStorageQuotaAuditEventImpl,
+  buildStorageQuotaDimensionStatus as buildStorageQuotaDimensionStatusImpl,
+  buildStorageQuotaProfile as buildStorageQuotaProfileImpl,
+  buildStorageQuotaScopeStatus as buildStorageQuotaScopeStatusImpl,
+  buildStorageQuotaViolation as buildStorageQuotaViolationImpl,
+  previewStorageBucketQuotaAdmission as previewStorageBucketQuotaAdmissionImpl,
+  previewStorageObjectQuotaAdmission as previewStorageObjectQuotaAdmissionImpl,
+  validateStorageQuotaGuardrails as validateStorageQuotaGuardrailsImpl
+} from './storage-capacity-quotas.mjs';
 
 export const providerAdapterCatalog = listAdapterPorts();
 export const adapterCallContract = getContract('adapter_call');
@@ -136,6 +151,11 @@ export const storagePolicyActions = STORAGE_POLICY_ACTIONS;
 export const storagePolicySources = STORAGE_POLICY_SOURCES;
 export const storagePolicyConditionTypes = STORAGE_POLICY_CONDITION_TYPES;
 export const storagePolicyNormalizedErrorCodes = STORAGE_POLICY_NORMALIZED_ERROR_CODES;
+export const storageQuotaDimensions = STORAGE_QUOTA_DIMENSIONS;
+export const storageQuotaScopeTypes = STORAGE_QUOTA_SCOPE_TYPES;
+export const storageQuotaSources = STORAGE_QUOTA_SOURCES;
+export const storageQuotaOperationTypes = STORAGE_QUOTA_OPERATION_TYPES;
+export const storageQuotaGuardrailErrorCodes = STORAGE_QUOTA_GUARDRAIL_ERROR_CODES;
 
 export function listProvisioningAdapters() {
   return listAdapterPortsForConsumer('provisioning_orchestrator');
@@ -351,6 +371,38 @@ export function checkStoragePresignedUrlCapability(input = {}) {
 
 export function buildStorageCapabilityNotAvailableError(input = {}) {
   return buildCapabilityNotAvailableError(input);
+}
+
+export function buildStorageQuotaDimensionStatus(input = {}) {
+  return buildStorageQuotaDimensionStatusImpl(input);
+}
+
+export function buildStorageQuotaScopeStatus(input = {}) {
+  return buildStorageQuotaScopeStatusImpl(input);
+}
+
+export function buildStorageQuotaProfile(input = {}) {
+  return buildStorageQuotaProfileImpl(input);
+}
+
+export function buildStorageQuotaViolation(input = {}) {
+  return buildStorageQuotaViolationImpl(input);
+}
+
+export function buildStorageQuotaAuditEvent(input = {}) {
+  return buildStorageQuotaAuditEventImpl(input);
+}
+
+export function validateStorageQuotaGuardrails(input = {}) {
+  return validateStorageQuotaGuardrailsImpl(input);
+}
+
+export function previewStorageBucketQuotaAdmission(input = {}) {
+  return previewStorageBucketQuotaAdmissionImpl(input);
+}
+
+export function previewStorageObjectQuotaAdmission(input = {}) {
+  return previewStorageObjectQuotaAdmissionImpl(input);
 }
 
 export function buildStoragePolicyStatement(input = {}) {
