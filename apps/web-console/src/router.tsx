@@ -5,6 +5,7 @@ import { ConsoleShellLayout } from '@/layouts/ConsoleShellLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { PendingActivationPage } from '@/pages/PendingActivationPage'
+import { ConsoleMembersPage } from '@/pages/ConsoleMembersPage'
 import { ConsolePlaceholderPage } from '@/pages/ConsolePlaceholderPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { WelcomePage } from '@/pages/WelcomePage'
@@ -67,6 +68,10 @@ export const appRoutes = [
                 description="Placeholder navegable para la organización operacional de recursos por workspace dentro del tenant."
               />
             )
+          },
+          {
+            path: 'members',
+            element: <ConsoleMembersPage />
           },
           {
             path: 'functions',
