@@ -400,3 +400,56 @@ This increment does **not** implement the final console rendering from `T05` or 
 cross-module end-to-end matrix from `T06`.
 It only establishes the bounded hard-limit contract, helper surfaces, adapter metadata, public API
 notes, documentation, and tests required for those later tasks.
+
+## Scope delivered in `US-OBS-03-T06`
+
+This increment establishes the **final cross-module verification matrix** for the story and proves
+that the previously delivered usage, quota, enforcement, and overview baselines remain aligned.
+
+Delivered artifacts:
+
+- `tests/unit/observability-quota-enforcement-verification.test.mjs` as the bounded verification
+  suite proving one below-limit allowed state, one hard-limit denied state, and one overview
+  explainability projection for each covered module family
+- additive story-summary coverage here in `docs/tasks/us-obs-03.md`
+- additive Spec Kit artifacts under `specs/042-quota-enforcement-verification/`
+
+Covered module families:
+
+- OpenWhisk functions
+- Kafka topics / events
+- storage bucket admission
+- PostgreSQL schema creation
+- MongoDB database creation
+
+## Main decisions in `US-OBS-03-T06`
+
+### The final increment validates the existing baselines instead of inventing a new runtime layer
+
+`T06` is intentionally verification-oriented.
+It does not add a second quota engine, new routes, or new provider integrations.
+
+### Explainable blocking stays attached to the overview vocabulary
+
+Every covered hard-limit denial is projected through the bounded workspace quota overview using the
+existing `sourceDimensionIds` linkage.
+That keeps blocked actions explainable through the same operator vocabulary established in `T05`.
+
+### Cross-module confidence is delivered through one compact matrix
+
+Rather than scattering final story confidence across several unrelated module tests, `T06` provides
+one explicit matrix covering the critical module families that consume the story baselines.
+
+## Validation for `US-OBS-03-T06`
+
+Primary validation entry points:
+
+```bash
+node --test tests/unit/observability-quota-enforcement-verification.test.mjs
+npm test
+```
+
+## Story completion note for `US-OBS-03`
+
+`US-OBS-03-T06` is the terminal objective for this story.
+After this increment, `US-OBS-03` no longer has residual in-story work pending.
