@@ -179,6 +179,7 @@ describe('console-context', () => {
       tenants: [
         createTenant('ten_alpha', 'Tenant Alpha', {
           governance: { governanceStatus: 'warning' },
+          identityContext: { consoleUserRealm: 'realm-alpha' },
           quotaProfile: {
             governanceStatus: 'warning',
             limits: [
@@ -233,11 +234,70 @@ describe('console-context', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('tenant-governance')).toHaveTextContent('warning')
+      expect(screen.getByTestId('tenant-console-user-realm')).toHaveTextContent('realm-alpha')
       expect(screen.getByTestId('tenant-quota-warning')).toHaveTextContent('1')
       expect(screen.getByTestId('tenant-quota-blocked')).toHaveTextContent('1')
       expect(screen.getByTestId('tenant-inventory-applications')).toHaveTextContent('6')
       expect(screen.getByTestId('workspace-provisioning')).toHaveTextContent('partially_failed')
       expect(screen.getByTestId('operational-alerts-count')).toHaveTextContent('3')
+    })
+  })
+
+  it('expone consoleUserRealm cuando el tenant tiene identityContext', async () => {
+    stubContextApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+
+    renderContextProbe()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tenant-console-user-realm')).toHaveTextContent('realm-alpha')
+    })
+  })
+
+  it('expone consoleUserRealm como none cuando falta identityContext o el campo consoleUserRealm', async () => {
+    stubContextApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: {} })],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+
+    renderContextProbe()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tenant-console-user-realm')).toHaveTextContent('none')
+    })
+  })
+
+  it('actualiza consoleUserRealm al cambiar el tenant activo', async () => {
+    stubContextApi({
+      tenants: [
+        createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } }),
+        createTenant('ten_beta', 'Tenant Beta', { identityContext: { consoleUserRealm: 'realm-beta' } })
+      ],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')],
+        ten_beta: [createWorkspace('wrk_beta', 'ten_beta', 'Workspace Beta')]
+      }
+    })
+    persistConsoleContextSelection('usr_abc123', 'ten_alpha', 'wrk_alpha')
+    const user = userEvent.setup()
+
+    renderContextProbe()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tenant-console-user-realm')).toHaveTextContent('realm-alpha')
+    })
+
+    await user.click(screen.getByRole('button', { name: /seleccionar tenant beta/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_beta')
+      expect(screen.getByTestId('tenant-console-user-realm')).toHaveTextContent('realm-beta')
     })
   })
 })
@@ -251,6 +311,7 @@ function ContextProbe() {
       <div data-testid="active-workspace">{context.activeWorkspaceId ?? 'none'}</div>
       <div data-testid="tenants-count">{context.tenants.length}</div>
       <div data-testid="tenant-governance">{context.activeTenant?.governanceStatus ?? 'none'}</div>
+      <div data-testid="tenant-console-user-realm">{context.activeTenant?.consoleUserRealm ?? 'none'}</div>
       <div data-testid="tenant-quota-warning">{context.activeTenant?.quotaSummary?.totals.warning ?? '0'}</div>
       <div data-testid="tenant-quota-blocked">{context.activeTenant?.quotaSummary?.totals.blocked ?? '0'}</div>
       <div data-testid="tenant-inventory-applications">{context.activeTenant?.inventorySummary?.applicationCount ?? '0'}</div>

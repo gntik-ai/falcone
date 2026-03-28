@@ -6,6 +6,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   LogOut,
+  Users,
   Settings,
   Shield,
   User,
@@ -50,6 +51,12 @@ const consoleNavigationItems = [
     to: '/console/workspaces',
     icon: FolderKanban,
     description: 'Superficie incremental para la organización por workspaces.'
+  },
+  {
+    label: 'Members',
+    to: '/console/members',
+    icon: Users,
+    description: 'Miembros, roles y permisos del realm IAM del tenant activo.'
   },
   {
     label: 'Functions',
