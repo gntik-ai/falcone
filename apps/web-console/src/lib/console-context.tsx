@@ -34,6 +34,10 @@ interface TenantGovernanceProfile {
   governanceStatus?: string
 }
 
+interface TenantIdentityContext {
+  consoleUserRealm?: string
+}
+
 interface TenantQuotaLimit {
   metricKey: string
   scope: string
@@ -73,6 +77,7 @@ interface Tenant {
   slug: string
   state?: string
   governance?: TenantGovernanceProfile
+  identityContext?: TenantIdentityContext
   provisioning?: ProvisioningSummary
   quotaProfile?: TenantQuotaProfile
   inventorySummary?: TenantInventoryResponse
@@ -145,6 +150,7 @@ export interface ConsoleTenantOption {
   secondary: string
   state: string | null
   governanceStatus: string | null
+  consoleUserRealm: string | null
   provisioningStatus: string | null
   quotaSummary: ConsoleQuotaSummary | null
   inventorySummary: ConsoleTenantInventorySummary | null
@@ -728,6 +734,7 @@ function normalizeTenantOptions(items: Tenant[]): ConsoleTenantOption[] {
     secondary: tenant.slug,
     state: tenant.state ?? null,
     governanceStatus: tenant.governance?.governanceStatus ?? tenant.quotaProfile?.governanceStatus ?? null,
+    consoleUserRealm: tenant.identityContext?.consoleUserRealm ?? null,
     provisioningStatus: tenant.provisioning?.status ?? null,
     quotaSummary: summarizeTenantQuotaProfile(tenant.quotaProfile),
     inventorySummary: normalizeTenantInventorySummary(tenant.inventorySummary)
