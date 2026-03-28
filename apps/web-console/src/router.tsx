@@ -2,9 +2,11 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { PendingActivationPage } from '@/pages/PendingActivationPage'
+import { SignupPage } from '@/pages/SignupPage'
 import { WelcomePage } from '@/pages/WelcomePage'
 
-// T02 añade login público. Las rutas con shell y protección llegarán en T05.
+// T03 añade signup y activación pendiente. Las rutas con shell y protección llegarán en T05.
 export const appRoutes = [
   {
     path: '/',
@@ -13,6 +15,14 @@ export const appRoutes = [
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    path: '/signup',
+    element: <SignupPage />
+  },
+  {
+    path: '/signup/pending-activation',
+    element: <PendingActivationPage />
   },
   {
     path: '*',
