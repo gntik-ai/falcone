@@ -56,7 +56,23 @@ export function LoginPage() {
 
   const signupVisible = Boolean(signupPolicy?.allowed)
 
-  const statusAction = useMemo(() => statusView?.allowedActions[0] ?? null, [statusView])
+  const statusAction = useMemo(() => {
+    const firstAllowedAction = statusView?.allowedActions[0] ?? null
+
+    if (firstAllowedAction) {
+      return firstAllowedAction
+    }
+
+    if (statusView?.statusView === 'pending_activation') {
+      return {
+        actionId: 'view_pending_activation',
+        label: 'Ver estado de activación',
+        target: consoleAuthConfig.pendingActivationPath
+      }
+    }
+
+    return null
+  }, [statusView])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()

@@ -1,6 +1,8 @@
 import { requestJson, type ApiError } from '@/lib/http'
 
 export type ConsoleAuthenticationState = 'active' | 'pending_activation' | 'suspended' | 'credentials_expired'
+export type ConsoleSignupMode = 'disabled' | 'approval_required' | 'auto_activate'
+export type ConsoleSignupState = 'pending_activation' | 'active' | 'rejected'
 export type ConsoleStatusViewId =
   | 'login'
   | 'signup'
@@ -15,10 +17,19 @@ export interface ConsoleLoginRequest {
   rememberMe?: boolean
 }
 
+export interface ConsoleSignupRequest {
+  username: string
+  displayName: string
+  primaryEmail: string
+  password: string
+  requestedEnvironment?: 'dev' | 'sandbox' | 'staging' | 'prod'
+  requestedPlanId?: string
+}
+
 export interface ConsoleSignupPolicy {
   allowed: boolean
   approvalRequired: boolean
-  effectiveMode: 'disabled' | 'approval_required' | 'auto_activate'
+  effectiveMode: ConsoleSignupMode
   globalMode: string
   environmentModes: Record<string, string>
   planModes: Record<string, string>
@@ -58,6 +69,22 @@ export interface ConsoleLoginSession {
   }
 }
 
+export interface ConsoleSignupRegistration {
+  registrationId: string
+  userId: string
+  activationMode: ConsoleSignupMode
+  state: ConsoleSignupState
+  statusView: ConsoleStatusViewId
+  createdAt: string
+  message: string
+  tenantId?: string
+  workspaceId?: string
+  provisioning?: {
+    state?: string
+    summary?: string
+  }
+}
+
 export interface ConsoleAuthStatusHint {
   statusView: ConsoleStatusViewId
   title: string
@@ -75,6 +102,18 @@ export async function createConsoleLoginSession(
   return requestJson<ConsoleLoginSession>('/v1/auth/login-sessions', {
     method: 'POST',
     body: payload as unknown as Record<string, string | boolean>,
+    idempotent: true,
+    signal
+  })
+}
+
+export async function createConsoleSignup(
+  payload: ConsoleSignupRequest,
+  signal?: AbortSignal
+): Promise<ConsoleSignupRegistration> {
+  return requestJson<ConsoleSignupRegistration>('/v1/auth/signups', {
+    method: 'POST',
+    body: payload as unknown as Record<string, string>,
     idempotent: true,
     signal
   })
