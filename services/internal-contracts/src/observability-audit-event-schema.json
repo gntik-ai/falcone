@@ -1,0 +1,186 @@
+{
+  "version": "2026-03-28",
+  "scope": "US-OBS-02-T02",
+  "system": "in-atelier-observability-plane",
+  "source_audit_pipeline_contract": "2026-03-28",
+  "source_authorization_contract": "2026-03-24",
+  "required_top_level_fields": [
+    "event_id",
+    "event_timestamp",
+    "actor",
+    "scope",
+    "resource",
+    "action",
+    "result",
+    "correlation_id",
+    "origin",
+    "detail"
+  ],
+  "event_identity": {
+    "event_id": {
+      "required": true,
+      "format": "stable_governed_audit_identifier",
+      "immutability": "immutable_once_recorded"
+    },
+    "event_timestamp": {
+      "required": true,
+      "format": "iso_8601_utc",
+      "semantic_meaning": "time_recorded_by_audit_emitter"
+    },
+    "schema_version": {
+      "required": true,
+      "value_source": "contract.version"
+    }
+  },
+  "actor": {
+    "required_fields": [
+      "actor_id",
+      "actor_type"
+    ],
+    "optional_fields": [
+      "display_name",
+      "service_account_id",
+      "effective_role_scope"
+    ],
+    "actor_types": [
+      "platform_user",
+      "tenant_user",
+      "workspace_user",
+      "service_account",
+      "system",
+      "provider_adapter"
+    ],
+    "governance_rule": "actor_id and actor_type are mandatory for every audit event regardless of emitting subsystem"
+  },
+  "scope_envelope": {
+    "scope_modes": [
+      "tenant",
+      "tenant_workspace",
+      "platform"
+    ],
+    "required_fields_by_mode": {
+      "tenant": [
+        "tenant_id"
+      ],
+      "tenant_workspace": [
+        "tenant_id",
+        "workspace_id"
+      ],
+      "platform": []
+    },
+    "optional_fields": [
+      "workspace_id",
+      "platform_scope_reason"
+    ],
+    "governance_rules": [
+      "tenant-scoped events must carry tenant_id",
+      "workspace_id is required only when the emitting subsystem can safely attribute workspace scope",
+      "platform-scoped events must not fabricate tenant_id or workspace_id"
+    ]
+  },
+  "resource": {
+    "required_fields": [
+      "subsystem_id",
+      "resource_type"
+    ],
+    "conditionally_required_fields": [
+      "resource_id"
+    ],
+    "optional_fields": [
+      "resource_display_name",
+      "parent_resource_id"
+    ],
+    "supported_subsystem_ids": [
+      "iam",
+      "postgresql",
+      "mongodb",
+      "kafka",
+      "openwhisk",
+      "storage",
+      "quota_metering",
+      "tenant_control_plane"
+    ],
+    "resource_id_policy": "resource_id is required unless the audited action targets a policy-only or platform-only configuration object without a stable resource identifier"
+  },
+  "action": {
+    "required_fields": [
+      "action_id",
+      "category"
+    ],
+    "optional_fields": [
+      "change_type",
+      "requested_operation"
+    ],
+    "categories": [
+      "resource_creation",
+      "resource_deletion",
+      "configuration_change",
+      "access_control_modification",
+      "privilege_escalation",
+      "quota_adjustment"
+    ],
+    "governance_rule": "category vocabulary must stay compatible with the audit pipeline subsystem roster"
+  },
+  "result": {
+    "required_fields": [
+      "outcome"
+    ],
+    "optional_fields": [
+      "error_code",
+      "failure_reason",
+      "policy_basis"
+    ],
+    "outcomes": [
+      "succeeded",
+      "failed",
+      "denied",
+      "partial",
+      "accepted"
+    ],
+    "governance_rule": "result.outcome uses only the normalized bounded vocabulary"
+  },
+  "origin": {
+    "required_fields": [
+      "origin_surface",
+      "emitting_service"
+    ],
+    "optional_fields": [
+      "execution_mode",
+      "api_family"
+    ],
+    "origin_surfaces": [
+      "control_api",
+      "console_backend",
+      "internal_reconciler",
+      "provider_adapter",
+      "bootstrap_job",
+      "scheduled_operation"
+    ],
+    "governance_rule": "every audit event must identify where the administrative action originated"
+  },
+  "detail_extension": {
+    "field_name": "detail",
+    "required": true,
+    "allowed_usage": "subsystem_specific_context_only",
+    "prohibited_usage": [
+      "redefining canonical envelope fields",
+      "replacing correlation_id",
+      "replacing actor",
+      "replacing scope"
+    ],
+    "forward_compatibility": "later tasks may classify, mask, export, or correlate detail fields without renaming the canonical envelope"
+  },
+  "governance": {
+    "future_work_boundaries": [
+      "query_filters_are_defined_in_us_obs_02_t03",
+      "export_and_masking_are_defined_in_us_obs_02_t04",
+      "cross_system_correlation_is_defined_in_us_obs_02_t05",
+      "end_to_end_traceability_tests_are_defined_in_us_obs_02_t06"
+    ],
+    "compatibility_rules": [
+      "canonical envelope changes must remain additive",
+      "required field names stay stable once published",
+      "category vocabulary must cover all categories required by the audit pipeline contract"
+    ]
+  }
+}

@@ -8,6 +8,7 @@ const OBSERVABILITY_METRICS_STACK_URL = new URL('./observability-metrics-stack.j
 const OBSERVABILITY_DASHBOARDS_URL = new URL('./observability-dashboards.json', import.meta.url);
 const OBSERVABILITY_HEALTH_CHECKS_URL = new URL('./observability-health-checks.json', import.meta.url);
 export const OBSERVABILITY_AUDIT_PIPELINE_URL = new URL('./observability-audit-pipeline.json', import.meta.url);
+export const OBSERVABILITY_AUDIT_EVENT_SCHEMA_URL = new URL('./observability-audit-event-schema.json', import.meta.url);
 const OBSERVABILITY_BUSINESS_METRICS_URL = new URL('./observability-business-metrics.json', import.meta.url);
 const OBSERVABILITY_CONSOLE_ALERTS_URL = new URL('./observability-console-alerts.json', import.meta.url);
 const PUBLIC_API_TAXONOMY_URL = new URL('./public-api-taxonomy.json', import.meta.url);
@@ -21,6 +22,7 @@ let cachedObservabilityMetricsStack;
 let cachedObservabilityDashboards;
 let cachedObservabilityHealthChecks;
 let cachedObservabilityAuditPipeline;
+let cachedObservabilityAuditEventSchema;
 let cachedObservabilityBusinessMetrics;
 let cachedObservabilityConsoleAlerts;
 let cachedPublicApiTaxonomy;
@@ -90,6 +92,14 @@ export function readObservabilityAuditPipeline() {
   return cachedObservabilityAuditPipeline;
 }
 
+export function readObservabilityAuditEventSchema() {
+  if (!cachedObservabilityAuditEventSchema) {
+    cachedObservabilityAuditEventSchema = JSON.parse(readFileSync(OBSERVABILITY_AUDIT_EVENT_SCHEMA_URL, 'utf8'));
+  }
+
+  return cachedObservabilityAuditEventSchema;
+}
+
 export function readObservabilityBusinessMetrics() {
   if (!cachedObservabilityBusinessMetrics) {
     cachedObservabilityBusinessMetrics = JSON.parse(readFileSync(OBSERVABILITY_BUSINESS_METRICS_URL, 'utf8'));
@@ -130,6 +140,7 @@ export const OBSERVABILITY_METRICS_STACK_VERSION = readObservabilityMetricsStack
 export const OBSERVABILITY_DASHBOARDS_VERSION = readObservabilityDashboards().version;
 export const OBSERVABILITY_HEALTH_CHECKS_VERSION = readObservabilityHealthChecks().version;
 export const OBSERVABILITY_AUDIT_PIPELINE_VERSION = readObservabilityAuditPipeline().version;
+export const OBSERVABILITY_AUDIT_EVENT_SCHEMA_VERSION = readObservabilityAuditEventSchema().version;
 export const OBSERVABILITY_BUSINESS_METRICS_VERSION = readObservabilityBusinessMetrics().version;
 export const OBSERVABILITY_CONSOLE_ALERTS_VERSION = readObservabilityConsoleAlerts().version;
 export const PUBLIC_API_VERSION = readPublicApiTaxonomy().version;
@@ -372,6 +383,34 @@ export function getAuditPipelineHealthSignals() {
 
 export function getAuditPipelineTenantIsolation() {
   return readObservabilityAuditPipeline().tenant_isolation ?? {};
+}
+
+export function getAuditEventRequiredFields() {
+  return readObservabilityAuditEventSchema().required_top_level_fields ?? [];
+}
+
+export function getAuditActorSchema() {
+  return readObservabilityAuditEventSchema().actor ?? {};
+}
+
+export function getAuditScopeEnvelope() {
+  return readObservabilityAuditEventSchema().scope_envelope ?? {};
+}
+
+export function getAuditResourceSchema() {
+  return readObservabilityAuditEventSchema().resource ?? {};
+}
+
+export function getAuditActionSchema() {
+  return readObservabilityAuditEventSchema().action ?? {};
+}
+
+export function getAuditResultSchema() {
+  return readObservabilityAuditEventSchema().result ?? {};
+}
+
+export function getAuditOriginSchema() {
+  return readObservabilityAuditEventSchema().origin ?? {};
 }
 
 export function listObservabilityBusinessDomains() {
