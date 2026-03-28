@@ -167,6 +167,16 @@ describe('ConsoleShellLayout', () => {
     expect(screen.getByTestId('console-context-workspace-select')).toBeDisabled()
   })
 
+  it('renderiza el ítem Members y apunta a /console/members', async () => {
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    const membersLink = await screen.findByRole('link', { name: /members/i })
+    expect(membersLink).toHaveAttribute('href', '/console/members')
+  })
+
   it('muestra reintento cuando falla la carga de tenants y se recupera al reintentar', async () => {
     fetchMock
       .mockImplementationOnce(async (input) => {
@@ -315,6 +325,10 @@ function renderShell(initialPath = '/console/overview') {
           {
             path: 'workspaces',
             element: <h1>Workspaces</h1>
+          },
+          {
+            path: 'members',
+            element: <h1>Members</h1>
           },
           {
             path: 'functions',
