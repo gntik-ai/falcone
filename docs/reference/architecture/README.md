@@ -21,6 +21,8 @@ This directory documents architecture baselines that future tasks should extend 
 - `docs/reference/architecture/storage-provider-operability.md` records the supported storage provider posture, planning limits, internal operating targets, and qualitative cost guidance introduced by `US-STO-03-T06`.
 - `services/internal-contracts/src/observability-metrics-stack.json` is the machine-readable source of truth for the unified observability metrics plane, including subsystem coverage, normalized metric families, selector labels, collection health, and collection topology.
 - `docs/reference/architecture/observability-metrics-stack.md` is the human-readable architecture companion for the unified observability metrics baseline introduced by `US-OBS-01-T01`.
+- `services/internal-contracts/src/observability-dashboards.json` is the machine-readable source of truth for the canonical observability health dashboard hierarchy, scope semantics, widget catalog, and workspace fallback behavior introduced by `US-OBS-01-T02`.
+- `docs/reference/architecture/observability-health-dashboards.md` is the human-readable architecture companion for the observability dashboard baseline introduced by `US-OBS-01-T02`.
 
 ## Usage rules
 
