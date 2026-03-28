@@ -31,6 +31,8 @@ This directory documents architecture baselines that future tasks should extend 
 - `docs/reference/architecture/observability-console-alerts.md` is the human-readable architecture companion for the observability console-summary and internal-alert baseline introduced by `US-OBS-01-T05`.
 - `services/internal-contracts/src/observability-audit-pipeline.json` is the machine-readable source of truth for the common audit pipeline baseline introduced by `US-OBS-02-T01`, including subsystem enrollment, Kafka transport topology, delivery guarantees, tenant isolation, health signals, and self-audit requirements.
 - `docs/reference/architecture/observability-audit-pipeline.md` is the human-readable architecture companion for the observability audit-pipeline baseline introduced by `US-OBS-02-T01`.
+- `services/internal-contracts/src/observability-audit-event-schema.json` is the machine-readable source of truth for the canonical audit event envelope introduced by `US-OBS-02-T02`, including normalized actor, scope, resource, action, result, correlation, and origin sections.
+- `docs/reference/architecture/observability-audit-event-schema.md` is the human-readable architecture companion for the observability audit-event-schema baseline introduced by `US-OBS-02-T02`.
 
 ## Usage rules
 
