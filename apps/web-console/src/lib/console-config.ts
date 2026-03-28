@@ -13,6 +13,7 @@ export const consoleAuthConfig = {
   clientId: readEnv('VITE_CONSOLE_AUTH_CLIENT_ID', 'in-atelier-console'),
   loginPath: readEnv('VITE_CONSOLE_AUTH_LOGIN_PATH', '/login'),
   signupPath: readEnv('VITE_CONSOLE_AUTH_SIGNUP_PATH', '/signup'),
+  pendingActivationPath: readEnv('VITE_CONSOLE_AUTH_PENDING_ACTIVATION_PATH', '/signup/pending-activation'),
   passwordRecoveryPath: readEnv('VITE_CONSOLE_AUTH_PASSWORD_RECOVERY_PATH', '/password-recovery'),
   headings: {
     title: readEnv('VITE_CONSOLE_AUTH_TITLE', 'Accede a In Atelier Console'),
@@ -32,6 +33,19 @@ export const consoleAuthConfig = {
     signupDisabled: readEnv(
       'VITE_CONSOLE_AUTH_SIGNUP_DISABLED_LABEL',
       'El auto-registro no está disponible actualmente para este entorno.'
+    ),
+    signupTitle: readEnv('VITE_CONSOLE_SIGNUP_TITLE', 'Crea tu acceso a In Atelier Console'),
+    signupSubtitle: readEnv(
+      'VITE_CONSOLE_SIGNUP_SUBTITLE',
+      'Registro público respaldado por Keycloak y gobernado por la policy efectiva de /v1/auth/signups/policy.'
+    ),
+    signupSubmit: readEnv('VITE_CONSOLE_SIGNUP_SUBMIT_LABEL', 'Crear solicitud de acceso'),
+    signupSubmitLoading: readEnv('VITE_CONSOLE_SIGNUP_SUBMIT_LOADING_LABEL', 'Enviando registro…'),
+    displayName: readEnv('VITE_CONSOLE_SIGNUP_DISPLAY_NAME_LABEL', 'Nombre visible'),
+    primaryEmail: readEnv('VITE_CONSOLE_SIGNUP_EMAIL_LABEL', 'Correo principal'),
+    pendingActivationTitle: readEnv(
+      'VITE_CONSOLE_PENDING_ACTIVATION_TITLE',
+      'Tu registro está pendiente de activación'
     )
   }
 } as const
