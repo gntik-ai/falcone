@@ -1,0 +1,495 @@
+{
+  "version": "2026-03-28",
+  "scope": "US-OBS-01-T02",
+  "system": "in-atelier-observability-plane",
+  "source_metrics_contract": "2026-03-28",
+  "hierarchy": {
+    "canonical_order": [
+      "global",
+      "tenant",
+      "workspace"
+    ],
+    "drilldown_rules": [
+      {
+        "from": "global",
+        "to": "tenant",
+        "requires": [
+          "platform_operator_access",
+          "target_tenant_id"
+        ],
+        "semantics": "Global dashboard drilldown may target a tenant view when the actor has platform-wide authority and a concrete tenant context."
+      },
+      {
+        "from": "tenant",
+        "to": "workspace",
+        "requires": [
+          "tenant_dashboard_access",
+          "target_workspace_id",
+          "workspace_belongs_to_tenant"
+        ],
+        "semantics": "Tenant dashboard drilldown may target a workspace view only when the workspace belongs to the current tenant scope."
+      }
+    ],
+    "forbidden_transitions": [
+      {
+        "from": "workspace",
+        "to": "tenant",
+        "reason": "Workspace views do not widen scope; operators must re-enter the tenant view through an authorized tenant context."
+      },
+      {
+        "from": "workspace",
+        "to": "global",
+        "reason": "Workspace views cannot widen to platform scope because presentation-level navigation must preserve least privilege."
+      }
+    ]
+  },
+  "mandatory_health_dimensions": [
+    {
+      "id": "availability",
+      "metric_category": "availability",
+      "description": "Normalized subsystem availability posture derived from component_up and companion health projections."
+    },
+    {
+      "id": "errors",
+      "metric_category": "errors",
+      "description": "Normalized error posture derived from component_operation_errors_total."
+    },
+    {
+      "id": "latency",
+      "metric_category": "latency",
+      "description": "Normalized latency posture derived from component_operation_duration_seconds."
+    },
+    {
+      "id": "throughput",
+      "metric_category": "throughput",
+      "description": "Normalized throughput posture derived from component_operations_total."
+    },
+    {
+      "id": "collection_freshness",
+      "metric_category": "collection_health",
+      "description": "Collection freshness and lag posture derived from observability collection health and lag signals."
+    }
+  ],
+  "health_states": {
+    "allowed_values": [
+      "healthy",
+      "degraded",
+      "unknown",
+      "stale",
+      "unavailable",
+      "inherited"
+    ],
+    "state_rules": [
+      {
+        "state": "stale",
+        "meaning": "Telemetry freshness is outside the subsystem max staleness window or collection has failed recently.",
+        "must_not_be_reported_as": "healthy"
+      },
+      {
+        "state": "unknown",
+        "meaning": "No reliable current posture can be inferred because telemetry is missing or incomplete."
+      },
+      {
+        "state": "inherited",
+        "meaning": "The visible degradation is inherited from a broader tenant or platform scope rather than proven workspace-local."
+      }
+    ]
+  },
+  "collection_freshness": {
+    "telemetry_contract": {
+      "health_metric": "in_atelier_observability_collection_health",
+      "failure_counter": "in_atelier_observability_collection_failures_total",
+      "lag_metric": "in_atelier_observability_collection_lag_seconds"
+    },
+    "semantics": [
+      "Dashboards must surface freshness as a first-class health dimension for every scope.",
+      "A widget with stale or failed collection cannot be presented as current healthy posture.",
+      "Collection lag should be interpreted against the subsystem max_staleness_seconds defined by the observability metrics stack contract."
+    ]
+  },
+  "authorization_and_traceability": {
+    "requirements": [
+      "Dashboard access must preserve actor identity, correlation context, and requested dashboard scope.",
+      "Tenant dashboards require tenant-bounded authorization and must reject cross-tenant access.",
+      "Workspace dashboards require both tenant-bounded authorization and proof that the workspace belongs to the tenant context.",
+      "Scope requests and drilldowns must remain attributable to the requesting actor for audit purposes.",
+      "Tenant and workspace views may reference upstream platform dependency states only in a redacted, non-comparative form that does not leak other-tenant details."
+    ],
+    "audit_context_fields": [
+      "actor_id",
+      "dashboard_scope",
+      "tenant_id",
+      "workspace_id",
+      "correlation_id"
+    ]
+  },
+  "scope_aliases": {
+    "global": {
+      "dashboard_scope": "global",
+      "metric_scope": "platform"
+    },
+    "tenant": {
+      "dashboard_scope": "tenant",
+      "metric_scope": "tenant"
+    },
+    "workspace": {
+      "dashboard_scope": "workspace",
+      "metric_scope": "workspace"
+    }
+  },
+  "subsystem_widget_catalog": [
+    {
+      "id": "apisix-health",
+      "subsystem_id": "apisix",
+      "display_name": "APISIX health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "tenant_inherited",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    },
+    {
+      "id": "kafka-health",
+      "subsystem_id": "kafka",
+      "display_name": "Kafka health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "tenant_inherited",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    },
+    {
+      "id": "postgresql-health",
+      "subsystem_id": "postgresql",
+      "display_name": "PostgreSQL health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "tenant_inherited",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    },
+    {
+      "id": "mongodb-health",
+      "subsystem_id": "mongodb",
+      "display_name": "MongoDB health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "tenant_inherited",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    },
+    {
+      "id": "openwhisk-health",
+      "subsystem_id": "openwhisk",
+      "display_name": "OpenWhisk health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "tenant_inherited",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    },
+    {
+      "id": "storage-health",
+      "subsystem_id": "storage",
+      "display_name": "Storage health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "tenant_inherited",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    },
+    {
+      "id": "control-plane-health",
+      "subsystem_id": "control_plane",
+      "display_name": "Control plane health",
+      "supports_dashboard_scopes": [
+        "global",
+        "tenant",
+        "workspace"
+      ],
+      "supports_metric_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "workspace_fallback": "workspace_native",
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "summary_kind": "subsystem_health_card",
+      "drilldown_targets": [
+        "tenant",
+        "workspace"
+      ]
+    }
+  ],
+  "dashboard_scopes": [
+    {
+      "id": "global",
+      "display_name": "Global platform health",
+      "underlying_metric_scope": "platform",
+      "allowed_drilldown_targets": [
+        "tenant"
+      ],
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "scope_hierarchy_level": 0,
+      "scope_context_requirements": [],
+      "authorization": {
+        "visibility": "platform_operators_only",
+        "requires_tenant_context": false,
+        "requires_workspace_context": false
+      },
+      "summary_cards": [
+        "subsystem_health_overview",
+        "degradation_rollup",
+        "collection_freshness_rollup"
+      ],
+      "widget_ids": [
+        "apisix-health",
+        "kafka-health",
+        "postgresql-health",
+        "mongodb-health",
+        "openwhisk-health",
+        "storage-health",
+        "control-plane-health"
+      ],
+      "inherited_degradation": {
+        "from": [],
+        "visible_as": "local_or_platform_authoritative"
+      },
+      "workspace_fallback_policy": "not_applicable",
+      "traceability": {
+        "must_capture": [
+          "actor_id",
+          "dashboard_scope",
+          "correlation_id"
+        ]
+      }
+    },
+    {
+      "id": "tenant",
+      "display_name": "Tenant health",
+      "underlying_metric_scope": "tenant",
+      "allowed_drilldown_targets": [
+        "workspace"
+      ],
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "scope_hierarchy_level": 1,
+      "scope_context_requirements": [
+        "tenant_id"
+      ],
+      "authorization": {
+        "visibility": "tenant_bounded",
+        "requires_tenant_context": true,
+        "requires_workspace_context": false
+      },
+      "summary_cards": [
+        "tenant_health_overview",
+        "inherited_platform_dependency",
+        "collection_freshness_rollup"
+      ],
+      "widget_ids": [
+        "apisix-health",
+        "kafka-health",
+        "postgresql-health",
+        "mongodb-health",
+        "openwhisk-health",
+        "storage-health",
+        "control-plane-health"
+      ],
+      "inherited_degradation": {
+        "from": [
+          "global"
+        ],
+        "visible_as": "platform_dependency_without_cross_tenant_detail"
+      },
+      "workspace_fallback_policy": "tenant_scope_is_authoritative_when_workspace_attribution_is_not_safe",
+      "traceability": {
+        "must_capture": [
+          "actor_id",
+          "dashboard_scope",
+          "tenant_id",
+          "correlation_id"
+        ]
+      }
+    },
+    {
+      "id": "workspace",
+      "display_name": "Workspace health",
+      "underlying_metric_scope": "workspace",
+      "allowed_drilldown_targets": [],
+      "mandatory_dimensions": [
+        "availability",
+        "errors",
+        "latency",
+        "throughput",
+        "collection_freshness"
+      ],
+      "scope_hierarchy_level": 2,
+      "scope_context_requirements": [
+        "tenant_id",
+        "workspace_id"
+      ],
+      "authorization": {
+        "visibility": "workspace_bounded",
+        "requires_tenant_context": true,
+        "requires_workspace_context": true
+      },
+      "summary_cards": [
+        "workspace_health_overview",
+        "tenant_inherited_degradation",
+        "collection_freshness_rollup"
+      ],
+      "widget_ids": [
+        "apisix-health",
+        "kafka-health",
+        "postgresql-health",
+        "mongodb-health",
+        "openwhisk-health",
+        "storage-health",
+        "control-plane-health"
+      ],
+      "inherited_degradation": {
+        "from": [
+          "global",
+          "tenant"
+        ],
+        "visible_as": "workspace_local_vs_inherited_must_be_distinguished"
+      },
+      "workspace_fallback_policy": "mark_unsupported_subsystems_as_tenant_inherited_or_platform_dependent",
+      "traceability": {
+        "must_capture": [
+          "actor_id",
+          "dashboard_scope",
+          "tenant_id",
+          "workspace_id",
+          "correlation_id"
+        ]
+      }
+    }
+  ]
+}

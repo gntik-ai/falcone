@@ -5,6 +5,7 @@ const DEPLOYMENT_TOPOLOGY_URL = new URL('./deployment-topology.json', import.met
 const AUTHORIZATION_MODEL_URL = new URL('./authorization-model.json', import.meta.url);
 const DOMAIN_MODEL_URL = new URL('./domain-model.json', import.meta.url);
 const OBSERVABILITY_METRICS_STACK_URL = new URL('./observability-metrics-stack.json', import.meta.url);
+const OBSERVABILITY_DASHBOARDS_URL = new URL('./observability-dashboards.json', import.meta.url);
 const PUBLIC_API_TAXONOMY_URL = new URL('./public-api-taxonomy.json', import.meta.url);
 const PUBLIC_ROUTE_CATALOG_URL = new URL('./public-route-catalog.json', import.meta.url);
 
@@ -13,6 +14,7 @@ let cachedDeploymentTopology;
 let cachedAuthorizationModel;
 let cachedDomainModel;
 let cachedObservabilityMetricsStack;
+let cachedObservabilityDashboards;
 let cachedPublicApiTaxonomy;
 let cachedPublicRouteCatalog;
 
@@ -56,6 +58,14 @@ export function readObservabilityMetricsStack() {
   return cachedObservabilityMetricsStack;
 }
 
+export function readObservabilityDashboards() {
+  if (!cachedObservabilityDashboards) {
+    cachedObservabilityDashboards = JSON.parse(readFileSync(OBSERVABILITY_DASHBOARDS_URL, 'utf8'));
+  }
+
+  return cachedObservabilityDashboards;
+}
+
 export function readPublicApiTaxonomy() {
   if (!cachedPublicApiTaxonomy) {
     cachedPublicApiTaxonomy = JSON.parse(readFileSync(PUBLIC_API_TAXONOMY_URL, 'utf8'));
@@ -77,6 +87,7 @@ export const DEPLOYMENT_TOPOLOGY_VERSION = readDeploymentTopology().version;
 export const AUTHORIZATION_MODEL_VERSION = readAuthorizationModel().version;
 export const DOMAIN_MODEL_VERSION = readDomainModel().version;
 export const OBSERVABILITY_METRICS_STACK_VERSION = readObservabilityMetricsStack().version;
+export const OBSERVABILITY_DASHBOARDS_VERSION = readObservabilityDashboards().version;
 export const PUBLIC_API_VERSION = readPublicApiTaxonomy().version;
 export const CONTROL_API_SERVICE_ID = 'control_api';
 export const PROVISIONING_ORCHESTRATOR_SERVICE_ID = 'provisioning_orchestrator';
@@ -253,6 +264,30 @@ export function getObservedSubsystem(subsystemId) {
 
 export function getObservabilityCollectionHealth() {
   return readObservabilityMetricsStack().collection_health ?? {};
+}
+
+export function listObservabilityDashboardScopes() {
+  return readObservabilityDashboards().dashboard_scopes ?? [];
+}
+
+export function getObservabilityDashboardScope(scopeId) {
+  return listObservabilityDashboardScopes().find((scope) => scope.id === scopeId);
+}
+
+export function listObservabilityDashboardDimensions() {
+  return readObservabilityDashboards().mandatory_health_dimensions ?? [];
+}
+
+export function getObservabilityDashboardDimension(dimensionId) {
+  return listObservabilityDashboardDimensions().find((dimension) => dimension.id === dimensionId);
+}
+
+export function listObservabilityDashboardWidgets() {
+  return readObservabilityDashboards().subsystem_widget_catalog ?? [];
+}
+
+export function getObservabilityDashboardWidget(widgetId) {
+  return listObservabilityDashboardWidgets().find((widget) => widget.id === widgetId);
 }
 
 export function getPublicRoute(operationId) {
