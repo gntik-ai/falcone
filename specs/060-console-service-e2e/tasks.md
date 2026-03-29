@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 MD031 -->
 # Tasks — US-UI-03-T06: Pruebas E2E por servicio verificando consumo de APIs públicas del BaaS
 
 **Feature Branch**: `060-console-service-e2e`
@@ -294,6 +295,7 @@ export const KAFKA_TOPIC_NAME = 'platform.audit.events'
 #### Functions
 
 **Constantes de contexto**:
+
 ```typescript
 export const FN_WORKSPACE_ID = 'ws_alpha_prod'
 export const FN_ACTION_ID = 'fn_hello_world'
@@ -301,6 +303,7 @@ export const FN_ACTION_NAME = 'hello-world'
 ```
 
 **GET `/v1/functions/workspaces/ws_alpha_prod/inventory`** — nominal:
+
 ```json
 {
   "actions": [
@@ -317,6 +320,7 @@ export const FN_ACTION_NAME = 'hello-world'
 ```
 
 **GET `/v1/functions/actions/fn_hello_world`** — nominal:
+
 ```json
 {
   "actionId": "fn_hello_world",
@@ -330,6 +334,7 @@ export const FN_ACTION_NAME = 'hello-world'
 ```
 
 **GET `/v1/functions/actions/fn_hello_world/activations`** — nominal:
+
 ```json
 {
   "items": [
@@ -345,6 +350,7 @@ export const FN_ACTION_NAME = 'hello-world'
 ```
 
 **GET `/v1/functions/actions/fn_hello_world/versions`** — nominal:
+
 ```json
 {
   "items": [
@@ -358,6 +364,7 @@ export const FN_ACTION_NAME = 'hello-world'
 #### Storage
 
 **Constantes de contexto**:
+
 ```typescript
 export const STO_WORKSPACE_ID = 'ws_alpha_prod'
 export const STO_BUCKET_ID = 'bucket_alpha_assets'
@@ -366,6 +373,7 @@ export const STO_OBJECT_KEY = 'images/logo.png'
 ```
 
 **GET `/v1/storage/buckets`** — nominal:
+
 ```json
 {
   "items": [
@@ -382,6 +390,7 @@ export const STO_OBJECT_KEY = 'images/logo.png'
 ```
 
 **GET `/v1/storage/workspaces/ws_alpha_prod/usage`** — nominal:
+
 ```json
 {
   "workspaceId": "ws_alpha_prod",
@@ -392,6 +401,7 @@ export const STO_OBJECT_KEY = 'images/logo.png'
 ```
 
 **GET `/v1/storage/buckets/bucket_alpha_assets/objects`** — nominal:
+
 ```json
 {
   "items": [
@@ -413,7 +423,7 @@ export const STO_OBJECT_KEY = 'images/logo.png'
 
 ## Tarea T2 — Crear `apps/web-console/e2e/console-service-e2e.e2e.ts`
 
-### Descripción
+### Objetivo
 
 Spec Playwright con 16+ escenarios en seis grupos. Usa el fixture `service-e2e.ts` para mocks de servicio y reutiliza helpers de `console-context-auth-e2e.e2e.ts` para login/contexto.
 
