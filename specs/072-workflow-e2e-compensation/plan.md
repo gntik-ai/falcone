@@ -162,7 +162,7 @@ Key entities and their test-side representations:
 
 ### Architecture: Test Flow
 
-```
+```text
 CI Job
   └─ index.mjs (suite entry)
        ├─ tenant-provisioner.mjs  ─→  Keycloak (create test realm / service account token)
@@ -211,7 +211,7 @@ No constitution violations. No additional tracking required.
 
 ## Dependency Sequence
 
-```
+```text
 US-UIB-01-T01 (workflow identification)
   ↓
 US-UIB-01-T02 (OpenWhisk workflow functions deployed)
