@@ -4,6 +4,7 @@ import {
   buildConsoleBackendActivationAnnotation,
   validateConsoleBackendInvocationRequest
 } from '../../../services/adapters/src/openwhisk-admin.mjs';
+import { executeSaga, getSagaStatus } from './saga/index.mjs';
 
 export const CONSOLE_BACKEND_INITIATING_SURFACE = OPENWHISK_CONSOLE_BACKEND_INITIATING_SURFACE;
 export const CONSOLE_BACKEND_ACTOR_TYPE = 'workspace_service_account';
@@ -185,4 +186,12 @@ export function summarizeConsoleBackendFunctionsSurface() {
     traceFields: ['actor', 'tenant_id', 'workspace_id', 'correlation_id', 'initiating_surface'],
     workflowRouteClassifications: CONSOLE_WORKFLOW_ROUTE_CLASSIFICATIONS
   };
+}
+
+export async function invokeWorkflow(workflowId, params, callerContext) {
+  return executeSaga(workflowId, params, callerContext);
+}
+
+export async function queryWorkflowStatus(sagaId, callerContext) {
+  return getSagaStatus(sagaId, callerContext);
 }
