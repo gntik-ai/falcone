@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD031 MD040 -->
 # Plan técnico de implementación — US-UI-03-T06
 
 **Feature Branch**: `060-console-service-e2e`
