@@ -275,7 +275,7 @@ export function ConsoleMembersPage() {
 
 function ConsoleMembersEmptyState({ message }: { message: string }) {
   return (
-    <section className="rounded-3xl border border-dashed border-border bg-card/40 p-10 text-center shadow-sm">
+    <section data-testid="console-section-empty" className="rounded-3xl border border-dashed border-border bg-card/40 p-10 text-center shadow-sm">
       <Badge variant="outline">Members</Badge>
       <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Members del tenant</h1>
       <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{message}</p>
@@ -292,7 +292,7 @@ function ConsoleSectionLoading({ label }: { label: string }) {
 }
 
 function ConsoleSectionEmpty({ message }: { message: string }) {
-  return <p className="mt-4 text-sm text-muted-foreground">{message}</p>
+  return <p data-testid="console-section-empty" className="mt-4 text-sm text-muted-foreground">{message}</p>
 }
 
 function ConsoleSectionError({

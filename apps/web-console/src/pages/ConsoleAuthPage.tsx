@@ -366,7 +366,7 @@ export function ConsoleAuthPage() {
 
   if (!activeTenant) {
     return (
-      <section className="space-y-4" aria-labelledby="console-auth-title">
+      <section data-testid="console-section-empty" className="space-y-4" aria-labelledby="console-auth-title">
         <div className="space-y-2">
           <Badge variant="secondary">Auth / IAM</Badge>
           <h1 id="console-auth-title" className="text-3xl font-semibold tracking-tight text-foreground">
@@ -380,7 +380,7 @@ export function ConsoleAuthPage() {
 
   if (!realmId) {
     return (
-      <section className="space-y-4" aria-labelledby="console-auth-title">
+      <section data-testid="console-section-empty" className="space-y-4" aria-labelledby="console-auth-title">
         <div className="space-y-2">
           <Badge variant="secondary">Auth / IAM</Badge>
           <h1 id="console-auth-title" className="text-3xl font-semibold tracking-tight text-foreground">
