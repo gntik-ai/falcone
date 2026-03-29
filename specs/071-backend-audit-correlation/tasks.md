@@ -77,6 +77,7 @@ Tasks are ordered by dependency. Each task is self-contained and executable by a
 ---
 
 ### GROUP A — Audit Module Core
+
 > No upstream code dependencies. Must be complete before engine integration (GROUP C).
 
 ---
@@ -159,6 +160,7 @@ export function maskAuditDetail(detail): { masked: object, maskedFieldRefs: stri
 ---
 
 ### GROUP B — Step Definition Annotations
+
 > Depends on: plan.md §4.4 audit milestone classification. Can be developed in parallel with GROUP A. Must be complete before GROUP C.
 
 ---
@@ -190,6 +192,7 @@ Set `auditMilestone: true` for the following steps (identified in the catalog as
 ---
 
 ### GROUP C — Saga Engine Integration
+
 > Depends on: TASK-001 (workflow-audit.mjs), TASK-002 (auditMilestone flags). Extends the existing T04-delivered saga-engine.mjs.
 
 ---
@@ -255,6 +258,7 @@ await eventsAdmin.emit({
 ```
 
 If `eventsAdmin` is not yet imported, add the import:
+
 ```js
 import * as eventsAdmin from '../events-admin.mjs';
 ```
