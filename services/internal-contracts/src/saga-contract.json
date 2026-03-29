@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SagaStatusResponse",
+  "type": "object",
+  "required": ["sagaId", "workflowId", "correlationId", "status", "steps"],
+  "properties": {
+    "sagaId": { "type": "string", "format": "uuid" },
+    "workflowId": { "type": "string", "pattern": "^WF-CON-[0-9]{3}$" },
+    "correlationId": { "type": "string" },
+    "status": { "type": "string", "enum": ["executing", "compensating", "completed", "compensated", "compensation-failed"] },
+    "currentStep": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/SagaStepSummary" }] },
+    "steps": { "type": "array", "items": { "$ref": "#/definitions/SagaStepSummary" } },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "errorSummary": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/SagaErrorSummary" }] }
+  },
+  "definitions": {
+    "SagaStepSummary": {
+      "type": "object",
+      "required": ["ordinal", "key", "status"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "key": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "executing", "succeeded", "failed", "compensating", "compensated", "compensation-failed"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "SagaErrorSummary": {
+      "type": "object",
+      "required": ["failedStep", "reason"],
+      "properties": {
+        "failedStep": { "type": "string" },
+        "reason": { "type": "string" },
+        "uncompensatedSteps": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
