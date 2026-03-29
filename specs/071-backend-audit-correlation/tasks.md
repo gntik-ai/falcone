@@ -270,6 +270,7 @@ import * as eventsAdmin from '../events-admin.mjs';
 ---
 
 ### GROUP D — Contract Artifact
+
 > No code dependency. Can be created in parallel with GROUP A–C.
 
 ---
@@ -315,6 +316,7 @@ Create the JSON file exactly as specified in plan.md §7.1:
 ---
 
 ### GROUP E — Contract Index Update
+
 > Depends on: TASK-004 (console-workflow-audit-policy.json must exist to be exported).
 
 ---
@@ -326,11 +328,13 @@ Create the JSON file exactly as specified in plan.md §7.1:
 **What to add** (plan.md §6.4):
 
 1. **Export the new policy contract**:
+
    ```js
    export { default as consoleWorkflowAuditPolicy } from './console-workflow-audit-policy.json' assert { type: 'json' };
    ```
 
 2. **Add `getAuditEventSchemaForSubsystem` helper** if not already exported:
+
    ```js
    // Read observability-audit-event-schema.json (already in this directory) and
    // return the subsystem configuration block for the given subsystemId.
@@ -341,7 +345,7 @@ Create the JSON file exactly as specified in plan.md §7.1:
      return schema?.subsystems?.[subsystemId] ?? schema?.subsystem_roster?.[subsystemId] ?? undefined;
    }
    ```
-   
+
    - If `observability-audit-event-schema.json` is not yet imported in `index.mjs`, add the import.
    - If the schema JSON does not have a `subsystems` or `subsystem_roster` key, return the schema root itself (since the schema is the authoritative source for all subsystems).
    - Do not modify or remove any existing exports.
@@ -351,6 +355,7 @@ Create the JSON file exactly as specified in plan.md §7.1:
 ---
 
 ### GROUP F — Test Suite
+
 > TASK-006 and TASK-007 can be authored in parallel with GROUP A–E; they must pass once implementation is complete. TASK-008 depends on TASK-003 (engine changes).
 
 ---
@@ -442,7 +447,7 @@ Cross-reference with plan.md §15:
 
 ## Implementation Order (Recommended)
 
-```
+```text
 TASK-004   (console-workflow-audit-policy.json)  ← no deps; create early as reference
 TASK-001   (workflow-audit.mjs)                  ← no code deps; needs schema contract as reference
 TASK-002   (saga-definitions.mjs auditMilestone) ← no new code deps; extend T04 output
