@@ -21,6 +21,7 @@ const OBSERVABILITY_CONSOLE_ALERTS_URL = new URL('./observability-console-alerts
 const OBSERVABILITY_QUOTA_USAGE_VIEW_URL = new URL('./observability-quota-usage-view.json', import.meta.url);
 const PUBLIC_API_TAXONOMY_URL = new URL('./public-api-taxonomy.json', import.meta.url);
 const PUBLIC_ROUTE_CATALOG_URL = new URL('./public-route-catalog.json', import.meta.url);
+export { default as sagaContract } from './saga-contract.json' with { type: 'json' };
 
 let cachedInternalServiceMap;
 let cachedDeploymentTopology;
