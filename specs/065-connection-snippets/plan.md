@@ -16,7 +16,7 @@ Implementar la capacidad de **snippets de conexión** en la consola de administr
 
 ## 2. Arquitectura y flujo objetivo
 
-```
+```text
 apps/web-console/src/
   lib/
     snippets/
@@ -134,6 +134,7 @@ export function generateSnippets(
 #### `apps/web-console/src/components/console/ConnectionSnippets.tsx`
 
 Props:
+
 ```typescript
 interface ConnectionSnippetsProps {
   resourceType: ResourceType
@@ -356,7 +357,7 @@ Los tests E2E de regresión de UX **quedan excluidos de esta tarea** (→ US-UI-
 
 ## 8. Secuencia recomendada de implementación
 
-```
+```text
 Paso 1 — Tipos y catálogo (sin UI, 100% testeable de forma aislada)
   snippet-types.ts
   snippet-catalog.ts
