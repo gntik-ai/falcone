@@ -12,7 +12,8 @@
 All artifacts to be created or modified in this feature:
 
 ### New files
-```
+
+```text
 apps/web-console/src/lib/snippets/snippet-catalog.ts              ← EXTEND (new resource type added)
 apps/web-console/src/lib/snippets/snippet-types.ts                ← EXTEND (new ResourceType member)
 apps/web-console/src/lib/snippets/snippet-generator.ts            ← EXTEND (3 new token handlers)
@@ -33,6 +34,7 @@ package.json                                                       ← EXTEND (l
 ```
 
 ### Key constants / identifiers
+
 - New `ResourceType` value: `'realtime-subscription'`
 - New `sessionStorage` key: `realtime-snippet-lang`
 - New console route: `/console/workspaces/:workspaceId/realtime`
@@ -100,6 +102,7 @@ Add `SNIPPET_CATALOG['realtime-subscription']` as a new catalog entry. The entry
 
 **A-1** `id: 'realtime-js-browser-basic'`, label `'JavaScript (browser) — WebSocket subscription'`  
 Template body:
+
 ```javascript
 // Requires: a valid Keycloak access token for this workspace
 const ENDPOINT = '{REALTIME_ENDPOINT}'
