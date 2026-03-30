@@ -15,7 +15,7 @@
 
 ## File Path Map (implementation reference)
 
-```
+```text
 charts/in-atelier/charts/vault/
   Chart.yaml
   values.yaml
@@ -142,7 +142,7 @@ docs/
 
 **Independent Test**: Deploy cluster, run `scripts/verify-secret-storage.sh` item 1 — confirms 0 env vars with PASSWORD|SECRET|KEY|TOKEN values; confirm `vault kv list secret/platform` returns postgresql, mongodb, kafka, s3, openwhisk
 
-- [ ] T015 [US1] Implement `charts/in-atelier/charts/eso/values.yaml` — values: `eso.vaultAddress` (https://vault.secret-store.svc.cluster.local:8200), `eso.vaultAuthPath` (kubernetes), `eso.vaultAuthRole` (eso-role), `eso.serviceAccountName` (eso-vault-auth), `eso.refreshInterval` (1h)
+- [ ] T015 [US1] Implement `charts/in-atelier/charts/eso/values.yaml` — values: `eso.vaultAddress` (`https://vault.secret-store.svc.cluster.local:8200`), `eso.vaultAuthPath` (kubernetes), `eso.vaultAuthRole` (eso-role), `eso.serviceAccountName` (eso-vault-auth), `eso.refreshInterval` (1h)
 - [ ] T016 [US1] Implement `charts/in-atelier/charts/eso/templates/eso-rbac.yaml` — Role + RoleBinding in each service namespace allowing ESO ServiceAccount to `create/update/delete` Kubernetes Secrets; ClusterRole for reading ServiceAccount tokens (TokenReview)
 - [ ] T017 [US1] Implement `charts/in-atelier/charts/eso/templates/eso-networkpolicy.yaml` — allow egress from `eso-system` namespace to `secret-store` on port 8200; deny direct pod-to-Vault from other namespaces
 - [ ] T018 [US1] Implement `charts/in-atelier/charts/eso/templates/cluster-secret-store.yaml` — ClusterSecretStore `vault-backend` authenticating to Vault using `kubernetes` auth with ServiceAccount `eso-vault-auth` in `eso-system`; mount KV v2 at `secret/`
@@ -261,7 +261,7 @@ docs/
 
 ## Dependencies Graph
 
-```
+```text
 Phase 1 (T001–T005)                    → no dependencies
 Phase 2 (T006–T014): Vault Core        → requires Phase 1
 Phase 3 (T015–T027): US1 Centralized   → requires Phase 2 (Vault running)
