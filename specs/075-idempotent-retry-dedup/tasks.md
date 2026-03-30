@@ -139,7 +139,7 @@ backlog:
 
 ## Dependency Graph
 
-```
+```text
 Phase 1 (T001-T006)  ──────────────────────────────────────► can start immediately (parallel)
 Phase 2 (T007-T009)  ──────────────────────────────────────► can start immediately (parallel)
                               │
@@ -167,13 +167,15 @@ T014 T015 T016 T017      T022
 ## Parallel Execution Examples
 
 ### Story 1 parallelization
-```
+
+```text
 Worker A: T010 (model) → T011 (repo) → T012 (create action) → T013 (events)
 Worker B: T014 (unit model tests) → T015 (unit action tests) → T016 (contract test) → T017 (integration test)
 ```
 
 ### Story 2 parallelization
-```
+
+```text
 Worker A: T018 (model) → T019 (repo) → T020 (extend repo) → T021 (retry action) → T022 (events)
 Worker B: T023 (unit model) → T024 (unit action) → T025 (contract) → T026 (integration)
 ```

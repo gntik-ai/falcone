@@ -105,6 +105,7 @@
 - El hash es un `TEXT` fijo de 64 chars, eficiente en storage.
 
 **Implementation**:
+
 ```javascript
 import { createHash } from 'node:crypto';
 
