@@ -1041,6 +1041,51 @@
         "read_path": "/v1/functions/workspaces/{workspaceId}/audit/quota-enforcement",
         "write_path": "/v1/functions/workspaces/{workspaceId}/audit/quota-enforcement"
       }
+    },
+    {
+      "id": "MongoCaptureConfig",
+      "scope": "workspace",
+      "description": "Workspace-scoped MongoDB change capture configuration.",
+      "attributes": [
+        "id",
+        "tenant_id",
+        "workspace_id",
+        "data_source_ref",
+        "database_name",
+        "collection_name",
+        "capture_mode",
+        "status",
+        "activation_ts",
+        "deactivation_ts",
+        "actor_identity",
+        "last_error"
+      ]
+    },
+    {
+      "id": "MongoCaptureQuota",
+      "scope": "workspace",
+      "description": "MongoDB change capture quota policy applied at workspace or tenant scope.",
+      "attributes": [
+        "id",
+        "scope",
+        "scope_id",
+        "max_collections"
+      ]
+    },
+    {
+      "id": "MongoChangeEvent",
+      "scope": "workspace",
+      "description": "CloudEvents envelope published for MongoDB collection mutations routed to workspace Kafka topics.",
+      "attributes": [
+        "specversion",
+        "type",
+        "source",
+        "id",
+        "time",
+        "tenantid",
+        "workspaceid",
+        "data"
+      ]
     }
   ],
   "relationships": [
@@ -1645,6 +1690,10 @@
     {
       "id": "BI-FN-AUD-003",
       "rule": "A rollback evidence record must be emitted for every rollback attempt regardless of outcome; a failed rollback must produce a record with outcome: 'failure', not an absent record."
+    },
+    {
+      "id": "BI-MONGO-CAPTURE-001",
+      "rule": "A change event from a captured MongoDB collection MUST NOT be delivered to a Kafka topic associated with a different workspace"
     }
   ],
   "business_state_machines": [
