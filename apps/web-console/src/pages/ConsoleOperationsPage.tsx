@@ -2,8 +2,12 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { OperationStatusBadge } from '@/components/console/OperationStatusBadge'
+import { OperationStatusBanner } from '@/components/console/OperationStatusBanner'
 import { Button } from '@/components/ui/button'
-import { useOperations, type OperationFilters } from '@/lib/console-operations'
+import { useConsoleContext } from '@/lib/console-context'
+import { useReconnectStateSync } from '@/lib/hooks/use-reconnect-state-sync'
+import { useOperations, type OperationFilters, type OperationSummary } from '@/lib/console-operations'
+import type { ReconciliationDelta } from '@/lib/reconcile-operations'
 
 const PAGE_SIZE = 20
 
@@ -18,10 +22,12 @@ function formatDateTime(value: string): string {
 
 export function ConsoleOperationsPage() {
   const navigate = useNavigate()
+  const { activeTenantId, activeWorkspaceId } = useConsoleContext()
   const [status, setStatus] = useState<OperationFilters['status']>()
   const [operationType, setOperationType] = useState('')
   const [workspaceId, setWorkspaceId] = useState('')
   const [offset, setOffset] = useState(0)
+  const [delta, setDelta] = useState<ReconciliationDelta | null>(null)
 
   const filters = useMemo<OperationFilters>(
     () => ({
@@ -36,6 +42,27 @@ export function ConsoleOperationsPage() {
   const operationTypes = useMemo(() => Array.from(new Set((data?.items ?? []).map((item) => item.operationType))).sort(), [data?.items])
   const canGoBack = offset > 0
   const canGoNext = Boolean(data && offset + data.items.length < data.total)
+  const reconnectEnabled =
+    ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_CONSOLE_RECONNECT_SYNC_ENABLED ?? 'true') !== 'false'
+  const localSnapshot = useMemo(
+    () => new Map<string, OperationSummary>((data?.items ?? []).map((operation) => [operation.operationId, operation])),
+    [data?.items]
+  )
+
+  useReconnectStateSync({
+    tenantId: activeTenantId ?? '',
+    workspaceId: activeWorkspaceId ?? null,
+    localSnapshot,
+    onStateChanged: (nextDelta) => {
+      setDelta(nextDelta)
+      if (nextDelta.updated.length > 0 || nextDelta.added.length > 0 || nextDelta.unavailable.length > 0) {
+        refetch()
+      }
+    },
+    debounceMs: 500
+  })
+
+  const shouldRenderReconnectSync = reconnectEnabled && Boolean(activeTenantId)
 
   return (
     <section className="space-y-6">
@@ -43,6 +70,8 @@ export function ConsoleOperationsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Operaciones</h1>
         <p className="text-sm text-muted-foreground">Consulta el progreso y el resultado de las operaciones asíncronas del tenant activo.</p>
       </div>
+
+      {shouldRenderReconnectSync ? <OperationStatusBanner delta={delta} onDismiss={() => setDelta(null)} /> : null}
 
       <div className="grid gap-4 rounded-3xl border border-border bg-card p-4 md:grid-cols-3">
         <label className="space-y-2 text-sm">
@@ -61,6 +90,8 @@ export function ConsoleOperationsPage() {
             <option value="running">En curso</option>
             <option value="completed">Completada</option>
             <option value="failed">Fallida</option>
+            <option value="timed_out">Expirada</option>
+            <option value="cancelled">Cancelada</option>
           </select>
         </label>
 
