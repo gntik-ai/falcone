@@ -311,6 +311,24 @@
       ],
       "postgres_tables_write": [
         "mongo_capture_resume_tokens"
+      ],
+      "owned_resources": [
+        "mongo change event envelope",
+        "mongo capture watcher health",
+        "mongo capture resume token checkpoint",
+        "mongo capture config cache"
+      ],
+      "service_dependencies": [
+        "provisioning_orchestrator"
+      ],
+      "adapter_dependencies": [
+        "mongodb",
+        "kafka",
+        "postgresql"
+      ],
+      "inbound_contracts": [],
+      "outbound_contracts": [
+        "mongo_change_stream_event"
       ]
     }
   ],

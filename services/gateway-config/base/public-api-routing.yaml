@@ -471,3 +471,22 @@ spec:
         - GET
       upstreamService: control_api
       authMode: none
+    - id: public-api-mongo-captures
+      path: /v1/realtime/workspaces/{workspaceId}/mongo-captures
+      methods:
+        - GET
+        - POST
+      upstreamService: control_api
+      authMode: bearer_oidc
+    - id: public-api-mongo-capture-disable
+      path: /v1/realtime/workspaces/{workspaceId}/mongo-captures/{captureId}
+      methods:
+        - DELETE
+      upstreamService: control_api
+      authMode: bearer_oidc
+    - id: public-api-mongo-capture-tenant-summary
+      path: /v1/realtime/tenants/{tenantId}/mongo-captures/summary
+      methods:
+        - GET
+      upstreamService: control_api
+      authMode: bearer_oidc
