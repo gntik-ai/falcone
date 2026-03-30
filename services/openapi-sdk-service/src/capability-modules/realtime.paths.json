@@ -1,0 +1,24 @@
+{
+  "tag": { "name": "realtime", "description": "Realtime channels" },
+  "paths": {
+    "/channels": {
+      "get": {
+        "operationId": "listChannels",
+        "tags": ["realtime"],
+        "summary": "List channels",
+        "responses": { "200": { "description": "Channels listed" } }
+      }
+    },
+    "/channels/{channelId}/publish": {
+      "post": {
+        "operationId": "publishChannelMessage",
+        "tags": ["realtime"],
+        "summary": "Publish a channel message",
+        "parameters": [{ "name": "channelId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": { "202": { "description": "Publish accepted" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}
