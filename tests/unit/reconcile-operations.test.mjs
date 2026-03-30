@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { reconcileOperations } from '../../apps/web-console/src/lib/reconcile-operations.ts'
+import { reconcileOperations } from '../../apps/web-console/src/lib/reconcile-operations.runtime.mjs'
 
 function op(operationId, status) {
   return {
