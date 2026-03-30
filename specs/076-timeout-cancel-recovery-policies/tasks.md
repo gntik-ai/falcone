@@ -142,14 +142,14 @@ backlog:
 
 **Purpose**: Alarm triggers, environment variables, and metric annotations for production readiness.
 
-- [ ] T026 [P] Update `helm/provisioning-orchestrator/values.yaml` — add timeoutSweep.enabled=true, timeoutSweep.schedule="*/5 * * * *", orphanSweep.enabled=true, orphanSweep.schedule="*/10 * * * *", env.OPERATION_DEFAULT_TIMEOUT_MINUTES="60", env.OPERATION_DEFAULT_ORPHAN_THRESHOLD_MINUTES="30", env.OPERATION_DEFAULT_CANCELLING_TIMEOUT_MINUTES="5"
+- [ ] T026 [P] Update `helm/provisioning-orchestrator/values.yaml` — add timeoutSweep.enabled=true, timeoutSweep.schedule=`*/5 * * * *`, orphanSweep.enabled=true, orphanSweep.schedule=`*/10 * * * *`, env.OPERATION_DEFAULT_TIMEOUT_MINUTES="60", env.OPERATION_DEFAULT_ORPHAN_THRESHOLD_MINUTES="30", env.OPERATION_DEFAULT_CANCELLING_TIMEOUT_MINUTES="5"
 - [ ] T027 [P] Add metric annotations to async-operation-timeout-sweep.mjs and async-operation-orphan-sweep.mjs — async_operation_timeout_sweep_total (labels: swept, errors), async_operation_orphan_sweep_total (labels: recovered, forced_cancelled, errors), async_operation_cancellation_total (labels: from_status, tenant); follow existing metricAnnotation pattern from async-operation-transition.mjs
 
 ---
 
 ## Dependency Graph
 
-```
+```text
 T001-T003 (contracts) ──► T009 (internal-contracts index)
 T004 (migration) ──────────────────────────────────────────────► T007 (repo), T008 (events)
 T005 (states) ──► T006 (model) ──► T007 (repo)                  │
