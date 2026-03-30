@@ -33,4 +33,18 @@ describe('OperationStatusBadge', () => {
     const badge = screen.getByText('Fallida')
     expect(badge.className).toContain('bg-red-600')
   })
+
+  it('F05 renders timed out state', () => {
+    render(<OperationStatusBadge status="timed_out" />)
+
+    const badge = screen.getByText('Expirada')
+    expect(badge.className).toContain('bg-amber-100')
+  })
+
+  it('F06 renders cancelled state', () => {
+    render(<OperationStatusBadge status="cancelled" />)
+
+    const badge = screen.getByText('Cancelada')
+    expect(badge.className).toContain('bg-zinc-100')
+  })
 })

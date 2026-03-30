@@ -5,11 +5,11 @@ import type { JsonValue } from '@/lib/http'
 
 export const ASYNC_OPERATION_QUERY_ENDPOINT = '/v1/async-operation-query'
 
-export type OperationStatus = 'pending' | 'running' | 'completed' | 'failed'
+export type OperationStatus = 'pending' | 'running' | 'completed' | 'failed' | 'timed_out' | 'cancelled'
 export type OperationResultType = 'success' | 'failure' | 'pending'
 
 export interface OperationFilters {
-  status?: OperationStatus
+  status?: OperationStatus | OperationStatus[]
   operationType?: string
   workspaceId?: string
   tenantId?: string
