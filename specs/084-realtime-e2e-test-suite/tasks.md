@@ -66,6 +66,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: Bounded polling utility. Calls `assertFn()` repeatedly until it resolves, with exponential backoff between calls. Rejects with a timeout error if `maxWaitMs` is exceeded.
 
 **Contract**:
+
 ```js
 // poll(assertFn, opts) → Promise<void>
 // opts: { maxWaitMs: number, intervalMs: number, backoffFactor: number }
@@ -87,6 +88,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: Wraps an array of cleanup async functions; executes all sequentially; logs but does not throw on individual failures. Intended for use in `finally` blocks.
 
 **Contract**:
+
 ```js
 // teardown(fns: Array<() => Promise<void>>, logger?: Console) → Promise<void>
 // Errors from individual fns are caught and logged; teardown completes all fns regardless.
@@ -104,6 +106,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: WebSocket/SSE test client. Wraps the `ws` package (WebSocket). Maintains an internal received-event buffer. Provides an async iterator interface for draining events. Supports connect, disconnect, reconnect, and subscribe operations.
 
 **Contract**:
+
 ```js
 // createRealtimeClient({ endpoint, token }) → RealtimeSession
 // session.subscribe({ workspaceId, channelId, filter }) → Promise<{ subscriptionId }>
@@ -135,6 +138,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: Keycloak Admin REST API wrapper for test fixtures. Creates test users, assigns/revokes scopes, obtains and refreshes tokens, cleans up users.
 
 **Contract**:
+
 ```js
 // createTestUser({ tenantId, scopes: string[] }) → Promise<{ userId, username, password }>
 // getToken({ username, password }) → Promise<{ accessToken, refreshToken, expiresIn }>
@@ -166,6 +170,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: Provisions test tenants, workspaces, and data source channels via the platform provisioning REST API. Also handles deprovisioning.
 
 **Contract**:
+
 ```js
 // createTestTenant(label) → Promise<{ tenantId, adminToken }>
 // createTestWorkspace(tenantId) → Promise<{ workspaceId }>
@@ -193,6 +198,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: Triggers CDC-producing data changes directly in PostgreSQL and MongoDB test data sources.
 
 **Contract**:
+
 ```js
 // pgInsert({ schema, table, row }) → Promise<{ rowId }>
 // pgUpdate({ schema, table, where, set }) → Promise<void>
@@ -253,6 +259,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **FR coverage**: FR-001, FR-002, FR-003, FR-014
 
 **Setup pattern** (shared across all tests in this file):
+
 ```js
 // 1. createProvisioner() → provision tenant → provision workspace
 // 2. registerPgDataSource(workspaceId, ['e2e_events'])
@@ -300,6 +307,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **SC coverage**: SC-004
 
 **Setup pattern**:
+
 ```js
 // Provision tenantA + workspaceA + pgSourceA + userA + sessionA
 // Provision tenantB + workspaceB + pgSourceB + userB + sessionB
@@ -333,6 +341,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **SC coverage**: SC-005
 
 **Setup pattern**:
+
 ```js
 // Provision one tenant with two workspaces (W1, W2)
 // Register pg data source in each workspace (same table name: 'e2e_ws_iso')
@@ -445,6 +454,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 **Description**: Minimal read-only Kafka consumer helper for audit assertion in scope-revocation tests.
 
 **Contract**:
+
 ```js
 // createKafkaConsumer({ topic, fromBeginning?: boolean }) → KafkaConsumerHandle
 // handle.waitForMessage(matchFn, opts) → Promise<message>  — uses poller internally
@@ -551,7 +561,7 @@ All files to be created or modified in this task, grouped by concern. The implem
 
 ## Dependency Order
 
-```
+```text
 TASK-01 (poller)
 TASK-02 (teardown)
    ↓
