@@ -86,7 +86,7 @@ Each test scenario:
 
 All assertions use **bounded polling with exponential backoff** rather than fixed sleeps:
 
-```
+```text
 poll(assertFn, { maxWaitMs: 10_000, intervalMs: 200, backoffFactor: 1.5 })
 ```
 
@@ -399,7 +399,7 @@ E2E tests require a running platform environment and are gated behind `pnpm test
 
 ## 10. Sequence & Implementation Order
 
-```
+```text
 Step 1 — Helpers scaffold
   Write all files under tests/e2e/realtime/helpers/
   Write unit tests for poller.mjs and client.mjs buffer logic
