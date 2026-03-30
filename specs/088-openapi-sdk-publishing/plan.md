@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD031 MD040 -->
 # Implementation Plan: OpenAPI Publishing & SDK Generation
 
 **Branch**: `088-openapi-sdk-publishing` | **Date**: 2026-03-30 | **Spec**: [spec.md](./spec.md)  
