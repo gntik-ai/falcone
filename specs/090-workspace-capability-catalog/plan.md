@@ -97,7 +97,7 @@ services/
 
 ### Component Map
 
-```
+```text
 [APISIX Gateway]
     │  route: GET /v1/workspaces/{workspaceId}/capability-catalog
     │  route: GET /v1/workspaces/{workspaceId}/capability-catalog/{capabilityId}
@@ -184,6 +184,7 @@ ON CONFLICT (capability_key) DO NOTHING;
 **Headers**: `Authorization: Bearer <token>`, `X-Api-Version: 1`, `X-Correlation-Id: <uuid>`
 
 **Response 200** (schema: `workspace-capability-catalog-response.json`):
+
 ```json
 {
   "workspaceId": "ws-123",
