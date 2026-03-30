@@ -211,31 +211,35 @@ export default async function handleCredentialGeneration(request) {
           action: 'rotate'
         };
       } else {
-        const history = createRotationHistoryRecord({
-          tenantId: normalizedRequest.callerContext.tenantId,
-          workspaceId: normalizedRequest.input.targetWorkspaceId,
-          serviceAccountId: normalizedRequest.input.serviceAccountId,
-          rotationType: 'immediate',
-          gracePeriodSeconds: 0,
-          oldCredentialId: normalizedRequest.input.credentialId ?? null,
-          newCredentialId: credential?.credentialId ?? null,
-          initiatedBy: normalizedRequest.callerContext.actor,
-          completedAt: new Date().toISOString(),
-          completedBy: normalizedRequest.callerContext.actor,
-          completionReason: 'immediate'
-        });
-        await dependencies.writeRotationHistory({ request: normalizedRequest, record: history });
+        const immediateRotationContext = normalizedRequest.input.serviceAccountId
+          ? createRotationHistoryRecord({
+              tenantId: normalizedRequest.callerContext.tenantId,
+              workspaceId: normalizedRequest.input.targetWorkspaceId,
+              serviceAccountId: normalizedRequest.input.serviceAccountId,
+              rotationType: 'immediate',
+              gracePeriodSeconds: 0,
+              oldCredentialId: normalizedRequest.input.credentialId ?? null,
+              newCredentialId: credential?.credentialId ?? null,
+              initiatedBy: normalizedRequest.callerContext.actor,
+              completedAt: new Date().toISOString(),
+              completedBy: normalizedRequest.callerContext.actor,
+              completionReason: 'immediate'
+            })
+          : null;
+        if (immediateRotationContext) {
+          await dependencies.writeRotationHistory({ request: normalizedRequest, record: immediateRotationContext });
+        }
         await dependencies.publishRotationEvent({
           topic: 'console.credential-rotation.initiated',
           payload: {
             tenantId: normalizedRequest.callerContext.tenantId,
             workspaceId: normalizedRequest.input.targetWorkspaceId,
-            serviceAccountId: normalizedRequest.input.serviceAccountId,
+            serviceAccountId: normalizedRequest.input.serviceAccountId ?? null,
             rotationType: 'immediate',
             gracePeriodSeconds: 0,
             actorId: normalizedRequest.callerContext.actor,
-            newCredentialId: history.new_credential_id,
-            oldCredentialId: history.old_credential_id
+            newCredentialId: immediateRotationContext?.new_credential_id ?? credential?.credentialId ?? null,
+            oldCredentialId: immediateRotationContext?.old_credential_id ?? normalizedRequest.input.credentialId ?? null
           }
         });
         output = {
