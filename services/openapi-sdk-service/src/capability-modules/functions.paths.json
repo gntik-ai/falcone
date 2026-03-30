@@ -1,0 +1,38 @@
+{
+  "tag": { "name": "functions", "description": "Workspace function operations" },
+  "paths": {
+    "/functions": {
+      "get": {
+        "operationId": "listFunctions",
+        "tags": ["functions"],
+        "summary": "List functions",
+        "responses": {
+          "200": {
+            "description": "Function list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions/{functionName}/invoke": {
+      "post": {
+        "operationId": "invokeFunction",
+        "tags": ["functions"],
+        "summary": "Invoke a function",
+        "parameters": [{ "name": "functionName", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": { "202": { "description": "Invocation accepted" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}
