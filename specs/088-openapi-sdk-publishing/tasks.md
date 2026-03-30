@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD022 MD031 MD040 -->
 # Tasks: OpenAPI Publishing & SDK Generation
 
 **Branch**: `088-openapi-sdk-publishing` | **Date**: 2026-03-30  

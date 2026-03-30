@@ -3,6 +3,7 @@
 ## Tables
 
 ### `workspace_openapi_versions`
+
 - Migration: `services/openapi-sdk-service/migrations/088-workspace-openapi-versions.sql`
 - Tracks the current and historical OpenAPI documents per workspace.
 - Indexed by current workspace row and tenant.
@@ -25,6 +26,7 @@ Lifecycle:
 3. Historical rows remain available for audit/rollback.
 
 ### `workspace_sdk_packages`
+
 - Migration: `services/openapi-sdk-service/migrations/088-workspace-sdk-packages.sql`
 - Tracks generated SDK archives per workspace, language, and spec version.
 
@@ -47,11 +49,13 @@ Lifecycle:
 3. Mark prior `ready` rows as `stale` when a new spec version is published.
 
 ## Version Increment Strategy
+
 - MAJOR when capability tags are removed.
 - MINOR when capability tags are added.
 - PATCH when the capability set is unchanged.
 
 ## Contract References
+
 - `services/internal-contracts/src/workspace-openapi-version.json`
 - `services/internal-contracts/src/sdk-package.json`
 - `services/internal-contracts/src/openapi-spec-updated-event.json`
