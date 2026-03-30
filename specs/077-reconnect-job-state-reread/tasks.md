@@ -32,6 +32,7 @@ T01–T04 have established:
 
 **What to do**:
 - Update the `OperationStatus` union type to include `'timed_out'` and `'cancelled'`:
+
   ```ts
   export type OperationStatus =
     | 'pending'
@@ -41,6 +42,7 @@ T01–T04 have established:
     | 'timed_out'
     | 'cancelled'
   ```
+
 - Update `OperationFilters.status` accordingly (already typed via `OperationStatus`, no additional change needed).
 - Verify no existing switch/if exhaustiveness checks break (add fallthrough cases as needed in `OperationStatusBadge`).
 
@@ -211,6 +213,7 @@ Tests to implement:
 **What to do**:
 - Locate whether T02 delivered an `OperationStatusBanner` component. If not, create it at the path above.
 - Accept the following props:
+
   ```ts
   interface OperationStatusBannerProps {
     delta: ReconciliationDelta | null
@@ -219,6 +222,7 @@ Tests to implement:
     autoDismissMs?: number
   }
   ```
+
 - Render nothing when `delta` is null or all arrays are empty.
 - When `delta.terminal.length > 0`: show a consolidated summary grouping by status, e.g. "2 operaciones completadas, 1 falló mientras estabas desconectado."
 - When `delta.unavailable.length > 0`: append "N operaciones ya no están disponibles (eliminadas o purgadas)."
@@ -333,7 +337,7 @@ Using `node:test` + `assert`:
 
 ## Execution Order
 
-```
+```text
 TASK-01 (type extension)
   └─► TASK-02 (reconcileOperations util)
         ├─► TASK-03 (unit tests for util)
