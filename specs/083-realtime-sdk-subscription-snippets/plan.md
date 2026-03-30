@@ -176,6 +176,7 @@ Template tokens: `{REALTIME_ENDPOINT}`, `{WORKSPACE_ID}`, `{CHANNEL_TYPE}`, `<YO
 #### Category A — Basic subscription (3 entries)
 
 **A-1: JavaScript (browser) — WebSocket subscription**
+
 ```typescript
 {
   id: 'realtime-js-browser-basic',
@@ -214,6 +215,7 @@ ws.addEventListener('close', (e) => console.log('Connection closed', e.code, e.r
 ```
 
 **A-2: Node.js (backend) — WebSocket subscription with service-account token**
+
 ```typescript
 {
   id: 'realtime-nodejs-backend-basic',
@@ -253,6 +255,7 @@ ws.on('close', (code, reason) => console.log('Closed', code, reason.toString()))
 ```
 
 **A-3: Python (backend) — WebSocket subscription**
+
 ```typescript
 {
   id: 'realtime-python-backend-basic',
@@ -297,6 +300,7 @@ Each template adds a `filter` object to the `subscribe` message: `{ operation: '
 #### Category C — Reconnection with backoff + token refresh (3 entries)
 
 **C-1: JavaScript (browser) — Reconnection + token refresh**  
+
 ```typescript
 {
   id: 'realtime-js-browser-reconnect',
@@ -362,6 +366,7 @@ connect()`,
 ### `apps/web-console/src/components/console/snippets/RealtimeSnippetsPanel.tsx`
 
 **Props interface**:
+
 ```typescript
 interface RealtimeSnippetsPanelProps {
   workspaceId: string
@@ -414,6 +419,7 @@ The `fillTemplate` regex in `snippet-generator.ts` is extended:
 ```
 
 `snippet-types.ts` gains:
+
 ```typescript
 export type ResourceType =
   | 'postgres-database'
