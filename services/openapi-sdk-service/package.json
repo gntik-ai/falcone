@@ -1,0 +1,22 @@
+{
+  "name": "@atelier/openapi-sdk-service",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/**/*.test.mjs",
+    "lint:openapi": "node ./scripts/lint-openapi.mjs",
+    "validate:sdk:ts": "tsc --noEmit -p /tmp/test-sdk-ts/tsconfig.json",
+    "validate:sdk:python": "bash -lc 'python3 - <<\"PY\"\nimport compileall\nimport sys\nok = compileall.compile_dir(\"/tmp/test-sdk-python\", quiet=1)\nsys.exit(0 if ok else 1)\nPY'"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.888.0",
+    "@aws-sdk/s3-request-presigner": "^3.888.0",
+    "js-yaml": "^4.1.0",
+    "kafkajs": "*",
+    "pg": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

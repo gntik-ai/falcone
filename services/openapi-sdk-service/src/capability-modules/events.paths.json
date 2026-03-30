@@ -1,0 +1,23 @@
+{
+  "tag": { "name": "events", "description": "Eventing operations" },
+  "paths": {
+    "/events/subscriptions": {
+      "get": {
+        "operationId": "listEventSubscriptions",
+        "tags": ["events"],
+        "summary": "List subscriptions",
+        "responses": { "200": { "description": "Subscriptions listed" } }
+      }
+    },
+    "/events/subscriptions": {
+      "post": {
+        "operationId": "createEventSubscription",
+        "tags": ["events"],
+        "summary": "Create subscription",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["eventType", "targetUrl"], "properties": { "eventType": { "type": "string" }, "targetUrl": { "type": "string", "format": "uri" } } } } } },
+        "responses": { "201": { "description": "Created" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}

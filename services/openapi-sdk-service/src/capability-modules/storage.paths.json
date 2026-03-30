@@ -1,0 +1,46 @@
+{
+  "tag": { "name": "storage", "description": "Workspace storage operations" },
+  "paths": {
+    "/buckets": {
+      "get": {
+        "operationId": "listBuckets",
+        "tags": ["storage"],
+        "summary": "List buckets",
+        "responses": {
+          "200": {
+            "description": "Bucket list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/buckets/{bucketName}/objects": {
+      "post": {
+        "operationId": "uploadObject",
+        "tags": ["storage"],
+        "summary": "Upload an object",
+        "parameters": [
+          { "name": "bucketName", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+        },
+        "responses": { "201": { "description": "Uploaded" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}

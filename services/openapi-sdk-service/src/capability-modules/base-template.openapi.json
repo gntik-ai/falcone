@@ -1,0 +1,54 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Atelier Workspace API",
+    "version": "__VERSION__",
+    "description": "Workspace-scoped API contract generated from enabled capabilities."
+  },
+  "servers": [
+    {
+      "url": "__BASE_URL__",
+      "description": "Workspace API"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["code", "message", "requestId"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "requestId": { "type": "string" }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "required": ["page", "pageSize", "total"],
+        "properties": {
+          "page": { "type": "integer", "minimum": 1 },
+          "pageSize": { "type": "integer", "minimum": 1 },
+          "total": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  },
+  "security": [
+    { "BearerAuth": [] },
+    { "ApiKeyAuth": [] }
+  ],
+  "paths": {},
+  "tags": []
+}
