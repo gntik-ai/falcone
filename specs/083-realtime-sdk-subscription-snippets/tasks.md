@@ -314,6 +314,7 @@ Equivalent async reconnection loop using `websockets` and `asyncio`. Implement e
 **File**: `apps/web-console/src/components/console/snippets/RealtimeSnippetsPanel.tsx`
 
 **Props interface**:
+
 ```typescript
 interface RealtimeSnippetsPanelProps {
   workspaceId: string
@@ -335,6 +336,7 @@ interface RealtimeSnippetsPanelProps {
    - On tab change: write selected language to `sessionStorage.setItem('realtime-snippet-lang', lang)`.
 
 3. **Context building**: Build a `SnippetContext`:
+
    ```typescript
    const ctx: SnippetContext = {
      resourceHost: realtimeEndpoint ?? undefined,
@@ -350,6 +352,7 @@ interface RealtimeSnippetsPanelProps {
    - Render `<ConnectionSnippets entries={filteredEntries} />` (reuse existing component).
 
 5. **Multi-channel note**: If `channelTypes.length > 1`, render below the snippets:
+
    ```tsx
    <p className="text-sm text-muted-foreground mt-2">
      Additional channel types available: {channelTypes.slice(1).join(', ')}. 
@@ -358,6 +361,7 @@ interface RealtimeSnippetsPanelProps {
    ```
 
 6. **Accessibility wrapper**:
+
    ```tsx
    <section aria-labelledby="realtime-snippets-heading">
      <h2 id="realtime-snippets-heading" className="sr-only">Realtime Subscription Snippets</h2>
@@ -493,6 +497,7 @@ interface RealtimeSnippetsPanelProps {
 - `docs/README.md` (extend with link to realtime guides section)
 
 **`docs/guides/realtime/index.md`** — navigation page:
+
 ```markdown
 # Realtime Subscription Quick Start
 
@@ -525,6 +530,7 @@ Connect your applications to workspace change events in real time.
 **`docs/guides/realtime/python-quickstart.md`** — mirrors frontend guide using A-3, B-3, C-3 snippets. Adds `asyncio` event loop setup note (`asyncio.run()` for Python 3.10+). Code blocks tagged `python`.
 
 **`docs/README.md`** — add entry under an appropriate section:
+
 ```markdown
 - [Realtime Subscriptions](./guides/realtime/index.md) — Connect to workspace change events from browser and backend apps.
 ```
@@ -562,7 +568,7 @@ Connect your applications to workspace change events in real time.
 
 ## Implementation Order
 
-```
+```text
 T-01 (snippet-types.ts)
   └── T-02 (snippet-generator.ts)
         └── T-03 (snippet-catalog.ts)
