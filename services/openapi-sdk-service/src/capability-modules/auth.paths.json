@@ -1,0 +1,57 @@
+{
+  "tag": { "name": "authentication", "description": "Workspace authentication operations" },
+  "paths": {
+    "/auth/tokens": {
+      "post": {
+        "operationId": "createToken",
+        "tags": ["authentication"],
+        "summary": "Issue a workspace API token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["label", "scopes"],
+                "properties": {
+                  "label": { "type": "string" },
+                  "scopes": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["tokenId", "token"],
+                  "properties": {
+                    "tokenId": { "type": "string" },
+                    "token": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/auth/tokens/{tokenId}": {
+      "delete": {
+        "operationId": "revokeToken",
+        "tags": ["authentication"],
+        "summary": "Revoke a workspace API token",
+        "parameters": [
+          { "name": "tokenId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "204": { "description": "Token revoked" }, "404": { "description": "Token not found" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}
