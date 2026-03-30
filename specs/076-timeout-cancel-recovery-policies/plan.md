@@ -22,7 +22,7 @@ Extender el modelo de operaciones asíncronas ya existente (T01/T02/T03) con tre
 
 ### 2.1 Ciclo de vida extendido
 
-```
+```text
 pending ──► running ──► completed
    │            │
    │            ├──► timed_out   (terminal)
@@ -134,6 +134,7 @@ Cambios:
 - Nueva constante `CANCELLABLE_STATES = ['pending','running']`.
 
 Transiciones añadidas:
+
 ```js
 running:    [...existentes, 'timed_out', 'cancelling'],
 pending:    [...existentes, 'cancelled'],
@@ -227,6 +228,7 @@ Flujo:
 **Ruta**: `services/provisioning-orchestrator/src/events/async-operation-events.mjs`
 
 Nuevos topics y builders:
+
 ```js
 export const ASYNC_OPERATION_CANCELLED_TOPIC   = 'console.async-operation.cancelled';
 export const ASYNC_OPERATION_TIMED_OUT_TOPIC   = 'console.async-operation.timed-out';
@@ -244,6 +246,7 @@ Todos los builders siguen el patrón ya establecido: `eventId` (UUID), `eventTyp
 Tres nuevos archivos JSON de esquema:
 
 **`operation-cancel-event.json`**:
+
 ```json
 {
   "type": "object",
@@ -253,6 +256,7 @@ Tres nuevos archivos JSON de esquema:
 ```
 
 **`operation-timeout-event.json`**:
+
 ```json
 {
   "type": "object",
@@ -262,6 +266,7 @@ Tres nuevos archivos JSON de esquema:
 ```
 
 **`operation-recovery-event.json`**:
+
 ```json
 {
   "type": "object",
@@ -394,6 +399,7 @@ Los tres nuevos topics siguen la misma estructura de clave (tenant_id) y valor (
 **Chart**: `helm/provisioning-orchestrator/`
 
 Añadir en `values.yaml`:
+
 ```yaml
 timeoutSweep:
   enabled: true
@@ -465,7 +471,7 @@ Logs estructurados en cada acción siguiendo el patrón JSON ya establecido en `
 
 ### Secuencia recomendada
 
-```
+```text
 Paso 1: Migración 076-timeout-cancel-recovery.sql
 Paso 2: async-operation-states.mjs — extensión de transiciones
 Paso 3: async-operation.mjs — nuevos campos y applyTransition extendido
