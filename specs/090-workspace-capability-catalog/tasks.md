@@ -43,6 +43,7 @@ Tasks are ordered by dependency. Steps 2–3 may be parallelised; Step 6 may be 
 Create the `capability_catalog_metadata` table and seed the six core capabilities.
 
 **Implementation**:
+
 ```sql
 -- services/provisioning-orchestrator/src/migrations/090-workspace-capability-catalog.sql
 BEGIN;
@@ -89,6 +90,7 @@ COMMIT;
 Create a static JSON file containing example code templates for all six capability categories. Each capability must have at least three operation examples per language (Node.js required; curl optional). Use `{HOST}`, `{PORT}`, `{WORKSPACE_ID}`, `{RESOURCE_NAME}`, `{REALTIME_ENDPOINT}` as interpolation placeholders.
 
 **Structure**:
+
 ```jsonc
 {
   "version": "1.0.0",
@@ -147,6 +149,7 @@ JSON Schema for the Kafka audit event. Required fields:
 #### 3c — Update `services/internal-contracts/src/index.mjs`
 
 Add named exports for both schemas:
+
 ```js
 export { default as workspaceCapabilityCatalogResponse } from './workspace-capability-catalog-response.json' assert { type: 'json' }
 export { default as workspaceCapabilityCatalogAccessedEvent } from './workspace-capability-catalog-accessed-event.json' assert { type: 'json' }
@@ -166,6 +169,7 @@ export { default as workspaceCapabilityCatalogAccessedEvent } from './workspace-
 Assemble capability catalog entries from raw capability state + workspace context.
 
 **Module Interface** (ESM):
+
 ```js
 /**
  * @param {Object[]} capabilities       — rows from capability_catalog_metadata + effective state
@@ -211,7 +215,8 @@ export function buildExamples(capabilityKey, enabled, workspaceContext) { ... }
 Main OpenWhisk action handler. Node.js 20+ ESM.
 
 **Handler Logic**:
-```
+
+```text
 1. Extract workspaceId from path params; optional capabilityId
 2. Extract JWT context (workspaceId claim, actorId, tenantId) using authorization-context.mjs pattern
 3. Enforce workspace-scope: if path workspaceId ≠ JWT workspaceId claim → 403
@@ -371,7 +376,7 @@ Use `node:test`. Requires test PostgreSQL DB and test Kafka broker (follow exist
 
 ## Implementation Order Summary
 
-```
+```text
 TASK-01 ──────────────────────────────────────────────────────────────────────┐
                                                                                │
 TASK-02 ────────────────────────────────────────────────┐                     │

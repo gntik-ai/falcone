@@ -87,7 +87,7 @@ services/
 └── gateway-config/
     └── routes/
         └── workspace-capability-catalog.yaml           [NEW] APISIX route definition
-```
+```text
 
 **Structure Decision**: Single monorepo additions pattern. The action lives in `provisioning-orchestrator` (established home for workspace-scoped OpenWhisk actions). Example-assembly logic lives in `workspace-docs-service` (already owns snippet interpolation). New schemas land in `internal-contracts`. Console page under `apps/web-console`.
 
@@ -229,6 +229,7 @@ ON CONFLICT (capability_key) DO NOTHING;
 Same shape but `capabilities` array contains exactly one item.
 
 **Error codes**:
+
 | Code | HTTP | Meaning |
 |------|------|---------|
 | `WORKSPACE_NOT_FOUND` | 404 | Workspace does not exist or caller has no access (no existence leak) |
@@ -359,14 +360,17 @@ With Keycloak JWT auth plugin and workspace-scope enforcement plugin (following 
 ## Observability & Security
 
 ### Metrics
+
 - `capability_catalog_requests_total` (labels: `workspace_id`, `capability_id`, `status_code`) — Prometheus counter via existing metrics pattern
 - `capability_catalog_duration_ms` — histogram (p50, p95, p99)
 
 ### Structured Logging
+
 - Every action invocation: `{ action: 'workspace-capability-catalog', workspaceId, capabilityId, durationMs, statusCode, correlationId }`
 - Kafka publish failure: `{ level: 'warn', event: 'audit-publish-failed', ... }` (non-blocking)
 
 ### Security Controls
+
 - JWT validation: delegated to APISIX Keycloak plugin (upstream of action)
 - Workspace-scope enforcement: `authorization-context.mjs` pattern (existing); caller's `workspace_id` claim must match path `{workspaceId}`
 - Existence leak prevention: 404 returned regardless of whether workspace exists or access is denied (FR-009)
@@ -389,12 +393,13 @@ With Keycloak JWT auth plugin and workspace-scope enforcement plugin (following 
 ## Dependencies & Sequencing
 
 ### Declared Dependencies
+
 - US-GW-01 (APISIX routing): gateway route definition depends on gateway patterns being established ✅ (already done per AGENTS.md)
 - US-DX-02-T01 through T05: capability catalog is independent of these; can be developed in parallel
 
 ### Recommended Implementation Sequence
 
-```
+```text
 Step 1 (DB):   090-workspace-capability-catalog.sql migration
 Step 2 (Core): capability-catalog-builder.mjs + unit tests
 Step 3 (Core): workspace-capability-catalog-response.json + event schema in internal-contracts
