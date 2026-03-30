@@ -6,9 +6,18 @@ import { ConsoleOperationsPage } from './ConsoleOperationsPage'
 
 const mockUseOperations = vi.fn()
 const mockNavigate = vi.fn()
+const mockUseReconnectStateSync = vi.fn()
 
 vi.mock('@/lib/console-operations', () => ({
   useOperations: (...args: unknown[]) => mockUseOperations(...args)
+}))
+
+vi.mock('@/lib/console-context', () => ({
+  useConsoleContext: () => ({ activeTenantId: 'tenant_a', activeWorkspaceId: 'wrk_1' })
+}))
+
+vi.mock('@/lib/hooks/use-reconnect-state-sync', () => ({
+  useReconnectStateSync: (...args: unknown[]) => mockUseReconnectStateSync(...args)
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -23,6 +32,8 @@ describe('ConsoleOperationsPage', () => {
   beforeEach(() => {
     mockUseOperations.mockReset()
     mockNavigate.mockReset()
+    mockUseReconnectStateSync.mockReset()
+    mockUseReconnectStateSync.mockReturnValue({ isSyncing: false, lastSyncedAt: null, syncError: null })
   })
 
   afterEach(() => {

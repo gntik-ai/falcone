@@ -12,14 +12,18 @@ const STATUS_LABELS: Record<OperationStatus, string> = {
   pending: 'Pendiente',
   running: 'En curso',
   completed: 'Completada',
-  failed: 'Fallida'
+  failed: 'Fallida',
+  timed_out: 'Expirada',
+  cancelled: 'Cancelada'
 }
 
 const STATUS_CLASSNAMES: Record<OperationStatus, string> = {
   pending: 'border-slate-300 bg-slate-100 text-slate-700',
   running: 'border-blue-600 bg-blue-600 text-white animate-pulse',
   completed: 'border-green-600 bg-transparent text-green-600',
-  failed: 'border-red-600 bg-red-600 text-white'
+  failed: 'border-red-600 bg-red-600 text-white',
+  timed_out: 'border-amber-500 bg-amber-100 text-amber-800',
+  cancelled: 'border-zinc-400 bg-zinc-100 text-zinc-700'
 }
 
 export function OperationStatusBadge({ status, className }: OperationStatusBadgeProps) {
