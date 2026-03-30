@@ -1,0 +1,24 @@
+{
+  "tag": { "name": "mongodb", "description": "MongoDB data plane" },
+  "paths": {
+    "/mongo/collections": {
+      "get": {
+        "operationId": "listMongoCollections",
+        "tags": ["mongodb"],
+        "summary": "List collections",
+        "responses": { "200": { "description": "Collections listed" } }
+      }
+    },
+    "/mongo/collections/{collection}/documents": {
+      "post": {
+        "operationId": "insertMongoDocument",
+        "tags": ["mongodb"],
+        "summary": "Insert a document",
+        "parameters": [{ "name": "collection", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": { "201": { "description": "Inserted" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}

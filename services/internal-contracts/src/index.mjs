@@ -34,6 +34,10 @@ export { default as failureClassifiedEventSchema } from './failure-classified-ev
 export { default as manualInterventionRequiredEventSchema } from './manual-intervention-required-event.json' with { type: 'json' };
 export { default as retryOverrideEventSchema } from './retry-override-event.json' with { type: 'json' };
 export { default as interventionNotificationEventSchema } from './intervention-notification-event.json' with { type: 'json' };
+export { default as workspaceOpenApiVersion } from './workspace-openapi-version.json' with { type: 'json' };
+export { default as sdkPackage } from './sdk-package.json' with { type: 'json' };
+export { default as openapiSpecUpdatedEvent } from './openapi-spec-updated-event.json' with { type: 'json' };
+export { default as sdkGenerationCompletedEvent } from './sdk-generation-completed-event.json' with { type: 'json' };
 
 let cachedInternalServiceMap;
 let cachedDeploymentTopology;

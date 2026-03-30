@@ -1,0 +1,23 @@
+{
+  "tag": { "name": "postgresql", "description": "PostgreSQL query surface" },
+  "paths": {
+    "/pg/query": {
+      "post": {
+        "operationId": "queryPostgresql",
+        "tags": ["postgresql"],
+        "summary": "Run a SQL query",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["sql"], "properties": { "sql": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Query results" } }
+      }
+    },
+    "/pg/tables": {
+      "get": {
+        "operationId": "listPostgresqlTables",
+        "tags": ["postgresql"],
+        "summary": "List tables",
+        "responses": { "200": { "description": "Tables listed" } }
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}
