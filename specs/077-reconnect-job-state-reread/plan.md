@@ -290,7 +290,7 @@ Se recomienda introducir el flag `CONSOLE_RECONNECT_SYNC_ENABLED` (boolean, defa
 
 ### 7.3 Secuencia recomendada
 
-```
+```text
 1. Phase 0 — Verificar contrato real del endpoint T02 (filtrado por status, paginación)
 2. Implementar reconcileOperations() + tests unitarios
 3. Implementar useReconnectStateSync + tests unitarios del hook
