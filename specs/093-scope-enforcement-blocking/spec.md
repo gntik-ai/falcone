@@ -145,6 +145,7 @@ Within a tenant, workspace-level tokens or memberships can further restrict the 
 ## Scope Boundaries
 
 ### In Scope
+
 - Token scope evaluation and enforcement at the API request level.
 - Plan entitlement evaluation and enforcement at the API request level.
 - Workspace-level scope isolation.
@@ -153,6 +154,7 @@ Within a tenant, workspace-level tokens or memberships can further restrict the 
 - Fail-closed default for unconfigured endpoints.
 
 ### Out of Scope
+
 - Token issuance, renewal, or revocation (handled by IAM/Keycloak — US-SEC-02-T01).
 - Secret rotation mechanics (US-SEC-02-T02).
 - Structural admin vs. data access permission separation (US-SEC-02-T04).
