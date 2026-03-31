@@ -1,0 +1,7 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { main as createOverride } from '../../../services/provisioning-orchestrator/src/actions/quota-override-create.mjs';
+import { main as listOverrides } from '../../../services/provisioning-orchestrator/src/actions/quota-override-list.mjs';
+import { main as effectiveLimits } from '../../../services/provisioning-orchestrator/src/actions/quota-effective-limits-get.mjs';
+import { createFakeDb, createFakeProducer, seedPlans } from './fixtures/seed-plans-with-quota-types.mjs';
+const admin={ callerContext:{ actor:{ id:'admin-1', type:'superadmin' } } };
+test('create override, supersede, list and resolve effective limits', async()=>{ const db=createFakeDb(); const producer=createFakeProducer(); seedPlans(db); const created=await createOverride({ ...admin, tenantId:'tenant-a', dimensionKey:'max_pg_databases', overrideValue:10, justification:'pilot' }, { db, producer }); assert.equal(created.statusCode, 201); const superseded=await createOverride({ ...admin, tenantId:'tenant-a', dimensionKey:'max_pg_databases', overrideValue:12, justification:'bigger pilot' }, { db, producer }); assert.ok(superseded.body.supersededOverrideId); const list=await listOverrides({ ...admin, tenantId:'tenant-a' }, { db }); assert.equal(list.body.total, 1); const limits=await effectiveLimits({ tenantId:'tenant-a', callerContext:{ actor:{ id:'admin-1', type:'superadmin' } } }, { db }); assert.equal(limits.body.effectiveLimits.find((x)=>x.dimensionKey==='max_pg_databases').source, 'override'); });

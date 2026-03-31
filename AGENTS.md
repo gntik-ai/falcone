@@ -136,4 +136,14 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - New web-console API service: `apps/web-console/src/services/planManagementApi.ts`.
 - Tenant-owner sessions are redirected toward `/console/my-plan` when attempting superadmin-only plan routes.
 
+## Hard & Soft Quotas with Superadmin Override (103-hard-soft-quota-overrides)
+
+- `plans.quota_type_config` añade clasificación por dimensión (`hard`/`soft`) y `graceMargin` por plan.
+- Nuevas tablas PostgreSQL: `quota_overrides` y `quota_enforcement_log`.
+- Nuevas acciones OpenWhisk: `quota-override-create`, `quota-override-modify`, `quota-override-revoke`, `quota-override-list`, `quota-effective-limits-get`, `quota-override-expiry-sweep`, `quota-enforce`, `quota-audit-query`.
+- Nuevos topics Kafka: `console.quota.override.created`, `console.quota.override.modified`, `console.quota.override.revoked`, `console.quota.override.expired`, `console.quota.hard_limit.blocked`, `console.quota.soft_limit.exceeded`.
+- Nuevas env vars: `QUOTA_OVERRIDE_KAFKA_TOPIC_CREATED`, `QUOTA_OVERRIDE_KAFKA_TOPIC_MODIFIED`, `QUOTA_OVERRIDE_KAFKA_TOPIC_REVOKED`, `QUOTA_OVERRIDE_KAFKA_TOPIC_EXPIRED`, `QUOTA_ENFORCEMENT_KAFKA_TOPIC_HARD_BLOCKED`, `QUOTA_ENFORCEMENT_KAFKA_TOPIC_SOFT_EXCEEDED`, `QUOTA_OVERRIDE_EXPIRY_SWEEP_BATCH_SIZE`, `QUOTA_OVERRIDE_JUSTIFICATION_MAX_LENGTH`.
+- Regla operativa: jerarquía efectiva `override > plan > catalog default`; soft quota permite gracia hasta `effectiveLimit + graceMargin`; `-1` mantiene el sentinel de ilimitado.
+- Restricción de implementación para este branch: durante `speckit.implement`, leer de forma dirigida solo `plan.md`, `tasks.md` y el File Path Map de la feature; no abrir el OpenAPI completo.
+
 <!-- MANUAL ADDITIONS END -->
