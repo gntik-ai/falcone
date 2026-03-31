@@ -40,7 +40,8 @@ CREATE UNIQUE INDEX uq_tcr_exact_pair
   WHERE source_plan_id IS NOT NULL AND target_plan_id IS NOT NULL;
 ```
 
-### Notes
+### Notes on `plan_transition_compatibility_rules`
+
 - Wildcards are represented with `NULL`, not string sentinels.
 - Exact duplicate non-wildcard rules are rejected by `uq_tcr_exact_pair`.
 - Lookup precedence is enforced in repository logic, not through schema.
@@ -97,7 +98,8 @@ CREATE INDEX idx_pepc_scope_type
   ON plan_excess_policy_config(scope_type, created_at DESC);
 ```
 
-### Notes
+### Notes on `plan_excess_policy_config`
+
 - Shape constraints prevent mixed-scope rows.
 - Only one platform default row may exist.
 - `grace_period_days` is mandatory only for `grace_period` rows.
@@ -140,7 +142,8 @@ CREATE INDEX idx_ptae_target_created
   ON plan_transition_audit_events(target_plan_id, created_at DESC);
 ```
 
-### Notes
+### Notes on `plan_transition_audit_events`
+
 - Exists even for blocked and no-op outcomes.
 - JSONB fields hold the per-dimension evaluation summary used by the console and audits.
 
