@@ -1,0 +1,3 @@
+import { expireOverrides } from '../repositories/quota-override-repository.mjs';
+import { emitOverrideEvent } from '../events/quota-override-events.mjs';
+export async function main(params={}, overrides={}) { const db=overrides.db??params.db; const producer=overrides.producer??params.producer; const expired=await expireOverrides(db,{ now: params.now ? new Date(params.now) : new Date(), batchSize:Number(params.batchSize ?? process.env.QUOTA_OVERRIDE_EXPIRY_SWEEP_BATCH_SIZE ?? 100) }); for (const item of expired) await emitOverrideEvent(producer,'expired',{ actorId:'system', tenantId:item.tenantId, dimensionKey:item.dimensionKey, payload:{ overrideId:item.overrideId } }); return { statusCode:200, body:{ expiredCount: expired.length, overrides: expired } }; }
