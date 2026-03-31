@@ -1,0 +1,46 @@
+{
+  "action": "quota-override-list",
+  "description": "List quota overrides with optional filters (paginated)",
+  "auth": "superadmin JWT",
+  "input": {
+    "type": "object",
+    "properties": {
+      "tenantId": { "type": "string", "description": "Filter by tenant" },
+      "dimensionKey": { "type": "string", "description": "Filter by dimension" },
+      "status": { "type": "string", "enum": ["active", "superseded", "revoked", "expired"], "description": "Filter by status (default: active)" },
+      "page": { "type": "integer", "minimum": 1, "default": 1 },
+      "pageSize": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+    }
+  },
+  "output": {
+    "status": 200,
+    "type": "object",
+    "properties": {
+      "overrides": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "overrideId": { "type": "string", "format": "uuid" },
+            "tenantId": { "type": "string" },
+            "dimensionKey": { "type": "string" },
+            "overrideValue": { "type": "integer" },
+            "quotaType": { "type": "string", "enum": ["hard", "soft"] },
+            "graceMargin": { "type": "integer" },
+            "justification": { "type": "string" },
+            "expiresAt": { "type": ["string", "null"] },
+            "status": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "createdBy": { "type": "string" }
+          }
+        }
+      },
+      "total": { "type": "integer" },
+      "page": { "type": "integer" },
+      "pageSize": { "type": "integer" }
+    }
+  },
+  "errors": [
+    { "status": 403, "code": "FORBIDDEN", "description": "Caller is not a superadmin" }
+  ]
+}
