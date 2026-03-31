@@ -10,16 +10,13 @@ function mapPlan(row) {
     id: row.id,
     status: row.status,
     slug: row.slug,
-    quotaDimensions: row.quota_dimensions ?? {}
+    quotaDimensions: row.quota_dimensions ?? {},
+    quotaTypeConfig: row.quota_type_config ?? {}
   } : null;
 }
 
 async function rollbackQuietly(pgClient) {
-  try {
-    await pgClient.query('ROLLBACK');
-  } catch {
-    // noop
-  }
+  try { await pgClient.query('ROLLBACK'); } catch {}
 }
 
 async function insertAuditEvent(pgClient, { actionType, actorId, correlationId, planId, previousState, newState }) {
@@ -31,27 +28,16 @@ async function insertAuditEvent(pgClient, { actionType, actorId, correlationId, 
 }
 
 export async function getPlanWithLock(pgClient, planId) {
-  const { rows } = await pgClient.query(
-    `SELECT id, status, slug, quota_dimensions
-       FROM plans
-      WHERE id = $1
-      FOR UPDATE`,
-    [planId]
-  );
+  const { rows } = await pgClient.query(`SELECT id, status, slug, quota_dimensions, quota_type_config FROM plans WHERE id = $1 FOR UPDATE`, [planId]);
   return mapPlan(rows[0]);
 }
 
 export async function getPlanById(pgClient, planId) {
-  const { rows } = await pgClient.query(
-    `SELECT id, status, slug, quota_dimensions
-       FROM plans
-      WHERE id = $1`,
-    [planId]
-  );
+  const { rows } = await pgClient.query(`SELECT id, status, slug, quota_dimensions, quota_type_config FROM plans WHERE id = $1`, [planId]);
   return mapPlan(rows[0]);
 }
 
-export async function setLimit(pgClient, { planId, dimensionKey, value, actorId = 'system', correlationId = null }) {
+export async function setLimit(pgClient, { planId, dimensionKey, value, quotaType = null, graceMargin = null, actorId = 'system', correlationId = null }) {
   await pgClient.query('BEGIN');
   try {
     await pgClient.query(`SET LOCAL lock_timeout = '${resolveLockTimeoutMs()}ms'`);
@@ -60,12 +46,15 @@ export async function setLimit(pgClient, { planId, dimensionKey, value, actorId 
     if (plan.status === 'deprecated' || plan.status === 'archived') throw Object.assign(new Error('Plan limits are frozen'), { code: 'PLAN_LIMITS_FROZEN' });
 
     const previousValue = Object.prototype.hasOwnProperty.call(plan.quotaDimensions, dimensionKey) ? plan.quotaDimensions[dimensionKey] : null;
+    const previousType = plan.quotaTypeConfig?.[dimensionKey] ?? null;
+    const nextTypeConfig = quotaType ? { ...(plan.quotaTypeConfig ?? {}), [dimensionKey]: { type: quotaType, graceMargin: graceMargin ?? 0 } } : (plan.quotaTypeConfig ?? {});
     const { rows } = await pgClient.query(
       `UPDATE plans
-          SET quota_dimensions = COALESCE(quota_dimensions, '{}'::jsonb) || jsonb_build_object($2::text, $3::bigint)
+          SET quota_dimensions = COALESCE(quota_dimensions, '{}'::jsonb) || jsonb_build_object($2::text, $3::bigint),
+              quota_type_config = $4::jsonb
         WHERE id = $1
-        RETURNING id, status, slug, quota_dimensions`,
-      [planId, dimensionKey, value]
+        RETURNING id, status, slug, quota_dimensions, quota_type_config`,
+      [planId, dimensionKey, value, JSON.stringify(nextTypeConfig)]
     );
 
     await insertAuditEvent(pgClient, {
@@ -73,12 +62,12 @@ export async function setLimit(pgClient, { planId, dimensionKey, value, actorId 
       actorId,
       correlationId,
       planId,
-      previousState: { dimensionKey, previousValue },
-      newState: { dimensionKey, newValue: value }
+      previousState: { dimensionKey, previousValue, previousType },
+      newState: { dimensionKey, newValue: value, quotaType: quotaType ?? previousType?.type ?? 'hard', graceMargin: graceMargin ?? previousType?.graceMargin ?? 0 }
     });
 
     await pgClient.query('COMMIT');
-    return { planId, dimensionKey, previousValue, newValue: value, planStatus: rows[0].status, planSlug: rows[0].slug };
+    return { planId, dimensionKey, previousValue, newValue: value, planStatus: rows[0].status, planSlug: rows[0].slug, quotaType: quotaType ?? previousType?.type ?? 'hard', graceMargin: graceMargin ?? previousType?.graceMargin ?? 0 };
   } catch (error) {
     await rollbackQuietly(pgClient);
     if (error?.code === '55P03') throw Object.assign(new Error('Concurrent plan limit conflict'), { code: 'CONCURRENT_PLAN_LIMIT_CONFLICT', cause: error });
@@ -94,26 +83,19 @@ export async function removeLimit(pgClient, { planId, dimensionKey, actorId = 's
     if (!plan) throw Object.assign(new Error('Plan not found'), { code: 'PLAN_NOT_FOUND' });
     if (plan.status === 'deprecated' || plan.status === 'archived') throw Object.assign(new Error('Plan limits are frozen'), { code: 'PLAN_LIMITS_FROZEN' });
     if (!Object.prototype.hasOwnProperty.call(plan.quotaDimensions, dimensionKey)) throw Object.assign(new Error('Limit not set'), { code: 'LIMIT_NOT_SET' });
-
     const previousValue = plan.quotaDimensions[dimensionKey];
     const effectiveValue = await getDefaultValue(pgClient, dimensionKey);
+    const nextTypeConfig = { ...(plan.quotaTypeConfig ?? {}) };
+    delete nextTypeConfig[dimensionKey];
     const { rows } = await pgClient.query(
       `UPDATE plans
-          SET quota_dimensions = COALESCE(quota_dimensions, '{}'::jsonb) - $2::text
+          SET quota_dimensions = COALESCE(quota_dimensions, '{}'::jsonb) - $2::text,
+              quota_type_config = $3::jsonb
         WHERE id = $1
-        RETURNING id, status, slug, quota_dimensions`,
-      [planId, dimensionKey]
+        RETURNING id, status, slug, quota_dimensions, quota_type_config`,
+      [planId, dimensionKey, JSON.stringify(nextTypeConfig)]
     );
-
-    await insertAuditEvent(pgClient, {
-      actionType: 'plan.limit.removed',
-      actorId,
-      correlationId,
-      planId,
-      previousState: { dimensionKey, previousValue },
-      newState: { dimensionKey, effectiveValue }
-    });
-
+    await insertAuditEvent(pgClient, { actionType: 'plan.limit.removed', actorId, correlationId, planId, previousState: { dimensionKey, previousValue }, newState: { dimensionKey, effectiveValue } });
     await pgClient.query('COMMIT');
     return { planId, dimensionKey, removedValue: previousValue, effectiveValue, planStatus: rows[0].status, planSlug: rows[0].slug };
   } catch (error) {
@@ -124,23 +106,18 @@ export async function removeLimit(pgClient, { planId, dimensionKey, actorId = 's
 }
 
 export async function getExplicitLimits(pgClient, planId) {
-  const { rows } = await pgClient.query('SELECT quota_dimensions FROM plans WHERE id = $1', [planId]);
-  return rows[0] ? { quota_dimensions: rows[0].quota_dimensions ?? {} } : null;
+  const { rows } = await pgClient.query('SELECT quota_dimensions, quota_type_config FROM plans WHERE id = $1', [planId]);
+  return rows[0] ? { quota_dimensions: rows[0].quota_dimensions ?? {}, quota_type_config: rows[0].quota_type_config ?? {} } : null;
 }
 
 export async function getLimitsByTenantCurrentPlan(pgClient, tenantId) {
   const { rows } = await pgClient.query(
-    `SELECT p.id AS plan_id, p.slug AS plan_slug, p.status AS plan_status, p.quota_dimensions
+    `SELECT p.id AS plan_id, p.slug AS plan_slug, p.status AS plan_status, p.quota_dimensions, p.quota_type_config
        FROM tenant_plan_assignments tpa
        JOIN plans p ON p.id = tpa.plan_id
       WHERE tpa.tenant_id = $1
         AND tpa.superseded_at IS NULL`,
     [tenantId]
   );
-  return rows[0] ? {
-    planId: rows[0].plan_id,
-    planSlug: rows[0].plan_slug,
-    planStatus: rows[0].plan_status,
-    quotaDimensions: rows[0].quota_dimensions ?? {}
-  } : null;
+  return rows[0] ? { planId: rows[0].plan_id, planSlug: rows[0].plan_slug, planStatus: rows[0].plan_status, quotaDimensions: rows[0].quota_dimensions ?? {}, quotaTypeConfig: rows[0].quota_type_config ?? {} } : null;
 }

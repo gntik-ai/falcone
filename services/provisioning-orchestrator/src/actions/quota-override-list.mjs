@@ -1,0 +1,3 @@
+import { listOverrides } from '../repositories/quota-override-repository.mjs';
+function requireSuperadmin(params){ const actor=params.callerContext?.actor; if(!actor?.id||actor.type!=='superadmin') throw Object.assign(new Error('Forbidden'),{code:'FORBIDDEN',statusCode:403}); }
+export async function main(params={}, overrides={}) { const db=overrides.db??params.db; requireSuperadmin(params); const result=await listOverrides(db,{ tenantId:params.tenantId ?? null, dimensionKey:params.dimensionKey ?? null, status:params.status ?? 'active', page:Number(params.page ?? 1), pageSize:Number(params.pageSize ?? 50) }); return { statusCode:200, body:result }; }
