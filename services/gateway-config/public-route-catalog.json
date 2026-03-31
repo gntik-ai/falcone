@@ -1,30 +1,34 @@
 [
-  {
-    "family": "workspaces",
-    "downstreamService": "workspace_docs_service",
-    "method": "GET",
-    "path": "/v1/workspaces/{workspaceId}/docs",
-    "audiences": ["developer_external", "workspace_owner", "workspace_admin", "workspace_viewer"]
-  },
-  {
-    "family": "workspaces",
-    "downstreamService": "workspace_docs_service",
-    "method": "POST",
-    "path": "/v1/workspaces/{workspaceId}/docs/notes",
-    "audiences": ["workspace_owner", "workspace_admin"]
-  },
-  {
-    "family": "workspaces",
-    "downstreamService": "workspace_docs_service",
-    "method": "PUT",
-    "path": "/v1/workspaces/{workspaceId}/docs/notes/{noteId}",
-    "audiences": ["workspace_owner", "workspace_admin"]
-  },
-  {
-    "family": "workspaces",
-    "downstreamService": "workspace_docs_service",
-    "method": "DELETE",
-    "path": "/v1/workspaces/{workspaceId}/docs/notes/{noteId}",
-    "audiences": ["workspace_owner", "workspace_admin"]
-  }
+  {"method":"POST","path":"/v1/tenants","privilege_domain":"structural_admin"},
+  {"method":"PUT","path":"/v1/tenants/{id}","privilege_domain":"structural_admin"},
+  {"method":"DELETE","path":"/v1/tenants/{id}","privilege_domain":"structural_admin"},
+  {"method":"POST","path":"/v1/workspaces","privilege_domain":"structural_admin"},
+  {"method":"PUT","path":"/v1/workspaces/{id}","privilege_domain":"structural_admin"},
+  {"method":"DELETE","path":"/v1/workspaces/{id}","privilege_domain":"structural_admin"},
+  {"method":"POST","path":"/v1/workspaces/{id}/members","privilege_domain":"structural_admin"},
+  {"method":"DELETE","path":"/v1/workspaces/{id}/members/{memberId}","privilege_domain":"structural_admin"},
+  {"method":"GET","path":"/v1/workspaces/{id}/members","privilege_domain":"structural_admin"},
+  {"method":"POST","path":"/v1/schemas","privilege_domain":"structural_admin"},
+  {"method":"PUT","path":"/v1/schemas/{id}","privilege_domain":"structural_admin"},
+  {"method":"DELETE","path":"/v1/schemas/{id}","privilege_domain":"structural_admin"},
+  {"method":"GET","path":"/v1/schemas","privilege_domain":"structural_admin"},
+  {"method":"POST","path":"/v1/functions","privilege_domain":"structural_admin"},
+  {"method":"DELETE","path":"/v1/functions/{id}","privilege_domain":"structural_admin"},
+  {"method":"PUT","path":"/v1/functions/{id}/config","privilege_domain":"structural_admin"},
+  {"method":"POST","path":"/v1/api-keys","privilege_domain":"structural_admin"},
+  {"method":"DELETE","path":"/v1/api-keys/{id}","privilege_domain":"structural_admin"},
+  {"method":"POST","path":"/v1/services/configure","privilege_domain":"structural_admin"},
+  {"method":"PUT","path":"/v1/quotas","privilege_domain":"structural_admin"},
+  {"method":"GET","path":"/v1/collections/{name}/documents","privilege_domain":"data_access"},
+  {"method":"POST","path":"/v1/collections/{name}/documents","privilege_domain":"data_access"},
+  {"method":"PUT","path":"/v1/collections/{name}/documents/{id}","privilege_domain":"data_access"},
+  {"method":"DELETE","path":"/v1/collections/{name}/documents/{id}","privilege_domain":"data_access"},
+  {"method":"POST","path":"/v1/collections/{name}/query","privilege_domain":"data_access"},
+  {"method":"GET","path":"/v1/objects/{bucket}/{key}","privilege_domain":"data_access"},
+  {"method":"PUT","path":"/v1/objects/{bucket}/{key}","privilege_domain":"data_access"},
+  {"method":"DELETE","path":"/v1/objects/{bucket}/{key}","privilege_domain":"data_access"},
+  {"method":"POST","path":"/v1/functions/{id}/invoke","privilege_domain":"data_access"},
+  {"method":"GET","path":"/v1/analytics/query","privilege_domain":"data_access"},
+  {"method":"POST","path":"/v1/events/publish","privilege_domain":"data_access"},
+  {"method":"GET","path":"/v1/events/subscribe","privilege_domain":"data_access"}
 ]

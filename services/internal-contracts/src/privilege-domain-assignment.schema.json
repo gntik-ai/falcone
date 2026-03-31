@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrivilegeDomainAssignmentEvent",
+  "type": "object",
+  "required": ["eventType", "tenantId", "workspaceId", "memberId", "occurredAt"],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": ["privilege_domain_assigned", "privilege_domain_revoked", "last_admin_guard_triggered"]
+    },
+    "tenantId": { "type": "string", "format": "uuid" },
+    "workspaceId": { "type": "string", "format": "uuid" },
+    "memberId": { "type": "string", "format": "uuid" },
+    "privilegeDomain": { "type": "string", "enum": ["structural_admin", "data_access"] },
+    "assignedBy": { "type": "string", "format": "uuid" },
+    "revokedBy": { "type": "string", "format": "uuid" },
+    "attemptedBy": { "type": "string", "format": "uuid" },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "eventType": { "const": "privilege_domain_assigned" } } },
+      "then": { "required": ["privilegeDomain", "assignedBy"] }
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "privilege_domain_revoked" } } },
+      "then": { "required": ["privilegeDomain", "revokedBy"] }
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "last_admin_guard_triggered" } } },
+      "then": { "required": ["attemptedBy"] }
+    }
+  ]
+}

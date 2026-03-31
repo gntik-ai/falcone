@@ -4,6 +4,7 @@ local lrucache = require("resty.lrucache")
 local plugin_name = "scope-enforcement"
 local _M = { version = 0.1, priority = 2900, name = plugin_name }
 local requirements_cache = lrucache.new(200)
+local privilege_domain_cache = lrucache.new(200)
 
 local schema = {
   type = "object",
@@ -34,7 +35,8 @@ local function get_claims(ctx)
     plan_id = claims.plan_id,
     role = claims.role,
     actor_id = claims.sub or claims.client_id or "anonymous",
-    actor_type = claims.actor_type or "user"
+    actor_type = claims.actor_type or "user",
+    privilege_domain = claims.privilege_domain
   }
 end
 
@@ -85,6 +87,93 @@ local function emit_denial_event(_, payload)
   client:request_uri(os.getenv("SCOPE_ENFORCEMENT_SIDECAR_URL") or "http://127.0.0.1:19092/denials", { method = "POST", body = core.json.encode(payload), headers = { ["Content-Type"] = "application/json" } })
 end
 
+local function emit_privilege_domain_denied_event(_, payload)
+  local http = require("resty.http")
+  local client = http.new()
+  client:set_timeout(200)
+  client:request_uri(os.getenv("SCOPE_ENFORCEMENT_SIDECAR_URL") or "http://127.0.0.1:19092/denials", { method = "POST", body = core.json.encode(payload), headers = { ["Content-Type"] = "application/json" } })
+end
+
+local function env_bool(name, default)
+  local value = os.getenv(name)
+  if value == nil then return default end
+  return tostring(value) == "true"
+end
+
+local function cache_ttl_seconds()
+  return tonumber(os.getenv("PRIVILEGE_DOMAIN_CACHE_TTL_SECONDS") or "60") or 60
+end
+
+function _M.fetch_endpoint_privilege_domain(_, _)
+  return nil
+end
+
+function _M.invalidate_privilege_domain_cache()
+  privilege_domain_cache:flush_all()
+end
+
+function _M.resolve_required_domain(method, path)
+  local cache_key = method .. ":" .. path
+  local cached = privilege_domain_cache:get(cache_key)
+  if cached then return cached, true end
+  local required_domain = _M.fetch_endpoint_privilege_domain(method, path)
+  if required_domain then privilege_domain_cache:set(cache_key, required_domain, cache_ttl_seconds()) end
+  return required_domain, false
+end
+
+function _M.evaluate_privilege_domain(ctx, claims)
+  local method = ctx.var.request_method
+  local path = ctx.var.uri
+  local credential_domain = (ctx.var and ctx.var.http_x_api_key_domain) or (claims and claims.privilege_domain) or "none"
+  local required_domain = nil
+  local _, cache_hit = nil, false
+  required_domain, cache_hit = _M.resolve_required_domain(method, path)
+  local enforcement_enabled = env_bool("PRIVILEGE_DOMAIN_ENFORCEMENT_ENABLED", false)
+
+  if claims.role == "platform_admin" then
+    core.request.set_header(ctx, "X-Privilege-Domain", "platform_admin")
+    return nil, { bypassed = true, cache_hit = cache_hit }
+  end
+
+  if required_domain == nil then
+    if enforcement_enabled then
+      return core.response.exit(403, {
+        error = "CONFIG_ERROR",
+        requiredDomain = nil,
+        credentialDomain = credential_domain
+      })
+    end
+    core.request.set_header(ctx, "X-Privilege-Domain", credential_domain)
+    return nil, { bypassed = false, cache_hit = cache_hit }
+  end
+
+  if credential_domain ~= required_domain then
+    ngx.timer.at(0, emit_privilege_domain_denied_event, {
+      eventType = "privilege_domain_denied",
+      tenantId = claims.tenant_id,
+      workspaceId = claims.workspace_id,
+      actorId = claims.actor_id,
+      actorType = claims.actor_type,
+      credentialDomain = credential_domain,
+      requiredDomain = required_domain,
+      httpMethod = method,
+      requestPath = path,
+      correlationId = (ctx.var.http_x_correlation_id or ctx.var.request_id),
+      occurredAt = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    })
+    if enforcement_enabled then
+      return core.response.exit(403, {
+        error = "PRIVILEGE_DOMAIN_MISMATCH",
+        requiredDomain = required_domain,
+        credentialDomain = credential_domain
+      })
+    end
+  end
+
+  core.request.set_header(ctx, "X-Privilege-Domain", credential_domain)
+  return nil, { bypassed = false, cache_hit = cache_hit }
+end
+
 function _M.check_schema(conf)
   return core.schema.check(schema, conf)
 end
@@ -122,6 +211,9 @@ function _M.access(conf, ctx)
     ngx.timer.at(0, emit_denial_event, { denial_type = "PLAN_ENTITLEMENT_DENIED", tenant_id = claims.tenant_id, workspace_id = claims.workspace_id, actor_id = claims.actor_id, actor_type = claims.actor_type, http_method = ctx.var.request_method, request_path = ctx.var.uri, required_scopes = req.required_scopes or {}, presented_scopes = claims.scopes, required_entitlement = missing_entitlements[1], current_plan_id = claims.plan_id, source_ip = ctx.var.remote_addr, correlation_id = ctx.var.http_x_correlation_id or ctx.var.request_id, denied_at = os.date("!%Y-%m-%dT%H:%M:%SZ") })
     return core.response.exit(403, deny(ctx, 403, "PLAN_ENTITLEMENT_DENIED", { required_entitlement = missing_entitlements[1], current_plan_id = claims.plan_id, message = "Your current plan does not include this capability." }))
   end
+
+  local domain_result = _M.evaluate_privilege_domain(ctx, claims)
+  if domain_result then return domain_result end
 
   core.request.set_header(ctx, "X-Enforcement-Verified", "true")
   core.request.set_header(ctx, "X-Verified-Tenant-Id", claims.tenant_id or "")
