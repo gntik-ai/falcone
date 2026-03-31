@@ -56,6 +56,27 @@ jobs:
       - name: Resilience scaffolding
         run: pnpm test:resilience
 
+      - name: Plan Enforcement Coherence Tests
+        run: node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs
+        env:
+          GATEWAY_BASE_URL: ${{ secrets.GATEWAY_BASE_URL }}
+          CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
+          CONSOLE_API_URL: ${{ secrets.CONSOLE_API_URL }}
+          KEYCLOAK_URL: ${{ secrets.KEYCLOAK_URL }}
+          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+          SUPERADMIN_CLIENT_ID: ${{ secrets.SUPERADMIN_CLIENT_ID }}
+          SUPERADMIN_CLIENT_SECRET: ${{ secrets.SUPERADMIN_CLIENT_SECRET }}
+          KAFKA_BROKERS: ${{ secrets.KAFKA_BROKERS }}
+          KAFKA_AUDIT_TOPIC: ${{ secrets.KAFKA_AUDIT_TOPIC }}
+          TEST_RESULT_OUTPUT_PATH: test-results/plan-enforcement-report.json
+
+      - name: Upload plan enforcement test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-enforcement-tests-result
+          path: test-results/plan-enforcement-report.json
+          if-no-files-found: ignore
+
       - name: Plan Upgrade/Downgrade E2E Tests
         run: node --test --test-reporter=tap tests/e2e/101-plan-upgrade-downgrade-tests/index.test.mjs
         env:

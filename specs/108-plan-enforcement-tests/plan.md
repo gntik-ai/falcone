@@ -92,7 +92,7 @@ La suite se organiza en tres capas complementarias:
 
 Cada test sigue un patrón estandarizado:
 
-```
+```text
 1. ARRANGE
    - Crear tenant de prueba (prefijo `test-t06-{uuid}`)
    - Crear/asignar plan de prueba
