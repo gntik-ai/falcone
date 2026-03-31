@@ -1,4 +1,8 @@
 export type PlanStatus = 'draft' | 'active' | 'deprecated' | 'archived'
+export type EffectiveValueKind = 'bounded' | 'unlimited' | 'missing'
+export type QuotaComparison = 'increased' | 'decreased' | 'unchanged' | 'added' | 'removed'
+export type CapabilityComparison = 'enabled' | 'disabled' | 'unchanged'
+export type UsageStatus = 'within_limit' | 'at_limit' | 'over_limit' | 'unknown'
 
 export interface PlanRecord {
   id: string
@@ -37,6 +41,71 @@ export interface LimitProfileRow {
   effectiveValue: number
   explicitValue?: number | null
   source: 'default' | 'explicit' | 'unlimited'
+}
+
+export interface PlanQuotaImpact {
+  dimensionKey: string
+  displayLabel?: string
+  unit?: string | null
+  previousEffectiveValueKind?: EffectiveValueKind
+  previousEffectiveValue?: number | null
+  newEffectiveValueKind: EffectiveValueKind
+  newEffectiveValue?: number | null
+  comparison: QuotaComparison
+  observedUsage?: number | null
+  usageStatus: UsageStatus
+  usageUnknownReason?: string | null
+  isHardDecrease?: boolean
+}
+
+export interface PlanCapabilityImpact {
+  capabilityKey: string
+  displayLabel?: string
+  previousState?: boolean | null
+  newState?: boolean | null
+  comparison: CapabilityComparison
+}
+
+export interface PlanChangeHistoryEntry {
+  historyEntryId: string
+  tenantId: string
+  previousPlanId?: string | null
+  newPlanId: string
+  actorId: string
+  effectiveAt: string
+  correlationId?: string | null
+  changeReason?: string | null
+  changeDirection: 'upgrade' | 'downgrade' | 'lateral' | 'equivalent' | 'initial_assignment'
+  usageCollectionStatus: 'complete' | 'partial' | 'unavailable'
+  overLimitDimensionCount: number
+  quotaImpacts: PlanQuotaImpact[]
+  capabilityImpacts: PlanCapabilityImpact[]
+}
+
+export interface CurrentEffectiveEntitlementSummary {
+  tenantId: string
+  planId?: string
+  planSlug?: string
+  planDisplayName?: string
+  effectiveFrom?: string
+  latestHistoryEntryId?: string | null
+  latestPlanChangeAt?: string | null
+  quotaDimensions: Array<{
+    dimensionKey: string
+    displayLabel?: string
+    unit?: string | null
+    effectiveValueKind: EffectiveValueKind
+    effectiveValue?: number | null
+    observedUsage?: number | null
+    usageStatus: UsageStatus
+    usageUnknownReason?: string | null
+  }>
+  capabilities: Array<{
+    capabilityKey: string
+    displayLabel?: string
+    enabled: boolean
+  }>
+  noAssignment?: boolean
 }
 
 export class PlanApiError extends Error {
@@ -99,3 +168,9 @@ export function getTenantCurrentPlan(tenantId: string) { return request(`/v1/ten
 export function getTenantPlanHistory(tenantId: string, params: { page?: number; pageSize?: number } = {}) { return request<PaginationEnvelope<AssignmentRecord>>(withSearch(`/v1/tenants/${tenantId}/plan/history`, { page: params.page ?? 1, pageSize: params.pageSize ?? 20 })) }
 export function getMyPlan() { return request('/v1/tenant/plan') }
 export function getMyPlanLimits() { return request<{ tenantId?: string; noAssignment?: boolean; profile: LimitProfileRow[] }>('/v1/tenant/plan/limits') }
+export function getEffectiveEntitlements(tenantId?: string): Promise<CurrentEffectiveEntitlementSummary> {
+  return request<CurrentEffectiveEntitlementSummary>(tenantId ? `/v1/tenants/${tenantId}/plan/effective-entitlements` : '/v1/tenant/plan/effective-entitlements')
+}
+export function getPlanChangeHistory(tenantId: string, params: { page?: number; pageSize?: number; actorId?: string; from?: string; to?: string } = {}): Promise<PaginationEnvelope<PlanChangeHistoryEntry>> {
+  return request<PaginationEnvelope<PlanChangeHistoryEntry>>(withSearch(`/v1/tenants/${tenantId}/plan/history-impact`, { page: params.page ?? 1, pageSize: params.pageSize ?? 20, actorId: params.actorId, from: params.from, to: params.to }))
+}
