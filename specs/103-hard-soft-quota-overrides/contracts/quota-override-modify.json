@@ -1,0 +1,54 @@
+{
+  "action": "quota-override-modify",
+  "description": "Modify an active quota override (value, quota type, grace margin, or expiration)",
+  "auth": "superadmin JWT",
+  "input": {
+    "type": "object",
+    "required": ["overrideId", "justification"],
+    "properties": {
+      "overrideId": { "type": "string", "format": "uuid", "description": "Override to modify" },
+      "overrideValue": { "type": "integer", "minimum": -1, "description": "New override limit value" },
+      "quotaType": { "type": "string", "enum": ["hard", "soft"], "description": "New enforcement type" },
+      "graceMargin": { "type": "integer", "minimum": 0, "description": "New grace margin" },
+      "expiresAt": { "type": ["string", "null"], "format": "date-time", "description": "New expiration (null to remove)" },
+      "justification": { "type": "string", "minLength": 1, "maxLength": 1000, "description": "Reason for modification" }
+    }
+  },
+  "output": {
+    "status": 200,
+    "type": "object",
+    "properties": {
+      "overrideId": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string" },
+      "dimensionKey": { "type": "string" },
+      "previousState": {
+        "type": "object",
+        "properties": {
+          "overrideValue": { "type": "integer" },
+          "quotaType": { "type": "string" },
+          "graceMargin": { "type": "integer" },
+          "expiresAt": { "type": ["string", "null"] }
+        }
+      },
+      "newState": {
+        "type": "object",
+        "properties": {
+          "overrideValue": { "type": "integer" },
+          "quotaType": { "type": "string" },
+          "graceMargin": { "type": "integer" },
+          "expiresAt": { "type": ["string", "null"] }
+        }
+      },
+      "justification": { "type": "string" },
+      "modifiedAt": { "type": "string", "format": "date-time" },
+      "modifiedBy": { "type": "string" }
+    }
+  },
+  "errors": [
+    { "status": 404, "code": "OVERRIDE_NOT_FOUND", "description": "overrideId does not exist" },
+    { "status": 409, "code": "OVERRIDE_NOT_ACTIVE", "description": "Override is not in active status" },
+    { "status": 400, "code": "NO_CHANGES_SPECIFIED", "description": "No modifiable fields provided" },
+    { "status": 400, "code": "JUSTIFICATION_REQUIRED", "description": "justification is empty or missing" },
+    { "status": 403, "code": "FORBIDDEN", "description": "Caller is not a superadmin" }
+  ]
+}

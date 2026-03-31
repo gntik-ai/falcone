@@ -1,0 +1,42 @@
+{
+  "action": "quota-enforce",
+  "description": "Internal enforcement action: resolves effective limit and applies hard/soft decision",
+  "auth": "Internal action invocation (service-to-service)",
+  "input": {
+    "type": "object",
+    "required": ["tenantId", "workspaceId", "dimensionKey", "currentUsage", "attemptedAction"],
+    "properties": {
+      "tenantId": { "type": "string" },
+      "workspaceId": { "type": "string" },
+      "dimensionKey": { "type": "string", "maxLength": 64 },
+      "currentUsage": { "type": "integer", "minimum": 0 },
+      "attemptedAction": { "type": "string", "description": "e.g. workspace.create, function.create" }
+    }
+  },
+  "output": {
+    "status": 200,
+    "type": "object",
+    "properties": {
+      "allowed": { "type": "boolean" },
+      "decision": {
+        "type": "string",
+        "enum": ["allowed", "hard_blocked", "soft_grace_allowed", "soft_grace_exhausted", "unlimited", "metering_unavailable"]
+      },
+      "effectiveLimit": { "type": "integer" },
+      "quotaType": { "type": "string", "enum": ["hard", "soft"] },
+      "graceMargin": { "type": "integer" },
+      "effectiveCeiling": { "type": "integer", "description": "effectiveLimit + graceMargin" },
+      "currentUsage": { "type": "integer" },
+      "source": { "type": "string", "enum": ["override", "plan", "default"] },
+      "warning": { "type": ["string", "null"], "description": "Present when decision = soft_grace_allowed" }
+    }
+  },
+  "errors": [
+    { "status": 500, "code": "METERING_UNAVAILABLE", "description": "Metering service unreachable; fail-closed" }
+  ],
+  "notes": [
+    "This action is internal — invoked by resource-creation actions, not exposed via APISIX routes",
+    "Calling action should propagate X-Quota-Warning header when decision = soft_grace_allowed",
+    "Fail-closed: when metering is unavailable, returns allowed=false with decision=metering_unavailable"
+  ]
+}
