@@ -168,7 +168,7 @@ interface FixtureSecretSet {
 
 ### Lifecycle
 
-```
+```text
 createIsolatedFixture(runId)
   │
   ├─► POST /v1/admin/tenants            → tenantA, tenantB
@@ -216,7 +216,7 @@ type HardeningCategory =
 
 ## Data Flow: Audit Verification
 
-```
+```text
 Test makes HTTP request
         │
         ▼
@@ -246,9 +246,9 @@ The hardening suite reads from (but does not write to) the following existing ta
 
 | Table | Source Feature | Purpose in hardening |
 |-------|----------------|----------------------|
-| `scope_enforcement_denials` | T03 | Verify scope-denied audit events for SE-* and PR-* tests |
-| `privilege_domain_denials` | T04 | Verify privilege-domain-denied events for PD-* and FP-* tests |
-| `secret_version_states` | T02 | Verify secret version status for SL-* tests |
+| `scope_enforcement_denials` | T03 | Verify scope-denied audit events for SE-\* and PR-\* tests |
+| `privilege_domain_denials` | T04 | Verify privilege-domain-denied events for PD-\* and FP-\* tests |
+| `secret_version_states` | T02 | Verify secret version status for SL-\* tests |
 | `endpoint_scope_requirements` | T03 | Verify fail-closed tests (SE-03, SE-04): endpoint with no/removed requirements |
 
 No DDL migrations are required for T06.
