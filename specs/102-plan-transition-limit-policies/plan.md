@@ -190,9 +190,11 @@ CREATE TABLE plan_excess_policy_config (
   )
 );
 ```
+
 Unique: one platform_default record, one per (source, target) for transition scope, one per (dimension_key) for dimension scope.
 
 **`tenant_grace_period_records`**
+
 ```sql
 CREATE TABLE tenant_grace_period_records (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -209,10 +211,12 @@ CREATE TABLE tenant_grace_period_records (
   escalated_at         TIMESTAMPTZ NULL
 );
 ```
+
 Index: `idx_tgpr_tenant_dimension_active` on `(tenant_id, dimension_key) WHERE status = 'active'`.  
 Partial unique: `uq_tgpr_tenant_dimension_active` on `(tenant_id, dimension_key) WHERE status = 'active'` — one active grace period per tenant/dimension.
 
 **`tenant_over_limit_conditions`**
+
 ```sql
 CREATE TABLE tenant_over_limit_conditions (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -228,10 +232,12 @@ CREATE TABLE tenant_over_limit_conditions (
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
 Partial unique: `uq_tolc_tenant_dimension_active` on `(tenant_id, dimension_key) WHERE evaluation_status = 'active'`.
 
 **`plan_transition_audit_events`**  
 New table (distinct from `plan_audit_events` which tracks plan entity mutations). Each row is one complete policy evaluation for a transition attempt.
+
 ```sql
 CREATE TABLE plan_transition_audit_events (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -250,9 +256,11 @@ CREATE TABLE plan_transition_audit_events (
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
 Index: `idx_ptae_tenant_created`, `idx_ptae_created`.
 
 **`tenant_transitions_in_progress`** (concurrency guard)
+
 ```sql
 CREATE TABLE tenant_transitions_in_progress (
   tenant_id    VARCHAR(255) NOT NULL,
