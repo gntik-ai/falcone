@@ -159,4 +159,15 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - `effective-entitlements-repository.mjs` enhanced: `toCapabilityList` now resolves display labels from catalog and includes all catalog capabilities (not just explicitly-set ones); backward-compatible fallback when table absent.
 - New `plan_audit_events.action_type` values: `plan.capability.enabled`, `plan.capability.disabled`.
 
+## Effective Limit Resolution (105-effective-limit-resolution)
+
+- New PostgreSQL table: `workspace_sub_quotas` with unique constraint `(tenant_id, workspace_id, dimension_key)`, FK to `quota_dimension_catalog(dimension_key)`, and `allocated_value >= 0`.
+- New OpenWhisk actions: `tenant-effective-entitlements-get`, `workspace-sub-quota-set`, `workspace-sub-quota-remove`, `workspace-sub-quota-list`, `workspace-effective-limits-get`.
+- New Kafka topics: `console.quota.sub_quota.set`, `console.quota.sub_quota.removed`, `console.quota.sub_quota.inconsistency_detected`.
+- New env vars: `SUB_QUOTA_KAFKA_TOPIC_SET`, `SUB_QUOTA_KAFKA_TOPIC_REMOVED`, `SUB_QUOTA_KAFKA_TOPIC_INCONSISTENCY`, `SUB_QUOTA_ALLOCATION_LOCK_TIMEOUT_MS`.
+- Resolution hierarchy: tenant `override > plan > catalog_default`; workspace `workspace_sub_quota > tenant_shared_pool`.
+- Workspace sub-quotas are finite-only: `-1` remains the tenant unlimited sentinel and is invalid at workspace sub-quota level.
+- Implement-read constraints for this slice: targeted file reads only, no full OpenAPI read, and only `plan.md` + `tasks.md` as spec context during `speckit.implement`.
+- Preserve unrelated untracked artifacts: `specs/070-saga-compensation-workflows/plan.md`, `specs/070-saga-compensation-workflows/tasks.md`, `specs/072-workflow-e2e-compensation/tasks.md`.
+
 <!-- MANUAL ADDITIONS END -->

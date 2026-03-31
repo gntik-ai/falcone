@@ -11,6 +11,9 @@ function mapDimension(row) {
 }
 
 export async function listAllDimensions(pgClient) {
+  if (pgClient.catalogDimensions !== undefined) {
+    return pgClient.catalogDimensions.map(mapDimension);
+  }
   const { rows } = await pgClient.query(
     `SELECT dimension_key, display_label, unit, default_value, description
        FROM quota_dimension_catalog
@@ -20,6 +23,9 @@ export async function listAllDimensions(pgClient) {
 }
 
 export async function getDimensionByKey(pgClient, dimensionKey) {
+  if (pgClient.catalogDimensions !== undefined) {
+    return mapDimension(pgClient.catalogDimensions.find((row) => (row.dimension_key ?? row.dimensionKey) === dimensionKey));
+  }
   const { rows } = await pgClient.query(
     `SELECT dimension_key, display_label, unit, default_value, description
        FROM quota_dimension_catalog
