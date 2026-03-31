@@ -43,6 +43,20 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - New environment variables: `IDEMPOTENCY_KEY_TTL_HOURS`, `OPERATION_DEFAULT_MAX_RETRIES`, `IDEMPOTENCY_KEY_MAX_LENGTH`
 
 <!-- MANUAL ADDITIONS START -->
+## Admin-Data Privilege Separation (094-admin-data-privilege-separation)
+
+- Two privilege domains enforced at APISIX plugin level: `structural_admin` (resource lifecycle, config, schema, deployment) and `data_access` (read/write/query/delete application data).
+- New PostgreSQL tables: `privilege_domain_assignments`, `privilege_domain_denials`, `privilege_domain_assignment_history`.
+- Extension of `services/gateway-config/plugins/scope-enforcement.lua` (T03) to evaluate `privilege_domain` claim from JWT or `api_keys.privilege_domain`.
+- New OpenWhisk actions: `privilege-domain-assign`, `privilege-domain-query`, `privilege-domain-audit-query`, `privilege-domain-event-recorder`, `api-key-domain-migration`.
+- New console pages: `ConsolePrivilegeDomainPage.tsx`, `ConsolePrivilegeDomainAuditPage.tsx`.
+- New Kafka topics: `console.security.privilege-domain-denied` (30d), `console.security.privilege-domain-assigned` (30d), `console.security.privilege-domain-revoked` (30d), `console.security.last-admin-guard-triggered` (30d).
+- New env vars: `PRIVILEGE_DOMAIN_CACHE_TTL_SECONDS` (default 60), `PRIVILEGE_DOMAIN_ENFORCEMENT_ENABLED` (default false), `PRIVILEGE_DOMAIN_LAST_ADMIN_GUARD_ENABLED` (default true), `APIKEY_DOMAIN_MIGRATION_GRACE_PERIOD_DAYS` (default 14), `PRIVILEGE_DOMAIN_KAFKA_TOPIC_DENIED`, `PRIVILEGE_DOMAIN_KAFKA_TOPIC_ASSIGNED`, `PRIVILEGE_DOMAIN_KAFKA_TOPIC_REVOKED`, `PRIVILEGE_DOMAIN_KAFKA_TOPIC_LAST_ADMIN`.
+- Last-admin guard: `SELECT FOR UPDATE` in `privilege-domain-assign` prevents removing the last structural-admin from a workspace.
+- Keycloak realm roles: `structural_admin_{workspaceId}` and `data_access_{workspaceId}`.
+- Legacy API keys migrated by `api-key-domain-migration` action; ambiguous keys flagged as `pending_classification`.
+- Feature flag `PRIVILEGE_DOMAIN_ENFORCEMENT_ENABLED=false` allows log-only observation before hard enforcement.
+
 ## Webhook Engine
 
 - New service: `services/webhook-engine` using Node.js ESM modules.
