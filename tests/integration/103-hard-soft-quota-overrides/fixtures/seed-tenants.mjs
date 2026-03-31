@@ -1,0 +1,1 @@
+export function seedTenants(db) { db.workspaces.push({ tenant_id: 'tenant-a' }, { tenant_id: 'tenant-a' }, { tenant_id: 'tenant-a' }, { tenant_id: 'tenant-a' }, { tenant_id: 'tenant-a' }); db.apiKeys.push({ tenant_id: 'tenant-a' }); }

@@ -38,15 +38,26 @@ export class QuotaDimension {
   }
 }
 
-export function formatProfileEntry({ dimension, explicitValue }) {
+export function normalizeQuotaTypeEntry(entry = null) {
+  if (!entry) return { type: 'hard', graceMargin: 0 };
+  return {
+    type: entry.type === 'soft' ? 'soft' : 'hard',
+    graceMargin: Number.isInteger(entry.graceMargin) && entry.graceMargin >= 0 ? entry.graceMargin : 0
+  };
+}
+
+export function formatProfileEntry({ dimension, explicitValue, quotaTypeEntry = null }) {
   const inherited = isInherited(explicitValue);
   const effectiveValue = inherited ? dimension.defaultValue : explicitValue;
+  const normalizedType = normalizeQuotaTypeEntry(quotaTypeEntry);
   return {
     dimensionKey: dimension.dimensionKey,
     displayLabel: dimension.displayLabel,
     unit: dimension.unit,
     effectiveValue,
     source: inherited ? 'default' : 'explicit',
-    unlimitedSentinel: isUnlimited(effectiveValue)
+    unlimitedSentinel: isUnlimited(effectiveValue),
+    quotaType: normalizedType.type,
+    graceMargin: normalizedType.graceMargin
   };
 }
