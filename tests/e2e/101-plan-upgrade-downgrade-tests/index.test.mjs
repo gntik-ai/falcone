@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { seedFixturePlans } from './fixtures/seed-plans.mjs';
@@ -42,7 +43,7 @@ after(async () => {
   assertVerificationResultShape(summary);
   const text = `${JSON.stringify(summary, null, 2)}\n`;
   if (process.env.TEST_RESULT_OUTPUT_PATH) {
-    await fs.mkdir(new URL('.', `file://${process.env.TEST_RESULT_OUTPUT_PATH}`).pathname, { recursive: true }).catch(() => {});
+    await fs.mkdir(path.dirname(process.env.TEST_RESULT_OUTPUT_PATH), { recursive: true });
     await fs.writeFile(process.env.TEST_RESULT_OUTPUT_PATH, text, 'utf8');
   } else {
     process.stdout.write(text);
