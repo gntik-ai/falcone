@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-31
 - PostgreSQL (rotation state, policy, history), Keycloak (credential lifecycle), APISIX (gateway consumer key verification) (089-api-key-rotation)
 - Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `node:test` (test runner nativo Node 20), `node:assert`, `undici` (cliente HTTP para llamadas a APISIX/API), `kafkajs` (verificación de eventos de auditoría), `pg` (consultas de estado para fixtures y auditoría), cliente Vault HTTP (`node-vault` o `undici` directo), `@in-atelier/internal-contracts` (schemas de contratos de auditoría) (096-security-hardening-tests)
 - PostgreSQL (lectura de tablas de auditoría: `scope_enforcement_denials`, `privilege_domain_denials`, `secret_version_states`), Kafka (consumo de audit topics para verificar emisión), Vault (API HTTP para bootstrap de secretos en fixtures) (096-security-hardening-tests)
+- Node.js 20+ ESM (`"type": "module"`), React 18 + TypeScript for console integrations + `pg` (PostgreSQL), `kafkajs` (audit events), `undici` (integration/API tests), React Testing Library + vitest (console tests), Apache OpenWhisk action wrappers, existing APISIX + Keycloak auth layers (100-plan-change-impact-history)
+- PostgreSQL (`tenant_plan_assignments`, `plans`, `quota_dimension_catalog`, `plan_audit_events` + new history/snapshot tables), optional read-only usage collectors backed by PostgreSQL/MongoDB/service APIs, Kafka for audit fan-out (100-plan-change-impact-history)
 
 ## Project Structure
 
@@ -31,9 +33,9 @@ services/provisioning-orchestrator/src/{models,repositories,events,actions,migra
 Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning assets: Follow standard conventions
 
 ## Recent Changes
+- 100-plan-change-impact-history: Added Node.js 20+ ESM (`"type": "module"`), React 18 + TypeScript for console integrations + `pg` (PostgreSQL), `kafkajs` (audit events), `undici` (integration/API tests), React Testing Library + vitest (console tests), Apache OpenWhisk action wrappers, existing APISIX + Keycloak auth layers
 - 096-security-hardening-tests: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `node:test` (test runner nativo Node 20), `node:assert`, `undici` (cliente HTTP para llamadas a APISIX/API), `kafkajs` (verificación de eventos de auditoría), `pg` (consultas de estado para fixtures y auditoría), cliente Vault HTTP (`node-vault` o `undici` directo), `@in-atelier/internal-contracts` (schemas de contratos de auditoría)
 - 089-api-key-rotation: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (existing `services/provisioning-orchestrator`), React 18 + Tailwind CSS + shadcn/ui (console)
-- 075-idempotent-retry-dedup: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka broker), Apache OpenWhisk action wrappers establecidos en T01/T02
 
 ## Async Operation Idempotency & Retry
 

@@ -1,4 +1,6 @@
 import { PlanAssignment } from '../models/plan-assignment.mjs';
+import { createPlanChangeHistoryEntry } from '../models/plan-change-history-entry.mjs';
+import * as historyRepository from './plan-change-history-repository.mjs';
 
 function resolveLockTimeoutMs(value = process.env.PLAN_ASSIGNMENT_LOCK_TIMEOUT_MS) {
   const parsed = Number.parseInt(`${value ?? '5000'}`, 10);
@@ -23,29 +25,75 @@ function mapAssignment(row) {
   } : null;
 }
 
+async function supersedeAndInsertAssignment(client, assignment) {
+  await client.query(`SET LOCAL lock_timeout = '${resolveLockTimeoutMs()}ms'`);
+  const currentResult = await client.query(
+    `SELECT id, plan_id FROM tenant_plan_assignments
+     WHERE tenant_id = $1 AND superseded_at IS NULL
+     FOR UPDATE`,
+    [assignment.tenantId]
+  );
+  const current = currentResult.rows[0] ?? null;
+  if (current) {
+    await client.query('UPDATE tenant_plan_assignments SET superseded_at = NOW() WHERE id = $1', [current.id]);
+  }
+  const { rows } = await client.query(
+    `INSERT INTO tenant_plan_assignments (tenant_id, plan_id, assigned_by, assignment_metadata)
+     VALUES ($1,$2,$3,$4::jsonb)
+     RETURNING *`,
+    [assignment.tenantId, assignment.planId, assignment.assignedBy, JSON.stringify(assignment.assignmentMetadata)]
+  );
+  return { assignment: rows[0], previousPlanId: current?.plan_id ?? null };
+}
+
 export async function assign(client, input) {
   const assignment = new PlanAssignment(input);
   await client.query('BEGIN');
   try {
-    await client.query(`SET LOCAL lock_timeout = '${resolveLockTimeoutMs()}ms'`);
-    const currentResult = await client.query(
-      `SELECT id, plan_id FROM tenant_plan_assignments
-       WHERE tenant_id = $1 AND superseded_at IS NULL
-       FOR UPDATE`,
-      [assignment.tenantId]
-    );
-    const current = currentResult.rows[0] ?? null;
-    if (current) {
-      await client.query('UPDATE tenant_plan_assignments SET superseded_at = NOW() WHERE id = $1', [current.id]);
-    }
-    const { rows } = await client.query(
-      `INSERT INTO tenant_plan_assignments (tenant_id, plan_id, assigned_by, assignment_metadata)
-       VALUES ($1,$2,$3,$4::jsonb)
-       RETURNING *`,
-      [assignment.tenantId, assignment.planId, assignment.assignedBy, JSON.stringify(assignment.assignmentMetadata)]
-    );
+    const result = await supersedeAndInsertAssignment(client, assignment);
     await client.query('COMMIT');
-    return { assignment: mapAssignment(rows[0]), previousPlanId: current?.plan_id ?? null };
+    return { assignment: mapAssignment(result.assignment), previousPlanId: result.previousPlanId };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error?.code === '55P03') throw Object.assign(new Error('Concurrent assignment conflict'), { code: 'CONCURRENT_ASSIGNMENT_CONFLICT', cause: error });
+    throw error;
+  }
+}
+
+export async function insertWithHistory(client, input, historyContext = {}) {
+  const assignment = new PlanAssignment(input);
+  await client.query('BEGIN');
+  try {
+    const result = await supersedeAndInsertAssignment(client, assignment);
+    let historyEntry = null;
+    if (historyContext) {
+      const model = createPlanChangeHistoryEntry({
+        planAssignmentId: result.assignment.id,
+        tenantId: assignment.tenantId,
+        previousPlanId: historyContext.previousPlanId ?? result.previousPlanId,
+        newPlanId: assignment.planId,
+        actorId: historyContext.actorId ?? assignment.assignedBy,
+        effectiveAt: result.assignment.effective_from,
+        correlationId: historyContext.correlationId ?? null,
+        changeReason: historyContext.changeReason ?? null,
+        changeDirection: historyContext.changeDirection ?? 'equivalent',
+        usageCollectionStatus: historyContext.usageCollectionStatus ?? 'unavailable',
+        overLimitDimensionCount: historyContext.overLimitDimensionCount ?? 0,
+        assignmentMetadata: assignment.assignmentMetadata ?? {},
+        quotaImpacts: historyContext.quotaImpacts ?? [],
+        capabilityImpacts: historyContext.capabilityImpacts ?? []
+      });
+      historyEntry = await historyRepository.insertHistoryEntry(client, model);
+      if (model.quotaImpacts.length) {
+        await historyRepository.insertQuotaImpacts(client, historyEntry.historyEntryId, model.quotaImpacts.map((item) => ({ tenantId: assignment.tenantId, ...item })));
+      }
+      if (model.capabilityImpacts.length) {
+        await historyRepository.insertCapabilityImpacts(client, historyEntry.historyEntryId, model.capabilityImpacts.map((item) => ({ tenantId: assignment.tenantId, ...item })));
+      }
+      historyEntry = await historyRepository.getHistoryEntry(client, historyEntry.historyEntryId);
+    }
+    await client.query('COMMIT');
+    return { assignment: mapAssignment(result.assignment), previousPlanId: result.previousPlanId, historyEntry };
   } catch (error) {
     await client.query('ROLLBACK');
     if (error?.code === '55P03') throw Object.assign(new Error('Concurrent assignment conflict'), { code: 'CONCURRENT_ASSIGNMENT_CONFLICT', cause: error });
