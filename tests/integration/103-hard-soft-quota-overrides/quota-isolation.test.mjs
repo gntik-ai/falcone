@@ -1,0 +1,7 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { main as createOverride } from '../../../services/provisioning-orchestrator/src/actions/quota-override-create.mjs';
+import { main as effectiveLimits } from '../../../services/provisioning-orchestrator/src/actions/quota-effective-limits-get.mjs';
+import { main as queryAudit } from '../../../services/provisioning-orchestrator/src/actions/quota-audit-query.mjs';
+import { createFakeDb, createFakeProducer, seedPlans } from './fixtures/seed-plans-with-quota-types.mjs';
+const admin={ callerContext:{ actor:{ id:'admin-1', type:'superadmin' } } };
+test('tenant-owner sees own limits without override metadata and own audit scope only', async()=>{ const db=createFakeDb(); seedPlans(db); await createOverride({ ...admin, tenantId:'tenant-a', dimensionKey:'max_pg_databases', overrideValue:10, justification:'pilot' }, { db, producer:createFakeProducer() }); const limits=await effectiveLimits({ tenantId:'tenant-a', callerContext:{ actor:{ id:'owner-1', type:'tenant-owner', tenantId:'tenant-a' } } }, { db }); assert.equal(limits.body.effectiveLimits.find((x)=>x.dimensionKey==='max_pg_databases').overrideMetadata, undefined); await assert.rejects(() => queryAudit({ tenantId:'tenant-b', callerContext:{ actor:{ id:'owner-1', type:'tenant-owner', tenantId:'tenant-a' } } }, { db }), (error) => error.code === 'FORBIDDEN'); });

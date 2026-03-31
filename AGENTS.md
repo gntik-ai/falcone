@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-31
 - PostgreSQL (lectura de tablas de auditoría: `scope_enforcement_denials`, `privilege_domain_denials`, `secret_version_states`), Kafka (consumo de audit topics para verificar emisión), Vault (API HTTP para bootstrap de secretos en fixtures) (096-security-hardening-tests)
 - Node.js 20+ ESM (`"type": "module"`), React 18 + TypeScript for console integrations + `pg` (PostgreSQL), `kafkajs` (audit events), `undici` (integration/API tests), React Testing Library + vitest (console tests), Apache OpenWhisk action wrappers, existing APISIX + Keycloak auth layers (100-plan-change-impact-history)
 - PostgreSQL (`tenant_plan_assignments`, `plans`, `quota_dimension_catalog`, `plan_audit_events` + new history/snapshot tables), optional read-only usage collectors backed by PostgreSQL/MongoDB/service APIs, Kafka for audit fan-out (100-plan-change-impact-history)
+- Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`) (103-hard-soft-quota-overrides)
+- PostgreSQL — extends `plans` and `quota_dimension_catalog` from 097/098; new tables `quota_overrides`, `quota_enforcement_log` (103-hard-soft-quota-overrides)
 
 ## Project Structure
 
@@ -33,9 +35,9 @@ services/provisioning-orchestrator/src/{models,repositories,events,actions,migra
 Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning assets: Follow standard conventions
 
 ## Recent Changes
+- 103-hard-soft-quota-overrides: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`)
 - 100-plan-change-impact-history: Added Node.js 20+ ESM (`"type": "module"`), React 18 + TypeScript for console integrations + `pg` (PostgreSQL), `kafkajs` (audit events), `undici` (integration/API tests), React Testing Library + vitest (console tests), Apache OpenWhisk action wrappers, existing APISIX + Keycloak auth layers
 - 096-security-hardening-tests: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `node:test` (test runner nativo Node 20), `node:assert`, `undici` (cliente HTTP para llamadas a APISIX/API), `kafkajs` (verificación de eventos de auditoría), `pg` (consultas de estado para fixtures y auditoría), cliente Vault HTTP (`node-vault` o `undici` directo), `@in-atelier/internal-contracts` (schemas de contratos de auditoría)
-- 089-api-key-rotation: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (existing `services/provisioning-orchestrator`), React 18 + Tailwind CSS + shadcn/ui (console)
 
 ## Async Operation Idempotency & Retry
 
@@ -133,5 +135,15 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - New shared console components: `PlanStatusBadge`, `PlanCapabilityBadge`, `PlanLimitsTable`, `PlanComparisonView`, `PlanAssignmentDialog`, `PlanHistoryTable`.
 - New web-console API service: `apps/web-console/src/services/planManagementApi.ts`.
 - Tenant-owner sessions are redirected toward `/console/my-plan` when attempting superadmin-only plan routes.
+
+## Hard & Soft Quotas with Superadmin Override (103-hard-soft-quota-overrides)
+
+- `plans.quota_type_config` añade clasificación por dimensión (`hard`/`soft`) y `graceMargin` por plan.
+- Nuevas tablas PostgreSQL: `quota_overrides` y `quota_enforcement_log`.
+- Nuevas acciones OpenWhisk: `quota-override-create`, `quota-override-modify`, `quota-override-revoke`, `quota-override-list`, `quota-effective-limits-get`, `quota-override-expiry-sweep`, `quota-enforce`, `quota-audit-query`.
+- Nuevos topics Kafka: `console.quota.override.created`, `console.quota.override.modified`, `console.quota.override.revoked`, `console.quota.override.expired`, `console.quota.hard_limit.blocked`, `console.quota.soft_limit.exceeded`.
+- Nuevas env vars: `QUOTA_OVERRIDE_KAFKA_TOPIC_CREATED`, `QUOTA_OVERRIDE_KAFKA_TOPIC_MODIFIED`, `QUOTA_OVERRIDE_KAFKA_TOPIC_REVOKED`, `QUOTA_OVERRIDE_KAFKA_TOPIC_EXPIRED`, `QUOTA_ENFORCEMENT_KAFKA_TOPIC_HARD_BLOCKED`, `QUOTA_ENFORCEMENT_KAFKA_TOPIC_SOFT_EXCEEDED`, `QUOTA_OVERRIDE_EXPIRY_SWEEP_BATCH_SIZE`, `QUOTA_OVERRIDE_JUSTIFICATION_MAX_LENGTH`.
+- Regla operativa: jerarquía efectiva `override > plan > catalog default`; soft quota permite gracia hasta `effectiveLimit + graceMargin`; `-1` mantiene el sentinel de ilimitado.
+- Restricción de implementación para este branch: durante `speckit.implement`, leer de forma dirigida solo `plan.md`, `tasks.md` y el File Path Map de la feature; no abrir el OpenAPI completo.
 
 <!-- MANUAL ADDITIONS END -->
