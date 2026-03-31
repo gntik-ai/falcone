@@ -5,6 +5,7 @@ local plugin_name = "scope-enforcement"
 local _M = { version = 0.1, priority = 2900, name = plugin_name }
 local requirements_cache = lrucache.new(200)
 local privilege_domain_cache = lrucache.new(200)
+local function_subdomain_cache = lrucache.new(200)
 
 local schema = {
   type = "object",
@@ -25,6 +26,12 @@ local function split_scopes(scope_claim)
   return scopes
 end
 
+local function normalize_string_array(items)
+  if type(items) == "table" then return items end
+  if type(items) == "string" then return { items } end
+  return {}
+end
+
 local function get_claims(ctx)
   local claims = (ctx.var and ctx.var.jwt_claims) or ctx.jwt_auth_payload or ctx.authenticated_consumer and ctx.authenticated_consumer.claims
   if not claims then return nil end
@@ -36,7 +43,8 @@ local function get_claims(ctx)
     role = claims.role,
     actor_id = claims.sub or claims.client_id or "anonymous",
     actor_type = claims.actor_type or "user",
-    privilege_domain = claims.privilege_domain
+    privilege_domain = claims.privilege_domain,
+    function_subdomains = normalize_string_array(claims.function_privileges or claims.function_subdomains)
   }
 end
 
@@ -88,10 +96,11 @@ local function emit_denial_event(_, payload)
 end
 
 local function emit_privilege_domain_denied_event(_, payload)
-  local http = require("resty.http")
-  local client = http.new()
-  client:set_timeout(200)
-  client:request_uri(os.getenv("SCOPE_ENFORCEMENT_SIDECAR_URL") or "http://127.0.0.1:19092/denials", { method = "POST", body = core.json.encode(payload), headers = { ["Content-Type"] = "application/json" } })
+  emit_denial_event(nil, payload)
+end
+
+local function emit_function_privilege_denied_event(_, payload)
+  emit_denial_event(nil, payload)
 end
 
 local function env_bool(name, default)
@@ -104,12 +113,24 @@ local function cache_ttl_seconds()
   return tonumber(os.getenv("PRIVILEGE_DOMAIN_CACHE_TTL_SECONDS") or "60") or 60
 end
 
+local function function_cache_ttl_seconds()
+  return tonumber(os.getenv("FUNCTION_PRIVILEGE_CACHE_TTL_SECONDS") or "60") or 60
+end
+
 function _M.fetch_endpoint_privilege_domain(_, _)
+  return nil
+end
+
+function _M.fetch_endpoint_function_subdomain(_, _)
   return nil
 end
 
 function _M.invalidate_privilege_domain_cache()
   privilege_domain_cache:flush_all()
+end
+
+function _M.invalidate_function_subdomain_cache()
+  function_subdomain_cache:flush_all()
 end
 
 function _M.resolve_required_domain(method, path)
@@ -119,6 +140,15 @@ function _M.resolve_required_domain(method, path)
   local required_domain = _M.fetch_endpoint_privilege_domain(method, path)
   if required_domain then privilege_domain_cache:set(cache_key, required_domain, cache_ttl_seconds()) end
   return required_domain, false
+end
+
+function _M.resolve_required_function_subdomain(method, path)
+  local cache_key = method .. ":" .. path
+  local cached = function_subdomain_cache:get(cache_key)
+  if cached then return cached, true end
+  local required_subdomain = _M.fetch_endpoint_function_subdomain(method, path)
+  if required_subdomain then function_subdomain_cache:set(cache_key, required_subdomain, function_cache_ttl_seconds()) end
+  return required_subdomain, false
 end
 
 function _M.evaluate_privilege_domain(ctx, claims)
@@ -174,6 +204,52 @@ function _M.evaluate_privilege_domain(ctx, claims)
   return nil, { bypassed = false, cache_hit = cache_hit }
 end
 
+function _M.evaluate_function_subdomain(ctx, claims)
+  local method = ctx.var.request_method
+  local path = ctx.var.uri
+  local required_subdomain = _M.resolve_required_function_subdomain(method, path)
+  local enforcement_enabled = env_bool("FUNCTION_PRIVILEGE_ENFORCEMENT_ENABLED", false)
+  if not required_subdomain then return nil end
+
+  local presented = normalize_string_array((ctx.var and ctx.var.http_x_api_key_function_privileges) or (claims and claims.function_subdomains) or {})
+  local presented_set = array_to_set(presented)
+  if presented_set[required_subdomain] then
+    core.request.set_header(ctx, "X-Function-Privilege-Subdomain", required_subdomain)
+    return nil
+  end
+
+  local target_function_id = string.match(path, "/actions/([^/]+)") or string.match(path, "/functions/([^/]+)")
+  local attempted_operation = required_subdomain == "function_invocation" and "function_invoke" or ((method == "DELETE" and string.find(path, "trigger", 1, true) and "trigger_delete") or (string.find(path, "trigger", 1, true) and (method == "PUT" and "trigger_update" or "trigger_create")) or (method == "DELETE" and "function_delete") or (method == "PUT" and "function_update") or "function_deploy")
+
+  ngx.timer.at(0, emit_function_privilege_denied_event, {
+    eventType = "function_privilege_denied",
+    tenantId = claims.tenant_id,
+    workspaceId = claims.workspace_id,
+    actorId = claims.actor_id,
+    actorType = claims.actor_type,
+    attemptedOperation = attempted_operation,
+    requiredSubdomain = required_subdomain,
+    presentedSubdomains = presented,
+    topLevelDomain = (ctx.var and ctx.var.http_x_api_key_domain) or claims.privilege_domain,
+    requestPath = path,
+    httpMethod = method,
+    targetFunctionId = target_function_id,
+    correlationId = (ctx.var.http_x_correlation_id or ctx.var.request_id),
+    deniedReason = "FUNCTION_PRIVILEGE_MISMATCH",
+    sourceIp = ctx.var.remote_addr,
+    occurredAt = os.date("!%Y-%m-%dT%H:%M:%SZ")
+  })
+
+  if enforcement_enabled then
+    return core.response.exit(403, {
+      code = "FUNCTION_PRIVILEGE_MISMATCH",
+      requiredSubdomain = required_subdomain,
+      presentedSubdomains = presented
+    })
+  end
+  return nil
+end
+
 function _M.check_schema(conf)
   return core.schema.check(schema, conf)
 end
@@ -214,6 +290,9 @@ function _M.access(conf, ctx)
 
   local domain_result = _M.evaluate_privilege_domain(ctx, claims)
   if domain_result then return domain_result end
+
+  local function_result = _M.evaluate_function_subdomain(ctx, claims)
+  if function_result then return function_result end
 
   core.request.set_header(ctx, "X-Enforcement-Verified", "true")
   core.request.set_header(ctx, "X-Verified-Tenant-Id", claims.tenant_id or "")
