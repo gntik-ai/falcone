@@ -431,7 +431,7 @@ Full JSON contract files are generated in `specs/104-plan-boolean-capabilities/c
 
 The current `toCapabilityList` function uses `capabilityKey` as both the key and `displayLabel`. With the catalog in place, this will be enhanced to join against `boolean_capability_catalog` to resolve proper display labels, descriptions, and platform defaults for capabilities not explicitly set on the plan. The effective resolution becomes:
 
-```
+```text
 For each active catalog entry:
   if plan.capabilities[key] is explicitly set → use that value (source: "explicit")
   else → use catalog.platform_default (source: "platform_default")
