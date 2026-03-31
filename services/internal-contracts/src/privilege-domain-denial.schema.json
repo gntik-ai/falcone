@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrivilegeDomainDeniedEvent",
+  "type": "object",
+  "required": ["eventType", "tenantId", "actorId", "actorType", "requiredDomain", "httpMethod", "requestPath", "correlationId", "occurredAt"],
+  "properties": {
+    "eventType": { "type": "string", "const": "privilege_domain_denied" },
+    "tenantId": { "type": "string", "format": "uuid" },
+    "workspaceId": { "type": ["string", "null"], "format": "uuid" },
+    "actorId": { "type": "string" },
+    "actorType": { "type": "string", "enum": ["user", "api_key", "service_account", "anonymous"] },
+    "credentialDomain": { "type": ["string", "null"], "enum": ["structural_admin", "data_access", "none", null] },
+    "requiredDomain": { "type": "string", "enum": ["structural_admin", "data_access"] },
+    "httpMethod": { "type": "string" },
+    "requestPath": { "type": "string" },
+    "correlationId": { "type": "string" },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  }
+}

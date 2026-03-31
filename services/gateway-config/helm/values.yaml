@@ -1,2 +1,11 @@
 scopeEnforcement:
   enabled: false
+env:
+  PRIVILEGE_DOMAIN_CACHE_TTL_SECONDS: "60"
+  PRIVILEGE_DOMAIN_ENFORCEMENT_ENABLED: "false"
+  PRIVILEGE_DOMAIN_LAST_ADMIN_GUARD_ENABLED: "true"
+  APIKEY_DOMAIN_MIGRATION_GRACE_PERIOD_DAYS: "14"
+  PRIVILEGE_DOMAIN_KAFKA_TOPIC_DENIED: "console.security.privilege-domain-denied"
+  PRIVILEGE_DOMAIN_KAFKA_TOPIC_ASSIGNED: "console.security.privilege-domain-assigned"
+  PRIVILEGE_DOMAIN_KAFKA_TOPIC_REVOKED: "console.security.privilege-domain-revoked"
+  PRIVILEGE_DOMAIN_KAFKA_TOPIC_LAST_ADMIN: "console.security.last-admin-guard-triggered"
