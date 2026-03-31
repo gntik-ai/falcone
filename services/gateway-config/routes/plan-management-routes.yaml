@@ -207,6 +207,54 @@ routes:
       nodes:
         provisioning-orchestrator: 1
 
+  - name: tenant-plan-history-impact
+    uri: /v1/tenants/:tenantId/plan/history-impact
+    methods:
+      - GET
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+      correlation-id:
+        header_name: X-Correlation-Id
+      prometheus:
+        prefer_name: true
+    upstream:
+      type: roundrobin
+      nodes:
+        provisioning-orchestrator: 1
+
+  - name: self-tenant-plan-effective-entitlements
+    uri: /v1/tenant/plan/effective-entitlements
+    methods:
+      - GET
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+      correlation-id:
+        header_name: X-Correlation-Id
+      prometheus:
+        prefer_name: true
+    upstream:
+      type: roundrobin
+      nodes:
+        provisioning-orchestrator: 1
+
+  - name: tenant-plan-effective-entitlements
+    uri: /v1/tenants/:tenantId/plan/effective-entitlements
+    methods:
+      - GET
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+      correlation-id:
+        header_name: X-Correlation-Id
+      prometheus:
+        prefer_name: true
+    upstream:
+      type: roundrobin
+      nodes:
+        provisioning-orchestrator: 1
+
   - name: self-tenant-plan-limits-get
     uri: /v1/tenant/plan/limits
     methods:
