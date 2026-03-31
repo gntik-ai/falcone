@@ -319,6 +319,7 @@ All events published to namespace-prefixed topics with 30-day retention.
 | `console.plan.creation.blocked` | Resource creation attempt blocked by over-limit |
 
 Standard envelope (extends existing patterns from 097–100):
+
 ```json
 {
   "eventType": "console.plan.transition.evaluated",
@@ -347,6 +348,7 @@ Standard envelope (extends existing patterns from 097–100):
 #### Resource creation enforcement hook
 
 When a tenant attempts to create a resource of a type governed by a `block_creation` over-limit condition, the enforcement layer (APISIX scope plugin or action-layer guard) returns:
+
 ```json
 {
   "error": "OVER_LIMIT_CREATION_BLOCKED",
@@ -401,7 +403,7 @@ New env vars (added to `services/provisioning-orchestrator` Helm values):
 
 ### Sequence: Plan Assignment with Policy Evaluation
 
-```
+```text
 SuperAdmin → APISIX → plan-assign action
   1. Validate JWT scope (structural_admin)
   2. INSERT INTO tenant_transitions_in_progress

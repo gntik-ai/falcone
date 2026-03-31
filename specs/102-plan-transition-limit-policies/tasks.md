@@ -205,7 +205,7 @@
 
 ### Critical Path
 
-```
+```text
 Phase 2 → T023 (plan-assign US1) → T029 (plan-assign US2) → T042 (over-limit-status US4)
                                                            → T052 (audit trail US5)
 ```
@@ -216,7 +216,7 @@ Phase 2 → T023 (plan-assign US1) → T029 (plan-assign US2) → T042 (over-lim
 
 ### Phase 2 Parallel Batch
 
-```
+```text
 Parallel: T010, T011, T012, T013 (models — independent files)
 Parallel: T015, T016, T017 (repositories — independent files)
 Then sequential: T014 (rule repo — uses models), T018 (Helm values)
@@ -224,7 +224,7 @@ Then sequential: T014 (rule repo — uses models), T018 (Helm values)
 
 ### Phase 3 Parallel Batch (after T009 migration complete)
 
-```
+```text
 Parallel: T020 (rule-create action), T021 (rule-list action), T022 (rule-delete action)
 Parallel with above: T024 (unit tests for evaluator)
 Then sequential: T019 (evaluator service), T023 (plan-assign modification)
@@ -233,7 +233,7 @@ Then: T025, T026 (integration tests)
 
 ### Phase 4 Parallel Batch (after T023 complete)
 
-```
+```text
 Parallel: T031 (excess detector unit tests), T032 (policy resolution unit tests)
 Sequential: T027 (excess detector), T028 (resolveExcessPolicy in evaluator)
 Then: T029 (plan-assign extension)
@@ -242,7 +242,7 @@ Parallel: T030 (sweep action), T033, T034, T035, T036 (integration tests)
 
 ### Phase 5 + Phase 8 Parallel (after Phase 4 foundation ready)
 
-```
+```text
 Phase 5: T037 (policy-set), T038 (policy-get), T039 (policy-evaluate), T040 (grace-period-list) — all parallel
 Phase 8: T053 (unit tests), T054 (integration test) — parallel with Phase 5
 ```
