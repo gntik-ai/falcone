@@ -237,8 +237,8 @@ Estos cambios son **backwards-compatible**: los consumidores que ignoran `schema
 }
 ```
 
-8. Emitir evento Kafka `console.config.schema.validated` (§10).
-9. Status codes: `200` (valid/valid_with_warnings), `422` (invalid estructura), `400` (format_version ausente o futura), `403` (sin permisos).
+1. Emitir evento Kafka `console.config.schema.validated` (§10).
+1. Status codes: `200` (valid/valid_with_warnings), `422` (invalid estructura), `400` (format_version ausente o futura), `403` (sin permisos).
 
 **Límites de tamaño**: rechazar body > `CONFIG_EXPORT_MAX_ARTIFACT_BYTES` (mismo env que T01) con 413.
 

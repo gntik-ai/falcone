@@ -46,3 +46,77 @@ routes:
         read: 10
       nodes:
         openwhisk-tenant-config-export-domains: 1
+
+  - name: config-validate-post
+    uri: /v1/admin/tenants/*/config/validate
+    methods:
+      - POST
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:export
+      limit-req:
+        rate: 10
+        burst: 20
+        key: consumer_name
+      response-rewrite:
+        headers:
+          set:
+            Cache-Control: "no-store"
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 15
+        read: 15
+      nodes:
+        openwhisk-tenant-config-validate: 1
+
+  - name: config-migrate-post
+    uri: /v1/admin/tenants/*/config/migrate
+    methods:
+      - POST
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:export
+      limit-req:
+        rate: 5
+        burst: 10
+        key: consumer_name
+      response-rewrite:
+        headers:
+          set:
+            Cache-Control: "no-store"
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 30
+        read: 30
+      nodes:
+        openwhisk-tenant-config-migrate: 1
+
+  - name: config-format-versions-get
+    uri: /v1/admin/config/format-versions
+    methods:
+      - GET
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:export
+      limit-req:
+        rate: 30
+        burst: 60
+        key: consumer_name
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 10
+        read: 10
+      nodes:
+        openwhisk-tenant-config-format-versions: 1
