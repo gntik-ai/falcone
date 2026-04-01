@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atelier.internal/schemas/config-export/v1.0.0",
+  "title": "Atelier Tenant Config Export Artifact — v1.0.0",
+  "type": "object",
+  "required": [
+    "export_timestamp",
+    "tenant_id",
+    "format_version",
+    "deployment_profile",
+    "correlation_id",
+    "schema_checksum",
+    "domains"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "export_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "format_version": {
+      "type": "string",
+      "pattern": "^1\\.\\d+\\.\\d+$"
+    },
+    "deployment_profile": {
+      "type": "string",
+      "enum": ["standard", "minimal", "full"]
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_checksum": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DomainSection"
+      }
+    },
+    "_migration_metadata": {
+      "$ref": "#/$defs/MigrationMetadata"
+    },
+    "_migration_warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/MigrationWarning"
+      }
+    }
+  },
+  "$defs": {
+    "DomainStatus": {
+      "type": "string",
+      "enum": ["ok", "empty", "error", "not_available", "not_requested"]
+    },
+    "DomainSection": {
+      "type": "object",
+      "required": ["domain_key", "status", "exported_at"],
+      "additionalProperties": true,
+      "properties": {
+        "domain_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/DomainStatus"
+        },
+        "exported_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "items_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "data": {
+          "type": ["object", "null"]
+        },
+        "error": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "MigrationMetadata": {
+      "type": "object",
+      "properties": {
+        "migrated_from": {
+          "type": "string"
+        },
+        "migrated_to": {
+          "type": "string"
+        },
+        "migration_chain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "migrated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "MigrationWarning": {
+      "type": "object",
+      "required": ["step", "message"],
+      "properties": {
+        "step": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "affected_path": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

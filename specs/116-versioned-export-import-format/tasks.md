@@ -153,7 +153,7 @@
 
 ### User Story Dependencies
 
-```
+```text
 Phase 1 → Phase 2 → US1 (Phase 3)     — independent
                   → US2 (Phase 4)     — independent, blocks US4, US5
                   → US3 (Phase 5)     — independent
