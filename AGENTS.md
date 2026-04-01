@@ -18,6 +18,8 @@ Auto-generated from all feature plans. Last updated: 2026-04-01
 - Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`) (103-hard-soft-quota-overrides)
 - PostgreSQL — extends `plans` and `quota_dimension_catalog` from 097/098; new tables `quota_overrides`, `quota_enforcement_log` (103-hard-soft-quota-overrides)
 - PostgreSQL — depends on `quota_dimension_catalog`, `quota_overrides`, `plans`, `tenant_plan_assignments` (T01) and `boolean_capability_catalog` (T02); new table `workspace_sub_quotas` (105-effective-limit-resolution)
+- Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + React 18 + TypeScript en consola + `pg`, `kafkajs`, `undici`, `ajv`, React + Tailwind CSS + shadcn/ui (117-tenant-reprovision-from-export)
+- PostgreSQL (lock + auditoría); artefacto procesado en memoria; dependencias externas Keycloak, Kafka, MongoDB, S3-compatible, OpenWhisk (117-tenant-reprovision-from-export)
 
 ## Project Structure
 
@@ -36,8 +38,8 @@ services/provisioning-orchestrator/src/{models,repositories,events,actions,migra
 Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning assets: Follow standard conventions
 
 ## Recent Changes
+- 117-tenant-reprovision-from-export: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + React 18 + TypeScript en consola + `pg`, `kafkajs`, `undici`, `ajv`, React + Tailwind CSS + shadcn/ui
 - 105-effective-limit-resolution: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`)
-- 103-hard-soft-quota-overrides: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`)
 
 ## Async Operation Idempotency & Retry
 
