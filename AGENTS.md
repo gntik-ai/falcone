@@ -251,4 +251,13 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - **New Kafka topics**: `console.config.schema.validated` (30d retention), `console.config.schema.migrated` (30d retention).
 - Authorization: same scope `platform:admin:config:export` as export endpoints. Roles: `superadmin`, `sre`, `service_account`.
 
+## Config vs Data Restore Differences (120-config-vs-data-restore-differences)
+
+- **New file**: `docs/operations/config-vs-data-restore-differences.md` — operational reference documenting the distinction between configuration restoration (US-BKP-02-T01 to T05) and user data restoration (not covered by the current chain), domain by domain (IAM/Keycloak, PostgreSQL, MongoDB, Kafka, OpenWhisk, S3-compatible).
+- **Coverage**: six domains × three aspects each (restorable config, non-restorable data, complementary mechanism).
+- **Transversal limitations documented**: redacted secrets, dynamic/emergent config, config-data coherence risk, cross-domain non-transactionality, optional domains.
+- **Audiences**: SRE/platform team (full document), superadmin (executive summary + table), product team (gap status column), QA/audit (traceability section).
+- **Gap status for all domains**: `no_cubierto` — no integrated platform mechanism for user data backup exists; external/native subsystem tools are documented as complementary mechanisms.
+- **No runtime dependencies**: documentation-only artifact; no code, migrations, API routes, or Kafka topics added.
+
 <!-- MANUAL ADDITIONS END -->
