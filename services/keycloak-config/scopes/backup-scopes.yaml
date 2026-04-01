@@ -1,0 +1,11 @@
+scopes:
+  - name: platform:admin:config:export
+    description: Export functional configuration of any tenant (superadmin/sre/service_account only)
+
+role_mappings:
+  superadmin:
+    - platform:admin:config:export
+  sre:
+    - platform:admin:config:export
+  service_account:
+    - platform:admin:config:export

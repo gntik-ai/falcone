@@ -1,0 +1,31 @@
+{
+  "realm": "test_tenant_115",
+  "enabled": true,
+  "displayName": "Test Tenant 115",
+  "sslRequired": "external",
+  "loginTheme": "base",
+  "emailTheme": "base",
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      { "name": "test-role", "description": "Test role for integration tests" }
+    ]
+  },
+  "groups": [
+    { "name": "test-group" }
+  ],
+  "clients": [
+    {
+      "clientId": "test-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "test-secret-value-do-not-use-in-production",
+      "redirectUris": ["http://localhost:3000/*"]
+    }
+  ],
+  "clientScopes": [],
+  "identityProviders": []
+}

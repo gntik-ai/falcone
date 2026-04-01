@@ -49,6 +49,37 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - New environment variables: `IDEMPOTENCY_KEY_TTL_HOURS`, `OPERATION_DEFAULT_MAX_RETRIES`, `IDEMPOTENCY_KEY_MAX_LENGTH`
 
 <!-- MANUAL ADDITIONS START -->
+## Functional Config Export (115-functional-config-export)
+
+- **New files (provisioning-orchestrator)**:
+  - `services/provisioning-orchestrator/src/collectors/types.mjs` — shared types (`CollectorResult`, `ExportArtifact`, `DomainStatus`) and `redactSensitiveFields()` helper
+  - `services/provisioning-orchestrator/src/collectors/registry.mjs` — collector registry by domain key, feature-gated
+  - `services/provisioning-orchestrator/src/collectors/iam-collector.mjs` — Keycloak Admin REST API collector
+  - `services/provisioning-orchestrator/src/collectors/postgres-collector.mjs` — PostgreSQL metadata collector (`information_schema`/`pg_catalog`)
+  - `services/provisioning-orchestrator/src/collectors/mongo-collector.mjs` — MongoDB metadata collector
+  - `services/provisioning-orchestrator/src/collectors/kafka-collector.mjs` — Kafka topics/ACLs/consumer groups collector
+  - `services/provisioning-orchestrator/src/collectors/functions-collector.mjs` — OpenWhisk functions collector
+  - `services/provisioning-orchestrator/src/collectors/s3-collector.mjs` — S3-compatible storage collector
+  - `services/provisioning-orchestrator/src/actions/tenant-config-export.mjs` — main export orchestrator action
+  - `services/provisioning-orchestrator/src/actions/tenant-config-export-domains.mjs` — auxiliary domains endpoint
+  - `services/provisioning-orchestrator/src/repositories/config-export-audit-repository.mjs` — audit log data access
+  - `services/provisioning-orchestrator/src/events/config-export-events.mjs` — Kafka event publisher (fire-and-forget)
+  - `services/provisioning-orchestrator/src/migrations/115-functional-config-export.sql` — DDL for `config_export_audit_log`
+- **New files (web-console)**:
+  - `apps/web-console/src/api/configExportApi.ts` — API client + TypeScript types
+  - `apps/web-console/src/components/ConfigExportDomainSelector.tsx` — domain checkbox selector
+  - `apps/web-console/src/components/ConfigExportResultPanel.tsx` — result display + JSON download
+  - `apps/web-console/src/pages/ConsoleTenantConfigExportPage.tsx` — export page
+- **New APISIX routes** (`services/gateway-config/routes/backup-admin-routes.yaml`):
+  - `POST /v1/admin/tenants/{tenant_id}/config/export` → `tenant-config-export` action (30s timeout)
+  - `GET /v1/admin/tenants/{tenant_id}/config/export/domains` → `tenant-config-export-domains` action (10s timeout)
+- **New Keycloak scope** (`services/keycloak-config/scopes/backup-scopes.yaml`):
+  - `platform:admin:config:export` — assigned to `superadmin`, `sre`, `service_account`; NOT assigned to `tenant_owner`
+- **New PostgreSQL table**: `config_export_audit_log` (audit metadata only; artifact not stored)
+- **New Kafka topic**: `console.config.export.completed` (90d retention)
+- **Environment variables** (19 total): `CONFIG_EXPORT_KEYCLOAK_ADMIN_URL`, `CONFIG_EXPORT_KEYCLOAK_REALM`, `CONFIG_EXPORT_KEYCLOAK_CLIENT_ID`, `CONFIG_EXPORT_KEYCLOAK_CLIENT_SECRET`, `CONFIG_EXPORT_PG_DATABASE_URL`, `CONFIG_EXPORT_MONGO_URI`, `CONFIG_EXPORT_KAFKA_BROKERS`, `CONFIG_EXPORT_KAFKA_ADMIN_SASL_USERNAME`, `CONFIG_EXPORT_KAFKA_ADMIN_SASL_PASSWORD`, `CONFIG_EXPORT_OW_API_HOST`, `CONFIG_EXPORT_OW_AUTH_TOKEN`, `CONFIG_EXPORT_S3_ENDPOINT`, `CONFIG_EXPORT_S3_ACCESS_KEY_ID`, `CONFIG_EXPORT_S3_SECRET_ACCESS_KEY`, `CONFIG_EXPORT_COLLECTOR_TIMEOUT_MS` (default 8000), `CONFIG_EXPORT_MAX_ARTIFACT_BYTES` (default 10MB), `CONFIG_EXPORT_KAFKA_TOPIC_COMPLETED` (default `console.config.export.completed`), `CONFIG_EXPORT_DEPLOYMENT_PROFILE` (default `standard`), `CONFIG_EXPORT_OW_ENABLED` (default `false`), `CONFIG_EXPORT_MONGO_ENABLED` (default `false`)
+- **Optional components**: OpenWhisk functions collector (`CONFIG_EXPORT_OW_ENABLED=false`), MongoDB collector (`CONFIG_EXPORT_MONGO_ENABLED=false`) — both return `not_available` when disabled
+
 ## Admin-Data Privilege Separation (094-admin-data-privilege-separation)
 
 - Two privilege domains enforced at APISIX plugin level: `structural_admin` (resource lifecycle, config, schema, deployment) and `data_access` (read/write/query/delete application data).
