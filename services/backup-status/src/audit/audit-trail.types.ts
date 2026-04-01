@@ -13,6 +13,24 @@ export type AuditEventType =
   | 'restore.completed'
   | 'restore.failed'
   | 'restore.rejected'
+  | 'restore.confirmation_pending'
+  | 'restore.confirmed'
+  | 'restore.aborted'
+  | 'restore.confirmation_expired'
+
+/** Additional detail fields for restore confirmation audit events (US-BKP-01-T04). */
+export interface RestoreConfirmationAuditDetail {
+  confirmation_request_id: string
+  risk_level?: string
+  prechecks_summary?: Array<{ code: string; result: string }>
+  prechecks_result?: unknown
+  warnings_shown?: string[]
+  confirmation_decision?: string
+  confirmation_timestamp?: string
+  second_factor_method?: string
+  second_actor_id?: string
+  confirmation_bypassed?: boolean
+}
 
 export type SessionContextStatus = 'full' | 'partial' | 'not_applicable'
 

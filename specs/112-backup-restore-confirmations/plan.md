@@ -173,7 +173,7 @@ CREATE INDEX idx_rcr_expires_pending
 
 Todos los archivos nuevos o modificados están dentro de `services/backup-status/src/` salvo indicación explícita.
 
-```
+```text
 services/backup-status/src/
 ├── confirmations/                           ← NUEVO módulo principal
 │   ├── confirmations.types.ts               ← Tipos TS: RiskLevel, PrecheckResult, ConfirmationRequest, etc.
@@ -231,6 +231,7 @@ apps/web-console/src/
 **Cambio respecto a T02:** este endpoint ya no despacha al adaptador. Ejecuta prechecks y retorna un token de confirmación.
 
 **Request body** (sin cambios estructurales):
+
 ```json
 {
   "tenant_id": "tenant-abc",
@@ -240,9 +241,11 @@ apps/web-console/src/
   "scope": "partial"
 }
 ```
+
 `scope` es opcional; por defecto `partial`. El valor `full` activa lógica de riesgo crítico automáticamente.
 
 **Response 202** (solicitud pendiente de confirmación):
+
 ```json
 {
   "schema_version": "2",
@@ -303,6 +306,7 @@ apps/web-console/src/
 ```
 
 **Response 422** (precheck bloqueante — no se genera token):
+
 ```json
 {
   "schema_version": "2",
@@ -327,6 +331,7 @@ apps/web-console/src/
 ### 4.2 `POST /v1/backup/restore/confirm` — Confirmar o abortar (Paso 2)
 
 **Request body — confirmar (riesgo normal o elevated):**
+
 ```json
 {
   "confirmation_token": "<base64url-opaque-token>",
@@ -337,6 +342,7 @@ apps/web-console/src/
 ```
 
 **Request body — confirmar (riesgo crítico, vía OTP):**
+
 ```json
 {
   "confirmation_token": "<base64url-opaque-token>",
@@ -349,6 +355,7 @@ apps/web-console/src/
 ```
 
 **Request body — confirmar (riesgo crítico, vía segundo actor):**
+
 ```json
 {
   "confirmation_token": "<base64url-opaque-token>",
@@ -361,6 +368,7 @@ apps/web-console/src/
 ```
 
 **Request body — abortar:**
+
 ```json
 {
   "confirmation_token": "<base64url-opaque-token>",
@@ -369,6 +377,7 @@ apps/web-console/src/
 ```
 
 **Response 202** (confirmación exitosa, operación despachada):
+
 ```json
 {
   "schema_version": "2",
@@ -379,6 +388,7 @@ apps/web-console/src/
 ```
 
 **Response 200** (abort registrado):
+
 ```json
 {
   "schema_version": "2",
@@ -388,26 +398,31 @@ apps/web-console/src/
 ```
 
 **Response 409** — token ya utilizado o solicitud no en estado `pending_confirmation`:
+
 ```json
 { "error": "confirmation_request_not_pending", "status": "confirmed" }
 ```
 
 **Response 410** — token expirado:
+
 ```json
 { "error": "confirmation_token_expired", "expired_at": "2026-04-01T09:26:00Z" }
 ```
 
 **Response 422** — revalidación fallida al confirmar (snapshot ya no existe):
+
 ```json
 { "error": "snapshot_no_longer_available", "snapshot_id": "snap-20260401-001" }
 ```
 
 **Response 422** — nombre del tenant incorrecto:
+
 ```json
 { "error": "tenant_name_confirmation_mismatch" }
 ```
 
 **Response 422** — OTP inválido o segundo actor no autorizado:
+
 ```json
 { "error": "second_factor_verification_failed", "detail": "otp_invalid" }
 ```
@@ -419,6 +434,7 @@ apps/web-console/src/
 Permite a la consola o al solicitante consultar el estado actual de una solicitud pendiente (útil para polling ligero desde la consola mientras el modal está abierto).
 
 **Response 200:**
+
 ```json
 {
   "schema_version": "2",
@@ -615,6 +631,7 @@ Dado que el Paso 1 del nuevo flujo retorna `schema_version: "2"` y el endpoint `
 ### 9.2 Rollback de migraciones de DB
 
 **Tabla `restore_confirmation_requests`:**
+
 ```sql
 DROP TABLE IF EXISTS restore_confirmation_requests;
 DROP TYPE IF EXISTS restore_confirmation_decision;
@@ -623,6 +640,7 @@ DROP TYPE IF EXISTS restore_confirmation_status;
 ```
 
 **Valores añadidos al ENUM `backup_audit_event_type`:**
+
 PostgreSQL no soporta `REMOVE VALUE` en enumerados. Si es necesario eliminar los cuatro valores añadidos, el procedimiento es:
 
 ```sql

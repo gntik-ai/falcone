@@ -134,7 +134,7 @@ export async function main(params: ActionParams): Promise<ActionResponse> {
 
   if (!deploymentBackupAvailable) {
     // Still return the components but add context
-    ;(body as Record<string, unknown>).message =
+    ;(body as unknown as Record<string, unknown>).message =
       'La visibilidad de backup no está habilitada en este perfil de despliegue.'
   }
 
