@@ -431,7 +431,7 @@ services/keycloak-config/scopes/backup-scopes.yaml           ← extend or creat
 
 ### Phase Dependencies
 
-```
+```text
 Phase 1 (Setup)        → No dependencies; start immediately
 Phase 2 (Foundational) → Requires Phase 1 complete; BLOCKS all user-story work
 Phase 3 (US1)          → Requires Phase 2 complete; 3A before 3C; 3B in parallel with 3C after 3A starts
@@ -468,7 +468,7 @@ Phase 6 (Polish)       → Requires Phase 3, 4, 5 complete
 
 ### Phase 2 Parallel Group (after T001–T003)
 
-```
+```text
 T004 (types)  →  T005 (registry) [sequential: registry imports types]
 T006 (migration)  →  T007 (audit repo) [sequential: repo uses table]
 T008 (kafka events) [parallel with T007]
@@ -476,7 +476,7 @@ T008 (kafka events) [parallel with T007]
 
 ### Phase 3B Collectors — Full Parallel Group (after T004)
 
-```
+```text
 T011 (IAM)        ─┐
 T012 (S3)         ─┤
 T013 (Kafka)      ─┤  all parallel — independent files, independent external APIs
@@ -487,7 +487,7 @@ T016 (MongoDB)    ─┘
 
 ### Phase 3C Unit Tests — Full Parallel Group (after 3B)
 
-```
+```text
 T017 (iam test)       ─┐
 T018 (pg test)        ─┤
 T019 (mongo test)     ─┤  all parallel after respective collector exists
@@ -500,7 +500,7 @@ T024 (domains test)      — after T010 + T036
 
 ### Phase 4 Parallel Groups
 
-```
+```text
 T025 (gateway routes) ─┐  parallel to Phase 4B frontend
 T026 (KC scopes)       ─┘
 
