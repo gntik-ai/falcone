@@ -95,7 +95,7 @@ This feature is documentation-only. There are no contract files, SQL migrations,
 
 For each of the six domains, write a subsection `3.x — <Domain>` with the following fixed structure (three sub-headings):
 
-```
+```text
 #### Configuración restaurable
 #### Datos de usuario NO restaurables
 #### Mecanismo complementario
@@ -228,7 +228,7 @@ Domain-specific requirements:
 
 1. **Update AGENTS.md**: append the following block inside the `<!-- MANUAL ADDITIONS START -->` section (before `<!-- MANUAL ADDITIONS END -->`), using the same format as existing feature entries:
 
-```
+```text
 ## Config vs Data Restore Differences (120-config-vs-data-restore-differences)
 
 - **New file**: `docs/operations/config-vs-data-restore-differences.md` — operational reference documenting the distinction between configuration restoration (US-BKP-02-T01 to T05) and user data restoration (not covered by the current chain), domain by domain (IAM/Keycloak, PostgreSQL, MongoDB, Kafka, OpenWhisk, S3-compatible).
@@ -239,25 +239,29 @@ Domain-specific requirements:
 - **No runtime dependencies**: documentation-only artifact; no code, migrations, API routes, or Kafka topics added.
 ```
 
-2. **Check for index file**: run `ls docs/operations/` — if a `README.md` or `index.md` exists, add an entry for `config-vs-data-restore-differences.md`. If none exists, skip.
+1. **Check for index file**: run `ls docs/operations/` — if a `README.md` or `index.md` exists, add an entry for `config-vs-data-restore-differences.md`. If none exists, skip.
 
-3. **Stage files**:
-   ```
+1. **Stage files**:
+
+   ```bash
    git add docs/operations/config-vs-data-restore-differences.md AGENTS.md
    ```
+
    (also stage `docs/operations/index.md` or `README.md` if modified in step 2)
 
-4. **Commit** with message:
-   ```
+1. **Commit** with message:
+
+   ```text
    docs: add config-vs-data-restore-differences operational reference (US-BKP-02-T06)
    ```
 
-5. **Push** to remote:
-   ```
+1. **Push** to remote:
+
+   ```bash
    git push origin 120-config-vs-data-restore-differences
    ```
 
-6. **Verify**: confirm push succeeded; report the commit SHA.
+1. **Verify**: confirm push succeeded; report the commit SHA.
 
 **Acceptance checks**:
 - [ ] `docs/operations/config-vs-data-restore-differences.md` is tracked in the commit.

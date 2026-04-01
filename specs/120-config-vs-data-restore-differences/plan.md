@@ -81,7 +81,7 @@ Alcance de la investigación:
 
 `docs/operations/config-vs-data-restore-differences.md` se organiza en las secciones siguientes:
 
-```
+```text
 1. Resumen ejecutivo
    - ¿Qué restaura el reaprovisionamiento de configuración?
    - ¿Qué NO restaura?
@@ -181,7 +181,7 @@ Esta tarea no produce código ejecutable, por lo que no aplican pruebas unitaria
 
 ### Secuencia de implementación
 
-```
+```text
 [Fase plan — esta fase]
   → research.md: inventario de T01/T03 + mecanismos nativos
   → data-model.md: entidades documentales y estructura del doc
