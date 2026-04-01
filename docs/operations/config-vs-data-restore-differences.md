@@ -46,7 +46,7 @@ Este documento detalla, dominio por dominio, qué restaura la cadena de configur
 
 ### 3.1 IAM (Keycloak)
 
-#### Configuración restaurable
+#### Configuración restaurable — Keycloak
 
 - Roles de realm.
 - Grupos (estructura jerárquica y membresías de grupo, sin usuarios individuales).
@@ -56,7 +56,7 @@ Este documento detalla, dominio por dominio, qué restaura la cadena de configur
 - Clients (metadatos de configuración, sin client secrets).
 - Configuración de realm (token lifetime, session settings, etc.).
 
-#### Datos de usuario NO restaurables
+#### Datos de usuario NO restaurables — Keycloak
 
 - Sesiones de usuario activas.
 - Tokens emitidos (access tokens, refresh tokens, ID tokens).
@@ -64,7 +64,7 @@ Este documento detalla, dominio por dominio, qué restaura la cadena de configur
 - Credenciales de usuarios individuales (passwords, TOTP secrets).
 - Cuentas de usuario registradas.
 
-#### Mecanismo complementario
+#### Mecanismo complementario — Keycloak
 
 **Keycloak Admin REST API** — exportación/importación de realm completo.
 
@@ -78,7 +78,7 @@ Limitaciones:
 
 ### 3.2 PostgreSQL
 
-#### Configuración restaurable
+#### Configuración restaurable — PostgreSQL
 
 - Esquemas.
 - Tablas (DDL completo: columnas, tipos, constraints, PKs, FKs).
@@ -88,13 +88,13 @@ Limitaciones:
 - Extensiones instaladas.
 - Grants sobre esquemas y tablas.
 
-#### Datos de usuario NO restaurables
+#### Datos de usuario NO restaurables — PostgreSQL
 
 - Filas de tablas de aplicación.
 - Valores actuales de secuencias (`currval`).
 - Datos materializados en vistas materializadas.
 
-#### Mecanismo complementario
+#### Mecanismo complementario — PostgreSQL
 
 **`pg_dump` / `pg_restore`** — backup lógico completo o por base de datos, esquema o tabla. Alternativa: snapshots de volumen persistente (PVC en Kubernetes).
 
@@ -109,19 +109,19 @@ Limitaciones:
 
 > **Dominio opcional**: requiere `CONFIG_EXPORT_MONGO_ENABLED=true`. Cuando está deshabilitado, el recolector devuelve `not_available` y no hay exportación ni restauración posible para este dominio.
 
-#### Configuración restaurable
+#### Configuración restaurable — MongoDB
 
 - Bases de datos (nombres).
 - Colecciones (nombres, validadores JSON Schema).
 - Índices (definición).
 - Configuración de sharding (si aplica).
 
-#### Datos de usuario NO restaurables
+#### Datos de usuario NO restaurables — MongoDB
 
 - Documentos almacenados en colecciones.
 - GridFS objects.
 
-#### Mecanismo complementario
+#### Mecanismo complementario — MongoDB
 
 **`mongodump` / `mongorestore`** — backup lógico por base de datos o colección.
 
@@ -134,13 +134,13 @@ Limitaciones:
 
 ### 3.4 Kafka
 
-#### Configuración restaurable
+#### Configuración restaurable — Kafka
 
 - Topics (nombre, número de particiones, factor de replicación, configuración de retention).
 - ACLs de topics.
 - Consumer groups registrados (nombre — sin estado ni offsets).
 
-#### Datos de usuario NO restaurables
+#### Datos de usuario NO restaurables — Kafka
 
 - Mensajes almacenados en los topics (sujetos a `retention.ms`).
 - Offsets de consumidores.
@@ -149,7 +149,7 @@ Limitaciones:
 
 > **Nota crítica**: los mensajes de Kafka son efímeros por diseño. Una vez expirada la ventana de retención (`retention.ms`), los mensajes no son recuperables aunque exista infraestructura de backup.
 
-#### Mecanismo complementario
+#### Mecanismo complementario — Kafka
 
 **MirrorMaker 2** (replicación de topics entre clusters) o **`kafka-console-consumer`** con persistencia a archivo.
 
@@ -164,7 +164,7 @@ Limitaciones:
 
 > **Dominio opcional**: requiere `CONFIG_EXPORT_OW_ENABLED=true`. Cuando está deshabilitado, el recolector devuelve `not_available`.
 
-#### Configuración restaurable
+#### Configuración restaurable — OpenWhisk
 
 - Acciones (runtime, código fuente o referencia, límites de memoria/timeout).
 - Paquetes.
@@ -173,13 +173,13 @@ Limitaciones:
 
 > **Nota sobre secretos**: los parámetros de acciones cuyos nombres coinciden con patrones sensibles (password, secret, token, key, credential) se redactan como `***REDACTED***` en el artefacto de exportación. Tras la restauración, estos parámetros deben configurarse manualmente.
 
-#### Datos de usuario NO restaurables
+#### Datos de usuario NO restaurables — OpenWhisk
 
 - Logs de ejecución de activaciones.
 - Resultados almacenados de invocaciones previas.
 - Estado de activaciones activas.
 
-#### Mecanismo complementario
+#### Mecanismo complementario — OpenWhisk
 
 **Repositorio Git del tenant** — el código fuente de las acciones debería estar versionado en el repositorio del tenant, no depender exclusivamente de la plataforma.
 
@@ -192,20 +192,20 @@ Limitaciones:
 
 ### 3.6 Almacenamiento (S3-compatible)
 
-#### Configuración restaurable
+#### Configuración restaurable — S3
 
 - Buckets (nombre, versionado habilitado).
 - Lifecycle rules.
 - Configuración CORS.
 - Políticas de acceso (bucket policies).
 
-#### Datos de usuario NO restaurables
+#### Datos de usuario NO restaurables — S3
 
 - Objetos almacenados en los buckets.
 - Versiones anteriores de objetos (si el versionado está habilitado).
 - Metadatos de objetos individuales.
 
-#### Mecanismo complementario
+#### Mecanismo complementario — S3
 
 **`rclone sync`**, **`aws s3 sync`** o replicación cross-bucket/cross-region del proveedor S3-compatible.
 

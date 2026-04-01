@@ -193,7 +193,7 @@ Limitación que afecta a todos los dominios, no específica de uno solo.
 
 El artefacto `docs/operations/config-vs-data-restore-differences.md` implementa las entidades anteriores con la siguiente estructura Markdown:
 
-```
+```text
 # Diferencias entre restauración de configuración y restauración de datos
 
 ## 1. Resumen ejecutivo
