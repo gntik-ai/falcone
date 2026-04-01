@@ -233,4 +233,16 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - HTTP responses: `200` full export, `207` partial, `403` insufficient role, `404` tenant not found, `422` artifact too large, `429` rate limit.
 - Authorized roles: `superadmin`, `sre`, `service_account` with scope `platform:admin:config:export`. Tenant owners are NOT permitted.
 
+### US-BKP-02-T02: Versioned export/import format
+
+- **New modules**: `services/provisioning-orchestrator/src/schemas/` (JSON Schema registry, v1.0.0 schema, lightweight validator, migration infrastructure).
+- **New actions**: `tenant-config-validate.mjs` (POST validate artifact), `tenant-config-migrate.mjs` (POST migrate artifact), `tenant-config-format-versions.mjs` (GET supported format versions).
+- **New events module**: `events/config-schema-events.mjs` — Kafka `console.config.schema.validated` and `console.config.schema.migrated`.
+- **Modified export action**: `tenant-config-export.mjs` — `format_version` changed from `'1.0'` to `'1.0.0'` (semver), added `schema_checksum` field.
+- **New APISIX routes**: `config-validate-post`, `config-migrate-post`, `config-format-versions-get` in `backup-admin-routes.yaml`.
+- **Console layer**: `apps/web-console/src/api/configSchemaApi.ts` (types + fetch), `apps/web-console/src/components/ConfigArtifactValidator.tsx` (validation/migration panel).
+- **New env vars**: `CONFIG_SCHEMA_KAFKA_TOPIC_VALIDATED` (default `console.config.schema.validated`), `CONFIG_SCHEMA_KAFKA_TOPIC_MIGRATED` (default `console.config.schema.migrated`), `CONFIG_SCHEMA_MAX_INPUT_BYTES` (default `10485760`).
+- **New Kafka topics**: `console.config.schema.validated` (30d retention), `console.config.schema.migrated` (30d retention).
+- Authorization: same scope `platform:admin:config:export` as export endpoints. Roles: `superadmin`, `sre`, `service_account`.
+
 <!-- MANUAL ADDITIONS END -->
