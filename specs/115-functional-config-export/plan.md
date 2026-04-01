@@ -283,9 +283,11 @@ Los contratos completos en formato OpenAPI 3.0 están en `specs/115-functional-c
 - **Auth**: JWT Keycloak (`Authorization: Bearer <token>`)
 - **Roles permitidos**: `superadmin`, `sre`, `service_account` con scope `platform:admin:config:export`
 - **Body** (opcional):
+
   ```json
   { "domains": ["iam", "kafka", "storage"] }
   ```
+
 - **Respuestas**:
   - `200 OK` — exportación completa
   - `207 Multi-Status` — exportación parcial (al menos un dominio fallido)
@@ -298,6 +300,7 @@ Los contratos completos en formato OpenAPI 3.0 están en `specs/115-functional-c
 
 - **Auth**: misma auth que exportación
 - **Respuesta**:
+
   ```json
   {
     "tenant_id": "acme-corp",
@@ -350,6 +353,7 @@ Los contratos completos en formato OpenAPI 3.0 están en `specs/115-functional-c
 ## Secuencia de implementación recomendada
 
 ### Paso 1: Infraestructura compartida (sin dependencias externas)
+
 1. `services/provisioning-orchestrator/src/collectors/types.mjs` — tipos compartidos
 2. `services/provisioning-orchestrator/src/collectors/registry.mjs` — registro de recolectores
 3. `services/provisioning-orchestrator/src/migrations/115-functional-config-export.sql` — tabla de auditoría
@@ -357,26 +361,30 @@ Los contratos completos en formato OpenAPI 3.0 están en `specs/115-functional-c
 5. `services/provisioning-orchestrator/src/events/config-export-events.mjs`
 
 ### Paso 2: Acción de orquestación (con collectors stub)
-6. `tenant-config-export.mjs` — acción principal con `Promise.allSettled`, auth, artefacto, auditoría
-7. `tenant-config-export-domains.mjs` — acción auxiliar
-8. Tests unitarios del orquestador con collectors mock
+
+1. `tenant-config-export.mjs` — acción principal con `Promise.allSettled`, auth, artefacto, auditoría
+2. `tenant-config-export-domains.mjs` — acción auxiliar
+3. Tests unitarios del orquestador con collectors mock
 
 ### Paso 3: Recolectores por orden de complejidad creciente
-9. `iam-collector.mjs` (Keycloak Admin REST API — bien documentada)
-10. `s3-collector.mjs` (API S3 estándar)
-11. `kafka-collector.mjs` (kafkajs AdminClient ya en uso en el proyecto)
-12. `postgres-collector.mjs` (pg + information_schema — ya hay patrones en el proyecto)
-13. `functions-collector.mjs` (OpenWhisk REST API + code base64)
-14. `mongo-collector.mjs` (MongoClient — mayor heterogeneidad de entornos)
+
+1. `iam-collector.mjs` (Keycloak Admin REST API — bien documentada)
+2. `s3-collector.mjs` (API S3 estándar)
+3. `kafka-collector.mjs` (kafkajs AdminClient ya en uso en el proyecto)
+4. `postgres-collector.mjs` (pg + information_schema — ya hay patrones en el proyecto)
+5. `functions-collector.mjs` (OpenWhisk REST API + code base64)
+6. `mongo-collector.mjs` (MongoClient — mayor heterogeneidad de entornos)
 
 ### Paso 4: Rutas APISIX, scopes Keycloak y consola
-15. Extensión de `backup-admin-routes.yaml`
-16. Extensión de `backup-scopes.yaml`
-17. Componentes de consola: `ConfigExportDomainSelector`, `ConfigExportResultPanel`, `ConsoleTenantConfigExportPage`
+
+1. Extensión de `backup-admin-routes.yaml`
+2. Extensión de `backup-scopes.yaml`
+3. Componentes de consola: `ConfigExportDomainSelector`, `ConfigExportResultPanel`, `ConsoleTenantConfigExportPage`
 
 ### Paso 5: Tests de integración y artefactos de spec
-18. Tests E2E en `tests/integration/115-functional-config-export/`
-19. Actualización de AGENTS.md
+
+1. Tests E2E en `tests/integration/115-functional-config-export/`
+2. Actualización de AGENTS.md
 
 ---
 
