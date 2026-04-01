@@ -1,6 +1,6 @@
 # atelier Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-31
+Auto-generated from all feature plans. Last updated: 2026-04-01
 
 ## Active Technologies
 - Node.js 20+ (ESM modules), aligned with existing project standard (072-workflow-e2e-compensation)
@@ -38,7 +38,6 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 ## Recent Changes
 - 105-effective-limit-resolution: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`)
 - 103-hard-soft-quota-overrides: Added Node.js 20+ ESM (`"type": "module"`, pnpm workspaces) + `pg` (PostgreSQL), `kafkajs` (Kafka), Apache OpenWhisk action patterns (established in `services/provisioning-orchestrator`)
-- 100-plan-change-impact-history: Added Node.js 20+ ESM (`"type": "module"`), React 18 + TypeScript for console integrations + `pg` (PostgreSQL), `kafkajs` (audit events), `undici` (integration/API tests), React Testing Library + vitest (console tests), Apache OpenWhisk action wrappers, existing APISIX + Keycloak auth layers
 
 ## Async Operation Idempotency & Retry
 
@@ -184,5 +183,23 @@ Node.js 20+ compatible ESM modules, JSON OpenAPI artifacts, Markdown planning as
 - Consumption unavailability degrades per-dimension to `usageStatus: 'unknown'`; row is never hidden (FR-018).
 - No Kafka events emitted; pure read path.
 - Implement-read constraints: targeted file reads only, no full control-plane OpenAPI reads, family OpenAPI only, no broad browsing.
+
+## Functional Config Export (115-functional-config-export)
+
+- Task: US-BKP-02-T01 — Export functional configuration (IAM, PostgreSQL metadata, MongoDB metadata, Kafka topics/ACLs, OpenWhisk functions, S3 buckets/policies) as a structured JSON artifact.
+- Architecture: collector-per-domain model with `Promise.allSettled` orchestration; partial degradation (one failing collector does not abort export).
+- New PostgreSQL table: `config_export_audit_log` (metadata-only audit; artifact NOT stored in DB — returned directly as HTTP response body).
+- New OpenWhisk actions: `tenant-config-export` (main orchestrator), `tenant-config-export-domains` (auxiliary: lists exportable domains by deployment profile).
+- New collectors under `services/provisioning-orchestrator/src/collectors/`: `iam-collector.mjs`, `postgres-collector.mjs`, `mongo-collector.mjs`, `kafka-collector.mjs`, `functions-collector.mjs`, `s3-collector.mjs`, `registry.mjs`, `types.mjs`.
+- New Kafka topic: `console.config.export.completed` (90-day retention).
+- New console page: `ConsoleTenantConfigExportPage.tsx` with `ConfigExportDomainSelector` and `ConfigExportResultPanel` components.
+- New API routes: `POST /v1/admin/tenants/{tenant_id}/config/export`, `GET /v1/admin/tenants/{tenant_id}/config/export/domains`.
+- Domain status values: `ok`, `empty`, `error`, `not_available`, `not_requested`.
+- Artifact format_version: `"1.0"` (formal versioning deferred to US-BKP-02-T02).
+- Secret redaction: explicit field allowlists per collector + heuristic pattern matching in `types.mjs`; placeholder `"***REDACTED***"`.
+- Optional components: `CONFIG_EXPORT_OW_ENABLED=false` and `CONFIG_EXPORT_MONGO_ENABLED=false` by default; return `not_available` when disabled.
+- New env vars (19): `CONFIG_EXPORT_KEYCLOAK_ADMIN_URL`, `CONFIG_EXPORT_KEYCLOAK_REALM`, `CONFIG_EXPORT_KEYCLOAK_CLIENT_ID`, `CONFIG_EXPORT_KEYCLOAK_CLIENT_SECRET`, `CONFIG_EXPORT_PG_DATABASE_URL`, `CONFIG_EXPORT_MONGO_URI`, `CONFIG_EXPORT_MONGO_ENABLED`, `CONFIG_EXPORT_KAFKA_BROKERS`, `CONFIG_EXPORT_KAFKA_ADMIN_SASL_USERNAME`, `CONFIG_EXPORT_KAFKA_ADMIN_SASL_PASSWORD`, `CONFIG_EXPORT_OW_API_HOST`, `CONFIG_EXPORT_OW_AUTH_TOKEN`, `CONFIG_EXPORT_OW_ENABLED`, `CONFIG_EXPORT_S3_ENDPOINT`, `CONFIG_EXPORT_S3_ACCESS_KEY_ID`, `CONFIG_EXPORT_S3_SECRET_ACCESS_KEY`, `CONFIG_EXPORT_COLLECTOR_TIMEOUT_MS` (default 8000), `CONFIG_EXPORT_MAX_ARTIFACT_BYTES` (default 10485760), `CONFIG_EXPORT_KAFKA_TOPIC_COMPLETED` (default `console.config.export.completed`), `CONFIG_EXPORT_DEPLOYMENT_PROFILE` (default `standard`).
+- HTTP responses: `200` full export, `207` partial, `403` insufficient role, `404` tenant not found, `422` artifact too large, `429` rate limit.
+- Authorized roles: `superadmin`, `sre`, `service_account` with scope `platform:admin:config:export`. Tenant owners are NOT permitted.
 
 <!-- MANUAL ADDITIONS END -->
