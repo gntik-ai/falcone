@@ -44,6 +44,7 @@ specs/110-backup-admin-endpoints/
 ├── spec.md
 ├── plan.md          ← este fichero
 └── tasks.md
+
 ```
 
 ### Código fuente — extensiones sobre `services/backup-status/`
@@ -126,6 +127,7 @@ helm/
     ├── values.yaml                                  # MODIFICADO — Añadir sección operations:
     └── templates/
         └── openwhisk-operations-actions.yaml        # NUEVO — Deploy de las acciones de mutación
+
 ```
 
 ---
@@ -134,7 +136,7 @@ helm/
 
 ### Diagrama de flujo (ASCII)
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  FLUJO DE MUTACIÓN: iniciar backup / solicitar restore                       │
 │                                                                              │
@@ -199,6 +201,7 @@ helm/
 │                               4. Filtrar identificadores internos            │
 │                               5. Responder { snapshots: [...] }              │
 └──────────────────────────────────────────────────────────────────────────────┘
+
 ```
 
 ### Componentes y responsabilidades
@@ -271,22 +274,26 @@ CREATE INDEX idx_backup_ops_active
 -- Índice para consultas por solicitante (un actor consulta sus propias operaciones)
 CREATE INDEX idx_backup_ops_requester
   ON backup_operations(requester_id, accepted_at DESC);
+
 ```
 
 > **Nota de rollback**: La migración solo añade una nueva tabla y dos tipos ENUM. El rollback es:
+>
 > ```sql
 > DROP TABLE backup_operations;
 > DROP TYPE backup_operation_type;
 > DROP TYPE backup_operation_status;
 > ```
+>
 > No afecta a `backup_status_snapshots` ni a ninguna tabla existente.
 
 ### Estados del ciclo de vida de una operación
 
-```
+```text
 [creación] ──► accepted ──► in_progress ──► completed
                   │                  └──────► failed
                   └──► rejected  (validación fallida antes de despachar)
+
 ```
 
 | Estado | Descripción |
@@ -319,6 +326,7 @@ CREATE INDEX idx_backup_ops_requester
     "failure_reason_public": null
   }
 }
+
 ```
 
 > `failure_reason` (detalle técnico) solo se incluye en la respuesta si el token del solicitante tiene el scope `backup-status:read:technical` (SRE/superadmin). Para tenant owners, `failure_reason` se omite y se devuelve únicamente `failure_reason_public`.
@@ -348,6 +356,7 @@ CREATE INDEX idx_backup_ops_requester
     }
   ]
 }
+
 ```
 
 ---
@@ -424,6 +433,7 @@ export interface BackupActionAdapter extends BackupAdapter {
     context: AdapterContext,
   ): Promise<SnapshotInfo[]>;
 }
+
 ```
 
 ### Extensión del registro (`adapters/registry.ts`)
@@ -452,6 +462,7 @@ function isActionAdapter(adapter: unknown): adapter is BackupActionAdapter {
     typeof (adapter as BackupActionAdapter).capabilities === 'function'
   );
 }
+
 ```
 
 ### Adaptador PostgreSQL extendido
@@ -484,12 +495,14 @@ Los adaptadores de MongoDB, S3, Keycloak y Kafka implementan `capabilities()` de
 **Scope requerido**: `backup:write:own` (para tenant owner sobre su propio tenant) o `backup:write:global` (para SRE/superadmin sobre cualquier tenant)
 
 **Request body**:
+
 ```json
 {
   "tenant_id": "tenant-abc",
   "component_type": "postgresql",
   "instance_id": "pg-cluster-12"
 }
+
 ```
 
 **Flujo de validación**:
@@ -508,6 +521,7 @@ Los adaptadores de MongoDB, S3, Keycloak y Kafka implementan `capabilities()` de
 **Scope requerido**: `backup:restore:global` (solo SRE/superadmin; no disponible para tenant owner)
 
 **Request body**:
+
 ```json
 {
   "tenant_id": "tenant-abc",
@@ -515,6 +529,7 @@ Los adaptadores de MongoDB, S3, Keycloak y Kafka implementan `capabilities()` de
   "instance_id": "pg-cluster-12",
   "snapshot_id": "snap-20260401-180000"
 }
+
 ```
 
 **Flujo de validación**:
@@ -590,6 +605,7 @@ required_scopes: []   # solo JWT válido; enforcement en el handler
 
 # GET /v1/backup/snapshots
 required_scopes: ["backup-status:read:global"]
+
 ```
 
 ---
@@ -656,6 +672,7 @@ required_scopes: ["backup-status:read:global"]
       rate: 10
       burst: 20
       key: consumer_name
+
 ```
 
 ---
@@ -664,7 +681,7 @@ required_scopes: ["backup-status:read:global"]
 
 Las acciones OpenWhisk de mutación son síncronas para la parte de validación y creación del registro, pero el despacho al adaptador es inherentemente asíncrono. El modelo es:
 
-```
+```text
 POST /v1/backup/trigger
   └─► [síncrono] Validar → Crear registro (accepted) → Responder 202
   └─► [asíncrono, OpenWhisk activation] OperationDispatcher.dispatch(operationId)
@@ -687,6 +704,7 @@ POST /v1/backup/trigger
       Kafka: platform.backup.operation.events
         { type: 'backup_operation_completed' | 'backup_operation_failed',
           operation_id, tenant_id, component_type, status, timestamp }
+
 ```
 
 **Opciones de implementación del despacho asíncrono en OpenWhisk**:
@@ -742,6 +760,7 @@ operations:
   restore_timeout_seconds: 600         # timeout del adaptador para operaciones de restore
   max_active_operations_per_instance: 1 # máximo de operaciones activas simultáneas por (tenant, component, instance, type)
   kafka_topic: "platform.backup.operation.events"
+
 ```
 
 ---
@@ -788,6 +807,7 @@ describe('OperationDispatcher.dispatch()', () => {
   it('emits Kafka event on completion', async () => { ... });
   it('emits Kafka event on failure', async () => { ... });
 });
+
 ```
 
 ### Casos unitarios para la extensión del adaptador PostgreSQL
@@ -805,6 +825,7 @@ describe('PostgresAdapter actions', () => {
   it('listSnapshots() returns completed backups as available: true', async () => { ... });
   it('listSnapshots() returns non-completed backups as available: false', async () => { ... });
 });
+
 ```
 
 ---
@@ -826,12 +847,13 @@ describe('PostgresAdapter actions', () => {
 
 ### Rollback completo
 
-```
+```text
 1. Eliminar rutas APISIX: backup-trigger-post, backup-restore-post, backup-operation-get, backup-snapshots-get
 2. Desvincular scopes Keycloak: backup:write:own, backup:write:global, backup:restore:global
 3. Revertir migración DB: DROP TABLE backup_operations; DROP TYPE backup_operation_type; DROP TYPE backup_operation_status;
 4. Desplegar versión anterior del chart Helm (sin las acciones OpenWhisk de mutación)
 5. Las acciones de T01 (colector, API de solo lectura) no se ven afectadas
+
 ```
 
 ### Compatibilidad hacia atrás
@@ -871,7 +893,7 @@ describe('PostgresAdapter actions', () => {
 
 ## Dependencias entre módulos de esta tarea
 
-```
+```text
 T-A (Migración DB: backup_operations) ──► T-B (OperationsRepository DAL)
                                                │
          ┌─────────────────────────────────────┘
@@ -898,6 +920,7 @@ T-C (Extensión de types.ts + registry.ts)
                    │
                    ▼
               T-K (Tests: unit + integration + contract + E2E)
+
 ```
 
 ### Paralelización posible

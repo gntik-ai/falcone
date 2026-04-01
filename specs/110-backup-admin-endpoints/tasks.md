@@ -432,7 +432,7 @@ Crear todos los ficheros de prueba del plan: tests unitarios para los handlers, 
 
 ## Resumen de dependencias
 
-```
+```text
 T-01 (Migración DB)
   └─► T-03 (OperationsRepository)
 
@@ -466,6 +466,7 @@ T-09 (infraestructura)
 
 T-02 a T-10
   └─► T-11 (tests)
+
 ```
 
 **Paralelización posible**: una vez completado T-04, las tareas T-05, T-06, T-07 y T-08 pueden desarrollarse en paralelo. T-10 (frontend) puede comenzar con mocks del API en cuanto los schemas de respuesta de T-02 estén definidos, sin esperar a T-09.
