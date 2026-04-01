@@ -1,5 +1,7 @@
 import type { BackupStatusComponent } from '@/services/backupStatusApi'
 import { BackupStatusBadge } from './BackupStatusBadge'
+import { useTriggerRestore } from '@/hooks/useTriggerRestore'
+import { RestoreConfirmationDialog } from './RestoreConfirmationDialog'
 
 interface BackupStatusDetailProps {
   component: BackupStatusComponent
@@ -7,6 +9,8 @@ interface BackupStatusDetailProps {
 }
 
 export function BackupStatusDetail({ component, onClose }: BackupStatusDetailProps) {
+  const { phase, precheckResponse, confirm, abort, operationId } = useTriggerRestore()
+
   return (
     <div className="rounded-lg border p-4 space-y-3" data-testid="backup-status-detail">
       <div className="flex items-center justify-between">
@@ -35,6 +39,21 @@ export function BackupStatusDetail({ component, onClose }: BackupStatusDetailPro
           </>
         )}
       </dl>
+
+      {phase === 'dispatched' && operationId && (
+        <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Restauración despachada correctamente. Operación: {operationId}
+        </div>
+      )}
+
+      {phase === 'pending_confirmation' && precheckResponse && (
+        <RestoreConfirmationDialog
+          precheckResponse={precheckResponse}
+          onConfirm={async (opts) => void confirm(opts)}
+          onAbort={async () => void abort()}
+          isConfirming={phase === 'confirming'}
+        />
+      )}
     </div>
   )
 }
