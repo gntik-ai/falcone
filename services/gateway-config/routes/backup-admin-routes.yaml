@@ -120,3 +120,55 @@ routes:
         read: 10
       nodes:
         openwhisk-tenant-config-format-versions: 1
+
+  - name: config-reprovision-post
+    uri: /v1/admin/tenants/*/config/reprovision
+    methods:
+      - POST
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:reprovision
+      limit-req:
+        rate: 3
+        burst: 6
+        key: consumer_name
+      response-rewrite:
+        headers:
+          set:
+            Cache-Control: "no-store"
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 90
+        read: 90
+      nodes:
+        openwhisk-tenant-config-reprovision: 1
+
+  - name: config-reprovision-identifier-map-post
+    uri: /v1/admin/tenants/*/config/reprovision/identifier-map
+    methods:
+      - POST
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:reprovision
+      limit-req:
+        rate: 10
+        burst: 20
+        key: consumer_name
+      response-rewrite:
+        headers:
+          set:
+            Cache-Control: "no-store"
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 15
+        read: 15
+      nodes:
+        openwhisk-tenant-config-identifier-map: 1
