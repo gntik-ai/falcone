@@ -13,7 +13,7 @@ Todo el trabajo se circunscribe a los siguientes paths. El paso `speckit.impleme
 
 ### Archivos nuevos a crear
 
-```
+```text
 services/provisioning-orchestrator/src/
   reprovision/
     types.mjs
@@ -79,7 +79,7 @@ services/provisioning-orchestrator/src/tests/actions/
 
 ### Artifacts de stage a preservar (no tocar)
 
-```
+```text
 specs/117-tenant-reprovision-from-export/
   spec.md
   plan.md
@@ -307,12 +307,16 @@ Implementar tres funciones exportadas:
 Inspecciona el artefacto e infiere un mapa de reemplazos propuesto. Para cada dominio disponible del artefacto, extrae los identificadores conocidos:
 
 | Scope | Fuente en el artefacto | Destino propuesto |
+
 |---|---|---|
 | `iam.realm` | `artifact.domains[iam].data.realm` o `artifact.tenant_id` como fallback | Derivado de `targetTenantId` según convención de la plataforma |
+
 | `postgres.schema` | `artifact.domains[postgres_metadata].data.schema` | Derivado de `targetTenantId` |
 | `mongo.database` | `artifact.domains[mongo_metadata].data.database` | Derivado de `targetTenantId` |
+
 | `kafka.topic_prefix` | Prefijo común de los topics en `artifact.domains[kafka].data.topics[*].name` | Derivado de `targetTenantId` |
 | `functions.namespace` | `artifact.domains[functions].data.namespace` | Derivado de `targetTenantId` |
+
 | `storage.bucket_prefix` | Prefijo común de los buckets en `artifact.domains[storage].data.buckets[*].name` | Derivado de `targetTenantId` |
 
 La derivación del valor destino sigue la convención: `<targetTenantId>` con separadores ajustados al dominio (guion para IAM/Kafka, subrayado para PostgreSQL, punto para prefijos de topics/buckets). Si no se puede inferir un valor destino, se devuelve `""` y se emite una advertencia.
@@ -592,7 +596,7 @@ El shape de cada evento debe ser compatible con el schema de `contracts/config-r
 
 Implementar la función `main(params, overrides)` siguiendo el patrón de `tenant-config-export.mjs`. Flujo completo:
 
-```
+```text
 1. Extraer claims JWT (reusar lógica de extractAuth de export; scope: platform:admin:config:reprovision)
 2. Extraer tenant_id del path o params
 3. Verificar que el tenant destino existe (tenantExistsFn)
@@ -633,16 +637,22 @@ Variables de entorno usadas:
 - Credenciales por subsistema: `CONFIG_IMPORT_KEYCLOAK_*`, `CONFIG_IMPORT_PG_*`, `CONFIG_IMPORT_MONGO_*`, `CONFIG_IMPORT_KAFKA_*`, `CONFIG_IMPORT_OW_*`, `CONFIG_IMPORT_S3_*`
 
 **Manejo de errores HTTP**:
+
 | Condición | HTTP |
 |---|---|
+
 | Sin autenticación o scope incorrecto | 403 |
 | tenant_id no encontrado | 404 |
+
 | format_version incompatible | 422 |
 | identifier_map inválido | 400 |
+
 | dominio desconocido en filtro | 400 |
 | lock activo | 409 |
+
 | Aplicador fallado (parcial) | 207 |
 | Todo OK (incluyendo dry_run) | 200 |
+
 | Todos los aplicadores fallaron | 207 (no 500) |
 
 **Criterio de aceptación**: Las pruebas unitarias (T-26) cubren todos los paths de retorno.
@@ -655,7 +665,7 @@ Variables de entorno usadas:
 
 Flujo:
 
-```
+```text
 1. Extraer JWT (mismo scope: platform:admin:config:reprovision)
 2. Extraer tenant_id del path
 3. Verificar tenant destino
@@ -668,6 +678,7 @@ Flujo:
 ```
 
 `IdentifierMapResponse`:
+
 ```json
 {
   "source_tenant_id": "...",
@@ -1026,20 +1037,28 @@ Tests de integración de extremo a extremo usando mocks de subsistemas externos 
 ## Criterios de done (verificables antes del merge)
 
 | # | Criterio |
+
 |---|---|
 | D-01 | Todos los archivos listados en el mapa de archivos existen o han sido modificados según lo especificado. |
+
 | D-02 | `117-tenant-config-reprovision.sql` es idempotente y crea las dos tablas correctamente. |
 | D-03 | `tenant-config-reprovision.mjs` devuelve los códigos HTTP correctos para los 16 casos de T-26. |
+
 | D-04 | `identifier-map.mjs` aplica orden por longitud descendente y no muta el artefacto original. |
 | D-05 | Los seis aplicadores nunca ejecutan operaciones de escritura cuando `dry_run=true`. |
+
 | D-06 | Los seis aplicadores nunca sobrescriben recursos con configuración diferente; los reportan como `conflict`. |
 | D-07 | Los valores `***REDACTED***` nunca se aplican a ningún subsistema; los recursos afectados se marcan `applied_with_warnings`. |
+
 | D-08 | El lock de concurrencia impide dos reaprovisionamientos simultáneos sobre el mismo tenant; el segundo recibe 409. |
 | D-09 | La auditoría se inserta en PostgreSQL y el evento Kafka se publica en toda invocación exitosa (incluido dry_run). |
+
 | D-10 | Los tres contratos en `contracts/` pasan sus respectivos contract tests. |
 | D-11 | Los tests E2E de T-29 pasan en entorno sin subsistemas reales (todos mockados). |
+
 | D-12 | Las rutas YAML de APISIX y el scope de Keycloak son válidos y no solapan ni duplican entradas existentes. |
 | D-13 | Ningún secreto, credential o payload completo del artefacto se escribe en logs, DB o eventos Kafka. |
+
 | D-14 | Los archivos de stage previos (`spec.md`, `plan.md`, `research.md`, `data-model.md`, contratos) no han sido modificados. |
 | D-15 | El worktree está limpio al finalizar (solo archivos de este feature, sin archivos temporales). |
 
@@ -1048,26 +1067,37 @@ Tests de integración de extremo a extremo usando mocks de subsistemas externos 
 ## Variables de entorno de referencia
 
 | Variable | Descripción | Default |
+
 |---|---|---|
 | `CONFIG_IMPORT_SUPPORTED_FORMAT_MAJOR` | Major version del artefacto que acepta el servidor | `'1'` |
+
 | `CONFIG_IMPORT_APPLIER_TIMEOUT_MS` | Timeout por aplicador en ms | `10000` |
 | `CONFIG_IMPORT_LOCK_TTL_MS` | TTL del lock de concurrencia en ms | `120000` |
+
 | `CONFIG_IMPORT_OW_ENABLED` | Habilita aplicador de funciones OpenWhisk | `'false'` |
 | `CONFIG_IMPORT_MONGO_ENABLED` | Habilita aplicador de MongoDB | `'false'` |
+
 | `CONFIG_IMPORT_KEYCLOAK_URL` | URL base del servidor Keycloak admin | — |
 | `CONFIG_IMPORT_KEYCLOAK_ADMIN_CLIENT_ID` | Client ID de servicio para escritura en Keycloak | — |
+
 | `CONFIG_IMPORT_KEYCLOAK_ADMIN_SECRET` | Secret del client de servicio | — |
 | `CONFIG_IMPORT_PG_CONNECTION_STRING` | Connection string PostgreSQL de escritura | — |
+
 | `CONFIG_IMPORT_MONGO_URI` | URI MongoDB de escritura | — |
 | `CONFIG_IMPORT_KAFKA_BROKERS` | Lista de brokers Kafka (comma-separated) | — |
+
 | `CONFIG_IMPORT_KAFKA_SASL_USERNAME` | SASL username para Kafka | — |
 | `CONFIG_IMPORT_KAFKA_SASL_PASSWORD` | SASL password para Kafka | — |
+
 | `CONFIG_IMPORT_OW_API_HOST` | API host de OpenWhisk | — |
 | `CONFIG_IMPORT_OW_API_KEY` | API key de OpenWhisk | — |
+
 | `CONFIG_IMPORT_S3_ENDPOINT` | Endpoint S3-compatible | — |
 | `CONFIG_IMPORT_S3_ACCESS_KEY` | Access key S3 | — |
+
 | `CONFIG_IMPORT_S3_SECRET_KEY` | Secret key S3 | — |
 | `CONFIG_REPROVISION_KAFKA_TOPIC_COMPLETED` | Topic Kafka para eventos de reprovision completado | `'console.config.reprovision.completed'` |
+
 | `CONFIG_REPROVISION_KAFKA_TOPIC_MAP` | Topic Kafka para eventos de mapa de identificadores | `'console.config.reprovision.identifier-map'` |
 
 ---

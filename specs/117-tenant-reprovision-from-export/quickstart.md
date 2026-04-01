@@ -13,6 +13,7 @@ This guide covers the implementation and verification flow for the tenant reprov
 ## 2. Files expected from this feature
 
 ### Feature docs
+
 - `specs/117-tenant-reprovision-from-export/plan.md`
 - `specs/117-tenant-reprovision-from-export/research.md`
 - `specs/117-tenant-reprovision-from-export/data-model.md`
@@ -20,6 +21,7 @@ This guide covers the implementation and verification flow for the tenant reprov
 - `specs/117-tenant-reprovision-from-export/contracts/*`
 
 ### Backend implementation targets
+
 - `services/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs`
 - `services/provisioning-orchestrator/src/actions/tenant-config-identifier-map.mjs`
 - `services/provisioning-orchestrator/src/reprovision/*`
@@ -28,6 +30,7 @@ This guide covers the implementation and verification flow for the tenant reprov
 - `services/provisioning-orchestrator/src/migrations/117-tenant-config-reprovision.sql`
 
 ### Console implementation targets
+
 - `apps/web-console/src/api/configReprovisionApi.ts`
 - `apps/web-console/src/pages/ConsoleTenantConfigReprovisionPage.tsx`
 - `apps/web-console/src/components/ConfigIdentifierMapEditor.tsx`
@@ -70,8 +73,8 @@ curl -X POST \
   -d '{"artifact": { ... }}'
 ```
 
-4. Review and adjust the returned map.
-5. Execute a dry-run:
+1. Review and adjust the returned map.
+2. Execute a dry-run:
 
 ```bash
 curl -X POST \
@@ -81,7 +84,7 @@ curl -X POST \
   -d '{"artifact": { ... }, "identifier_map": { ... }, "dry_run": true}'
 ```
 
-6. Execute the effective reprovision with the same payload and `dry_run: false`.
+1. Execute the effective reprovision with the same payload and `dry_run: false`.
 
 ## 4. What to verify
 
