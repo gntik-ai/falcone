@@ -17,6 +17,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 0 — Research Spike
 
 #### TASK-01: Research spike — confirm external dependencies
+
 - **File**: `specs/114-backup-scope-deployment-profiles/research.md` *(new)*
 - **Action**: Create document recording findings for:
   1. US-OBS-01 component health table name/schema (needed by `backup-scope-repository.mjs` for `operationalStatus` join)
@@ -32,6 +33,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 1 — Design Artifacts
 
 #### TASK-02: Write data-model.md with final DDL and API shapes
+
 - **File**: `specs/114-backup-scope-deployment-profiles/data-model.md` *(new)*
 - **Action**: Document final DDL (may diverge from plan after TASK-01 research), full API response shapes, component prop types, health join strategy, and `operationalStatus` resolution
 - **Contents**:
@@ -43,6 +45,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-01
 
 #### TASK-03: Write OpenAPI contract — backup-scope-get.json
+
 - **File**: `specs/114-backup-scope-deployment-profiles/contracts/backup-scope-get.json` *(new)*
 - **Action**: OpenAPI 3.0 operation object for `GET /v1/admin/backup/scope`
 - **Contents**:
@@ -55,6 +58,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-02
 
 #### TASK-04: Write OpenAPI contract — tenant-backup-scope-get.json
+
 - **File**: `specs/114-backup-scope-deployment-profiles/contracts/tenant-backup-scope-get.json` *(new)*
 - **Action**: OpenAPI 3.0 operation object for `GET /v1/tenants/{tenantId}/backup/scope`
 - **Contents**:
@@ -66,6 +70,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-02
 
 #### TASK-05: Write Kafka event schema — backup-scope-query-event.json
+
 - **File**: `specs/114-backup-scope-deployment-profiles/contracts/backup-scope-query-event.json` *(new)*
 - **Action**: JSON Schema (draft-07) for Kafka topic `console.backup.scope.queried`
 - **Contents**:
@@ -76,6 +81,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-01 (Kafka topic naming confirmed)
 
 #### TASK-06: Write quickstart.md
+
 - **File**: `specs/114-backup-scope-deployment-profiles/quickstart.md` *(new)*
 - **Action**: Local dev setup guide covering:
   - How to run the migration: `psql` command or Helm hook invocation
@@ -92,6 +98,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 2 — Migration & Seed
 
 #### TASK-07: Implement PostgreSQL migration — 114-backup-scope-deployment-profiles.sql
+
 - **File**: `services/provisioning-orchestrator/src/migrations/114-backup-scope-deployment-profiles.sql` *(new)*
 - **Action**: Write idempotent migration:
   1. `CREATE TABLE IF NOT EXISTS deployment_profile_registry` (profile_key PK, display_name, description, is_active, created_at, updated_at)
@@ -109,6 +116,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 3 — Repository
 
 #### TASK-08: Implement backup-scope-repository.mjs
+
 - **File**: `services/provisioning-orchestrator/src/repositories/backup-scope-repository.mjs` *(new)*
 - **Action**: ESM module exporting:
   - `getMatrix({ pg, profileKey, includeAll })` — queries `backup_scope_entries` joined with `deployment_profile_registry`; if `includeAll=true` returns all 21 entries; if `profileKey` given filters by that profile; defaults to active profile (`is_active = true`); joins health table for `operationalStatus` when `BACKUP_SCOPE_HEALTH_JOIN_ENABLED=true`
@@ -123,6 +131,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 4 — OpenWhisk Actions
 
 #### TASK-09: Implement backup-scope-get.mjs action
+
 - **File**: `services/provisioning-orchestrator/src/actions/backup-scope-get.mjs` *(new)*
 - **Action**: OpenWhisk action (ESM, `main` export) that:
   1. Extracts actor from `params.__ow_headers` JWT / `params.__ow_user`
@@ -135,6 +144,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-08, TASK-12
 
 #### TASK-10: Implement tenant-backup-scope-get.mjs action
+
 - **File**: `services/provisioning-orchestrator/src/actions/tenant-backup-scope-get.mjs` *(new)*
 - **Action**: OpenWhisk action (ESM, `main` export) that:
   1. Extracts actor and validates role: `superadmin`, `sre`, or `tenant:owner`/`tenant:admin`
@@ -151,6 +161,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 5 — Kafka Audit Events
 
 #### TASK-11: Implement backup-scope-events.mjs
+
 - **File**: `services/provisioning-orchestrator/src/events/backup-scope-events.mjs` *(new)*
 - **Action**: ESM module exporting:
   - `publishScopeQueried({ correlationId, actor, tenantId, requestedProfile, kafkaClient })` → publishes to topic `process.env.BACKUP_SCOPE_KAFKA_TOPIC_QUERIED || 'console.backup.scope.queried'`
@@ -159,6 +170,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Done when**: Exports valid async function; audit integration test TASK-19 consumes event and asserts schema
 
 #### TASK-12: Wire backup-scope-events.mjs into actions (dependency artifact)
+
 - **File**: Internal wiring — no new file; TASK-09 and TASK-10 import from TASK-11
 - **Action**: Ensure `backup-scope-get.mjs` and `tenant-backup-scope-get.mjs` both import and call `publishScopeQueried` after successful response construction
 - **Note**: This task is satisfied when TASK-09 and TASK-10 both correctly import TASK-11
@@ -170,8 +182,10 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 6 — APISIX Routes
 
 #### TASK-13: Extend platform-admin-routes.yaml with 2 backup scope routes
+
 - **File**: `services/gateway-config/routes/platform-admin-routes.yaml` *(extended)*
 - **Action**: Add two route entries (preserving all existing routes unmodified):
+
   ```yaml
   - uri: /v1/admin/backup/scope
     methods: [GET]
@@ -194,6 +208,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
       kafka-logger:
         topic: console.audit.gateway
   ```
+
 - **Done when**: YAML is valid (`helm template` smoke or `yq .` passes); existing routes not modified; 2 new routes present
 - **Depends on**: TASK-01 (confirmed yaml path)
 
@@ -202,6 +217,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 7 — Console
 
 #### TASK-14: Implement backupScopeApi.ts
+
 - **File**: `apps/web-console/src/lib/backupScopeApi.ts` *(new)*
 - **Action**: TypeScript module exporting:
   - Types: `BackupScopeEntry`, `BackupScopeMatrixResponse`, `TenantBackupScopeEntry`, `TenantBackupScopeResponse`
@@ -212,6 +228,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-03, TASK-04
 
 #### TASK-15: Implement BackupScopeLegend.tsx and BackupScopeProfileSelector.tsx
+
 - **Files**:
   - `apps/web-console/src/components/console/BackupScopeLegend.tsx` *(new)*
   - `apps/web-console/src/components/console/BackupScopeProfileSelector.tsx` *(new)*
@@ -227,6 +244,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-14
 
 #### TASK-16: Implement BackupScopeMatrix.tsx and ConsoleBackupScopePage.tsx
+
 - **Files**:
   - `apps/web-console/src/components/console/BackupScopeMatrix.tsx` *(new)*
   - `apps/web-console/src/pages/ConsoleBackupScopePage.tsx` *(new)*
@@ -253,6 +271,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 8 — Integration Tests
 
 #### TASK-17: Integration test — backup-scope-get.test.mjs
+
 - **File**: `tests/integration/114-backup-scope-deployment-profiles/backup-scope-get.test.mjs` *(new)*
 - **Action**: `node:test` test file covering:
   - `GET /v1/admin/backup/scope` as superadmin → 200, 7 entries for active profile, no null `coverageStatus`
@@ -265,6 +284,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-09, TASK-13
 
 #### TASK-18: Integration test — tenant-backup-scope-get.test.mjs
+
 - **File**: `tests/integration/114-backup-scope-deployment-profiles/tenant-backup-scope-get.test.mjs` *(new)*
 - **Action**: `node:test` test file covering:
   - Superadmin `GET /v1/tenants/{tenantId}/backup/scope` → 200, entries for tenant's resource types only
@@ -276,6 +296,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-10, TASK-13
 
 #### TASK-19: Integration test — backup-scope-audit.test.mjs
+
 - **File**: `tests/integration/114-backup-scope-deployment-profiles/backup-scope-audit.test.mjs` *(new)*
 - **Action**: `node:test` test file covering:
   - Call `GET /v1/admin/backup/scope` → consume `console.backup.scope.queried` Kafka topic → assert event contains: `eventType`, `correlationId`, `actor.id`, `actor.role`, `timestamp`
@@ -289,6 +310,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 ### Phase 9 — Console Tests
 
 #### TASK-20: Console test fixtures and test utilities
+
 - **File**: `apps/web-console/src/__tests__/fixtures/backupScopeFixtures.ts` *(new)*
 - **Action**: Export typed mock data:
   - `mockBackupScopeMatrix`: `BackupScopeMatrixResponse` with 7 entries (all 7 components for `standard` profile) covering all `coverageStatus` values
@@ -298,6 +320,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-14
 
 #### TASK-21: Console unit test — BackupScopeMatrix.test.tsx
+
 - **File**: `apps/web-console/src/__tests__/BackupScopeMatrix.test.tsx` *(new)*
 - **Action**: `vitest` + React Testing Library tests:
   - Renders table with 7 rows using `mockBackupScopeMatrix`
@@ -310,6 +333,7 @@ This task produces a **documentation + API surface** for the backup scope matrix
 - **Depends on**: TASK-16, TASK-20
 
 #### TASK-22: Console unit test — ConsoleBackupScopePage.test.tsx
+
 - **File**: `apps/web-console/src/__tests__/ConsoleBackupScopePage.test.tsx` *(new)*
 - **Action**: `vitest` + React Testing Library tests:
   - Loading state renders skeleton before data resolves
@@ -323,7 +347,8 @@ This task produces a **documentation + API surface** for the backup scope matrix
 
 ## Execution Order
 
-```
+```text
+
 TASK-01 (Research)
     └─► TASK-02 (data-model.md)
             ├─► TASK-03 (contract: backup-scope-get.json)
@@ -348,9 +373,11 @@ TASK-03 + TASK-04
                             └─► TASK-20 (test fixtures)
                                     ├─► TASK-21 (BackupScopeMatrix.test)
                                     └─► TASK-22 (ConsoleBackupScopePage.test)
+
 ```
 
 ### Parallel opportunities after TASK-01 + TASK-02 complete
+
 - TASK-03/04/05/06 can proceed in parallel
 - TASK-07 can proceed in parallel with TASK-03/04
 - TASK-13 (APISIX) can proceed in parallel with TASK-07

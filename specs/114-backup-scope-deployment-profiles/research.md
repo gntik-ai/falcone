@@ -9,6 +9,7 @@
 **Decision**: Default `BACKUP_SCOPE_HEALTH_JOIN_ENABLED=false`. The `backup-scope-repository.mjs` will include a conditional LEFT JOIN against a future `component_health_status` table when the env var is `true`. When `false` (or table absent), `operationalStatus` resolves to `'unknown'` for all entries without error.
 
 **Fallback schema assumed** (for future join):
+
 ```sql
 -- Expected from US-OBS-01 (not created by this migration)
 -- component_health_status (

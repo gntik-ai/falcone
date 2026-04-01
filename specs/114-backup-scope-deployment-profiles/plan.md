@@ -189,6 +189,7 @@ The migration seeds the known 3 profiles × 7 components = 21 entries. Example r
 **Query params**: `?profile=all-in-one|standard|ha` (optional; omit = active profile; `?profile=all` = full matrix)
 
 Response shape:
+
 ```json
 {
   "activeProfile": "standard",
@@ -224,6 +225,7 @@ Response shape:
 **Query params**: none (returns only resource types the tenant uses, filtered by plan capabilities)
 
 Response shape:
+
 ```json
 {
   "tenantId": "ten-xyz",
@@ -261,6 +263,7 @@ Response shape:
 ### Kafka Audit Event: `console.backup.scope.queried`
 
 Topic retention: 30d
+
 ```json
 {
   "eventType": "backup.scope.queried",
@@ -283,7 +286,7 @@ Topic retention: 30d
 
 ---
 
-## APISIX Routes
+## APISIX Route Definitions
 
 Two new routes added to `services/gateway-config/routes/platform-admin-routes.yaml`:
 
@@ -459,7 +462,7 @@ All requests require valid Keycloak JWT. Scope enforcement plugin enforces `plat
 
 ## Sequence of Implementation
 
-```
+```text
 Phase 0 (Research)
     └─► Phase 1 (Design + Contracts)
             └─► Phase 2 (Migration + Seed)
