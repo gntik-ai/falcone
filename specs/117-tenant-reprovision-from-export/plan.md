@@ -182,6 +182,7 @@ Rules shared by all appliers:
 ### 4) Actions and API flow
 
 #### Main reprovision endpoint
+
 `POST /v1/admin/tenants/{tenant_id}/config/reprovision`
 
 Request envelope:
@@ -202,6 +203,7 @@ Flow:
 9. Release the lock and return `200` or `207` depending on the outcome.
 
 #### Identifier map endpoint
+
 `POST /v1/admin/tenants/{tenant_id}/config/reprovision/identifier-map`
 
 Flow:
@@ -232,22 +234,26 @@ Flow:
 ## Data, Metadata, Events, Secrets, and Infra
 
 ### Database
+
 - New migration for lock + audit tables.
 - No artifact payload persistence.
 - No new cross-service DB dependency.
 
 ### Kafka
+
 - New event publisher module for:
   - reprovision completed / partial / failed
   - identifier-map generated
 - Events are fire-and-forget; Kafka failures must not abort the HTTP response after the backend has already completed local processing.
 
 ### Secrets
+
 - Redacted values (`***REDACTED***`) are never restored.
 - Appliers may create the resource without the secret and annotate the warning.
 - No secret value from the export artifact is ever written to DB or logs.
 
 ### Infrastructure
+
 - Reuse existing APISIX / Keycloak / OpenWhisk deployment paths.
 - Keep all new resources Helm-compatible and OpenShift-safe.
 
@@ -256,18 +262,21 @@ Flow:
 ## Testing Strategy
 
 ### Unit tests
+
 - Identifier-map generation and override validation.
 - Token-aware substitution and longest-match-first behavior.
 - Per-domain diff helpers for `skipped` vs `conflict`.
 - Lock repository acquire/release/expiry semantics.
 
 ### Contract tests
+
 - Main reprovision endpoint request/response schema.
 - Identifier-map endpoint request/response schema.
 - Kafka audit event schema.
 - Authorization coverage for the new scope.
 
 ### Integration tests
+
 - Full happy path on a mock tenant with all six domains.
 - Dry-run path with existing resources and conflict detection.
 - Partial success when one applier fails.
@@ -275,11 +284,13 @@ Flow:
 - `422` when the artifact format is incompatible.
 
 ### Console tests
+
 - Identifier map editor renders proposed entries and preserves edits.
 - Result panel renders per-domain and per-resource statuses.
 - Unauthorized roles do not see or cannot submit the reprovision action.
 
 ### Operational validation
+
 - Verify no full artifact is stored in PostgreSQL.
 - Verify audit event emission on both the map-generation and reprovision steps.
 - Verify lock expiry cleanup works after a simulated crash.
@@ -289,6 +300,7 @@ Flow:
 ## Implementation Sequence and Parallelization
 
 ### Recommended order
+
 1. Add migration + repositories for audit and lock handling.
 2. Add the shared `reprovision/` runtime and identifier-map logic.
 3. Implement the two OpenWhisk actions.
@@ -298,6 +310,7 @@ Flow:
 7. Run validation scripts and tighten response shapes.
 
 ### Parallelizable work
+
 - Domain appliers can be developed independently once the shared runtime contract is stable.
 - Console components can be built in parallel with backend actions after the response schemas are fixed.
 - Contract tests and backend unit tests can advance in parallel once the contracts are agreed.
@@ -307,26 +320,31 @@ Flow:
 ## Risks, Compatibility, Rollback, Idempotency, Observability, Security
 
 ### Risks
+
 - **Identifier collision**: naive text replacement could corrupt the artifact. Mitigation: token-aware replacement + longest match first + post-validation.
 - **Mixed-state tenant**: partial failure can leave some domains applied and others not. Mitigation: explicit domain summaries, dry-run, and no cross-domain rollback promise.
 - **Lock leakage**: crash during reprovision can leave a stale lock. Mitigation: TTL-based reclamation and explicit lock status.
 - **Comparison complexity**: deep equivalence checks differ per subsystem. Mitigation: conservative diff rules and a preference for `conflict` over silent overwrite.
 
 ### Compatibility
+
 - The feature consumes the exported artifact format produced by T01/T02.
 - It does not change the export artifact schema.
 - It introduces a new scope and new endpoints without breaking existing backup routes.
 
 ### Rollback
+
 - No automatic rollback across domains.
 - If implementation mistakes are found, rollback is done by removing the new routes/actions/migration in the next patch and leaving existing export/validation paths untouched.
 
 ### Idempotency
+
 - The feature is safe to retry at the resource level because equivalent resources are skipped.
 - The lock prevents concurrent executions on the same tenant.
 - The audit record stores the request summary and correlation id for replay analysis.
 
 ### Observability and security
+
 - Emit audit data to Kafka and PostgreSQL.
 - Keep log messages free of raw secret values or the full artifact payload.
 - Surface `409`, `422`, and partial-success responses clearly to the caller.
