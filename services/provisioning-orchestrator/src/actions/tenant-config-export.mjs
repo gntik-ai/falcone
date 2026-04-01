@@ -8,8 +8,9 @@ import { randomUUID } from 'node:crypto';
 import { getRegistry, KNOWN_DOMAINS } from '../collectors/registry.mjs';
 import { insertExportAuditLog } from '../repositories/config-export-audit-repository.mjs';
 import { publishExportCompleted } from '../events/config-export-events.mjs';
+import { getChecksum } from '../schemas/index.mjs';
 
-const FORMAT_VERSION = '1.0';
+const FORMAT_VERSION = '1.0.0';
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_MAX_ARTIFACT_BYTES = 10_485_760; // 10 MB
 
@@ -144,12 +145,14 @@ export async function main(params = {}, overrides = {}) {
   });
 
   // --- Build artifact ---
+  const schemaChecksum = (overrides.getChecksum ?? getChecksum)(FORMAT_VERSION);
   const artifact = {
     export_timestamp: exportStartedAt,
     tenant_id: tenantId,
     format_version: FORMAT_VERSION,
     deployment_profile: deploymentProfile,
     correlation_id: correlationId,
+    schema_checksum: schemaChecksum,
     domains: domainResults,
   };
 
