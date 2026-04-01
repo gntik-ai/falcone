@@ -1,0 +1,48 @@
+routes:
+  - name: config-export-post
+    uri: /v1/admin/tenants/*/config/export
+    methods:
+      - POST
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:export
+      limit-req:
+        rate: 5
+        burst: 10
+        key: consumer_name
+      response-rewrite:
+        headers:
+          set:
+            Cache-Control: "no-store"
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 30
+        read: 30
+      nodes:
+        openwhisk-tenant-config-export: 1
+
+  - name: config-export-domains-get
+    uri: /v1/admin/tenants/*/config/export/domains
+    methods:
+      - GET
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - platform:admin:config:export
+      limit-req:
+        rate: 20
+        burst: 40
+        key: consumer_name
+    upstream:
+      type: roundrobin
+      timeout:
+        connect: 5
+        send: 10
+        read: 10
+      nodes:
+        openwhisk-tenant-config-export-domains: 1
