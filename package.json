@@ -35,6 +35,7 @@
     "test:e2e:deployment": "node --test tests/e2e/deployment/*.test.mjs",
     "test:e2e:observability": "node --test tests/e2e/observability/*.test.mjs",
     "test:e2e:workflows": "node --test tests/e2e/workflows/*.test.mjs",
+    "test:e2e:restore": "node --test tests/e2e/workflows/restore/*.test.mjs",
     "test:e2e:realtime": "node --test --test-reporter=tap tests/e2e/realtime/**/*.test.mjs",
     "test:unit:realtime": "node --test tests/unit/realtime/**/*.test.mjs",
     "test:resilience": "node --test tests/resilience/*.test.mjs",
