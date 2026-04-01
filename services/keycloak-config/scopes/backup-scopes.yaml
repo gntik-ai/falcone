@@ -1,11 +1,18 @@
 scopes:
   - name: platform:admin:config:export
     description: Export functional configuration of any tenant (superadmin/sre/service_account only)
+  - name: platform:admin:config:reprovision
+    description: >
+      Reprovision the functional configuration of any tenant from an export artifact
+      (superadmin/sre/service_account only)
 
 role_mappings:
   superadmin:
     - platform:admin:config:export
+    - platform:admin:config:reprovision
   sre:
     - platform:admin:config:export
+    - platform:admin:config:reprovision
   service_account:
     - platform:admin:config:export
+    - platform:admin:config:reprovision
