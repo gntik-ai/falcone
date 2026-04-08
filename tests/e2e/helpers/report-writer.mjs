@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SCHEMA_PATH = resolve(__dirname, '../../../specs/119-sandbox-restore-functional-tests/contracts/restore-test-report.json');
+const SCHEMA_PATH = resolve(__dirname, '../../contracts/schemas/restore-test-report.json');
 const SCHEMA = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8'));
 const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false });
 const validate = ajv.compile(SCHEMA);

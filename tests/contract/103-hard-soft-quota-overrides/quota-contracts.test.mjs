@@ -1,3 +1,3 @@
 import test from 'node:test'; import assert from 'node:assert/strict'; import fs from 'node:fs/promises';
 const files=['quota-override-create.json','quota-override-modify.json','quota-override-revoke.json','quota-override-list.json','quota-effective-limits-get.json','quota-enforce.json','quota-audit-query.json'];
-for (const file of files) test(`contract ${file} is valid json schema shell`, async()=>{ const raw=await fs.readFile(new URL(`../../../specs/103-hard-soft-quota-overrides/contracts/${file}`, import.meta.url), 'utf8'); const schema=JSON.parse(raw); assert.equal(schema.type, 'object'); assert.ok(Array.isArray(schema.required)); });
+for (const file of files) test(`contract ${file} is valid json schema shell`, async()=>{ const raw=await fs.readFile(new URL(`../../../tests/contracts/schemas/${file}`, import.meta.url), 'utf8'); const schema=JSON.parse(raw); assert.equal(schema.type, 'object'); assert.ok(Array.isArray(schema.required)); });

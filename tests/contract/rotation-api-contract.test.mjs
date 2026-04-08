@@ -18,7 +18,7 @@ for (const [fixture, schemaName] of [
 ]) {
   test(`fixture ${fixture} matches ${schemaName}`, () => {
     const validate = compile(schemaName);
-    const payload = JSON.parse(fs.readFileSync(new URL(`../../specs/089-api-key-rotation/contracts/${fixture}`, import.meta.url), 'utf8'));
+    const payload = JSON.parse(fs.readFileSync(new URL(`../../tests/contracts/schemas/${fixture}`, import.meta.url), 'utf8'));
     assert.equal(validate(payload), true, JSON.stringify(validate.errors));
   });
 }

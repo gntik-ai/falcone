@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Ajv from 'ajv';
 
-const SCHEMA_PATH = resolve('specs/117-tenant-reprovision-from-export/contracts/config-reprovision-audit-event.json');
+const SCHEMA_PATH = resolve('tests/contracts/schemas/config-reprovision-audit-event.json');
 
 let schema;
 let ajv;

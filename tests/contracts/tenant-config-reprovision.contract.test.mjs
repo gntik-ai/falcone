@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const CONTRACT_PATH = resolve('specs/117-tenant-reprovision-from-export/contracts/tenant-config-reprovision.json');
+const CONTRACT_PATH = resolve('tests/contracts/schemas/tenant-config-reprovision.json');
 
 test('tenant-config-reprovision contract: file is valid JSON', async () => {
   const raw = await readFile(CONTRACT_PATH, 'utf-8');
