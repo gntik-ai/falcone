@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Ajv from 'ajv';
 
-const SCHEMA_PATH = resolve('specs/118-export-conflict-prechecks/contracts/config-preflight-audit-event.json');
+const SCHEMA_PATH = resolve('tests/contracts/schemas/config-preflight-audit-event.json');
 
 let schema;
 let ajv;

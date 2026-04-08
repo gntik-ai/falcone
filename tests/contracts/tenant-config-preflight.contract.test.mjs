@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import SwaggerParser from '@apidevtools/swagger-parser';
 
-const CONTRACT_PATH = resolve('specs/118-export-conflict-prechecks/contracts/tenant-config-preflight.json');
+const CONTRACT_PATH = resolve('tests/contracts/schemas/tenant-config-preflight.json');
 
 let document;
 

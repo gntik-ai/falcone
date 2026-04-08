@@ -1,12 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 const requiredFiles = [
-  'specs/us-prg-02-t01/spec.md',
-  'specs/us-prg-02-t01/plan.md',
-  'specs/us-prg-02-t01/research.md',
-  'specs/us-prg-02-t01/data-model.md',
-  'specs/us-prg-02-t01/quickstart.md',
-  'specs/us-prg-02-t01/tasks.md',
   'docs/tasks/us-prg-02-t01.md',
   'docs/adr/0002-postgresql-tenant-isolation.md',
   'docs/reference/postgresql/tenant-isolation-baseline.sql',
