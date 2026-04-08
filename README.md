@@ -1,10 +1,20 @@
-# in-falcone monorepo
+# In Falcone
 
-Bootstrap monorepo for the In Falcone platform.
+**In Falcone** is a self-hosted, multi-tenant Backend-as-a-Service (BaaS) platform that provides managed databases, identity, serverless functions, event streaming, and object storage — all deployed on your own Kubernetes or OpenShift infrastructure via a single Helm chart.
 
-## Scope of this bootstrap
+It organizes resources in a hierarchical model — platform, tenants, workspaces — with built-in plan governance, quota enforcement, and contextual authorization. Each workspace gets isolated PostgreSQL schemas (with RLS), MongoDB databases, Kafka topics, OpenWhisk namespaces, and S3 bucket paths, all provisioned automatically through an idempotent orchestration engine.
 
-This repository establishes the minimal working structure for:
+The platform ships with an APISIX API gateway (OIDC auth, rate limiting, idempotency, CORS), a Keycloak-based IAM layer with per-tenant realms, a React management console, realtime WebSocket subscriptions backed by CDC bridges, a full audit pipeline with correlation tracking, and Vault-based secret management via External Secrets Operator.
+
+Deployment is declarative and layered: choose a profile (all-in-one, standard, HA), an environment (dev, staging, prod), and a platform target (Kubernetes, OpenShift, air-gapped) — compose them as Helm value overlays and deploy.
+
+## Documentation
+
+Full documentation is available at **[gntik-ai.github.io/falcone](https://gntik-ai.github.io/falcone/)**.
+
+## Repository Structure
+
+This repository establishes the working structure for:
 
 - `apps/control-plane`: control plane backend surface
 - `apps/web-console`: web console frontend surface
