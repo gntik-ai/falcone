@@ -37,8 +37,7 @@ jobs:
           version: 10
 
       - name: Install dependencies
-        working-directory: docs-site
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build documentation
         working-directory: docs-site
