@@ -5,7 +5,8 @@ export default defineConfig({
   description: 'Multi-tenant Backend-as-a-Service platform — documentation',
   base: '/falcone/',
   head: [
-    ['meta', { name: 'theme-color', content: '#3451b2' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/falcone/favicon.svg' }],
+    ['meta', { name: 'theme-color', content: '#1B2D5B' }],
     ['meta', { name: 'og:type', content: 'website' }],
     ['meta', { name: 'og:title', content: 'In Falcone Docs' }],
     ['meta', { name: 'og:description', content: 'Multi-tenant BaaS platform documentation' }],
