@@ -9,16 +9,16 @@ This capability owns every authentication, authorization, and identity-administr
 - **Public REST endpoints**:
   - `/v1/auth` (`apps/control-plane/openapi/families/auth.openapi.json`) — `POST /v1/auth/access-checks`, `POST /v1/auth/login-sessions`, `DELETE /v1/auth/login-sessions/{sessionId}`, `POST /v1/auth/login-sessions/{sessionId}/refresh`, `POST /v1/auth/password-recovery-requests`, `POST /v1/auth/password-recovery-requests/{recoveryRequestId}/confirmations`, `POST /v1/auth/signups`, `GET /v1/auth/signups/policy`, `GET /v1/auth/signups/{registrationId}`, `POST /v1/auth/signups/{registrationId}/activation-decisions`, `GET /v1/auth/status-views/{statusViewId}`.
   - `/v1/iam` (`apps/control-plane/openapi/families/iam.openapi.json`) — realms (list / create / get / update / delete / set-status), realm clients (list / create / get / update / delete / set-status), realm roles (list / create / get / update / delete), realm client scopes (list / create / get / update / delete), realm users (list / create / get / update / delete / set-status / credential-resets), and per-tenant and per-workspace IAM activity (`GET /v1/iam/tenants/{tenantId}/activity`, `GET /v1/iam/workspaces/{workspaceId}/activity`).
+  - _(planned, per Q-IAM-03 resolution)_ — privilege-domain assignment management and scope-enforcement / privilege-domain denial query surfaces, currently served via the internal `/api/security/*` and `/api/workspaces/{workspaceId}/members/{memberId}/privilege-domains` paths through APISIX, will be promoted to `/v1/iam/...` operations in `iam.openapi.json` by a follow-up change proposal.
 - **Frontend pages**:
   - `LoginPage` → `/login`
   - `SignupPage` → `/signup`
   - `PendingActivationPage` → `/signup/pending-activation`
   - `ConsoleAuthPage` → `/console/auth`
   - `ConsoleServiceAccountsPage` → `/console/service-accounts`
-  - `ConsoleCapabilityCatalogPage` → _(no top-level console route in `apps/web-console/src/router.tsx`; rendered as an embedded sub-view via props — see Open question Q-IAM-02)_
-  - `ConsolePrivilegeDomainPage` → _(no top-level console route; embedded sub-view receiving `workspaceId`, `memberId` via props — see Q-IAM-04)_
-  - `ConsolePrivilegeDomainAuditPage` → _(no top-level console route; embedded sub-view — see Q-IAM-04)_
-  - `ConsoleScopeEnforcementPage` → _(no top-level console route; embedded sub-view receiving `isSuperadmin` via props — see Q-IAM-04)_
+  - `ConsolePrivilegeDomainPage` → _(missing route)_ — planned top-level route `/console/workspaces/:workspaceId/members/:memberId/privilege-domain` per Q-IAM-04 resolution; today rendered as an embedded sub-view receiving `workspaceId`, `memberId`, optional `memberName` via props.
+  - `ConsolePrivilegeDomainAuditPage` → _(missing route)_ — planned top-level console route per Q-IAM-04 resolution (exact path TBD); today rendered as an embedded sub-view.
+  - `ConsoleScopeEnforcementPage` → _(missing route)_ — planned top-level console route per Q-IAM-04 resolution (exact path TBD); today rendered as an embedded sub-view receiving `isSuperadmin` via props.
 - **Internal contracts**:
   - `services/internal-contracts/src/authorization-model.json` — the canonical security context, authorization-decision shape, ownership semantics, role/scope matrix, and context-propagation targets.
   - `services/internal-contracts/src/privilege-domain-assignment.schema.json`
@@ -34,8 +34,9 @@ This capability owns every authentication, authorization, and identity-administr
 - **PostgreSQL tables owned**:
   - `privilege_domain_assignments`, `privilege_domain_assignment_history`, `privilege_domain_denials`, and the `workspace_structural_admin_count` view (created by `services/provisioning-orchestrator/src/migrations/094-admin-data-privilege-separation.sql`).
   - `scope_enforcement_denials`, `endpoint_scope_requirements` (created by `services/provisioning-orchestrator/src/migrations/093-scope-enforcement.sql`).
+  - _No platform-DB tables are claimed for `/v1/auth/*` resources (login sessions, signups, password recovery)._ Per Q-IAM-05 resolution, these resources live entirely on the Keycloak side.
 - **Owned services**:
-  - `services/keycloak-config/` — currently contains only the `scopes/backup-*.yaml` files; see Open question Q-IAM-01. The substantive Keycloak adapter logic lives in `services/adapters/src/keycloak-admin.mjs` and is invoked by `services/provisioning-orchestrator` rather than by IAM directly.
+  - `services/keycloak-config/` — designated future home for Keycloak realm, client, role, scope, and protocol-mapper configuration (per Q-IAM-01 resolution). Today contains only an early-seed `scopes/backup-{audit,operations,scopes,status}.yaml` set; the substantive Keycloak admin logic still lives in `services/adapters/src/keycloak-admin.mjs` and is invoked by `services/provisioning-orchestrator`. Backfill of realm/client/role config into this directory is tracked as a follow-up.
 
 ## Behaviour
 
@@ -152,7 +153,7 @@ This capability owns every authentication, authorization, and identity-administr
 
 ## Cross-capability dependencies
 
-- `workspace-management` — service-account routes (`/v1/workspaces/{id}/service-accounts*`) and external-application routes (`/v1/workspaces/{id}/applications*`, including federation providers) live in the workspaces family. `ConsoleServiceAccountsPage` and `ConsoleAuthPage` consume those routes as cross-capability dependencies; IAM owns only the page mapping and the underlying identity semantics.
+- `workspace-management` — service-account routes (`/v1/workspaces/{id}/service-accounts*`) and external-application routes (`/v1/workspaces/{id}/applications*`, including federation providers) live in the workspaces family. `ConsoleServiceAccountsPage` and `ConsoleAuthPage` consume those routes as cross-capability dependencies; IAM owns only the page mapping and the underlying identity semantics. The workspace capability catalog (page `ConsoleCapabilityCatalogPage`) is owned by `workspace-management` per Q-IAM-02 resolution.
 - `tenant-lifecycle` — IAM activity is scoped to tenants (`/v1/iam/tenants/{tenantId}/activity`); tenant suspension/reactivation events drive the IAM access-evaluation behaviour described in REQ-IAM-08.
 - `observability-and-audit` — every IAM lifecycle event and every scope/privilege denial is consumed by the audit pipeline owned by OBS; IAM only emits, it does not store the long-term audit trail.
 - `gateway-and-public-surface` — the APISIX `access`-phase Lua plugin enforces scopes and privilege domains and is owned by GW; IAM provides the contract (`endpoint_scope_requirements`, `authorization-model.json`) and the denial schema.
@@ -167,12 +168,15 @@ This capability owns every authentication, authorization, and identity-administr
 - Plan and quota policy CRUD (`quota-and-billing`).
 - Secret distribution and rotation flows (`secret-management`).
 - Kafka topic creation, ACLs, and websocket session storage (`realtime-and-events`).
-- Workspace capability catalog (postgres-database / mongo-collection enablement) — see Q-IAM-02.
+- Workspace capability catalog (postgres-database / mongo-collection enablement, page `ConsoleCapabilityCatalogPage`) — `workspace-management` per Q-IAM-02 resolution.
+- Persistence of `/v1/auth/*` resources (login sessions, signups, password recovery requests) — Keycloak-side, not platform DB, per Q-IAM-05 resolution.
 
 ## Open questions
 
-- **Q-IAM-01.** `services/keycloak-config/` is asserted as IAM-owned by the catalog, but its only contents today are `scopes/backup-*.yaml` (four files declaring backup-related Keycloak scopes). The substantive Keycloak admin logic lives in `services/adapters/src/keycloak-admin.mjs`, which the catalog assigns to `data-services`. Decide whether (a) `services/keycloak-config/` is the future home for Keycloak realm/client config and the backup yaml is an early seed, or (b) the directory is misnamed and IAM should own a different path. The catalog mapping should be updated either way.
-- **Q-IAM-02.** `ConsoleCapabilityCatalogPage` is mapped to IAM by the catalog, but its test (`ConsoleCapabilityCatalogPage.test.tsx`) and its supporting contracts (`workspace-capability-catalog-response.json`, `workspace-capability-catalog-accessed-event.json`) describe a *workspace*-capability catalog (postgres-database / mongo-collection enablement, examples, enablement guides). Recommend reassigning this page to `workspace-management` and updating the catalog. If left in IAM, the spec would have to invent a behaviour the code does not implement.
-- **Q-IAM-03.** `ConsolePrivilegeDomainPage`, `ConsolePrivilegeDomainAuditPage`, and `ConsoleScopeEnforcementPage` call `/api/workspaces/{ws}/members/{mid}/privilege-domains`, `/api/security/privilege-domains/denials`, and `/api/security/scope-enforcement/denials`. None of these are registered in any `/v1/*` OpenAPI family. Decide whether to (a) promote them to `/v1/iam/...` (new operations in `iam.openapi.json`) or (b) document them as an internal-only `/api/security/*` surface served behind APISIX. Today the public OpenAPI does not describe them.
-- **Q-IAM-04.** `ConsolePrivilegeDomainPage`, `ConsolePrivilegeDomainAuditPage`, `ConsoleScopeEnforcementPage`, and `ConsoleCapabilityCatalogPage` exist in `apps/web-console/src/pages/` but are *not* mounted in `apps/web-console/src/router.tsx`. They are rendered as embedded sub-views with props (`workspaceId`, `memberId`, `isSuperadmin`, `fetcher`). Decide whether each should gain a top-level console route (e.g. `/console/workspaces/:wsId/members/:memberId/privilege-domain`) or whether the catalog should record them as "embedded view, no route".
-- **Q-IAM-05.** No PostgreSQL migration was found that creates tables for console login sessions, signups, or password recovery requests. The `/v1/auth/*` endpoints are documented and the contracts are defined, but the persistence layer for these resources is not present in `services/provisioning-orchestrator/src/migrations/`. Confirm where this state is stored (Keycloak-side vs platform DB) before declaring tables as IAM-owned in this spec.
+- _All five Q-IAM-* questions opened by the prior version of this spec were resolved by Andrea on 2026-05-06 and have been folded into the spec body and the Out-of-scope list:_
+  - **Q-IAM-01 — resolved.** `services/keycloak-config/` is the future home for Keycloak realm/client/role/scope configuration; current `scopes/backup-*.yaml` contents are an early seed.
+  - **Q-IAM-02 — resolved.** `ConsoleCapabilityCatalogPage` is reassigned to `workspace-management`. `CAPABILITY-CATALOG.md` still records this page under IAM and must be updated to reflect the new ownership.
+  - **Q-IAM-03 — resolved.** The privilege-domain assignment surface and the privilege-domain / scope-enforcement denial query surfaces will be promoted from the internal `/api/security/*` and `/api/workspaces/.../privilege-domains` paths to first-class operations under `/v1/iam/...` in `iam.openapi.json`. The promotion is a follow-up change proposal; until it lands, the front-end pages continue to call the internal `/api/*` paths.
+  - **Q-IAM-04 — resolved.** `ConsolePrivilegeDomainPage` will gain the top-level console route `/console/workspaces/:workspaceId/members/:memberId/privilege-domain`. `ConsolePrivilegeDomainAuditPage` and `ConsoleScopeEnforcementPage` will each gain a top-level console route as well (exact paths TBD in the change proposal).
+  - **Q-IAM-05 — resolved.** Console login sessions, signups, and password-recovery requests are persisted Keycloak-side; this spec does not claim platform-DB tables for them.
+- **Q-IAM-06 (new).** `CAPABILITY-CATALOG.md` currently still maps `ConsoleCapabilityCatalogPage` to `identity-and-access`; the catalog must be edited to move the page to `workspace-management` (Q-IAM-02 resolution) and to record the planned top-level routes for the three privilege-domain / scope-enforcement pages (Q-IAM-04 resolution). Without that edit, the catalog and this spec disagree on IAM's page list and the route validator (`validate:openspec-coverage`, when implemented) will fail.
