@@ -2,15 +2,18 @@
 
 > Output of prompt `01-onboard-and-discover` executed on 2026-05-05.
 > Updated on 2026-05-06 after Andrea resolved the eleven Q-CAT-* questions.
+> Updated on 2026-05-06 again, after Andrea resolved the five Q-IAM-* questions
+> raised during the identity-and-access spec round (page reassignment, planned
+> `/v1/iam/...` promotions, planned top-level console routes).
 > Pending human review before any spec is generated.
 
 ## Proposed capabilities
 
 | # | Slug | Prefix | One-liner | Owns route families | Owns pages | Owns services |
 | - | ---- | ------ | --------- | ------------------- | ---------- | ------------- |
-| 1 | identity-and-access | IAM | Authentication, sessions, IAM realms/users/clients/scopes, contextual authorization, privilege domains, scope enforcement, service-account credential lifecycle | `/v1/auth` (`auth.openapi.json`), `/v1/iam` (`iam.openapi.json`) | LoginPage, SignupPage, PendingActivationPage, ConsoleAuthPage, ConsoleServiceAccountsPage, ConsoleCapabilityCatalogPage, ConsolePrivilegeDomainPage, ConsolePrivilegeDomainAuditPage, ConsoleScopeEnforcementPage | `services/keycloak-config` |
+| 1 | identity-and-access | IAM | Authentication, sessions, IAM realms/users/clients/scopes, contextual authorization, privilege domains, scope enforcement, service-account credential lifecycle | `/v1/auth` (`auth.openapi.json`), `/v1/iam` (`iam.openapi.json`); planned per Q-IAM-03: promote the internal `/api/security/*` and `/api/workspaces/.../privilege-domains` paths to first-class operations under `/v1/iam/...` in `iam.openapi.json` | LoginPage, SignupPage, PendingActivationPage, ConsoleAuthPage, ConsoleServiceAccountsPage, ConsolePrivilegeDomainPage (planned route `/console/workspaces/:workspaceId/members/:memberId/privilege-domain`), ConsolePrivilegeDomainAuditPage (planned top-level console route, path TBD), ConsoleScopeEnforcementPage (planned top-level console route, path TBD) | `services/keycloak-config` (designated future home for Keycloak realm/client/role/scope config per Q-IAM-01; today contains only the early-seed `scopes/backup-*.yaml` set, while substantive Keycloak admin logic still lives in `services/adapters/src/keycloak-admin.mjs` and is invoked by `services/provisioning-orchestrator`) |
 | 2 | tenant-lifecycle | TEN | Tenant CRUD, memberships, invitations, ownership transfers, reactivation, purge, tenant configuration export/preflight/reprovision, tenant-scoped exports and storage-context, canonical entity model | `/v1/tenants` (`tenants.openapi.json`) | ConsoleTenantsPage, ConsoleMembersPage, ConsoleTenantConfigExportPage, ConsoleTenantConfigPreflightPage, ConsoleTenantConfigReprovisionPage | `services/provisioning-orchestrator` |
-| 3 | workspace-management | WSP | Workspace CRUD, workspace memberships, applications, federation providers, managed resources, workspace docs, workspace clone, service-account routing under workspaces | `/v1/workspaces` (`workspaces.openapi.json`) | ConsoleWorkspacesPage, ConsoleWorkspaceDashboardPage, ConsoleDocsPage | `services/workspace-docs-service` |
+| 3 | workspace-management | WSP | Workspace CRUD, workspace memberships, applications, federation providers, managed resources, workspace docs, workspace clone, service-account routing under workspaces, workspace capability catalog (postgres-database / mongo-collection enablement) | `/v1/workspaces` (`workspaces.openapi.json`) | ConsoleWorkspacesPage, ConsoleWorkspaceDashboardPage, ConsoleDocsPage, ConsoleCapabilityCatalogPage | `services/workspace-docs-service` |
 | 4 | data-services | DAT | PostgreSQL, MongoDB and S3-compatible object storage management plus tenant-scoped data CRUD, schemas, credentials, exports/imports | `/v1/postgres` (`postgres.openapi.json`), `/v1/mongo` (`mongo.openapi.json`), `/v1/storage` (`storage.openapi.json`) | ConsolePostgresPage, ConsoleMongoPage, ConsoleStoragePage | `services/adapters` |
 | 5 | functions-runtime | FN | OpenWhisk-backed functions, action versions, triggers (cron / Kafka / storage / HTTP), packages, rules, function secrets, activation logs | `/v1/functions` (`functions.openapi.json`) | ConsoleFunctionsPage | `services/scheduling-engine` |
 | 6 | realtime-and-events | RTM | Kafka topic management, CDC capture summaries, realtime websockets, event bridges, webhook delivery | `/v1/events` (`events.openapi.json`), `/v1/websockets` (`websockets.openapi.json`), `/v1/workspaces/{id}/pg-captures` (`pg-captures.openapi.json`), `/v1/tenants/{id}/pg-captures/summary` (`pg-capture-tenant-summary.openapi.json`), `/v1/realtime/workspaces/{id}/mongo-captures` (`mongo-captures.openapi.json`), `/v1/realtime/tenants/{id}/mongo-captures/summary` (`mongo-capture-tenant-summary.openapi.json`) | ConsoleKafkaPage, ConsoleRealtimePage | `services/event-gateway`, `services/realtime-gateway`, `services/pg-cdc-bridge`, `services/mongo-cdc-bridge`, `services/webhook-engine` |
@@ -99,7 +102,6 @@ Cross-cutting note: `services/internal-contracts/` is shared by every capability
 | PendingActivationPage | identity-and-access |
 | ConsoleAuthPage | identity-and-access |
 | ConsoleServiceAccountsPage | identity-and-access |
-| ConsoleCapabilityCatalogPage | identity-and-access |
 | ConsolePrivilegeDomainPage | identity-and-access |
 | ConsolePrivilegeDomainAuditPage | identity-and-access |
 | ConsoleScopeEnforcementPage | identity-and-access |
@@ -111,6 +113,7 @@ Cross-cutting note: `services/internal-contracts/` is shared by every capability
 | ConsoleWorkspacesPage | workspace-management |
 | ConsoleWorkspaceDashboardPage | workspace-management |
 | ConsoleDocsPage | workspace-management |
+| ConsoleCapabilityCatalogPage | workspace-management |
 | ConsolePostgresPage | data-services |
 | ConsoleMongoPage | data-services |
 | ConsoleStoragePage | data-services |
@@ -151,9 +154,17 @@ Cross-cutting note: `services/internal-contracts/` is shared by every capability
 - **Q-CAT-10 — Resolved.** `services/provisioning-orchestrator` belongs to **tenant-lifecycle** as the saga is for tenant creation; downstream workspace and data-service provisioning treat the saga as a cross-capability dependency.
 - **Q-CAT-11 — Resolved.** `services/webhook-engine` belongs to **realtime-and-events** as webhook delivery is event egress.
 
+## Resolved decisions (Q-IAM-* answered by Andrea on 2026-05-06 during the IAM spec round)
+
+- **Q-IAM-01 — Resolved.** `services/keycloak-config/` is the future home for Keycloak realm, client, role, scope, and protocol-mapper configuration. Current `scopes/backup-*.yaml` contents are an early seed; substantive Keycloak admin logic stays in `services/adapters/src/keycloak-admin.mjs` until the directory is backfilled.
+- **Q-IAM-02 — Resolved.** `ConsoleCapabilityCatalogPage` is reassigned from **identity-and-access** to **workspace-management**. The page is a workspace-capability catalog UI (postgres-database / mongo-collection enablement), not an IAM authorization-capability catalog. The catalog tables above reflect the move.
+- **Q-IAM-03 — Resolved.** Privilege-domain assignment management and the privilege-domain / scope-enforcement denial query surfaces — currently served via the internal `/api/security/*` and `/api/workspaces/{workspaceId}/members/{memberId}/privilege-domains` paths through APISIX — will be promoted to first-class operations under `/v1/iam/...` in `iam.openapi.json` by a follow-up change proposal. Until that lands, the IAM front-end pages continue to call the internal `/api/*` paths.
+- **Q-IAM-04 — Resolved.** Three IAM pages that today render only as embedded sub-views will gain top-level console routes: `ConsolePrivilegeDomainPage` → `/console/workspaces/:workspaceId/members/:memberId/privilege-domain`; `ConsolePrivilegeDomainAuditPage` → top-level console route, exact path TBD in the change proposal; `ConsoleScopeEnforcementPage` → top-level console route, exact path TBD in the change proposal.
+- **Q-IAM-05 — Resolved.** Console login sessions, signups, and password-recovery requests are persisted Keycloak-side; no platform-DB tables are claimed for `/v1/auth/*` resources in the IAM spec.
+
 ## Open questions
 
-- _None remaining._ All eleven Q-CAT-* questions were resolved on 2026-05-06. Two follow-up actions are tracked under Resolved decisions: the optional split of `platform.openapi.json` (Q-CAT-01) and the required creation of `backups.openapi.json` (Q-CAT-09).
+- _None remaining._ All eleven Q-CAT-* and all five Q-IAM-* questions were resolved on 2026-05-06. Open follow-up actions tracked under Resolved decisions: the optional split of `platform.openapi.json` (Q-CAT-01); the required creation of `backups.openapi.json` (Q-CAT-09); the `/v1/iam/...` promotion change proposal (Q-IAM-03); the new top-level console routes for the privilege-domain / scope-enforcement pages (Q-IAM-04); and the backfill of Keycloak realm/client/role/scope config under `services/keycloak-config/` (Q-IAM-01).
 
 ## Suggested next step
 
