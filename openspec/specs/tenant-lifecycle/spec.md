@@ -8,13 +8,13 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
 
 - **Public REST endpoints**:
   - `/v1/tenants` (`apps/control-plane/openapi/families/tenants.openapi.json`) — `GET /v1/tenants`, `POST /v1/tenants`, `GET /v1/tenants/{tenantId}`, `PUT /v1/tenants/{tenantId}`, `DELETE /v1/tenants/{tenantId}` (logical delete), `GET /v1/tenants/{tenantId}/dashboard`, `GET /v1/tenants/{tenantId}/effective-capabilities`, `POST /v1/tenants/{tenantId}/exports`, `POST /v1/tenants/{tenantId}/iam-access`, `GET /v1/tenants/{tenantId}/inventory`, invitations (`POST /invitations`, `GET /invitations/{invitationId}`, `POST /invitations/{invitationId}/acceptance`, `POST /invitations/{invitationId}/revocation`), memberships (`POST /memberships`, `GET /memberships/{tenantMembershipId}`), ownership transfers (`POST /ownership-transfers`, `GET /ownership-transfers/{ownershipTransferId}`, `POST /ownership-transfers/{ownershipTransferId}/acceptance`), `GET /v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}`, `POST /v1/tenants/{tenantId}/purge`, `POST /v1/tenants/{tenantId}/reactivation`, `GET /v1/tenants/{tenantId}/storage-context`, `POST /v1/tenants/{tenantId}/storage-context/credential-rotations`, `GET /v1/tenants/{tenantId}/workflow-jobs/{jobRef}`.
-  - _(today, but not in any `/v1/*` family)_ — the tenant-config admin surfaces consumed by the three `ConsoleTenantConfig*` pages: `GET /v1/admin/tenants/{tenantId}/config/export/domains`, `POST /v1/admin/tenants/{tenantId}/config/export`, `POST /v1/admin/tenants/{tenantId}/config/reprovision/preflight`, `POST /v1/admin/tenants/{tenantId}/config/reprovision/identifier-map`, `POST /v1/admin/tenants/{tenantId}/config/reprovision`. These are not registered in `tenants.openapi.json`. See **Q-TEN-01**.
+  - _(planned, per Q-TEN-01 resolution)_ — the tenant-config admin surfaces consumed today by the three `ConsoleTenantConfig*` pages will be promoted to first-class operations under `/v1/tenants/{tenantId}/config/...` in `tenants.openapi.json`. Today the pages call `GET /v1/admin/tenants/{tenantId}/config/export/domains`, `POST /v1/admin/tenants/{tenantId}/config/export`, `POST /v1/admin/tenants/{tenantId}/config/reprovision/preflight`, `POST /v1/admin/tenants/{tenantId}/config/reprovision/identifier-map`, `POST /v1/admin/tenants/{tenantId}/config/reprovision`. The promotion is a follow-up change proposal; until it lands, the pages continue to call the `/v1/admin/tenants/...` paths.
 - **Frontend pages**:
   - `ConsoleTenantsPage` → `/console/tenants`
   - `ConsoleMembersPage` → `/console/members`
-  - `ConsoleTenantConfigExportPage` → _(missing route)_ — embedded sub-view receiving `tenantId` via props; see **Q-TEN-02**.
-  - `ConsoleTenantConfigPreflightPage` → _(missing route)_ — embedded sub-view receiving `tenantId`, `userRole` via props; gated to `superadmin` and `sre` only; see **Q-TEN-02**.
-  - `ConsoleTenantConfigReprovisionPage` → _(missing route)_ — embedded sub-view receiving `tenantId`, `userRole` via props; gated to `superadmin` and `sre` only; see **Q-TEN-02**.
+  - `ConsoleTenantConfigExportPage` → _(missing route)_ — planned top-level route `/console/tenants/:tenantId/config/export` per Q-TEN-02 resolution; today rendered as an embedded sub-view receiving `tenantId` via props.
+  - `ConsoleTenantConfigPreflightPage` → _(missing route)_ — planned top-level route `/console/tenants/:tenantId/config/preflight` per Q-TEN-02 resolution; today rendered as an embedded sub-view receiving `tenantId`, `userRole` via props; gated to `superadmin` and `sre` only.
+  - `ConsoleTenantConfigReprovisionPage` → _(missing route)_ — planned top-level route `/console/tenants/:tenantId/config/reprovision` per Q-TEN-02 resolution; today rendered as an embedded sub-view receiving `tenantId`, `userRole` via props; gated to `superadmin` and `sre` only.
 - **Internal contracts**:
   - `services/internal-contracts/src/domain-model.json` — canonical entity model, lifecycle states, transitions, lifecycle event vocabulary, effective-capability-resolution shape.
   - `services/internal-contracts/src/saga-contract.json` — saga envelope used by the provisioning orchestrator.
@@ -22,7 +22,7 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
   - `services/internal-contracts/src/console-workflow-invocation.json`, `services/internal-contracts/src/console-workflow-job-status.json`, `services/internal-contracts/src/console-workflow-audit-policy.json` — workflow invocation contracts emitted by the orchestrator.
   - `services/internal-contracts/src/intervention-notification-event.json`, `services/internal-contracts/src/manual-intervention-required-event.json`, `services/internal-contracts/src/operation-cancel-event.json`, `services/internal-contracts/src/operation-recovery-event.json`, `services/internal-contracts/src/operation-retry-event.json`, `services/internal-contracts/src/operation-timeout-event.json`, `services/internal-contracts/src/retry-override-event.json`, `services/internal-contracts/src/idempotency-dedup-event.json`, `services/internal-contracts/src/failure-classified-event.json` — long-running provisioning lifecycle envelopes.
 - **Kafka topics emitted**:
-  - Tenant lifecycle events declared in `services/internal-contracts/src/domain-model.json`: `tenant.created`, `tenant.activated`, `tenant.suspended`, `tenant.soft_deleted`; `tenant_membership.{created,activated,suspended,soft_deleted}`; `invitation.{created,activated,suspended,soft_deleted}`. See **Q-TEN-04** for emission ownership.
+  - Canonical tenant lifecycle events declared in `services/internal-contracts/src/domain-model.json`: `tenant.created`, `tenant.activated`, `tenant.suspended`, `tenant.soft_deleted`; `tenant_membership.{created,activated,suspended,soft_deleted}`; `invitation.{created,activated,suspended,soft_deleted}`. These are required emissions per REQ-TEN-09; the implementation gap is tracked under Q-TEN-05.
   - Tenant-config admin events emitted by `services/provisioning-orchestrator`: `console.config.export.completed` (`config-export-events.mjs`), `console.config.reprovision.completed`, `console.config.reprovision.identifier_map.generated` (`config-reprovision-events.mjs`), `console.config.preflight.completed` (`config-preflight-events.mjs`).
   - Async-operation lifecycle events (`operation-cancel-event.json`, `operation-recovery-event.json`, `operation-retry-event.json`, `operation-timeout-event.json`, etc.) emitted by saga steps.
 - **Kafka topics consumed**:
@@ -91,16 +91,16 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
 **Trace.**
 `apps/control-plane/openapi/families/tenants.openapi.json`, `apps/control-plane/src/tenant-management.mjs`, `services/internal-contracts/src/domain-model.json`, `docs/adr/0007-membership-plan-governance.md`, `docs/tasks/us-ten-04.md`.
 
-### REQ-TEN-05 — Tenant configuration export, pre-flight, and reprovision (admin surfaces)
+### REQ-TEN-05 — Tenant configuration export, pre-flight, and reprovision
 
-**Description.** Operators move a tenant's functional configuration between environments through three admin endpoints — export, pre-flight conflict check, and reprovision — all gated to `superadmin` or `sre`. Reprovision runs are mutually exclusive per tenant (lock) and are auditable.
+**Description.** Operators move a tenant's functional configuration between environments through three endpoints — export, pre-flight conflict check, and reprovision — all gated to `superadmin` or `sre`. Reprovision runs are mutually exclusive per tenant (lock) and are auditable. The endpoints are planned to live under `/v1/tenants/{tenantId}/config/...` (Q-TEN-01 resolution) and are served today by the `/v1/admin/tenants/.../config/...` admin paths.
 
 **Acceptance criteria.**
 
-- `POST /v1/tenants/{tenantId}/exports` (and the admin variant `POST /v1/admin/tenants/{tenantId}/config/export`) returns a recovery-oriented functional configuration export; partial successes are reported with HTTP 207 and surface the per-domain breakdown to the console.
-- `POST /v1/admin/tenants/{tenantId}/config/reprovision/preflight` analyses an artifact, classifies conflicts at risk levels `low | medium | high | critical`, and either returns a report or asks the operator to confirm an identifier map proposal before re-running.
-- `POST /v1/admin/tenants/{tenantId}/config/reprovision` honours `dry_run`, refuses to run when another reprovision lock is `active` for the same tenant, and writes one audit row per run with `result_status` ∈ {`success`, `partial`, `failed`, `blocked`, `dry_run`}.
-- The console pages are gated client-side: `ConsoleTenantConfigPreflightPage` and `ConsoleTenantConfigReprovisionPage` render a forbidden message when the principal's role is not `superadmin` or `sre`.
+- `POST /v1/tenants/{tenantId}/exports` (and the admin variant `POST /v1/admin/tenants/{tenantId}/config/export` until the Q-TEN-01 promotion lands) returns a recovery-oriented functional configuration export; partial successes are reported with HTTP 207 and surface the per-domain breakdown to the console.
+- The pre-flight endpoint analyses an artifact, classifies conflicts at risk levels `low | medium | high | critical`, and either returns a report or asks the operator to confirm an identifier map proposal before re-running.
+- The reprovision endpoint honours `dry_run`, refuses to run when another reprovision lock is `active` for the same tenant, and writes one audit row per run with `result_status` ∈ {`success`, `partial`, `failed`, `blocked`, `dry_run`}.
+- `ConsoleTenantConfigPreflightPage` and `ConsoleTenantConfigReprovisionPage` render a forbidden message when the principal's role is not `superadmin` or `sre`.
 
 **Trace.**
 `apps/control-plane/openapi/families/tenants.openapi.json`, `services/provisioning-orchestrator/src/migrations/115-functional-config-export.sql`, `services/provisioning-orchestrator/src/migrations/117-tenant-config-reprovision.sql`, `services/provisioning-orchestrator/src/migrations/118-config-preflight.sql`, `apps/web-console/src/api/configExportApi.ts`, `apps/web-console/src/api/configPreflightApi.ts`, `apps/web-console/src/api/configReprovisionApi.ts`, `apps/web-console/src/pages/ConsoleTenantConfigExportPage.tsx`, `apps/web-console/src/pages/ConsoleTenantConfigPreflightPage.tsx`, `apps/web-console/src/pages/ConsoleTenantConfigReprovisionPage.tsx`.
@@ -135,7 +135,7 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
 
 ### REQ-TEN-08 — Console operator entry points for tenants and members
 
-**Description.** Two console pages give operators their primary entry point into a tenant: the catalog of tenants (with create wizard) and the membership lens that surfaces IAM realm users and roles for the active tenant.
+**Description.** Two console pages give operators their primary entry point into a tenant: the catalog of tenants (with create wizard) and the membership lens that surfaces IAM realm users and roles for the active tenant. The membership lens is owned by `tenant-lifecycle` per Q-TEN-03 resolution: it is a tenant-scoped view that consumes IAM as a cross-capability dependency.
 
 **Acceptance criteria.**
 
@@ -147,6 +147,20 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
 **Trace.**
 `apps/web-console/src/pages/ConsoleTenantsPage.tsx`, `apps/web-console/src/pages/ConsoleTenantsPage.test.tsx`, `apps/web-console/src/pages/ConsoleMembersPage.tsx`, `apps/web-console/src/pages/ConsoleMembersPage.test.tsx`.
 
+### REQ-TEN-09 — Canonical tenant lifecycle event emission
+
+**Description.** Every tenant, tenant-membership, and invitation state transition MUST emit the canonical lifecycle event declared in the core domain model. The emission is required by ADR 0006 § "Lifecycle rules" and is the contract that audit, observability, billing, and downstream provisioning consumers rely on.
+
+**Acceptance criteria.**
+
+- Every successful tenant transition (`create`, `activate`, `suspend`, `soft_delete`) emits exactly one event with `event_type` ∈ {`tenant.created`, `tenant.activated`, `tenant.suspended`, `tenant.soft_deleted`} carrying tenant binding, correlation id, actor, and before/after state, per `services/internal-contracts/src/domain-model.json`.
+- Every successful tenant-membership transition emits exactly one of `tenant_membership.{created,activated,suspended,soft_deleted}` with the same envelope shape; workspace-membership counterparts are emitted by the `workspace-management` capability and remain tenant-safe.
+- Every successful invitation transition emits exactly one of `invitation.{created,activated,suspended,soft_deleted}`; revoked or expired invitations emit `invitation.suspended` and cannot mint memberships afterwards.
+- Failed transitions DO NOT emit a lifecycle event; failures are recorded through the saga / async-operation surfaces (REQ-TEN-06) instead, so a downstream consumer that observes a `tenant.activated` event can rely on the activation having actually taken effect.
+
+**Trace.**
+`services/internal-contracts/src/domain-model.json`, `docs/adr/0006-core-domain-entity-model.md`, `docs/adr/0007-membership-plan-governance.md`.
+
 ## Cross-capability dependencies
 
 - `identity-and-access` — tenant activation provisions the per-tenant Keycloak `identityContext` (platform realm reference, tenant realm strategy, console realm) via `services/adapters/src/keycloak-admin.mjs`. `ConsoleMembersPage` consumes `/v1/iam/realms/.../users` and `/v1/iam/realms/.../roles` to render the membership view; tenant IAM access toggle (`/v1/tenants/{id}/iam-access`) drives the IAM lifecycle events owned by IAM.
@@ -154,7 +168,7 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
 - `quota-and-billing` — every tenant references one plan, one quota policy, and one deployment profile from QTA; effective-capability resolution intersects QTA's plan and quota state with the tenant's deployment-profile bindings.
 - `observability-and-audit` — every tenant lifecycle event, membership change, invitation transition, ownership transfer, IAM access toggle, and tenant-config admin run is consumed by the audit pipeline owned by OBS; tenant-config audit tables are read by OBS query/export surfaces.
 - `secret-management` — tenant-scoped storage credentials and provisioning bootstrap secrets are distributed via External Secrets Operator + Vault; the orchestrator never stores secret material in tenant tables.
-- `gateway-and-public-surface` — long-running tenant operations surface through the cross-capability operations console (`ConsoleOperationsPage`, `ConsoleOperationDetailPage`); the gateway also serves the admin `/v1/admin/tenants/.../config/*` paths today (see Q-TEN-01).
+- `gateway-and-public-surface` — long-running tenant operations surface through the cross-capability operations console (`ConsoleOperationsPage`, `ConsoleOperationDetailPage`); the gateway also serves the `/v1/admin/tenants/.../config/*` paths until the Q-TEN-01 promotion lands.
 - `data-services` — provisioning bootstraps tenant-scoped Postgres / Mongo / object-storage namespaces through the adapters owned by DAT.
 
 ## Out of scope
@@ -169,7 +183,9 @@ This capability owns the tenant as the root business boundary in In Falcone: ten
 
 ## Open questions
 
-- **Q-TEN-01.** The three `ConsoleTenantConfig*` pages call `/v1/admin/tenants/{tenantId}/config/{export,reprovision/preflight,reprovision/identifier-map,reprovision}` which are *not* registered in `tenants.openapi.json` (or in any other `/v1/*` family). This is the same situation as Q-IAM-03. Decide whether to (a) promote them to first-class operations under `/v1/tenants/{tenantId}/config/...` in `tenants.openapi.json`, or (b) document them as an internal-only `/v1/admin/tenants/...` admin surface served behind APISIX. Today the public OpenAPI does not describe them.
-- **Q-TEN-02.** `ConsoleTenantConfigExportPage`, `ConsoleTenantConfigPreflightPage`, and `ConsoleTenantConfigReprovisionPage` are present in `apps/web-console/src/pages/` but are not mounted in `apps/web-console/src/router.tsx`. They render as embedded sub-views with `tenantId` (and `userRole`) props. Decide whether each should gain a top-level console route (e.g. `/console/tenants/:tenantId/config/export`, `/console/tenants/:tenantId/config/preflight`, `/console/tenants/:tenantId/config/reprovision`) — same shape as the IAM Q-IAM-04 resolution.
-- **Q-TEN-03.** `ConsoleMembersPage` is mapped to `tenant-lifecycle` by the catalog but its primary data source is `/v1/iam/realms/{realmId}/users` and `/v1/iam/realms/{realmId}/roles` — both owned by `identity-and-access`. `/v1/tenants/{tenantId}/memberships` is not consumed by the page today. Confirm whether the page belongs to TEN as a "tenant member view that consumes IAM" (current placement), or whether it should move to IAM as a tenant-scoped IAM lens. The catalog row should reflect the answer.
-- **Q-TEN-04.** Tenant lifecycle event types (`tenant.created`, `tenant.activated`, `tenant.suspended`, `tenant.soft_deleted`, plus the parallel `tenant_membership.*` and `invitation.*` series) are declared in `services/internal-contracts/src/domain-model.json` but I did not find a backend module that explicitly emits them on `/v1/tenants/...` requests. The orchestrator emits the *config-export / preflight / reprovision* events, but the canonical tenant lifecycle events appear to be a contract-only baseline. Confirm where (and whether) they are emitted today, so the spec accurately claims the topics or marks them as planned.
+- _All four Q-TEN-* questions opened by the prior version of this spec were resolved by Andrea on 2026-05-06 and have been folded into the spec body and the Surfaces list:_
+  - **Q-TEN-01 — resolved.** The tenant-config admin paths will be promoted to first-class operations under `/v1/tenants/{tenantId}/config/...` in `tenants.openapi.json`. Until that change proposal lands, the `ConsoleTenantConfig*` pages continue to call the `/v1/admin/tenants/.../config/...` paths described in Surfaces.
+  - **Q-TEN-02 — resolved.** The three `ConsoleTenantConfig*` pages will gain the top-level console routes `/console/tenants/:tenantId/config/{export,preflight,reprovision}` (Surfaces records them as `(missing route)` until the change proposal lands).
+  - **Q-TEN-03 — resolved.** `ConsoleMembersPage` keeps its current placement in `tenant-lifecycle`. It is framed as "a tenant-scoped membership view that consumes IAM realm users and roles as a cross-capability dependency" (REQ-TEN-08).
+  - **Q-TEN-04 — resolved.** The canonical tenant / membership / invitation lifecycle events declared in `domain-model.json` MUST be emitted on every successful state transition. The spec records this requirement as **REQ-TEN-09**, so any module that owns the lifecycle write path (today the candidate is the provisioning orchestrator together with the future tenant-manager handler) must comply with it. The implementation gap is tracked as **Q-TEN-05** below.
+- **Q-TEN-05 (new — implementation gap).** REQ-TEN-09 mandates emission of the canonical tenant / membership / invitation lifecycle events, but I did not find a backend module that explicitly emits them on `/v1/tenants/...` write paths. The provisioning orchestrator emits the *config-* events (`console.config.export.completed`, etc.) and the saga-level lifecycle events (`operation-cancel`, `operation-recovery`, etc.), and `apps/control-plane/src/tenant-management.mjs` is a contract-registry surface (no Fastify handlers, no Kafka producer wiring). A change proposal is required to (a) decide which module owns the emission (provisioning orchestrator, a new `tenant-manager` handler in the control plane, or both, with the orchestrator emitting saga-internal events and the handler emitting business-level lifecycle events on terminal saga success), (b) wire up the emission, and (c) add validators / contract tests that assert REQ-TEN-09 holds. This is the IAM-side counterpart to ensuring lifecycle traceability is end-to-end and not only contract-only.
