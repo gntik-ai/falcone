@@ -11,3 +11,5 @@ charts/in-falcone/values/local.yaml
 .codex/
 .specify/
 specs/
+!openspec/specs/
+!openspec/specs/**
