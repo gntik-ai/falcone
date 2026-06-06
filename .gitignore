@@ -13,3 +13,6 @@ charts/in-falcone/values/local.yaml
 specs/
 !openspec/specs/
 !openspec/specs/**
+# OpenSpec change deltas live under each change's specs/ — keep them tracked too
+!openspec/changes/**/specs/
+!openspec/changes/**/specs/**
