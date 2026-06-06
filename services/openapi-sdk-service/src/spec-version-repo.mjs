@@ -28,7 +28,10 @@ export async function insertNewSpec(pool, spec) {
   const client = typeof pool.connect === 'function' ? await pool.connect() : pool;
   try {
     await client.query('BEGIN');
-    await client.query('UPDATE workspace_openapi_versions SET is_current = FALSE WHERE workspace_id = $1 AND is_current = TRUE', [spec.workspaceId]);
+    await client.query(
+      'UPDATE workspace_openapi_versions SET is_current = FALSE WHERE workspace_id = $1 AND tenant_id = $2 AND is_current = TRUE',
+      [spec.workspaceId, spec.tenantId]
+    );
     const inserted = await client.query(
       `INSERT INTO workspace_openapi_versions
        (tenant_id, workspace_id, spec_version, content_hash, format_json, format_yaml, capability_tags, is_current)
@@ -46,14 +49,14 @@ export async function insertNewSpec(pool, spec) {
   }
 }
 
-export async function getSpecHistory(pool, workspaceId, limit = 10) {
+export async function getSpecHistory(pool, workspaceId, tenantId, limit = 10) {
   const result = await pool.query(
     `SELECT id, tenant_id, workspace_id, spec_version, content_hash, capability_tags, is_current, created_at
        FROM workspace_openapi_versions
-      WHERE workspace_id = $1
+      WHERE workspace_id = $1 AND tenant_id = $2
       ORDER BY created_at DESC
-      LIMIT $2`,
-    [workspaceId, limit]
+      LIMIT $3`,
+    [workspaceId, tenantId, limit]
   );
 
   return result.rows.map((row) => ({
