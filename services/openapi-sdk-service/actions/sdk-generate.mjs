@@ -1,10 +1,6 @@
-import pg from 'pg';
-import { Kafka } from 'kafkajs';
 import { config } from '../src/config.mjs';
 import { getCurrentSpec } from '../src/spec-version-repo.mjs';
 import { upsertSdkPackage, updateSdkPackageStatus, getSdkPackage } from '../src/sdk-package-repo.mjs';
-import { buildSdk } from '../src/sdk-builder.mjs';
-import { uploadSdkArtefact } from '../src/sdk-storage.mjs';
 import { emitSdkGenerationCompleted } from '../src/spec-audit.mjs';
 
 const SUPPORTED_LANGUAGES = new Set(['typescript', 'python']);
@@ -25,6 +21,13 @@ function parseBody(params) {
 }
 
 async function handleStatusCheck(params, pool) {
+  const headers = params.__ow_headers ?? {};
+  const tenantId = headers['x-auth-tenant-id'] ?? headers['x-tenant-id'];
+
+  if (!tenantId) {
+    return { statusCode: 401, body: { code: 'UNAUTHORIZED', message: 'Authentication required' } };
+  }
+
   const workspaceId = extractWorkspaceId(params.__ow_path);
   const language = extractLanguage(params.__ow_path);
 
@@ -32,7 +35,7 @@ async function handleStatusCheck(params, pool) {
     return { statusCode: 404, body: { code: 'SDK_NOT_FOUND', message: 'Unknown SDK language' } };
   }
 
-  const pkg = await getSdkPackage(pool, workspaceId, language);
+  const pkg = await getSdkPackage(pool, workspaceId, language, tenantId);
   if (!pkg) {
     return { statusCode: 404, body: { code: 'SDK_NOT_FOUND', message: 'No SDK package found' } };
   }
@@ -70,6 +73,10 @@ async function handleGenerateRequest(params, pool, kafka, dependencies = {}) {
     return { statusCode: 404, body: { code: 'SPEC_NOT_FOUND', message: 'No current spec found' } };
   }
 
+  if (spec.tenantId !== tenantId) {
+    return { statusCode: 403, body: { code: 'FORBIDDEN', message: 'Workspace tenant mismatch' } };
+  }
+
   const pkg = await upsertSdkPackage(pool, { tenantId, workspaceId, language, specVersion: spec.specVersion });
   if (pkg.status === 'ready' && pkg.downloadUrl) {
     return {
@@ -89,8 +96,8 @@ async function handleGenerateRequest(params, pool, kafka, dependencies = {}) {
   await updateSdkPackageStatus(pool, pkg.id, { status: 'building' });
 
   try {
-    const builder = dependencies.buildSdk ?? buildSdk;
-    const storage = dependencies.uploadSdkArtefact ?? uploadSdkArtefact;
+    const builder = dependencies.buildSdk ?? (await import('../src/sdk-builder.mjs')).buildSdk;
+    const storage = dependencies.uploadSdkArtefact ?? (await import('../src/sdk-storage.mjs')).uploadSdkArtefact;
     const built = await builder(spec.formatJson, language, workspaceId, spec.specVersion);
     const uploaded = await storage({ ...built, workspaceId, language, specVersion: spec.specVersion });
     await updateSdkPackageStatus(pool, pkg.id, { status: 'ready', downloadUrl: uploaded.downloadUrl, urlExpiresAt: uploaded.urlExpiresAt });
@@ -114,8 +121,19 @@ async function handleGenerateRequest(params, pool, kafka, dependencies = {}) {
 }
 
 export async function main(params, dependencies = {}) {
-  const pool = dependencies.pool ?? new pg.Pool({ connectionString: config.pgConnectionString });
-  const kafka = dependencies.kafka ?? new Kafka({ brokers: config.kafkaBrokers, clientId: config.kafkaClientId });
+  let pool = dependencies.pool;
+  let kafka = dependencies.kafka;
+
+  if (!pool) {
+    const pg = (await import('pg')).default;
+    pool = new pg.Pool({ connectionString: config.pgConnectionString });
+  }
+
+  if (!kafka) {
+    const { Kafka } = await import('kafkajs');
+    kafka = new Kafka({ brokers: config.kafkaBrokers, clientId: config.kafkaClientId });
+  }
+
   const method = params.__ow_method?.toUpperCase();
   if (method === 'GET') return handleStatusCheck(params, pool);
   if (method === 'POST') return handleGenerateRequest(params, pool, kafka, dependencies);
