@@ -33,7 +33,7 @@ export async function main(params, dependencies = {}) {
     ...assembled
   });
 
-  await markStaleSdkPackages(pool, params.workspaceId, assembled.specVersion);
+  await markStaleSdkPackages(pool, params.workspaceId, assembled.specVersion, params.tenantId);
 
   await emitSpecUpdated(kafka, {
     workspaceId: params.workspaceId,

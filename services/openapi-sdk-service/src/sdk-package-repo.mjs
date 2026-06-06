@@ -2,9 +2,9 @@ export async function upsertSdkPackage(pool, { tenantId, workspaceId, language, 
   const existing = await pool.query(
     `SELECT id, status, download_url, url_expires_at, error_message, spec_version
        FROM workspace_sdk_packages
-      WHERE workspace_id = $1 AND language = $2 AND spec_version = $3
+      WHERE workspace_id = $1 AND language = $2 AND spec_version = $3 AND tenant_id = $4
       LIMIT 1`,
-    [workspaceId, language, specVersion]
+    [workspaceId, language, specVersion, tenantId]
   );
 
   if (existing.rows[0]) {
@@ -41,14 +41,14 @@ export async function updateSdkPackageStatus(pool, id, { status, downloadUrl = n
   );
 }
 
-export async function getSdkPackage(pool, workspaceId, language) {
+export async function getSdkPackage(pool, workspaceId, language, tenantId) {
   const result = await pool.query(
     `SELECT id, tenant_id, workspace_id, language, spec_version, status, download_url, url_expires_at, error_message, created_at, updated_at
        FROM workspace_sdk_packages
-      WHERE workspace_id = $1 AND language = $2
+      WHERE workspace_id = $1 AND language = $2 AND tenant_id = $3
       ORDER BY updated_at DESC
       LIMIT 1`,
-    [workspaceId, language]
+    [workspaceId, language, tenantId]
   );
 
   const row = result.rows[0];
@@ -69,11 +69,11 @@ export async function getSdkPackage(pool, workspaceId, language) {
   };
 }
 
-export async function markStaleSdkPackages(pool, workspaceId, currentSpecVersion) {
+export async function markStaleSdkPackages(pool, workspaceId, currentSpecVersion, tenantId) {
   await pool.query(
     `UPDATE workspace_sdk_packages
         SET status = 'stale', updated_at = now()
-      WHERE workspace_id = $1 AND status = 'ready' AND spec_version <> $2`,
-    [workspaceId, currentSpecVersion]
+      WHERE workspace_id = $1 AND status = 'ready' AND spec_version <> $2 AND tenant_id = $3`,
+    [workspaceId, currentSpecVersion, tenantId]
   );
 }
