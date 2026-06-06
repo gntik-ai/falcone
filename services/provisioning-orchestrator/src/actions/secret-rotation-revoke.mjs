@@ -1,4 +1,5 @@
 import * as repo from '../repositories/secret-rotation-repo.mjs';
+import { assertSecretRotationOwnership } from './secret-path-ownership.mjs';
 
 function allowed(auth, domain, tenantId) {
   const roles = auth?.roles ?? [];
@@ -22,10 +23,16 @@ export async function main(params = {}) {
   const { auth, secretPath, domain, tenantId, vaultVersion, justification, forceRevoke = false } = params;
   if (!allowed(auth, domain, tenantId)) return { error: { code: 'FORBIDDEN', status: 403 } };
 
-  const target = await dataRepo.getVersionByVaultVersion(db, { secretPath, vaultVersion });
+  // Bind the operated secretPath to the verified caller tenant BEFORE any read or
+  // Vault delete (bug-001: cross-tenant revoke).
+  const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
+  if (ownership.error) return { error: ownership.error };
+  const ownerTenantId = ownership.ownerTenantId;
+
+  const target = await dataRepo.getVersionByVaultVersion(db, { secretPath, vaultVersion, tenantId: ownerTenantId });
   if (!target) return { error: { code: 'VERSION_NOT_FOUND', status: 404 } };
 
-  const allValid = [await dataRepo.getActiveVersion(db, secretPath), await dataRepo.getGraceVersion(db, secretPath)].filter(Boolean);
+  const allValid = [await dataRepo.getActiveVersion(db, secretPath, ownerTenantId), await dataRepo.getGraceVersion(db, secretPath, ownerTenantId)].filter(Boolean);
   const otherValid = allValid.filter((row) => row.id !== target.id);
   if (otherValid.length === 0 && forceRevoke !== true) {
     return { error: { code: 'REVOKE_LEAVES_NO_ACTIVE_VERSION', status: 409 } };
@@ -33,7 +40,7 @@ export async function main(params = {}) {
 
   await db.query('BEGIN');
   try {
-    await dataRepo.revokeVersion(db, { id: target.id, justification, actorId: auth.sub });
+    await dataRepo.revokeVersion(db, { id: target.id, justification, actorId: auth.sub, tenantId: ownerTenantId });
     await dataRepo.insertRotationEvent(db, {
       secretPath,
       domain,
