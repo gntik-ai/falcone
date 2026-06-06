@@ -27,7 +27,7 @@ function createPool() {
         return { rows: row ? [row] : [] };
       }
       if (sql.includes('ORDER BY created_at DESC')) {
-        return { rows: state.rows.filter((item) => item.workspace_id === params[0]).slice(0, params[1] ?? state.rows.length) };
+        return { rows: state.rows.filter((item) => item.workspace_id === params[0] && item.tenant_id === params[1]).slice(0, params[2] ?? state.rows.length) };
       }
       throw new Error(`Unhandled SQL: ${sql}`);
     },
@@ -45,7 +45,7 @@ test('insertNewSpec flips previous current record', async () => {
   const pool = createPool();
   await insertNewSpec(pool, { tenantId: 'tenant_1', workspaceId: 'ws_1', specVersion: '1.0.0', contentHash: 'sha256:a', formatJson: '{}', formatYaml: '---', capabilityTags: ['storage'] });
   await insertNewSpec(pool, { tenantId: 'tenant_1', workspaceId: 'ws_1', specVersion: '1.1.0', contentHash: 'sha256:b', formatJson: '{}', formatYaml: '---', capabilityTags: ['storage', 'authentication'] });
-  const history = await getSpecHistory(pool, 'ws_1', 10);
+  const history = await getSpecHistory(pool, 'ws_1', 'tenant_1', 10);
   assert.equal(history[0].isCurrent, true);
   assert.equal(history[1].isCurrent, false);
 });
@@ -60,7 +60,7 @@ test('getSpecHistory returns rows ordered descending', async () => {
   const pool = createPool();
   await insertNewSpec(pool, { tenantId: 'tenant_1', workspaceId: 'ws_1', specVersion: '1.0.0', contentHash: 'sha256:a', formatJson: '{}', formatYaml: '---', capabilityTags: [] });
   await insertNewSpec(pool, { tenantId: 'tenant_1', workspaceId: 'ws_1', specVersion: '1.0.1', contentHash: 'sha256:b', formatJson: '{}', formatYaml: '---', capabilityTags: [] });
-  const history = await getSpecHistory(pool, 'ws_1', 10);
+  const history = await getSpecHistory(pool, 'ws_1', 'tenant_1', 10);
   assert.equal(history[0].specVersion, '1.0.1');
   assert.equal(history[1].specVersion, '1.0.0');
 });
