@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import * as repo from '../repositories/secret-rotation-repo.mjs';
+import { assertSecretRotationOwnership } from './secret-path-ownership.mjs';
 import { SECRET_ROTATION_DEFAULT_GRACE_SECONDS, SECRET_ROTATION_MAX_GRACE_SECONDS, SECRET_ROTATION_MIN_GRACE_SECONDS } from '../models/secret-version-state.mjs';
 
 function allowed(auth, domain, tenantId) {
@@ -26,13 +27,20 @@ export async function main(params = {}) {
   const gracePeriodSeconds = params.gracePeriodSeconds ?? SECRET_ROTATION_DEFAULT_GRACE_SECONDS;
 
   if (!allowed(auth, domain, tenantId)) return { error: { code: 'FORBIDDEN', status: 403 } };
+
+  // Bind the operated secretPath to the verified caller tenant BEFORE any read,
+  // state mutation, or Vault write (bug-001: cross-tenant rotation).
+  const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
+  if (ownership.error) return { error: ownership.error };
+  const ownerTenantId = ownership.ownerTenantId;
+
   if (!Number.isInteger(gracePeriodSeconds) || gracePeriodSeconds < SECRET_ROTATION_MIN_GRACE_SECONDS || gracePeriodSeconds > SECRET_ROTATION_MAX_GRACE_SECONDS) {
     return { error: { code: 'INVALID_GRACE_PERIOD', status: 422 } };
   }
 
   const client = db;
-  const previousActive = await dataRepo.getActiveVersion(client, secretPath);
-  const existingGrace = await dataRepo.getGraceVersion(client, secretPath);
+  const previousActive = await dataRepo.getActiveVersion(client, secretPath, ownerTenantId);
+  const existingGrace = await dataRepo.getGraceVersion(client, secretPath, ownerTenantId);
   const secretName = secretPath.split('/').pop();
   const rotationId = crypto.randomUUID();
 
@@ -41,7 +49,7 @@ export async function main(params = {}) {
     if (existingGrace) {
       await dataRepo.expireGraceVersion(client, { id: existingGrace.id, actorId: auth.sub });
     }
-    const graced = previousActive ? await dataRepo.transitionToGrace(client, { secretPath, gracePeriodSeconds, initiatedBy: auth.sub }) : null;
+    const graced = previousActive ? await dataRepo.transitionToGrace(client, { secretPath, gracePeriodSeconds, initiatedBy: auth.sub, tenantId: ownerTenantId }) : null;
     let inserted = await dataRepo.insertSecretVersion(client, {
       secretPath,
       domain,
