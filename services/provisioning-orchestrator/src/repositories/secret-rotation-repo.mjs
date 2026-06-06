@@ -17,28 +17,36 @@ export async function insertSecretVersion(client, record) {
   );
 }
 
-export async function getActiveVersion(client, secretPath) {
-  return queryOne(client, `SELECT * FROM secret_version_states WHERE secret_path=$1 AND state='active' ORDER BY activated_at DESC LIMIT 1`, [secretPath]);
+// Authoritative owner of a secret path, recorded in `secret_metadata`.
+// Returns `{ domain, tenant_id }` or null when no owner row exists.
+export async function getSecretOwner(client, secretPath) {
+  return queryOne(client, `SELECT domain, tenant_id FROM secret_metadata WHERE secret_path=$1 ORDER BY updated_at DESC LIMIT 1`, [secretPath]);
 }
 
-export async function getGraceVersion(client, secretPath) {
-  return queryOne(client, `SELECT * FROM secret_version_states WHERE secret_path=$1 AND state='grace' ORDER BY activated_at ASC LIMIT 1`, [secretPath]);
+// The optional `tenantId` predicate is backward-compatible: a null value matches
+// every row (no restriction), a uuid restricts to the owning tenant.
+export async function getActiveVersion(client, secretPath, tenantId = null) {
+  return queryOne(client, `SELECT * FROM secret_version_states WHERE secret_path=$1 AND state='active' AND ($2::uuid IS NULL OR tenant_id = $2::uuid) ORDER BY activated_at DESC LIMIT 1`, [secretPath, tenantId]);
 }
 
-export async function getVersionByVaultVersion(client, { secretPath, vaultVersion }) {
-  return queryOne(client, `SELECT * FROM secret_version_states WHERE secret_path=$1 AND vault_version=$2 LIMIT 1`, [secretPath, vaultVersion]);
+export async function getGraceVersion(client, secretPath, tenantId = null) {
+  return queryOne(client, `SELECT * FROM secret_version_states WHERE secret_path=$1 AND state='grace' AND ($2::uuid IS NULL OR tenant_id = $2::uuid) ORDER BY activated_at ASC LIMIT 1`, [secretPath, tenantId]);
 }
 
-export async function transitionToGrace(client, { secretPath, gracePeriodSeconds }) {
+export async function getVersionByVaultVersion(client, { secretPath, vaultVersion, tenantId = null }) {
+  return queryOne(client, `SELECT * FROM secret_version_states WHERE secret_path=$1 AND vault_version=$2 AND ($3::uuid IS NULL OR tenant_id = $3::uuid) LIMIT 1`, [secretPath, vaultVersion, tenantId]);
+}
+
+export async function transitionToGrace(client, { secretPath, gracePeriodSeconds, tenantId = null }) {
   return queryOne(
     client,
     `UPDATE secret_version_states
      SET state='grace', grace_period_seconds=$2, grace_expires_at=NOW() + ($2 * INTERVAL '1 second')
      WHERE id = (
-      SELECT id FROM secret_version_states WHERE secret_path=$1 AND state='active' ORDER BY activated_at DESC LIMIT 1
+      SELECT id FROM secret_version_states WHERE secret_path=$1 AND state='active' AND ($3::uuid IS NULL OR tenant_id = $3::uuid) ORDER BY activated_at DESC LIMIT 1
      )
      RETURNING *`,
-    [secretPath, gracePeriodSeconds]
+    [secretPath, gracePeriodSeconds, tenantId]
   );
 }
 
@@ -46,8 +54,8 @@ export async function updateSecretVersionVaultVersion(client, { id, vaultVersion
   return queryOne(client, `UPDATE secret_version_states SET vault_version=$2 WHERE id=$1 RETURNING *`, [id, vaultVersion]);
 }
 
-export async function revokeVersion(client, { id, justification }) {
-  return queryOne(client, `UPDATE secret_version_states SET state='revoked', expired_at=NOW(), revocation_justification=$2 WHERE id=$1 RETURNING *`, [id, justification]);
+export async function revokeVersion(client, { id, justification, tenantId = null }) {
+  return queryOne(client, `UPDATE secret_version_states SET state='revoked', expired_at=NOW(), revocation_justification=$2 WHERE id=$1 AND ($3::uuid IS NULL OR tenant_id = $3::uuid) RETURNING *`, [id, justification, tenantId]);
 }
 
 export async function listExpiredGraceVersions(client, batchSize) {
