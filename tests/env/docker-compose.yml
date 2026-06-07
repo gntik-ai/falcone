@@ -1,0 +1,46 @@
+# Falcone test environment — REAL backing services for integration tests.
+#
+# Brings up the in-cluster dependencies that Falcone services talk to, so changes
+# can be exercised against real infrastructure (not mocks):
+#   - postgres : per-service relational store (backup-status, openapi-sdk, ...)
+#   - keycloak : internal IdP. Tenants map 1:1 to realms (realm name == tenantId);
+#                a realm's displayName is the authoritative tenant name.
+#
+# Lifecycle is driven by tests/env/up.sh (waits for health, provisions the admin
+# service account, applies migrations) and tests/env/down.sh.
+name: falcone-testenv
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: falcone
+      POSTGRES_PASSWORD: falcone
+      POSTGRES_DB: falcone_test
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U falcone -d falcone_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data  # ephemeral: clean DB every run
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+    healthcheck:
+      # Keycloak 26 has no curl/wget; probe the master realm over bash /dev/tcp.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo ok >&3"]
+      interval: 5s
+      timeout: 4s
+      retries: 40
