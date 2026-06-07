@@ -386,6 +386,35 @@ export function resolveEventGatewayProfile(context = {}, topic = {}) {
 export function validateEventPublicationRequest({ context = {}, topic = {}, request = {} }) {
   const normalized = normalizePublicationInput(request);
   const profile = resolveEventGatewayProfile(context, topic);
+
+  // Authorization: deny-on-auth-first — checked before any other validation so
+  // that partial validation errors cannot leak through a 400 response when the
+  // real failure is a scope violation. Mirror the repo idiom from
+  // apps/control-plane/src/observability-audit-export.mjs:107.
+  const authViolations = [];
+  if (context.tenantId && topic.tenantId && topic.tenantId !== context.tenantId) {
+    authViolations.push('tenant/workspace does not match authenticated context.');
+  }
+  if (context.workspaceId && topic.workspaceId && topic.workspaceId !== context.workspaceId) {
+    authViolations.push('tenant/workspace does not match authenticated context.');
+  }
+  if (context.tenantId && normalized.tenantId && normalized.tenantId !== context.tenantId) {
+    authViolations.push('tenant/workspace does not match authenticated context.');
+  }
+  if (context.workspaceId && normalized.workspaceId && normalized.workspaceId !== context.workspaceId) {
+    authViolations.push('tenant/workspace does not match authenticated context.');
+  }
+  if (authViolations.length > 0) {
+    return {
+      ok: false,
+      errorClass: 'authorization_error',
+      violations: authViolations,
+      profile,
+      payloadBytes: undefined,
+      normalized: compactDefined({ ...normalized, eventTimestamp: undefined })
+    };
+  }
+
   const violations = [];
 
   if (!normalized.tenantId) {
@@ -484,7 +513,7 @@ export function buildEventGatewayPublishRequest({
 }) {
   const validation = validateEventPublicationRequest({ context, topic, request });
   if (!validation.ok) {
-    return { ok: false, violations: validation.violations, profile: validation.profile };
+    return { ok: false, errorClass: validation.errorClass, violations: validation.violations, profile: validation.profile };
   }
 
   const normalized = validation.normalized;
