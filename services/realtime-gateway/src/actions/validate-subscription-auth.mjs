@@ -32,8 +32,26 @@ export function createValidateSubscriptionAuthAction({
     const env = envProvider();
 
     if (!env.REALTIME_AUTH_ENABLED) {
-      logger.warn?.({ reason: 'AUTH_BYPASSED' }, 'Realtime auth bypassed by feature flag.');
-      return { allowed: true, subscriptionContext: {} };
+      if (env.NODE_ENV === 'production') {
+        // loadEnv already throws in production when auth is disabled, so this
+        // path is unreachable in practice.  Defend-in-depth: refuse rather than
+        // silently allow a tenant-less subscription.
+        return { allowed: false, error: { code: 'AUTH_DISABLED_IN_PRODUCTION', message: 'Realtime auth must be enabled in production.' } };
+      }
+
+      // Development-only bypass: return a labelled dev-tenant context so that
+      // downstream consumers never receive a tenant-less empty subscriptionContext.
+      logger.warn?.({ reason: 'AUTH_BYPASSED', env: env.NODE_ENV }, 'Realtime auth bypassed by feature flag (dev mode only).');
+      return {
+        allowed: true,
+        subscriptionContext: {
+          tenantId: 'dev-bypass-tenant',
+          workspaceId: params?.workspaceId ?? 'dev-bypass-workspace',
+          actorIdentity: 'dev-bypass-actor',
+          channelType: params?.channelType ?? 'unknown',
+          filterSpec: null
+        }
+      };
     }
 
     const { token, workspaceId, channelType, filter } = params;
