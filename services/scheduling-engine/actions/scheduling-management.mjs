@@ -12,15 +12,31 @@ function errorResponse(statusCode, code, message, details = {}) {
   return response(statusCode, { code, message, details });
 }
 
+function parseRoles(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') return value.split(',').map((role) => role.trim()).filter(Boolean);
+  return [];
+}
+
 function parseIdentity(params) {
-  if (!params.jwt || !params.jwt.tenantId || !params.jwt.workspaceId) {
+  // Identity is derived exclusively from the trusted identity headers the API
+  // gateway injects from the verified token (APISIX proxy-rewrite from
+  // $jwt_claim_*), read here as lowercase keys on params.__ow_headers. The
+  // gateway rejects any client-supplied X-* identity headers (request-validation
+  // maxLength:0), so these values are trustworthy and caller-supplied body/query
+  // fields are never consulted. Returns null (-> HTTP 401) when the trusted
+  // tenant/workspace headers are absent or empty.
+  const headers = params.__ow_headers ?? {};
+  const tenantId = headers['x-tenant-id'];
+  const workspaceId = headers['x-workspace-id'];
+  if (!tenantId || !workspaceId) {
     return null;
   }
   return {
-    tenantId: params.jwt.tenantId,
-    workspaceId: params.jwt.workspaceId,
-    actorId: params.jwt.sub ?? 'system',
-    roles: params.jwt.roles ?? [],
+    tenantId,
+    workspaceId,
+    actorId: headers['x-auth-subject'] ?? 'system',
+    roles: parseRoles(headers['x-actor-roles']),
   };
 }
 
@@ -59,7 +75,7 @@ export default async function main(params) {
   const { pg } = params;
   const identity = parseIdentity(params);
   if (!identity) {
-    return errorResponse(401, 'UNAUTHENTICATED', 'A valid JWT with tenantId and workspaceId claims is required.');
+    return errorResponse(401, 'UNAUTHENTICATED', 'Valid gateway-derived identity headers (X-Tenant-Id, X-Workspace-Id) are required.');
   }
   const method = params.method ?? 'GET';
   const path = params.path ?? '/v1/scheduling/jobs';

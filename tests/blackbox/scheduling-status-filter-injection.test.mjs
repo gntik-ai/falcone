@@ -26,11 +26,13 @@ function baseParams(pg, query = {}) {
     method: 'GET',
     path: '/v1/scheduling/jobs',
     query,
-    jwt: {
-      tenantId: TENANT_A,
-      workspaceId: WS_A,
-      sub: 'user:a',
-      roles: ['tenant-owner'],
+    // Identity is delivered by the gateway as trusted claim headers (lowercased
+    // by OpenWhisk); see change configure-apisix-scheduling-claim-forwarding.
+    __ow_headers: {
+      'x-tenant-id': TENANT_A,
+      'x-workspace-id': WS_A,
+      'x-auth-subject': 'user:a',
+      'x-actor-roles': 'tenant-owner',
     },
   };
 }

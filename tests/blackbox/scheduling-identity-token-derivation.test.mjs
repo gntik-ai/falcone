@@ -1,9 +1,20 @@
-// Black-box test suite for change derive-scheduling-identity-from-token.
-// Drives the PUBLIC action entrypoint (`main`) only — fake pg injected via params.
-// Covers all 5 acceptance scenarios from the spec delta.
+// Black-box test suite for change configure-apisix-scheduling-claim-forwarding
+// (supersedes the params.jwt contract introduced by derive-scheduling-identity-from-token).
 //
-// Tests: bbx-sched-identity-no-jwt, bbx-sched-identity-jwt-scope,
-//        bbx-sched-identity-missing-tenantid, bbx-sched-identity-missing-workspaceid,
+// Drives the PUBLIC action entrypoint (`main`) only — fake pg injected via params.
+// Identity is derived exclusively from the trusted identity headers the API gateway
+// injects from the verified token (X-Tenant-Id / X-Workspace-Id / X-Auth-Subject /
+// X-Actor-Roles), read by the action as lowercase keys on params.__ow_headers. The
+// action never reads identity from caller-supplied body/query fields, and fails
+// closed (HTTP 401) when the trusted tenant/workspace headers are absent.
+//
+// Gateway-layer scenarios (401 issued AT the gateway, stripping of client-supplied
+// X-* headers) are NOT exercisable through the action's public interface and are
+// covered by real-stack E2E instead; these tests assert the action-side contract
+// and defense-in-depth.
+//
+// Tests: bbx-sched-identity-no-headers, bbx-sched-identity-header-scope,
+//        bbx-sched-identity-missing-tenant, bbx-sched-identity-missing-workspace,
 //        bbx-sched-identity-tenant-scope
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,136 +36,109 @@ function fakePg(rows = []) {
   };
 }
 
-// bbx-sched-identity-no-jwt
-// Scenario 1: request body has tenantId/workspaceId but NO jwt → HTTP 401 UNAUTHENTICATED,
-// no scheduling DB operation runs.
-test('bbx-sched-identity-no-jwt: body tenantId/workspaceId without JWT returns 401 UNAUTHENTICATED with no DB queries', async () => {
+// Trusted identity headers as the gateway delivers them (OpenWhisk lowercases header keys).
+// Pass an override value of `undefined` to OMIT that header (simulating an absent claim).
+function identityHeaders(overrides = {}) {
+  const h = {
+    'x-tenant-id': TENANT_A,
+    'x-workspace-id': WS_A,
+    'x-auth-subject': 'user:a',
+    'x-actor-roles': 'tenant-owner',
+  };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) delete h[key];
+    else h[key] = value;
+  }
+  return h;
+}
+
+const schedulingDbQueries = (pg) =>
+  pg.calls.filter((c) => /scheduled_jobs/i.test(c.sql) || /scheduling_config/i.test(c.sql));
+
+// bbx-sched-identity-no-headers
+// No trusted identity headers, even with attacker-controlled body fields -> HTTP 401
+// UNAUTHENTICATED, and no scheduling DB operation runs.
+test('bbx-sched-identity-no-headers: body tenantId/workspaceId without trusted identity headers returns 401 with no DB queries', async () => {
   const pg = fakePg([]);
   const result = await main({
     pg,
     method: 'GET',
     path: '/v1/scheduling/jobs',
     query: {},
-    // no jwt field — attacker injects identity via body/params
+    __ow_headers: {}, // gateway injected nothing -> unauthenticated
+    // attacker-controlled body fields that must NEVER be used as identity
     tenantId: TENANT_A,
     workspaceId: WS_A,
   });
 
   assert.equal(result.statusCode, 401, `expected statusCode 401, got ${result.statusCode}`);
   assert.equal(result.body?.code, 'UNAUTHENTICATED', `expected code UNAUTHENTICATED, got ${result.body?.code}`);
-
-  const dbQueries = pg.calls.filter(
-    (c) => /scheduled_jobs/i.test(c.sql) || /scheduling_config/i.test(c.sql),
-  );
   assert.equal(
-    dbQueries.length,
+    schedulingDbQueries(pg).length,
     0,
-    `expected NO scheduling DB queries, but got ${dbQueries.length}: ${JSON.stringify(dbQueries.map((c) => c.sql))}`,
+    `expected NO scheduling DB queries, got ${schedulingDbQueries(pg).length}`,
   );
 });
 
-// bbx-sched-identity-jwt-scope
-// Scenario 2: valid JWT present with tenantId=A; conflicting tenantId=B in body →
-// identity is derived from jwt.tenantId (A), not body. DB query scoped to tenant A.
-test('bbx-sched-identity-jwt-scope: JWT tenantId takes precedence over conflicting body tenantId', async () => {
+// bbx-sched-identity-header-scope
+// Trusted X-Tenant-Id header (A) is authoritative; a conflicting body tenantId (B) is ignored.
+test('bbx-sched-identity-header-scope: trusted X-Tenant-Id header takes precedence over conflicting body tenantId', async () => {
   const pg = fakePg([]);
   const result = await main({
     pg,
     method: 'GET',
     path: '/v1/scheduling/jobs',
     query: {},
-    jwt: {
-      tenantId: TENANT_A,
-      workspaceId: WS_A,
-      sub: 'user:a',
-      roles: ['tenant-owner'],
-    },
+    __ow_headers: identityHeaders({ tenantId: TENANT_A, workspaceId: WS_A }),
     // attacker-controlled body fields that must be ignored
     tenantId: TENANT_B,
     workspaceId: WS_B,
   });
 
   assert.equal(result.statusCode, 200, `expected statusCode 200, got ${result.statusCode}`);
-
   const listQuery = pg.calls.find((c) => /SELECT \* FROM scheduled_jobs/i.test(c.sql));
   assert.ok(listQuery, 'expected a SELECT * FROM scheduled_jobs query to be executed');
-
-  // First two params must be TENANT_A and WS_A — not the body's TENANT_B/WS_B
-  assert.equal(
-    listQuery.params[0],
-    TENANT_A,
-    `expected DB query scoped to TENANT_A, got ${listQuery.params[0]}`,
-  );
-  assert.equal(
-    listQuery.params[1],
-    WS_A,
-    `expected DB query scoped to WS_A, got ${listQuery.params[1]}`,
-  );
+  assert.equal(listQuery.params[0], TENANT_A, `expected DB query scoped to TENANT_A, got ${listQuery.params[0]}`);
+  assert.equal(listQuery.params[1], WS_A, `expected DB query scoped to WS_A, got ${listQuery.params[1]}`);
 });
 
-// bbx-sched-identity-missing-tenantid
-// Scenario 3: JWT present but missing tenantId claim → HTTP 401, no DB query.
-test('bbx-sched-identity-missing-tenantid: JWT without tenantId returns 401 UNAUTHENTICATED with no DB queries', async () => {
+// bbx-sched-identity-missing-tenant
+// X-Tenant-Id header absent -> HTTP 401, no DB query.
+test('bbx-sched-identity-missing-tenant: absent X-Tenant-Id header returns 401 with no DB queries', async () => {
   const pg = fakePg([]);
   const result = await main({
     pg,
     method: 'GET',
     path: '/v1/scheduling/jobs',
     query: {},
-    jwt: {
-      // tenantId intentionally absent
-      workspaceId: WS_A,
-      sub: 'user:a',
-      roles: [],
-    },
+    __ow_headers: identityHeaders({ 'x-tenant-id': undefined }),
   });
 
   assert.equal(result.statusCode, 401, `expected statusCode 401, got ${result.statusCode}`);
   assert.equal(result.body?.code, 'UNAUTHENTICATED', `expected code UNAUTHENTICATED, got ${result.body?.code}`);
-
-  const dbQueries = pg.calls.filter(
-    (c) => /scheduled_jobs/i.test(c.sql) || /scheduling_config/i.test(c.sql),
-  );
-  assert.equal(
-    dbQueries.length,
-    0,
-    `expected NO scheduling DB queries, but got ${dbQueries.length}: ${JSON.stringify(dbQueries.map((c) => c.sql))}`,
-  );
+  assert.equal(schedulingDbQueries(pg).length, 0, `expected NO scheduling DB queries, got ${schedulingDbQueries(pg).length}`);
 });
 
-// bbx-sched-identity-missing-workspaceid
-// Scenario 4: JWT present but missing workspaceId claim → HTTP 401, no DB query.
-test('bbx-sched-identity-missing-workspaceid: JWT without workspaceId returns 401 UNAUTHENTICATED with no DB queries', async () => {
+// bbx-sched-identity-missing-workspace
+// X-Workspace-Id header absent -> HTTP 401, no DB query.
+test('bbx-sched-identity-missing-workspace: absent X-Workspace-Id header returns 401 with no DB queries', async () => {
   const pg = fakePg([]);
   const result = await main({
     pg,
     method: 'GET',
     path: '/v1/scheduling/jobs',
     query: {},
-    jwt: {
-      tenantId: TENANT_A,
-      // workspaceId intentionally absent
-      sub: 'user:a',
-      roles: [],
-    },
+    __ow_headers: identityHeaders({ 'x-workspace-id': undefined }),
   });
 
   assert.equal(result.statusCode, 401, `expected statusCode 401, got ${result.statusCode}`);
   assert.equal(result.body?.code, 'UNAUTHENTICATED', `expected code UNAUTHENTICATED, got ${result.body?.code}`);
-
-  const dbQueries = pg.calls.filter(
-    (c) => /scheduled_jobs/i.test(c.sql) || /scheduling_config/i.test(c.sql),
-  );
-  assert.equal(
-    dbQueries.length,
-    0,
-    `expected NO scheduling DB queries, but got ${dbQueries.length}: ${JSON.stringify(dbQueries.map((c) => c.sql))}`,
-  );
+  assert.equal(schedulingDbQueries(pg).length, 0, `expected NO scheduling DB queries, got ${schedulingDbQueries(pg).length}`);
 });
 
 // bbx-sched-identity-tenant-scope
-// Scenario 5: authenticated caller jwt.tenantId=A listing jobs → query scoped to tenant A only.
-test('bbx-sched-identity-tenant-scope: authenticated caller with jwt.tenantId=A sees only tenant A jobs', async () => {
+// Authenticated caller with X-Tenant-Id=A lists jobs -> query scoped to tenant A only.
+test('bbx-sched-identity-tenant-scope: authenticated caller with X-Tenant-Id=A sees only tenant A jobs', async () => {
   const fakeRow = {
     id: 'job-a1',
     name: 'job-a',
@@ -176,34 +160,14 @@ test('bbx-sched-identity-tenant-scope: authenticated caller with jwt.tenantId=A 
     method: 'GET',
     path: '/v1/scheduling/jobs',
     query: {},
-    jwt: {
-      tenantId: TENANT_A,
-      workspaceId: WS_A,
-      sub: 'user:a',
-      roles: ['tenant-owner'],
-    },
+    __ow_headers: identityHeaders({ tenantId: TENANT_A, workspaceId: WS_A }),
   });
 
   assert.equal(result.statusCode, 200, `expected statusCode 200, got ${result.statusCode}`);
   assert.ok(Array.isArray(result.body?.items), 'expected items array in response');
-
   const listQuery = pg.calls.find((c) => /SELECT \* FROM scheduled_jobs/i.test(c.sql));
   assert.ok(listQuery, 'expected a SELECT * FROM scheduled_jobs query to be executed');
-
-  // Verify query is scoped exclusively to TENANT_A
-  assert.equal(
-    listQuery.params[0],
-    TENANT_A,
-    `expected first query param to be TENANT_A=${TENANT_A}, got ${listQuery.params[0]}`,
-  );
-  assert.notEqual(
-    listQuery.params[0],
-    TENANT_B,
-    'query must NOT be scoped to TENANT_B',
-  );
-  assert.equal(
-    listQuery.params[1],
-    WS_A,
-    `expected second query param to be WS_A=${WS_A}, got ${listQuery.params[1]}`,
-  );
+  assert.equal(listQuery.params[0], TENANT_A, `expected first query param TENANT_A, got ${listQuery.params[0]}`);
+  assert.notEqual(listQuery.params[0], TENANT_B, 'query must NOT be scoped to TENANT_B');
+  assert.equal(listQuery.params[1], WS_A, `expected second query param WS_A, got ${listQuery.params[1]}`);
 });
