@@ -71,6 +71,18 @@ export function loadEnv(source = process.env) {
     throw new Error('Environment variable REALTIME_AUTH_ENABLED must be either true or false.');
   }
 
+  const nodeEnv = typeof source.NODE_ENV === 'string' && source.NODE_ENV.trim() !== ''
+    ? source.NODE_ENV.trim()
+    : 'development';
+
+  if (realtimeAuthEnabled === 'false' && nodeEnv === 'production') {
+    throw new Error(
+      'Configuration error: REALTIME_AUTH_ENABLED=false is not permitted in NODE_ENV=production. ' +
+      'Disabling realtime authentication in a production environment removes the tenant-isolation ' +
+      'boundary and is rejected at startup. Set REALTIME_AUTH_ENABLED=true or run in a non-production environment.'
+    );
+  }
+
   return {
     KEYCLOAK_JWKS_URL: parseUrl(source.KEYCLOAK_JWKS_URL, 'KEYCLOAK_JWKS_URL'),
     KEYCLOAK_INTROSPECTION_URL: parseUrl(source.KEYCLOAK_INTROSPECTION_URL, 'KEYCLOAK_INTROSPECTION_URL'),
@@ -87,6 +99,7 @@ export function loadEnv(source = process.env) {
     AUDIT_KAFKA_TOPIC_AUTH_DENIED: source.AUDIT_KAFKA_TOPIC_AUTH_DENIED ?? DEFAULTS.AUDIT_KAFKA_TOPIC_AUTH_DENIED,
     AUDIT_KAFKA_TOPIC_SESSION_SUSPENDED: source.AUDIT_KAFKA_TOPIC_SESSION_SUSPENDED ?? DEFAULTS.AUDIT_KAFKA_TOPIC_SESSION_SUSPENDED,
     AUDIT_KAFKA_TOPIC_SESSION_RESUMED: source.AUDIT_KAFKA_TOPIC_SESSION_RESUMED ?? DEFAULTS.AUDIT_KAFKA_TOPIC_SESSION_RESUMED,
-    REALTIME_AUTH_ENABLED: realtimeAuthEnabled === 'true'
+    REALTIME_AUTH_ENABLED: realtimeAuthEnabled === 'true',
+    NODE_ENV: nodeEnv
   };
 }
