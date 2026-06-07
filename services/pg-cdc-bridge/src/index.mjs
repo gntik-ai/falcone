@@ -1,9 +1,10 @@
 import pg from 'pg';
 import { Kafka } from 'kafkajs';
 import { MetricsCollector } from './MetricsCollector.mjs';
-import { KafkaChangePublisher } from './KafkaChangePublisher.mjs';
+import { KafkaChangePublisher, assertValidTopicNamespace } from './KafkaChangePublisher.mjs';
 import { WalListenerManager } from './WalListenerManager.mjs';
 import { HealthServer } from './HealthServer.mjs';
+assertValidTopicNamespace(process.env.PG_CDC_KAFKA_TOPIC_PREFIX);
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const kafka = new Kafka({ clientId: process.env.PG_CDC_KAFKA_CLIENT_ID ?? 'pg-cdc-bridge', brokers: (process.env.PG_CDC_KAFKA_BROKERS ?? '').split(',').filter(Boolean) });
