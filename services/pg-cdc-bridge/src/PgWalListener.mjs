@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import pg from 'pg';
 const { Client } = pg;
 export class PgWalListener extends EventEmitter {
-  constructor({ connectionString, dataSourceRef, decoder, routeFilter, publisher, slotName }) { super(); this.connectionString = connectionString; this.dataSourceRef = dataSourceRef; this.decoder = decoder; this.routeFilter = routeFilter; this.publisher = publisher; this.slotName = slotName ?? `cdc_${crypto.createHash('sha1').update(dataSourceRef).digest('hex').slice(0, 8)}`; this._running = false; }
+  constructor({ connectionString, dataSourceRef, tenantId, decoder, routeFilter, publisher, slotName }) { super(); this.connectionString = connectionString; this.dataSourceRef = dataSourceRef; this.tenantId = tenantId; this.decoder = decoder; this.routeFilter = routeFilter; this.publisher = publisher; this.slotName = slotName ?? `cdc_${crypto.createHash('sha1').update(dataSourceRef).digest('hex').slice(0, 8)}`; this._running = false; }
   get isRunning() { return this._running; }
   async start() {
     this.client = new Client({ connectionString: this.connectionString, replication: 'database' });
@@ -14,7 +14,7 @@ export class PgWalListener extends EventEmitter {
   async processMessage(buffer, lsn, committedAt = new Date().toISOString()) {
     const decoded = this.decoder.decodeMessage(buffer, lsn);
     if (!decoded?.relation) return null;
-    const matches = await this.routeFilter.match(decoded, this.dataSourceRef);
+    const matches = await this.routeFilter.match(decoded, this.dataSourceRef, this.tenantId);
     await Promise.all(matches.map((config) => this.publisher.publish(config, decoded, lsn, committedAt)));
     this.lastAckedLsn = lsn;
     return matches.length;

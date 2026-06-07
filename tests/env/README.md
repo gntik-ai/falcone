@@ -10,6 +10,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 |----------|-------------------------------------------------|-------|
 | Postgres | `postgres://falcone:falcone@localhost:55432/falcone_test` | ephemeral (tmpfs); backup-status migrations applied on `up` |
 | Keycloak | `http://localhost:8081` (admin `admin`/`admin`) | internal IdP; tenants map 1:1 to realms |
+| Redpanda | `localhost:19092` (`KAFKA_BROKERS`) | Kafka API broker (events, audit, CDC change streams); auto-creates topics |
 
 ### Keycloak model (matches production)
 

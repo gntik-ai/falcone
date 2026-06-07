@@ -15,6 +15,9 @@ export KEYCLOAK_ISSUER="http://localhost:8081/realms/master"
 export KEYCLOAK_ADMIN_CLIENT_ID="falcone-admin"
 export KEYCLOAK_ADMIN_CLIENT_SECRET="falcone-admin-secret"
 
+# Kafka (Redpanda) — events, audit, CDC change streams.
+export KAFKA_BROKERS="localhost:19092"
+
 # Marker + seeded tenants. Realm name == tenantId; displayName is the tenant name.
 export FALCONE_TESTENV=1
 export TESTENV_TENANT_A="11111111-1111-1111-1111-111111111111"  # displayName: Acme Corporation
