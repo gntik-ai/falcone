@@ -14,10 +14,11 @@ echo "==> waiting for health"
 for i in $(seq 1 60); do
   pg=$(docker compose ps postgres --format '{{.Health}}' 2>/dev/null || true)
   kc=$(docker compose ps keycloak --format '{{.Health}}' 2>/dev/null || true)
-  [ "$pg" = "healthy" ] && [ "$kc" = "healthy" ] && break
+  rp=$(docker compose ps redpanda --format '{{.Health}}' 2>/dev/null || true)
+  [ "$pg" = "healthy" ] && [ "$kc" = "healthy" ] && [ "$rp" = "healthy" ] && break
   sleep 5
 done
-[ "${pg:-}" = "healthy" ] && [ "${kc:-}" = "healthy" ] || { echo "services not healthy (pg=$pg kc=$kc)" >&2; exit 1; }
+[ "${pg:-}" = "healthy" ] && [ "${kc:-}" = "healthy" ] && [ "${rp:-}" = "healthy" ] || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp)" >&2; exit 1; }
 
 echo "==> provisioning Keycloak admin service account (falcone-admin)"
 docker compose exec -T keycloak "$KC" config credentials \
