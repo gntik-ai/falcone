@@ -1,4 +1,4 @@
-import { buildJobRecord, applyTransition, applyNextRunAt } from '../src/job-model.mjs';
+import { buildJobRecord, applyTransition, applyNextRunAt, VALID_TRANSITIONS } from '../src/job-model.mjs';
 import { validateCronExpression } from '../src/cron-validator.mjs';
 import { checkJobCreationQuota, checkResumeQuota, getActiveJobCount } from '../src/quota.mjs';
 import { getConfig, isSchedulingEnabled, upsertConfig, getActiveJobsToSuspend } from '../src/config-model.mjs';
@@ -154,9 +154,18 @@ export default async function main(params) {
     }
 
     if (segments[0] === 'jobs' && method === 'GET' && segments.length === 1) {
+      const statusFilter = params.query?.status;
+      if (statusFilter !== undefined && statusFilter !== null && statusFilter !== '') {
+        if (!Object.keys(VALID_TRANSITIONS).includes(statusFilter)) {
+          return errorResponse(400, 'INVALID_STATUS', `Invalid status value. Allowed values: ${Object.keys(VALID_TRANSITIONS).join(', ')}.`);
+        }
+      }
+      const queryParams = [identity.tenantId, identity.workspaceId, Math.min(Number(params.query?.limit ?? 100), 100)];
+      const statusClause = statusFilter ? ' AND status = $4' : '';
+      if (statusFilter) queryParams.push(statusFilter);
       const result = await pg.query(
-        `SELECT * FROM scheduled_jobs WHERE tenant_id = $1 AND workspace_id = $2 AND deleted_at IS NULL ${params.query?.status ? "AND status = '" + params.query.status + "'" : ''} ORDER BY id ASC LIMIT $3`,
-        [identity.tenantId, identity.workspaceId, Math.min(Number(params.query?.limit ?? 100), 100)],
+        `SELECT * FROM scheduled_jobs WHERE tenant_id = $1 AND workspace_id = $2 AND deleted_at IS NULL${statusClause} ORDER BY id ASC LIMIT $3`,
+        queryParams,
       );
       return response(200, { items: result.rows.map(mapJob), nextCursor: null });
     }
