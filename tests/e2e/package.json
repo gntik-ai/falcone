@@ -7,5 +7,8 @@
     "lint": "node -e \"console.log('e2e lint placeholder')\"",
     "test": "node -e \"console.log('e2e test placeholder')\"",
     "typecheck": "node -e \"console.log('e2e typecheck placeholder')\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
   }
 }
