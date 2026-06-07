@@ -12,6 +12,36 @@ routes:
         bearer_only: true
         discovery: ${KEYCLOAK_DISCOVERY_URL}
         client_id: ${KEYCLOAK_CLIENT_ID}
+      # Anti-spoofing: callers MUST NOT supply identity headers themselves. Any
+      # request carrying these headers is rejected (maxLength: 0); the gateway is
+      # the sole source of identity, set from the verified token by proxy-rewrite
+      # below. Mirrors gatewayPolicy.claimsPropagation in charts/in-falcone.
+      request-validation:
+        header_schema:
+          type: object
+          properties:
+            X-Auth-Subject:
+              type: string
+              maxLength: 0
+            X-Tenant-Id:
+              type: string
+              maxLength: 0
+            X-Workspace-Id:
+              type: string
+              maxLength: 0
+            X-Actor-Roles:
+              type: string
+              maxLength: 0
+      # Inject the verified token claims as trusted identity headers. These are
+      # consumed by scheduling-management.mjs::parseIdentity via params.__ow_headers
+      # (x-tenant-id, x-workspace-id, x-auth-subject, x-actor-roles). Keycloak
+      # issues the claims as snake_case (tenant_id, workspace_id, realm_access.roles).
+      proxy-rewrite:
+        headers:
+          X-Auth-Subject: $jwt_claim_sub
+          X-Tenant-Id: $jwt_claim_tenant_id
+          X-Workspace-Id: $jwt_claim_workspace_id
+          X-Actor-Roles: $jwt_claim_realm_access_roles
     upstream:
       type: roundrobin
       nodes:
