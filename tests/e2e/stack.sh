@@ -1,23 +1,37 @@
 #!/usr/bin/env bash
-# Real-stack bootstrap for E2E: install dependencies and run backend + frontend.
-# PLACEHOLDER — `e2e-test-author` (via /build-e2e) specializes this for the actual stack.
-# Contract: `up` is idempotent (install deps, migrate/seed, start back+front, wait for health,
-# print E2E_BASE_URL=...); `down` tears everything down; `status` reports.
+# Real-stack bootstrap for E2E.
+#
+# The Falcone codebase ships as pure-logic libraries (validators, contract
+# builders) with no runnable in-repo app server or HTTP API, so the REAL stack
+# that exercises a change is the backing infrastructure the services resolve
+# identity and route data through:
+#   - postgres : per-service relational store
+#   - keycloak : internal IdP (realm name == tenantId; displayName == tenant name)
+#   - redpanda : Kafka API broker (events, audit, CDC change streams)
+#
+# This delegates to tests/env, which boots those services, waits for health,
+# provisions the Keycloak admin service account, and applies known migrations.
+#
+# Contract: `up` is idempotent and prints the env file to source; `down` tears
+# everything down (incl. ephemeral data); `status` reports container health.
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 CMD="${1:-up}"
-if [ "$CMD" = "up" ]; then
-  if [ -f docker-compose.yml ] || [ -f compose.yaml ]; then
-    docker compose up -d --build
-    echo "TODO(specialize): wait for health endpoints, run migrations/seed, then echo E2E_BASE_URL=http://localhost:<port>"
-  else
-    echo "Specialize tests/e2e/stack.sh: install deps, run migrations/seed, start backend + frontend, wait for health, print E2E_BASE_URL." >&2
-    exit 2
-  fi
-elif [ "$CMD" = "down" ]; then
-  if [ -f docker-compose.yml ] || [ -f compose.yaml ]; then docker compose down -v; fi
-elif [ "$CMD" = "status" ]; then
-  docker compose ps 2>/dev/null || echo "unknown (specialize stack.sh)"
-else
-  echo "usage: stack.sh up|down|status" >&2; exit 1
-fi
+case "$CMD" in
+  up)
+    bash tests/env/up.sh
+    # No HTTP app to expose; surface the real endpoints integration specs target.
+    echo "E2E_ENV_FILE=tests/env/env.sh   # source it before running specs: source tests/env/env.sh"
+    echo "E2E_KEYCLOAK_URL=http://localhost:8081"
+    echo "E2E_KAFKA_BROKERS=localhost:19092"
+    ;;
+  down)
+    bash tests/env/down.sh
+    ;;
+  status)
+    ( cd tests/env && docker compose ps ) 2>/dev/null || echo "unknown (is the env up? run: bash tests/e2e/stack.sh up)"
+    ;;
+  *)
+    echo "usage: stack.sh up|down|status" >&2; exit 1
+    ;;
+esac
