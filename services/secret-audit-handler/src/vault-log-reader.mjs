@@ -6,6 +6,7 @@ export function parseVaultEntry(line) {
   const entry = JSON.parse(line);
   const path = entry?.request?.path?.replace(/^secret\/data\//, '') ?? 'unknown/unknown';
   const [domain = 'platform', ...rest] = path.split('/');
+  const tenantId = domain === 'tenant' ? (rest[0] ?? null) : null;
   const secretName = rest.at(-1) ?? 'unknown';
   const requestor = entry?.auth?.display_name ?? 'unknown';
   const namespace = entry?.auth?.metadata?.service_account_namespace ?? 'unknown';
@@ -16,6 +17,7 @@ export function parseVaultEntry(line) {
     timestamp: entry?.time ?? new Date().toISOString(),
     operation,
     domain,
+    tenantId,
     secretPath: path,
     secretName,
     requestorIdentity: {
