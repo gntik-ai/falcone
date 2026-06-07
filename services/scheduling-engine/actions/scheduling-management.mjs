@@ -13,11 +13,14 @@ function errorResponse(statusCode, code, message, details = {}) {
 }
 
 function parseIdentity(params) {
+  if (!params.jwt || !params.jwt.tenantId || !params.jwt.workspaceId) {
+    return null;
+  }
   return {
-    tenantId: params.jwt?.tenantId ?? params.tenantId,
-    workspaceId: params.jwt?.workspaceId ?? params.workspaceId,
-    actorId: params.jwt?.sub ?? params.actorId ?? 'system',
-    roles: params.jwt?.roles ?? [],
+    tenantId: params.jwt.tenantId,
+    workspaceId: params.jwt.workspaceId,
+    actorId: params.jwt.sub ?? 'system',
+    roles: params.jwt.roles ?? [],
   };
 }
 
@@ -55,6 +58,9 @@ async function requireTargetAction(params, targetAction, workspaceId) {
 export default async function main(params) {
   const { pg } = params;
   const identity = parseIdentity(params);
+  if (!identity) {
+    return errorResponse(401, 'UNAUTHENTICATED', 'A valid JWT with tenantId and workspaceId claims is required.');
+  }
   const method = params.method ?? 'GET';
   const path = params.path ?? '/v1/scheduling/jobs';
   const segments = path.replace(/^\/v1\/scheduling/, '').split('/').filter(Boolean);
