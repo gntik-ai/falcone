@@ -13,9 +13,32 @@ function createMockProducer() {
   };
 }
 
-test('publishAuditEvent sends to expected topic with domain key', async () => {
+test('publishAuditEvent sends to per-tenant topic with domain key for tenant events', async () => {
   const producer = createMockProducer();
-  const publisher = createPublisher({ brokers: ['kafka:9092'], topic: 'console.secrets.audit', producer });
+  const publisher = await createPublisher({ brokers: ['kafka:9092'], topic: 'console.secrets.audit', producer });
+  await publisher.connect();
+  await publisher.publishAuditEvent({
+    eventId: '123e4567-e89b-12d3-a456-426614174000',
+    timestamp: '2026-03-30T00:00:00.000Z',
+    operation: 'read',
+    domain: 'tenant',
+    tenantId: 'tid-1',
+    secretPath: 'tenant/tid-1/db-password',
+    secretName: 'db-password',
+    requestorIdentity: { type: 'service', name: 'svc', namespace: 'ns', serviceAccount: 'sa' },
+    result: 'success',
+    denialReason: null,
+    vaultRequestId: 'req-1'
+  });
+  assert.equal(producer.sent[0].topic, 'console.secrets.audit.tid-1');
+  assert.equal(producer.sent[0].messages[0].key, 'tenant');
+  await publisher.disconnect();
+  assert.equal(producer.disconnected, true);
+});
+
+test('publishAuditEvent sends to .platform topic for platform-domain events', async () => {
+  const producer = createMockProducer();
+  const publisher = await createPublisher({ brokers: ['kafka:9092'], topic: 'console.secrets.audit', producer });
   await publisher.connect();
   await publisher.publishAuditEvent({
     eventId: '123e4567-e89b-12d3-a456-426614174000',
@@ -29,7 +52,7 @@ test('publishAuditEvent sends to expected topic with domain key', async () => {
     denialReason: null,
     vaultRequestId: 'req-1'
   });
-  assert.equal(producer.sent[0].topic, 'console.secrets.audit');
+  assert.equal(producer.sent[0].topic, 'console.secrets.audit.platform');
   assert.equal(producer.sent[0].messages[0].key, 'platform');
   await publisher.disconnect();
   assert.equal(producer.disconnected, true);
@@ -37,7 +60,7 @@ test('publishAuditEvent sends to expected topic with domain key', async () => {
 
 test('publishAuditEvent rejects forbidden fields', async () => {
   const producer = createMockProducer();
-  const publisher = createPublisher({ brokers: ['kafka:9092'], topic: 'console.secrets.audit', producer });
+  const publisher = await createPublisher({ brokers: ['kafka:9092'], topic: 'console.secrets.audit', producer });
   await assert.rejects(() => publisher.publishAuditEvent({
     eventId: '123e4567-e89b-12d3-a456-426614174000',
     timestamp: '2026-03-30T00:00:00.000Z',
