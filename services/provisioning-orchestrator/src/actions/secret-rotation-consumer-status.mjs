@@ -1,6 +1,13 @@
 import * as repo from '../repositories/secret-rotation-repo.mjs';
 
-function allowed(auth, secretPath) {
+const PLATFORM_ROLES = new Set(['superadmin', 'platform-operator']);
+
+function isPlatformCaller(auth) {
+  const roles = auth?.roles ?? [];
+  return roles.some((r) => PLATFORM_ROLES.has(r));
+}
+
+function hasBasePermission(auth, secretPath) {
   return Boolean(auth && Array.isArray(auth.roles) && auth.roles.length > 0 && secretPath);
 }
 
@@ -11,10 +18,16 @@ export function resolveDependencies(params = {}) {
 export async function main(params = {}) {
   const { db, repo: dataRepo } = resolveDependencies(params);
   const { auth, secretPath } = params;
-  if (!allowed(auth, secretPath)) return { error: { code: 'FORBIDDEN', status: 403 } };
+  if (!hasBasePermission(auth, secretPath)) return { error: { code: 'FORBIDDEN', status: 403 } };
+
+  const activeVersion = await dataRepo.getActiveVersion(db, secretPath);
+
+  if (!isPlatformCaller(auth)) {
+    if (!activeVersion) return { error: { code: 'FORBIDDEN', status: 403 } };
+    if (activeVersion.tenant_id !== auth.tenantId) return { error: { code: 'FORBIDDEN', status: 403 } };
+  }
 
   const consumers = await dataRepo.listConsumers(db, secretPath);
-  const activeVersion = await dataRepo.getActiveVersion(db, secretPath);
   const vaultVersion = params.vaultVersion ?? activeVersion?.vault_version;
   const pending = await dataRepo.listPendingPropagations(db, { secretPath, vaultVersion });
   const pendingByConsumer = new Map(pending.map((row) => [row.consumer_id, row]));
