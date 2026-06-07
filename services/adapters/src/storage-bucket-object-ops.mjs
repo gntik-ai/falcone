@@ -56,6 +56,27 @@ export function assertObjectKey(objectKey) {
   ) {
     throw new Error(STORAGE_BUCKET_OBJECT_ERROR_CODES.INVALID_OBJECT_KEY);
   }
+
+  // Reject backslash characters.
+  if (objectKey.includes('\\')) {
+    throw new Error(STORAGE_BUCKET_OBJECT_ERROR_CODES.INVALID_OBJECT_KEY);
+  }
+
+  // Reject control characters 0x00–0x1F and 0x7F.
+  for (let i = 0; i < objectKey.length; i++) {
+    const code = objectKey.charCodeAt(i);
+    if (code <= 0x1f || code === 0x7f) {
+      throw new Error(STORAGE_BUCKET_OBJECT_ERROR_CODES.INVALID_OBJECT_KEY);
+    }
+  }
+
+  // Reject any path segment equal to '..'.
+  const segments = objectKey.split('/');
+  for (const segment of segments) {
+    if (segment === '..') {
+      throw new Error(STORAGE_BUCKET_OBJECT_ERROR_CODES.INVALID_OBJECT_KEY);
+    }
+  }
 }
 
 function buildPageInfo({ size, after = undefined, nextCursor = undefined }) {
