@@ -70,43 +70,43 @@ function createPg() {
 test('full lifecycle and summary/config flow', async () => {
   const pg = createPg();
   const events = [];
-  await main({ pg, method: 'PATCH', path: '/v1/scheduling/config', jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, body: { schedulingEnabled: true, maxActiveJobs: 2 } , publishAudit: async (event) => events.push(event) });
+  await main({ pg, method: 'PATCH', path: '/v1/scheduling/config', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, body: { schedulingEnabled: true, maxActiveJobs: 2 } , publishAudit: async (event) => events.push(event) });
 
-  const created = await main({ pg, method: 'POST', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, body: { name: 'cleanup', cronExpression: '0 * * * *', targetAction: 'w1/cleanup', payload: { mode: 'soft' } }, validateTargetAction: async () => true, publishAudit: async (event) => events.push(event) });
+  const created = await main({ pg, method: 'POST', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, body: { name: 'cleanup', cronExpression: '0 * * * *', targetAction: 'w1/cleanup', payload: { mode: 'soft' } }, validateTargetAction: async () => true, publishAudit: async (event) => events.push(event) });
   assert.equal(created.statusCode, 201);
 
-  const listed = await main({ pg, method: 'GET', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1' }, query: {} });
+  const listed = await main({ pg, method: 'GET', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, query: {} });
   assert.equal(listed.body.items.length, 1);
 
-  const updated = await main({ pg, method: 'PATCH', path: `/v1/scheduling/jobs/${created.body.jobId}`, jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, body: { cronExpression: '*/5 * * * *' }, validateTargetAction: async () => true, publishAudit: async (event) => events.push(event) });
+  const updated = await main({ pg, method: 'PATCH', path: `/v1/scheduling/jobs/${created.body.jobId}`, __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, body: { cronExpression: '*/5 * * * *' }, validateTargetAction: async () => true, publishAudit: async (event) => events.push(event) });
   assert.equal(updated.statusCode, 200);
 
-  const paused = await main({ pg, method: 'POST', path: `/v1/scheduling/jobs/${created.body.jobId}/pause`, jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, publishAudit: async (event) => events.push(event) });
+  const paused = await main({ pg, method: 'POST', path: `/v1/scheduling/jobs/${created.body.jobId}/pause`, __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, publishAudit: async (event) => events.push(event) });
   assert.equal(paused.body.status, 'paused');
 
-  const resumed = await main({ pg, method: 'POST', path: `/v1/scheduling/jobs/${created.body.jobId}/resume`, jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, publishAudit: async (event) => events.push(event) });
+  const resumed = await main({ pg, method: 'POST', path: `/v1/scheduling/jobs/${created.body.jobId}/resume`, __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, publishAudit: async (event) => events.push(event) });
   assert.equal(resumed.body.status, 'active');
 
-  const summary = await main({ pg, method: 'GET', path: '/v1/scheduling/summary', jwt: { tenantId: 't1', workspaceId: 'w1' } });
+  const summary = await main({ pg, method: 'GET', path: '/v1/scheduling/summary', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' } });
   assert.equal(summary.body.activeJobs, 1);
 
-  const disabled = await main({ pg, method: 'PATCH', path: '/v1/scheduling/config', jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, body: { schedulingEnabled: false }, publishAudit: async (event) => events.push(event) });
+  const disabled = await main({ pg, method: 'PATCH', path: '/v1/scheduling/config', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, body: { schedulingEnabled: false }, publishAudit: async (event) => events.push(event) });
   assert.equal(disabled.body.schedulingEnabled, false);
 
-  const blockedResume = await main({ pg, method: 'POST', path: `/v1/scheduling/jobs/${created.body.jobId}/resume`, jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' } });
+  const blockedResume = await main({ pg, method: 'POST', path: `/v1/scheduling/jobs/${created.body.jobId}/resume`, __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' } });
   assert.equal(blockedResume.statusCode, 403);
 
-  const deleted = await main({ pg, method: 'DELETE', path: `/v1/scheduling/jobs/${created.body.jobId}`, jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, publishAudit: async (event) => events.push(event) });
+  const deleted = await main({ pg, method: 'DELETE', path: `/v1/scheduling/jobs/${created.body.jobId}`, __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, publishAudit: async (event) => events.push(event) });
   assert.equal(deleted.statusCode, 204);
   assert.ok(events.length >= 5);
 });
 
 test('quota and tenant isolation checks', async () => {
   const pg = createPg();
-  await main({ pg, method: 'PATCH', path: '/v1/scheduling/config', jwt: { tenantId: 't1', workspaceId: 'w1' }, body: { schedulingEnabled: true, maxActiveJobs: 1 } });
-  await main({ pg, method: 'POST', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1' }, body: { name: 'one', cronExpression: '0 * * * *', targetAction: 'w1/a', payload: {} }, validateTargetAction: async () => true });
-  const quota = await main({ pg, method: 'POST', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1' }, body: { name: 'two', cronExpression: '0 * * * *', targetAction: 'w1/b', payload: {} }, validateTargetAction: async () => true });
+  await main({ pg, method: 'PATCH', path: '/v1/scheduling/config', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, body: { schedulingEnabled: true, maxActiveJobs: 1 } });
+  await main({ pg, method: 'POST', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, body: { name: 'one', cronExpression: '0 * * * *', targetAction: 'w1/a', payload: {} }, validateTargetAction: async () => true });
+  const quota = await main({ pg, method: 'POST', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, body: { name: 'two', cronExpression: '0 * * * *', targetAction: 'w1/b', payload: {} }, validateTargetAction: async () => true });
   assert.equal(quota.statusCode, 409);
-  const notFound = await main({ pg, method: 'GET', path: `/v1/scheduling/jobs/${pg.state.jobs[0].id}`, jwt: { tenantId: 't2', workspaceId: 'w2' } });
+  const notFound = await main({ pg, method: 'GET', path: `/v1/scheduling/jobs/${pg.state.jobs[0].id}`, __ow_headers: { 'x-tenant-id': 't2', 'x-workspace-id': 'w2' } });
   assert.equal(notFound.statusCode, 404);
 });
