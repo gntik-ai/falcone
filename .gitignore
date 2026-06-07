@@ -16,3 +16,6 @@ specs/
 # OpenSpec change deltas live under each change's specs/ — keep them tracked too
 !openspec/changes/**/specs/
 !openspec/changes/**/specs/**
+# E2E Playwright specs live under tests/e2e/specs/ — keep per-issue regression specs tracked
+!tests/e2e/specs/
+!tests/e2e/specs/**
