@@ -23,8 +23,8 @@ const TENANT_ID = 'acme-corp'
 const DISPLAY_NAME = 'Acme Corporation'
 
 const ENV_VARS = {
-  KEYCLOAK_ADMIN_BASE_URL: 'https://keycloak.internal/auth',
-  KEYCLOAK_ADMIN_TOKEN_URL: 'https://keycloak.internal/auth/realms/master/protocol/openid-connect/token',
+  // Base URL is reused from the JWKS URL the service already configures.
+  KEYCLOAK_JWKS_URL: 'https://keycloak.internal/auth/realms/master/protocol/openid-connect/certs',
   KEYCLOAK_ADMIN_CLIENT_ID: 'backup-admin',
   KEYCLOAK_ADMIN_CLIENT_SECRET: 's3cr3t',
 }
@@ -76,8 +76,8 @@ function makeNetworkErrorFetch(): typeof fetch {
 describe('createKeycloakTenantNameResolver', () => {
   beforeEach(() => {
     // Set required env vars for every test; individual tests can override
-    vi.stubEnv('KEYCLOAK_ADMIN_BASE_URL', ENV_VARS.KEYCLOAK_ADMIN_BASE_URL)
-    vi.stubEnv('KEYCLOAK_ADMIN_TOKEN_URL', ENV_VARS.KEYCLOAK_ADMIN_TOKEN_URL)
+    vi.stubEnv('KEYCLOAK_BASE_URL', '')
+    vi.stubEnv('KEYCLOAK_JWKS_URL', ENV_VARS.KEYCLOAK_JWKS_URL)
     vi.stubEnv('KEYCLOAK_ADMIN_CLIENT_ID', ENV_VARS.KEYCLOAK_ADMIN_CLIENT_ID)
     vi.stubEnv('KEYCLOAK_ADMIN_CLIENT_SECRET', ENV_VARS.KEYCLOAK_ADMIN_CLIENT_SECRET)
   })
@@ -119,8 +119,9 @@ describe('createKeycloakTenantNameResolver', () => {
   // Fail-closed: config missing
   // -------------------------------------------------------------------------
 
-  it('throws tenant_name_resolver_unavailable when KEYCLOAK_ADMIN_BASE_URL is missing', async () => {
-    vi.stubEnv('KEYCLOAK_ADMIN_BASE_URL', '')
+  it('throws tenant_name_resolver_unavailable when no Keycloak base URL can be derived', async () => {
+    vi.stubEnv('KEYCLOAK_BASE_URL', '')
+    vi.stubEnv('KEYCLOAK_JWKS_URL', '')
     const resolver = createKeycloakTenantNameResolver({ fetch: makeFakeFetch({ displayName: DISPLAY_NAME }) })
 
     await expect(resolver(TENANT_ID)).rejects.toMatchObject({
@@ -129,14 +130,13 @@ describe('createKeycloakTenantNameResolver', () => {
     })
   })
 
-  it('throws tenant_name_resolver_unavailable when KEYCLOAK_ADMIN_TOKEN_URL is missing', async () => {
-    vi.stubEnv('KEYCLOAK_ADMIN_TOKEN_URL', '')
+  it('derives admin URLs from KEYCLOAK_BASE_URL when set (overrides JWKS derivation)', async () => {
+    vi.stubEnv('KEYCLOAK_JWKS_URL', '')
+    vi.stubEnv('KEYCLOAK_BASE_URL', 'https://kc.example/auth')
     const resolver = createKeycloakTenantNameResolver({ fetch: makeFakeFetch({ displayName: DISPLAY_NAME }) })
 
-    await expect(resolver(TENANT_ID)).rejects.toMatchObject({
-      code: 'tenant_name_resolver_unavailable',
-      statusCode: 500,
-    })
+    const result = await resolver(TENANT_ID)
+    expect(result).toBe(DISPLAY_NAME)
   })
 
   it('throws tenant_name_resolver_unavailable when KEYCLOAK_ADMIN_CLIENT_ID is missing', async () => {
