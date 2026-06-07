@@ -284,7 +284,7 @@ export function normalizeKeycloakAdminError(error = {}, context = {}) {
 
 export function validateIamAdminRequest(request = {}) {
   const violations = [];
-  const { resourceKind, action, payload = {}, context = {} } = request;
+  const { resourceKind, action, payload = {}, context = {}, tenantId } = request;
 
   if (!IAM_ADMIN_RESOURCE_KINDS.includes(resourceKind)) {
     violations.push(`Unsupported IAM resource kind ${String(resourceKind)}.`);
@@ -300,6 +300,13 @@ export function validateIamAdminRequest(request = {}) {
 
   if (context.scope !== 'platform' && RESERVED_REALM_IDS.includes(context.realmId)) {
     violations.push(`Realm ${context.realmId} is reserved for platform control-plane use.`);
+  }
+
+  // Fail-closed realm binding: a non-platform IAM admin request must target the
+  // caller's own realm (realm == tenantId). A missing tenantId never equals a
+  // targeted realmId, so it is rejected rather than silently bypassing the check.
+  if (context.scope !== 'platform' && context.realmId !== undefined && context.realmId !== tenantId) {
+    violations.push(`Realm ${context.realmId} does not belong to caller tenant ${tenantId}.`);
   }
 
   switch (resourceKind) {
@@ -486,10 +493,15 @@ export function buildIamAdminAdapterCall({
   identityBlueprintRef = 'identity-blueprint-platform-v1',
   context = {}
 } = {}) {
-  const validation = validateIamAdminRequest({ resourceKind, action, payload, context });
+  const validation = validateIamAdminRequest({ resourceKind, action, payload, context, tenantId });
   if (!validation.ok) {
     const error = new Error('IAM admin request failed validation.');
     error.validation = validation;
+    const isCrossRealmViolation = validation.violations.some((v) => v.includes('does not belong to caller tenant'));
+    if (isCrossRealmViolation) {
+      error.status = 403;
+      error.code = 'FORBIDDEN';
+    }
     throw error;
   }
 
