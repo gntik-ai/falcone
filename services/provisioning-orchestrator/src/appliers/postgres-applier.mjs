@@ -40,10 +40,12 @@ const _PG_BASE_TYPE_RE = new RegExp(
     '|inet|cidr|macaddr' +
     '|smallserial|serial2|serial|serial4|bigserial|serial8' +
   ')' +
-  // optional length/precision: (n) or (n,m)
-  '(\\s*\\(\\s*\\d+(\\s*,\\s*\\d+)?\\s*\\))?' +
+  // optional length/precision: (n) or (n,m). _isValidDataType strips whitespace
+  // around the punctuation first, so no internal \s* is needed here (avoids the
+  // ambiguous nullable quantifiers that cause exponential backtracking / ReDoS).
+  '(\\(\\d+(,\\d+)?\\))?' +
   // optional array suffix(es): [] or [n]
-  '(\\s*\\[\\s*\\d*\\s*\\])*' +
+  '(\\[\\d*\\])*' +
   '$',
   'i',
 );
@@ -56,9 +58,13 @@ const _PG_BASE_TYPE_RE = new RegExp(
  */
 function _isValidDataType(value) {
   if (typeof value !== 'string') return false;
-  const v = value.trim();
+  let v = value.trim();
   // Fast-reject dangerous characters before regex
   if (/[;'"\\]/.test(v) || v.includes('--')) return false;
+  // Normalize whitespace: collapse runs to single spaces (keeps multi-word types
+  // like "timestamp with time zone") and drop spaces around ( ) , [ ] so the
+  // allowlist regex needs no internal \s* (which would risk ReDoS).
+  v = v.replace(/\s+/g, ' ').replace(/ ?([(),[\]]) ?/g, '$1');
   return _PG_BASE_TYPE_RE.test(v);
 }
 
