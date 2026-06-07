@@ -1,43 +1,29 @@
 /**
  * OpenWhisk action: REST API handler for GET /v1/backup/status.
+ * ESM sibling of backup-status.action.ts — used by black-box tests.
+ * BUG (pre-fix): includeShared is gated on hasTechnicalScope, not hasPlatformScope,
+ * so tenant-scoped callers with read:technical can read all shared rows across tenants.
  */
 
 import { getByTenant, getAll } from '../db/repository.js'
-import type { BackupSnapshot } from '../db/repository.js'
 import { validateToken, enforceScope, AuthError } from './backup-status.auth.js'
-import type { BackupStatusApiResponse, BackupStatusComponentResponse } from './backup-status.schema.js'
 import * as audit from '../shared/audit.js'
 
 const STALE_THRESHOLD_MS = parseInt(process.env.BACKUP_STALE_THRESHOLD_MS ?? '900000', 10) // 15 min default
 
-interface ActionParams {
-  __ow_headers?: Record<string, string>
-  __ow_method?: string
-  tenant_id?: string
-}
-
-interface ActionResponse {
-  statusCode: number
-  headers: Record<string, string>
-  body: unknown
-}
-
-function extractToken(headers: Record<string, string>): string | null {
+function extractToken(headers) {
   const auth = headers.authorization ?? headers.Authorization
   if (!auth?.startsWith('Bearer ')) return null
   return auth.slice(7)
 }
 
-function isStale(lastCheckedAt: Date): boolean {
+function isStale(lastCheckedAt) {
   return Date.now() - lastCheckedAt.getTime() > STALE_THRESHOLD_MS
 }
 
-function serializeComponent(
-  snapshot: BackupSnapshot,
-  includeTechnical: boolean,
-): BackupStatusComponentResponse {
+function serializeComponent(snapshot, includeTechnical) {
   const stale = isStale(snapshot.lastCheckedAt)
-  const component: BackupStatusComponentResponse = {
+  const component = {
     component_type: snapshot.componentType,
     instance_label: snapshot.instanceLabel ?? snapshot.componentType,
     status: snapshot.status,
@@ -53,7 +39,7 @@ function serializeComponent(
   return component
 }
 
-function response(statusCode: number, body: unknown): ActionResponse {
+function response(statusCode, body) {
   return {
     statusCode,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
@@ -61,7 +47,7 @@ function response(statusCode: number, body: unknown): ActionResponse {
   }
 }
 
-export async function main(params: ActionParams): Promise<ActionResponse> {
+export async function main(params) {
   // Method check
   if (params.__ow_method && params.__ow_method !== 'get') {
     return response(405, { error: 'Method not allowed' })
@@ -107,7 +93,7 @@ export async function main(params: ActionParams): Promise<ActionResponse> {
   // FIX (Option A): includeShared for getByTenant is now gated on hasPlatformScope only.
   // A tenant-scoped caller with read:technical but no platform scope gets includeShared=false,
   // preventing the "OR is_shared_instance = TRUE" SQL path from leaking cross-tenant shared rows.
-  let snapshots: BackupSnapshot[]
+  let snapshots
   try {
     if (requestedTenantId) {
       snapshots = await getByTenant(requestedTenantId, { includeShared: hasPlatformScope })
@@ -135,7 +121,7 @@ export async function main(params: ActionParams): Promise<ActionResponse> {
     (s) => s.status !== 'not_available' && s.status !== 'not_configured',
   )
 
-  const body: BackupStatusApiResponse = {
+  const body = {
     schema_version: '1',
     tenant_id: requestedTenantId ?? null,
     queried_at: new Date().toISOString(),
@@ -144,9 +130,7 @@ export async function main(params: ActionParams): Promise<ActionResponse> {
   }
 
   if (!deploymentBackupAvailable) {
-    // Still return the components but add context
-    ;(body as unknown as Record<string, unknown>).message =
-      'La visibilidad de backup no está habilitada en este perfil de despliegue.'
+    body.message = 'La visibilidad de backup no está habilitada en este perfil de despliegue.'
   }
 
   // Audit access event
