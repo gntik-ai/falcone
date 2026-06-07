@@ -36,8 +36,8 @@ async function requireSubscription(db, ctx, id) {
 }
 
 export async function main(params) {
-  const { db, kafka, env = process.env, method = 'GET', path = '/', body = {}, query = {}, auth = {} } = params;
-  const ctx = { tenantId: auth.tenantId, workspaceId: auth.workspaceId, actorId: auth.actorId };
+  const { db, kafka, env = process.env, method = 'GET', path = '/', body = {}, query = {}, auth = {}, resolver } = params;
+  const ctx = { tenantId: auth.tenantId, workspaceId: auth.workspaceId, actorId: auth.actorId, resolver };
   const parts = pathParts(path);
   const quotaConfig = getQuotaConfig(env);
   const signingKey = env.WEBHOOK_SIGNING_KEY ?? 'development-signing-key';
@@ -52,7 +52,7 @@ export async function main(params) {
       if (!checkSubscriptionQuota(ctx.workspaceId, currentCount, quotaConfig.maxSubscriptionsPerWorkspace).allowed) {
         return error(409, 'QUOTA_EXCEEDED', 'Workspace subscription quota reached');
       }
-      const record = buildSubscriptionRecord(body, ctx);
+      const record = await buildSubscriptionRecord(body, ctx);
       const signingSecret = generateSigningSecret();
       const encrypted = encryptSecret(signingSecret, signingKey);
       await db.insertSubscription(record);
@@ -77,7 +77,7 @@ export async function main(params) {
 
   if (method === 'PATCH' && parts.length === 2) {
     try {
-      const validated = validateSubscriptionInput({ targetUrl: body.targetUrl ?? subscription.target_url, eventTypes: body.eventTypes ?? subscription.event_types });
+      const validated = await validateSubscriptionInput({ targetUrl: body.targetUrl ?? subscription.target_url, eventTypes: body.eventTypes ?? subscription.event_types }, { resolver });
       const updated = await db.updateSubscription(subscription.id, { ...body, target_url: validated.targetUrl, event_types: validated.eventTypes });
       await publish(kafka, 'console.webhook.subscription.updated', subscriptionUpdatedEvent(ctx, subscription.id));
       return ok(200, responseSubscription(updated));

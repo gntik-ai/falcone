@@ -33,6 +33,8 @@ function seededDb() {
   return db;
 }
 
+const resolver = async () => ['93.184.216.34']; // deterministic offline resolver (example.com → public IP)
+
 test('delivery worker succeeds on 2xx and records attempts', async () => {
   const db = seededDb();
   const kafkaEvents = [];
@@ -42,7 +44,7 @@ test('delivery worker succeeds on 2xx and records attempts', async () => {
     seenHeaders = options.headers;
     return new Response('', { status: 200, headers: { 'x-ok': 'yes' } });
   };
-  const result = await deliveryMain({ db, kafka: { publish: async (t, p) => kafkaEvents.push({ t, p }) }, scheduler, http, deliveryId: 'd1', env: { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_MAX_PAYLOAD_BYTES: '5000', WEBHOOK_RESPONSE_TIMEOUT_MS: '1000' } });
+  const result = await deliveryMain({ db, kafka: { publish: async (t, p) => kafkaEvents.push({ t, p }) }, scheduler, http, resolver, deliveryId: 'd1', env: { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_MAX_PAYLOAD_BYTES: '5000', WEBHOOK_RESPONSE_TIMEOUT_MS: '1000' } });
   assert.equal(result.status, 'succeeded');
   assert.equal(db.state.deliveries.get('d1').status, 'succeeded');
   assert.equal(db.state.attempts.length, 1);
@@ -57,10 +59,10 @@ test('3xx and thrown errors schedule retry/permanent failure/auto-disable', asyn
   const scheduler = { main: retryMain, invoker: { invoke: async (name, payload) => schedulerInvocations.push({ name, payload }) } };
   const kafkaEvents = [];
   const redirectHttp = async () => new Response('', { status: 302 });
-  const first = await deliveryMain({ db, kafka: { publish: async (t, p) => kafkaEvents.push({ t, p }) }, scheduler, http: redirectHttp, deliveryId: 'd1', env: { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_AUTO_DISABLE_THRESHOLD: '1', WEBHOOK_RESPONSE_TIMEOUT_MS: '1000' } });
+  const first = await deliveryMain({ db, kafka: { publish: async (t, p) => kafkaEvents.push({ t, p }) }, scheduler, http: redirectHttp, resolver, deliveryId: 'd1', env: { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_AUTO_DISABLE_THRESHOLD: '1', WEBHOOK_RESPONSE_TIMEOUT_MS: '1000' } });
   assert.equal(first.status, 'scheduled');
   db.state.deliveries.set('d1', { ...db.state.deliveries.get('d1'), attempt_count: 1, status: 'pending' });
-  const second = await deliveryMain({ db, kafka: { publish: async (t, p) => kafkaEvents.push({ t, p }) }, scheduler, http: async () => { throw new Error('timeout'); }, deliveryId: 'd1', env: { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_AUTO_DISABLE_THRESHOLD: '1', WEBHOOK_RESPONSE_TIMEOUT_MS: '1' } });
+  const second = await deliveryMain({ db, kafka: { publish: async (t, p) => kafkaEvents.push({ t, p }) }, scheduler, http: async () => { throw new Error('timeout'); }, resolver, deliveryId: 'd1', env: { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_AUTO_DISABLE_THRESHOLD: '1', WEBHOOK_RESPONSE_TIMEOUT_MS: '1' } });
   assert.equal(['permanently_failed', 'auto_disabled'].includes(second.status), true);
   assert.ok(db.state.attempts.length >= 2);
   assert.ok(kafkaEvents.length >= 1);
