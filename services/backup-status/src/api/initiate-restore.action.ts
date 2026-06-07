@@ -2,10 +2,20 @@ import { validateToken, AuthError } from './backup-status.auth.js'
 import { adapterRegistry, isActionAdapter } from '../adapters/registry.js'
 import type { AdapterContext, BackupActionAdapter } from '../adapters/types.js'
 import { initiate, ConfirmationError, toSnakeCaseInitiate } from '../confirmations/confirmations.service.js'
+import { createKeycloakTenantNameResolver, type TenantNameResolverDeps } from '../confirmations/tenant-name-resolver.js'
 
 interface ActionParams {
   __ow_headers?: Record<string, string>
   __ow_body?: string
+  /**
+   * Injection seam: supply an authoritative tenant-name resolver.
+   * In production this is left unset and the action creates a Keycloak-backed
+   * resolver from env vars.  In unit tests a fake resolver is injected here so
+   * the test does not need a live Keycloak instance or a real database.
+   */
+  _tenantNameResolverDeps?: TenantNameResolverDeps & {
+    resolveTenantName?: (tenantId: string) => Promise<string> | string
+  }
 }
 
 export async function main(params: ActionParams) {
@@ -37,6 +47,13 @@ export async function main(params: ActionParams) {
       return { statusCode: 400, headers, body: { error: 'Missing required fields: tenant_id, component_type, instance_id, snapshot_id' } }
     }
 
+    // Tenant binding: the restore target must match the token's verified tenant unless
+    // the caller holds a platform-level cross-tenant privilege (superadmin scope).
+    const isSuperadmin = token.scopes.includes('superadmin')
+    if (!isSuperadmin && body.tenant_id !== token.tenantId) {
+      return { statusCode: 403, headers, body: { error: 'Tenant mismatch: restore target tenant does not match authenticated tenant' } }
+    }
+
     const adapter = adapterRegistry.get(body.component_type)
     const adapterContext: AdapterContext = {
       deploymentProfile: process.env.DEPLOYMENT_PROFILE_SLUG ?? 'default',
@@ -51,6 +68,11 @@ export async function main(params: ActionParams) {
       return snap?.createdAt ?? null
     }
 
+    // Authoritative tenant-name resolver: injected via params for tests,
+    // or created from Keycloak admin env vars in production.
+    const tenantNameResolver = params._tenantNameResolverDeps?.resolveTenantName
+      ?? createKeycloakTenantNameResolver(params._tenantNameResolverDeps)
+
     const response = await initiate(
       {
         tenant_id: body.tenant_id,
@@ -59,7 +81,7 @@ export async function main(params: ActionParams) {
         snapshot_id: body.snapshot_id,
         scope: body.scope,
       },
-      { sub: token.sub, tenantId: token.tenantId, role: token.scopes.includes('superadmin') ? 'superadmin' : 'sre', scopes: token.scopes },
+      { sub: token.sub, tenantId: token.tenantId, role: isSuperadmin ? 'superadmin' : 'sre', scopes: token.scopes },
       {
         operationsRepo: {
           findActive: async (tenantId: string, componentType: string, instanceId: string, type: 'restore') => {
@@ -71,7 +93,7 @@ export async function main(params: ActionParams) {
         adapterContext,
       },
       await resolveSnapshotCreatedAt() ?? undefined,
-      body.tenant_id,
+      tenantNameResolver,
     )
 
     return { statusCode: 202, headers, body: toSnakeCaseInitiate(response) }

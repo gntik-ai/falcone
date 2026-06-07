@@ -171,7 +171,11 @@ export class ConfirmationsService {
   private async resolveTenantName(tenantId: string): Promise<string> {
     const resolver = this.config.resolveTenantName
     if (resolver) return await resolver(tenantId)
-    return tenantId
+    // Fail safe: never echo the raw tenantId as the authoritative name.
+    // If no resolver is wired the confirmation gate cannot be safely evaluated.
+    throw new ConfirmationError(500, 'tenant_name_resolver_not_configured', {
+      detail: 'A resolveTenantName resolver must be configured for restore confirmation to work safely.',
+    })
   }
 
   async initiate(body: InitiateRestoreBody, actor: Actor): Promise<InitiateRestoreResponse> {
@@ -500,9 +504,19 @@ export class ConfirmationsService {
   async getStatus(confirmationRequestId: string, actor: Actor): Promise<ConfirmationStatusResponse> {
     const request = await this.repo.findById(confirmationRequestId)
     if (!request) throw new ConfirmationError(404, 'confirmation_request_not_found')
-    if (request.requesterId !== actor.sub && !actor.scopes.includes('backup:restore:global')) {
+
+    // Tenant isolation: the actor must belong to the same tenant as the request, OR
+    // hold a platform-level cross-tenant privilege (superadmin scope).
+    const isSuperadmin = actor.scopes.includes('superadmin')
+    if (!isSuperadmin && actor.tenantId !== request.tenantId) {
       throw new ConfirmationError(403, 'access_denied')
     }
+
+    // Within the same tenant, only the requester (or a platform operator) may read status.
+    if (!isSuperadmin && request.requesterId !== actor.sub && !actor.scopes.includes('backup:restore:global')) {
+      throw new ConfirmationError(403, 'access_denied')
+    }
+
     return {
       schemaVersion: '2',
       id: request.id,
@@ -528,14 +542,14 @@ export async function initiate(
   actor: Actor,
   precheckDeps?: PrecheckDeps,
   snapshotCreatedAt?: Date,
-  tenantName?: string,
+  resolveTenantName?: (tenantId: string) => Promise<string> | string,
 ): Promise<InitiateRestoreResponse> {
-  const service = precheckDeps || snapshotCreatedAt || tenantName
+  const service = precheckDeps || snapshotCreatedAt || resolveTenantName
     ? new ConfirmationsService(
         new ConfirmationsRepositoryClass(),
         { emitAuditEvent },
         dispatcher,
-        { ...getDefaultConfig(), precheckDeps, resolveSnapshotCreatedAt: snapshotCreatedAt ? async () => snapshotCreatedAt : undefined, resolveTenantName: tenantName ? async () => tenantName : undefined },
+        { ...getDefaultConfig(), precheckDeps, resolveSnapshotCreatedAt: snapshotCreatedAt ? async () => snapshotCreatedAt : undefined, resolveTenantName },
       )
     : defaultService
   return await service.initiate(body, actor)
@@ -545,9 +559,10 @@ export async function confirm(
   body: ConfirmRestoreBody,
   actor: Actor,
   precheckDeps?: PrecheckDeps,
+  resolveTenantName?: (tenantId: string) => Promise<string> | string,
 ): Promise<ConfirmRestoreResult> {
-  const service = precheckDeps
-    ? new ConfirmationsService(new ConfirmationsRepositoryClass(), { emitAuditEvent }, dispatcher, { ...getDefaultConfig(), precheckDeps })
+  const service = precheckDeps || resolveTenantName
+    ? new ConfirmationsService(new ConfirmationsRepositoryClass(), { emitAuditEvent }, dispatcher, { ...getDefaultConfig(), precheckDeps, resolveTenantName })
     : defaultService
   return await service.confirm(body, actor)
 }
