@@ -12,6 +12,7 @@ import * as dispatcher from './operation-dispatcher.js'
 import * as audit from '../shared/audit.js'
 import { emitAuditEvent } from '../audit/audit-trail.js'
 import { initiate, toSnakeCaseInitiate, ConfirmationError } from '../confirmations/confirmations.service.js'
+import { createKeycloakTenantNameResolver } from '../confirmations/tenant-name-resolver.js'
 import { isSafeSimulationProfile } from './restore-simulation.types.js'
 
 interface ActionParams {
@@ -332,10 +333,9 @@ export async function main(params: ActionParams) {
         adapterClient: isActionAdapter(adapter) ? (adapter as BackupActionAdapter) : null,
         adapterContext,
         snapshotCreatedAt: snap?.createdAt,
-        resolveTenantName: async (tenantId: string) => tenantId,
       },
       snap?.createdAt,
-      body.tenant_id,
+      createKeycloakTenantNameResolver(),
     )
 
     return { statusCode: 202, headers, body: toSnakeCaseInitiate(response) }
