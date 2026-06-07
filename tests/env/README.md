@@ -12,6 +12,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 | Keycloak | `http://localhost:8081` (admin `admin`/`admin`) | internal IdP; tenants map 1:1 to realms |
 
 ### Keycloak model (matches production)
+
 In Falcone the **Keycloak realm name equals the `tenantId`** (see
 `services/provisioning-orchestrator/src/reprovision/identifier-map.mjs::deriveIamRealm`),
 and a realm's **`displayName`** is the authoritative human-readable tenant name.
