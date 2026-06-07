@@ -1,6 +1,18 @@
 /**
  * JWT validation and scope enforcement for backup-status API.
+ *
+ * Production path: full cryptographic verification via jose + jwks-rsa,
+ * mirroring services/realtime-gateway/src/auth/token-validator.mjs::createTokenValidator.
+ *
+ * TEST_MODE path: base64url payload parsing (no signature check). Refused if
+ * NODE_ENV === 'production' to prevent accidental mis-configuration.
+ *
+ * Injectable JWKS override: export _setJwksOverride(fn) to allow unit tests to
+ * supply a local key-set without network calls.
  */
+
+import { jwtVerify, decodeProtectedHeader, type JWTVerifyGetKey, createLocalJWKSet } from 'jose'
+import jwksClient from 'jwks-rsa'
 
 export interface TokenClaims {
   sub: string
@@ -10,15 +22,70 @@ export interface TokenClaims {
   iat: number
 }
 
-const KEYCLOAK_JWKS_URL = process.env.KEYCLOAK_JWKS_URL
-const TEST_MODE = process.env.TEST_MODE === 'true'
+// ---------------------------------------------------------------------------
+// Environment — read once at module load so we capture startup config.
+// The JWKS key-set is built lazily (first request) so tests that set env
+// vars before importing still get the correct values.
+// ---------------------------------------------------------------------------
+
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+const IS_TEST_MODE = process.env.TEST_MODE === 'true'
+
+// Injectable override for unit tests (no network required).
+let _jwksOverride: JWTVerifyGetKey | null = null
+
+export function _setJwksOverride(fn: JWTVerifyGetKey | null): void {
+  _jwksOverride = fn
+}
+
+// Lazily-built JWKS key-set (cached per-import-instance).
+let _remoteJwks: JWTVerifyGetKey | null = null
+
+function getJwks(): JWTVerifyGetKey {
+  if (_jwksOverride) return _jwksOverride
+  if (_remoteJwks) return _remoteJwks
+
+  const jwksUrl = process.env.KEYCLOAK_JWKS_URL
+  if (!jwksUrl) throw new AuthError(500, 'JWKS URL not configured')
+
+  // Build a jwks-rsa client and wrap it as a jose-compatible key getter.
+  const client = jwksClient({ jwksUri: jwksUrl, cache: true, cacheMaxAge: 600_000 })
+
+  _remoteJwks = async (header) => {
+    const kid = header.kid
+    const signingKey = await client.getSigningKey(kid)
+    const publicKey = signingKey.getPublicKey()
+    // jose accepts CryptoKey or KeyObject; createPublicKey is available in Node.
+    const { createPublicKey } = await import('node:crypto')
+    return createPublicKey(publicKey)
+  }
+
+  return _remoteJwks
+}
 
 /**
  * Validate a JWT token and return claims.
- * In TEST_MODE, parses the token as base64-encoded JSON (no signature verification).
+ *
+ * In TEST_MODE (non-production only), parses the token as a base64url-encoded
+ * JSON payload without signature verification.
+ *
+ * In production (or when TEST_MODE is not set), performs full JWKS-based
+ * cryptographic verification including issuer, audience, exp, and nbf.
  */
 export async function validateToken(token: string): Promise<TokenClaims> {
-  if (TEST_MODE) {
+  // Production guard: TEST_MODE must never be accepted in production.
+  if (IS_PRODUCTION && IS_TEST_MODE) {
+    throw new AuthError(500, 'TEST_MODE is not permitted in NODE_ENV=production')
+  }
+
+  // Re-check at call time so env changes after module load (e.g. in tests) are respected.
+  const testMode = process.env.TEST_MODE === 'true'
+  const isProd = process.env.NODE_ENV === 'production'
+  if (isProd && testMode) {
+    throw new AuthError(500, 'TEST_MODE is not permitted in NODE_ENV=production')
+  }
+
+  if (testMode) {
     try {
       const parts = token.split('.')
       const payload = JSON.parse(Buffer.from(parts[1] ?? parts[0], 'base64url').toString())
@@ -34,27 +101,37 @@ export async function validateToken(token: string): Promise<TokenClaims> {
     }
   }
 
-  if (!KEYCLOAK_JWKS_URL) {
+  // --- Production / non-TEST path: full cryptographic verification ---
+
+  const jwksUrl = process.env.KEYCLOAK_JWKS_URL
+  if (!jwksUrl) {
     throw new AuthError(500, 'JWKS URL not configured')
   }
 
-  // In production, verify JWT signature with Keycloak JWKS
-  // Using a simplified verification approach for the MVP
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) throw new Error('Invalid JWT structure')
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+  const issuer = process.env.KEYCLOAK_ISSUER
+  const audience = process.env.KEYCLOAK_AUDIENCE
 
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      throw new AuthError(401, 'Token expired')
-    }
+  try {
+    const jwks = getJwks()
+    const { payload } = await jwtVerify(token, jwks, {
+      ...(issuer ? { issuer } : {}),
+      ...(audience ? { audience } : {}),
+      clockTolerance: '5 seconds',
+    })
+
+    const rawScopes: string[] = Array.isArray(payload.scopes)
+      ? (payload.scopes as string[])
+      : typeof payload.scope === 'string'
+        ? payload.scope.split(' ').filter(Boolean)
+        : []
 
     return {
-      sub: payload.sub,
-      tenantId: payload.tenant_id ?? payload.tenantId,
-      scopes: payload.scopes ?? payload.scope?.split(' ') ?? [],
-      exp: payload.exp,
-      iat: payload.iat,
+      sub: payload.sub ?? '',
+      tenantId: (payload as Record<string, unknown>).tenant_id as string | undefined
+        ?? (payload as Record<string, unknown>).tenantId as string | undefined,
+      scopes: rawScopes,
+      exp: payload.exp ?? 0,
+      iat: payload.iat ?? 0,
     }
   } catch (err) {
     if (err instanceof AuthError) throw err
