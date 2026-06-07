@@ -72,6 +72,7 @@ test('keycloak admin adapter validates conflicting IAM configurations before bui
   const invalidClient = validateIamAdminRequest({
     resourceKind: 'client',
     action: 'create',
+    tenantId: 'tenant-starter-alpha',
     context: {
       scope: 'workspace',
       realmId: 'tenant-starter-alpha',
@@ -91,6 +92,7 @@ test('keycloak admin adapter validates conflicting IAM configurations before bui
   const invalidSamlClient = validateIamAdminRequest({
     resourceKind: 'client',
     action: 'update',
+    tenantId: 'tenant-starter-alpha',
     context: {
       scope: 'workspace',
       realmId: 'tenant-starter-alpha',
@@ -109,6 +111,7 @@ test('keycloak admin adapter validates conflicting IAM configurations before bui
   const invalidUser = validateIamAdminRequest({
     resourceKind: 'user',
     action: 'reset_credentials',
+    tenantId: 'tenant-starter-alpha',
     context: {
       scope: 'tenant',
       realmId: 'tenant-starter-alpha'
@@ -150,7 +153,7 @@ test('keycloak admin adapter builds stable adapter envelopes and normalized depe
     resourceKind: 'realm',
     action: 'create',
     callId: 'call_01iamrealmcreate',
-    tenantId: 'ten_01starteralpha',
+    tenantId: 'tenant-starter-alpha',
     workspaceId: 'wrk_01starterdev',
     planId: 'pln_01growth',
     correlationId: 'corr-iam-001',
