@@ -5,6 +5,7 @@
 #   - postgres : per-service relational store (backup-status, openapi-sdk, ...)
 #   - keycloak : internal IdP. Tenants map 1:1 to realms (realm name == tenantId);
 #                a realm's displayName is the authoritative tenant name.
+#   - redpanda : Kafka API broker (events, audit, CDC change streams).
 #
 # Lifecycle is driven by tests/env/up.sh (waits for health, provisions the admin
 # service account, applies migrations) and tests/env/down.sh.
@@ -43,4 +44,21 @@ services:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo ok >&3"]
       interval: 5s
       timeout: 4s
+      retries: 40
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
       retries: 40
