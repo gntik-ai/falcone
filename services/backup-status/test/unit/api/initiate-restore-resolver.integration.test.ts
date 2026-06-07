@@ -125,8 +125,10 @@ describe('initiate-restore: real ConfirmationsService + resolver injection', () 
   beforeEach(async () => {
     vi.resetModules()
     vi.stubEnv('TEST_MODE', 'true')
-    vi.stubEnv('KEYCLOAK_ADMIN_BASE_URL', '')
-    vi.stubEnv('KEYCLOAK_ADMIN_TOKEN_URL', '')
+    // Clear all Keycloak resolver config so the default (non-injected) resolver
+    // fails closed — base URL cannot be derived and admin creds are absent.
+    vi.stubEnv('KEYCLOAK_BASE_URL', '')
+    vi.stubEnv('KEYCLOAK_JWKS_URL', '')
     vi.stubEnv('KEYCLOAK_ADMIN_CLIENT_ID', '')
     vi.stubEnv('KEYCLOAK_ADMIN_CLIENT_SECRET', '')
     vi.mocked(validateToken).mockResolvedValue({

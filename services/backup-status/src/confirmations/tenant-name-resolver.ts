@@ -109,17 +109,46 @@ async function fetchAdminToken(
 }
 
 // ---------------------------------------------------------------------------
+// Config resolution — reuse Falcone's internal Keycloak conventions.
+//
+// Keycloak is an INTERNAL Falcone component, accessed the same way
+// provisioning-orchestrator already does (client-credentials → admin API).
+// So we DERIVE the admin/token URLs from the Keycloak base URL the service
+// already knows, instead of asking for a parallel set of env vars:
+//   - base URL: KEYCLOAK_BASE_URL, else stripped from KEYCLOAK_JWKS_URL
+//     (which the service already uses for token signature verification).
+//   - admin token: {base}/realms/master/protocol/openid-connect/token
+//     (mirrors provisioning-orchestrator's iam-collector/iam-applier).
+//   - realm lookup: {base}/admin/realms/{tenantId}.
+// The ONLY genuinely-new config is the service-account credentials, which the
+// chart already provisions (secret `in-falcone-keycloak-admin`):
+//   - KEYCLOAK_ADMIN_CLIENT_ID
+//   - KEYCLOAK_ADMIN_CLIENT_SECRET
+// ---------------------------------------------------------------------------
+
+function deriveKeycloakBaseUrl(): string | null {
+  const explicit = process.env.KEYCLOAK_BASE_URL
+  if (explicit && explicit.trim()) return explicit.trim().replace(/\/+$/, '')
+  const jwks = process.env.KEYCLOAK_JWKS_URL
+  if (jwks) {
+    const idx = jwks.indexOf('/realms/')
+    if (idx > 0) return jwks.slice(0, idx).replace(/\/+$/, '')
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Public factory
 // ---------------------------------------------------------------------------
 
 /**
  * Returns an authoritative resolver that fetches the Keycloak realm displayName.
  *
- * Required environment variables (read at call time so tests can stub them):
- *   KEYCLOAK_ADMIN_BASE_URL    — e.g. https://keycloak.internal/auth
- *   KEYCLOAK_ADMIN_TOKEN_URL   — e.g. https://keycloak.internal/auth/realms/master/protocol/openid-connect/token
- *   KEYCLOAK_ADMIN_CLIENT_ID   — client id with realm admin read rights
- *   KEYCLOAK_ADMIN_CLIENT_SECRET
+ * Configuration (read at call time so tests can stub it):
+ *   - Base URL is reused from KEYCLOAK_JWKS_URL (or KEYCLOAK_BASE_URL); the
+ *     admin-token and realm-lookup URLs are derived from it.
+ *   - KEYCLOAK_ADMIN_CLIENT_ID / KEYCLOAK_ADMIN_CLIENT_SECRET — the in-cluster
+ *     admin service account (chart secret `in-falcone-keycloak-admin`).
  *
  * @param deps Optional injectable dependencies (fetch, getAdminToken) for testing.
  */
@@ -130,16 +159,18 @@ export function createKeycloakTenantNameResolver(
 
   return async function resolveKeycloakTenantName(tenantId: string): Promise<string> {
     // --- Config validation (fail closed) ---
-    const adminBaseUrl = process.env.KEYCLOAK_ADMIN_BASE_URL
-    const tokenUrl = process.env.KEYCLOAK_ADMIN_TOKEN_URL
+    const adminBaseUrl = deriveKeycloakBaseUrl()
     const clientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID
     const clientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET
 
-    if (!adminBaseUrl || !tokenUrl || !clientId || !clientSecret) {
+    if (!adminBaseUrl || !clientId || !clientSecret) {
       throw new ConfirmationError(500, 'tenant_name_resolver_unavailable', {
-        detail: 'missing required KEYCLOAK_ADMIN_* environment variables',
+        detail: 'missing Keycloak base URL (KEYCLOAK_JWKS_URL/KEYCLOAK_BASE_URL) or admin service-account credentials (KEYCLOAK_ADMIN_CLIENT_ID/SECRET)',
       })
     }
+
+    // Admin token endpoint lives in the master realm (same as provisioning-orchestrator).
+    const tokenUrl = `${adminBaseUrl}/realms/master/protocol/openid-connect/token`
 
     // --- Cache hit ---
     const now = Date.now()
