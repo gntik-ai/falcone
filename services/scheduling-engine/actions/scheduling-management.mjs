@@ -75,7 +75,7 @@ export default async function main(params) {
   const { pg } = params;
   const identity = parseIdentity(params);
   if (!identity) {
-    return errorResponse(401, 'UNAUTHENTICATED', 'A valid JWT with tenantId and workspaceId claims is required.');
+    return errorResponse(401, 'UNAUTHENTICATED', 'Valid gateway-derived identity headers (X-Tenant-Id, X-Workspace-Id) are required.');
   }
   const method = params.method ?? 'GET';
   const path = params.path ?? '/v1/scheduling/jobs';

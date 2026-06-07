@@ -23,30 +23,30 @@ function pgStub() {
 
 test('request/response shapes follow contract', async () => {
   const pg = pgStub();
-  const created = await management({ pg, method: 'POST', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1', sub: 'u1' }, body: { name: 'cleanup', cronExpression: '0 * * * *', targetAction: 'w1/cleanup', payload: { mode: 'soft' } }, validateTargetAction: async () => true });
+  const created = await management({ pg, method: 'POST', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1', 'x-auth-subject': 'u1' }, body: { name: 'cleanup', cronExpression: '0 * * * *', targetAction: 'w1/cleanup', payload: { mode: 'soft' } }, validateTargetAction: async () => true });
   assert.equal(typeof created.body.jobId, 'string');
   assert.equal(typeof created.body.nextRunAt, 'string');
 
-  const list = await management({ pg, method: 'GET', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1' }, query: {} });
+  const list = await management({ pg, method: 'GET', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, query: {} });
   assert.ok(Array.isArray(list.body.items));
   assert.ok('nextCursor' in list.body);
 
-  const detail = await management({ pg, method: 'GET', path: '/v1/scheduling/jobs/job-1', jwt: { tenantId: 't1', workspaceId: 'w1' } });
+  const detail = await management({ pg, method: 'GET', path: '/v1/scheduling/jobs/job-1', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' } });
   assert.ok('payload' in detail.body);
 
-  const executions = await management({ pg, method: 'GET', path: '/v1/scheduling/jobs/job-1/executions', jwt: { tenantId: 't1', workspaceId: 'w1' }, query: {} });
+  const executions = await management({ pg, method: 'GET', path: '/v1/scheduling/jobs/job-1/executions', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, query: {} });
   assert.ok(Array.isArray(executions.body.items));
   assert.ok('executionId' in executions.body.items[0]);
 
-  const summary = await management({ pg, method: 'GET', path: '/v1/scheduling/summary', jwt: { tenantId: 't1', workspaceId: 'w1' } });
+  const summary = await management({ pg, method: 'GET', path: '/v1/scheduling/summary', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' } });
   assert.equal(typeof summary.body.activeJobs, 'number');
 
-  const config = await management({ pg, method: 'PATCH', path: '/v1/scheduling/config', jwt: { tenantId: 't1', workspaceId: 'w1' }, body: { schedulingEnabled: false } });
+  const config = await management({ pg, method: 'PATCH', path: '/v1/scheduling/config', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, body: { schedulingEnabled: false } });
   assert.equal(typeof config.body.schedulingEnabled, 'boolean');
 });
 
 test('error envelope shape is stable', async () => {
   const pg = pgStub();
-  const response = await management({ pg, method: 'POST', path: '/v1/scheduling/jobs', jwt: { tenantId: 't1', workspaceId: 'w1' }, body: { name: 'bad', cronExpression: '* * *', targetAction: 'w1/cleanup', payload: {} } });
+  const response = await management({ pg, method: 'POST', path: '/v1/scheduling/jobs', __ow_headers: { 'x-tenant-id': 't1', 'x-workspace-id': 'w1' }, body: { name: 'bad', cronExpression: '* * *', targetAction: 'w1/cleanup', payload: {} } });
   assert.deepEqual(Object.keys(response.body), ['code', 'message', 'details']);
 });
