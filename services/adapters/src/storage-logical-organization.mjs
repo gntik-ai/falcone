@@ -1,3 +1,5 @@
+import { posix as posixPath } from 'node:path';
+
 import { buildTenantStorageContextRecord } from './storage-tenant-context.mjs';
 
 const ORGANIZATION_STRATEGY = 'tenant-workspace-application-prefix-v1';
@@ -156,6 +158,14 @@ export function buildStorageObjectOrganization(input = {}) {
     ? organization.applicationRootPrefixTemplate.replace('{applicationId}', applicationId.trim())
     : organization.workspaceSharedPrefix;
   const canonicalObjectPath = `${objectPrefix}${normalizedObjectKey}`;
+
+  // Defense-in-depth: normalize the canonical path and assert it still begins
+  // with the workspace/application prefix so that any residual traversal
+  // sequences (e.g. '..') cannot escape the caller's prefix scope.
+  const normalizedCanonical = posixPath.normalize(canonicalObjectPath);
+  if (!normalizedCanonical.startsWith(objectPrefix)) {
+    throw new Error('INVALID_OBJECT_KEY');
+  }
 
   return {
     strategy: organization.strategy,
