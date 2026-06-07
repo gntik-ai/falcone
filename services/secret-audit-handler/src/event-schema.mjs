@@ -20,6 +20,7 @@ export const SecretAuditEvent = {
         serviceAccount: { type: 'string' }
       }
     },
+    tenantId: { type: ['string', 'null'] },
     result: { enum: ['success', 'denied', 'error'] },
     denialReason: { type: ['string', 'null'] },
     vaultRequestId: { type: 'string' }

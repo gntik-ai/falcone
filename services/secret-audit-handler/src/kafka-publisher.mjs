@@ -1,13 +1,20 @@
-import { Kafka, logLevel } from 'kafkajs';
 import { validateAuditEvent } from './event-schema.mjs';
+import { resolveAuditTopic } from './topic-router.mjs';
 
-export function createPublisher({ brokers, topic, producer: injectedProducer }) {
-  const kafka = injectedProducer ? null : new Kafka({
-    brokers,
-    logLevel: logLevel.NOTHING,
-    retry: { retries: 5, initialRetryTime: 300 }
-  });
-  const producer = injectedProducer ?? kafka.producer();
+export async function createPublisher({ brokers, topic, producer: injectedProducer }) {
+  let producer;
+
+  if (injectedProducer) {
+    producer = injectedProducer;
+  } else {
+    const { Kafka, logLevel } = await import('kafkajs');
+    const kafka = new Kafka({
+      brokers,
+      logLevel: logLevel.NOTHING,
+      retry: { retries: 5, initialRetryTime: 300 }
+    });
+    producer = kafka.producer();
+  }
 
   return {
     async connect() {
@@ -15,9 +22,10 @@ export function createPublisher({ brokers, topic, producer: injectedProducer }) 
     },
     async publishAuditEvent(event) {
       validateAuditEvent(event);
+      const resolvedTopic = resolveAuditTopic(topic, event);
       try {
         await producer.send({
-          topic,
+          topic: resolvedTopic,
           messages: [{
             key: event.domain,
             value: JSON.stringify(event),

@@ -11,7 +11,7 @@ if (brokers.length === 0) {
   process.exit(1);
 }
 
-const publisher = createPublisher({ brokers, topic });
+const publisher = await createPublisher({ brokers, topic });
 
 try {
   await publisher.connect();
