@@ -9,6 +9,142 @@ import { REDACTED_MARKER, zeroCounts } from '../reprovision/types.mjs';
 const RESOURCE_TYPES = ['schemas', 'tables', 'views', 'extensions', 'grants'];
 const IGNORE_KEYS = ['oid', 'tableowner', 'schemaname'];
 
+// ---------------------------------------------------------------------------
+// Validation helpers — pure, no I/O
+// ---------------------------------------------------------------------------
+
+/**
+ * PostgreSQL base type names (without length/precision modifiers or array suffix).
+ * Case-insensitive; used inside _isValidDataType.
+ */
+const _PG_BASE_TYPE_RE = new RegExp(
+  '^(' +
+    'boolean|bool' +
+    '|smallint|int2' +
+    '|integer|int|int4' +
+    '|bigint|int8' +
+    '|real|float4' +
+    '|double precision|float8' +
+    '|numeric|decimal' +
+    '|money' +
+    '|text' +
+    '|varchar|character varying' +
+    '|char|character' +
+    '|bytea' +
+    '|date' +
+    '|time without time zone|time with time zone|timetz|time' +
+    '|timestamp without time zone|timestamp with time zone|timestamptz|timestamp' +
+    '|interval' +
+    '|uuid' +
+    '|json|jsonb' +
+    '|inet|cidr|macaddr' +
+    '|smallserial|serial2|serial|serial4|bigserial|serial8' +
+  ')' +
+  // optional length/precision: (n) or (n,m)
+  '(\\s*\\(\\s*\\d+(\\s*,\\s*\\d+)?\\s*\\))?' +
+  // optional array suffix(es): [] or [n]
+  '(\\s*\\[\\s*\\d*\\s*\\])*' +
+  '$',
+  'i',
+);
+
+/**
+ * Returns true if the data_type string is a safe, known PostgreSQL type.
+ * Quickly rejects anything containing `;`, `)` (outside allowed forms), quotes, or `--`.
+ * @param {string} value
+ * @returns {boolean}
+ */
+function _isValidDataType(value) {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  // Fast-reject dangerous characters before regex
+  if (/[;'"\\]/.test(v) || v.includes('--')) return false;
+  return _PG_BASE_TYPE_RE.test(v);
+}
+
+/**
+ * Returns true if the column_default value is safe to interpolate.
+ * Accepts: numeric literals, single-quoted strings (no embedded quote/semicolon),
+ * true/false/null, now(), gen_random_uuid(), CURRENT_TIMESTAMP.
+ * @param {string|null|undefined} value
+ * @returns {boolean}
+ */
+function _isSafeColumnDefault(value) {
+  if (value == null) return true; // no default → fine
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  // Numeric literal (including negative)
+  if (/^-?\d+(\.\d+)?$/.test(v)) return true;
+  // Single-quoted string literal — no embedded single-quote, no semicolon
+  if (/^'[^';]*'$/.test(v)) return true;
+  // Boolean / null keywords
+  if (/^(true|false|null)$/i.test(v)) return true;
+  // Approved zero-arg function calls
+  if (/^(now\(\)|gen_random_uuid\(\)|CURRENT_TIMESTAMP)$/i.test(v)) return true;
+  return false;
+}
+
+/** Fixed set of SQL privilege keywords (case-insensitive trimmed match). */
+const _ALLOWED_PRIVILEGES = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']);
+
+/**
+ * Returns true if privilege_type is in the fixed SQL privilege keyword set.
+ * @param {string} value
+ * @returns {boolean}
+ */
+function _isValidPrivilege(value) {
+  if (typeof value !== 'string') return false;
+  return _ALLOWED_PRIVILEGES.has(value.trim().toUpperCase());
+}
+
+/**
+ * Validate ALL resource items in domainData BEFORE any I/O.
+ * Returns an array of { resourceType, item, messages[] } for every invalid item.
+ * @param {Object} domainData
+ * @returns {{ resourceType: string, itemName: string, messages: string[] }[]}
+ */
+function _validateAll(domainData) {
+  const errors = [];
+
+  for (const resourceType of RESOURCE_TYPES) {
+    const items = domainData[resourceType];
+    if (!Array.isArray(items)) continue;
+
+    for (const item of items) {
+      const itemName = item.name ?? 'unknown';
+      const messages = [];
+
+      if (resourceType === 'tables' && Array.isArray(item.columns)) {
+        for (const col of item.columns) {
+          const colName = col.column_name ?? col.name ?? '?';
+          if (!_isValidDataType(col.data_type)) {
+            messages.push(`Column '${colName}': invalid data_type '${col.data_type}'`);
+          }
+          if (!_isSafeColumnDefault(col.column_default)) {
+            messages.push(`Column '${colName}': unsafe column_default '${col.column_default}'`);
+          }
+        }
+      }
+
+      if (resourceType === 'grants') {
+        if (!_isValidPrivilege(item.privilege_type)) {
+          messages.push(`Grant: invalid privilege_type '${item.privilege_type}'`);
+        }
+      }
+
+      if (resourceType === 'views' && item.definition != null) {
+        messages.push(`View '${itemName}': tenant-supplied 'definition' is not permitted`);
+      }
+
+      if (messages.length > 0) {
+        errors.push({ resourceType, itemName, messages });
+      }
+    }
+  }
+
+  return errors;
+}
+
 /**
  * @param {string} tenantId
  * @param {Object} domainData
@@ -37,6 +173,26 @@ export async function apply(tenantId, domainData, options = {}) {
   });
 
   const schema = domainData.schema ?? tenantId.replace(/-/g, '_');
+
+  // Validation pass — pure, no query calls.
+  // Reject the ENTIRE operation if ANY item is invalid.
+  const validationErrors = _validateAll(domainData);
+  if (validationErrors.length > 0) {
+    const errorCounts = zeroCounts();
+    const errorResults = validationErrors.map(({ resourceType, itemName, messages }) => {
+      errorCounts.errors++;
+      return {
+        resource_type: resourceType,
+        resource_name: itemName,
+        resource_id: null,
+        action: 'error',
+        message: messages.join('; '),
+        warnings: [],
+        diff: null,
+      };
+    });
+    return { domain_key, status: 'error', resource_results: errorResults, counts: errorCounts, message: 'Validation failed' };
+  }
 
   for (const resourceType of RESOURCE_TYPES) {
     const items = domainData[resourceType];
