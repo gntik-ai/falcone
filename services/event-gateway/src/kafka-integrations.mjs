@@ -93,7 +93,7 @@ function normalizeSourceType(sourceType) {
 }
 
 function normalizeTopicRef(topicRef, context = {}, topic = {}) {
-  return topicRef ?? context.topicRef ?? topic.resourceId ?? topic.topicRef;
+  return context.topicRef ?? topic.resourceId ?? topic.topicRef ?? topicRef;
 }
 
 function uniqueStrings(values = []) {
