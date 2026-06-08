@@ -140,54 +140,81 @@ spec:
       burst: 60
       timeoutProfile: control_plane
       retryProfile: mutations
+      limitKey: X-Tenant-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     tenant_control:
       rateLimitClass: control-write
       requestsPerMinute: 240
       burst: 60
       timeoutProfile: control_plane
       retryProfile: mutations
+      limitKey: X-Tenant-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     workspace_control:
       rateLimitClass: control-write
       requestsPerMinute: 240
       burst: 60
       timeoutProfile: control_plane
       retryProfile: mutations
+      limitKey: X-Tenant-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     auth_control:
       rateLimitClass: catalog
       requestsPerMinute: 180
       burst: 40
       timeoutProfile: control_plane
       retryProfile: mutations
+      limitKey: X-Tenant-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     provisioning:
       rateLimitClass: data-control
       requestsPerMinute: 120
       burst: 30
       timeoutProfile: provisioning
       retryProfile: mutations
+      limitKey: X-Tenant-Id:X-Workspace-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     observability:
       rateLimitClass: observability
       requestsPerMinute: 300
       burst: 80
       timeoutProfile: observability
       retryProfile: safe_reads
+      limitKey: X-Tenant-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     event_gateway:
       rateLimitClass: event-gateway-publish
       requestsPerMinute: 180
       burst: 60
       timeoutProfile: event_gateway
       retryProfile: mutations
+      limitKey: X-Tenant-Id:X-Workspace-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     realtime:
       rateLimitClass: event-gateway-stream
       requestsPerMinute: 180
       burst: 80
       timeoutProfile: realtime
       retryProfile: mutations
+      limitKey: X-Tenant-Id:X-Workspace-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
     native_admin:
       rateLimitClass: native-admin
       requestsPerMinute: 30
       burst: 10
       timeoutProfile: native_admin
       retryProfile: native_admin
+      limitKey: X-Tenant-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
   internalRequestMode:
     mode: validated_attestation
     trustBoundary: gateway_to_control_plane
