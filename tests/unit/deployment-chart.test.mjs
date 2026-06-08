@@ -102,7 +102,9 @@ test('deployment chart keeps the Keycloak platform and tenant IAM bootstrap base
 });
 
 test('all expected component aliases are present in the root chart dependencies', () => {
-  const aliases = readRootChart().dependencies.map((entry) => entry.alias);
+  const aliases = readRootChart()
+    .dependencies.filter((entry) => entry.name === 'component-wrapper')
+    .map((entry) => entry.alias);
   assert.deepEqual(aliases, REQUIRED_COMPONENT_ALIASES);
 });
 
