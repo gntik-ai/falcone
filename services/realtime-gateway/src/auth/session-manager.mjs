@@ -191,6 +191,14 @@ export function createSessionManager({
 
     const priorStatus = session.status;
     const claims = await validateTokenFn(newBearerToken);
+
+    if (claims.tenant_id !== session.tenantId || claims.sub !== session.actorIdentity) {
+      await closeSession(sessionId, db);
+      const err = new Error('Refresh token identity does not match session');
+      err.code = 'IDENTITY_MISMATCH';
+      throw err;
+    }
+
     session.claims = claims;
     session.token = newBearerToken;
     session.tokenJti = claims.jti;
