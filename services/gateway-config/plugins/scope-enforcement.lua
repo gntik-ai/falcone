@@ -6,13 +6,22 @@ local _M = { version = 0.1, priority = 2900, name = plugin_name }
 local requirements_cache = lrucache.new(200)
 local privilege_domain_cache = lrucache.new(200)
 local function_subdomain_cache = lrucache.new(200)
+-- Reuses the same plan-capability resolution path as entitlement checks (design D2):
+-- caches the resolved per-tenant requests/minute ceiling keyed by plan id.
+local plan_rate_limit_cache = lrucache.new(200)
 
 local schema = {
   type = "object",
   properties = {
     required_scopes = { type = "array", items = { type = "string" } },
     required_entitlements = { type = "array", items = { type = "string" } },
-    workspace_scoped = { type = "boolean", default = true }
+    workspace_scoped = { type = "boolean", default = true },
+    -- Static per-route requests/minute floor from the qosProfile YAML; used as the
+    -- fallback when the per-tenant plan quota cannot be resolved (D3) and as the
+    -- grace-period floor (limitCeiling: max_of_plan_and_static, D-risk mitigation).
+    static_requests_per_minute = { type = "integer", minimum = 0 },
+    -- The plan quota metric key carrying the per-tenant requests/minute ceiling.
+    rate_limit_metric_key = { type = "string", default = "tenant.api_requests_per_minute.max" }
   }
 }
 
@@ -250,6 +259,51 @@ function _M.evaluate_function_subdomain(ctx, claims)
   return nil
 end
 
+local function plan_rate_cache_ttl_seconds()
+  return tonumber(os.getenv("SCOPE_ENFORCEMENT_PLAN_CACHE_TTL_SECONDS") or "30") or 30
+end
+
+-- Hook point for the control-plane plan-quota lookup. Returns the per-tenant
+-- requests/minute ceiling for a plan, or nil when it cannot be resolved. The
+-- resolved value mirrors internal-contracts resolveTenantRateLimit(); the live
+-- value is supplied by the sidecar and cached here. Returns nil by default so
+-- the static YAML floor remains authoritative until the lookup is wired in.
+function _M.fetch_plan_requests_per_minute(_plan_id, _metric_key)
+  return nil
+end
+
+-- Resolve the effective per-tenant requests/minute ceiling (design D2/D3):
+--   max(plan_quota, static_floor) when a plan quota is resolvable, else the
+--   static floor. The value is exposed as ctx.var.tenant_rate_limit_rpm so the
+--   limit-count plugin (or downstream tooling) can partition the counter by the
+--   per-tenant budget instead of a single global constant.
+function _M.resolve_tenant_rate_limit(conf, claims)
+  local static_floor = tonumber(conf and conf.static_requests_per_minute) or 0
+  local plan_id = claims and claims.plan_id
+  if not plan_id then
+    return static_floor
+  end
+
+  local metric_key = (conf and conf.rate_limit_metric_key) or "tenant.api_requests_per_minute.max"
+  local cache_key = plan_id .. ":" .. metric_key
+  local plan_quota = plan_rate_limit_cache:get(cache_key)
+  if plan_quota == nil then
+    plan_quota = _M.fetch_plan_requests_per_minute(plan_id, metric_key)
+    if plan_quota ~= nil then
+      plan_rate_limit_cache:set(cache_key, plan_quota, plan_rate_cache_ttl_seconds())
+    end
+  end
+
+  if type(plan_quota) ~= "number" then
+    return static_floor
+  end
+
+  if plan_quota > static_floor then
+    return plan_quota
+  end
+  return static_floor
+end
+
 function _M.check_schema(conf)
   return core.schema.check(schema, conf)
 end
@@ -293,6 +347,14 @@ function _M.access(conf, ctx)
 
   local function_result = _M.evaluate_function_subdomain(ctx, claims)
   if function_result then return function_result end
+
+  -- Expose the resolved per-tenant requests/minute ceiling for the limit-count
+  -- plugin to consume; falls back to the static YAML constant when the plan
+  -- quota is unresolvable (design D2/D3).
+  local tenant_rate_limit = _M.resolve_tenant_rate_limit(conf, claims)
+  if ctx.var then
+    ctx.var.tenant_rate_limit_rpm = tenant_rate_limit
+  end
 
   core.request.set_header(ctx, "X-Enforcement-Verified", "true")
   core.request.set_header(ctx, "X-Verified-Tenant-Id", claims.tenant_id or "")
