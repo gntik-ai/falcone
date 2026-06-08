@@ -264,6 +264,9 @@ importers:
       pg:
         specifier: ^8.13.1
         version: 8.16.3
+      undici:
+        specifier: ^6.21.0
+        version: 6.24.1
 
   services/workspace-docs-service:
     dependencies:
