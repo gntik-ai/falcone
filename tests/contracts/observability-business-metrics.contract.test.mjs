@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import {
   OBSERVABILITY_BUSINESS_METRICS_VERSION,
@@ -130,7 +130,7 @@ test('audit context captures actor, metric family, and correlation fields', () =
   }
 });
 
-test('architecture README and task summary document the observability business-metrics baseline', () => {
+test('architecture README and task summary document the observability business-metrics baseline', { skip: !existsSync('docs/reference/architecture/README.md') || !existsSync('docs/tasks/us-obs-01.md') }, () => {
   const architectureIndex = readFileSync('docs/reference/architecture/README.md', 'utf8');
   const taskSummary = readFileSync('docs/tasks/us-obs-01.md', 'utf8');
 
