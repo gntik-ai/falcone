@@ -77,13 +77,25 @@ export async function main(params: ActionParams): Promise<ActionResponse> {
       return { statusCode: 400, headers, body: { error: 'Missing operation id' } }
     }
 
-    const operation = await repo.findById(operationId)
+    const hasGlobal = token.scopes.includes('backup:read:global')
+
+    // Non-global callers are scoped to their own tenant at the query layer, so a
+    // cross-tenant id returns null -> uniform 404 (no 404-vs-403 existence oracle).
+    // backup:read:global is a platform-level scope that may read any tenant.
+    const operation = hasGlobal
+      ? await repo.findById(operationId)
+      : await repo.findById(operationId, token.tenantId)
     if (!operation) {
       return { statusCode: 404, headers, body: { error: 'Operation not found' } }
     }
 
-    // Access control: requester owns the operation, or has global read scope
-    if (token.sub !== operation.requesterId && !token.scopes.includes('backup:read:global')) {
+    // Non-global caller must own the operation's tenant; mismatch -> uniform 404 (no oracle).
+    if (!hasGlobal && operation.tenantId !== token.tenantId) {
+      return { statusCode: 404, headers, body: { error: 'Operation not found' } }
+    }
+
+    // Within-tenant authorization: requester owns the operation, or holds global read scope.
+    if (token.sub !== operation.requesterId && !hasGlobal) {
       return { statusCode: 403, headers, body: { error: 'Insufficient scope' } }
     }
 
