@@ -1144,6 +1144,44 @@ export function resolveTenantEffectiveCapabilities({ tenantId = null, planId, re
   });
 }
 
+export const TENANT_RATE_LIMIT_METRIC_KEY = 'tenant.api_requests_per_minute.max';
+
+/**
+ * Resolve the effective per-tenant gateway rate-limit ceiling (requests/minute).
+ *
+ * The plan-quota ceiling comes from the tenant's active plan via
+ * `resolveTenantEffectiveCapabilities`. During the grace period the gateway
+ * applies the *maximum* of the plan quota and the static YAML floor
+ * (`limitCeiling: max_of_plan_and_static`), so a downgrade never drops a tenant
+ * below the previously published static budget. The static floor is also the
+ * fallback when a request has no resolvable plan.
+ *
+ * @param {{ planId?: string|null, staticFloor?: number }} params
+ * @returns {number} effective requests-per-minute ceiling
+ */
+export function resolveTenantRateLimit({ planId = null, staticFloor = 0 } = {}) {
+  const floor = Number.isFinite(staticFloor) ? staticFloor : 0;
+
+  if (!planId) {
+    return floor;
+  }
+
+  let planQuota = null;
+  try {
+    const resolution = resolveTenantEffectiveCapabilities({ planId });
+    const quota = (resolution.quotas ?? []).find((entry) => entry.metricKey === TENANT_RATE_LIMIT_METRIC_KEY);
+    planQuota = quota && Number.isFinite(quota.limit) ? quota.limit : null;
+  } catch {
+    planQuota = null;
+  }
+
+  if (planQuota === null) {
+    return floor;
+  }
+
+  return Math.max(planQuota, floor);
+}
+
 export function resolveWorkspaceEffectiveCapabilities({
   tenantId = null,
   workspaceId,
