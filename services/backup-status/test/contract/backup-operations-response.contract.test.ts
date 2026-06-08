@@ -68,7 +68,8 @@ describe('Contract: snapshots response', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('each snapshot has snapshot_id, created_at, available and no internal fields', async () => {
-    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: ['backup-status:read:global'], exp: 0, iat: 0 })
+    // Platform operator: actorType='platform_operator' + :global scope — may list any tenant
+    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: ['backup-status:read:global'], actorType: 'platform_operator', exp: 0, iat: 0 })
     mockCaps.mockReturnValue({ triggerBackup: true, triggerRestore: true, listSnapshots: true })
 
     const mockAdapter = {

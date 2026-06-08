@@ -57,6 +57,7 @@ export async function validateToken(token) {
       return {
         sub: payload.sub ?? 'test-user',
         tenantId: payload.tenant_id ?? payload.tenantId,
+        actorType: payload.actor_type ?? payload.actorType,
         scopes: payload.scopes ?? payload.scope?.split(' ') ?? [],
         exp: payload.exp ?? Math.floor(Date.now() / 1000) + 3600,
         iat: payload.iat ?? Math.floor(Date.now() / 1000),
@@ -92,6 +93,7 @@ export async function validateToken(token) {
     return {
       sub: payload.sub ?? '',
       tenantId: payload.tenant_id ?? payload.tenantId,
+      actorType: payload.actor_type ?? payload.actorType,
       scopes: rawScopes,
       exp: payload.exp ?? 0,
       iat: payload.iat ?? 0,
