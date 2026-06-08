@@ -99,11 +99,15 @@ data:
 {{- $_ := set $cors "max_age" $.Values.gatewayPolicy.cors.maxAgeSeconds -}}
 {{- end }}
 {{- if and $qosProfileName (hasKey $plugins "limit-count") }}
+{{- /* Static requestsPerMinute is the grace-period floor (limitCeiling: max_of_plan_and_static);
+       the scope-enforcement plugin raises it to the resolved per-tenant plan quota at runtime. */ -}}
 {{- $_ := set (index $plugins "limit-count") "count" ($qosProfile.requestsPerMinute | default 60) -}}
 {{- $_ := set (index $plugins "limit-count") "time_window" 60 -}}
 {{- $_ := set (index $plugins "limit-count") "rejected_code" 429 -}}
-{{- $_ := set (index $plugins "limit-count") "key_type" "var" -}}
-{{- $_ := set (index $plugins "limit-count") "key" "$consumer_name" -}}
+{{- /* Partition the rate-limit counter per tenant (and per workspace for workspace-bound
+       families) using the qosProfile limitKeyType/limitKeyVar; fall back to the per-tenant var. */ -}}
+{{- $_ := set (index $plugins "limit-count") "key_type" ($qosProfile.limitKeyType | default "var") -}}
+{{- $_ := set (index $plugins "limit-count") "key" ($qosProfile.limitKeyVar | default "$http_x_tenant_id") -}}
 {{- $_ := set (index $plugins "limit-count") "allow_degradation" false -}}
 {{- end }}
 {{- if and $validationProfileName (hasKey $plugins "client-control") }}
