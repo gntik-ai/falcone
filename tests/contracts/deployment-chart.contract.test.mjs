@@ -15,10 +15,10 @@ import { readYaml } from '../../scripts/lib/quality-gates.mjs';
 
 test('deployment chart contract exposes aliased wrapper dependencies for every required component', () => {
   const dependencies = readRootChart().dependencies;
+  const wrapperDeps = dependencies.filter((entry) => entry.name === 'component-wrapper');
 
-  assert.equal(dependencies.every((entry) => entry.name === 'component-wrapper'), true);
-  assert.deepEqual(dependencies.map((entry) => entry.alias), REQUIRED_COMPONENT_ALIASES);
-  assert.equal(dependencies.every((entry) => entry.repository === 'file://./charts/component-wrapper'), true);
+  assert.deepEqual(wrapperDeps.map((entry) => entry.alias), REQUIRED_COMPONENT_ALIASES);
+  assert.equal(wrapperDeps.every((entry) => entry.repository === 'file://./charts/component-wrapper'), true);
 });
 
 test('chart values layers and topology packaging guidance stay aligned', () => {

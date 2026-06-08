@@ -1,3 +1,7 @@
+eso:
+  serviceAccountName: "eso-vault-auth"
+  tokenTTL: "24h"
+
 vault:
   namespace: secret-store
   replicas: 1
