@@ -4,6 +4,7 @@ import {
   getOperationResult,
   listOperations
 } from '../repositories/async-operation-query-repo.mjs';
+import { buildCallerContext } from './caller-context.mjs';
 
 const VALID_QUERY_TYPES = new Set(['list', 'detail', 'logs', 'result']);
 const ERROR_STATUS_CODES = {
@@ -37,10 +38,6 @@ function requireOperationId(queryType, operationId) {
       statusCode: 400
     });
   }
-}
-
-function getCallerContext(params = {}) {
-  return params.callerContext ?? {};
 }
 
 function requireCallerIdentity(callerContext) {
@@ -170,7 +167,14 @@ export function buildQueryActionDependencies(overrides = {}) {
 export async function main(params = {}, overrides = {}) {
   const startedAt = Date.now();
   const dependencies = buildQueryActionDependencies(overrides);
-  const callerContext = getCallerContext(params);
+  const callerContext = buildCallerContext(params);
+
+  if (!callerContext) {
+    return {
+      statusCode: 401,
+      body: { code: 'UNAUTHORIZED', message: 'Missing or untrusted caller identity headers' }
+    };
+  }
 
   requireCallerIdentity(callerContext);
   requireQueryType(params.queryType);
