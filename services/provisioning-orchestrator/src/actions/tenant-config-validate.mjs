@@ -14,31 +14,9 @@ import {
 } from '../schemas/index.mjs';
 import { validate } from '../schemas/schema-validator.mjs';
 import { publishValidationEvent } from '../events/config-schema-events.mjs';
+import { parseConfigIdentity } from './tenant-config-identity.mjs';
 
 const DEFAULT_MAX_INPUT_BYTES = 10_485_760; // 10 MB
-
-/**
- * Extract and validate JWT claims from OpenWhisk params.
- */
-function extractAuth(params) {
-  const authHeader = params?.__ow_headers?.authorization ?? '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf-8'));
-    const roles = payload.realm_access?.roles ?? [];
-    const scopes = (payload.scope ?? '').split(' ').filter(Boolean);
-    let actor_type = null;
-    if (roles.includes('superadmin')) actor_type = 'superadmin';
-    else if (roles.includes('sre')) actor_type = 'sre';
-    else if (payload.azp && !roles.includes('tenant_owner') && scopes.includes('platform:admin:config:export')) actor_type = 'service_account';
-
-    return actor_type ? { actor_id: payload.sub ?? payload.preferred_username ?? 'unknown', actor_type, scopes } : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * @param {Object} params - OpenWhisk action params (body is the artifact)
@@ -54,12 +32,12 @@ export async function main(params = {}, overrides = {}) {
   const correlationId = `req-${randomUUID().slice(0, 12)}`;
 
   // --- Auth ---
-  const auth = overrides.auth ?? extractAuth(params);
+  const auth = overrides.auth ?? parseConfigIdentity(params);
   if (!auth) {
-    return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:export' } };
+    return { statusCode: 401, body: { code: 'UNAUTHORIZED', error: 'Unauthorized: missing identity headers' } };
   }
-  if (!auth.scopes?.includes('platform:admin:config:export') && !overrides.auth) {
-    return { statusCode: 403, body: { error: 'Forbidden: missing scope platform:admin:config:export' } };
+  if (!auth.actor_type || (!auth.scopes?.includes('platform:admin:config:export') && !overrides.auth)) {
+    return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:export' } };
   }
 
   // --- Extract tenant_id (from route) ---
