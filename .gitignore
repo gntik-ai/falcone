@@ -20,5 +20,9 @@ specs/
 !tests/e2e/specs/
 !tests/e2e/specs/**
 
+# Playwright E2E run output (reports, traces, screenshots) — never commit
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+
 # Local cluster kubeconfig (sensitive credentials — never commit)
 kubeconfig-test-cluster-b.yaml
