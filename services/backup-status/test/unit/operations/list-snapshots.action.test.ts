@@ -38,7 +38,8 @@ describe('list-snapshots.action', () => {
   })
 
   it('returns 422 when adapter does not support listSnapshots', async () => {
-    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: ['backup-status:read:global'], exp: 0, iat: 0 })
+    // Platform operator: actorType='platform_operator' + :global scope — may list any tenant
+    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: ['backup-status:read:global'], actorType: 'platform_operator', exp: 0, iat: 0 })
     mockCaps.mockReturnValue({ triggerBackup: false, triggerRestore: false, listSnapshots: false })
 
     const res = await main({
@@ -50,7 +51,8 @@ describe('list-snapshots.action', () => {
   })
 
   it('CA-05: returns sanitized snapshots with schema v1', async () => {
-    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: ['backup-status:read:global'], exp: 0, iat: 0 })
+    // Platform operator: actorType='platform_operator' + :global scope — may list any tenant
+    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: ['backup-status:read:global'], actorType: 'platform_operator', exp: 0, iat: 0 })
     mockCaps.mockReturnValue({ triggerBackup: true, triggerRestore: true, listSnapshots: true })
 
     const mockAdapter = {
@@ -77,5 +79,79 @@ describe('list-snapshots.action', () => {
     // No internal fields leaked
     expect(body.snapshots[0].namespace).toBeUndefined()
     expect(body.snapshots[0].storagePath).toBeUndefined()
+  })
+
+  // --- IDOR / tenant-scope tests (bbx-snapshots-scope) ---
+
+  it('bbx-snapshots-scope-01: :own scope caller cannot list another tenant snapshots → 403', async () => {
+    mockValidate.mockResolvedValue({ sub: 'user-a', tenantId: 'ten_A', scopes: ['backup-status:read:own'], exp: 0, iat: 0 })
+
+    const res = await main({
+      __ow_headers: { authorization: 'Bearer t' },
+      tenant_id: 'ten_B', component_type: 'postgresql', instance_id: 'pg-1',
+    })
+
+    expect(res.statusCode).toBe(403)
+    // Must not disclose snapshot data
+    const body = res.body as any
+    expect(body.snapshots).toBeUndefined()
+  })
+
+  it('bbx-snapshots-scope-02: :own scope caller can list their own tenant snapshots → 200', async () => {
+    mockValidate.mockResolvedValue({ sub: 'user-a', tenantId: 'ten_A', scopes: ['backup-status:read:own'], exp: 0, iat: 0 })
+    mockCaps.mockReturnValue({ triggerBackup: true, triggerRestore: true, listSnapshots: true })
+    const mockAdapter = {
+      listSnapshots: vi.fn().mockResolvedValue([
+        { snapshotId: 'snap-own-1', createdAt: new Date('2026-01-01T00:00:00Z'), available: true, sizeBytes: 512, label: null },
+      ]),
+    }
+    mockGetAdapter.mockReturnValue(mockAdapter as any)
+    mockIsAction.mockReturnValue(true)
+
+    const res = await main({
+      __ow_headers: { authorization: 'Bearer t' },
+      tenant_id: 'ten_A', component_type: 'postgresql', instance_id: 'pg-1',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.body as any
+    expect(body.tenant_id).toBe('ten_A')
+    expect(body.snapshots).toHaveLength(1)
+  })
+
+  it('bbx-snapshots-scope-03: :global scope with non-platform-operator actor listing foreign tenant → 403', async () => {
+    // Tenant-scoped actor accidentally granted :global — must still be rejected for foreign tenants
+    mockValidate.mockResolvedValue({ sub: 'user-a', tenantId: 'ten_A', scopes: ['backup-status:read:global'], actorType: 'tenant_user', exp: 0, iat: 0 })
+
+    const res = await main({
+      __ow_headers: { authorization: 'Bearer t' },
+      tenant_id: 'ten_B', component_type: 'postgresql', instance_id: 'pg-1',
+    })
+
+    expect(res.statusCode).toBe(403)
+    const body = res.body as any
+    expect(body.snapshots).toBeUndefined()
+  })
+
+  it('bbx-snapshots-scope-04: platform operator with :global scope can list any tenant snapshots → 200', async () => {
+    mockValidate.mockResolvedValue({ sub: 'platform-op', tenantId: 'ten_A', scopes: ['backup-status:read:global'], actorType: 'platform_operator', exp: 0, iat: 0 })
+    mockCaps.mockReturnValue({ triggerBackup: true, triggerRestore: true, listSnapshots: true })
+    const mockAdapter = {
+      listSnapshots: vi.fn().mockResolvedValue([
+        { snapshotId: 'snap-x', createdAt: new Date('2026-01-01T00:00:00Z'), available: true, sizeBytes: 256, label: null },
+      ]),
+    }
+    mockGetAdapter.mockReturnValue(mockAdapter as any)
+    mockIsAction.mockReturnValue(true)
+
+    const res = await main({
+      __ow_headers: { authorization: 'Bearer t' },
+      tenant_id: 'ten_B', component_type: 'postgresql', instance_id: 'pg-1',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.body as any
+    expect(body.tenant_id).toBe('ten_B')
+    expect(body.snapshots).toHaveLength(1)
   })
 })
