@@ -96,6 +96,94 @@ export async function apply(tenantId, domainData, options = {}) {
   return { domain_key, status, resource_results, counts, message: null };
 }
 
+/**
+ * Symmetric reverse of {@link apply}: deletes the tenant's Kafka topics and ACLs
+ * using the SAME injected admin client. Idempotent (only deletes topics that
+ * currently exist) and honors options.dryRun. Returns a DomainResult.
+ *
+ * @param {string} tenantId
+ * @param {Object} domainData
+ * @param {Object} options
+ * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
+ */
+export async function teardown(tenantId, domainData = {}, options = {}) {
+  const { dryRun = false, credentials = {}, log = console } = options;
+  const domain_key = 'kafka';
+  const counts = zeroCounts();
+  const resource_results = [];
+
+  const admin = credentials.kafkaAdmin ?? null;
+
+  const topics = Array.isArray(domainData?.topics) ? domainData.topics : [];
+  const acls = Array.isArray(domainData?.acls) ? domainData.acls : [];
+
+  // Topics: delete only those that currently exist (idempotent).
+  if (topics.length > 0) {
+    let existing = [];
+    try {
+      if (admin) existing = await admin.listTopics();
+    } catch { /* treat as none existing */ }
+
+    const toDelete = topics
+      .map((t) => t.name)
+      .filter((name) => name && existing.includes(name));
+
+    if (toDelete.length > 0 && !dryRun) {
+      try {
+        if (!admin) throw new Error('No Kafka admin client configured for teardown');
+        await admin.deleteTopics({ topics: toDelete });
+      } catch (err) {
+        for (const name of toDelete) {
+          resource_results.push({ resource_type: 'topic', resource_name: name, resource_id: name, action: 'error', message: err.message, warnings: [], diff: null });
+          counts.errors++;
+        }
+      }
+    }
+
+    for (const topic of topics) {
+      const name = topic.name ?? 'unknown';
+      if (resource_results.some((r) => r.resource_type === 'topic' && r.resource_name === name)) continue;
+      const present = existing.includes(name);
+      resource_results.push({
+        resource_type: 'topic',
+        resource_name: name,
+        resource_id: name,
+        action: !present ? (dryRun ? 'would_remove' : 'skipped') : (dryRun ? 'would_remove' : 'removed'),
+        message: present ? null : 'topic not present',
+        warnings: [],
+        diff: null,
+      });
+    }
+  }
+
+  // ACLs: delete via admin.deleteAcls (idempotent — deleting a non-existent ACL is a no-op).
+  for (const acl of acls) {
+    const name = `${acl.principal}/${acl.operation}/${acl.resourceName ?? ''}`;
+    try {
+      if (!dryRun) {
+        if (!admin) throw new Error('No Kafka admin client configured for teardown');
+        await admin.deleteAcls({
+          filters: [{
+            resourceType: acl.resourceType,
+            resourceName: acl.resourceName,
+            resourcePatternType: acl.resourcePatternType ?? acl.patternType,
+            principal: acl.principal,
+            operation: acl.operation,
+            permissionType: acl.permissionType,
+          }],
+        });
+      }
+      resource_results.push({ resource_type: 'acl', resource_name: name, resource_id: name, action: dryRun ? 'would_remove' : 'removed', message: null, warnings: [], diff: null });
+    } catch (err) {
+      resource_results.push({ resource_type: 'acl', resource_name: name, resource_id: name, action: 'error', message: err.message, warnings: [], diff: null });
+      counts.errors++;
+    }
+  }
+
+  const status = counts.errors > 0 ? 'error' : (dryRun ? 'would_apply' : 'applied');
+  return { domain_key, status, resource_results, counts, message: null };
+}
+
 async function _processTopic(topic, { dryRun, admin, log }) {
   const name = topic.name ?? 'unknown';
   const warnings = [];

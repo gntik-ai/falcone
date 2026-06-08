@@ -96,6 +96,81 @@ export async function apply(tenantId, domainData, options = {}) {
   return { domain_key, status, resource_results, counts, message: null };
 }
 
+/**
+ * Symmetric reverse of {@link apply}: empties and deletes the tenant's storage
+ * buckets using the SAME injected s3Api/s3Client. Idempotent (a missing bucket
+ * is treated as already removed) and honors options.dryRun. Returns a
+ * DomainResult.
+ *
+ * @param {string} tenantId
+ * @param {Object} domainData
+ * @param {Object} options
+ * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
+ */
+export async function teardown(tenantId, domainData = {}, options = {}) {
+  const { dryRun = false, credentials = {}, log = console } = options;
+  const domain_key = 'storage';
+  const counts = zeroCounts();
+  const resource_results = [];
+
+  const s3Client = credentials.s3Client ?? null;
+
+  const s3Api = credentials.s3Api ?? {
+    headBucket: async (name) => {
+      if (!s3Client) throw new Error('No S3 client configured for teardown');
+      return s3Client.headBucket({ Bucket: name }).promise();
+    },
+    listObjects: async (name) => {
+      if (!s3Client) throw new Error('No S3 client configured for teardown');
+      return s3Client.listObjectsV2({ Bucket: name }).promise();
+    },
+    deleteObjects: async (name, keys) => {
+      if (!s3Client) throw new Error('No S3 client configured for teardown');
+      return s3Client.deleteObjects({ Bucket: name, Delete: { Objects: keys.map((Key) => ({ Key })) } }).promise();
+    },
+    deleteBucket: async (name) => {
+      if (!s3Client) throw new Error('No S3 client configured for teardown');
+      return s3Client.deleteBucket({ Bucket: name }).promise();
+    },
+  };
+
+  const buckets = Array.isArray(domainData?.buckets) ? domainData.buckets : [];
+
+  for (const bucket of buckets) {
+    const name = bucket.name ?? 'unknown';
+    try {
+      let exists = true;
+      try {
+        await s3Api.headBucket(name);
+      } catch { exists = false; }
+
+      if (!exists) {
+        resource_results.push({ resource_type: 'bucket', resource_name: name, resource_id: name, action: dryRun ? 'would_remove' : 'skipped', message: 'bucket not present', warnings: [], diff: null });
+        continue;
+      }
+
+      if (!dryRun) {
+        // Empty the bucket first (best-effort), then delete it.
+        if (typeof s3Api.listObjects === 'function') {
+          const listing = await s3Api.listObjects(name);
+          const keys = (listing?.Contents ?? []).map((obj) => obj.Key).filter(Boolean);
+          if (keys.length > 0 && typeof s3Api.deleteObjects === 'function') {
+            await s3Api.deleteObjects(name, keys);
+          }
+        }
+        await s3Api.deleteBucket(name);
+      }
+      resource_results.push({ resource_type: 'bucket', resource_name: name, resource_id: name, action: dryRun ? 'would_remove' : 'removed', message: null, warnings: [], diff: null });
+    } catch (err) {
+      resource_results.push({ resource_type: 'bucket', resource_name: name, resource_id: name, action: 'error', message: err.message, warnings: [], diff: null });
+      counts.errors++;
+    }
+  }
+
+  const status = counts.errors > 0 ? 'error' : (dryRun ? 'would_apply' : 'applied');
+  return { domain_key, status, resource_results, counts, message: null };
+}
+
 async function _processBucket(bucket, { dryRun, s3Api, log }) {
   const name = bucket.name ?? 'unknown';
   const warnings = [];
