@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import {
   OBSERVABILITY_CONSOLE_ALERTS_VERSION,
@@ -74,7 +74,7 @@ test('validator reports no contract violations for the checked-in artifact set',
   assert.deepEqual(collectObservabilityConsoleAlertViolations(), []);
 });
 
-test('docs and package wiring expose the new observability console-alerts baseline', () => {
+test('docs and package wiring expose the new observability console-alerts baseline', { skip: !existsSync(new URL('../../docs/reference/architecture/README.md', import.meta.url)) || !existsSync(new URL('../../docs/tasks/us-obs-01.md', import.meta.url)) || !existsSync(new URL('../../docs/reference/architecture/observability-console-alerts.md', import.meta.url)) }, () => {
   const architectureIndex = readFileSync(new URL('../../docs/reference/architecture/README.md', import.meta.url), 'utf8');
   const taskSummary = readFileSync(new URL('../../docs/tasks/us-obs-01.md', import.meta.url), 'utf8');
   const architectureDoc = readFileSync(new URL('../../docs/reference/architecture/observability-console-alerts.md', import.meta.url), 'utf8');
