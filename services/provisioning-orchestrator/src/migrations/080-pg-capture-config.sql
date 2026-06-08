@@ -14,7 +14,9 @@ CREATE TABLE IF NOT EXISTS pg_capture_configs (
   lsn_start PG_LSN,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (workspace_id, data_source_ref, schema_name, table_name) DEFERRABLE INITIALLY IMMEDIATE
+  -- Non-deferrable so it is a valid ON CONFLICT arbiter for CaptureConfigRepository.create();
+  -- PostgreSQL rejects DEFERRABLE unique constraints as ON CONFLICT arbiters.
+  UNIQUE (workspace_id, data_source_ref, schema_name, table_name)
 );
 CREATE INDEX IF NOT EXISTS idx_pg_capture_workspace ON pg_capture_configs (workspace_id, status);
 CREATE INDEX IF NOT EXISTS idx_pg_capture_tenant ON pg_capture_configs (tenant_id, status);

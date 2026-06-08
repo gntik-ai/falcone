@@ -1,10 +1,10 @@
 import { MongoCaptureConfigRepository } from '../../repositories/realtime/MongoCaptureConfigRepository.mjs';
 import { MongoCaptureQuotaRepository } from '../../repositories/realtime/MongoCaptureQuotaRepository.mjs';
-const decodeAuth = (header) => { if (!header?.startsWith('Bearer ')) return null; try { return JSON.parse(Buffer.from(header.slice(7), 'base64url').toString('utf8')); } catch { return null; } };
+import { parseIdentity } from './parse-identity.mjs';
 export async function main(params, deps = {}) {
-  const claims = decodeAuth(params?.__ow_headers?.authorization);
+  const identity = parseIdentity(params);
   const tenantId = params.tenantId ?? params.path?.tenantId;
-  if (!claims?.tenant_id || claims.tenant_id !== tenantId || !claims.roles?.includes('tenant_owner')) return { statusCode: 401, body: { code: 'UNAUTHORIZED' } };
+  if (!identity || identity.tenantId !== tenantId || !identity.roles?.includes('tenant_owner')) return { statusCode: 401, body: { code: 'UNAUTHORIZED' } };
   const repo = deps.configRepo ?? new MongoCaptureConfigRepository(deps.db);
   const quotaRepo = deps.quotaRepo ?? new MongoCaptureQuotaRepository(deps.db);
   const workspaces = await repo.findByTenantSummary(tenantId);

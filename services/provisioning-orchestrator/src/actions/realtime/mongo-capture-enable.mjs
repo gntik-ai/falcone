@@ -2,13 +2,10 @@ import { MongoCaptureConfigRepository } from '../../repositories/realtime/MongoC
 import { MongoCaptureQuotaRepository } from '../../repositories/realtime/MongoCaptureQuotaRepository.mjs';
 import { MongoCaptureAuditRepository } from '../../repositories/realtime/MongoCaptureAuditRepository.mjs';
 import { MongoCaptureLifecyclePublisher } from '../../events/realtime/MongoCaptureLifecyclePublisher.mjs';
+import { parseIdentity } from './parse-identity.mjs';
 
 const unauthorized = () => ({ statusCode: 401, body: { code: 'UNAUTHORIZED' } });
 const bodyOf = (params) => params.body ?? params;
-const decodeAuth = (header) => {
-  if (!header?.startsWith('Bearer ')) return null;
-  try { return JSON.parse(Buffer.from(header.slice(7), 'base64url').toString('utf8')); } catch { return null; }
-};
 
 const probeCollection = async (deps, { data_source_ref, database_name, collection_name }) => {
   if (typeof deps.collectionProbe === 'function') return deps.collectionProbe({ data_source_ref, database_name, collection_name });
@@ -16,13 +13,13 @@ const probeCollection = async (deps, { data_source_ref, database_name, collectio
 };
 
 export async function main(params, deps = {}) {
-  const claims = decodeAuth(params?.__ow_headers?.authorization);
-  if (!claims?.workspace_id || !claims?.tenant_id) return unauthorized();
+  const identity = parseIdentity(params);
+  if (!identity) return unauthorized();
   const body = bodyOf(params);
   if (!body.data_source_ref || !body.database_name || !body.collection_name) return { statusCode: 400, body: { code: 'INVALID_REQUEST' } };
-  const workspaceId = claims.workspace_id;
-  const tenantId = claims.tenant_id;
-  const actorIdentity = claims.actor_identity ?? claims.sub ?? 'unknown';
+  const workspaceId = identity.workspaceId;
+  const tenantId = identity.tenantId;
+  const actorIdentity = identity.actorId;
   const quotaRepo = deps.quotaRepo ?? new MongoCaptureQuotaRepository(deps.db);
   const configRepo = deps.configRepo ?? new MongoCaptureConfigRepository(deps.db);
   const auditRepo = deps.auditRepo ?? new MongoCaptureAuditRepository(deps.db);
