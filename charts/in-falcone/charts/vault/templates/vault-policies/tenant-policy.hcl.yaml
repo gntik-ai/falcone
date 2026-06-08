@@ -5,9 +5,9 @@ metadata:
   namespace: {{ .Values.vault.namespace }}
 data:
   tenant.hcl: |
-    path "secret/data/tenant/{{identity.entity.aliases.auth_kubernetes_cluster_1.metadata.tenantId}}/*" {
+    path "secret/data/tenant/{{ "{{" }}identity.entity.aliases.auth_kubernetes_cluster_1.metadata.tenantId{{ "}}" }}/*" {
       capabilities = ["read"]
     }
-    path "secret/metadata/tenant/{{identity.entity.aliases.auth_kubernetes_cluster_1.metadata.tenantId}}/*" {
+    path "secret/metadata/tenant/{{ "{{" }}identity.entity.aliases.auth_kubernetes_cluster_1.metadata.tenantId{{ "}}" }}/*" {
       capabilities = ["list", "read"]
     }
