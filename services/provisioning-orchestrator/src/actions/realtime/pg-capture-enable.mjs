@@ -2,22 +2,19 @@ import { CaptureConfigRepository } from '../../repositories/realtime/CaptureConf
 import { CaptureQuotaRepository } from '../../repositories/realtime/CaptureQuotaRepository.mjs';
 import { CaptureAuditRepository } from '../../repositories/realtime/CaptureAuditRepository.mjs';
 import { PgCaptureLifecyclePublisher } from '../../events/realtime/PgCaptureLifecyclePublisher.mjs';
+import { parseIdentity } from './parse-identity.mjs';
 
 const unauthorized = () => ({ statusCode: 401, body: { code: 'UNAUTHORIZED' } });
 const bodyOf = (params) => params.body ?? params;
-const decodeAuth = (header) => {
-  if (!header?.startsWith('Bearer ')) return null;
-  try { return JSON.parse(Buffer.from(header.slice(7), 'base64url').toString('utf8')); } catch { return null; }
-};
 
 export async function main(params, deps = {}) {
-  const claims = decodeAuth(params?.__ow_headers?.authorization);
-  if (!claims?.workspace_id || !claims?.tenant_id) return unauthorized();
+  const identity = parseIdentity(params);
+  if (!identity) return unauthorized();
   const body = bodyOf(params);
   if (!body.data_source_ref || !body.table_name) return { statusCode: 400, body: { code: 'INVALID_REQUEST' } };
-  const workspaceId = claims.workspace_id;
-  const tenantId = claims.tenant_id;
-  const actorIdentity = claims.actor_identity ?? claims.sub ?? 'unknown';
+  const workspaceId = identity.workspaceId;
+  const tenantId = identity.tenantId;
+  const actorIdentity = identity.actorId;
   const quotaRepo = deps.quotaRepo ?? new CaptureQuotaRepository(deps.db);
   const configRepo = deps.configRepo ?? new CaptureConfigRepository(deps.db);
   const auditRepo = deps.auditRepo ?? new CaptureAuditRepository(deps.db);
