@@ -521,12 +521,13 @@ export function collectDeploymentChartViolations(
   }
 
   const dependencies = normalizeDependencies(chart);
-  if (dependencies.length !== REQUIRED_COMPONENT_ALIASES.length) {
+  const wrapperDependencies = dependencies.filter((dep) => dep.name === 'component-wrapper');
+  if (wrapperDependencies.length !== REQUIRED_COMPONENT_ALIASES.length) {
     violations.push(`Root chart must declare ${REQUIRED_COMPONENT_ALIASES.length} aliased wrapper dependencies.`);
   }
 
   for (const alias of REQUIRED_COMPONENT_ALIASES) {
-    const dependency = dependencies.find((entry) => entry.alias === alias);
+    const dependency = wrapperDependencies.find((entry) => entry.alias === alias);
     if (!dependency) {
       violations.push(`Missing wrapper dependency alias ${alias}.`);
       continue;
