@@ -5,7 +5,11 @@ export default defineConfig({
   testDir: './specs',
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+    ['json', { outputFile: 'test-results/results.json' }], // consumed by /report-e2e-failures
+  ],
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',

@@ -5,7 +5,7 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 Resolve the bug in $ARGUMENTS using OpenSpec.
 1. Inspect the change: `openspec show $1` (and read `openspec/changes/$1/`). Restate the acceptance scenarios.
-2. Add or locate a FAILING black-box test that reproduces it (public interface only).
+2. Add or locate a FAILING reproduction: a black-box test (public interface only) — or, for E2E-originated issues (label `e2e`), the failing Playwright spec, run with `bash tests/e2e/run-issue.sh $1`.
 3. Implement with OpenSpec **apply** — `/opsx:apply $1` — working through `tasks.md` with the minimal source fix. Never edit tests to make them pass.
 4. Run `bash tests/blackbox/run.sh`. Iterate until green with no regressions.
 5. Verify: `/opsx:verify $1` and `openspec validate $1 --strict`.
