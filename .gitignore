@@ -19,3 +19,6 @@ specs/
 # E2E Playwright specs live under tests/e2e/specs/ — keep per-issue regression specs tracked
 !tests/e2e/specs/
 !tests/e2e/specs/**
+
+# Local cluster kubeconfig (sensitive credentials — never commit)
+kubeconfig-test-cluster-b.yaml

@@ -1,10 +1,48 @@
+import dns from 'node:dns';
+import net from 'node:net';
 import { buildDeliveryAttemptRecord, buildPayloadEnvelope, enforcePayloadSizeLimit } from '../src/webhook-delivery.mjs';
 import { deliverySucceededEvent } from '../src/webhook-audit.mjs';
 import { computeSignature } from '../src/webhook-signing.mjs';
 import { revealSecretRecords } from './webhook-management.mjs';
+import { isBlockedIp } from '../src/webhook-subscription.mjs';
+
+async function defaultResolver(hostname) {
+  const results = await dns.promises.lookup(hostname, { all: true });
+  return results.map((r) => r.address);
+}
+
+/**
+ * Re-validate the target URL host at delivery time against the SSRF blocklist.
+ * Returns true if the request should be blocked.
+ */
+async function isDeliveryTargetBlocked(targetUrl, resolver) {
+  let hostname;
+  try {
+    hostname = new URL(targetUrl).hostname.replace(/^\[|\]$/g, '');
+  } catch {
+    return true; // malformed URL → block
+  }
+
+  // If it's an IP literal, check directly
+  if (net.isIP(hostname) !== 0) {
+    return isBlockedIp(hostname);
+  }
+
+  // DNS hostname: resolve fail-closed
+  let addresses;
+  try {
+    addresses = await resolver(hostname);
+  } catch {
+    return true; // fail-closed
+  }
+  if (!addresses || addresses.length === 0) return true;
+  return addresses.some((ip) => isBlockedIp(ip));
+}
 
 export async function main(params) {
-  const { db, kafka, scheduler, http = fetch, deliveryId, env = process.env } = params;
+  const { db, kafka, scheduler, http = fetch, deliveryId, env = process.env, resolver: paramResolver } = params;
+  const resolver = paramResolver ?? defaultResolver;
+
   const delivery = await db.getDeliveryById(deliveryId);
   const subscription = await db.getSubscription(delivery.subscription_id);
   const secretRows = revealSecretRecords(await db.listSecrets(subscription.id), env);
@@ -14,6 +52,15 @@ export async function main(params) {
   const payloadResult = enforcePayloadSizeLimit(payloadEnvelope, Number(env.WEBHOOK_MAX_PAYLOAD_BYTES ?? 524288));
   const rawBody = JSON.stringify(payloadResult.payload);
   const attemptNum = (delivery.attempt_count ?? 0) + 1;
+
+  // Delivery-time SSRF re-validation (DNS-rebinding defense)
+  const blocked = await isDeliveryTargetBlocked(subscription.target_url, resolver);
+  if (blocked) {
+    await db.insertAttempt(buildDeliveryAttemptRecord(delivery.id, attemptNum, 'blocked', { errorDetail: 'SSRF guard: target resolved to blocked address' }));
+    await db.updateDelivery(delivery.id, { status: 'permanently_failed', attempt_count: attemptNum });
+    return { status: 'permanently_failed', reason: 'ssrf_blocked' };
+  }
+
   const startedAt = Date.now();
   try {
     const response = await http(subscription.target_url, {
