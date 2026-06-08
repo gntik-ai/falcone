@@ -109,7 +109,7 @@ export class ConfirmationsRepository {
   }
 
   async findByTokenHash(tokenOrHash: string): Promise<ConfirmationRequest | null> {
-    const tokenHash = /^[a-f0-9]{64}$/i.test(tokenOrHash) ? tokenOrHash : hashToken(tokenOrHash)
+    const tokenHash = hashToken(tokenOrHash)
     const result = await this.db.query(
       'SELECT * FROM restore_confirmation_requests WHERE token_hash = $1',
       [tokenHash],
