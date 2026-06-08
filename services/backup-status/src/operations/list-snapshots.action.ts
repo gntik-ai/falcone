@@ -36,14 +36,29 @@ export async function main(params: ActionParams): Promise<ActionResponse> {
 
     const token = await validateToken(rawToken)
 
-    // Requires global read scope
-    if (!token.scopes.includes('backup-status:read:global')) {
+    const hasGlobal = token.scopes.includes('backup-status:read:global')
+    const hasOwn = token.scopes.includes('backup-status:read:own')
+
+    if (!hasGlobal && !hasOwn) {
       return { statusCode: 403, headers, body: { error: 'Insufficient scope' } }
     }
 
     const { tenant_id, component_type, instance_id } = params
     if (!tenant_id || !component_type || !instance_id) {
       return { statusCode: 400, headers, body: { error: 'Missing required query params: tenant_id, component_type, instance_id' } }
+    }
+
+    // Tenant scope enforcement
+    if (!hasGlobal) {
+      // :own path — caller may only list their own tenant's snapshots
+      if (tenant_id !== token.tenantId) {
+        return { statusCode: 403, headers, body: { error: 'Insufficient scope' } }
+      }
+    } else {
+      // :global path — restricted to platform operators for foreign tenant access
+      if (token.actorType !== 'platform_operator' && tenant_id !== token.tenantId) {
+        return { statusCode: 403, headers, body: { error: 'Insufficient scope' } }
+      }
     }
 
     // Check capabilities
