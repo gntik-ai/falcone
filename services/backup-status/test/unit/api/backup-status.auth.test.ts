@@ -87,6 +87,63 @@ describe('validateToken — TEST_MODE', () => {
     const token = makeForgedToken({ sub: 'attacker', tenant_id: 'victim', scopes: [] })
     await expect(validateToken(token)).rejects.toThrow()
   })
+
+  it('T5a: TEST_MODE=true, NODE_ENV=staging, KEYCLOAK_JWKS_URL set — must throw (bypass blocked)', async () => {
+    // Core reproduction: shared-env bypass — forged token carrying superadmin scope must be rejected
+    process.env.TEST_MODE = 'true'
+    process.env.NODE_ENV = 'staging'
+    process.env.KEYCLOAK_JWKS_URL = 'https://idp.example/realms/r/protocol/openid-connect/certs'
+
+    vi.resetModules()
+    const { validateToken } = await import('../../../src/api/backup-status.auth.js')
+
+    const forgedSuperadmin = makeForgedToken({
+      sub: 'attacker',
+      tenant_id: 'victim-tenant',
+      scopes: ['superadmin'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    await expect(validateToken(forgedSuperadmin)).rejects.toMatchObject({ statusCode: 500 })
+  })
+
+  it('T5b: TEST_MODE=true, NODE_ENV=staging, KEYCLOAK_JWKS_URL set — backup:restore:global scope also rejected', async () => {
+    process.env.TEST_MODE = 'true'
+    process.env.NODE_ENV = 'staging'
+    process.env.KEYCLOAK_JWKS_URL = 'https://idp.example/realms/r/protocol/openid-connect/certs'
+
+    vi.resetModules()
+    const { validateToken } = await import('../../../src/api/backup-status.auth.js')
+
+    const forgedRestoreGlobal = makeForgedToken({
+      sub: 'attacker',
+      tenant_id: 'victim-tenant',
+      scopes: ['backup:restore:global'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    await expect(validateToken(forgedRestoreGlobal)).rejects.toMatchObject({ statusCode: 500 })
+  })
+
+  it('T5c: TEST_MODE=true, KEYCLOAK_JWKS_URL absent — isolated env, unsigned parse still allowed', async () => {
+    // Positive case: legitimate isolated unit-test env — no JWKS URL means no real IdP, bypass is safe
+    process.env.TEST_MODE = 'true'
+    delete process.env.NODE_ENV
+    delete process.env.KEYCLOAK_JWKS_URL
+
+    vi.resetModules()
+    const { validateToken } = await import('../../../src/api/backup-status.auth.js')
+
+    const payload = {
+      sub: 'test-svc',
+      tenant_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      scopes: ['backup:read'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    }
+    const token = makeForgedToken(payload)
+    const claims = await validateToken(token)
+    expect(claims.sub).toBe('test-svc')
+    expect(claims.tenantId).toBe('cccccccc-cccc-cccc-cccc-cccccccccccc')
+    expect(claims.scopes).toEqual(['backup:read'])
+  })
 })
 
 describe('validateToken — production JWT verification', () => {
