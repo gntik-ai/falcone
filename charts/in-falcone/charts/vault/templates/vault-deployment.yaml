@@ -68,7 +68,7 @@ spec:
             - name: tls
               mountPath: /vault/tls
               readOnly: true
-{{ tpl (.Files.Get "templates/vault-audit-sidecar.yaml") . | indent 8 }}
+{{ tpl (.Files.Get "files/vault-audit-sidecar.yaml") . | indent 8 }}
       volumes:
         - name: config
           configMap:

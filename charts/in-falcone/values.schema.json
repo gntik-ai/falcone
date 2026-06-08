@@ -1950,7 +1950,9 @@
                 "type": [
                   "string",
                   "number",
-                  "boolean"
+                  "boolean",
+                  "object",
+                  "array"
                 ]
               }
             }
