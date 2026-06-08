@@ -24,6 +24,7 @@ function makeDb() {
 }
 
 const auth = { tenantId: 't1', workspaceId: 'w1', actorId: 'u1' };
+const resolver = async () => ['93.184.216.34']; // deterministic offline resolver
 
 test('management lifecycle create-read-update-pause-resume-rotate-delete and deliveries history', async () => {
   const db = makeDb();
@@ -31,7 +32,7 @@ test('management lifecycle create-read-update-pause-resume-rotate-delete and del
   const kafka = { publish: async (topic, payload) => published.push({ topic, payload }) };
   const env = { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE: '5', WEBHOOK_SECRET_GRACE_PERIOD_SECONDS: '3600' };
 
-  const created = await managementMain({ db, kafka, env, auth, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'https://example.com/hook', eventTypes: ['document.created'] } });
+  const created = await managementMain({ db, kafka, env, auth, resolver, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'https://example.com/hook', eventTypes: ['document.created'] } });
   assert.equal(created.statusCode, 201);
   assert.ok(created.body.signingSecret);
   const subscriptionId = created.body.subscriptionId;
@@ -39,7 +40,7 @@ test('management lifecycle create-read-update-pause-resume-rotate-delete and del
   const detail = await managementMain({ db, kafka, env, auth, method: 'GET', path: `/v1/webhooks/subscriptions/${subscriptionId}` });
   assert.equal('signingSecret' in detail.body, false);
 
-  const updated = await managementMain({ db, kafka, env, auth, method: 'PATCH', path: `/v1/webhooks/subscriptions/${subscriptionId}`, body: { targetUrl: 'https://example.com/new', eventTypes: ['document.updated'] } });
+  const updated = await managementMain({ db, kafka, env, auth, resolver, method: 'PATCH', path: `/v1/webhooks/subscriptions/${subscriptionId}`, body: { targetUrl: 'https://example.com/new', eventTypes: ['document.updated'] } });
   assert.equal(updated.body.targetUrl, 'https://example.com/new');
 
   const paused = await managementMain({ db, kafka, env, auth, method: 'POST', path: `/v1/webhooks/subscriptions/${subscriptionId}/pause` });
@@ -74,11 +75,11 @@ test('management validation and isolation errors', async () => {
   const db = makeDb();
   const kafka = { publish: async () => {} };
   const env = { WEBHOOK_SIGNING_KEY: 'master', WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE: '1' };
-  const bad = await managementMain({ db, kafka, env, auth, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'http://nope', eventTypes: ['document.created'] } });
+  const bad = await managementMain({ db, kafka, env, auth, resolver, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'http://nope', eventTypes: ['document.created'] } });
   assert.equal(bad.statusCode, 400);
-  const ok = await managementMain({ db, kafka, env, auth, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'https://example.com/hook', eventTypes: ['document.created'] } });
+  const ok = await managementMain({ db, kafka, env, auth, resolver, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'https://example.com/hook', eventTypes: ['document.created'] } });
   assert.equal(ok.statusCode, 201);
-  const quota = await managementMain({ db, kafka, env, auth, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'https://example.com/other', eventTypes: ['document.created'] } });
+  const quota = await managementMain({ db, kafka, env, auth, resolver, method: 'POST', path: '/v1/webhooks/subscriptions', body: { targetUrl: 'https://example.com/other', eventTypes: ['document.created'] } });
   assert.equal(quota.statusCode, 409);
   const wrongWorkspace = await managementMain({ db, kafka, env, auth: { ...auth, workspaceId: 'other' }, method: 'GET', path: `/v1/webhooks/subscriptions/${ok.body.subscriptionId}` });
   assert.equal(wrongWorkspace.statusCode, 404);
