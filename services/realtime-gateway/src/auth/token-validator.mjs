@@ -158,7 +158,7 @@ export function createTokenValidator({
     }
 
     const key = await fetchSigningKey(env, header.kid, forceRefresh);
-    const { payload } = await jwtVerifyFn(token, key, { clockTolerance: '5 seconds' });
+    const { payload } = await jwtVerifyFn(token, key, { issuer: env.KEYCLOAK_ISSUER, audience: env.KEYCLOAK_AUDIENCE, clockTolerance: '5 seconds' });
     return normalizeClaims(payload);
   }
 
