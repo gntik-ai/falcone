@@ -1,11 +1,11 @@
 ---
-description: Boot the REAL stack (backend + frontend) and run the FULL Playwright E2E suite. Use after the issues are resolved.
+description: Helm-install Falcone on the kind test cluster and run the FULL Playwright E2E suite; ALWAYS tears the workloads down afterwards. Use after the issues are resolved.
 argument-hint: "[filter]   (optional grep over spec titles)"
 allowed-tools: Read, Glob, Grep, Bash
 ---
-Run the complete real-stack E2E: `bash tests/e2e/run.sh $ARGUMENTS` (boots the stack via `tests/e2e/stack.sh up`, runs the whole Playwright suite, tears down on exit).
+Run the complete real-stack E2E on the kind test cluster: `bash tests/e2e/run.sh $ARGUMENTS`.
 
-If the suite or `stack.sh` is missing or still a placeholder, say so and point to `/build-e2e` — do not improvise.
-Report pass/fail counts, failing `uc-`/spec names with expected vs actual, and artifact paths (traces, screenshots, HTML report). Do not fix anything here.
+It Helm-installs Falcone into an ephemeral namespace via `tests/e2e/stack.sh up` (using `./kubeconfig-test-cluster-b.yaml` automatically), gates on ALL services healthy, runs the whole Playwright suite, and ALWAYS removes the workloads on exit (the namespace is deleted; the cluster is left intact) — teardown runs even on failure or Ctrl-C.
 
-Prefer delegating to the `e2e-runner` subagent.
+If the suite or the Helm wiring in `stack.sh` is missing, say so and point to `/build-e2e` — do not improvise.
+Report pass/fail counts, failing `us-`/spec names with expected vs actual, artifact paths, and confirm the namespace was deleted. If there are failures, suggest `/report-e2e-failures` to turn them into OpenSpec issues. Do not fix anything here. Prefer delegating to `e2e-runner`.

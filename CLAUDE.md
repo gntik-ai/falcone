@@ -26,13 +26,14 @@ Typical BaaS surface (use to guide capability/functionality extraction, always c
 - **Capability** (`cap-…`): high-level ability the system offers.
 - **Functionality** (`fn-…`): a concrete, testable behavior within a capability.
 - **Use case** (`uc-…`): end-to-end flow from an actor's perspective.
+- **User story** (`us-…`): a real-user goal over the BaaS ("As a … I want … so that …") with acceptance criteria; drives a frontend-first Playwright flow.
 - **Black box** (`bbx-…`): tested only through the public interface; no internal knowledge.
 
-Chain: `fn → uc → bbx → OpenSpec scenario → issue`.
+Chain: `fn → uc/us → bbx (contract) | E2E spec → OpenSpec scenario → issue`.
 
 ## Testing — black box (two suites)
 - **Contract suite** (`tests/blackbox/`): drives the public interface only (CLI/API/public symbols). Entrypoint **`bash tests/blackbox/run.sh`** — always run it before declaring work done.
-- **Real-stack E2E** (`tests/e2e/`, Playwright): installs + boots the REAL backend and frontend via `tests/e2e/stack.sh up|down|status` and exercises use cases through the actual UI/API. Entrypoint **`bash tests/e2e/run.sh`**. Per-issue verification: `/e2e-issue <change-id>` (spec kept at `tests/e2e/specs/issues/` as regression). Full suite: `/build-e2e` generates specs from the use cases (every `fn-…` covered); `/run-e2e` executes it after the issues are done.
+- **Real-stack E2E** (`tests/e2e/`, Playwright on the kind test cluster): Falcone is **Helm-installed** into an **ephemeral namespace** using the dedicated kubeconfig `./kubeconfig-test-cluster-b.yaml` (auto-detected; override `E2E_KUBECONFIG`; **never commit it**). `stack.sh up` gates on ALL services operational (rollout complete, every pod Ready, optional `E2E_HEALTH_PATH` smoke). Specs replicate **real-user flows from `audit/user-stories.md`, frontend-first**. Then `stack.sh down` **always deletes the namespace so no pods remain** (the cluster stays); the entrypoints `bash tests/e2e/run.sh` (full) and `bash tests/e2e/run-issue.sh <change-id>` (one issue) enforce teardown via a trap, even on failure/Ctrl-C. Per-issue: `/e2e-issue <change-id>`; full suite: `/build-e2e` then `/run-e2e`; failures → `/report-e2e-failures`.
 - Both suites: public interface / real UI only; deterministic, isolated, idempotent; fixtures under `tests/*/fixtures/`. E2E fixtures provision two tenants (A/B) and tenancy-sensitive specs include cross-tenant probes.
 
 ## Changes — OpenSpec (spec-driven; native tooling)
@@ -54,17 +55,18 @@ All discovery runs from Claude Code as commands and writes artifacts under `audi
 1. `/recon` → `audit/recon.md`
 2. `/capabilities` → `audit/capabilities.md`, `audit/functionalities.md`
 3. `/use-cases` → `audit/use-cases.md`
-4. `/coverage` → `audit/coverage.md`
-5. `/audit-isolation` + `/find-bugs` → `audit/bugs.md`
-6. `/propose-features` → `audit/proposed-features.md`
+4. `/user-stories` → `audit/user-stories.md`
+5. `/coverage` → `audit/coverage.md`
+6. `/audit-isolation` + `/find-bugs` → `audit/bugs.md`
+7. `/propose-features` → `audit/proposed-features.md`
 
-`/audit-all` runs 1–6 in order. Then **`/file-issues`** turns bugs and advanced features into OpenSpec changes and **GitHub issues with labels** — dry-run by default; `--confirm` creates them (needs `gh` authenticated).
+`/audit-all` runs 1–7 in order. Then **`/file-issues`** turns bugs and advanced features into OpenSpec changes and **GitHub issues with labels** — dry-run by default; `--confirm` creates them (needs `gh` authenticated). After E2E runs, **`/report-e2e-failures`** turns failing specs into OpenSpec changes + issues (label `e2e`, evidence from `tests/e2e/test-results/results.json`); fix them with the same `/fix-bug` pattern.
 
 ## Commands (`/`)
-- **Analyze** (write to `audit/`): `/recon`, `/capabilities`, `/use-cases`, `/coverage`, `/find-bugs`, `/propose-features`, `/audit-all` (runs them all), `/audit-isolation [scope]` (cross-tenant leakage, read-only).
-- **Publish**: `/file-issues [--confirm]` — bugs + advanced features → OpenSpec changes + GitHub issues with labels (`bug`/`enhancement`, `P0|P1|P2`, `cap:<name>`, `security`/`tenant-isolation`, `openspec`). Dry-run by default; needs `gh`.
+- **Analyze** (write to `audit/`): `/recon`, `/capabilities`, `/use-cases`, `/user-stories`, `/coverage`, `/find-bugs`, `/propose-features`, `/audit-all` (runs them all), `/audit-isolation [scope]` (cross-tenant leakage, read-only).
+- **Publish**: `/file-issues [--confirm]` — bugs + advanced features → OpenSpec changes + GitHub issues with labels (`bug`/`enhancement`, `P0|P1|P2`, `cap:<name>`, `security`/`tenant-isolation`, `openspec`). `/report-e2e-failures [--confirm]` — failing Playwright specs → OpenSpec changes + issues (label `e2e`). Both dry-run by default; need `gh`.
 - **Resolve**: `/triage <description>`, `/fix-bug <change-id>`, `/implement-change <change-id>`, `/run-blackbox [filter]`.
-- **Real-stack E2E**: `/e2e-issue <change-id> [--keep-up]` (per-issue, boots real backend + frontend), `/build-e2e` (generate the Playwright suite from use cases), `/run-e2e [filter]` (full suite after issues are done).
+- **Real-stack E2E** (on a local K8s/OpenShift test cluster; ephemeral namespace, **always torn down**): `/e2e-issue <change-id>` (per-issue), `/build-e2e` (generate the Playwright suite from use cases), `/run-e2e [filter]` (full suite, after issues are done).
 - **Maintain**: `/clean-slate [--confirm]` — remove the target repo's docs + reset OpenSpec **content** (preserves the OpenSpec install: `openspec/project.md` + config). Dry-run by default, reversible via git.
 
 ## Agents
