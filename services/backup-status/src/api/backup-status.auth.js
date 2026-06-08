@@ -50,6 +50,14 @@ export async function validateToken(token) {
     throw new AuthError(500, 'TEST_MODE is not permitted in NODE_ENV=production')
   }
 
+  // Block TEST_MODE whenever a real JWKS URL is configured — a non-empty KEYCLOAK_JWKS_URL
+  // signals a deployment wired to a real IdP (staging, CI, etc.), where unsigned-payload
+  // parsing would allow fully-forged token bypass regardless of NODE_ENV.
+  const jwksConfigured = !!(process.env.KEYCLOAK_JWKS_URL && process.env.KEYCLOAK_JWKS_URL.trim())
+  if (testMode && jwksConfigured) {
+    throw new AuthError(500, 'TEST_MODE is not permitted when a JWKS URL is configured')
+  }
+
   if (testMode) {
     try {
       const parts = token.split('.')
