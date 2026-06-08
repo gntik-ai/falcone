@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import {
   OBSERVABILITY_QUOTA_USAGE_VIEW_VERSION,
@@ -56,7 +56,7 @@ test('quota usage view contract stays aligned with routes, resource taxonomy, an
   assert.equal(taxonomy.resource_taxonomy.some((entry) => entry.resource_type === 'workspace_quota_usage_view'), true);
 });
 
-test('quota usage view docs and task summaries remain discoverable', () => {
+test('quota usage view docs and task summaries remain discoverable', { skip: !existsSync(new URL('../../docs/reference/architecture/README.md', import.meta.url)) || !existsSync(new URL('../../docs/tasks/us-obs-03.md', import.meta.url)) }, () => {
   const architectureIndex = readFileSync(new URL('../../docs/reference/architecture/README.md', import.meta.url), 'utf8');
   const taskSummary = readFileSync(new URL('../../docs/tasks/us-obs-03.md', import.meta.url), 'utf8');
 

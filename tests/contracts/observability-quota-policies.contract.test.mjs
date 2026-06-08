@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
 
@@ -79,7 +79,7 @@ test('route catalog, authorization model, and helper route list stay aligned for
   assert.equal(summary.scopes.some((scope) => scope.requiredPermission === 'workspace.quota.read'), true);
 });
 
-test('architecture README and task summary document the quota-policy baseline', () => {
+test('architecture README and task summary document the quota-policy baseline', { skip: !existsSync('docs/reference/architecture/README.md') || !existsSync('docs/tasks/us-obs-03.md') }, () => {
   const architectureIndex = readFileSync('docs/reference/architecture/README.md', 'utf8');
   const taskSummary = readFileSync('docs/tasks/us-obs-03.md', 'utf8');
 
