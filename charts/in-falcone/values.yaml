@@ -3122,3 +3122,11 @@ gatewayPolicy:
         routeKind: passthrough
         routeId: openwhisk_admin
         expect: allow
+
+# Optional infrastructure sub-charts — disabled by default; opt-in for operators
+# who want Vault secret storage or External Secrets Operator integration.
+eso:
+  enabled: false
+
+vault:
+  enabled: false

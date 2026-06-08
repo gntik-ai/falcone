@@ -55,3 +55,11 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: webConsole.enabled
+  - name: eso
+    version: 0.1.0
+    repository: file://./charts/eso
+    condition: eso.enabled
+  - name: vault
+    version: 0.1.0
+    repository: file://./charts/vault
+    condition: vault.enabled
