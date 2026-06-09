@@ -183,7 +183,9 @@ export function listStorageAdminRoutes(filters = {}) {
     getPublicRoute('createStorageProgrammaticCredential'),
     getPublicRoute('getStorageProgrammaticCredential'),
     getPublicRoute('rotateStorageProgrammaticCredential'),
-    getPublicRoute('revokeStorageProgrammaticCredential')
+    getPublicRoute('revokeStorageProgrammaticCredential'),
+    getPublicRoute('getStorageCredentialRotationPolicy'),
+    getPublicRoute('setStorageCredentialRotationPolicy')
   ];
   const storageUsageRoutes = [
     getPublicRoute('getTenantStorageUsage'),
@@ -354,6 +356,65 @@ export function revokeStorageProgrammaticCredentialPreview(input = {}) {
   return {
     route,
     credential: revokeStorageProgrammaticCredential(input)
+  };
+}
+
+// Default warn-before-expiry window applied when a tenant has set an age limit but
+// no explicit warn window. Mirrors the migration default
+// (`storage_credential_warn_before_expiry_days INTEGER DEFAULT 14`).
+export const STORAGE_CREDENTIAL_DEFAULT_WARN_BEFORE_EXPIRY_DAYS = 14;
+
+function normalizePolicyInteger(value, { allowZero = false } = {}) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  const truncated = Math.trunc(number);
+  if (truncated < 0 || (!allowZero && truncated === 0)) {
+    return null;
+  }
+
+  return truncated;
+}
+
+function normalizeStorageCredentialRotationPolicy(input = {}) {
+  const source = input.policy ?? input;
+  const tenantId = source.tenantId ?? input.tenantId ?? null;
+  const maxStorageCredentialAgeDays = normalizePolicyInteger(source.maxStorageCredentialAgeDays);
+  const warn = normalizePolicyInteger(source.storageCredentialWarnBeforeExpiryDays, { allowZero: true });
+
+  return {
+    tenantId,
+    maxStorageCredentialAgeDays,
+    storageCredentialWarnBeforeExpiryDays:
+      maxStorageCredentialAgeDays === null
+        ? (warn === null ? null : warn)
+        : (warn === null ? STORAGE_CREDENTIAL_DEFAULT_WARN_BEFORE_EXPIRY_DAYS : warn),
+    updatedAt: source.updatedAt ?? null,
+    updatedBy: source.updatedBy ?? input.updatedBy ?? null
+  };
+}
+
+export function getStorageCredentialRotationPolicyPreview(input = {}) {
+  const route = getStorageAdminRoute('getStorageCredentialRotationPolicy');
+
+  return {
+    route,
+    policy: normalizeStorageCredentialRotationPolicy(input)
+  };
+}
+
+export function setStorageCredentialRotationPolicyPreview(input = {}) {
+  const route = getStorageAdminRoute('setStorageCredentialRotationPolicy');
+
+  return {
+    route,
+    policy: normalizeStorageCredentialRotationPolicy(input)
   };
 }
 
