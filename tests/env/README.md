@@ -8,9 +8,51 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 
 | Service  | Host endpoint                                   | Notes |
 |----------|-------------------------------------------------|-------|
-| Postgres | `postgres://falcone:falcone@localhost:55432/falcone_test` | ephemeral (tmpfs); backup-status migrations applied on `up` |
-| Keycloak | `http://localhost:8081` (admin `admin`/`admin`) | internal IdP; tenants map 1:1 to realms |
+| Postgres | `postgres://falcone:falcone@localhost:55432/falcone_test` | ephemeral (tmpfs); backup-status + scheduling-engine migrations applied on `up` |
+| Keycloak | `http://localhost:8081` (admin `admin`/`admin`) | internal IdP; tenants map 1:1 to realms; also hosts the slice realm `falcone-e2e` |
 | Redpanda | `localhost:19092` (`KAFKA_BROKERS`) | Kafka API broker (events, audit, CDC change streams); auto-creates topics |
+| MongoDB  | `mongodb://localhost:57017/?replicaSet=rs0&directConnection=true` (`MONGO_URI` / `MONGO_TEST_URI`) | document store; single-node replica set `rs0` (**required** for CDC change streams); ephemeral (tmpfs); `rs.initiate()` + wait-for-PRIMARY on `up` |
+| MinIO    | `http://localhost:59000` S3 API / `http://localhost:59001` console (`minioadmin`/`minioadmin`) | S3-compatible object storage (`S3_ENDPOINT`); ephemeral (tmpfs); bucket `falcone-test` (`S3_SDK_BUCKET`) created on `up` |
+| Vault    | `http://localhost:58200` (token `root`) (`VAULT_ADDR`/`VAULT_TOKEN`) | dev mode (auto-unsealed); file audit device → host-mounted log at `tests/env/vault/audit/vault-audit.log` (`VAULT_AUDIT_LOG_PATH`), tailed by `secret-audit-handler` |
+
+### What each new service is for
+
+- **MongoDB** — the document store collected by `provisioning-orchestrator`
+  (`collectors/mongo-collector.mjs`) and the source of CDC change streams consumed
+  by `mongo-cdc-bridge` (`src/index.mjs`, reads `MONGO_TEST_URI`/`MONGO_URI`).
+  MongoDB change streams require a replica set, so the node runs as single-node
+  `rs0` and `up.sh` initiates it and waits until it is PRIMARY.
+- **MinIO** — S3-compatible object storage for workspace SDK artifacts
+  (`openapi-sdk-service`, reads `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` /
+  `S3_SDK_BUCKET`) and storage-config export (`provisioning-orchestrator`
+  `collectors/s3-collector.mjs`). `up.sh` creates the `falcone-test` bucket.
+- **Vault** — secret store. Its only test-relevant job is emitting a **file**
+  audit log to a host-mounted path that `secret-audit-handler` (`src/index.mjs`,
+  reads `VAULT_AUDIT_LOG_PATH`) tails and republishes. `up.sh` enables the file
+  audit device and generates an audit entry so the host log file exists.
+
+### Bootstrap performed by `up.sh` (idempotent)
+
+- **MongoDB**: `rs.initiate({_id:'rs0', members:[{host:'mongodb:27017'}]})` if the
+  set is not already configured, then waits until `rs.status().myState == 1`
+  (PRIMARY).
+- **MinIO**: `mc alias set local … && mc mb --ignore-existing local/falcone-test`
+  (run with the in-container `mc` client).
+- **Vault**: `vault audit enable file file_path=/vault/audit/vault-audit.log`
+  ("already enabled" is ignored), then a `vault kv get` / `vault token lookup` to
+  guarantee the host-visible audit log file is non-empty.
+
+### Out of scope (these stay on the Kubernetes/Helm path)
+
+- **OpenWhisk / functions** — too heavy to run under docker compose.
+- **The Falcone app + APISIX gateway containers** — there are no Dockerfiles for
+  them; in these tests the Falcone microservices run **in-process** (specs import
+  the service `.mjs` and hit this live backing infra).
+- **Observability** (metrics/tracing/logging stack).
+
+These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
+| action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs the real scheduling action with a real pg Pool (HTTP-slice only) |
+| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
 
 ### Keycloak model (matches production)
 
@@ -56,10 +98,91 @@ Reference: `services/backup-status/test/integration/tenant-name-resolver.keycloa
 drives the actual `createKeycloakTenantNameResolver` against the live Keycloak
 (real client-credentials flow + admin API) and asserts the fail-closed contract.
 
+## HTTP request-chain slice (scheduling)
+
+`up.sh` also boots an **API-level vertical slice** that runs Falcone's real HTTP
+request chain end-to-end:
+
+```
+Keycloak (JWT)  ->  APISIX (auth + identity-header inject)  ->  action-runner shim
+                ->  scheduling-management action (real, imported as-is)  ->  Postgres
+```
+
+| Piece | Where | What it does |
+|-------|-------|--------------|
+| action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` the action reads (`__ow_headers`, `method`, `path`, `query`, `body`) and injects a real `pg` Pool at `params.pg`, then dynamically `import()`s the **product action as-is** from the repo bind-mounted read-only at `/repo` and returns its `{statusCode, body}`. Route table is data-driven (`routes.mjs`) so more services can be added. |
+| APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (route) | Gateway for `/v1/scheduling/*`. `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. |
+| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, user `e2e-user`/`e2e-password`, role `scheduling.admin`, and claim mappers (see below). |
+
+### Boot + hit the API
+
+```bash
+bash tests/env/up.sh          # boots backing services + the slice, provisions Keycloak
+source tests/env/env.sh        # exports APISIX_BASE_URL, E2E_REALM/CLIENT/USER/PASSWORD, E2E_TENANT_ID/...
+
+# 1) get an access token (Resource Owner Password grant)
+TOKEN=$(curl -s -X POST \
+  "$KEYCLOAK_BASE_URL/realms/$E2E_REALM/protocol/openid-connect/token" \
+  -d grant_type=password -d "client_id=$E2E_CLIENT_ID" \
+  -d "username=$E2E_USERNAME" -d "password=$E2E_PASSWORD" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+
+# 2) call the gateway (no token -> 401)
+curl -s -o /dev/null -w '%{http_code}\n' "$APISIX_BASE_URL/v1/scheduling/jobs"           # 401
+
+# 3) enable scheduling, create a job, list it (authenticated)
+curl -s -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -X PATCH "$APISIX_BASE_URL/v1/scheduling/config" -d '{"schedulingEnabled":true}'
+curl -s -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -X POST  "$APISIX_BASE_URL/v1/scheduling/jobs"   -d '{"name":"nightly","cronExpression":"0 2 * * *","targetAction":"reports/build"}'   # 201
+curl -s -H "Authorization: Bearer $TOKEN" "$APISIX_BASE_URL/v1/scheduling/jobs"          # lists it
+```
+
+### Smoke tests
+
+```bash
+bash tests/env/e2e-smoke/run.sh        # curl/node: 401 -> token -> 201 -> listed
+( cd tests/env/e2e-smoke && npm install && npx playwright test )   # same flow via @playwright/test request API
+```
+
+### How identity flows (claims -> headers)
+
+The action derives identity **only** from trusted gateway-injected headers
+(`scheduling-management.mjs::parseIdentity`). The slice produces them like this:
+
+- **Keycloak mappers** (`keycloak-e2e-provision.sh`) put these on the *access token*:
+  - `tenant_id`, `workspace_id` — `oidc-usermodel-attribute-mapper` from the user's
+    `tenant_id` / `workspace_id` attributes (realm has `unmanagedAttributePolicy=ENABLED`
+    so Keycloak 26 does not strip them).
+  - `actor_roles` — `oidc-usermodel-realm-role-mapper` (multivalued, unprefixed), includes `scheduling.admin`.
+  - `sub` — standard subject.
+- **APISIX** (`apisix/apisix.yaml`): `openid-connect` validates the token, then the
+  `serverless-pre-function` decodes the verified token and sets upstream headers
+  `X-Tenant-Id <- tenant_id`, `X-Workspace-Id <- workspace_id`,
+  `X-Auth-Subject <- sub`, `X-Actor-Roles <- actor_roles` (joined). It first deletes
+  any caller-supplied `X-*` identity headers, so a client cannot spoof identity.
+
+### Scope / deferred (honest)
+
+- **Scope: scheduling only.** The route table (`action-runner/routes.mjs`) is
+  data-driven; other services can be added the same way.
+- **Custom scope-enforcement Lua plugin: deferred** (out of scope for this slice).
+  APISIX here does AuthN + identity-header injection, not the fine-grained
+  per-resource scope checks the production gateway plugin performs.
+- **Web-console UI: deferred** — the console backend is not present in this repo,
+  so the slice is API-level only.
+
 ## Extending
 
-- **More backing services** (Kafka/Redpanda, Vault, MinIO, MongoDB): add them to
+- **More backing services**: add them to `docker-compose.yml`, expose host ports
+  with a healthcheck consistent with the existing services (so `up.sh`'s health
+  loop works), wire any bootstrap into `up.sh`, and export their endpoints in
+  `env.sh`. (Postgres, Keycloak, Redpanda, MongoDB, MinIO and Vault are already
+  provided.)
+- **More backing services** (Vault, MinIO, MongoDB): add them to
   `docker-compose.yml`, expose host ports, and export their endpoints in `env.sh`.
+- **More slice routes**: add a `{ method, pathRegex, module, exportName }` entry to
+  `action-runner/routes.mjs` (the shim imports the module from the bind-mounted repo)
+  and an APISIX route in `apisix/apisix.yaml`.
 - **More seeded tenants**: drop another `keycloak/import/<id>-realm.json` (realm
   name = tenantId, with a `displayName`).
 - **Full API integration** (tests that need a service's HTTP API, e.g. the
