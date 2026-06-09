@@ -17,6 +17,7 @@ import jwksClient from 'jwks-rsa'
 export interface TokenClaims {
   sub: string
   tenantId?: string
+  actorType?: string
   scopes: string[]
   exp: number
   iat: number
@@ -92,6 +93,7 @@ export async function validateToken(token: string): Promise<TokenClaims> {
       return {
         sub: payload.sub ?? 'test-user',
         tenantId: payload.tenant_id ?? payload.tenantId,
+        actorType: payload.actor_type ?? payload.actorType,
         scopes: payload.scopes ?? payload.scope?.split(' ') ?? [],
         exp: payload.exp ?? Math.floor(Date.now() / 1000) + 3600,
         iat: payload.iat ?? Math.floor(Date.now() / 1000),
@@ -129,6 +131,8 @@ export async function validateToken(token: string): Promise<TokenClaims> {
       sub: payload.sub ?? '',
       tenantId: (payload as Record<string, unknown>).tenant_id as string | undefined
         ?? (payload as Record<string, unknown>).tenantId as string | undefined,
+      actorType: (payload as Record<string, unknown>).actor_type as string | undefined
+        ?? (payload as Record<string, unknown>).actorType as string | undefined,
       scopes: rawScopes,
       exp: payload.exp ?? 0,
       iat: payload.iat ?? 0,
