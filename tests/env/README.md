@@ -124,7 +124,7 @@ Families behind the gateway (each exercised by the smoke test):
 |-------|-------|--------------|
 | action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` actions read (`__ow_headers`, `method`, `path`, `query`, `body`) and invokes each **product action as-is** (imported from the repo bind-mounted read-only at `/repo`), returning its `{statusCode, headers?, body}`. The route table (`routes.mjs`) is data-driven AND declares **per-route dependency injection** (`invoke` style + `deps`) so actions with different DI models — `params.pg`, `main(params, overrides)`, or no deps — coexist behind one shim. Routes can also opt into OpenWhisk-style flattening of the query string / JSON body into top-level params (`mergeQueryIntoParams` / `mergeBodyIntoParams`) and supply `defaults` (e.g. `queryType`). |
 | APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (routes) | Gateway for all slice routes. For most routes: `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. The same plugin chain is inlined per route (APISIX's tinyyaml parser does not support YAML anchors). **Exception — `/v1/backups/status`:** a **plain proxy** with NO `openid-connect` and NO identity injection, because the backup-status action validates the Bearer JWT itself (JWKS) and reads its own claims. APISIX forwards the `Authorization` header upstream unchanged by default, so the action receives the raw token. |
-| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export` + `backup_scopes=["backup-status:read:own"]`) for the scheduling/async-operation/tenant-config families, **the tenant-scoped entitlements family** (a `tenant_owner` reads only its own tenant), **and the backup-status family** (own-tenant `read:own`), and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin` + `backup_scopes=["backup-status:read:global"]`) for the plan/quota families (superadmin cross-scope entitlements reads, and the backup-status **global** view). Both reuse the same client claim mappers (see below), plus a dedicated `scopes` mapper (multivalued array, from `backup_scopes`) that ONLY the backup-status family consumes. |
+| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export` + `backup_scopes=["backup-status:read:own"]`) for the scheduling/async-operation/tenant-config families, **the tenant-scoped entitlements family** (a `tenant_owner` reads only its own tenant), **and the backup-status family** (own-tenant `read:own`), and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin` + `backup_scopes=["backup-status:read:global","backup-status:read:technical"]`) for the plan/quota families (superadmin cross-scope entitlements reads, and the backup-status **global** view). Both reuse the same client claim mappers (see below), plus a dedicated `scopes` mapper (multivalued array, from `backup_scopes`) that ONLY the backup-status family consumes. |
 
 ### Boot + hit the API
 
@@ -180,22 +180,31 @@ The smoke run covers all seven families end-to-end:
   `GET /v1/tenant/entitlements?tenantId=<own tenant>` → 200 (a superadmin may
   cross-scope). The Playwright mirror is `tenant-entitlements-http-slice.spec.ts`.
 - **backup-status** (the **first in-action-auth family**, with a cross-tenant
-  **IDOR probe** AND a **scope probe**) — first the minted `tenant_owner` token is
+  **IDOR probe**, a **scope probe**, AND a **data-layer leak probe** over seeded
+  fixtures) — `up.sh` seeds `backup_status_snapshots` with a tenant-A OWN row
+  (`tenant-a-primary-db`, non-shared) and a tenant-B **SHARED** row
+  (`shared-platform-objectstore`). First the minted `tenant_owner` token is
   decoded and asserted to carry the `scopes:["backup-status:read:own"]` claim
   (Keycloak unmanaged-attribute → claim mapping is finicky, so this is verified
   empirically); then **no bearer token** `GET /v1/backups/status` → **401** *from
   the action's own validator* (the route is a plain proxy with no gateway
   jwt-auth); then the `tenant_owner` `e2e-user`
-  `GET /v1/backups/status?tenant_id=<A>` → 200 (its own tenant; with an empty
-  snapshots table the body has `schema_version:"1"` and
-  `deployment_backup_available:false`); then the **IDOR probe**
-  `GET /v1/backups/status?tenant_id=<TENANT_B>` → **403** (a `tenant_owner` lacks
-  `read:global`, so it cannot read another tenant's backup status); then the
-  **scope probe** `GET /v1/backups/status` with no `tenant_id` → **403** (the
-  global view requires `read:global`, which a `tenant_owner` lacks); then the
-  `e2e-superadmin` (`read:global`) `GET /v1/backups/status` with no `tenant_id`
-  → 200 (`tenant_id:null`, global view allowed). The Playwright mirror is
-  `backup-status-http-slice.spec.ts`.
+  `GET /v1/backups/status?tenant_id=<A>` → 200 with
+  `deployment_backup_available:true` and the own component `tenant-a-primary-db`
+  present; then the **data-layer leak probe** — that same response MUST NOT
+  contain `shared-platform-objectstore` (`getByTenant(includeShared:false)` →
+  `WHERE tenant_id=$1 AND is_shared_instance=FALSE`, plus two in-action belts —
+  proving the *data* layer, not just the auth gate, keeps tenants apart); then the
+  **IDOR probe** `GET /v1/backups/status?tenant_id=<TENANT_B>` → **403** (a
+  `tenant_owner` lacks `read:global`, so it cannot read another tenant's backup
+  status); then the **scope probe** `GET /v1/backups/status` with no `tenant_id`
+  → **403** (the global view requires `read:global`, which a `tenant_owner`
+  lacks); then the `e2e-superadmin` (`read:global` + `read:technical`)
+  `GET /v1/backups/status` with no `tenant_id` → 200 (`tenant_id:null`) whose
+  components contain **both** `tenant-a-primary-db` **and**
+  `shared-platform-objectstore` — the contrast that shared rows are visible to a
+  platform/technical caller (`getAll(includeShared:true)`) but invisible to a
+  tenant-scoped one. The Playwright mirror is `backup-status-http-slice.spec.ts`.
 
 ### How identity flows (claims -> headers)
 
@@ -228,7 +237,7 @@ so the request body can never spoof identity. The slice produces the headers lik
     user's `backup_scopes` attribute. **Consumed ONLY by the backup-status family**,
     which validates the token in-action and reads `claims.scopes` itself (NOT the
     gateway's `actor_scopes`). `e2e-user` carries `["backup-status:read:own"]`;
-    `e2e-superadmin` carries `["backup-status:read:global"]`. (The gateway never sees
+    `e2e-superadmin` carries `["backup-status:read:global","backup-status:read:technical"]`. (The gateway never sees
     this claim — its `serverless-pre-function` does not inject it.)
   - `sub` — standard subject.
 - **APISIX** (`apisix/apisix.yaml`): `openid-connect` validates the token, then the
