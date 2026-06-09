@@ -11,9 +11,12 @@
 #   [9-10] tenant-config        /v1/admin/config/format-versions (GET 200 + body)
 #   [11-14] plan catalog        /v1/plans                        (POST 201 + list, superadmin)
 #   [15-16] quota dimensions    /v1/quota-dimensions             (GET 200 + seeded catalog, superadmin)
+#   [17-20] entitlements        /v1/tenant/entitlements          (tenant-scoped: own 200 + IDOR 403)
 #
 # Steps 0-10 use the tenant_owner user; steps 11-16 use the dedicated superadmin
-# user (the plan/quota actions require actor.type 'superadmin').
+# user (the plan/quota actions require actor.type 'superadmin'). Steps 17-20 are
+# the FIRST tenant-scoped family: a tenant_owner reads only its own tenant, and a
+# ?tenantId=<other> is a cross-tenant IDOR attempt the action rejects with 403.
 #
 # Assumes `tests/env/up.sh` has already booted + provisioned the stack.
 # No assertion is weakened: a missing token MUST 401, created resources MUST appear,
@@ -192,10 +195,50 @@ QD_OK=$(printf '%s' "$QDBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=
 [ "$QD_OK" = "true" ] || fail "quota-dimensions body missing seeded dimensions (expected >=8 incl max_workspaces): $QDBODY"
 pass "quota-dimensions returned seeded catalog (>=8 dimensions incl max_workspaces)"
 
+# ---- tenant effective entitlements family (provisioning-orchestrator) -------
+# tenant-effective-entitlements-get: main(params, overrides), db via overrides.db,
+# identity via params.callerContext built by the shim from the trusted x-* headers
+# (params-callercontext-overrides invoke). This is the FIRST tenant-scoped
+# (non-superadmin) family: a tenant_owner reads ONLY its own tenant. The action's
+# authz throws FORBIDDEN (403) BEFORE any DB access when ?tenantId=<other> does
+# not match the caller's tenant -> the cross-tenant IDOR probe. For an unseeded
+# tenant it returns 200 with catalog-default quantitative limits and planSlug:null.
+
+TENANT_B="22222222-2222-2222-2222-222222222222"  # a DIFFERENT tenant (need not exist; 403 fires pre-DB)
+
+echo "==> [17] gateway rejects unauthenticated tenant-entitlements request"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$APISIX/v1/tenant/entitlements")
+[ "$code" = "401" ] || fail "expected 401 without token on /v1/tenant/entitlements, got $code"
+pass "tenant-entitlements unauthenticated -> 401"
+
+echo "==> [18] tenant_owner GET /v1/tenant/entitlements (own tenant) -> 200 catalog defaults"
+ENT=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/tenant/entitlements")
+ENTBODY=$(printf '%s' "$ENT" | sed '$d')
+ENTCODE=$(printf '%s' "$ENT" | tail -n1)
+[ "$ENTCODE" = "200" ] || fail "expected 200 on own-tenant entitlements, got $ENTCODE: $ENTBODY"
+ENT_OK=$(printf '%s' "$ENTBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const q=j.quantitativeLimits||[];process.stdout.write(String(Array.isArray(q)&&q.length>0&&j.planSlug===null))})')
+[ "$ENT_OK" = "true" ] || fail "own-tenant entitlements body missing non-empty quantitativeLimits / planSlug!=null: $ENTBODY"
+pass "tenant_owner own-tenant entitlements -> 200 (non-empty quantitativeLimits, planSlug null)"
+
+echo "==> [19] IDOR PROBE: tenant_owner GET /v1/tenant/entitlements?tenantId=<TENANT_B> -> 403 (cross-tenant read blocked)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/tenant/entitlements?tenantId=$TENANT_B")
+[ "$code" = "403" ] || fail "expected 403 for tenant_owner reading another tenant's entitlements (IDOR), got $code"
+pass "IDOR blocked: tenant_owner cross-tenant entitlements read -> 403"
+
+echo "==> [20] superadmin GET /v1/tenant/entitlements?tenantId=<own tenant> -> 200 (may cross-scope)"
+SENT=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $STOKEN" "$APISIX/v1/tenant/entitlements?tenantId=$E2E_TENANT_ID")
+SENTBODY=$(printf '%s' "$SENT" | sed '$d')
+SENTCODE=$(printf '%s' "$SENT" | tail -n1)
+[ "$SENTCODE" = "200" ] || fail "expected 200 for superadmin scoped entitlements, got $SENTCODE: $SENTBODY"
+SENT_OK=$(printf '%s' "$SENTBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String(Array.isArray(j.quantitativeLimits)&&j.quantitativeLimits.length>0))})')
+[ "$SENT_OK" = "true" ] || fail "superadmin scoped entitlements body missing non-empty quantitativeLimits: $SENTBODY"
+pass "superadmin scoped entitlements (explicit tenantId) -> 200 (cross-scope allowed)"
+
 echo
-echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota} actions -> Postgres."
+echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements} actions -> Postgres."
 echo "  scheduling           : 401 + POST 201 + list"
 echo "  async-operation      : 401 + POST 200 + detail + list"
 echo "  tenant-config formats: 401 + GET 200 + body"
 echo "  plan catalog         : 401 + tenant_owner 403 + superadmin POST 201 + list"
 echo "  quota dimensions     : 401 + superadmin GET 200 + seeded catalog"
+echo "  entitlements (tenant): 401 + tenant_owner own 200 + IDOR cross-tenant 403 + superadmin scoped 200"
