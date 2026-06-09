@@ -172,7 +172,8 @@ echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin)
 echo "  MinIO console          : http://localhost:59001"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
-echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions, /v1/tenant/entitlements)"
+echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/backups/status)"
+echo "                            NOTE /v1/backups/status authenticates IN-ACTION (plain proxy, no gateway jwt-auth): the backup-status action verifies the Bearer JWT itself against the realm JWKS and reads tenant+scopes from the token's own claims."
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
 echo "  Keycloak realm (slice) : falcone-e2e  client=falcone-e2e-client users=e2e-user/e2e-password (tenant_owner), e2e-superadmin/e2e-superadmin-password (superadmin)"
 echo
