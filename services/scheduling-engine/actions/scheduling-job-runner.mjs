@@ -16,7 +16,11 @@ export default async function main(params) {
   }
 
   const startedAt = new Date().toISOString();
-  const started = (await pg.query(`UPDATE scheduled_executions SET started_at = $2 WHERE id = $1 RETURNING *`, [executionId, startedAt])).rows[0];
+  const started = (await pg.query(`UPDATE scheduled_executions SET started_at = $2 WHERE id = $1 AND started_at IS NULL RETURNING *`, [executionId, startedAt])).rows[0];
+
+  if (!started) {
+    return { statusCode: 200, body: { skipped: true, reason: 'already_claimed' } };
+  }
 
   let result;
   let errorSummary = null;
