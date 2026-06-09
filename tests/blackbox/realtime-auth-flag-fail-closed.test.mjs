@@ -21,6 +21,8 @@ const REQUIRED_ENV = {
   KEYCLOAK_INTROSPECTION_URL: 'https://keycloak.example.com/realms/test/protocol/openid-connect/token/introspect',
   KEYCLOAK_INTROSPECTION_CLIENT_ID: 'realtime-client',
   KEYCLOAK_INTROSPECTION_CLIENT_SECRET: 'secret-value',
+  KEYCLOAK_ISSUER: 'https://keycloak.example.com/realms/test',
+  KEYCLOAK_AUDIENCE: 'realtime-client',
   DATABASE_URL: 'postgres://user:pass@localhost:5432/testdb',
   KAFKA_BROKERS: 'kafka1:9092,kafka2:9092'
 };
