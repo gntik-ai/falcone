@@ -159,6 +159,40 @@ export const routes = [
     invoke: 'params-callercontext-overrides',
     deps: ['db'],
   },
+
+  // ---- tenant effective entitlements (provisioning-orchestrator) -----------
+  // GET /v1/tenant/entitlements -> tenant-effective-entitlements-get::main
+  //   main(params, overrides), db from overrides.db. Reads
+  //   params.callerContext.actor DIRECTLY (params-callercontext-overrides), so
+  //   the shim builds callerContext from the TRUSTED x-* identity headers
+  //   (x-auth-subject/x-tenant-id/x-actor-type), overwriting any client value.
+  //
+  //   This is the FIRST tenant-scoped (non-superadmin) family in the slice: a
+  //   tenant_owner actor may read ONLY its own tenant. The action's authz reads
+  //   actor.type in {tenant_owner, tenant-owner, tenant}; if params.tenantId is
+  //   present AND !== actor.tenantId it throws { code:'FORBIDDEN' } (HTTP 403)
+  //   BEFORE any DB access. superadmin/internal may pass any params.tenantId.
+  //
+  //   mergeQueryIntoParams:true flattens ?tenantId=<uuid> to params.tenantId,
+  //   which drives the cross-tenant IDOR probe in the smoke. NO defaults are set
+  //   (injecting a tenantId would mask the own-tenant default-resolution path).
+  //
+  //   For an unseeded tenant (no plan assignment / no overrides) the positive
+  //   path returns HTTP 200 with one catalog_default quantitative limit per
+  //   quota_dimension_catalog dimension and planSlug:null. Reads
+  //   quota_dimension_catalog (098), tenant_plan_assignments/plans (097),
+  //   quota_overrides (103); boolean_capability_catalog (104) is optional (its
+  //   42P01 is caught), but the slice applies 104 too.
+  {
+    name: 'tenant-effective-entitlements-get',
+    pathRegex: /^\/v1\/tenant\/entitlements\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeQueryIntoParams: true,
+  },
 ];
 
 export function matchRoute(method, path) {

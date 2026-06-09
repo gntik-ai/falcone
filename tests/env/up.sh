@@ -121,13 +121,22 @@ for m in 073-async-operation-tables 074-async-operation-log-entries \
     && echo "   applied $m" || echo "   skipped $m (already applied?)"
 done
 
-echo "==> applying provisioning-orchestrator plan + quota migrations to Postgres"
-# Only the migrations the plan/quota HTTP slice needs, in dependency order:
+echo "==> applying provisioning-orchestrator plan + quota + entitlements migrations to Postgres"
+# Only the migrations the plan/quota/entitlements HTTP slices need, in dependency
+# order:
 #   097 plans + tenant_plan_assignments + plan_audit_events
-#       (+ set_updated_at_timestamp() function used by 098)
+#       (+ set_updated_at_timestamp() function used by 098/104)
 #   098 quota_dimension_catalog (+ seeds the 8 default dimensions the
 #       quota-dimension-catalog-list action returns)
-for m in 097-plan-entity-tenant-assignment 098-plan-base-limits; do
+#   100 tenant_plan_change_history + quota/capability impacts (plan-change audit)
+#   103 quota_overrides (+ plans.quota_type_config) — resolveUnifiedEntitlements
+#       LEFT JOINs quota_overrides, so the entitlements query needs this table
+#   104 boolean_capability_catalog (+ seeds) — resolveUnifiedEntitlements queries
+#       it optionally (its 42P01 is caught), but seeding it exercises the full
+#       capability-resolution path
+for m in 097-plan-entity-tenant-assignment 098-plan-base-limits \
+         100-plan-change-impact-history 103-hard-soft-quota-overrides \
+         104-plan-boolean-capabilities; do
   f="$PO_MIGRATIONS/$m.sql"
   [ -f "$f" ] || { echo "   MISSING $m.sql" >&2; continue; }
   docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test < "$f" >/dev/null 2>&1 \
@@ -163,7 +172,7 @@ echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin)
 echo "  MinIO console          : http://localhost:59001"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
-echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions)"
+echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions, /v1/tenant/entitlements)"
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
 echo "  Keycloak realm (slice) : falcone-e2e  client=falcone-e2e-client users=e2e-user/e2e-password (tenant_owner), e2e-superadmin/e2e-superadmin-password (superadmin)"
 echo
