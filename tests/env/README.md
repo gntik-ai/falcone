@@ -171,14 +171,20 @@ The smoke run covers all seven families end-to-end:
   `GET /v1/quota-dimensions` → 200 with the seeded catalog (≥ 8 dimensions,
   including `max_workspaces`, from migration `098-plan-base-limits.sql`).
 - **tenant entitlements** (the **first tenant-scoped family**, with a cross-tenant
-  **IDOR probe**) — 401 unauthenticated, then the `tenant_owner` `e2e-user`
-  `GET /v1/tenant/entitlements` → 200 (its own tenant; an unseeded tenant yields a
-  non-empty `quantitativeLimits` array of `catalog_default` rows and `planSlug:null`),
+  **IDOR probe**, over **real plan-derived limits**) — `up.sh` assigns plan
+  `e2e-pro-plan` (`quota_dimensions={"max_workspaces":50}`) to tenant A, so the
+  resolution path is exercised end-to-end (plan → `tenant_plan_assignments` →
+  `resolveUnifiedEntitlements`). 401 unauthenticated, then the `tenant_owner`
+  `e2e-user` `GET /v1/tenant/entitlements` → 200 whose `quantitativeLimits` are
+  **plan-derived, not catalog defaults**: `planSlug:"e2e-pro-plan"` and the
+  `max_workspaces` dimension resolves to `source:"plan"` with `effectiveValue:50`
+  (vs the `catalog_default`/`planSlug:null` fallback for an unassigned tenant);
   then the **IDOR probe** `GET /v1/tenant/entitlements?tenantId=<TENANT_B>` → **403**
   (a `tenant_owner` may read only its own tenant; the action throws `FORBIDDEN`
   before any DB access, so `TENANT_B` need not exist), then the `e2e-superadmin`
   `GET /v1/tenant/entitlements?tenantId=<own tenant>` → 200 (a superadmin may
-  cross-scope). The Playwright mirror is `tenant-entitlements-http-slice.spec.ts`.
+  cross-scope and sees the same `planSlug:"e2e-pro-plan"`). The Playwright mirror
+  is `tenant-entitlements-http-slice.spec.ts`.
 - **backup-status** (the **first in-action-auth family**, with a cross-tenant
   **IDOR probe**, a **scope probe**, AND a **data-layer leak probe** over seeded
   fixtures) — `up.sh` seeds `backup_status_snapshots` with a tenant-A OWN row
@@ -322,9 +328,12 @@ unmanaged-attribute → array-claim mapping is finicky.
   cross-tenant `?tenantId` mismatch with `FORBIDDEN`/403 **before any DB access**,
   so the smoke's IDOR probe (`?tenantId=22222222-…` as `e2e-user`) proves
   cross-tenant isolation without seeding a second tenant. The positive own-tenant
-  read uses an unseeded tenant: `resolveUnifiedEntitlements` LEFT JOINs the
-  catalog/plan-assignment/override tables and returns one `catalog_default`
-  quantitative limit per `quota_dimension_catalog` dimension with `planSlug:null`.
+  read exercises the **real** resolution path: `up.sh` assigns plan `e2e-pro-plan`
+  (`quota_dimensions={"max_workspaces":50}`) to tenant A, so
+  `resolveUnifiedEntitlements` (LEFT JOINing the catalog/plan-assignment/override
+  tables) returns `planSlug:"e2e-pro-plan"` with the `max_workspaces` dimension at
+  `source:"plan"`/`effectiveValue:50` — not the `catalog_default`/`planSlug:null`
+  fallback an unassigned tenant would get.
   This family needs three more migrations than the plan/quota families —
   `100-plan-change-impact-history` (loop dependency ordering), `103-hard-soft-quota-overrides`
   (the `quota_overrides` table the entitlements query LEFT JOINs), and
