@@ -51,8 +51,8 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 - **Observability** (metrics/tracing/logging stack).
 
 These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
-| action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs the real scheduling action with a real pg Pool (HTTP-slice only) |
-| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
+| action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs real product actions with per-route dependency injection (HTTP-slice only) |
+| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
 
 ### Keycloak model (matches production)
 
@@ -98,21 +98,29 @@ Reference: `services/backup-status/test/integration/tenant-name-resolver.keycloa
 drives the actual `createKeycloakTenantNameResolver` against the live Keycloak
 (real client-credentials flow + admin API) and asserts the fail-closed contract.
 
-## HTTP request-chain slice (scheduling)
+## HTTP request-chain slice (multiple action families)
 
 `up.sh` also boots an **API-level vertical slice** that runs Falcone's real HTTP
-request chain end-to-end:
+request chain end-to-end for several action families:
 
 ```
 Keycloak (JWT)  ->  APISIX (auth + identity-header inject)  ->  action-runner shim
-                ->  scheduling-management action (real, imported as-is)  ->  Postgres
+                ->  product action (real, imported as-is)  ->  Postgres
 ```
+
+Families behind the gateway (each exercised by the smoke test):
+
+| Family | Route(s) | Product action (imported as-is) | Invoke style / deps |
+|--------|----------|---------------------------------|---------------------|
+| scheduling | `/v1/scheduling/*` | `scheduling-engine/actions/scheduling-management.mjs` | `params-pg` — `params.pg` = pg Pool |
+| async-operation | `POST/GET /v1/async-operations`, `GET /v1/async-operations/{id}` | `provisioning-orchestrator/src/actions/async-operation-create.mjs` + `async-operation-query.mjs` | `params-overrides` — `main(params, overrides)`, `overrides.db` = pg Pool |
+| tenant-config formats | `GET /v1/admin/config/format-versions` | `provisioning-orchestrator/src/actions/tenant-config-format-versions.mjs` | `params-only` — pure GET, no DB |
 
 | Piece | Where | What it does |
 |-------|-------|--------------|
-| action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` the action reads (`__ow_headers`, `method`, `path`, `query`, `body`) and injects a real `pg` Pool at `params.pg`, then dynamically `import()`s the **product action as-is** from the repo bind-mounted read-only at `/repo` and returns its `{statusCode, body}`. Route table is data-driven (`routes.mjs`) so more services can be added. |
-| APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (route) | Gateway for `/v1/scheduling/*`. `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. |
-| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, user `e2e-user`/`e2e-password`, role `scheduling.admin`, and claim mappers (see below). |
+| action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` actions read (`__ow_headers`, `method`, `path`, `query`, `body`) and invokes each **product action as-is** (imported from the repo bind-mounted read-only at `/repo`), returning its `{statusCode, headers?, body}`. The route table (`routes.mjs`) is data-driven AND declares **per-route dependency injection** (`invoke` style + `deps`) so actions with different DI models — `params.pg`, `main(params, overrides)`, or no deps — coexist behind one shim. Routes can also opt into OpenWhisk-style flattening of the query string / JSON body into top-level params (`mergeQueryIntoParams` / `mergeBodyIntoParams`) and supply `defaults` (e.g. `queryType`). |
+| APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (routes) | Gateway for all slice routes. `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. The same plugin chain is inlined per route (APISIX's tinyyaml parser does not support YAML anchors). |
+| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, user `e2e-user`/`e2e-password`, role `scheduling.admin`, user attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export`, and claim mappers (see below). |
 
 ### Boot + hit the API
 
@@ -140,31 +148,54 @@ curl -s -H "Authorization: Bearer $TOKEN" "$APISIX_BASE_URL/v1/scheduling/jobs" 
 ### Smoke tests
 
 ```bash
-bash tests/env/e2e-smoke/run.sh        # curl/node: 401 -> token -> 201 -> listed
-( cd tests/env/e2e-smoke && npm install && npx playwright test )   # same flow via @playwright/test request API
+bash tests/env/e2e-smoke/run.sh        # curl/node: per family 401 -> token -> create -> read-back
+( cd tests/env/e2e-smoke && npm install && npx playwright test )   # same flows via @playwright/test request API
 ```
+
+The smoke run covers all three families end-to-end:
+- **scheduling** — 401 unauthenticated, then `POST /v1/scheduling/jobs` → 201, then listed.
+- **async-operation** — 401 unauthenticated, `POST /v1/async-operations` → 200 (the
+  action's `formatCreateResponse` contract returns **200**, not 201), then
+  `GET /v1/async-operations/{id}` detail returns it, then it appears in the list.
+- **tenant-config formats** — 401 unauthenticated, then
+  `GET /v1/admin/config/format-versions` → 200 with `current_version` + non-empty `versions`.
 
 ### How identity flows (claims -> headers)
 
-The action derives identity **only** from trusted gateway-injected headers
-(`scheduling-management.mjs::parseIdentity`). The slice produces them like this:
+Each action derives identity **only** from trusted gateway-injected headers
+(`scheduling-management.mjs::parseIdentity`, `async-operation` `caller-context.mjs`,
+`tenant-config` `parseConfigIdentity`). The slice produces them like this:
 
 - **Keycloak mappers** (`keycloak-e2e-provision.sh`) put these on the *access token*:
   - `tenant_id`, `workspace_id` — `oidc-usermodel-attribute-mapper` from the user's
     `tenant_id` / `workspace_id` attributes (realm has `unmanagedAttributePolicy=ENABLED`
     so Keycloak 26 does not strip them).
   - `actor_roles` — `oidc-usermodel-realm-role-mapper` (multivalued, unprefixed), includes `scheduling.admin`.
+  - `actor_type` — `oidc-usermodel-attribute-mapper` from the user's `actor_type`
+    attribute (`tenant_owner`; required by the async-operation create model, which
+    only accepts `{workspace_admin, tenant_owner, superadmin, tenant_member}`).
+  - `actor_scopes` — `oidc-usermodel-attribute-mapper` (multivalued) from the user's
+    `actor_scopes` attribute (`platform:admin:config:export`; required by the
+    tenant-config format-versions action).
   - `sub` — standard subject.
 - **APISIX** (`apisix/apisix.yaml`): `openid-connect` validates the token, then the
   `serverless-pre-function` decodes the verified token and sets upstream headers
   `X-Tenant-Id <- tenant_id`, `X-Workspace-Id <- workspace_id`,
-  `X-Auth-Subject <- sub`, `X-Actor-Roles <- actor_roles` (joined). It first deletes
-  any caller-supplied `X-*` identity headers, so a client cannot spoof identity.
+  `X-Auth-Subject <- sub`, `X-Actor-Roles <- actor_roles` (joined),
+  `X-Actor-Type <- actor_type`, `X-Actor-Scopes <- actor_scopes` (joined). It first
+  deletes any caller-supplied `X-*` identity headers, so a client cannot spoof identity.
 
 ### Scope / deferred (honest)
 
-- **Scope: scheduling only.** The route table (`action-runner/routes.mjs`) is
-  data-driven; other services can be added the same way.
+- **Families covered: scheduling, async-operation, tenant-config format-versions.**
+  The route table (`action-runner/routes.mjs`) is data-driven with per-route DI;
+  other actions can be added the same way (declare `invoke` + `deps`).
+- **async-operation `result` queryType + idempotency-key path: deferred.** The
+  `getOperationResult` query selects `result`/`completed_at` columns no migration
+  in this repo adds to `async_operations`, and the idempotency-key create path runs
+  `BEGIN/COMMIT` across a shared pool (no single-connection guarantee). The slice
+  therefore exercises create (no idempotency key), `detail`, and `list`, which use
+  only columns the applied migrations (073/075/076/078) provide.
 - **Custom scope-enforcement Lua plugin: deferred** (out of scope for this slice).
   APISIX here does AuthN + identity-header injection, not the fine-grained
   per-resource scope checks the production gateway plugin performs.
@@ -180,9 +211,13 @@ The action derives identity **only** from trusted gateway-injected headers
   provided.)
 - **More backing services** (Vault, MinIO, MongoDB): add them to
   `docker-compose.yml`, expose host ports, and export their endpoints in `env.sh`.
-- **More slice routes**: add a `{ method, pathRegex, module, exportName }` entry to
-  `action-runner/routes.mjs` (the shim imports the module from the bind-mounted repo)
-  and an APISIX route in `apisix/apisix.yaml`.
+- **More slice routes**: add a `{ name, methods, pathRegex, module, exportName, invoke, deps? }`
+  entry to `action-runner/routes.mjs` (the shim imports the module from the
+  bind-mounted repo) and an APISIX route in `apisix/apisix.yaml`. Pick the `invoke`
+  style that matches how the action takes its dependencies (`params-pg`,
+  `params-overrides` + `deps: ['db']`, or `params-only`), and set
+  `mergeQueryIntoParams` / `mergeBodyIntoParams` / `defaults` if the action reads
+  flat top-level params (OpenWhisk web-action style).
 - **More seeded tenants**: drop another `keycloak/import/<id>-realm.json` (realm
   name = tenantId, with a `displayName`).
 - **Full API integration** (tests that need a service's HTTP API, e.g. the
