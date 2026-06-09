@@ -34,7 +34,7 @@ describe('Contract: operation response without technical scope', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('does not contain failure_reason, adapterOperationId, or metadata', async () => {
-    mockValidate.mockResolvedValue({ sub: 'user-1', scopes: [], exp: 0, iat: 0 })
+    mockValidate.mockResolvedValue({ sub: 'user-1', tenantId: 'tenant-a', scopes: [], exp: 0, iat: 0 })
     mockFindById.mockResolvedValue({
       id: 'op-1', type: 'backup', tenantId: 'tenant-a', componentType: 'postgresql',
       instanceId: 'pg-1', status: 'failed', requesterId: 'user-1', requesterRole: 'tenant_owner',
