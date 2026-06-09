@@ -12,7 +12,7 @@
 #   [11-14] plan catalog        /v1/plans                        (POST 201 + list, superadmin)
 #   [15-16] quota dimensions    /v1/quota-dimensions             (GET 200 + seeded catalog, superadmin)
 #   [17-20] entitlements        /v1/tenant/entitlements          (tenant-scoped: own 200 + IDOR 403)
-#   [21-26] backup-status       /v1/backups/status               (IN-ACTION JWKS auth: own 200 + IDOR 403 + scope 403 + global 200)
+#   [21-26] backup-status       /v1/backups/status               (IN-ACTION JWKS auth: seeded own 200 + data-leak probe + IDOR 403 + scope 403 + global 200 sees shared)
 #
 # Steps 0-10 use the tenant_owner user; steps 11-16 use the dedicated superadmin
 # user (the plan/quota actions require actor.type 'superadmin'). Steps 17-20 are
@@ -251,8 +251,11 @@ pass "superadmin scoped entitlements (explicit tenantId) -> 200 (cross-scope all
 #                        a DIFFERENT tenant without global -> 403 (IDOR blocked).
 #   tenant_id absent  -> read:global required, else 403 (global view).
 # e2e-user (tenant A) carries scopes:["backup-status:read:own"]; e2e-superadmin
-# carries ["backup-status:read:global"]. With an empty snapshots table the action
-# returns 200 with deployment_backup_available:false (no seeding required).
+# carries ["backup-status:read:global","backup-status:read:technical"]. up.sh seeds
+# two snapshot rows: a tenant-A OWN row (tenant-a-primary-db, non-shared) and a
+# tenant-B SHARED row (shared-platform-objectstore). This lets the smoke prove the
+# DATA layer keeps tenants apart: tenant A sees its own row but NOT tenant B's
+# shared row (step 23b), while a technical-scoped global caller sees BOTH (step 26).
 TENANT_B="22222222-2222-2222-2222-222222222222"
 
 # Decode the JWT payload (middle segment, base64url) and assert the `scopes` claim
@@ -268,14 +271,26 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$APISIX/v1/backups/status")
 [ "$code" = "401" ] || fail "expected 401 without token on backup-status (in-action), got $code"
 pass "backup-status no-token -> 401 (in-action, route is a plain proxy with NO gateway jwt-auth)"
 
-echo "==> [23] e2e-user (tenant A, read:own) GET /v1/backups/status?tenant_id=A -> 200"
+echo "==> [23] e2e-user (tenant A, read:own) GET /v1/backups/status?tenant_id=A -> 200 with the seeded OWN row"
 BS=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/backups/status?tenant_id=$E2E_TENANT_ID")
 BSBODY=$(printf '%s' "$BS" | sed '$d')
 BSCODE=$(printf '%s' "$BS" | tail -n1)
 [ "$BSCODE" = "200" ] || fail "expected 200 on own-tenant backup-status, got $BSCODE: $BSBODY"
-BS_OK=$(printf '%s' "$BSBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String(j.schema_version==="1"&&typeof j.deployment_backup_available==="boolean"))})')
-[ "$BS_OK" = "true" ] || fail "backup-status body missing schema_version/deployment_backup_available: $BSBODY"
-pass "backup-status own-tenant -> 200 (schema_version + deployment_backup_available present)"
+# With the seeded tenant-A row, the response is no longer a hollow "not enabled"
+# 200: deployment_backup_available must be TRUE and the own row must be present.
+BS_OK=$(printf '%s' "$BSBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const labels=(j.components||[]).map(c=>c.instance_label);process.stdout.write(String(j.schema_version==="1"&&j.deployment_backup_available===true&&labels.includes("tenant-a-primary-db")))})')
+[ "$BS_OK" = "true" ] || fail "own-tenant backup-status should show deployment_backup_available:true + the seeded tenant-a-primary-db component: $BSBODY"
+pass "backup-status own-tenant -> 200 (deployment_backup_available:true, own component tenant-a-primary-db present)"
+
+echo "==> [23b] DATA-LEAK PROBE: tenant A's response MUST NOT contain tenant B's shared-instance row"
+# getByTenant(tenantId, includeShared:false) for a read:own caller queries
+# WHERE tenant_id=$1 AND is_shared_instance=FALSE, and two in-action belts drop
+# any cross-tenant shared row. So tenant A must never see the seeded shared row
+# (shared-platform-objectstore) that is owned by tenant B. This proves the DATA
+# layer keeps tenants apart, not just the auth gate (step 24).
+LEAK=$(printf '%s' "$BSBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const labels=(j.components||[]).map(c=>c.instance_label);process.stdout.write(String(labels.includes("shared-platform-objectstore")))})')
+[ "$LEAK" = "false" ] || fail "DATA LEAK: tenant A's backup-status response contains tenant B's shared-instance row (shared-platform-objectstore): $BSBODY"
+pass "no data leak: tenant A does NOT see tenant B's shared-instance backup row"
 
 echo "==> [24] IDOR PROBE: e2e-user GET /v1/backups/status?tenant_id=<TENANT_B> -> 403 (cross-tenant backup read blocked)"
 code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/backups/status?tenant_id=$TENANT_B")
@@ -287,7 +302,7 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" 
 [ "$code" = "403" ] || fail "expected 403 for tenant_owner global backup-status view (lacks read:global), got $code"
 pass "scope enforced: tenant_owner global view (no tenant_id) -> 403 (read:global required)"
 
-echo "==> [26] e2e-superadmin (read:global) GET /v1/backups/status (no tenant_id) -> 200 (global view allowed)"
+echo "==> [26] e2e-superadmin (read:global+read:technical) GET /v1/backups/status (no tenant_id) -> 200 sees BOTH own + shared rows"
 # Mint a fresh superadmin token (STOKEN above may not carry the scopes claim if it
 # was issued before; re-login to be deterministic across re-runs).
 STOKEN=$(curl -s -X POST "$KC/realms/$REALM/protocol/openid-connect/token" \
@@ -298,9 +313,14 @@ SGLOBAL=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $STOKEN" "$APISI
 SGBODY=$(printf '%s' "$SGLOBAL" | sed '$d')
 SGCODE=$(printf '%s' "$SGLOBAL" | tail -n1)
 [ "$SGCODE" = "200" ] || fail "expected 200 for superadmin global backup-status view, got $SGCODE: $SGBODY"
-SG_OK=$(printf '%s' "$SGBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String(j.schema_version==="1"&&j.tenant_id===null))})')
-[ "$SG_OK" = "true" ] || fail "superadmin global backup-status body missing schema_version / tenant_id!=null: $SGBODY"
-pass "backup-status superadmin global view (no tenant_id) -> 200 (read:global allowed, tenant_id null)"
+# Contrast with [23b]: a technical-scoped global caller getAll(includeShared:true)
+# DOES see shared rows, so the global view contains BOTH the tenant-A own row and
+# the tenant-B shared row — shared rows are visible to a platform/technical caller
+# but invisible to a tenant-scoped one. (instance_id is technical-only; match on
+# instance_label, present for every scope.)
+SG_OK=$(printf '%s' "$SGBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const labels=(j.components||[]).map(c=>c.instance_label);process.stdout.write(String(j.schema_version==="1"&&j.tenant_id===null&&labels.includes("tenant-a-primary-db")&&labels.includes("shared-platform-objectstore")))})')
+[ "$SG_OK" = "true" ] || fail "superadmin global view should show tenant_id:null + BOTH tenant-a-primary-db AND the shared-platform-objectstore row (technical scope sees shared): $SGBODY"
+pass "backup-status superadmin global view -> 200 (tenant_id null; technical scope sees own + shared rows)"
 
 echo
 echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements, backup-status} actions -> Postgres."
@@ -310,4 +330,4 @@ echo "  tenant-config formats: 401 + GET 200 + body"
 echo "  plan catalog         : 401 + tenant_owner 403 + superadmin POST 201 + list"
 echo "  quota dimensions     : 401 + superadmin GET 200 + seeded catalog"
 echo "  entitlements (tenant): 401 + tenant_owner own 200 + IDOR cross-tenant 403 + superadmin scoped 200"
-echo "  backup-status (JWKS) : token scopes claim verified + in-action 401 + own 200 + IDOR cross-tenant 403 + scope-403 + superadmin global 200"
+echo "  backup-status (JWKS) : scopes claim verified + in-action 401 + own 200 (seeded row) + DATA-LEAK probe (no tenant-B shared row) + IDOR 403 + scope-403 + superadmin global 200 (sees own + shared)"
