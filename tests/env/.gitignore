@@ -1,0 +1,3 @@
+# Runtime Vault file audit log (written by the Vault dev container on `up.sh`).
+# Never commit runtime audit logs.
+vault/audit/
