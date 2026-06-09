@@ -1,0 +1,13 @@
+{
+  "name": "falcone-testenv-e2e-smoke",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained Playwright API-level smoke for the scheduling HTTP request-chain slice on docker-compose. Independent of the Helm/kind e2e suite under tests/e2e.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}
