@@ -55103,6 +55103,263 @@
         "x-scope": "tenant",
         "x-visibility": "public"
       }
+    },
+    "/v1/platform/billing/usage": {
+      "get": {
+        "operationId": "listBillingUsageRecords",
+        "summary": "List billing usage records",
+        "tags": [
+          "Platform",
+          "Billing"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/PageAfter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated billing usage records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingUsageRecordList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "platform",
+        "x-scope": "platform",
+        "x-resource-type": "billing_usage_record",
+        "x-audiences": [
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "catalog",
+        "x-owning-service": "control_api",
+        "x-console-tier": "platform"
+      }
+    },
+    "/v1/platform/billing/usage/{tenantId}": {
+      "get": {
+        "operationId": "listTenantBillingUsageRecords",
+        "summary": "List billing usage records for one tenant",
+        "tags": [
+          "Platform",
+          "Billing"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/PageAfter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated billing usage records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingUsageRecordList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested tenant was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "platform",
+        "x-scope": "platform",
+        "x-resource-type": "billing_usage_record",
+        "x-audiences": [
+          "platform_team",
+          "superadmin"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "catalog",
+        "x-owning-service": "control_api",
+        "x-console-tier": "platform"
+      }
     }
   },
   "components": {
@@ -86382,6 +86639,111 @@
           "accessAudit"
         ],
         "type": "object"
+      },
+      "BillingUsageRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "cycleId",
+          "tenantId",
+          "dimensions",
+          "hasDegradedDimensions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable usage-record identifier."
+          },
+          "cycleId": {
+            "type": "string",
+            "description": "Identifier of the quota_metering calculation cycle."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant the usage record belongs to."
+          },
+          "snapshotTimestamp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Snapshot timestamp from the cycle audit."
+          },
+          "dimensions": {
+            "type": "array",
+            "description": "Resolved consumption dimensions for the tenant in this cycle.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimensionKey": {
+                  "type": "string"
+                },
+                "displayLabel": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "currentUsage": {
+                  "type": "number"
+                },
+                "usageStatus": {
+                  "type": "string"
+                },
+                "usageUnknownReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "hasDegradedDimensions": {
+            "type": "boolean",
+            "description": "Whether any dimension was degraded at snapshot time."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BillingUsageRecordList": {
+        "type": "object",
+        "required": [
+          "records",
+          "pagination"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingUsageRecord"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "required": [
+              "limit",
+              "offset"
+            ],
+            "properties": {
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
       }
     }
   }
