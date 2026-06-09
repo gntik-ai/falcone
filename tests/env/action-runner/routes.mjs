@@ -24,6 +24,29 @@
 //   invoke: 'params-only' — handler(params) with NO injected deps (pure GET,
 //       identity from headers, no DB). Used by tenant-config-format-versions.
 //
+//   invoke: 'params-owhttp' — handler(params) for a raw HTTP web-action that does
+//       its OWN authentication AND its OWN database access. This is a DELIBERATELY
+//       DIFFERENT auth model from every other family above: instead of trusting
+//       the gateway-injected identity headers (x-auth-subject/x-tenant-id/...),
+//       the action reads the Bearer token from params.__ow_headers.authorization
+//       and VERIFIES THE JWT SIGNATURE ITSELF against a JWKS endpoint
+//       (KEYCLOAK_JWKS_URL) — an in-action JWKS Bearer-JWT validator. So the shim
+//       injects NEITHER callerContext NOR a db dep; it only forwards the headers
+//       verbatim and lowercases __ow_method (the action 405s unless
+//       params.__ow_method === 'get'). The action's tenant + scope authorization
+//       matrix (own-tenant vs global, read:own vs read:global) is enforced
+//       entirely IN-ACTION off the token's tenant_id + scopes claims.
+//       Used by backup-status (GET /v1/backups/status).
+//
+//       `setClientModule` (string): the product module whose exported
+//       setClient(client) primes a module-level pg singleton. The backup-status
+//       COMPILED .js repository's getByTenant/getAll read a module-level `_client`
+//       directly (they do NOT lazily build a Pool from DB_URL the way the .ts
+//       getClient() does), so without setClient() every authorized request 500s
+//       with "No DB client injected". The shim imports the module and calls
+//       setClient(pool) once (cached) before the first invocation — the wiring a
+//       real deployment bootstrap would perform; product source is untouched.
+//
 //   invoke: 'params-callercontext-overrides' — handler(params, overrides) where
 //       the action reads params.callerContext (an { actor:{ id,type,tenantId },
 //       tenantId, correlationId } object) DIRECTLY rather than re-deriving it
@@ -191,6 +214,40 @@ export const routes = [
     exportName: 'main',
     invoke: 'params-callercontext-overrides',
     deps: ['db'],
+    mergeQueryIntoParams: true,
+  },
+
+  // ---- backup-status (in-action JWKS auth) ----------------------------------
+  // GET /v1/backups/status -> backup-status.action::main
+  //   The FIRST family that authenticates IN-ACTION via a JWKS Bearer-JWT
+  //   validator (NOT the gateway's trusted identity headers) AND uses the
+  //   product's OWN module-level pg client. main(params) — params-owhttp.
+  //
+  //   Auth model (entirely in-action, off the verified token's claims):
+  //     - reads Bearer from params.__ow_headers.authorization, verifies the JWT
+  //       signature against KEYCLOAK_JWKS_URL (set on the action-runner CONTAINER
+  //       env). No/invalid Bearer -> 401 from the ACTION (not the gateway).
+  //     - tenant <- token claim tenant_id; scopes <- token claim scopes (array)
+  //       or scope (space-split string).
+  //     - authorization matrix over params.tenant_id (from ?tenant_id=, merged):
+  //         tenant_id present  -> requires read:global OR (claim.tenantId ===
+  //           tenant_id AND read:own); a different tenant w/o global -> 403.
+  //         tenant_id absent   -> requires read:global -> 403 otherwise.
+  //
+  //   mergeQueryIntoParams:true flattens ?tenant_id=<uuid> to params.tenant_id,
+  //   driving the cross-tenant IDOR probe. setClientModule primes the .js
+  //   repository's module-level pg client (see invoke-style doc above) — without
+  //   it getByTenant/getAll throw "No DB client injected" -> 500. With an empty
+  //   snapshots table the action returns 200 with deployment_backup_available:
+  //   false (no snapshot seeding needed).
+  {
+    name: 'backup-status-get',
+    pathRegex: /^\/v1\/backups\/status\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/backup-status/src/api/backup-status.action.js',
+    exportName: 'main',
+    invoke: 'params-owhttp',
+    setClientModule: '/repo/services/backup-status/src/db/repository.js',
     mergeQueryIntoParams: true,
   },
 ];

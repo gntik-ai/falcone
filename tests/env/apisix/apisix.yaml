@@ -10,7 +10,10 @@
 #   - quota dimension catalog       /v1/quota-dimensions             (provisioning-orchestrator, superadmin)
 #   - tenant effective entitlements /v1/tenant/entitlements          (provisioning-orchestrator, tenant-scoped)
 #
-# Flow for every route:
+# PLUS one family that does NOT share the chain below (it authenticates itself):
+#   - backup-status                 /v1/backups/status               (backup-status, IN-ACTION JWKS auth — plain proxy, see its route)
+#
+# Flow for every route (EXCEPT backup-status, which is a plain proxy):
 #   1. openid-connect (bearer_only): validates the Keycloak access token against
 #      the realm's discovery/JWKS. No token / bad token => 401 BEFORE the upstream
 #      is ever reached.
@@ -610,6 +613,33 @@ routes:
                 core.request.set_header(ctx, "X-Actor-Scopes", tostring(scopes))
               end
             end
+      proxy-rewrite:
+        scheme: http
+    upstream:
+      type: roundrobin
+      nodes:
+        "action-runner:8090": 1
+
+  # backup-status: GET resolves the deployment/tenant backup status (200).
+  #
+  # This route INTENTIONALLY OMITS the gateway jwt-auth (openid-connect) plugin
+  # AND the serverless-pre-function identity-header injection used by every route
+  # above, because backup-status authenticates IN-ACTION: the product action reads
+  # the Bearer token from the request and VERIFIES the JWT signature itself against
+  # the realm JWKS (KEYCLOAK_JWKS_URL on the action-runner container), then derives
+  # tenant + scopes from the token's own claims. Putting jwt-auth here would be
+  # redundant and would mask the family's distinct auth model; injecting identity
+  # headers would be ignored (the action never reads them).
+  #
+  # This is therefore a PLAIN PROXY. APISIX forwards the Authorization header
+  # upstream unchanged by default (nothing here strips or rewrites it), so the
+  # action receives the raw Bearer token to validate. A missing/invalid token is
+  # rejected by the ACTION (401), not by the gateway.
+  - id: backup-status-get
+    uri: /v1/backups/status
+    methods:
+      - GET
+    plugins:
       proxy-rewrite:
         scheme: http
     upstream:

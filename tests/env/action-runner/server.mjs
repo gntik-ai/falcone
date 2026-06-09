@@ -78,6 +78,27 @@ function sendJson(res, statusCode, body, extraHeaders = {}) {
   res.end(payload);
 }
 
+// Some product modules keep their pg client in a module-level singleton that must
+// be primed once via an exported `setClient(client)` (the backup-status COMPILED
+// .js repository does this: getByTenant/getAll read the module-level `_client`
+// directly and throw "No DB client injected" until setClient() is called — the
+// .js getByTenant/getAll do NOT fall back to a DB_URL-built Pool the way the .ts
+// getClient() does). The shim cannot edit product source, so for routes that
+// declare `setClientModule` it imports that module and calls its setClient export
+// with the shared pool, ONCE per module (cached). This is the test-env adapter
+// doing wiring the real deployment's bootstrap would do, not a behavior change.
+const setClientDone = new Set();
+async function ensureSetClient(route, pool) {
+  const mod = route.setClientModule;
+  if (!mod || setClientDone.has(mod)) return;
+  const imported = await import(mod);
+  if (typeof imported.setClient !== 'function') {
+    throw new Error(`Route ${route.name} setClientModule ${mod} has no setClient export`);
+  }
+  imported.setClient(pool);
+  setClientDone.add(mod);
+}
+
 // Build the dependency-injection `overrides` object a `params-overrides` action
 // expects, from the route's declared `deps`. Today only `db` is supported (the
 // shared pg Pool, whose `.query()` interface the async-operation repos use).
@@ -151,6 +172,20 @@ async function invokeRoute({ route, handler, params, pool }) {
         throw err;
       }
       return handler({ ...params, callerContext }, buildOverrides(route, pool));
+    }
+    case 'params-owhttp': {
+      // handler(params) for a raw HTTP web-action that does its OWN auth + DB.
+      //
+      // Used by backup-status, the FIRST family that authenticates IN-ACTION:
+      // it reads the Bearer token from params.__ow_headers.authorization and
+      // verifies the JWT signature itself against KEYCLOAK_JWKS_URL (a JWKS
+      // Bearer-JWT validator), rather than trusting gateway-injected identity
+      // headers. So the shim injects NEITHER callerContext NOR a db dep — it only
+      // (a) forwards __ow_headers verbatim (incl. authorization), (b) lowercases
+      // __ow_method (the action 405s unless params.__ow_method === 'get'), and
+      // (c) primes the action's module-level pg client via setClientModule.
+      await ensureSetClient(route, pool);
+      return handler({ ...params, __ow_method: String(params.__ow_method ?? '').toLowerCase() });
     }
     default:
       throw new Error(`Route ${route.name} declares unknown invoke style "${route.invoke}"`);
