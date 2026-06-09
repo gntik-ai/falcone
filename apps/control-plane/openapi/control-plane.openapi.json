@@ -50878,6 +50878,247 @@
         "x-visibility": "public"
       }
     },
+    "/v1/storage/credentials/rotation-policy": {
+      "get": {
+        "operationId": "getStorageCredentialRotationPolicy",
+        "summary": "Read the tenant storage programmatic-credential rotation policy",
+        "tags": [
+          "Storage"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Storage credential rotation policy returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageCredentialRotationPolicy"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not authorized to read this tenant storage rotation policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected oversized headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timeout while awaiting the upstream service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "storage",
+        "x-scope": "tenant",
+        "x-resource-type": "storage_credential",
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "none",
+        "x-audiences": [
+          "tenant_admin",
+          "tenant_owner",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-read",
+        "x-owning-service": "control_api",
+        "x-downstream-adapters": [
+          "storage"
+        ]
+      },
+      "put": {
+        "operationId": "setStorageCredentialRotationPolicy",
+        "summary": "Set the tenant storage programmatic-credential rotation policy",
+        "tags": [
+          "Storage"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageCredentialRotationPolicyWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Storage credential rotation policy updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageCredentialRotationPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not authorized to set this tenant storage rotation policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The rotation policy payload failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected oversized headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timeout while awaiting the upstream service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "storage",
+        "x-scope": "tenant",
+        "x-resource-type": "storage_credential",
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "none",
+        "x-audiences": [
+          "tenant_admin",
+          "tenant_owner",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-write",
+        "x-owning-service": "control_api",
+        "x-downstream-adapters": [
+          "storage"
+        ]
+      }
+    },
     "/v1/storage/tenants/{tenantId}/usage": {
       "get": {
         "operationId": "getTenantStorageUsage",
@@ -86382,6 +86623,71 @@
           "accessAudit"
         ],
         "type": "object"
+      },
+      "StorageCredentialRotationPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxStorageCredentialAgeDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "storageCredentialWarnBeforeExpiryDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tenantId",
+          "maxStorageCredentialAgeDays",
+          "storageCredentialWarnBeforeExpiryDays"
+        ]
+      },
+      "StorageCredentialRotationPolicyWriteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxStorageCredentialAgeDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "storageCredentialWarnBeforeExpiryDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "maxStorageCredentialAgeDays"
+        ]
       }
     }
   }
