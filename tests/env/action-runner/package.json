@@ -1,0 +1,11 @@
+{
+  "name": "falcone-testenv-action-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Test-only HTTP shim that adapts plain HTTP requests to Falcone OpenWhisk-style action handlers (params in / {statusCode,body} out) and injects a real pg Pool. Imports the product actions from the bind-mounted repo as-is.",
+  "main": "server.mjs",
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

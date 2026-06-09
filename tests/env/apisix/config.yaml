@@ -1,0 +1,25 @@
+# APISIX control/runtime config for the test slice.
+#
+# Standalone mode (no etcd): routes are read from conf/apisix.yaml. Only the
+# plugins this slice uses are enabled. serverless-* is enabled so the route can
+# turn the JWT claims that openid-connect validated into the trusted identity
+# headers the upstream action expects.
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
+
+apisix:
+  node_listen: 9080
+  enable_admin: false
+
+# Allow Lua require for the serverless function (claim decode helper).
+nginx_config:
+  http_configuration_snippet: |
+    # (none) — keep defaults
+
+plugins:
+  - openid-connect
+  - proxy-rewrite
+  - serverless-pre-function
+  - response-rewrite
