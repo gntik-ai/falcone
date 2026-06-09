@@ -88,12 +88,13 @@ export async function create(
   return rowToRecord(result.rows[0])
 }
 
-export async function findById(id: string): Promise<OperationRecord | null> {
+export async function findById(id: string, tenantId?: string): Promise<OperationRecord | null> {
   const client = getClient()
-  const result = await client.query(
-    'SELECT * FROM backup_operations WHERE id = $1',
-    [id],
-  )
+  const sql = tenantId != null
+    ? 'SELECT * FROM backup_operations WHERE id = $1 AND tenant_id = $2'
+    : 'SELECT * FROM backup_operations WHERE id = $1'
+  const params = tenantId != null ? [id, tenantId] : [id]
+  const result = await client.query(sql, params)
   return result.rows.length > 0 ? rowToRecord(result.rows[0]) : null
 }
 

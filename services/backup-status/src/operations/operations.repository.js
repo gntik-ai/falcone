@@ -67,9 +67,13 @@ export async function create(record) {
     ]);
     return rowToRecord(result.rows[0]);
 }
-export async function findById(id) {
+export async function findById(id, tenantId) {
     const client = getClient();
-    const result = await client.query('SELECT * FROM backup_operations WHERE id = $1', [id]);
+    const sql = tenantId != null
+        ? 'SELECT * FROM backup_operations WHERE id = $1 AND tenant_id = $2'
+        : 'SELECT * FROM backup_operations WHERE id = $1';
+    const params = tenantId != null ? [id, tenantId] : [id];
+    const result = await client.query(sql, params);
     return result.rows.length > 0 ? rowToRecord(result.rows[0]) : null;
 }
 export async function findActive(tenantId, componentType, instanceId, type) {
