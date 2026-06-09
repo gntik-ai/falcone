@@ -100,6 +100,61 @@ export async function apply(tenantId, domainData, options = {}) {
   return { domain_key, status, resource_results, counts, message: null };
 }
 
+/**
+ * Symmetric reverse of {@link apply}: drops the tenant's Mongo database using
+ * the SAME injected getDb client. Idempotent (dropDatabase on a missing db is a
+ * no-op) and honors options.dryRun. Returns a DomainResult.
+ *
+ * @param {string} tenantId
+ * @param {Object} domainData
+ * @param {Object} options
+ * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
+ */
+export async function teardown(tenantId, domainData = {}, options = {}) {
+  const { dryRun = false, credentials = {}, log = console } = options;
+  const domain_key = 'mongo_metadata';
+  const counts = zeroCounts();
+  const resource_results = [];
+
+  const mongoClient = credentials.mongoClient ?? null;
+  const database = domainData?.database ?? tenantId.replace(/-/g, '_');
+
+  const getDb = credentials.getDb ?? (() => {
+    if (!mongoClient) throw new Error('No MongoDB client configured for teardown');
+    return mongoClient.db(database);
+  });
+
+  try {
+    if (!dryRun) {
+      const db = getDb();
+      await db.dropDatabase();
+    }
+    resource_results.push({
+      resource_type: 'database',
+      resource_name: database,
+      resource_id: database,
+      action: dryRun ? 'would_remove' : 'removed',
+      message: null,
+      warnings: [],
+      diff: null,
+    });
+  } catch (err) {
+    resource_results.push({
+      resource_type: 'database',
+      resource_name: database,
+      resource_id: database,
+      action: 'error',
+      message: err.message,
+      warnings: [],
+      diff: null,
+    });
+    counts.errors++;
+  }
+
+  const status = counts.errors > 0 ? 'error' : (dryRun ? 'would_apply' : 'applied');
+  return { domain_key, status, resource_results, counts, message: null };
+}
+
 async function _processCollection(item, { dryRun, getDb, log }) {
   const name = item.name ?? 'unknown';
   const warnings = [];
