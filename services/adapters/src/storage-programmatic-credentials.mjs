@@ -152,6 +152,27 @@ function maskAccessKeyId(accessKeyId) {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
+function normalizePolicyMaxAgeDays(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const days = Number(value);
+  if (!Number.isFinite(days) || days <= 0) {
+    return null;
+  }
+
+  return Math.trunc(days);
+}
+
+function derivePolicyExpiresAt({ policyMaxAgeDays, lastRotatedAt }) {
+  if (policyMaxAgeDays === null) {
+    return null;
+  }
+
+  return new Date(new Date(lastRotatedAt).getTime() + policyMaxAgeDays * 86400 * 1000).toISOString();
+}
+
 function normalizeExpiresAt({ expiresAt, createdAt, ttlSeconds, state }) {
   if (state === STORAGE_PROGRAMMATIC_CREDENTIAL_STATES.REVOKED) {
     return normalizeOptionalString(expiresAt) ? toIso(expiresAt) : null;
@@ -203,6 +224,9 @@ export function buildStorageProgrammaticCredentialRecord(input = {}) {
   const revokedAt = state === STORAGE_PROGRAMMATIC_CREDENTIAL_STATES.REVOKED
     ? toIso(input.revokedAt ?? now)
     : null;
+  const lastRotatedAt = toIso(input.lastRotatedAt ?? createdAt);
+  const policyMaxAgeDays = normalizePolicyMaxAgeDays(input.policyMaxAgeDays);
+  const policyExpiresAt = derivePolicyExpiresAt({ policyMaxAgeDays, lastRotatedAt });
 
   return {
     credentialId,
@@ -218,9 +242,11 @@ export function buildStorageProgrammaticCredentialRecord(input = {}) {
     ttlSeconds,
     createdAt,
     updatedAt,
-    lastRotatedAt: toIso(input.lastRotatedAt ?? createdAt),
+    lastRotatedAt,
     expiresAt,
     revokedAt,
+    policyMaxAgeDays,
+    policyExpiresAt,
     issuer: {
       actorId: normalizeOptionalString(input.actorId) ?? null,
       actorType: normalizeOptionalString(input.actorType) ?? null,
@@ -228,6 +254,11 @@ export function buildStorageProgrammaticCredentialRecord(input = {}) {
       correlationId: normalizeOptionalString(input.correlationId) ?? null
     }
   };
+}
+
+function normalizeRotationReason(value) {
+  const reason = normalizeOptionalString(value);
+  return reason ? reason : 'manual';
 }
 
 export function buildStorageProgrammaticCredentialSecretEnvelope(input = {}) {
@@ -244,7 +275,8 @@ export function buildStorageProgrammaticCredentialSecretEnvelope(input = {}) {
       credentialId: credential.credentialId,
       secretVersion: credential.secretVersion
     }),
-    secretDelivery: 'one_time'
+    secretDelivery: 'one_time',
+    rotationReason: normalizeRotationReason(input.rotationReason)
   };
 }
 
@@ -278,7 +310,9 @@ export function rotateStorageProgrammaticCredential(input = {}) {
     updatedAt: requestedAt,
     lastRotatedAt: requestedAt,
     createdAt: current.createdAt,
-    state: STORAGE_PROGRAMMATIC_CREDENTIAL_STATES.ACTIVE
+    policyMaxAgeDays: input.policyMaxAgeDays ?? current.policyMaxAgeDays,
+    state: STORAGE_PROGRAMMATIC_CREDENTIAL_STATES.ACTIVE,
+    rotationReason: normalizeRotationReason(input.rotationReason)
   });
 }
 
