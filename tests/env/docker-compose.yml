@@ -130,3 +130,58 @@ services:
       interval: 5s
       timeout: 4s
       retries: 40
+  # ---- HTTP request-chain slice (scheduling only) ----------------------------
+  # action-runner: TEST-ONLY HTTP shim that adapts plain HTTP -> the OpenWhisk-
+  # style scheduling action (params in / {statusCode,body} out) and injects a
+  # real pg Pool. Imports the PRODUCT action as-is from the bind-mounted repo.
+  action-runner:
+    build:
+      context: ./action-runner
+    environment:
+      PORT: "8090"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: falcone
+      PGPASSWORD: falcone
+      PGDATABASE: falcone_test
+    volumes:
+      # Repo bind-mounted read-only so the shim imports services/ as-is.
+      - ../../:/repo:ro
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:8090/healthz').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+
+  # apisix: API gateway. Standalone YAML config provider (no etcd). Validates the
+  # Keycloak realm JWT and injects identity headers from JWT claims, then proxies
+  # to action-runner. Config in ./apisix/apisix.yaml + ./apisix/config.yaml.
+  apisix:
+    image: apache/apisix:3.9.1-debian
+    # NOTE: APISIX_STAND_ALONE is intentionally NOT set. With it, the entrypoint
+    # rewrites config.yaml in place (fails on a bind mount the apisix user cannot
+    # write). Our config.yaml already declares role: data_plane + config_provider:
+    # yaml, so APISIX runs in standalone YAML mode purely from the mounted config.
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    ports:
+      - "9080:9080"
+    depends_on:
+      action-runner:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      # The apisix image has no curl/wget and the default CMD-SHELL is dash
+      # (no /dev/tcp). Invoke bash explicitly to probe the proxy listener
+      # (port open == data plane accepting connections).
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9080 && echo ok >&3"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
