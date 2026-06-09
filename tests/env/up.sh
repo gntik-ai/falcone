@@ -121,6 +121,19 @@ for m in 073-async-operation-tables 074-async-operation-log-entries \
     && echo "   applied $m" || echo "   skipped $m (already applied?)"
 done
 
+echo "==> applying provisioning-orchestrator plan + quota migrations to Postgres"
+# Only the migrations the plan/quota HTTP slice needs, in dependency order:
+#   097 plans + tenant_plan_assignments + plan_audit_events
+#       (+ set_updated_at_timestamp() function used by 098)
+#   098 quota_dimension_catalog (+ seeds the 8 default dimensions the
+#       quota-dimension-catalog-list action returns)
+for m in 097-plan-entity-tenant-assignment 098-plan-base-limits; do
+  f="$PO_MIGRATIONS/$m.sql"
+  [ -f "$f" ] || { echo "   MISSING $m.sql" >&2; continue; }
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test < "$f" >/dev/null 2>&1 \
+    && echo "   applied $m" || echo "   skipped $m (already applied?)"
+done
+
 # ---- HTTP request-chain slice (scheduling only) ----------------------------
 # Concrete tenant/workspace the slice user is bound to (mirrors env.sh).
 E2E_TENANT_ID="${E2E_TENANT_ID:-11111111-1111-1111-1111-111111111111}"
@@ -150,9 +163,9 @@ echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin)
 echo "  MinIO console          : http://localhost:59001"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
-echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions)"
+echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions)"
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
-echo "  Keycloak realm (slice) : falcone-e2e  client=falcone-e2e-client user=e2e-user/e2e-password"
+echo "  Keycloak realm (slice) : falcone-e2e  client=falcone-e2e-client users=e2e-user/e2e-password (tenant_owner), e2e-superadmin/e2e-superadmin-password (superadmin)"
 echo
 echo "Point a shell/test at it with:  source tests/env/env.sh"
 echo "Run the HTTP-slice smoke with:  bash tests/env/e2e-smoke/run.sh"
