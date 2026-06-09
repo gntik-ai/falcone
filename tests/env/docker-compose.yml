@@ -6,9 +6,20 @@
 #   - keycloak : internal IdP. Tenants map 1:1 to realms (realm name == tenantId);
 #                a realm's displayName is the authoritative tenant name.
 #   - redpanda : Kafka API broker (events, audit, CDC change streams).
+#   - mongodb  : document store. Run as a single-node replica set (rs0) because
+#                Falcone's CDC change streams require a replica set.
+#   - minio    : S3-compatible object storage (workspace SDK artifacts, storage
+#                config export). Bucket `falcone-test` created on `up`.
+#   - vault    : secret store (dev mode). Emits a FILE audit log to a host-mounted
+#                path that secret-audit-handler tails (VAULT_AUDIT_LOG_PATH).
 #
 # Lifecycle is driven by tests/env/up.sh (waits for health, provisions the admin
-# service account, applies migrations) and tests/env/down.sh.
+# service account, applies migrations, initiates the Mongo replica set, creates
+# the MinIO bucket, enables the Vault file audit device) and tests/env/down.sh.
+#
+# OUT OF SCOPE here (these stay on the Kubernetes/Helm path): OpenWhisk/functions
+# (too heavy for compose), the Falcone app + APISIX gateway containers (no
+# Dockerfiles — services run in-process in tests), and observability.
 name: falcone-testenv
 
 services:
@@ -61,4 +72,61 @@ services:
       test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
       interval: 5s
       timeout: 5s
+      retries: 40
+
+  mongodb:
+    image: mongo:7
+    # Single-node replica set: Falcone CDC change streams require a replica set.
+    # Replica-set initiation (rs.initiate) is performed by up.sh after health.
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "57017:27017"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    tmpfs:
+      - /data/db  # ephemeral: clean DB every run (matches the postgres pattern)
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "59000:9000"  # S3 API
+      - "59001:9001"  # web console
+    healthcheck:
+      # The minio image ships curl; probe the live health endpoint.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 4s
+      retries: 40
+    tmpfs:
+      - /data  # ephemeral object storage
+
+  vault:
+    image: hashicorp/vault:1.18
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      # Address used by the in-container vault CLI (audit-enable in up.sh).
+      VAULT_ADDR: http://localhost:8200
+      VAULT_TOKEN: root
+    command: ["server", "-dev"]
+    ports:
+      - "58200:8200"
+    volumes:
+      # Host-mounted audit dir so a host test process (secret-audit-handler) can
+      # tail the file audit log written by the Vault file audit device.
+      - ./vault/audit:/vault/audit
+    healthcheck:
+      # Dev server is auto-unsealed; `vault status` returns 0 when sealed=false.
+      test: ["CMD-SHELL", "vault status >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 4s
       retries: 40
