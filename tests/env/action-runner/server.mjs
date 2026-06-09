@@ -68,13 +68,47 @@ function readBody(req) {
   });
 }
 
-function sendJson(res, statusCode, body) {
+function sendJson(res, statusCode, body, extraHeaders = {}) {
   const payload = body == null ? '' : JSON.stringify(body);
   res.writeHead(statusCode, {
     'content-type': 'application/json',
     'content-length': Buffer.byteLength(payload),
+    ...extraHeaders,
   });
   res.end(payload);
+}
+
+// Build the dependency-injection `overrides` object a `params-overrides` action
+// expects, from the route's declared `deps`. Today only `db` is supported (the
+// shared pg Pool, whose `.query()` interface the async-operation repos use).
+function buildOverrides(route, pool) {
+  const overrides = {};
+  for (const dep of route.deps ?? []) {
+    if (dep === 'db') {
+      overrides.db = pool;
+    } else {
+      throw new Error(`Route ${route.name} declares unknown dep "${dep}"`);
+    }
+  }
+  return overrides;
+}
+
+// Invoke a matched action the way its route declares. Returns the action's
+// `{ statusCode, headers?, body }` result unchanged.
+async function invokeRoute({ route, handler, params, pool }) {
+  switch (route.invoke ?? 'params-pg') {
+    case 'params-pg':
+      // handler(params) with a real pg Pool injected at params.pg.
+      return handler({ ...params, pg: pool });
+    case 'params-only':
+      // handler(params) — pure, no injected deps (e.g. a header-only GET).
+      return handler(params);
+    case 'params-overrides':
+      // handler(params, overrides) — deps go in the second argument.
+      return handler(params, buildOverrides(route, pool));
+    default:
+      throw new Error(`Route ${route.name} declares unknown invoke style "${route.invoke}"`);
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -114,6 +148,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     const headers = lowercaseHeaders(req.headers);
+    const route = matched.route;
 
     const params = {
       // OpenWhisk-style fields the actions read.
@@ -125,20 +160,37 @@ const server = http.createServer(async (req, res) => {
       path,
       query,
       body,
-      // Path params from named capture groups (e.g. :id) — none for the broad
-      // scheduling route (the action splits the path itself), but kept generic.
+      // Route defaults (e.g. queryType for the async-operation query action).
+      // Applied first so explicit query/body values below can override them.
+      ...(route.defaults ?? {}),
+      // OpenWhisk web actions flatten the query string and JSON body into the
+      // top-level params. The scheduling action reads params.query/params.body
+      // instead, so its route leaves these flags off; the async-operation
+      // actions read flat fields, so their routes opt in to mirror OpenWhisk.
+      ...(route.mergeQueryIntoParams ? query : {}),
+      ...(route.mergeBodyIntoParams && body && typeof body === 'object' ? body : {}),
+      // Path params from named capture groups (e.g. :operationId). For the broad
+      // scheduling route the action splits the path itself; for the async-op
+      // detail route this supplies params.operationId.
       ...matched.params,
-      // Real Postgres client injected by the shim (NOT env-driven inside action).
-      pg: pool,
       // Audit publishing is optional and intentionally omitted (no kafka here):
-      // the action skips events when params.publishAudit is absent.
+      // the action skips events when its producer dependency is absent.
     };
 
-    const handler = await loadHandler(matched.route);
-    const result = await handler(params);
+    const handler = await loadHandler(route);
+    const result = await invokeRoute({ route, handler, params, pool });
     const statusCode = result?.statusCode ?? 200;
     const respBody = result?.body ?? null;
-    sendJson(res, statusCode, respBody);
+    // Propagate action-set response headers (e.g. X-Correlation-Id) but never
+    // let the action override content-type/length sendJson computes.
+    const respHeaders = {};
+    for (const [k, v] of Object.entries(result?.headers ?? {})) {
+      if (v == null) continue;
+      const lk = k.toLowerCase();
+      if (lk === 'content-type' || lk === 'content-length') continue;
+      respHeaders[k] = String(v);
+    }
+    sendJson(res, statusCode, respBody, respHeaders);
   } catch (err) {
     const statusCode = err?.statusCode ?? 500;
     sendJson(res, statusCode, { code: 'SHIM_ERROR', message: String(err?.message ?? err) });
