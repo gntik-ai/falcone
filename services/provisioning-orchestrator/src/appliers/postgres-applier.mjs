@@ -229,6 +229,61 @@ export async function apply(tenantId, domainData, options = {}) {
   return { domain_key, status, resource_results, counts, message: null };
 }
 
+/**
+ * Symmetric reverse of {@link apply}: drops the tenant's Postgres schema
+ * (CASCADE) using the SAME injected I/O client. Idempotent (DROP SCHEMA IF
+ * EXISTS) and honors options.dryRun. Returns a DomainResult.
+ *
+ * @param {string} tenantId
+ * @param {Object} domainData
+ * @param {Object} options
+ * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
+ */
+export async function teardown(tenantId, domainData = {}, options = {}) {
+  const { dryRun = false, credentials = {}, log = console } = options;
+  const domain_key = 'postgres_metadata';
+  const counts = zeroCounts();
+  const resource_results = [];
+
+  const pgClient = credentials.pgClient ?? null;
+  const query = credentials.query ?? (async (sql, params) => {
+    if (!pgClient) throw new Error('No PostgreSQL client configured for teardown');
+    const res = await pgClient.query(sql, params);
+    return res.rows;
+  });
+
+  const schema = domainData?.schema ?? tenantId.replace(/-/g, '_');
+
+  try {
+    if (!dryRun) {
+      await query(`DROP SCHEMA IF EXISTS ${_ident(schema)} CASCADE`, []);
+    }
+    resource_results.push({
+      resource_type: 'schema',
+      resource_name: schema,
+      resource_id: schema,
+      action: dryRun ? 'would_remove' : 'removed',
+      message: null,
+      warnings: [],
+      diff: null,
+    });
+  } catch (err) {
+    resource_results.push({
+      resource_type: 'schema',
+      resource_name: schema,
+      resource_id: schema,
+      action: 'error',
+      message: err.message,
+      warnings: [],
+      diff: null,
+    });
+    counts.errors++;
+  }
+
+  const status = counts.errors > 0 ? 'error' : (dryRun ? 'would_apply' : 'applied');
+  return { domain_key, status, resource_results, counts, message: null };
+}
+
 async function _processResource(resourceType, item, { dryRun, query, schema, log }) {
   const name = item.name ?? 'unknown';
   const warnings = [];

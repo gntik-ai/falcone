@@ -72,6 +72,73 @@ export async function apply(tenantId, domainData, options = {}) {
   return { domain_key, status, resource_results, counts, message: null };
 }
 
+/**
+ * Symmetric reverse of {@link apply}: deletes the tenant's OpenWhisk namespace
+ * using the SAME injected owApi. Idempotent (a 404 means the namespace is
+ * already gone) and honors options.dryRun. Returns a DomainResult.
+ *
+ * @param {string} tenantId
+ * @param {Object} domainData
+ * @param {Object} options
+ * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
+ */
+export async function teardown(tenantId, domainData = {}, options = {}) {
+  const { dryRun = false, credentials = {}, log = console } = options;
+  const domain_key = 'functions';
+  const counts = zeroCounts();
+  const resource_results = [];
+
+  const owApiHost = credentials.owApiHost ?? process.env.CONFIG_IMPORT_OW_API_HOST;
+  const owApiKey = credentials.owApiKey ?? process.env.CONFIG_IMPORT_OW_API_KEY;
+  const namespace = domainData?.namespace ?? tenantId;
+
+  const owApi = credentials.owApi ?? (async (method, path, body) => {
+    const normalizedOwApiHost = normalizeServiceBaseUrl(owApiHost, 'CONFIG_IMPORT_OW_API_HOST', {
+      allowBareInternalHttp: true,
+    });
+    const namespacePath = encodePathSegment(namespace, 'namespace');
+    const url = buildServiceUrl(normalizedOwApiHost, `api/v1/namespaces/${namespacePath}${path}`);
+    const authHeader = `Basic ${Buffer.from(owApiKey).toString('base64')}`;
+    const opts = { method, headers: { Authorization: authHeader, 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(url, opts);
+  });
+
+  try {
+    if (!dryRun) {
+      // DELETE on the namespace root removes the namespace's resources.
+      const res = await owApi('DELETE', '');
+      const ok = res?.ok === true || res?.status === 200 || res?.status === 204 || res?.status === 404;
+      if (!ok) {
+        throw new Error(`OpenWhisk namespace deletion failed with status ${res?.status ?? 'unknown'}`);
+      }
+    }
+    resource_results.push({
+      resource_type: 'namespace',
+      resource_name: namespace,
+      resource_id: namespace,
+      action: dryRun ? 'would_remove' : 'removed',
+      message: null,
+      warnings: [],
+      diff: null,
+    });
+  } catch (err) {
+    resource_results.push({
+      resource_type: 'namespace',
+      resource_name: namespace,
+      resource_id: namespace,
+      action: 'error',
+      message: err.message,
+      warnings: [],
+      diff: null,
+    });
+    counts.errors++;
+  }
+
+  const status = counts.errors > 0 ? 'error' : (dryRun ? 'would_apply' : 'applied');
+  return { domain_key, status, resource_results, counts, message: null };
+}
+
 async function _processResource(resourceType, item, { dryRun, owApi, namespace, log }) {
   const name = item.name ?? 'unknown';
   const warnings = [];
