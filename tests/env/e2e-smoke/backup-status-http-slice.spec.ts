@@ -18,8 +18,10 @@
 //   - tenant_id absent  -> read:global required, else 403 (global view).
 //
 // e2e-user (tenant A) carries scopes:["backup-status:read:own"];
-// e2e-superadmin carries ["backup-status:read:global"]. With an empty snapshots
-// table the action returns 200 with deployment_backup_available:false (no
+// e2e-superadmin carries ["backup-status:read:global","backup-status:read:technical"].
+// up.sh seeds a tenant-A own row + a tenant-B shared row so these specs prove the
+// DATA layer keeps tenants apart. (Legacy note: with an empty snapshots
+// table the action returns 200 with deployment_backup_available:false — no
 // snapshot seeding is performed). Issuer/audience claim checks are intentionally
 // NOT enabled (the JWKS signature is the real gate).
 //
@@ -94,8 +96,14 @@ test.describe('backup-status HTTP slice (in-action JWKS auth) @api', () => {
     expect(res.status(), await res.text()).toBe(200);
     const body = await res.json();
     expect(body.schema_version).toBe('1');
-    // Empty snapshots table -> deployment_backup_available:false (no seeding).
-    expect(typeof body.deployment_backup_available).toBe('boolean');
+    // up.sh seeds a tenant-A OWN row -> deployment_backup_available is true and
+    // the own component is present.
+    expect(body.deployment_backup_available).toBe(true);
+    const labels = (body.components ?? []).map((c: any) => c.instance_label);
+    expect(labels).toContain('tenant-a-primary-db');
+    // DATA-LEAK PROBE: a tenant-B SHARED-instance row is also seeded; a read:own
+    // caller (getByTenant includeShared:false + in-action belts) must NOT see it.
+    expect(labels).not.toContain('shared-platform-objectstore');
 
     await ctx.dispose();
   });
@@ -126,7 +134,7 @@ test.describe('backup-status HTTP slice (in-action JWKS auth) @api', () => {
     await ctx.dispose();
   });
 
-  test('superadmin global view (no tenant_id) is allowed (200, read:global)', async () => {
+  test('superadmin global view (no tenant_id) is allowed (200) and sees own + shared rows', async () => {
     const token = await getAccessToken(SUPER_USERNAME, SUPER_PASSWORD);
     expect(tokenScopes(token)).toContain('backup-status:read:global');
     const ctx = await pwRequest.newContext({
@@ -138,6 +146,12 @@ test.describe('backup-status HTTP slice (in-action JWKS auth) @api', () => {
     const body = await res.json();
     expect(body.schema_version).toBe('1');
     expect(body.tenant_id).toBeNull();
+    // Contrast with the read:own caller: a technical-scoped global caller
+    // (getAll includeShared:true) DOES see shared rows, so the global view
+    // contains BOTH the tenant-A own row and the tenant-B shared row.
+    const labels = (body.components ?? []).map((c: any) => c.instance_label);
+    expect(labels).toContain('tenant-a-primary-db');
+    expect(labels).toContain('shared-platform-objectstore');
 
     await ctx.dispose();
   });

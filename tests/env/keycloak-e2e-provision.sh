@@ -17,7 +17,9 @@
 #     ONLY by the backup-status family, which validates the token IN-ACTION and
 #     reads claims.scopes itself (the gateway never sees this claim). e2e-user gets
 #     backup_scopes=["backup-status:read:own"]; e2e-superadmin gets
-#     ["backup-status:read:global"].
+#     ["backup-status:read:global","backup-status:read:technical"] (read:technical
+#     lets its global view include shared-instance rows, proving shared rows are
+#     visible to a platform/technical caller but NOT to a tenant-scoped one).
 #
 # These claims are what APISIX proxy-rewrite injects as x-tenant-id /
 # x-workspace-id / x-actor-roles / x-auth-subject into the upstream request.
@@ -280,7 +282,7 @@ else
     -s "attributes.tenant_id=$TENANT_ID" \
     -s "attributes.workspace_id=$WORKSPACE_ID" \
     -s 'attributes.actor_type=superadmin' \
-    -s 'attributes.backup_scopes=backup-status:read:global' >/dev/null
+    -s 'attributes.backup_scopes=["backup-status:read:global","backup-status:read:technical"]' >/dev/null
   SUPER_USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$SUPER_USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1)
   log "created user $SUPER_USERNAME ($SUPER_USER_ID)"
 fi
@@ -295,7 +297,7 @@ dc "$KC" update "users/$SUPER_USER_ID" -r "$REALM" \
   -s "attributes.tenant_id=[\"$TENANT_ID\"]" \
   -s "attributes.workspace_id=[\"$WORKSPACE_ID\"]" \
   -s 'attributes.actor_type=["superadmin"]' \
-  -s 'attributes.backup_scopes=["backup-status:read:global"]' >/dev/null
-log "set password + attributes for $SUPER_USERNAME (actor_type=superadmin backup_scopes=read:global)"
+  -s 'attributes.backup_scopes=["backup-status:read:global","backup-status:read:technical"]' >/dev/null
+log "set password + attributes for $SUPER_USERNAME (actor_type=superadmin backup_scopes=read:global+read:technical)"
 
 echo "Keycloak realm '$REALM' provisioned for the scheduling HTTP slice."
