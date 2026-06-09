@@ -82,6 +82,7 @@ vi.mock('../../../src/adapters/registry.js', () => ({
 
 vi.mock('../../../src/operations/operations.repository.js', () => ({
   findActive: vi.fn().mockResolvedValue([]),
+  create: vi.fn().mockResolvedValue({ id: 'op-mock-1', acceptedAt: new Date() }),
 }))
 
 vi.stubEnv('TEST_MODE', 'true')
@@ -235,6 +236,116 @@ describe('confirm-restore: tenant binding', () => {
 
     expect(result.statusCode).not.toBe(403)
     expect(confirmStub).toHaveBeenCalledOnce()
+  })
+
+  it('B3: omitting tenant_id entirely → 400 (required field), confirm() NOT called', async () => {
+    const rawToken = makeToken(TENANT_A)
+    // tenant_id deliberately omitted — the core bypass vector
+    const body = { confirmation_token: 'tok', confirmed: true }
+    const params = {
+      __ow_headers: { authorization: `Bearer ${rawToken}` },
+      __ow_method: 'POST',
+      __ow_body: Buffer.from(JSON.stringify(body)).toString('base64'),
+    }
+
+    const result = await main(params)
+
+    expect(result.statusCode).toBe(400)
+    expect(confirmStub).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// E: ConfirmationsService.confirm — service-layer tenant gate (issue #252)
+// Tests the ConfirmationsService class directly, bypassing the action-layer mock.
+// ---------------------------------------------------------------------------
+
+describe('ConfirmationsService.confirm: tenant gate', () => {
+  function makeConfirmService(tenantId: string) {
+    return async (overrides: { isSuperadmin?: boolean } = {}) => {
+      const { ConfirmationsService, ConfirmationError } = (await vi.importActual(
+        '../../../src/confirmations/confirmations.service.js',
+      )) as typeof import('../../../src/confirmations/confirmations.service.js')
+
+      const fakeRequest: any = {
+        id: 'req-b-1',
+        tenantId: TENANT_B, // request belongs to tenant B
+        requesterId: 'user-b',
+        requesterRole: 'sre',
+        status: 'pending_confirmation',
+        riskLevel: 'normal',
+        expiresAt: new Date(Date.now() + 300_000),
+        createdAt: new Date(),
+        prechecksResult: [],
+        warningsShown: [],
+        availableSecondFactors: [],
+        componentType: 'postgres',
+        instanceId: 'inst-1',
+        snapshotId: 'snap-1',
+        scope: 'partial',
+        tokenHash: 'hash',
+      }
+
+      const fakeRepo: any = {
+        findByTokenHash: vi.fn().mockResolvedValue(fakeRequest),
+        updateDecision: vi.fn(),
+      }
+      const fakeAudit = { emitAuditEvent: vi.fn() }
+      const fakeDispatcher = { dispatch: vi.fn().mockResolvedValue(undefined) }
+      const fakeConfig: any = {
+        ttlSeconds: 300,
+        precheckTimeoutMs: 10_000,
+        snapshotAgeWarningHours: 48,
+        criticalMultiWarningThreshold: 3,
+        operationalHoursEnabled: false,
+        operationalHoursStart: '08:00',
+        operationalHoursEnd: '20:00',
+        mfaEnabled: false,
+        keycloakOtpVerifyUrl: '',
+        resolveTenantName: async (_: string) => 'Tenant B',
+      }
+
+      const service = new ConfirmationsService(fakeRepo, fakeAudit, fakeDispatcher, fakeConfig)
+      const scopes = overrides.isSuperadmin
+        ? ['backup:restore:global', 'superadmin']
+        : ['backup:restore:global']
+      const actor = { sub: `user-${tenantId.slice(0, 8)}`, tenantId, role: overrides.isSuperadmin ? 'superadmin' : 'sre', scopes }
+      return { service, actor, fakeRepo, fakeAudit, ConfirmationError }
+    }
+  }
+
+  it('E1: actor tenant A confirms request from tenant B (no superadmin) → 403, no state change', async () => {
+    const build = makeConfirmService(TENANT_A)
+    const { service, actor } = await build()
+
+    const body = {
+      confirmationToken: 'tok',
+      confirmed: true,
+      tenantNameConfirmation: 'Tenant B',
+      acknowledgeWarnings: true,
+    }
+
+    await expect(service.confirm(body, actor)).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'access_denied',
+    })
+  })
+
+  it('E2: superadmin actor with mismatched tenant passes the service-layer gate', async () => {
+    const build = makeConfirmService(TENANT_A)
+    const { service, actor, fakeRepo } = await build({ isSuperadmin: true })
+
+    // updateDecision called means the gate did not block
+    fakeRepo.updateDecision.mockResolvedValue(undefined)
+
+    const body = {
+      confirmationToken: 'tok',
+      confirmed: false, // abort path — simplest valid flow past the gate
+    }
+
+    // Superadmin aborting a cross-tenant request must NOT throw 403
+    const result = await service.confirm(body, actor)
+    expect(result.status).toBe('aborted')
   })
 })
 
