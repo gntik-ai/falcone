@@ -6,9 +6,14 @@
 #   -> action-runner shim -> PRODUCT action -> Postgres.
 #
 # Families covered (each authenticated end-to-end, plus a 401 probe):
-#   [0-4] scheduling                 /v1/scheduling/*               (POST 201 + list)
-#   [5-8] async-operation            /v1/async-operations[ /{id} ]  (POST 200 + detail + list + cross-tenant 404)
-#   [9-10] tenant-config             /v1/admin/config/format-versions (GET 200 + body)
+#   [0-4]  scheduling           /v1/scheduling/*                 (POST 201 + list)
+#   [5-8]  async-operation      /v1/async-operations[ /{id} ]    (POST 200 + detail + list)
+#   [9-10] tenant-config        /v1/admin/config/format-versions (GET 200 + body)
+#   [11-14] plan catalog        /v1/plans                        (POST 201 + list, superadmin)
+#   [15-16] quota dimensions    /v1/quota-dimensions             (GET 200 + seeded catalog, superadmin)
+#
+# Steps 0-10 use the tenant_owner user; steps 11-16 use the dedicated superadmin
+# user (the plan/quota actions require actor.type 'superadmin').
 #
 # Assumes `tests/env/up.sh` has already booted + provisioned the stack.
 # No assertion is weakened: a missing token MUST 401, created resources MUST appear,
@@ -122,8 +127,75 @@ FV_OK=$(printf '%s' "$FVBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=
 [ "$FV_OK" = "true" ] || fail "format-versions body missing current_version/versions: $FVBODY"
 pass "format-versions returned current_version + non-empty versions"
 
+# ---- plan catalog family (provisioning-orchestrator) -----------------------
+# plan-create / plan-list: main(params, overrides), db injected via overrides.db,
+# identity via params.callerContext built by the shim from the trusted x-* headers
+# (params-callercontext-overrides invoke). Both require actor.type 'superadmin',
+# so this family uses a dedicated superadmin ROPC user. plan-create returns 201.
+
+SUPER_USER="${E2E_SUPER_USERNAME:-e2e-superadmin}"
+SUPER_PASS="${E2E_SUPER_PASSWORD:-e2e-superadmin-password}"
+
+echo "==> [11] gateway rejects unauthenticated plan request"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$APISIX/v1/plans")
+[ "$code" = "401" ] || fail "expected 401 without token on /v1/plans, got $code"
+pass "plans unauthenticated -> 401"
+
+echo "==> [12] ROPC login as superadmin ($SUPER_USER)"
+STOKEN=$(curl -s -X POST "$KC/realms/$REALM/protocol/openid-connect/token" \
+  -d grant_type=password -d "client_id=$CLIENT" \
+  -d "username=$SUPER_USER" -d "password=$SUPER_PASS" \
+  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);if(!j.access_token){console.error(d);process.exit(1)}process.stdout.write(j.access_token)})')
+[ -n "$STOKEN" ] || fail "no access_token for superadmin from Keycloak"
+pass "got superadmin access_token (len ${#STOKEN})"
+
+echo "==> [12b] non-superadmin (tenant_owner) is FORBIDDEN from creating a plan -> 403"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -X POST "$APISIX/v1/plans" -d '{"slug":"should-not-exist","displayName":"Nope"}')
+[ "$code" = "403" ] || fail "expected 403 for tenant_owner creating a plan, got $code"
+pass "tenant_owner plan create -> 403 (superadmin-only enforced)"
+
+echo "==> [13] authenticated POST /v1/plans (superadmin) -> expect 201 with plan id"
+PSLUG="smoke-plan-$(date +%s)-$$"
+PCREATE=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $STOKEN" -H 'content-type: application/json' \
+  -X POST "$APISIX/v1/plans" \
+  -d "{\"slug\":\"$PSLUG\",\"displayName\":\"Smoke Plan\",\"description\":\"slice smoke\",\"quotaDimensions\":{\"max_workspaces\":5}}")
+PBODY=$(printf '%s' "$PCREATE" | sed '$d')
+PCODE=$(printf '%s' "$PCREATE" | tail -n1)
+[ "$PCODE" = "201" ] || fail "expected 201 on plan create, got $PCODE: $PBODY"
+PLAN_ID=$(printf '%s' "$PBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{process.stdout.write(JSON.parse(d).id||"")})')
+[ -n "$PLAN_ID" ] || fail "no plan id in create response: $PBODY"
+pass "created plan $PLAN_ID slug=$PSLUG (HTTP 201)"
+
+echo "==> [14] authenticated GET /v1/plans (superadmin) -> the new plan is listed"
+PLIST=$(curl -s -H "Authorization: Bearer $STOKEN" "$APISIX/v1/plans")
+PL_FOUND=$(printf '%s' "$PLIST" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String((j.plans||[]).some(p=>p.id==="'"$PLAN_ID"'"&&p.slug==="'"$PSLUG"'")))})')
+[ "$PL_FOUND" = "true" ] || fail "created plan $PLAN_ID not found in list: $PLIST"
+pass "plan $PLAN_ID present in GET list"
+
+# ---- quota dimension catalog family (provisioning-orchestrator) ------------
+# quota-dimension-catalog-list: main(params, overrides), db via overrides.db,
+# identity via params.callerContext (superadmin). Reads the quota_dimension_catalog
+# table seeded by migration 098 (8 default dimensions). Returns 200 with the list.
+
+echo "==> [15] gateway rejects unauthenticated quota-dimensions request"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$APISIX/v1/quota-dimensions")
+[ "$code" = "401" ] || fail "expected 401 without token on /v1/quota-dimensions, got $code"
+pass "quota-dimensions unauthenticated -> 401"
+
+echo "==> [16] authenticated GET /v1/quota-dimensions (superadmin) -> 200 with seeded catalog"
+QD=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $STOKEN" "$APISIX/v1/quota-dimensions")
+QDBODY=$(printf '%s' "$QD" | sed '$d')
+QDCODE=$(printf '%s' "$QD" | tail -n1)
+[ "$QDCODE" = "200" ] || fail "expected 200 on quota-dimensions, got $QDCODE: $QDBODY"
+QD_OK=$(printf '%s' "$QDBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const dims=j.dimensions||[];process.stdout.write(String(Array.isArray(dims)&&j.total>=8&&dims.some(x=>x.dimensionKey==="max_workspaces")))})')
+[ "$QD_OK" = "true" ] || fail "quota-dimensions body missing seeded dimensions (expected >=8 incl max_workspaces): $QDBODY"
+pass "quota-dimensions returned seeded catalog (>=8 dimensions incl max_workspaces)"
+
 echo
-echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config} actions -> Postgres."
+echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota} actions -> Postgres."
 echo "  scheduling           : 401 + POST 201 + list"
 echo "  async-operation      : 401 + POST 200 + detail + list"
 echo "  tenant-config formats: 401 + GET 200 + body"
+echo "  plan catalog         : 401 + tenant_owner 403 + superadmin POST 201 + list"
+echo "  quota dimensions     : 401 + superadmin GET 200 + seeded catalog"
