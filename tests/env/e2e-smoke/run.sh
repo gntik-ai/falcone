@@ -12,11 +12,16 @@
 #   [11-14] plan catalog        /v1/plans                        (POST 201 + list, superadmin)
 #   [15-16] quota dimensions    /v1/quota-dimensions             (GET 200 + seeded catalog, superadmin)
 #   [17-20] entitlements        /v1/tenant/entitlements          (tenant-scoped: own 200 + IDOR 403)
+#   [21-26] backup-status       /v1/backups/status               (IN-ACTION JWKS auth: own 200 + IDOR 403 + scope 403 + global 200)
 #
 # Steps 0-10 use the tenant_owner user; steps 11-16 use the dedicated superadmin
 # user (the plan/quota actions require actor.type 'superadmin'). Steps 17-20 are
 # the FIRST tenant-scoped family: a tenant_owner reads only its own tenant, and a
 # ?tenantId=<other> is a cross-tenant IDOR attempt the action rejects with 403.
+# Steps 21-26 are the FIRST family that authenticates IN-ACTION: the route is a
+# plain proxy (NO gateway jwt-auth) and the backup-status action validates the
+# Bearer JWT itself against the realm JWKS, deriving tenant + scopes from the
+# token's own claims (a separate `scopes` claim, NOT the gateway's actor_scopes).
 #
 # Assumes `tests/env/up.sh` has already booted + provisioned the stack.
 # No assertion is weakened: a missing token MUST 401, created resources MUST appear,
@@ -234,11 +239,75 @@ SENT_OK=$(printf '%s' "$SENTBODY" | node -e 'let d="";process.stdin.on("data",c=
 [ "$SENT_OK" = "true" ] || fail "superadmin scoped entitlements body missing non-empty quantitativeLimits: $SENTBODY"
 pass "superadmin scoped entitlements (explicit tenantId) -> 200 (cross-scope allowed)"
 
+# ---- backup-status family (IN-ACTION JWKS auth) ----------------------------
+# This is the FIRST family that does NOT trust the gateway-injected identity
+# headers. The /v1/backups/status route is a PLAIN PROXY (no gateway jwt-auth);
+# the backup-status action reads the Bearer token itself and verifies the JWT
+# signature against KEYCLOAK_JWKS_URL (params-owhttp invoke). It derives tenant +
+# scopes from the token's OWN claims:
+#   tenant <- tenant_id ; scopes <- scopes (array) / scope (space string).
+# Authorization matrix (off ?tenant_id=):
+#   tenant_id present -> read:global OR (claim.tenant == tenant_id AND read:own);
+#                        a DIFFERENT tenant without global -> 403 (IDOR blocked).
+#   tenant_id absent  -> read:global required, else 403 (global view).
+# e2e-user (tenant A) carries scopes:["backup-status:read:own"]; e2e-superadmin
+# carries ["backup-status:read:global"]. With an empty snapshots table the action
+# returns 200 with deployment_backup_available:false (no seeding required).
+TENANT_B="22222222-2222-2222-2222-222222222222"
+
+# Decode the JWT payload (middle segment, base64url) and assert the `scopes` claim
+# is actually present + carries read:own — Keycloak unmanaged-attribute->claim
+# mapping is finicky, so this verifies the mapper empirically before the matrix.
+echo "==> [21] verify minted token carries the backup-status 'scopes' claim (read:own)"
+SCOPES_OK=$(printf '%s' "$TOKEN" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const p=d.trim().split(".")[1];const j=JSON.parse(Buffer.from(p,"base64url").toString());const s=Array.isArray(j.scopes)?j.scopes:(typeof j.scope==="string"?j.scope.split(" "):[]);process.stdout.write(String(s.includes("backup-status:read:own")))})')
+[ "$SCOPES_OK" = "true" ] || fail "tenant_owner token is missing the scopes:[backup-status:read:own] claim (decode the JWT payload to debug)"
+pass "tenant_owner token carries scopes claim incl backup-status:read:own"
+
+echo "==> [22] no bearer token: GET /v1/backups/status -> 401 (IN-ACTION validator, not the gateway)"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$APISIX/v1/backups/status")
+[ "$code" = "401" ] || fail "expected 401 without token on backup-status (in-action), got $code"
+pass "backup-status no-token -> 401 (in-action, route is a plain proxy with NO gateway jwt-auth)"
+
+echo "==> [23] e2e-user (tenant A, read:own) GET /v1/backups/status?tenant_id=A -> 200"
+BS=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/backups/status?tenant_id=$E2E_TENANT_ID")
+BSBODY=$(printf '%s' "$BS" | sed '$d')
+BSCODE=$(printf '%s' "$BS" | tail -n1)
+[ "$BSCODE" = "200" ] || fail "expected 200 on own-tenant backup-status, got $BSCODE: $BSBODY"
+BS_OK=$(printf '%s' "$BSBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String(j.schema_version==="1"&&typeof j.deployment_backup_available==="boolean"))})')
+[ "$BS_OK" = "true" ] || fail "backup-status body missing schema_version/deployment_backup_available: $BSBODY"
+pass "backup-status own-tenant -> 200 (schema_version + deployment_backup_available present)"
+
+echo "==> [24] IDOR PROBE: e2e-user GET /v1/backups/status?tenant_id=<TENANT_B> -> 403 (cross-tenant backup read blocked)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/backups/status?tenant_id=$TENANT_B")
+[ "$code" = "403" ] || fail "expected 403 for tenant_owner reading another tenant's backup status (IDOR), got $code"
+pass "IDOR blocked: tenant_owner cross-tenant backup-status read -> 403"
+
+echo "==> [25] SCOPE PROBE: e2e-user GET /v1/backups/status (no tenant_id) -> 403 (global view requires read:global)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/backups/status")
+[ "$code" = "403" ] || fail "expected 403 for tenant_owner global backup-status view (lacks read:global), got $code"
+pass "scope enforced: tenant_owner global view (no tenant_id) -> 403 (read:global required)"
+
+echo "==> [26] e2e-superadmin (read:global) GET /v1/backups/status (no tenant_id) -> 200 (global view allowed)"
+# Mint a fresh superadmin token (STOKEN above may not carry the scopes claim if it
+# was issued before; re-login to be deterministic across re-runs).
+STOKEN=$(curl -s -X POST "$KC/realms/$REALM/protocol/openid-connect/token" \
+  -d grant_type=password -d "client_id=$CLIENT" \
+  -d "username=$SUPER_USER" -d "password=$SUPER_PASS" \
+  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);if(!j.access_token){console.error(d);process.exit(1)}process.stdout.write(j.access_token)})')
+SGLOBAL=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $STOKEN" "$APISIX/v1/backups/status")
+SGBODY=$(printf '%s' "$SGLOBAL" | sed '$d')
+SGCODE=$(printf '%s' "$SGLOBAL" | tail -n1)
+[ "$SGCODE" = "200" ] || fail "expected 200 for superadmin global backup-status view, got $SGCODE: $SGBODY"
+SG_OK=$(printf '%s' "$SGBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String(j.schema_version==="1"&&j.tenant_id===null))})')
+[ "$SG_OK" = "true" ] || fail "superadmin global backup-status body missing schema_version / tenant_id!=null: $SGBODY"
+pass "backup-status superadmin global view (no tenant_id) -> 200 (read:global allowed, tenant_id null)"
+
 echo
-echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements} actions -> Postgres."
+echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements, backup-status} actions -> Postgres."
 echo "  scheduling           : 401 + POST 201 + list"
 echo "  async-operation      : 401 + POST 200 + detail + list"
 echo "  tenant-config formats: 401 + GET 200 + body"
 echo "  plan catalog         : 401 + tenant_owner 403 + superadmin POST 201 + list"
 echo "  quota dimensions     : 401 + superadmin GET 200 + seeded catalog"
 echo "  entitlements (tenant): 401 + tenant_owner own 200 + IDOR cross-tenant 403 + superadmin scoped 200"
+echo "  backup-status (JWKS) : token scopes claim verified + in-action 401 + own 200 + IDOR cross-tenant 403 + scope-403 + superadmin global 200"

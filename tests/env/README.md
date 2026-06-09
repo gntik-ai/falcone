@@ -52,7 +52,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 
 These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
 | action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs real product actions with per-route dependency injection (HTTP-slice only) |
-| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/quota-dimensions`, `/v1/tenant/entitlements`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
+| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/quota-dimensions`, `/v1/tenant/entitlements`, `/v1/backups/status`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only). **Exception:** `/v1/backups/status` is a **plain proxy** — that family authenticates **in-action** (see below). |
 
 ### Keycloak model (matches production)
 
@@ -118,12 +118,13 @@ Families behind the gateway (each exercised by the smoke test):
 | plan catalog | `POST /v1/plans`, `GET /v1/plans` | `provisioning-orchestrator/src/actions/plan-create.mjs` + `plan-list.mjs` | `params-callercontext-overrides` — `main(params, overrides)`, `overrides.db` = pg Pool, `params.callerContext` built from headers; **superadmin only** |
 | quota dimensions | `GET /v1/quota-dimensions` | `provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`; **superadmin only** |
 | tenant entitlements | `GET /v1/tenant/entitlements` | `provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`, `?tenantId` flattened (`mergeQueryIntoParams`); **first tenant-scoped family** — a `tenant_owner` reads only its own tenant (cross-tenant `?tenantId` → 403); superadmin may cross-scope |
+| backup-status | `GET /v1/backups/status` | `backup-status/src/api/backup-status.action.js` | `params-owhttp` — `main(params)`, **in-action JWKS auth** (NOT gateway headers): the action reads the Bearer token itself and verifies the JWT signature against `KEYCLOAK_JWKS_URL`, then derives tenant + scopes from the token's own claims; uses the product's OWN module-level pg client (shim primes it via `setClient`, `setClientModule`); `?tenant_id` flattened (`mergeQueryIntoParams`). **First in-action-auth family** — tenant/scope matrix: own-tenant `read:own` vs global `read:global` (cross-tenant `?tenant_id` → 403; global view without `read:global` → 403) |
 
 | Piece | Where | What it does |
 |-------|-------|--------------|
 | action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` actions read (`__ow_headers`, `method`, `path`, `query`, `body`) and invokes each **product action as-is** (imported from the repo bind-mounted read-only at `/repo`), returning its `{statusCode, headers?, body}`. The route table (`routes.mjs`) is data-driven AND declares **per-route dependency injection** (`invoke` style + `deps`) so actions with different DI models — `params.pg`, `main(params, overrides)`, or no deps — coexist behind one shim. Routes can also opt into OpenWhisk-style flattening of the query string / JSON body into top-level params (`mergeQueryIntoParams` / `mergeBodyIntoParams`) and supply `defaults` (e.g. `queryType`). |
-| APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (routes) | Gateway for all slice routes. `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. The same plugin chain is inlined per route (APISIX's tinyyaml parser does not support YAML anchors). |
-| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export`) for the scheduling/async-operation/tenant-config families **and the tenant-scoped entitlements family** (a `tenant_owner` reads only its own tenant), and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin`) for the plan/quota families (and superadmin cross-scope entitlements reads). Both reuse the same client claim mappers (see below). |
+| APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (routes) | Gateway for all slice routes. For most routes: `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. The same plugin chain is inlined per route (APISIX's tinyyaml parser does not support YAML anchors). **Exception — `/v1/backups/status`:** a **plain proxy** with NO `openid-connect` and NO identity injection, because the backup-status action validates the Bearer JWT itself (JWKS) and reads its own claims. APISIX forwards the `Authorization` header upstream unchanged by default, so the action receives the raw token. |
+| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export` + `backup_scopes=["backup-status:read:own"]`) for the scheduling/async-operation/tenant-config families, **the tenant-scoped entitlements family** (a `tenant_owner` reads only its own tenant), **and the backup-status family** (own-tenant `read:own`), and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin` + `backup_scopes=["backup-status:read:global"]`) for the plan/quota families (superadmin cross-scope entitlements reads, and the backup-status **global** view). Both reuse the same client claim mappers (see below), plus a dedicated `scopes` mapper (multivalued array, from `backup_scopes`) that ONLY the backup-status family consumes. |
 
 ### Boot + hit the API
 
@@ -155,7 +156,7 @@ bash tests/env/e2e-smoke/run.sh        # curl/node: per family 401 -> token -> c
 ( cd tests/env/e2e-smoke && npm install && npx playwright test )   # same flows via @playwright/test request API
 ```
 
-The smoke run covers all six families end-to-end:
+The smoke run covers all seven families end-to-end:
 - **scheduling** — 401 unauthenticated, then `POST /v1/scheduling/jobs` → 201, then listed.
 - **async-operation** — 401 unauthenticated, `POST /v1/async-operations` → 200 (the
   action's `formatCreateResponse` contract returns **200**, not 201), then
@@ -178,6 +179,23 @@ The smoke run covers all six families end-to-end:
   before any DB access, so `TENANT_B` need not exist), then the `e2e-superadmin`
   `GET /v1/tenant/entitlements?tenantId=<own tenant>` → 200 (a superadmin may
   cross-scope). The Playwright mirror is `tenant-entitlements-http-slice.spec.ts`.
+- **backup-status** (the **first in-action-auth family**, with a cross-tenant
+  **IDOR probe** AND a **scope probe**) — first the minted `tenant_owner` token is
+  decoded and asserted to carry the `scopes:["backup-status:read:own"]` claim
+  (Keycloak unmanaged-attribute → claim mapping is finicky, so this is verified
+  empirically); then **no bearer token** `GET /v1/backups/status` → **401** *from
+  the action's own validator* (the route is a plain proxy with no gateway
+  jwt-auth); then the `tenant_owner` `e2e-user`
+  `GET /v1/backups/status?tenant_id=<A>` → 200 (its own tenant; with an empty
+  snapshots table the body has `schema_version:"1"` and
+  `deployment_backup_available:false`); then the **IDOR probe**
+  `GET /v1/backups/status?tenant_id=<TENANT_B>` → **403** (a `tenant_owner` lacks
+  `read:global`, so it cannot read another tenant's backup status); then the
+  **scope probe** `GET /v1/backups/status` with no `tenant_id` → **403** (the
+  global view requires `read:global`, which a `tenant_owner` lacks); then the
+  `e2e-superadmin` (`read:global`) `GET /v1/backups/status` with no `tenant_id`
+  → 200 (`tenant_id:null`, global view allowed). The Playwright mirror is
+  `backup-status-http-slice.spec.ts`.
 
 ### How identity flows (claims -> headers)
 
@@ -206,6 +224,12 @@ so the request body can never spoof identity. The slice produces the headers lik
   - `actor_scopes` — `oidc-usermodel-attribute-mapper` (multivalued) from the user's
     `actor_scopes` attribute (`platform:admin:config:export`; required by the
     tenant-config format-versions action).
+  - `scopes` — `oidc-usermodel-attribute-mapper` (**multivalued ARRAY**) from the
+    user's `backup_scopes` attribute. **Consumed ONLY by the backup-status family**,
+    which validates the token in-action and reads `claims.scopes` itself (NOT the
+    gateway's `actor_scopes`). `e2e-user` carries `["backup-status:read:own"]`;
+    `e2e-superadmin` carries `["backup-status:read:global"]`. (The gateway never sees
+    this claim — its `serverless-pre-function` does not inject it.)
   - `sub` — standard subject.
 - **APISIX** (`apisix/apisix.yaml`): `openid-connect` validates the token, then the
   `serverless-pre-function` decodes the verified token and sets upstream headers
@@ -214,13 +238,74 @@ so the request body can never spoof identity. The slice produces the headers lik
   `X-Actor-Type <- actor_type`, `X-Actor-Scopes <- actor_scopes` (joined). It first
   deletes any caller-supplied `X-*` identity headers, so a client cannot spoof identity.
 
+### In-action JWKS auth (backup-status — a different auth model)
+
+Every family above trusts the **gateway** as the auth boundary: APISIX validates
+the JWT and the action consumes pre-injected identity headers. The **backup-status**
+family is deliberately different — it is the first family that authenticates
+**in-action**:
+
+- Its APISIX route (`backup-status-get`) is a **plain proxy**: NO `openid-connect`
+  plugin and NO identity-header injection. APISIX forwards the `Authorization`
+  header upstream unchanged (its default behavior — nothing in the route strips it).
+- The product action (`backup-status.action.js::main`, `params-owhttp` invoke)
+  reads the Bearer token from `params.__ow_headers.authorization` and **verifies the
+  JWT signature itself** against the realm JWKS, using the action-runner container
+  env `KEYCLOAK_JWKS_URL=http://keycloak:8080/realms/falcone-e2e/protocol/openid-connect/certs`
+  (a JWKS Bearer-JWT validator, via the action's `jose` + `jwks-rsa` imports). No /
+  invalid token → **401 from the action** (not the gateway).
+- It derives identity from the **token's own claims**: `tenantId <- tenant_id`,
+  `scopes <- scopes` (array) or `scope` (space-split). It does NOT read the gateway
+  `x-*` headers or the `actor_scopes` claim at all.
+- Authorization matrix (over `?tenant_id=`, flattened by `mergeQueryIntoParams`):
+  - `tenant_id` present → requires `read:global` OR (`claims.tenantId === tenant_id`
+    AND `read:own`); a different tenant without `read:global` → **403** (cross-tenant
+    IDOR blocked).
+  - `tenant_id` absent → requires `read:global`; otherwise → **403** (global view).
+- DB: the action queries snapshots via its **own** module-level pg client. The
+  COMPILED `.js` repository (`db/repository.js`) reads a module-level `_client`
+  directly — it does NOT lazily build a Pool from `DB_URL` the way the `.ts`
+  `getClient()` does — so the shim primes it once via the repository's exported
+  `setClient(pool)` (declared on the route as `setClientModule`). Without that,
+  every authorized request would 500 with "No DB client injected". `DB_URL` is also
+  set on the container (`postgres://falcone:falcone@postgres:5432/falcone_test`,
+  the in-network host/port) for completeness.
+- **`KEYCLOAK_ISSUER` / `KEYCLOAK_AUDIENCE` are intentionally NOT set** on the
+  container: the action applies those claim checks only when present, and ROPC
+  tokens' issuer/audience would otherwise mismatch. The JWKS signature is the real
+  gate. `TEST_MODE` is NOT set (the action refuses it whenever a JWKS URL is
+  configured); `NODE_ENV` is `test` (non-production).
+
+The smoke decodes the minted token's payload (base64url middle segment) and asserts
+the `scopes` claim is actually present before running the matrix, because Keycloak's
+unmanaged-attribute → array-claim mapping is finicky.
+
 ### Scope / deferred (honest)
 
 - **Families covered: scheduling, async-operation, tenant-config format-versions,
   plan catalog (create/list), quota dimension catalog (list), tenant effective
-  entitlements (get).** The route table (`action-runner/routes.mjs`) is data-driven
-  with per-route DI; other actions can be added the same way (declare `invoke` +
-  `deps`).
+  entitlements (get), backup-status (get).** The route table
+  (`action-runner/routes.mjs`) is data-driven with per-route DI; other actions can
+  be added the same way (declare `invoke` + `deps`).
+- **backup-status — first in-action-auth family + IDOR probe + scope probe + no
+  snapshot seeding.** It is the only family that authenticates itself (JWKS) rather
+  than trusting gateway headers, and the only one that uses the product's own
+  module-level pg client (primed by the shim via `setClient`). See "In-action JWKS
+  auth" above. **No backup snapshots are seeded**, so the positive 200 responses
+  carry `deployment_backup_available:false` (and a Spanish `message`); that is
+  sufficient to prove the auth matrix end-to-end — the IDOR/scope 403s fire before
+  any query, and the own/global 200s only need a reachable, empty snapshots table
+  (created by migration `001_backup_status_snapshots.sql`, applied by `up.sh`).
+  Issuer/audience claim checks are intentionally not enabled (signature is the gate).
+- **backup-status dep resolution (test-env wiring, not a product change).** The repo
+  is bind-mounted from a git **worktree** that has no `node_modules`, and the
+  backup-status action imports `jose` + `jwks-rsa` (unlike the other families, whose
+  graphs are builtins + local `.mjs` + `pg`). Node's ESM resolver does not honor
+  `NODE_PATH` for static bare imports, so the action-runner image installs those
+  deps (added to `action-runner/package.json`) and exposes them at the filesystem
+  root `/node_modules` (a symlink in the `Dockerfile`), the final candidate the ESM
+  resolver checks when walking up from `/repo`. Product source under `/repo` is
+  untouched.
 - **tenant effective entitlements — first tenant-scoped family + IDOR probe.**
   Every prior family is either tenant-agnostic or superadmin-only; this is the
   first family whose authorization is **per-tenant** (a `tenant_owner` may read
@@ -278,9 +363,14 @@ so the request body can never spoof identity. The slice produces the headers lik
   entry to `action-runner/routes.mjs` (the shim imports the module from the
   bind-mounted repo) and an APISIX route in `apisix/apisix.yaml`. Pick the `invoke`
   style that matches how the action takes its dependencies (`params-pg`,
-  `params-overrides` + `deps: ['db']`, or `params-only`), and set
-  `mergeQueryIntoParams` / `mergeBodyIntoParams` / `defaults` if the action reads
-  flat top-level params (OpenWhisk web-action style).
+  `params-overrides` + `deps: ['db']`, `params-callercontext-overrides`,
+  `params-only`, or `params-owhttp` for an action that does its OWN auth + DB —
+  add `setClientModule` if it keeps its pg client in a module-level singleton that
+  needs priming via an exported `setClient`), and set `mergeQueryIntoParams` /
+  `mergeBodyIntoParams` / `defaults` if the action reads flat top-level params
+  (OpenWhisk web-action style). If the action has external npm deps not present in
+  the bind-mounted worktree, add them to `action-runner/package.json` (they become
+  resolvable at `/node_modules` for the `/repo`-imported action).
 - **More seeded tenants**: drop another `keycloak/import/<id>-realm.json` (realm
   name = tenantId, with a `displayName`).
 - **Full API integration** (tests that need a service's HTTP API, e.g. the

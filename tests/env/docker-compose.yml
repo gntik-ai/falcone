@@ -130,10 +130,13 @@ services:
       interval: 5s
       timeout: 4s
       retries: 40
-  # ---- HTTP request-chain slice (scheduling only) ----------------------------
+  # ---- HTTP request-chain slice ----------------------------------------------
   # action-runner: TEST-ONLY HTTP shim that adapts plain HTTP -> the OpenWhisk-
-  # style scheduling action (params in / {statusCode,body} out) and injects a
-  # real pg Pool. Imports the PRODUCT action as-is from the bind-mounted repo.
+  # style product actions (params in / {statusCode,body} out) and injects a real
+  # pg Pool. Imports the PRODUCT actions as-is from the bind-mounted repo. Most
+  # families trust the gateway-injected identity headers; backup-status instead
+  # validates the Bearer JWT itself against KEYCLOAK_JWKS_URL (in-action auth),
+  # which is why this container carries DB_URL + KEYCLOAK_JWKS_URL env.
   action-runner:
     build:
       context: ./action-runner
@@ -144,6 +147,17 @@ services:
       PGUSER: falcone
       PGPASSWORD: falcone
       PGDATABASE: falcone_test
+      # backup-status family (in-action JWKS auth + own pg client). The shim
+      # primes the .js repository's pg client with its shared pool via setClient
+      # (DB_URL is the in-network host/port — NOT the host-published 55432). The
+      # action validates the Bearer JWT itself against KEYCLOAK_JWKS_URL (the
+      # in-network keycloak:8080, the realm the slice provisions). KEYCLOAK_ISSUER
+      # / KEYCLOAK_AUDIENCE are intentionally LEFT UNSET so the action skips those
+      # claim checks (the JWKS signature is the real gate); TEST_MODE is NOT set
+      # (refused while a JWKS URL is configured); NODE_ENV stays non-production.
+      DB_URL: postgres://falcone:falcone@postgres:5432/falcone_test
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/falcone-e2e/protocol/openid-connect/certs
+      NODE_ENV: test
     volumes:
       # Repo bind-mounted read-only so the shim imports services/ as-is.
       - ../../:/repo:ro
