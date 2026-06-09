@@ -52,7 +52,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 
 These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
 | action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs real product actions with per-route dependency injection (HTTP-slice only) |
-| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
+| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/quota-dimensions`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
 
 ### Keycloak model (matches production)
 
@@ -115,12 +115,14 @@ Families behind the gateway (each exercised by the smoke test):
 | scheduling | `/v1/scheduling/*` | `scheduling-engine/actions/scheduling-management.mjs` | `params-pg` — `params.pg` = pg Pool |
 | async-operation | `POST/GET /v1/async-operations`, `GET /v1/async-operations/{id}` | `provisioning-orchestrator/src/actions/async-operation-create.mjs` + `async-operation-query.mjs` | `params-overrides` — `main(params, overrides)`, `overrides.db` = pg Pool |
 | tenant-config formats | `GET /v1/admin/config/format-versions` | `provisioning-orchestrator/src/actions/tenant-config-format-versions.mjs` | `params-only` — pure GET, no DB |
+| plan catalog | `POST /v1/plans`, `GET /v1/plans` | `provisioning-orchestrator/src/actions/plan-create.mjs` + `plan-list.mjs` | `params-callercontext-overrides` — `main(params, overrides)`, `overrides.db` = pg Pool, `params.callerContext` built from headers; **superadmin only** |
+| quota dimensions | `GET /v1/quota-dimensions` | `provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`; **superadmin only** |
 
 | Piece | Where | What it does |
 |-------|-------|--------------|
 | action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` actions read (`__ow_headers`, `method`, `path`, `query`, `body`) and invokes each **product action as-is** (imported from the repo bind-mounted read-only at `/repo`), returning its `{statusCode, headers?, body}`. The route table (`routes.mjs`) is data-driven AND declares **per-route dependency injection** (`invoke` style + `deps`) so actions with different DI models — `params.pg`, `main(params, overrides)`, or no deps — coexist behind one shim. Routes can also opt into OpenWhisk-style flattening of the query string / JSON body into top-level params (`mergeQueryIntoParams` / `mergeBodyIntoParams`) and supply `defaults` (e.g. `queryType`). |
 | APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (routes) | Gateway for all slice routes. `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. The same plugin chain is inlined per route (APISIX's tinyyaml parser does not support YAML anchors). |
-| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, user `e2e-user`/`e2e-password`, role `scheduling.admin`, user attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export`, and claim mappers (see below). |
+| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export`) for the scheduling/async-operation/tenant-config families, and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin`) for the plan/quota families. Both reuse the same client claim mappers (see below). |
 
 ### Boot + hit the API
 
@@ -152,19 +154,32 @@ bash tests/env/e2e-smoke/run.sh        # curl/node: per family 401 -> token -> c
 ( cd tests/env/e2e-smoke && npm install && npx playwright test )   # same flows via @playwright/test request API
 ```
 
-The smoke run covers all three families end-to-end:
+The smoke run covers all five families end-to-end:
 - **scheduling** — 401 unauthenticated, then `POST /v1/scheduling/jobs` → 201, then listed.
 - **async-operation** — 401 unauthenticated, `POST /v1/async-operations` → 200 (the
   action's `formatCreateResponse` contract returns **200**, not 201), then
   `GET /v1/async-operations/{id}` detail returns it, then it appears in the list.
 - **tenant-config formats** — 401 unauthenticated, then
   `GET /v1/admin/config/format-versions` → 200 with `current_version` + non-empty `versions`.
+- **plan catalog** — 401 unauthenticated, then a **negative authZ probe** (the
+  `tenant_owner` user `POST /v1/plans` → **403**, proving the superadmin gate is
+  real), then the `e2e-superadmin` user `POST /v1/plans` → 201 and the created plan
+  appears in `GET /v1/plans`.
+- **quota dimensions** — 401 unauthenticated, then the `e2e-superadmin` user
+  `GET /v1/quota-dimensions` → 200 with the seeded catalog (≥ 8 dimensions,
+  including `max_workspaces`, from migration `098-plan-base-limits.sql`).
 
 ### How identity flows (claims -> headers)
 
-Each action derives identity **only** from trusted gateway-injected headers
+Most actions derive identity **only** from trusted gateway-injected headers
 (`scheduling-management.mjs::parseIdentity`, `async-operation` `caller-context.mjs`,
-`tenant-config` `parseConfigIdentity`). The slice produces them like this:
+`tenant-config` `parseConfigIdentity`). The **plan/quota** actions instead read a
+pre-built `params.callerContext.actor` object directly — they do **not** re-derive
+it from `__ow_headers`. In the real system a trusted HTTP handler builds that
+object from the gateway headers before dispatch; the slice's shim does the same in
+its `params-callercontext-overrides` invoke style (`buildCallerContextFromHeaders`
+in `action-runner/server.mjs`), **overwriting** any client-supplied `callerContext`
+so the request body can never spoof identity. The slice produces the headers like this:
 
 - **Keycloak mappers** (`keycloak-e2e-provision.sh`) put these on the *access token*:
   - `tenant_id`, `workspace_id` — `oidc-usermodel-attribute-mapper` from the user's
@@ -172,8 +187,12 @@ Each action derives identity **only** from trusted gateway-injected headers
     so Keycloak 26 does not strip them).
   - `actor_roles` — `oidc-usermodel-realm-role-mapper` (multivalued, unprefixed), includes `scheduling.admin`.
   - `actor_type` — `oidc-usermodel-attribute-mapper` from the user's `actor_type`
-    attribute (`tenant_owner`; required by the async-operation create model, which
-    only accepts `{workspace_admin, tenant_owner, superadmin, tenant_member}`).
+    attribute. `e2e-user` is `tenant_owner` (required by the async-operation create
+    model, which only accepts `{workspace_admin, tenant_owner, superadmin,
+    tenant_member}`); `e2e-superadmin` is `superadmin` (required by the plan/quota
+    actions, which compare `actor.type === 'superadmin'`). `superadmin` is the one
+    value identical across both conventions, so a single superadmin user satisfies
+    both contracts.
   - `actor_scopes` — `oidc-usermodel-attribute-mapper` (multivalued) from the user's
     `actor_scopes` attribute (`platform:admin:config:export`; required by the
     tenant-config format-versions action).
@@ -187,9 +206,26 @@ Each action derives identity **only** from trusted gateway-injected headers
 
 ### Scope / deferred (honest)
 
-- **Families covered: scheduling, async-operation, tenant-config format-versions.**
-  The route table (`action-runner/routes.mjs`) is data-driven with per-route DI;
-  other actions can be added the same way (declare `invoke` + `deps`).
+- **Families covered: scheduling, async-operation, tenant-config format-versions,
+  plan catalog (create/list), quota dimension catalog (list).** The route table
+  (`action-runner/routes.mjs`) is data-driven with per-route DI; other actions can
+  be added the same way (declare `invoke` + `deps`).
+- **plan/quota identity model.** Unlike the other families, the plan/quota actions
+  read `params.callerContext.actor` directly instead of re-deriving it from
+  `__ow_headers`. The shim builds `callerContext` from the trusted gateway headers
+  (`params-callercontext-overrides`) and overwrites any client value — faithful to
+  the gateway-as-trust-boundary model. The smoke includes a negative probe
+  (`tenant_owner` → 403 on `POST /v1/plans`) so the superadmin gate is verified, not
+  assumed.
+- **quota-override-list / quota-effective-limits-get: deferred.** Their repositories
+  (`quota-override-repository.mjs::listOverrides`, `quota-enforcement-repository.mjs`)
+  operate on an **in-memory store** (`db._quotaOverrides`, `ensureStores(db)`) rather
+  than issuing SQL against a pg Pool, so they are not wireable end-to-end through the
+  shim's shared Pool without a fake-db adapter. `quota-dimension-catalog-list` was
+  chosen for the quota family precisely because its repository issues real SQL
+  (`SELECT … FROM quota_dimension_catalog`) against the Pool. `plan-get` (superadmin
+  or tenant-owner, real SQL) is wireable too but was left out to keep the slice to
+  one create+list pair per family.
 - **async-operation `result` queryType + idempotency-key path: deferred.** The
   `getOperationResult` query selects `result`/`completed_at` columns no migration
   in this repo adds to `async_operations`, and the idempotency-key create path runs
