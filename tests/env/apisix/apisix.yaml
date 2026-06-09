@@ -1,0 +1,102 @@
+# APISIX standalone route table for the scheduling HTTP slice.
+#
+# Flow for /v1/scheduling/*:
+#   1. openid-connect (bearer_only): validates the Keycloak access token against
+#      the realm's discovery/JWKS. No token / bad token => 401 BEFORE the upstream
+#      is ever reached.
+#   2. serverless-pre-function: the token is now trusted; decode its payload and
+#      inject the identity headers the action reads — x-tenant-id, x-workspace-id,
+#      x-auth-subject (sub), x-actor-roles (joined) — from the JWT claims.
+#      It also STRIPS any client-supplied x-* identity headers first so a caller
+#      cannot spoof identity (mirrors the gateway's request-validation contract).
+#   3. proxy to the action-runner upstream.
+#
+# Out of scope for this slice (documented, not implemented here): the custom
+# scope-enforcement Lua plugin and the web-console UI.
+
+routes:
+  - id: scheduling
+    uri: /v1/scheduling/*
+    methods:
+      - GET
+      - POST
+      - PATCH
+      - DELETE
+    plugins:
+      openid-connect:
+        # Public client; bearer-only resource-server validation of the access token.
+        client_id: falcone-e2e-client
+        client_secret: unused-public-client
+        discovery: http://keycloak:8080/realms/falcone-e2e/.well-known/openid-configuration
+        realm: falcone-e2e
+        bearer_only: true
+        use_jwks: true
+        # account is the default audience Keycloak issues; accept it.
+        token_signing_alg_values_expected: RS256
+        scope: openid
+      serverless-pre-function:
+        phase: rewrite
+        functions:
+          - |
+            return function(conf, ctx)
+              local core = require("apisix.core")
+              local ngx = ngx
+
+              -- Strip any client-supplied identity headers: identity is derived
+              -- ONLY from the verified token, never from caller input.
+              core.request.set_header(ctx, "X-Tenant-Id", nil)
+              core.request.set_header(ctx, "X-Workspace-Id", nil)
+              core.request.set_header(ctx, "X-Auth-Subject", nil)
+              core.request.set_header(ctx, "X-Actor-Roles", nil)
+
+              -- The bearer token has already been validated by openid-connect.
+              local auth = core.request.header(ctx, "Authorization")
+              if not auth then
+                return 401, { code = "UNAUTHENTICATED", message = "missing bearer token" }
+              end
+              local token = auth:gsub("^[Bb]earer%s+", "")
+              local b64 = token:match("^[^.]+%.([^.]+)%.")
+              if not b64 then
+                return 401, { code = "UNAUTHENTICATED", message = "malformed token" }
+              end
+              -- base64url -> base64, pad, decode
+              b64 = b64:gsub("-", "+"):gsub("_", "/")
+              local pad = #b64 % 4
+              if pad == 2 then b64 = b64 .. "=="
+              elseif pad == 3 then b64 = b64 .. "="
+              elseif pad == 1 then b64 = b64 .. "===" end
+              local payload = ngx.decode_base64(b64)
+              if not payload then
+                return 401, { code = "UNAUTHENTICATED", message = "undecodable token" }
+              end
+              local claims, err = core.json.decode(payload)
+              if not claims then
+                return 401, { code = "UNAUTHENTICATED", message = "unparseable claims: " .. tostring(err) }
+              end
+
+              if claims.tenant_id then
+                core.request.set_header(ctx, "X-Tenant-Id", tostring(claims.tenant_id))
+              end
+              if claims.workspace_id then
+                core.request.set_header(ctx, "X-Workspace-Id", tostring(claims.workspace_id))
+              end
+              if claims.sub then
+                core.request.set_header(ctx, "X-Auth-Subject", tostring(claims.sub))
+              end
+              -- actor_roles may be a JSON array or a string; emit a comma-joined header.
+              local roles = claims.actor_roles
+              if type(roles) == "table" then
+                core.request.set_header(ctx, "X-Actor-Roles", table.concat(roles, ","))
+              elseif roles ~= nil then
+                core.request.set_header(ctx, "X-Actor-Roles", tostring(roles))
+              end
+            end
+      proxy-rewrite:
+        # Keep the original path; the action splits on /v1/scheduling/.
+        scheme: http
+    upstream:
+      type: roundrobin
+      nodes:
+        "action-runner:8090": 1
+
+#END
