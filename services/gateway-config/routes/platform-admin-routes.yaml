@@ -20,6 +20,50 @@
         Cache-Control: "no-store, no-cache"
         X-Content-Type-Options: "nosniff"
 
+- id: admin-billing-usage-list
+  uri: /v1/platform/billing/usage
+  methods: [GET]
+  upstream_id: provisioning-orchestrator
+  plugins:
+    openid-connect:
+      discovery: "${KEYCLOAK_DISCOVERY_URL}"
+      required_scopes: ["platform:admin:billing:read"]
+    scope-enforcement:
+      required_scope: "platform:admin:billing:read"
+      required_roles: ["superadmin", "sre"]
+    limit-req:
+      rate: 30
+      burst: 60
+      key: consumer_name
+    kafka-logger:
+      topic: console.audit.gateway
+    response-rewrite:
+      headers:
+        Cache-Control: "no-store, no-cache"
+        X-Content-Type-Options: "nosniff"
+
+- id: admin-billing-usage-tenant-get
+  uri: /v1/platform/billing/usage/*
+  methods: [GET]
+  upstream_id: provisioning-orchestrator
+  plugins:
+    openid-connect:
+      discovery: "${KEYCLOAK_DISCOVERY_URL}"
+      required_scopes: ["platform:admin:billing:read"]
+    scope-enforcement:
+      required_scope: "platform:admin:billing:read"
+      required_roles: ["superadmin", "sre"]
+    limit-req:
+      rate: 30
+      burst: 60
+      key: consumer_name
+    kafka-logger:
+      topic: console.audit.gateway
+    response-rewrite:
+      headers:
+        Cache-Control: "no-store, no-cache"
+        X-Content-Type-Options: "nosniff"
+
 - id: tenant-backup-scope-get
   uri: /v1/tenants/*/backup/scope
   methods: [GET]
