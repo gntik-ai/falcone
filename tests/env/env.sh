@@ -22,3 +22,24 @@ export KAFKA_BROKERS="localhost:19092"
 export FALCONE_TESTENV=1
 export TESTENV_TENANT_A="11111111-1111-1111-1111-111111111111"  # displayName: Acme Corporation
 export TESTENV_TENANT_B="22222222-2222-2222-2222-222222222222"  # displayName: Globex Industries
+
+# ---- HTTP request-chain slice (scheduling only) ----------------------------
+# APISIX is the gateway in front of the scheduling action-runner shim.
+export APISIX_BASE_URL="http://localhost:9080"
+# Direct shim URL (bypasses the gateway — used by layer-1 checks only).
+export ACTION_RUNNER_URL="http://localhost:8090"
+
+# Keycloak realm + ROPC client/user provisioned by keycloak-e2e-provision.sh.
+# The access token carries claims tenant_id/workspace_id/actor_roles + sub that
+# APISIX injects as x-tenant-id/x-workspace-id/x-actor-roles/x-auth-subject.
+export E2E_REALM="falcone-e2e"
+export E2E_CLIENT_ID="falcone-e2e-client"   # public client, Direct Access Grants
+export E2E_USERNAME="e2e-user"
+export E2E_PASSWORD="e2e-password"
+export E2E_ROLE="scheduling.admin"
+export E2E_JWKS_URL="http://localhost:8081/realms/falcone-e2e/protocol/openid-connect/certs"
+export E2E_ISSUER="http://localhost:8081/realms/falcone-e2e"
+
+# Identity the slice user is bound to (token claims tenant_id/workspace_id).
+export E2E_TENANT_ID="11111111-1111-1111-1111-111111111111"
+export E2E_WORKSPACE_ID="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
