@@ -136,6 +136,12 @@ importers:
 
   services/audit: {}
 
+  services/audit-anomaly-handler:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+
   services/backup-status:
     dependencies:
       jose:
