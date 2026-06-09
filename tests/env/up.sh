@@ -147,6 +147,42 @@ done
 # Concrete tenant/workspace the slice user is bound to (mirrors env.sh).
 E2E_TENANT_ID="${E2E_TENANT_ID:-11111111-1111-1111-1111-111111111111}"
 E2E_WORKSPACE_ID="${E2E_WORKSPACE_ID:-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
+# A DIFFERENT tenant used only as the owner of a SHARED-instance backup snapshot,
+# to prove tenant A never sees another tenant's shared rows (data-layer probe).
+E2E_TENANT_B_ID="${E2E_TENANT_B_ID:-22222222-2222-2222-2222-222222222222}"
+
+# ---- backup-status fixtures (data-layer tenant-isolation probe) -------------
+# Seed the backup_status_snapshots table (created by migration 001 above) so the
+# backup-status family returns REAL rows instead of an empty "not enabled" 200,
+# and so the smoke can prove the data layer — not just the auth gate — keeps
+# tenants apart. Two rows:
+#   A) tenant A, is_shared_instance=FALSE  -> tenant A's own-tenant view SEES it.
+#   B) tenant B, is_shared_instance=TRUE   -> tenant A (read:own, no platform/
+#      technical scope) MUST NOT see it: getByTenant(includeShared:false) filters
+#      it at the SQL layer (WHERE tenant_id=$1 AND is_shared_instance=FALSE) and
+#      two in-action belts drop it again. A technical-scoped global caller
+#      (superadmin) DOES see it via getAll(includeShared:true).
+# Idempotent: ON CONFLICT on the (tenant_id, component_type, instance_id) unique
+# constraint does nothing on re-run.
+echo "==> seeding backup_status_snapshots fixtures (tenant A own + tenant B shared)"
+# if/then/else with the heredoc directly on the command line — avoids the bash
+# heredoc + backslash-continuation footgun (where the body would be mis-collected).
+if docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test >/dev/null 2>&1 <<SQL
+INSERT INTO backup_status_snapshots
+  (tenant_id, component_type, instance_id, instance_label, deployment_profile,
+   is_shared_instance, status, last_successful_backup_at, last_checked_at, detail)
+VALUES
+  ('$E2E_TENANT_ID', 'postgres', 'pg-tenant-a-1', 'tenant-a-primary-db', 'dedicated',
+   FALSE, 'success', NOW(), NOW(), 'tenant A dedicated database'),
+  ('$E2E_TENANT_B_ID', 'object-store', 'minio-shared-1', 'shared-platform-objectstore', 'shared',
+   TRUE, 'success', NOW(), NOW(), 'platform-shared object store owned by tenant B')
+ON CONFLICT (tenant_id, component_type, instance_id) DO NOTHING;
+SQL
+then
+  echo "   seeded backup snapshots (own=tenant-a-primary-db, shared=shared-platform-objectstore)"
+else
+  echo "   skipped backup snapshot seed (table missing or already seeded?)"
+fi
 
 echo "==> provisioning Keycloak realm falcone-e2e (ROPC client + user + claim mappers)"
 E2E_TENANT_ID="$E2E_TENANT_ID" E2E_WORKSPACE_ID="$E2E_WORKSPACE_ID" bash ./keycloak-e2e-provision.sh
@@ -174,6 +210,7 @@ echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
 echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/backups/status)"
 echo "                            NOTE /v1/backups/status authenticates IN-ACTION (plain proxy, no gateway jwt-auth): the backup-status action verifies the Bearer JWT itself against the realm JWKS and reads tenant+scopes from the token's own claims."
+echo "                            backup_status_snapshots seeded with a tenant-A own row + a tenant-B SHARED row -> the smoke proves tenant A never sees tenant B's shared row (data-layer isolation), while a technical-scoped global view sees both."
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
 echo "  Keycloak realm (slice) : falcone-e2e  client=falcone-e2e-client users=e2e-user/e2e-password (tenant_owner), e2e-superadmin/e2e-superadmin-password (superadmin)"
 echo
