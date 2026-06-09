@@ -1,27 +1,4 @@
-# gateway Specification
-
-## Purpose
-TBD - created by archiving change add-per-tenant-gateway-rate-limit. Update Purpose after archive.
-## Requirements
-### Requirement: Per-tenant rate-limit partitioning
-
-The system SHALL partition all gateway rate-limit counters by tenant identity so
-that exhausting one tenant's rate budget does not reduce the available request
-quota for any other tenant.
-
-#### Scenario: Tenant A saturation does not affect Tenant B
-
-- **WHEN** Tenant A sends requests that exhaust its `requestsPerMinute` quota on
-  the `event_gateway` qosProfile
-- **THEN** subsequent requests from Tenant B on the same route class receive 200
-  (or the appropriate success status) and are not throttled by Tenant A's counter
-
-#### Scenario: Rate-limited tenant receives per-tenant 429
-
-- **WHEN** a tenant exceeds its plan-level `requestsPerMinute` ceiling
-- **THEN** the gateway responds with HTTP 429 and includes `X-RateLimit-Limit`,
-  `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers scoped to that
-  tenant's counter
+## MODIFIED Requirements
 
 ### Requirement: Plan-quota-driven rate limit ceiling
 
@@ -65,23 +42,3 @@ unresolvable or the request is unauthenticated (design D3).
 
 - **WHEN** the control-plane plan-quota source is unreachable or returns a non-numeric value for the tenant's plan
 - **THEN** `fetch_plan_requests_per_minute` returns `nil`, `resolve_tenant_rate_limit` returns the static floor, and the gateway continues to serve the request without error
-
-### Requirement: Workspace-scoped counter for workspace-bound families
-
-The system SHALL further partition rate-limit counters by workspace for route
-families where `workspaceBinding: required`, using the compound key
-`X-Tenant-Id:X-Workspace-Id`.
-
-#### Scenario: Two workspaces under the same tenant have independent counters
-
-- **WHEN** workspace W1 and workspace W2 (both under Tenant A) independently
-  send requests on a workspace-bound route family
-- **THEN** requests from W1 do not consume quota from W2's counter, and each
-  workspace can independently reach its workspace-level sub-quota
-
-#### Scenario: Workspace sub-quota exhaustion does not affect sibling workspaces
-
-- **WHEN** workspace W1 exhausts its workspace-level rate budget
-- **THEN** workspace W2 under the same tenant continues to receive 200 responses
-  and its `X-RateLimit-Remaining` header is unaffected
-
