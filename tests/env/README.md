@@ -52,7 +52,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 
 These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
 | action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs real product actions with per-route dependency injection (HTTP-slice only) |
-| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/quota-dimensions`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
+| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/quota-dimensions`, `/v1/tenant/entitlements`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only) |
 
 ### Keycloak model (matches production)
 
@@ -117,12 +117,13 @@ Families behind the gateway (each exercised by the smoke test):
 | tenant-config formats | `GET /v1/admin/config/format-versions` | `provisioning-orchestrator/src/actions/tenant-config-format-versions.mjs` | `params-only` — pure GET, no DB |
 | plan catalog | `POST /v1/plans`, `GET /v1/plans` | `provisioning-orchestrator/src/actions/plan-create.mjs` + `plan-list.mjs` | `params-callercontext-overrides` — `main(params, overrides)`, `overrides.db` = pg Pool, `params.callerContext` built from headers; **superadmin only** |
 | quota dimensions | `GET /v1/quota-dimensions` | `provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`; **superadmin only** |
+| tenant entitlements | `GET /v1/tenant/entitlements` | `provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`, `?tenantId` flattened (`mergeQueryIntoParams`); **first tenant-scoped family** — a `tenant_owner` reads only its own tenant (cross-tenant `?tenantId` → 403); superadmin may cross-scope |
 
 | Piece | Where | What it does |
 |-------|-------|--------------|
 | action-runner shim | `action-runner/` (`server.mjs`, `routes.mjs`, `Dockerfile`) | node:http server. Adapts a plain HTTP request into the OpenWhisk-style `params` actions read (`__ow_headers`, `method`, `path`, `query`, `body`) and invokes each **product action as-is** (imported from the repo bind-mounted read-only at `/repo`), returning its `{statusCode, headers?, body}`. The route table (`routes.mjs`) is data-driven AND declares **per-route dependency injection** (`invoke` style + `deps`) so actions with different DI models — `params.pg`, `main(params, overrides)`, or no deps — coexist behind one shim. Routes can also opt into OpenWhisk-style flattening of the query string / JSON body into top-level params (`mergeQueryIntoParams` / `mergeBodyIntoParams`) and supply `defaults` (e.g. `queryType`). |
 | APISIX | `apisix/config.yaml` (standalone YAML mode), `apisix/apisix.yaml` (routes) | Gateway for all slice routes. `openid-connect` (bearer-only) validates the Keycloak access token; a `serverless-pre-function` then strips any client-supplied `x-*` identity headers and re-injects them from the **verified** token claims; `proxy-rewrite` forwards to the shim. The same plugin chain is inlined per route (APISIX's tinyyaml parser does not support YAML anchors). |
-| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export`) for the scheduling/async-operation/tenant-config families, and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin`) for the plan/quota families. Both reuse the same client claim mappers (see below). |
+| Keycloak realm | `keycloak-e2e-provision.sh` | Realm `falcone-e2e`, public ROPC client `falcone-e2e-client`, and two users: `e2e-user`/`e2e-password` (role `scheduling.admin`, attributes `actor_type=tenant_owner` + `actor_scopes=platform:admin:config:export`) for the scheduling/async-operation/tenant-config families **and the tenant-scoped entitlements family** (a `tenant_owner` reads only its own tenant), and `e2e-superadmin`/`e2e-superadmin-password` (`actor_type=superadmin`) for the plan/quota families (and superadmin cross-scope entitlements reads). Both reuse the same client claim mappers (see below). |
 
 ### Boot + hit the API
 
@@ -154,7 +155,7 @@ bash tests/env/e2e-smoke/run.sh        # curl/node: per family 401 -> token -> c
 ( cd tests/env/e2e-smoke && npm install && npx playwright test )   # same flows via @playwright/test request API
 ```
 
-The smoke run covers all five families end-to-end:
+The smoke run covers all six families end-to-end:
 - **scheduling** — 401 unauthenticated, then `POST /v1/scheduling/jobs` → 201, then listed.
 - **async-operation** — 401 unauthenticated, `POST /v1/async-operations` → 200 (the
   action's `formatCreateResponse` contract returns **200**, not 201), then
@@ -168,6 +169,15 @@ The smoke run covers all five families end-to-end:
 - **quota dimensions** — 401 unauthenticated, then the `e2e-superadmin` user
   `GET /v1/quota-dimensions` → 200 with the seeded catalog (≥ 8 dimensions,
   including `max_workspaces`, from migration `098-plan-base-limits.sql`).
+- **tenant entitlements** (the **first tenant-scoped family**, with a cross-tenant
+  **IDOR probe**) — 401 unauthenticated, then the `tenant_owner` `e2e-user`
+  `GET /v1/tenant/entitlements` → 200 (its own tenant; an unseeded tenant yields a
+  non-empty `quantitativeLimits` array of `catalog_default` rows and `planSlug:null`),
+  then the **IDOR probe** `GET /v1/tenant/entitlements?tenantId=<TENANT_B>` → **403**
+  (a `tenant_owner` may read only its own tenant; the action throws `FORBIDDEN`
+  before any DB access, so `TENANT_B` need not exist), then the `e2e-superadmin`
+  `GET /v1/tenant/entitlements?tenantId=<own tenant>` → 200 (a superadmin may
+  cross-scope). The Playwright mirror is `tenant-entitlements-http-slice.spec.ts`.
 
 ### How identity flows (claims -> headers)
 
@@ -207,9 +217,26 @@ so the request body can never spoof identity. The slice produces the headers lik
 ### Scope / deferred (honest)
 
 - **Families covered: scheduling, async-operation, tenant-config format-versions,
-  plan catalog (create/list), quota dimension catalog (list).** The route table
-  (`action-runner/routes.mjs`) is data-driven with per-route DI; other actions can
-  be added the same way (declare `invoke` + `deps`).
+  plan catalog (create/list), quota dimension catalog (list), tenant effective
+  entitlements (get).** The route table (`action-runner/routes.mjs`) is data-driven
+  with per-route DI; other actions can be added the same way (declare `invoke` +
+  `deps`).
+- **tenant effective entitlements — first tenant-scoped family + IDOR probe.**
+  Every prior family is either tenant-agnostic or superadmin-only; this is the
+  first family whose authorization is **per-tenant** (a `tenant_owner` may read
+  only its own tenant). The action reads `params.callerContext.actor` and rejects a
+  cross-tenant `?tenantId` mismatch with `FORBIDDEN`/403 **before any DB access**,
+  so the smoke's IDOR probe (`?tenantId=22222222-…` as `e2e-user`) proves
+  cross-tenant isolation without seeding a second tenant. The positive own-tenant
+  read uses an unseeded tenant: `resolveUnifiedEntitlements` LEFT JOINs the
+  catalog/plan-assignment/override tables and returns one `catalog_default`
+  quantitative limit per `quota_dimension_catalog` dimension with `planSlug:null`.
+  This family needs three more migrations than the plan/quota families —
+  `100-plan-change-impact-history` (loop dependency ordering), `103-hard-soft-quota-overrides`
+  (the `quota_overrides` table the entitlements query LEFT JOINs), and
+  `104-plan-boolean-capabilities` (the optional `boolean_capability_catalog`; its
+  `42P01` is caught, but seeding it exercises the full capability-resolution path)
+  — all applied idempotently by `up.sh` after 097/098.
 - **plan/quota identity model.** Unlike the other families, the plan/quota actions
   read `params.callerContext.actor` directly instead of re-deriving it from
   `__ow_headers`. The shim builds `callerContext` from the trusted gateway headers
