@@ -184,6 +184,42 @@ else
   echo "   skipped backup snapshot seed (table missing or already seeded?)"
 fi
 
+# ---- entitlements fixtures (real plan-derived limits, not catalog defaults) -
+# Assign a real plan to tenant A so tenant-effective-entitlements-get returns
+# plan-derived limits (planSlug set, a dimension sourced from 'plan') instead of
+# the catalog-default fallback. resolveUnifiedEntitlements LEFT JOINs
+# tenant_plan_assignments (097) + plans (097); for any dimension present in the
+# plan's quota_dimensions JSONB it reports source='plan' with the plan's value,
+# else 'catalog_default'. We give the plan max_workspaces=50 (a seeded catalog
+# dimension), so that dimension resolves to source='plan', effectiveValue=50.
+# Idempotent: the plan upserts on its unique LOWER(slug) index and the assignment
+# is guarded by NOT EXISTS (+ the partial unique index on the active row).
+echo "==> seeding entitlements fixture (assign plan 'e2e-pro-plan' to tenant A)"
+if docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test >/dev/null 2>&1 <<SQL
+WITH plan_upsert AS (
+  INSERT INTO plans (slug, display_name, description, status, quota_dimensions, capabilities, created_by, updated_by)
+  VALUES ('e2e-pro-plan', 'E2E Pro Plan', 'Seeded by tests/env/up.sh for the entitlements slice', 'active',
+          '{"max_workspaces": 50}'::jsonb, '{}'::jsonb, 'e2e-seed', 'e2e-seed')
+  ON CONFLICT (LOWER(slug)) DO NOTHING
+  RETURNING id
+),
+resolved AS (
+  SELECT id FROM plan_upsert
+  UNION ALL
+  SELECT id FROM plans WHERE LOWER(slug) = LOWER('e2e-pro-plan')
+)
+INSERT INTO tenant_plan_assignments (tenant_id, plan_id, assigned_by)
+SELECT '$E2E_TENANT_ID', (SELECT id FROM resolved LIMIT 1), 'e2e-seed'
+WHERE NOT EXISTS (
+  SELECT 1 FROM tenant_plan_assignments WHERE tenant_id = '$E2E_TENANT_ID' AND superseded_at IS NULL
+);
+SQL
+then
+  echo "   assigned plan e2e-pro-plan (max_workspaces=50) to tenant A"
+else
+  echo "   skipped plan assignment seed (tables missing or already assigned?)"
+fi
+
 echo "==> provisioning Keycloak realm falcone-e2e (ROPC client + user + claim mappers)"
 E2E_TENANT_ID="$E2E_TENANT_ID" E2E_WORKSPACE_ID="$E2E_WORKSPACE_ID" bash ./keycloak-e2e-provision.sh
 
