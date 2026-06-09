@@ -24,6 +24,17 @@
 //   invoke: 'params-only' — handler(params) with NO injected deps (pure GET,
 //       identity from headers, no DB). Used by tenant-config-format-versions.
 //
+//   invoke: 'params-callercontext-overrides' — handler(params, overrides) where
+//       the action reads params.callerContext (an { actor:{ id,type,tenantId },
+//       tenantId, correlationId } object) DIRECTLY rather than re-deriving it
+//       from __ow_headers, AND reads its db from overrides.db. server.mjs builds
+//       callerContext from the TRUSTED gateway-injected identity headers
+//       (x-auth-subject/x-tenant-id/x-actor-type), overwriting any client value,
+//       exactly as the real Falcone HTTP handler would before dispatch. Used by
+//       the provisioning-orchestrator plan/quota actions (plan-list, plan-create,
+//       quota-dimension-catalog-list). These actions require actor.type
+//       'superadmin' (the slice provisions a dedicated e2e-superadmin user).
+//
 // `mergeQueryIntoParams` / `mergeBodyIntoParams` (booleans): OpenWhisk web
 // actions flatten the query string and JSON body into top-level params. The
 // scheduling action instead reads params.query / params.body, so it leaves both
@@ -100,6 +111,53 @@ export const routes = [
     module: '/repo/services/provisioning-orchestrator/src/actions/tenant-config-format-versions.mjs',
     exportName: 'main',
     invoke: 'params-only',
+  },
+
+  // ---- plan catalog (provisioning-orchestrator) ----------------------------
+  // CREATE: POST /v1/plans  -> plan-create::main
+  //   main(params, overrides), db from overrides.db. Reads flat fields off
+  //   params (slug, displayName, description, ...), so the body is merged into
+  //   params. Requires actor.type 'superadmin' (read from params.callerContext,
+  //   built by the shim from the trusted x-* headers). Returns HTTP 201.
+  //   (No producer is wired; emitPlanEvent no-ops when its producer is absent.)
+  {
+    name: 'plan-create',
+    pathRegex: /^\/v1\/plans\/?$/,
+    methods: ['POST'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/plan-create.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeBodyIntoParams: true,
+  },
+
+  // LIST: GET /v1/plans  -> plan-list::main
+  //   Reads flat query fields (page, pageSize, status). Requires superadmin.
+  //   Returns 200 with { plans, total, page, pageSize }.
+  {
+    name: 'plan-list',
+    pathRegex: /^\/v1\/plans\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/plan-list.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeQueryIntoParams: true,
+  },
+
+  // ---- quota dimension catalog (provisioning-orchestrator) -----------------
+  // LIST: GET /v1/quota-dimensions  -> quota-dimension-catalog-list::main
+  //   No params beyond identity; reads the quota_dimension_catalog table
+  //   (seeded by migration 098). Requires superadmin. Returns 200 with
+  //   { dimensions, total }.
+  {
+    name: 'quota-dimension-catalog-list',
+    pathRegex: /^\/v1\/quota-dimensions\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
   },
 ];
 

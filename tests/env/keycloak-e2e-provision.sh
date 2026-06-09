@@ -226,4 +226,45 @@ log "set password + attributes for $USERNAME (actor_type=$ACTOR_TYPE actor_scope
 dc "$KC" add-roles -r "$REALM" --uusername "$USERNAME" --rolename "$ROLE" >/dev/null 2>&1 \
   && log "granted role $ROLE to $USERNAME" || log "role $ROLE already granted to $USERNAME"
 
+# 7. Superadmin test user for the plan + quota families.
+# The plan/quota actions (plan-create, plan-list, quota-dimension-catalog-list)
+# read params.callerContext.actor.type and require it to equal 'superadmin'. The
+# shim builds callerContext from the x-actor-type header APISIX injects from this
+# user's actor_type claim, so a dedicated user with actor_type=superadmin
+# satisfies those contracts WITHOUT disturbing the tenant_owner-scoped existing
+# families (scheduling/async-operation). It reuses the same client protocol
+# mappers (tenant_id/workspace_id/actor_type/...), so no new mappers are needed.
+SUPER_USERNAME="${E2E_SUPER_USERNAME:-e2e-superadmin}"
+SUPER_PASSWORD="${E2E_SUPER_PASSWORD:-e2e-superadmin-password}"
+SUPER_USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$SUPER_USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1 || true)
+if [ -n "$SUPER_USER_ID" ]; then
+  log "user $SUPER_USERNAME already exists ($SUPER_USER_ID)"
+else
+  dc "$KC" create users -r "$REALM" \
+    -s username="$SUPER_USERNAME" \
+    -s enabled=true \
+    -s emailVerified=true \
+    -s "email=${SUPER_USERNAME}@example.test" \
+    -s firstName=E2E \
+    -s lastName=Superadmin \
+    -s 'requiredActions=[]' \
+    -s "attributes.tenant_id=$TENANT_ID" \
+    -s "attributes.workspace_id=$WORKSPACE_ID" \
+    -s 'attributes.actor_type=superadmin' >/dev/null
+  SUPER_USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$SUPER_USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1)
+  log "created user $SUPER_USERNAME ($SUPER_USER_ID)"
+fi
+dc "$KC" set-password -r "$REALM" --userid "$SUPER_USER_ID" --new-password "$SUPER_PASSWORD" >/dev/null
+dc "$KC" update "users/$SUPER_USER_ID" -r "$REALM" \
+  -s enabled=true \
+  -s emailVerified=true \
+  -s "email=${SUPER_USERNAME}@example.test" \
+  -s firstName=E2E \
+  -s lastName=Superadmin \
+  -s 'requiredActions=[]' \
+  -s "attributes.tenant_id=[\"$TENANT_ID\"]" \
+  -s "attributes.workspace_id=[\"$WORKSPACE_ID\"]" \
+  -s 'attributes.actor_type=["superadmin"]' >/dev/null
+log "set password + attributes for $SUPER_USERNAME (actor_type=superadmin)"
+
 echo "Keycloak realm '$REALM' provisioned for the scheduling HTTP slice."

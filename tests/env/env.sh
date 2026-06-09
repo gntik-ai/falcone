@@ -53,6 +53,8 @@ export TESTENV_TENANT_B="22222222-2222-2222-2222-222222222222"  # displayName: G
 #   /v1/scheduling/*                  -> scheduling-engine scheduling-management
 #   /v1/async-operations[ /{id} ]     -> provisioning-orchestrator async-operation
 #   /v1/admin/config/format-versions  -> provisioning-orchestrator tenant-config
+#   /v1/plans                         -> provisioning-orchestrator plan (create/list)
+#   /v1/quota-dimensions              -> provisioning-orchestrator quota dimension catalog
 export APISIX_BASE_URL="http://localhost:9080"
 # Direct shim URL (bypasses the gateway — used by layer-1 checks only).
 export ACTION_RUNNER_URL="http://localhost:8090"
@@ -76,3 +78,10 @@ export E2E_WORKSPACE_ID="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 # actor_scope grants the tenant-config format-versions action its required scope.
 export E2E_ACTOR_TYPE="tenant_owner"
 export E2E_ACTOR_SCOPE="platform:admin:config:export"
+
+# Dedicated superadmin ROPC user for the plan + quota families (those actions
+# read params.callerContext.actor and require actor.type 'superadmin'). Same
+# realm/client, actor_type=superadmin. Keeps the tenant_owner-scoped families
+# (scheduling/async-operation) untouched.
+export E2E_SUPER_USERNAME="e2e-superadmin"
+export E2E_SUPER_PASSWORD="e2e-superadmin-password"

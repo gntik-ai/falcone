@@ -93,6 +93,39 @@ function buildOverrides(route, pool) {
   return overrides;
 }
 
+// Build params.callerContext from the gateway-injected identity headers, the way
+// a real Falcone HTTP handler would before dispatching to a plan/quota action.
+//
+// The plan/quota actions (plan-list, plan-create, quota-dimension-catalog-list,
+// ...) read params.callerContext.actor DIRECTLY (they do NOT call
+// buildCallerContext off __ow_headers like the async-operation actions). So the
+// trusted adapter — here, this shim, mirroring the real handler — is responsible
+// for deriving callerContext from the TRUSTED headers APISIX injected from the
+// verified JWT (x-auth-subject / x-tenant-id / x-actor-type), having first
+// STRIPPED any client-supplied x-* identity headers. We OVERWRITE any
+// client-supplied params.callerContext so the body can never spoof identity.
+//
+// actor.type is taken verbatim from x-actor-type. Note the plan/quota actions
+// compare against 'superadmin' and 'tenant-owner' (hyphen); 'superadmin' is the
+// one value identical across the async-operation underscore convention, so the
+// slice's superadmin user satisfies both contracts.
+function buildCallerContextFromHeaders(headers = {}) {
+  const subject = headers['x-auth-subject'];
+  const tenantId = headers['x-tenant-id'];
+  const actorType = headers['x-actor-type'];
+  if (!subject) return null;
+  return {
+    actor: {
+      id: subject,
+      type: actorType ?? '',
+      // plan/quota tenant-scoped checks read actor.tenantId; mirror tenantId.
+      tenantId: tenantId ?? null
+    },
+    tenantId: tenantId ?? null,
+    correlationId: headers['x-correlation-id'] ?? null
+  };
+}
+
 // Invoke a matched action the way its route declares. Returns the action's
 // `{ statusCode, headers?, body }` result unchanged.
 async function invokeRoute({ route, handler, params, pool }) {
@@ -106,6 +139,19 @@ async function invokeRoute({ route, handler, params, pool }) {
     case 'params-overrides':
       // handler(params, overrides) — deps go in the second argument.
       return handler(params, buildOverrides(route, pool));
+    case 'params-callercontext-overrides': {
+      // handler(params, overrides) where the action reads params.callerContext
+      // (built here from the TRUSTED gateway headers, overwriting any
+      // client-supplied value) AND deps from overrides (overrides.db = Pool).
+      // Used by the provisioning-orchestrator plan/quota actions.
+      const callerContext = buildCallerContextFromHeaders(params.__ow_headers);
+      if (!callerContext) {
+        const err = new Error('callerContext could not be established from gateway headers');
+        err.statusCode = 401;
+        throw err;
+      }
+      return handler({ ...params, callerContext }, buildOverrides(route, pool));
+    }
     default:
       throw new Error(`Route ${route.name} declares unknown invoke style "${route.invoke}"`);
   }
