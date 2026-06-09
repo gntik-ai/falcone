@@ -535,6 +535,55 @@ export class ConfirmationsService {
       createdAt: request.createdAt,
     }
   }
+
+  async abortById(confirmationRequestId: string, actor: Actor): Promise<ConfirmRestoreResult> {
+    const request = await this.repo.findById(confirmationRequestId)
+    if (!request) {
+      throw new ConfirmationError(404, 'confirmation_request_not_found')
+    }
+
+    // Tenant isolation: mirror the gate used by getStatus.
+    const isSuperadmin = actor.scopes.includes('superadmin')
+    if (!isSuperadmin && actor.tenantId !== request.tenantId) {
+      throw new ConfirmationError(403, 'access_denied')
+    }
+
+    // Within the same tenant, only the requester or a backup:restore:global operator may abort.
+    if (!isSuperadmin && request.requesterId !== actor.sub && !actor.scopes.includes('backup:restore:global')) {
+      throw new ConfirmationError(403, 'access_denied')
+    }
+
+    if (request.status !== 'pending_confirmation') {
+      throw new ConfirmationError(409, 'confirmation_request_not_pending', { status: request.status })
+    }
+
+    const now = new Date()
+    await this.repo.updateDecision(request.id, 'aborted', {})
+    await this.auditTrail.emitAuditEvent({
+      eventType: 'restore.aborted',
+      operationId: null,
+      tenantId: request.tenantId,
+      componentType: request.componentType,
+      instanceId: request.instanceId,
+      snapshotId: request.snapshotId,
+      actorId: actor.sub,
+      actorRole: actor.role,
+      sessionContext: { status: 'not_applicable' },
+      result: 'aborted',
+      destructive: true,
+      detail: JSON.stringify({
+        confirmation_request_id: request.id,
+        warnings_shown: request.warningsShown,
+        confirmation_decision: 'aborted',
+        confirmation_timestamp: now.toISOString(),
+      }),
+    })
+    return {
+      schemaVersion: '2',
+      status: 'aborted',
+      confirmationRequestId: request.id,
+    }
+  }
 }
 
 const defaultService = new ConfirmationsService(
@@ -585,9 +634,7 @@ export async function getStatus(confirmationRequestId: string, actor: Actor): Pr
 }
 
 export async function abort(confirmationRequestId: string, actor: Actor): Promise<ConfirmRestoreResult> {
-  const request = await new ConfirmationsRepositoryClass().findById(confirmationRequestId)
-  if (!request) throw new ConfirmationError(404, 'confirmation_request_not_found')
-  return await defaultService.confirm({ confirmationToken: request.tokenHash, confirmed: false }, actor)
+  return await defaultService.abortById(confirmationRequestId, actor)
 }
 
 export { toSnakeCaseInitiate, toSnakeCaseConfirm }
