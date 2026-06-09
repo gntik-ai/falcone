@@ -66,12 +66,15 @@ export async function main(params: ActionParams) {
       return { statusCode: 400, headers, body: { error: 'Missing required fields: confirmation_token, confirmed' } }
     }
 
-    // Tenant binding: if body includes tenant_id, it must match the token's verified tenant
+    // tenant_id is required — omitting it is not a valid bypass.
+    if (typeof body.tenant_id !== 'string' || !body.tenant_id) {
+      return { statusCode: 400, headers, body: { error: 'Missing required field: tenant_id' } }
+    }
+
+    // Tenant binding: the body tenant must match the token's verified tenant,
     // unless the caller holds a platform-level cross-tenant privilege (superadmin scope).
-    if (typeof body.tenant_id === 'string' && !isSuperadmin) {
-      if (body.tenant_id !== token.tenantId) {
-        return { statusCode: 403, headers, body: { error: 'Tenant mismatch: restore target tenant does not match authenticated tenant' } }
-      }
+    if (!isSuperadmin && body.tenant_id !== token.tenantId) {
+      return { statusCode: 403, headers, body: { error: 'Tenant mismatch: restore target tenant does not match authenticated tenant' } }
     }
 
     // Authoritative tenant-name resolver: injected via params for tests,

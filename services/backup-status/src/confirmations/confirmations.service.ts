@@ -316,6 +316,15 @@ export class ConfirmationsService {
       throw new ConfirmationError(404, 'confirmation_request_not_found')
     }
 
+    // Tenant isolation: the actor must belong to the same tenant as the request,
+    // OR hold a platform-level cross-tenant privilege (superadmin scope).
+    // This gate fires before any further processing so a cross-tenant actor
+    // cannot learn the request's status or trigger any state change.
+    const isSuperadmin = actor.scopes.includes('superadmin')
+    if (!isSuperadmin && actor.tenantId !== request.tenantId) {
+      throw new ConfirmationError(403, 'access_denied')
+    }
+
     if (request.status !== 'pending_confirmation') {
       throw new ConfirmationError(409, 'confirmation_request_not_pending', { status: request.status })
     }
