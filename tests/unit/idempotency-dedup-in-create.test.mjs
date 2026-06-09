@@ -7,10 +7,11 @@ function buildParams(overrides = {}) {
   return {
     operation_type: 'create-workspace',
     workspace_id: 'ws-01',
-    callerContext: {
-      tenantId: 'tenant-a',
-      correlationId: 'req-correlation',
-      actor: { id: 'user-1', type: 'workspace_admin' }
+    __ow_headers: {
+      'x-tenant-id': 'tenant-a',
+      'x-auth-subject': 'user-1',
+      'x-actor-type': 'workspace_admin',
+      'x-correlation-id': 'req-correlation'
     },
     ...overrides
   };

@@ -10,15 +10,12 @@ import {
   publishDeduplicationEvent,
   publishStateChanged
 } from '../events/async-operation-events.mjs';
+import { buildCallerContext } from './caller-context.mjs';
 
 const ERROR_STATUS_CODES = {
   IDEMPOTENCY_KEY_CONFLICT: 409,
   VALIDATION_ERROR: 400
 };
-
-function getCallerContext(params = {}) {
-  return params.callerContext ?? {};
-}
 
 function requireCallerIdentity(callerContext) {
   if (!callerContext.tenantId) {
@@ -167,7 +164,15 @@ async function resolveExistingOperation(dependencies, tenantId, record, operatio
 
 export async function main(params = {}, overrides = {}) {
   const dependencies = buildCreateActionDependencies(overrides);
-  const callerContext = getCallerContext(params);
+  const callerContext = buildCallerContext(params);
+
+  if (!callerContext) {
+    return {
+      statusCode: 401,
+      body: { code: 'UNAUTHORIZED', message: 'Missing or untrusted caller identity headers' }
+    };
+  }
+
   requireCallerIdentity(callerContext);
 
   const requestCorrelationId = params.correlation_id ?? callerContext.correlationId;
