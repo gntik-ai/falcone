@@ -8,6 +8,32 @@ function ok(statusCode, body) { return { statusCode, body }; }
 function noContent() { return { statusCode: 204, body: null }; }
 function error(statusCode, code, message) { return { statusCode, body: { code, message } }; }
 
+/**
+ * App-layer consistency guard: a signing-secret record (or its parent
+ * subscription) must carry a non-empty tenant_id/workspace_id before any secret
+ * is persisted. The per-row predicate that enforces tenant scoping at read time
+ * lives in the injected db layer (SQL out of source); this guard prevents an
+ * un-scoped or tenant-mismatched secret from ever being written in the first
+ * place. Throws a 400-mapped error (caught by the create handler) on violation.
+ */
+function assertTenantScoped(record, expectedTenantId) {
+  if (!record || typeof record.tenant_id !== 'string' || record.tenant_id.length === 0) {
+    const err = new Error('Signing secret requires a tenant_id');
+    err.code = 'TENANT_SCOPE_REQUIRED';
+    throw err;
+  }
+  if (typeof record.workspace_id !== 'string' || record.workspace_id.length === 0) {
+    const err = new Error('Signing secret requires a workspace_id');
+    err.code = 'TENANT_SCOPE_REQUIRED';
+    throw err;
+  }
+  if (expectedTenantId !== undefined && record.tenant_id !== expectedTenantId) {
+    const err = new Error('Signing secret tenant_id does not match the subscription tenant_id');
+    err.code = 'TENANT_SCOPE_MISMATCH';
+    throw err;
+  }
+}
+
 function pathParts(path) {
   return String(path || '').replace(/^\/v1\/webhooks\/?/, '').split('/').filter(Boolean);
 }
@@ -53,10 +79,18 @@ export async function main(params) {
         return error(409, 'QUOTA_EXCEEDED', 'Workspace subscription quota reached');
       }
       const record = await buildSubscriptionRecord(body, ctx);
+      // Consistency guard: a signing secret must never be persisted without the
+      // tenant dimension that scopes it. The deployed db layer applies an
+      // AND tenant_id = $N AND workspace_id = $M predicate to every secret read;
+      // a secret created without a tenant_id would be unreachable (or, worse,
+      // reachable cross-tenant). Fail closed before any secret is written.
+      assertTenantScoped(record);
       const signingSecret = generateSigningSecret();
       const encrypted = encryptSecret(signingSecret, signingKey);
       await db.insertSubscription(record);
-      await db.insertSecret(record.id, encrypted);
+      // Thread tenant_id/workspace_id so the db layer can scope the INSERT and
+      // every subsequent read by (tenant_id, workspace_id), not subscription_id alone.
+      await db.insertSecret(record.id, encrypted, record.tenant_id, record.workspace_id);
       await publish(kafka, 'console.webhook.subscription.created', subscriptionCreatedEvent(ctx, record.id));
       return ok(201, { ...responseSubscription(record), signingSecret });
     } catch (caught) {
@@ -118,7 +152,9 @@ export async function main(params) {
     const newSigningSecret = generateSigningSecret();
     const encrypted = encryptSecret(newSigningSecret, signingKey);
     const graceExpiresAt = new Date(Date.now() + (gracePeriodSeconds * 1000)).toISOString();
-    await db.rotateSecret(subscription.id, encrypted, graceExpiresAt);
+    // Scope rotation to the owning tenant so only rows where tenant_id matches
+    // the subscription are rotated/invalidated by the db layer's predicate.
+    await db.rotateSecret(subscription.id, encrypted, graceExpiresAt, subscription.tenant_id, subscription.workspace_id);
     await publish(kafka, 'console.webhook.secret.rotated', secretRotatedEvent(ctx, subscription.id));
     return ok(200, { newSigningSecret, gracePeriodSeconds, graceExpiresAt });
   }
