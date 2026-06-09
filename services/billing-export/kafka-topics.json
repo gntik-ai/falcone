@@ -1,0 +1,24 @@
+{
+  "service": "@falcone/billing-export",
+  "produces": [
+    {
+      "topic": "console.billing.usage",
+      "namespace": "platform",
+      "partitions": 6,
+      "replicationFactor": 3,
+      "config": {
+        "retention.ms": 7776000000,
+        "cleanup.policy": "delete"
+      },
+      "description": "Per-tenant billing usage records projected from completed quota_metering cycles. Keyed by tenant_id; envelope carries cycleId, dimensions, snapshot_at, has_degraded_dimensions, and degraded-dimension keys."
+    }
+  ],
+  "consumes": [
+    {
+      "topic": "console.metering.cycle.completed",
+      "namespace": "platform",
+      "consumerGroup": "billing-export",
+      "description": "quota_metering calculation-cycle completion events carrying cycleId, processedScopes, snapshotTimestamp, and degradedDimensions."
+    }
+  ]
+}

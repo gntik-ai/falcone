@@ -167,6 +167,12 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@types/node@20.19.37)(jsdom@25.0.1)(vite@6.4.2(@types/node@20.19.37)(jiti@1.21.7)(yaml@2.8.3))
 
+  services/billing-export:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+
   services/event-gateway: {}
 
   services/internal-contracts: {}
