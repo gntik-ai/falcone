@@ -6,6 +6,8 @@
   "description": "Test-only HTTP shim that adapts plain HTTP requests to Falcone OpenWhisk-style action handlers (params in / {statusCode,body} out) and injects a real pg Pool. Imports the product actions from the bind-mounted repo as-is.",
   "main": "server.mjs",
   "dependencies": {
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "jose": "^5.10.0",
+    "jwks-rsa": "^3.2.2"
   }
 }

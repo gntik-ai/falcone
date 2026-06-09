@@ -13,6 +13,11 @@
 #     claims:  tenant_id, workspace_id  (from user attributes) and
 #              actor_roles (realm roles, comma-joined, single string)
 #     plus the standard `sub` (subject) APISIX maps to x-auth-subject.
+#   - a `scopes` mapper (multivalued ARRAY, from the backup_scopes attribute) used
+#     ONLY by the backup-status family, which validates the token IN-ACTION and
+#     reads claims.scopes itself (the gateway never sees this claim). e2e-user gets
+#     backup_scopes=["backup-status:read:own"]; e2e-superadmin gets
+#     ["backup-status:read:global"].
 #
 # These claims are what APISIX proxy-rewrite injects as x-tenant-id /
 # x-workspace-id / x-actor-roles / x-auth-subject into the upstream request.
@@ -179,6 +184,28 @@ create_mapper "actor_scopes" '{
   }
 }'
 
+# scopes <- user attribute backup_scopes (multivalued ARRAY). The backup-status
+# action validates the Bearer JWT itself and reads claims.scopes (array) OR
+# claims.scope (space-split string) — NOT the actor_scopes claim the gateway
+# families use. Emitting a SEPARATE multivalued `scopes` claim from the
+# backup_scopes attribute keeps the backup-status auth matrix independent of the
+# trusted-header families. multivalued:true makes Keycloak serialise the claim as
+# a JSON array, which the action consumes directly as claims.scopes.
+create_mapper "scopes" '{
+  "name":"scopes",
+  "protocol":"openid-connect",
+  "protocolMapper":"oidc-usermodel-attribute-mapper",
+  "config":{
+    "user.attribute":"backup_scopes",
+    "claim.name":"scopes",
+    "jsonType.label":"String",
+    "multivalued":"true",
+    "id.token.claim":"true",
+    "access.token.claim":"true",
+    "userinfo.token.claim":"true"
+  }
+}'
+
 # 6. Test user with attributes + role.
 # actor_type must be one of the create model's accepted values; tenant_owner is a
 # realistic privileged caller. actor_scopes carries the admin config export scope
@@ -200,7 +227,8 @@ else
     -s "attributes.tenant_id=$TENANT_ID" \
     -s "attributes.workspace_id=$WORKSPACE_ID" \
     -s "attributes.actor_type=$ACTOR_TYPE" \
-    -s "attributes.actor_scopes=$ACTOR_SCOPE" >/dev/null
+    -s "attributes.actor_scopes=$ACTOR_SCOPE" \
+    -s 'attributes.backup_scopes=backup-status:read:own' >/dev/null
   USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1)
   log "created user $USERNAME ($USER_ID)"
 fi
@@ -219,8 +247,9 @@ dc "$KC" update "users/$USER_ID" -r "$REALM" \
   -s "attributes.tenant_id=[\"$TENANT_ID\"]" \
   -s "attributes.workspace_id=[\"$WORKSPACE_ID\"]" \
   -s "attributes.actor_type=[\"$ACTOR_TYPE\"]" \
-  -s "attributes.actor_scopes=[\"$ACTOR_SCOPE\"]" >/dev/null
-log "set password + attributes for $USERNAME (actor_type=$ACTOR_TYPE actor_scope=$ACTOR_SCOPE)"
+  -s "attributes.actor_scopes=[\"$ACTOR_SCOPE\"]" \
+  -s 'attributes.backup_scopes=["backup-status:read:own"]' >/dev/null
+log "set password + attributes for $USERNAME (actor_type=$ACTOR_TYPE actor_scope=$ACTOR_SCOPE backup_scopes=read:own)"
 
 # Grant the realm role to the user (idempotent).
 dc "$KC" add-roles -r "$REALM" --uusername "$USERNAME" --rolename "$ROLE" >/dev/null 2>&1 \
@@ -250,7 +279,8 @@ else
     -s 'requiredActions=[]' \
     -s "attributes.tenant_id=$TENANT_ID" \
     -s "attributes.workspace_id=$WORKSPACE_ID" \
-    -s 'attributes.actor_type=superadmin' >/dev/null
+    -s 'attributes.actor_type=superadmin' \
+    -s 'attributes.backup_scopes=backup-status:read:global' >/dev/null
   SUPER_USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$SUPER_USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1)
   log "created user $SUPER_USERNAME ($SUPER_USER_ID)"
 fi
@@ -264,7 +294,8 @@ dc "$KC" update "users/$SUPER_USER_ID" -r "$REALM" \
   -s 'requiredActions=[]' \
   -s "attributes.tenant_id=[\"$TENANT_ID\"]" \
   -s "attributes.workspace_id=[\"$WORKSPACE_ID\"]" \
-  -s 'attributes.actor_type=["superadmin"]' >/dev/null
-log "set password + attributes for $SUPER_USERNAME (actor_type=superadmin)"
+  -s 'attributes.actor_type=["superadmin"]' \
+  -s 'attributes.backup_scopes=["backup-status:read:global"]' >/dev/null
+log "set password + attributes for $SUPER_USERNAME (actor_type=superadmin backup_scopes=read:global)"
 
 echo "Keycloak realm '$REALM' provisioned for the scheduling HTTP slice."
