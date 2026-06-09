@@ -9,37 +9,11 @@ import { getRegistry, KNOWN_DOMAINS } from '../collectors/registry.mjs';
 import { insertExportAuditLog } from '../repositories/config-export-audit-repository.mjs';
 import { publishExportCompleted } from '../events/config-export-events.mjs';
 import { getChecksum } from '../schemas/index.mjs';
+import { parseConfigIdentity } from './tenant-config-identity.mjs';
 
 const FORMAT_VERSION = '1.0.0';
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_MAX_ARTIFACT_BYTES = 10_485_760; // 10 MB
-
-/**
- * Extract and validate JWT claims from OpenWhisk params.
- * @returns {{ actor_id: string, actor_type: string, scopes: string[] } | null}
- */
-function extractAuth(params) {
-  // In OpenWhisk, JWT claims are typically decoded by the gateway and forwarded.
-  // For this action, we trust the gateway-validated claims in params.
-  const authHeader = params?.__ow_headers?.authorization ?? '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-
-  try {
-    // Decode JWT payload (base64url); we do NOT verify signature here — APISIX does that.
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf-8'));
-    const roles = payload.realm_access?.roles ?? [];
-    const scopes = (payload.scope ?? '').split(' ').filter(Boolean);
-    let actor_type = null;
-    if (roles.includes('superadmin')) actor_type = 'superadmin';
-    else if (roles.includes('sre')) actor_type = 'sre';
-    else if (payload.azp && !roles.includes('tenant_owner') && scopes.includes('platform:admin:config:export')) actor_type = 'service_account';
-
-    return actor_type ? { actor_id: payload.sub ?? payload.preferred_username ?? 'unknown', actor_type, scopes } : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Race a promise against a timeout.
@@ -77,12 +51,12 @@ export async function main(params = {}, overrides = {}) {
   const correlationId = `req-${randomUUID().slice(0, 12)}`;
 
   // --- Auth ---
-  const auth = overrides.auth ?? extractAuth(params);
+  const auth = overrides.auth ?? parseConfigIdentity(params);
   if (!auth) {
-    return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:export' } };
+    return { statusCode: 401, body: { code: 'UNAUTHORIZED', error: 'Unauthorized: missing identity headers' } };
   }
-  if (!auth.scopes?.includes('platform:admin:config:export') && !overrides.auth) {
-    return { statusCode: 403, body: { error: 'Forbidden: missing scope platform:admin:config:export' } };
+  if (!auth.actor_type || (!auth.scopes?.includes('platform:admin:config:export') && !overrides.auth)) {
+    return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:export' } };
   }
 
   // --- Tenant ---

@@ -10,7 +10,8 @@ import { buildMockRegistry, stubCollector, timeoutCollector } from './helpers/mo
 const { main } = await import('../../../services/provisioning-orchestrator/src/actions/tenant-config-export.mjs');
 
 const AUTH_SUPERADMIN = { actor_id: 'admin@test.com', actor_type: 'superadmin', scopes: ['platform:admin:config:export'] };
-const AUTH_TENANT_OWNER = null; // tenant_owner does not have the scope
+// tenant_owner: identity present but no admin scope → actor_type null → 403
+const AUTH_TENANT_OWNER = { actor_id: 'owner@test.com', actor_type: null, roles: ['tenant_owner'], scopes: ['openid', 'profile'] };
 const noopAudit = async () => ({ id: 'audit-id' });
 const noopPublish = async () => ({ published: false });
 const log = { error: () => {}, warn: () => {}, info: () => {} };
