@@ -263,12 +263,57 @@ local function plan_rate_cache_ttl_seconds()
   return tonumber(os.getenv("SCOPE_ENFORCEMENT_PLAN_CACHE_TTL_SECONDS") or "30") or 30
 end
 
--- Hook point for the control-plane plan-quota lookup. Returns the per-tenant
--- requests/minute ceiling for a plan, or nil when it cannot be resolved. The
--- resolved value mirrors internal-contracts resolveTenantRateLimit(); the live
--- value is supplied by the sidecar and cached here. Returns nil by default so
--- the static YAML floor remains authoritative until the lookup is wired in.
-function _M.fetch_plan_requests_per_minute(_plan_id, _metric_key)
+-- Live control-plane plan-quota lookup. Performs an HTTP GET against the
+-- plan-quota source and returns the numeric per-tenant requests/minute ceiling
+-- for (plan_id, metric_key), mirroring internal-contracts
+-- resolveTenantEffectiveCapabilities. The endpoint is SCOPE_ENFORCEMENT_PLAN_QUOTA_URL
+-- when set, else derived from SCOPE_ENFORCEMENT_SIDECAR_URL by swapping a trailing
+-- "/denials" for "/plan-quota" (same sidecar used for denial events). The response
+-- body is JSON carrying the ceiling under "requests_per_minute" (or "value"/"limit").
+-- Returns nil on any failure (no plan id, non-200, parse error, missing/non-numeric
+-- field, or transport error) so the caller falls back to the static YAML floor (D3).
+-- Caching is the caller's responsibility (resolve_tenant_rate_limit / plan_rate_limit_cache).
+function _M.fetch_plan_requests_per_minute(plan_id, metric_key)
+  if not plan_id or not metric_key then
+    return nil
+  end
+
+  local url = os.getenv("SCOPE_ENFORCEMENT_PLAN_QUOTA_URL")
+  if not url then
+    local base = os.getenv("SCOPE_ENFORCEMENT_SIDECAR_URL") or "http://127.0.0.1:19092/denials"
+    local swapped, n = base:gsub("/denials$", "/plan-quota")
+    url = (n > 0) and swapped or (base .. "/plan-quota")
+  end
+
+  local ok, value = pcall(function()
+    local http = require("resty.http")
+    local client = http.new()
+    client:set_timeout(tonumber(os.getenv("SCOPE_ENFORCEMENT_PLAN_LOOKUP_TIMEOUT_MS") or "200") or 200)
+    local res = client:request_uri(url, {
+      method = "GET",
+      query = { plan_id = plan_id, metric_key = metric_key },
+      headers = { ["Accept"] = "application/json" }
+    })
+    if not res or res.status ~= 200 or not res.body then
+      return nil
+    end
+    local decoded = core.json.decode(res.body)
+    if type(decoded) ~= "table" then
+      return nil
+    end
+    local ceiling = decoded.requests_per_minute or decoded.value or decoded.limit
+    if type(ceiling) == "number" then
+      return ceiling
+    end
+    if type(ceiling) == "string" then
+      return tonumber(ceiling)
+    end
+    return nil
+  end)
+
+  if ok and type(value) == "number" then
+    return value
+  end
   return nil
 end
 
