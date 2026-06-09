@@ -15,7 +15,10 @@ mkdir -p ./vault/audit
 chmod 777 ./vault/audit 2>/dev/null || true
 
 echo "==> docker compose up"
-docker compose up -d
+# --build so the action-runner shim image always reflects the current
+# tests/env/action-runner/ source (routes.mjs/server.mjs). Without it, compose
+# reuses a stale cached image and new routes silently 404.
+docker compose up -d --build
 
 echo "==> waiting for backing-service health (postgres, keycloak, redpanda)"
 for i in $(seq 1 60); do
@@ -99,6 +102,25 @@ for f in "$ROOT"/services/scheduling-engine/migrations/*.sql; do
     && echo "   applied $(basename "$f")" || echo "   skipped $(basename "$f") (already applied?)"
 done
 
+echo "==> applying provisioning-orchestrator async-operation migrations to Postgres"
+# Only the migrations the async-operation HTTP slice needs: the async_operations
+# table + the columns the create/query actions read. Applied in dependency order
+# (073 creates the table other migrations ALTER / reference).
+#   073 async_operations + transitions
+#   074 async_operation_log_entries
+#   075 idempotency_key_records + retry_attempts (+ attempt_count/max_retries cols)
+#   076 timeout/cancel/recovery cols + operation_policies (+ status-check widening)
+#   078 failure-classification + intervention cols/tables
+PO_MIGRATIONS="$ROOT/services/provisioning-orchestrator/src/migrations"
+for m in 073-async-operation-tables 074-async-operation-log-entries \
+         075-idempotency-retry-tables 076-timeout-cancel-recovery \
+         078-retry-semantics-intervention; do
+  f="$PO_MIGRATIONS/$m.sql"
+  [ -f "$f" ] || { echo "   MISSING $m.sql" >&2; continue; }
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test < "$f" >/dev/null 2>&1 \
+    && echo "   applied $m" || echo "   skipped $m (already applied?)"
+done
+
 # ---- HTTP request-chain slice (scheduling only) ----------------------------
 # Concrete tenant/workspace the slice user is bound to (mirrors env.sh).
 E2E_TENANT_ID="${E2E_TENANT_ID:-11111111-1111-1111-1111-111111111111}"
@@ -128,7 +150,7 @@ echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin)
 echo "  MinIO console          : http://localhost:59001"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
-echo "  API gateway (APISIX)   : http://localhost:9080  (route /v1/scheduling/*)"
+echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions)"
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
 echo "  Keycloak realm (slice) : falcone-e2e  client=falcone-e2e-client user=e2e-user/e2e-password"
 echo
