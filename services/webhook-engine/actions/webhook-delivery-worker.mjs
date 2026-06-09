@@ -90,7 +90,11 @@ export async function main(params) {
 
   const delivery = await db.getDeliveryById(deliveryId);
   const subscription = await db.getSubscription(delivery.subscription_id);
-  const secretRows = revealSecretRecords(await db.listSecrets(subscription.id), env);
+  // Scope the secret lookup to the owning tenant. The injected db layer applies
+  // an AND tenant_id = $N AND workspace_id = $M predicate so that a known or
+  // guessed subscription_id alone can never load another tenant's secrets into
+  // the signing context.
+  const secretRows = revealSecretRecords(await db.listSecrets(subscription.id, subscription.tenant_id, subscription.workspace_id), env);
   const secret = secretRows.find((row) => row.status === 'active') ?? secretRows[0];
   const event = await db.getEvent(delivery.event_id);
   const payloadEnvelope = buildPayloadEnvelope(delivery, event);
