@@ -12,32 +12,11 @@ import { acquireLock, releaseLock, failLock } from '../repositories/config-repro
 import { insertReprovisionAuditLog } from '../repositories/config-reprovision-audit-repository.mjs';
 import { publishReprovisionCompleted } from '../events/config-reprovision-events.mjs';
 import { isSameMajor } from '../schemas/index.mjs';
+import { parseConfigIdentity } from './tenant-config-identity.mjs';
 
 const SUPPORTED_FORMAT_MAJOR = process.env.CONFIG_IMPORT_SUPPORTED_FORMAT_MAJOR ?? '1';
 const DEFAULT_APPLIER_TIMEOUT_MS = 10_000;
 const DEFAULT_LOCK_TTL_MS = 120_000;
-
-/**
- * Extract and validate JWT claims.
- */
-function extractAuth(params) {
-  const authHeader = params?.__ow_headers?.authorization ?? '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf-8'));
-    const roles = payload.realm_access?.roles ?? [];
-    const scopes = (payload.scope ?? '').split(' ').filter(Boolean);
-    let actor_type = null;
-    if (roles.includes('superadmin')) actor_type = 'superadmin';
-    else if (roles.includes('sre')) actor_type = 'sre';
-    else if (payload.azp && !roles.includes('tenant_owner') && scopes.includes('platform:admin:config:reprovision')) actor_type = 'service_account';
-    return actor_type ? { actor_id: payload.sub ?? payload.preferred_username ?? 'unknown', actor_type, scopes } : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Race a promise against a timeout.
@@ -74,12 +53,12 @@ export async function main(params = {}, overrides = {}) {
   const correlationId = `req-${randomUUID().slice(0, 12)}`;
 
   // --- Auth ---
-  const auth = overrides.auth ?? extractAuth(params);
+  const auth = overrides.auth ?? parseConfigIdentity(params);
   if (!auth) {
-    return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:reprovision' } };
+    return { statusCode: 401, body: { code: 'UNAUTHORIZED', error: 'Unauthorized: missing identity headers' } };
   }
-  if (!auth.scopes?.includes('platform:admin:config:reprovision') && !overrides.auth) {
-    return { statusCode: 403, body: { error: 'Forbidden: missing scope platform:admin:config:reprovision' } };
+  if (!auth.actor_type || (!auth.scopes?.includes('platform:admin:config:reprovision') && !overrides.auth)) {
+    return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:reprovision' } };
   }
 
   // --- Tenant ---
