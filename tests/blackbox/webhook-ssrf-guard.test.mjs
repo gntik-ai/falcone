@@ -138,13 +138,11 @@ test('bbx-webhook-ssrf-06: legitimate public HTTPS URL is accepted → 201', asy
 });
 
 // -------------------------------------------------------------------------
-// bbx-webhook-ssrf-07: DNS-rebinding — delivery-time re-validation
-// A URL valid at registration time later resolves to a blocked IP.
-// The delivery must be aborted (no HTTP call) and recorded as permanently_failed.
+// Shared delivery-db factory for delivery-worker black-box tests
 // -------------------------------------------------------------------------
-test('bbx-webhook-ssrf-07: DNS rebinding at delivery time → abort, permanently_failed, no http call', async () => {
+function makeDeliveryDb(targetUrl = 'https://hooks.example.com/endpoint') {
   const encrypted = encryptSecret('signing-secret', 'test-signing-key');
-  const deliveryDb = {
+  return {
     state: {
       deliveries: new Map([['d1', {
         id: 'd1',
@@ -161,8 +159,7 @@ test('bbx-webhook-ssrf-07: DNS rebinding at delivery time → abort, permanently
         id: 's1',
         tenant_id: 't1',
         workspace_id: 'w1',
-        // DNS name (not IP literal) so delivery-time re-resolution fires
-        target_url: 'https://hooks.example.com/endpoint',
+        target_url: targetUrl,
         status: 'active',
         consecutive_failures: 0
       }]]),
@@ -191,7 +188,15 @@ test('bbx-webhook-ssrf-07: DNS rebinding at delivery time → abort, permanently
       return row;
     }
   };
+}
 
+// -------------------------------------------------------------------------
+// bbx-webhook-ssrf-07: DNS-rebinding — delivery-time re-validation
+// A URL valid at registration time later resolves to a blocked IP.
+// The delivery must be aborted (no HTTP call) and recorded as permanently_failed.
+// -------------------------------------------------------------------------
+test('bbx-webhook-ssrf-07: DNS rebinding at delivery time → abort, permanently_failed, no http call', async () => {
+  const deliveryDb = makeDeliveryDb();
   let httpCalled = false;
   const http = async () => {
     httpCalled = true;
@@ -216,4 +221,114 @@ test('bbx-webhook-ssrf-07: DNS rebinding at delivery time → abort, permanently
   assert.equal(httpCalled, false, 'http must NOT be called when SSRF guard triggers');
   const delivery = deliveryDb.state.deliveries.get('d1');
   assert.equal(delivery.status, 'permanently_failed', `expected permanently_failed but got ${delivery.status}`);
+});
+
+// -------------------------------------------------------------------------
+// bbx-webhook-rebind: DNS-rebinding re-validation (alias / req-1 explicit)
+// Same guard as ssrf-07; explicit name for the spec scenario.
+// -------------------------------------------------------------------------
+test('bbx-webhook-rebind: rebind to blocked IP at delivery → permanently_failed, http NOT called', async () => {
+  const deliveryDb = makeDeliveryDb();
+  let httpCalled = false;
+  const http = async () => { httpCalled = true; return new Response('', { status: 200 }); };
+  const resolver = async () => ['192.168.1.100'];  // RFC-1918 private
+  const scheduler = { main: async () => ({ status: 'scheduled' }), invoker: { invoke: async () => {} } };
+
+  await deliveryMain({
+    db: deliveryDb,
+    kafka: { publish: async () => {} },
+    scheduler, http, resolver,
+    deliveryId: 'd1',
+    env: { WEBHOOK_SIGNING_KEY: 'test-signing-key', WEBHOOK_MAX_PAYLOAD_BYTES: '524288', WEBHOOK_RESPONSE_TIMEOUT_MS: '5000' }
+  });
+
+  assert.equal(httpCalled, false, 'http must NOT be called on rebind');
+  const delivery = deliveryDb.state.deliveries.get('d1');
+  assert.equal(delivery.status, 'permanently_failed', `expected permanently_failed but got ${delivery.status}`);
+});
+
+// -------------------------------------------------------------------------
+// bbx-webhook-pin-01: IP pinning (req-2)
+// After validation, the HTTP call must use the exact pinned address from the
+// resolver. A fake dispatcherFactory records the address it was given; a fake
+// http records the dispatcher it received. Asserts pinning without undici.
+// -------------------------------------------------------------------------
+test('bbx-webhook-pin-01: delivery pins HTTP connection to the validated IP address', async () => {
+  const deliveryDb = makeDeliveryDb();
+  const PINNED_IP = '203.0.113.10';  // TEST-NET-3, public documentation IP
+  const resolver = async () => [PINNED_IP];
+
+  // Sentinel dispatcher object so we can test identity equality
+  const sentinelDispatcher = { isSentinel: true };
+
+  let factoryCalledWith = null;
+  const dispatcherFactory = async ({ address, family }) => {
+    factoryCalledWith = { address, family };
+    return sentinelDispatcher;
+  };
+
+  let httpCalledWithDispatcher = null;
+  const http = async (url, opts) => {
+    httpCalledWithDispatcher = opts?.dispatcher ?? null;
+    return new Response('', { status: 200 });
+  };
+
+  const scheduler = { main: async () => ({ status: 'scheduled' }), invoker: { invoke: async () => {} } };
+
+  const result = await deliveryMain({
+    db: deliveryDb,
+    kafka: { publish: async () => {} },
+    scheduler, http, resolver,
+    dispatcherFactory,
+    deliveryId: 'd1',
+    env: { WEBHOOK_SIGNING_KEY: 'test-signing-key', WEBHOOK_MAX_PAYLOAD_BYTES: '524288', WEBHOOK_RESPONSE_TIMEOUT_MS: '5000' }
+  });
+
+  assert.equal(result.status, 'succeeded', `expected succeeded but got ${result.status}`);
+  assert.ok(factoryCalledWith !== null, 'dispatcherFactory must be called');
+  assert.equal(factoryCalledWith.address, PINNED_IP, `dispatcherFactory must receive the validated IP, got ${factoryCalledWith?.address}`);
+  assert.strictEqual(httpCalledWithDispatcher, sentinelDispatcher, 'http must receive the sentinel dispatcher from dispatcherFactory');
+});
+
+// -------------------------------------------------------------------------
+// bbx-webhook-redirect-01: redirect to blocked IP (req-3)
+// A 302 whose Location resolves to a blocked address must permanently_fail.
+// http is called once (the initial POST) but redirect is NOT followed.
+// -------------------------------------------------------------------------
+test('bbx-webhook-redirect-01: 302 redirect to blocked IP → permanently_failed, redirect not followed', async () => {
+  const deliveryDb = makeDeliveryDb();
+  // Public IP for initial delivery target
+  const resolver = async (hostname) => {
+    if (hostname === 'hooks.example.com') return ['203.0.113.10'];
+    if (hostname === 'evil.example') return ['169.254.169.254'];
+    return ['93.184.216.34'];
+  };
+
+  let httpCallCount = 0;
+  const http = async () => {
+    httpCallCount += 1;
+    // Return a 302 redirect to a hostname that resolves to a blocked IP
+    return new Response(null, {
+      status: 302,
+      headers: { location: 'https://evil.example/x' }
+    });
+  };
+
+  // No-op dispatcherFactory (pinning)
+  const dispatcherFactory = async () => ({ isFake: true });
+  const scheduler = { main: async () => ({ status: 'scheduled' }), invoker: { invoke: async () => {} } };
+
+  const result = await deliveryMain({
+    db: deliveryDb,
+    kafka: { publish: async () => {} },
+    scheduler, http, resolver,
+    dispatcherFactory,
+    deliveryId: 'd1',
+    env: { WEBHOOK_SIGNING_KEY: 'test-signing-key', WEBHOOK_MAX_PAYLOAD_BYTES: '524288', WEBHOOK_RESPONSE_TIMEOUT_MS: '5000' }
+  });
+
+  assert.equal(result.status, 'permanently_failed', `expected permanently_failed but got ${result.status}`);
+  assert.equal(httpCallCount, 1, 'http must be called exactly once (no redirect following)');
+  const delivery = deliveryDb.state.deliveries.get('d1');
+  assert.equal(delivery.status, 'permanently_failed', `delivery record must be permanently_failed, got ${delivery.status}`);
 });
