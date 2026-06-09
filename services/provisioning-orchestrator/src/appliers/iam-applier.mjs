@@ -94,6 +94,89 @@ export async function apply(tenantId, domainData, options = {}) {
   return { domain_key, status, resource_results, counts, message: null };
 }
 
+/**
+ * Symmetric reverse of {@link apply}: deletes the tenant's Keycloak realm using
+ * the SAME injected kcApi. Idempotent (a 404 means the realm is already gone)
+ * and honors options.dryRun. Returns a DomainResult.
+ *
+ * @param {string} tenantId
+ * @param {Object} domainData
+ * @param {Object} options
+ * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
+ */
+export async function teardown(tenantId, domainData = {}, options = {}) {
+  const { dryRun = false, credentials = {}, log = console } = options;
+  const domain_key = 'iam';
+  const counts = zeroCounts();
+  const resource_results = [];
+
+  const keycloakUrl = credentials.keycloakUrl ?? process.env.CONFIG_IMPORT_KEYCLOAK_URL;
+  const clientId = credentials.clientId ?? process.env.CONFIG_IMPORT_KEYCLOAK_ADMIN_CLIENT_ID;
+  const clientSecret = credentials.clientSecret ?? process.env.CONFIG_IMPORT_KEYCLOAK_ADMIN_SECRET;
+  const realm = domainData?.realm ?? tenantId;
+
+  const getAdminToken = credentials.getAdminToken ?? (async () => {
+    const normalizedKeycloakUrl = normalizeServiceBaseUrl(keycloakUrl, 'CONFIG_IMPORT_KEYCLOAK_URL', {
+      allowBareInternalHttp: true,
+    });
+    const tokenUrl = buildServiceUrl(normalizedKeycloakUrl, 'realms/master/protocol/openid-connect/token');
+    const res = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret }),
+    });
+    const data = await res.json();
+    return data.access_token;
+  });
+
+  // Realm-level kcApi: the path is relative to admin/realms/{realm}. An empty
+  // path targets the realm itself; DELETE removes the entire realm.
+  const kcApi = credentials.kcApi ?? (async (method, path, body) => {
+    const token = await getAdminToken();
+    const normalizedKeycloakUrl = normalizeServiceBaseUrl(keycloakUrl, 'CONFIG_IMPORT_KEYCLOAK_URL', {
+      allowBareInternalHttp: true,
+    });
+    const realmPath = encodePathSegment(realm, 'realm');
+    const url = buildServiceUrl(normalizedKeycloakUrl, `admin/realms/${realmPath}${path}`);
+    const opts = { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(url, opts);
+  });
+
+  try {
+    if (!dryRun) {
+      const res = await kcApi('DELETE', '');
+      const ok = res?.ok === true || res?.status === 204 || res?.status === 200 || res?.status === 404;
+      if (!ok) {
+        throw new Error(`Keycloak realm deletion failed with status ${res?.status ?? 'unknown'}`);
+      }
+    }
+    resource_results.push({
+      resource_type: 'realm',
+      resource_name: realm,
+      resource_id: realm,
+      action: dryRun ? 'would_remove' : 'removed',
+      message: null,
+      warnings: [],
+      diff: null,
+    });
+  } catch (err) {
+    resource_results.push({
+      resource_type: 'realm',
+      resource_name: realm,
+      resource_id: realm,
+      action: 'error',
+      message: err.message,
+      warnings: [],
+      diff: null,
+    });
+    counts.errors++;
+  }
+
+  const status = counts.errors > 0 ? 'error' : (dryRun ? 'would_apply' : 'applied');
+  return { domain_key, status, resource_results, counts, message: null };
+}
+
 async function _processResource(resourceType, item, { dryRun, kcApi, realm, log }) {
   const name = item.name ?? item.alias ?? 'unknown';
   const warnings = [];
