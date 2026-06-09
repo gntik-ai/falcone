@@ -8636,6 +8636,414 @@
         "application/json"
       ],
       "audiences": [
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "keycloak"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "iam",
+      "familyTitle": "IAM",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "GET",
+      "operationId": "listTenantCustomRoles",
+      "path": "/v1/iam/tenant-roles",
+      "planCapabilityAnyOf": [
+        "identity.sso.oidc"
+      ],
+      "qosBurst": 60,
+      "rateLimitClass": "catalog",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "iam_custom_role",
+      "scope": "tenant",
+      "summary": "List tenant-authored custom RBAC roles scoped to the caller",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "IAM",
+        "IAMCustomRoles"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "keycloak"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "iam",
+      "familyTitle": "IAM",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "POST",
+      "operationId": "createTenantCustomRole",
+      "path": "/v1/iam/tenant-roles",
+      "planCapabilityAnyOf": [
+        "identity.sso.oidc"
+      ],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "iam_custom_role",
+      "scope": "tenant",
+      "summary": "Create a tenant-authored custom RBAC role bounded by the creator's permissions",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "IAM",
+        "IAMCustomRoles"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "keycloak"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "iam",
+      "familyTitle": "IAM",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "DELETE",
+      "operationId": "deleteTenantCustomRole",
+      "path": "/v1/iam/tenant-roles/{roleId}",
+      "planCapabilityAnyOf": [
+        "identity.sso.oidc"
+      ],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "iam_custom_role",
+      "scope": "tenant",
+      "summary": "Soft-delete a tenant custom RBAC role and trigger effective-permissions recalculation",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "IAM",
+        "IAMCustomRoles"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "keycloak"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "iam",
+      "familyTitle": "IAM",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "GET",
+      "operationId": "getTenantCustomRole",
+      "path": "/v1/iam/tenant-roles/{roleId}",
+      "planCapabilityAnyOf": [
+        "identity.sso.oidc"
+      ],
+      "qosBurst": 60,
+      "rateLimitClass": "catalog",
+      "requiredHeaders": [
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "iam_custom_role",
+      "scope": "tenant",
+      "summary": "Fetch one tenant custom RBAC role scoped to the caller's tenant",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "IAM",
+        "IAMCustomRoles"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "tenant_admin",
+        "workspace_admin",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "keycloak"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "iam",
+      "familyTitle": "IAM",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "tenant_control",
+      "gatewayRequestValidationProfile": "tenant_control",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "control",
+      "gatewayTimeoutProfile": "control_plane",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 262144,
+      "method": "PUT",
+      "operationId": "updateTenantCustomRole",
+      "path": "/v1/iam/tenant-roles/{roleId}",
+      "planCapabilityAnyOf": [
+        "identity.sso.oidc"
+      ],
+      "qosBurst": 60,
+      "rateLimitClass": "control-write",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "iam_custom_role",
+      "scope": "tenant",
+      "summary": "Replace a tenant custom RBAC role's bound actions with the same validation as create",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "IAM",
+        "IAMCustomRoles"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "optional"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
         "tenant_owner",
         "tenant_admin",
         "tenant_viewer",
