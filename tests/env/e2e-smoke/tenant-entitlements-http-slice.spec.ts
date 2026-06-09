@@ -55,7 +55,7 @@ test.describe('tenant effective entitlements HTTP slice @api', () => {
     await ctx.dispose();
   });
 
-  test('tenant_owner reads its OWN tenant entitlements (200, catalog defaults)', async () => {
+  test('tenant_owner reads its OWN tenant entitlements (200, plan-derived limits)', async () => {
     const token = await getAccessToken(USERNAME, PASSWORD);
     const ctx = await pwRequest.newContext({
       extraHTTPHeaders: { Authorization: `Bearer ${token}` },
@@ -64,10 +64,16 @@ test.describe('tenant effective entitlements HTTP slice @api', () => {
     const res = await ctx.get(`${APISIX}/v1/tenant/entitlements`);
     expect(res.status(), await res.text()).toBe(200);
     const body = await res.json();
-    // Unseeded tenant: one catalog_default quantitative limit per dimension, no plan.
+    // up.sh assigned plan 'e2e-pro-plan' (max_workspaces=50) to tenant A, so the
+    // limits are plan-derived, not catalog defaults: planSlug is set and the
+    // max_workspaces dimension resolves to source='plan' with effectiveValue 50.
     expect(Array.isArray(body.quantitativeLimits)).toBeTruthy();
     expect(body.quantitativeLimits.length).toBeGreaterThan(0);
-    expect(body.planSlug).toBeNull();
+    expect(body.planSlug).toBe('e2e-pro-plan');
+    const mw = body.quantitativeLimits.find((x: any) => x.dimensionKey === 'max_workspaces');
+    expect(mw, 'max_workspaces dimension present').toBeTruthy();
+    expect(mw.source).toBe('plan');
+    expect(Number(mw.effectiveValue)).toBe(50);
 
     await ctx.dispose();
   });
@@ -97,6 +103,8 @@ test.describe('tenant effective entitlements HTTP slice @api', () => {
     const body = await res.json();
     expect(Array.isArray(body.quantitativeLimits)).toBeTruthy();
     expect(body.quantitativeLimits.length).toBeGreaterThan(0);
+    // superadmin cross-scoping into tenant A sees the SAME real plan-derived data.
+    expect(body.planSlug).toBe('e2e-pro-plan');
 
     await ctx.dispose();
   });
