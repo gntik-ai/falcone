@@ -141,7 +141,50 @@ create_mapper "actor_roles" '{
   }
 }'
 
+# actor_type <- user attribute actor_type. The provisioning-orchestrator
+# async-operation actions read x-actor-type via buildCallerContext, and the
+# create model only accepts actor_type in
+# {workspace_admin, tenant_owner, superadmin, tenant_member}. APISIX injects this
+# claim as the x-actor-type header.
+create_mapper "actor_type" '{
+  "name":"actor_type",
+  "protocol":"openid-connect",
+  "protocolMapper":"oidc-usermodel-attribute-mapper",
+  "config":{
+    "user.attribute":"actor_type",
+    "claim.name":"actor_type",
+    "jsonType.label":"String",
+    "id.token.claim":"true",
+    "access.token.claim":"true",
+    "userinfo.token.claim":"true"
+  }
+}'
+
+# actor_scopes <- user attribute actor_scopes (multivalued). The tenant-config
+# action family (parseConfigIdentity) reads x-actor-scopes and requires the
+# platform:admin:config:export scope for format-versions. APISIX serialises the
+# array into the injected x-actor-scopes header.
+create_mapper "actor_scopes" '{
+  "name":"actor_scopes",
+  "protocol":"openid-connect",
+  "protocolMapper":"oidc-usermodel-attribute-mapper",
+  "config":{
+    "user.attribute":"actor_scopes",
+    "claim.name":"actor_scopes",
+    "jsonType.label":"String",
+    "multivalued":"true",
+    "id.token.claim":"true",
+    "access.token.claim":"true",
+    "userinfo.token.claim":"true"
+  }
+}'
+
 # 6. Test user with attributes + role.
+# actor_type must be one of the create model's accepted values; tenant_owner is a
+# realistic privileged caller. actor_scopes carries the admin config export scope
+# the tenant-config format-versions action requires.
+ACTOR_TYPE="${E2E_ACTOR_TYPE:-tenant_owner}"
+ACTOR_SCOPE="${E2E_ACTOR_SCOPE:-platform:admin:config:export}"
 USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1 || true)
 if [ -n "$USER_ID" ]; then
   log "user $USERNAME already exists ($USER_ID)"
@@ -155,7 +198,9 @@ else
     -s lastName=User \
     -s 'requiredActions=[]' \
     -s "attributes.tenant_id=$TENANT_ID" \
-    -s "attributes.workspace_id=$WORKSPACE_ID" >/dev/null
+    -s "attributes.workspace_id=$WORKSPACE_ID" \
+    -s "attributes.actor_type=$ACTOR_TYPE" \
+    -s "attributes.actor_scopes=$ACTOR_SCOPE" >/dev/null
   USER_ID=$(dc "$KC" get users -r "$REALM" -q username="$USERNAME" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r' | head -n1)
   log "created user $USERNAME ($USER_ID)"
 fi
@@ -172,8 +217,10 @@ dc "$KC" update "users/$USER_ID" -r "$REALM" \
   -s lastName=User \
   -s 'requiredActions=[]' \
   -s "attributes.tenant_id=[\"$TENANT_ID\"]" \
-  -s "attributes.workspace_id=[\"$WORKSPACE_ID\"]" >/dev/null
-log "set password + attributes for $USERNAME"
+  -s "attributes.workspace_id=[\"$WORKSPACE_ID\"]" \
+  -s "attributes.actor_type=[\"$ACTOR_TYPE\"]" \
+  -s "attributes.actor_scopes=[\"$ACTOR_SCOPE\"]" >/dev/null
+log "set password + attributes for $USERNAME (actor_type=$ACTOR_TYPE actor_scope=$ACTOR_SCOPE)"
 
 # Grant the realm role to the user (idempotent).
 dc "$KC" add-roles -r "$REALM" --uusername "$USERNAME" --rolename "$ROLE" >/dev/null 2>&1 \
