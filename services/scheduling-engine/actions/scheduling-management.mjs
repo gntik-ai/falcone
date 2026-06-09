@@ -1,6 +1,6 @@
 import { buildJobRecord, applyTransition, applyNextRunAt, VALID_TRANSITIONS } from '../src/job-model.mjs';
 import { validateCronExpression } from '../src/cron-validator.mjs';
-import { checkJobCreationQuota, checkResumeQuota, getActiveJobCount } from '../src/quota.mjs';
+import { checkJobCreationQuota, checkResumeQuota, getActiveJobCount, assertCronFloor } from '../src/quota.mjs';
 import { getConfig, isSchedulingEnabled, upsertConfig, getActiveJobsToSuspend } from '../src/config-model.mjs';
 import { jobCreatedEvent, jobUpdatedEvent, jobPausedEvent, jobResumedEvent, jobDeletedEvent, capabilityToggledEvent, quotaExceededEvent } from '../src/audit.mjs';
 
@@ -152,6 +152,8 @@ export default async function main(params) {
       if (!validation.valid) {
         return errorResponse(400, 'INVALID_CRON_EXPRESSION', validation.error);
       }
+      try { assertCronFloor(params.body.cronExpression, config.min_interval_seconds); }
+      catch (err) { return errorResponse(422, 'CRON_BELOW_FLOOR', err.message); }
       await requireTargetAction(params, params.body.targetAction, identity.workspaceId);
       const activeCount = await getActiveJobCount(pg, identity.tenantId, identity.workspaceId);
       const quota = checkJobCreationQuota(activeCount, config.max_active_jobs);
@@ -237,6 +239,9 @@ export default async function main(params) {
       if (params.body.cronExpression) {
         const validation = validateCronExpression(params.body.cronExpression);
         if (!validation.valid) return errorResponse(400, 'INVALID_CRON_EXPRESSION', validation.error);
+        const config = await getConfig(pg, identity.tenantId, identity.workspaceId);
+        try { assertCronFloor(params.body.cronExpression, config.min_interval_seconds); }
+        catch (err) { return errorResponse(422, 'CRON_BELOW_FLOOR', err.message); }
       }
       if (params.body.targetAction) {
         await requireTargetAction(params, params.body.targetAction, identity.workspaceId);
