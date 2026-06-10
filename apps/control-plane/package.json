@@ -1,11 +1,16 @@
 {
   "name": "@in-falcone/control-plane",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.7.0",
   "type": "module",
+  "main": "src/runtime/main.mjs",
   "scripts": {
+    "start": "node src/runtime/main.mjs",
     "lint": "node -e \"console.log('control-plane lint placeholder')\"",
     "test": "node -e \"console.log('control-plane test placeholder')\"",
     "typecheck": "node -e \"console.log('control-plane typecheck placeholder')\""
+  },
+  "dependencies": {
+    "pg": "8.14.1"
   }
 }

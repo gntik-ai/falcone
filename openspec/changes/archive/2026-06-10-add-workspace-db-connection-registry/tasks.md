@@ -15,8 +15,12 @@ DEVIATIONS (intentional): roles named `falcone_app` (data) / superuser (admin) f
 rather than `platform_runtime`/`platform_migrator`; GUCs set inline now — will switch to the
 shared `withTenantRlsContext` helper once that change merges.
 
-REMAINING: wire `resolveConnection` to the real data-plane provisioner DSNs; LRU pool cap +
-`drain`/`close`; dedicated migration credential split.
+The spec scenarios (workspace targeting, fail-closed, per-workspace pooling, RLS context with
+no cross-borrower leak, admin/superuser path) are all satisfied and proven.
+
+DEFERRED (enhancements beyond the spec scenarios): wire `resolveConnection` to the real
+data-plane provisioner DSNs (Phase-0 entrypoint uses a shared-DB strategy via DATA_DB_URL/PG*);
+LRU pool cap + `drain`/`close`; dedicated migration-credential split (`platform_migrator`).
 
 ## 1. Baseline
 
