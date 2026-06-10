@@ -2100,10 +2100,12 @@ controlPlane:
   serviceAccount:
     create: true
     name: ""
-    # The control-plane runs the function executor (creates Knative Services via the
-    # k8s API), so it needs its SA token mounted. RBAC granted by
-    # templates/control-plane-rbac.yaml (functionExecutor.enabled).
-    automountToken: true
+    # Least-privilege baseline: SA token NOT mounted by default (enforced by
+    # scripts/validate-deployment-chart.mjs for every component). The function
+    # executor needs the token to create Knative Services via the k8s API, so
+    # overlays that enable functions set this to true (deploy/kind/values-kind.yaml,
+    # deploy/openshift/values-openshift.yaml). RBAC: templates/control-plane-rbac.yaml.
+    automountToken: false
   # Function executor (Knative): RBAC + the per-function runtime image. The data-plane
   # connection env (PG/KEYCLOAK/MINIO/MONGO/KAFKA host+secret refs) is environment-
   # specific (release-prefixed service DNS + external secrets) and lives in the overlay

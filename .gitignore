@@ -33,3 +33,6 @@ kubeconfig-test-cluster-b.yaml
 # kind dev runtime: abandoned OpenWhisk attempt + browser verification screenshots
 deploy/kind/openwhisk/
 deploy/kind/.uiout/
+
+# kind web-console build output (served by static-server.mjs)
+deploy/kind/web-console/dist/

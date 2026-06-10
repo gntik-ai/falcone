@@ -57,17 +57,22 @@ keycloak:
     fsGroup: null
     fsGroupChangePolicy: null
 
-# Control-plane runtime. The chart now ships the executor RBAC
-# (templates/control-plane-rbac.yaml, gated by controlPlane.functionExecutor.enabled)
-# and defaults serviceAccount.automountToken: true, so only the env (environment-
-# specific) is set here. NOTE: the *HOST values below are <release>-<component>
-# service DNS — they assume `helm install <RELEASE>` with RELEASE matching the prefix
-# (here: falcone). Adjust if you use a different release name. Secret refs should be
-# satisfied by ESO/Vault-provisioned Secrets (the chart creates none).
+# Control-plane runtime. The chart ships the executor RBAC
+# (templates/control-plane-rbac.yaml, gated by controlPlane.functionExecutor.enabled);
+# this overlay enables the SA token (chart default is false) + sets the env. NOTE: the
+# *HOST values below are <release>-<component> service DNS — they assume
+# `helm install <RELEASE>` with RELEASE matching the prefix (here: falcone). Adjust if
+# you use a different release name. Secret refs should be satisfied by ESO/Vault-
+# provisioned Secrets (the chart creates none).
 controlPlane:
   image:
     repository: ghcr.io/gntik-ai/in-falcone-control-plane   # global.imageRegistry => harbor.example.com/falcone/gntik-ai/in-falcone-control-plane
     tag: "0.6.2"
+  serviceAccount:
+    # Function executor calls the k8s API (create/patch Knative Services), so the SA
+    # token MUST be mounted here. The chart default is false (least-privilege baseline,
+    # enforced by validate-deployment-chart.mjs); enable it in this functions overlay.
+    automountToken: true
   podSecurityContext:                                       # SCC: let the namespace range set fsGroup
     fsGroup: null
     fsGroupChangePolicy: null

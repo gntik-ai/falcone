@@ -231,7 +231,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
     if (path === '/healthz' || path === '/readyz') {
       try { await pool.query('SELECT 1'); return sendJson(res, 200, { status: 'ok' }); }
-      catch (e) { return sendJson(res, 503, { status: 'db_unavailable', error: String(e.message ?? e) }); }
+      catch (e) { console.error('[control-plane] healthz db check failed:', e); return sendJson(res, 503, { status: 'db_unavailable' }); }
     }
     if (path === '/') return sendJson(res, 200, { service: 'in-falcone-control-plane', routes: ROUTES.length });
 
@@ -245,7 +245,7 @@ const server = http.createServer(async (req, res) => {
     let identity = null;
     if (route.auth !== 'public') {
       try { identity = await authenticate(headers); }
-      catch (e) { return sendJson(res, 401, { code: 'INVALID_TOKEN', message: String(e.message ?? e) }); }
+      catch (e) { console.error('[control-plane] token verification failed:', e); return sendJson(res, 401, { code: 'INVALID_TOKEN', message: 'Token verification failed' }); }
       if (!identity) return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing or invalid Bearer token' });
       if (!authzOk(route, identity)) return sendJson(res, 403, { code: 'FORBIDDEN', message: `requires ${route.auth}` });
     }
@@ -306,8 +306,12 @@ const server = http.createServer(async (req, res) => {
     }
     sendJson(res, result?.statusCode ?? 200, result?.body ?? null, respHeaders);
   } catch (err) {
+    // Log the full error (incl. stack) server-side only; never echo an exception's
+    // message/stack to the client (stack-trace exposure). Return the stable code.
+    console.error('[control-plane] request failed:', err);
     const statusCode = err?.statusCode ?? (err?.code === 'FORBIDDEN' ? 403 : 500);
-    sendJson(res, statusCode, { code: err?.code ?? 'CONTROL_PLANE_ERROR', message: String(err?.message ?? err) });
+    const code = err?.code ?? 'CONTROL_PLANE_ERROR';
+    sendJson(res, statusCode, { code, message: statusCode >= 500 ? 'Internal server error' : code });
   }
 });
 
