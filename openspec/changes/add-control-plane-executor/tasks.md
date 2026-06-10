@@ -1,3 +1,24 @@
+## Implementation status (increment 1 — keystone proven)
+
+DONE and green against real Postgres (`bash tests/env/executor/run.sh`, 13/13):
+- Executor-over-adapter-plans for the Postgres data-row family (list/get/insert/update/delete):
+  `apps/control-plane/src/runtime/postgres-data-executor.mjs` introspects the table, calls
+  `buildPostgresDataApiPlan`, and EXECUTES the returned `sql:{text,values}` against the
+  workspace DB (closing the spec-only gap). Insert stamps tenant_id/workspace_id from the
+  verified identity (anti-spoof); reads are tenant-scoped by the adapter's injected predicate.
+- Runnable HTTP service `apps/control-plane/src/runtime/server.mjs`: identity from gateway
+  headers (x-tenant-id/x-workspace-id/x-auth-subject), route matching, `/healthz`, sanitized
+  errors (no stack/SQL leak), 401 missing identity, 404 NO_ROUTE / TABLE_NOT_FOUND.
+- Real-stack tests: `tests/env/executor/postgres-data-executor.test.mjs` +
+  `control-plane-http.test.mjs`.
+
+DEVIATIONS from the plan below (intentional): code lives under `src/runtime/`; identity header
+is `x-tenant-id` (align to `X-Verified-*` once the gateway header contract is finalized).
+
+REMAINING (next increments): generalize the route loader to ALL OpenAPI families (currently
+postgres-data rows only); finer PG error-code mapping (23505→409, 23503→422, 08*→502);
+Dockerfile (§4) + Helm image wiring (§5); then verify + archive.
+
 ## 0. Prerequisite check
 
 - [ ] 0.1 Confirm `add-workspace-db-connection-registry` is applied (or confirm tests/env PG* env-var fallback is sufficient for the first slice); document which path is taken

@@ -1,3 +1,23 @@
+## Implementation status (increment 1)
+
+DONE and proven against real Postgres (`bash tests/env/executor/run.sh`):
+- `apps/control-plane/src/runtime/connection-registry.mjs` — `createConnectionRegistry({resolveConnection})`
+  with `withWorkspaceClient(workspaceId,{tenantId,workspaceId},fn)` = connect → BEGIN →
+  `set_config('app.tenant_id'|'app.workspace_id', …, true)` (SET LOCAL) → fn → COMMIT/ROLLBACK →
+  release; per-DSN pooling; fail-closed (503 `WORKSPACE_DB_UNRESOLVED`) on an unresolved workspace;
+  separate `withAdminClient` (superuser/bypass) path. The injected `resolveConnection(workspaceId)`
+  is the DSN seam to the data-plane provisioner.
+- Verified by the executor proof: queries run under the correct tenant context, the SET LOCAL
+  context does not leak across pooled borrowers (it's per-transaction), and data role is a
+  non-superuser/non-BYPASSRLS login role.
+
+DEVIATIONS (intentional): roles named `falcone_app` (data) / superuser (admin) for the proof
+rather than `platform_runtime`/`platform_migrator`; GUCs set inline now — will switch to the
+shared `withTenantRlsContext` helper once that change merges.
+
+REMAINING: wire `resolveConnection` to the real data-plane provisioner DSNs; LRU pool cap +
+`drain`/`close`; dedicated migration credential split.
+
 ## 1. Baseline
 
 - [ ] 1.1 Confirm baseline green: `bash tests/blackbox/run.sh`
