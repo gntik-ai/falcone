@@ -13,6 +13,7 @@
 #   [15-16] quota dimensions    /v1/quota-dimensions             (GET 200 + seeded catalog, superadmin)
 #   [17-20] entitlements        /v1/tenant/entitlements          (tenant-scoped: own 200 plan-derived limits + IDOR 403)
 #   [21-26] backup-status       /v1/backups/status               (IN-ACTION JWKS auth: seeded own 200 + data-leak probe + IDOR 403 + scope 403 + global 200 sees shared)
+#   [27-29] plan change-history /v1/plans/change-history          (superadmin-only: 401 + tenant_owner 403 + superadmin 200 seeded upgrade trail)
 #
 # Steps 0-10 use the tenant_owner user; steps 11-16 use the dedicated superadmin
 # user (the plan/quota actions require actor.type 'superadmin'). Steps 17-20 are
@@ -329,8 +330,35 @@ SG_OK=$(printf '%s' "$SGBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=
 [ "$SG_OK" = "true" ] || fail "superadmin global view should show tenant_id:null + BOTH tenant-a-primary-db AND the shared-platform-objectstore row (technical scope sees shared): $SGBODY"
 pass "backup-status superadmin global view -> 200 (tenant_id null; technical scope sees own + shared rows)"
 
+# ---- plan change-history family (provisioning-orchestrator) -----------------
+# Per-tenant plan-change audit trail. Superadmin/internal only (a tenant_owner
+# -> 403). up.sh seeded tenant A with a starter->pro upgrade trail (2 entries):
+# an 'initial_assignment' (starter) and an 'upgrade' (starter -> pro). The active
+# plan stays e2e-pro-plan, so the entitlements assertions above are unaffected.
+
+echo "==> [27] gateway rejects unauthenticated plan change-history request"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$APISIX/v1/plans/change-history?tenantId=$E2E_TENANT_ID")
+[ "$code" = "401" ] || fail "expected 401 without token on /v1/plans/change-history, got $code"
+pass "plan change-history unauthenticated -> 401"
+
+echo "==> [28] AUTHZ PROBE: tenant_owner GET /v1/plans/change-history -> 403 (superadmin/internal only)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$APISIX/v1/plans/change-history?tenantId=$E2E_TENANT_ID")
+[ "$code" = "403" ] || fail "expected 403 for tenant_owner reading plan change-history (superadmin-only), got $code"
+pass "authz enforced: tenant_owner plan change-history -> 403 (superadmin/internal only)"
+
+echo "==> [29] superadmin GET /v1/plans/change-history?tenantId=A -> 200 with the seeded upgrade trail"
+PCH=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $STOKEN" "$APISIX/v1/plans/change-history?tenantId=$E2E_TENANT_ID")
+PCHBODY=$(printf '%s' "$PCH" | sed '$d')
+PCHCODE=$(printf '%s' "$PCH" | tail -n1)
+[ "$PCHCODE" = "200" ] || fail "expected 200 for superadmin plan change-history, got $PCHCODE: $PCHBODY"
+# Expect >=2 entries whose change directions include BOTH 'initial_assignment'
+# (onto starter) and 'upgrade' (starter -> pro) — the seeded trail.
+PCH_OK=$(printf '%s' "$PCHBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const items=j.items||[];const dirs=items.map(x=>x.changeDirection);process.stdout.write(String(Array.isArray(items)&&(j.total>=2)&&dirs.includes("initial_assignment")&&dirs.includes("upgrade")))})')
+[ "$PCH_OK" = "true" ] || fail "plan change-history should contain the seeded initial_assignment + upgrade trail (total>=2): $PCHBODY"
+pass "superadmin plan change-history -> 200 (seeded trail: initial_assignment + upgrade, total>=2)"
+
 echo
-echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements, backup-status} actions -> Postgres."
+echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements, backup-status, plan-change-history} actions -> Postgres."
 echo "  scheduling           : 401 + POST 201 + list"
 echo "  async-operation      : 401 + POST 200 + detail + list"
 echo "  tenant-config formats: 401 + GET 200 + body"
@@ -338,3 +366,4 @@ echo "  plan catalog         : 401 + tenant_owner 403 + superadmin POST 201 + li
 echo "  quota dimensions     : 401 + superadmin GET 200 + seeded catalog"
 echo "  entitlements (tenant): 401 + tenant_owner own 200 (plan e2e-pro-plan, max_workspaces source=plan=50) + IDOR cross-tenant 403 + superadmin scoped 200"
 echo "  backup-status (JWKS) : scopes claim verified + in-action 401 + own 200 (seeded row) + DATA-LEAK probe (no tenant-B shared row) + IDOR 403 + scope-403 + superadmin global 200 (sees own + shared)"
+echo "  plan change-history   : 401 + tenant_owner 403 (superadmin-only) + superadmin GET 200 (seeded initial_assignment + upgrade trail)"
