@@ -271,6 +271,42 @@ export const routes = [
     setClientModule: '/repo/services/backup-status/src/db/repository.js',
     mergeQueryIntoParams: true,
   },
+
+  // ---- workspace sub-quota (provisioning-orchestrator) ---------------------
+  // SET: POST /v1/workspace-sub-quotas  -> workspace-sub-quota-set::main
+  //   Allocates a per-workspace slice of a tenant quota dimension. Tenant-scoped:
+  //   a tenant_owner may set ONLY within its own tenant (authorize compares
+  //   actor.tenantId to params.tenantId -> 403 on mismatch); a workspace_admin is
+  //   further pinned to its workspaceId. The action resolves the tenant's
+  //   effective limit (resolveUnifiedEntitlements) and rejects an allocation that
+  //   would exceed it with 422 (SUB_QUOTA_EXCEEDS_TENANT_LIMIT). Reads flat body
+  //   fields (tenantId, workspaceId, dimensionKey, allocatedValue) -> mergeBody.
+  //   Returns 201 (new) / 200 (updated or unchanged). Writes workspace_sub_quotas
+  //   (migration 105).
+  {
+    name: 'workspace-sub-quota-set',
+    pathRegex: /^\/v1\/workspace-sub-quotas\/?$/,
+    methods: ['POST'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/workspace-sub-quota-set.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeBodyIntoParams: true,
+  },
+
+  // LIST: GET /v1/workspace-sub-quotas?tenantId=&workspaceId=  -> workspace-sub-quota-list::main
+  //   Same tenant-scoping authz as set. Reads flat query fields (tenantId,
+  //   workspaceId, dimensionKey, limit, offset). Returns 200 with { items, total }.
+  {
+    name: 'workspace-sub-quota-list',
+    pathRegex: /^\/v1\/workspace-sub-quotas\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/workspace-sub-quota-list.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeQueryIntoParams: true,
+  },
 ];
 
 export function matchRoute(method, path) {
