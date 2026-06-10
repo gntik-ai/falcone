@@ -54,6 +54,7 @@ before(async () => {
     )`);
   await admin.query(`DROP ROLE IF EXISTS ${APP_LOGIN}`);
   await admin.query(`CREATE ROLE ${APP_LOGIN} LOGIN PASSWORD '${APP_PW}' NOSUPERUSER NOBYPASSRLS`);
+  await admin.query('CREATE UNIQUE INDEX notes_tenant_body_uq ON public.notes (tenant_id, body)');
   await admin.query(`GRANT USAGE ON SCHEMA public TO ${APP_LOGIN}`);
   await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON public.notes TO ${APP_LOGIN}`);
 
@@ -163,6 +164,13 @@ test('unknown table → 404 client error (sanitized)', async () => {
   await assert.rejects(
     () => executePostgresData(registry, { ...reqBase(TEN_A, WS_A), operation: 'list', tableName: 'does_not_exist' }),
     (e) => e.statusCode === 404 && e.code === 'TABLE_NOT_FOUND',
+  );
+});
+
+test('unique violation → 409 (sanitized, no SQL/detail leak)', async () => {
+  await assert.rejects(
+    () => executePostgresData(registry, { ...reqBase(TEN_A, WS_A), operation: 'insert', values: { body: 'a-one' } }),
+    (e) => e.statusCode === 409 && e.code === 'UNIQUE_VIOLATION' && !/notes_tenant_body_uq|INSERT/i.test(e.message),
   );
 });
 
