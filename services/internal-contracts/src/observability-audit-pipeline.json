@@ -137,7 +137,8 @@
       ],
       "optional_event_categories": [
         "workspace_lifecycle_change",
-        "tenant_governance_change"
+        "tenant_governance_change",
+        "residency_violation"
       ],
       "emission_freshness_threshold_seconds": 120,
       "scope_attribution": "both"
