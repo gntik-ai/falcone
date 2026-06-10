@@ -14,11 +14,20 @@ export async function getTotalAllocatedExcluding({ tenantId, dimensionKey, exclu
       .filter((row) => row.tenantId === tenantId && row.dimensionKey === dimensionKey && row.workspaceId !== excludeWorkspaceId)
       .reduce((sum, row) => sum + Number(row.allocatedValue), 0);
   }
+  // Lock the sibling sub-quota rows (FOR UPDATE) and sum them. The FOR UPDATE
+  // MUST sit on a non-aggregate subquery: Postgres rejects FOR UPDATE combined
+  // with an aggregate ("FOR UPDATE is not allowed with aggregate functions",
+  // SQLSTATE 0A000), so a top-level `SELECT SUM(...) ... FOR UPDATE` errors at
+  // runtime. The inner query takes the row locks; the outer aggregates them —
+  // preserving the intended pessimistic lock against concurrent over-allocation.
   const { rows } = await pgClient.query(
     `SELECT COALESCE(SUM(allocated_value), 0) AS total
-       FROM workspace_sub_quotas
-      WHERE tenant_id = $1 AND dimension_key = $2 AND workspace_id <> $3
-      FOR UPDATE`,
+       FROM (
+         SELECT allocated_value
+           FROM workspace_sub_quotas
+          WHERE tenant_id = $1 AND dimension_key = $2 AND workspace_id <> $3
+          FOR UPDATE
+       ) locked_rows`,
     [tenantId, dimensionKey, excludeWorkspaceId]
   );
   return Number(rows[0]?.total ?? 0);
