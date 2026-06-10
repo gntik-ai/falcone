@@ -1,7 +1,18 @@
 {{- if .Values.enabled }}
 {{- $workloadKind := .Values.wrapper.workload.kind | default "Deployment" -}}
 {{- $podSecurityContext := mergeOverwrite (deepCopy (default (dict) .Values.global.podSecurity)) (default (dict) .Values.podSecurityContext) -}}
-{{- $imagePullSecrets := concat (default (list) .Values.global.imagePullSecrets) (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+{{- /* Normalize pull secrets to a string list: global.imagePullSecrets items are
+       {name: ...} maps; global.privateRegistry.pullSecretNames items are strings
+       (per values.schema.json). The previous concat + `{{ .name | default . }}`
+       crashed on string items, so the private-registry/Harbor path could not render. */ -}}
+{{- $imagePullSecrets := list -}}
+{{- range (default (list) .Values.global.imagePullSecrets) -}}
+  {{- $imagePullSecrets = append $imagePullSecrets (.name | default .) -}}
+{{- end -}}
+{{- range (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+  {{- $imagePullSecrets = append $imagePullSecrets . -}}
+{{- end -}}
+{{- $imagePullSecrets = $imagePullSecrets | uniq -}}
 apiVersion: apps/v1
 kind: {{ $workloadKind }}
 metadata:
@@ -34,7 +45,7 @@ spec:
       {{- if gt (len $imagePullSecrets) 0 }}
       imagePullSecrets:
         {{- range $imagePullSecrets }}
-        - name: {{ .name | default . }}
+        - name: {{ . }}
         {{- end }}
       {{- end }}
       {{- if gt (len $podSecurityContext) 0 }}

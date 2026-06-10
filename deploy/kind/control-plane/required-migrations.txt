@@ -1,0 +1,58 @@
+# Additional DB migrations required by the wireable control-plane routes
+# (route-map.runtime.json), beyond those ALREADY APPLIED to in_falcone:
+#   097, 098, 100, 103, 104, 105  (plans / quota dimensions / change-history /
+#   quota overrides / boolean capabilities / workspace sub-quotas)
+#
+# Apply in NUMERIC order. The numeric prefix already encodes the dependency order;
+# the only hard cross-FILE constraint is 073 BEFORE 074 (FK). All other FKs are
+# intra-file (table created before the table that references it).
+# Paths are repo-relative.
+
+# --- provisioning-orchestrator (services/provisioning-orchestrator/src/migrations) ---
+
+services/provisioning-orchestrator/src/migrations/073-async-operation-tables.sql
+# async_operations, async_operation_transitions — read by async-operation-query (list/detail/result).
+# MUST run before 074 (074 FKs operation_id -> async_operations).
+
+services/provisioning-orchestrator/src/migrations/074-async-operation-log-entries.sql
+# async_operation_log_entries — read by async-operation-query queryType=logs. Depends on 073.
+
+services/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql
+# pg_capture_configs (+ pg_capture_quotas, pg_capture_audit_log) — read by realtime/pg-capture-list
+# via CaptureConfigRepository.findByWorkspace. Intra-file FKs only.
+
+services/provisioning-orchestrator/src/migrations/093-scope-enforcement.sql
+# scope_enforcement_denials (+ endpoint_scope_requirements) — read by scope-enforcement-audit-query
+# (queryDenials from scope-enforcement-repo).
+
+services/provisioning-orchestrator/src/migrations/094-admin-data-privilege-separation.sql
+# privilege_domain_assignments, privilege_domain_denials, privilege_domain_assignment_history,
+# workspace_structural_admin_count — read by privilege-domain-query and privilege-domain-audit-query.
+
+services/provisioning-orchestrator/src/migrations/114-backup-scope-deployment-profiles.sql
+# deployment_profile_registry + backup_scope_entries — read by backup-scope-get and
+# tenant-backup-scope-get. Intra-file FK: backup_scope_entries.profile_key -> deployment_profile_registry
+# (registry created first within the file, so file order is correct).
+
+services/provisioning-orchestrator/src/migrations/115-functional-config-export.sql
+# config_export_audit_log — written by tenant-config-export (insertExportAuditLog).
+
+services/provisioning-orchestrator/src/migrations/117-tenant-config-reprovision.sql
+# tenant_config_reprovision_locks + config_reprovision_audit_log — used by tenant-config-reprovision
+# (acquire/release lock + audit) and tenant-config-identifier-map (audit).
+
+services/provisioning-orchestrator/src/migrations/118-config-preflight.sql
+# config_preflight_audit_log — written by tenant-config-preflight (insertPreflightAuditLog).
+
+# --- scheduling-engine (services/scheduling-engine/migrations) ---
+
+services/scheduling-engine/migrations/001-scheduling-tables.sql
+# scheduling_configurations, scheduled_jobs, scheduled_executions — used by the scheduling route
+# (scheduling-management). Intra-file FK: scheduled_executions.job_id -> scheduled_jobs (file order correct).
+
+# --- NOTES on routes that DEGRADE rather than need a new migration ---
+# * tenant-effective-capabilities-get reads tenant_plan_adjustments, but catches 42P01 (missing table)
+#   and returns {} — NO migration required for that table (none exists in-repo anyway).
+# * tenant-config-validate / tenant-config-migrate / tenant-config-format-versions /
+#   tenant-config-export-domains: pure compute, no DB tables required.
+# * Event emission (kafka), Vault, and object-store writes are no-op/degraded (server injects only db).

@@ -26,3 +26,13 @@ tests/e2e/playwright-report/
 
 # Local cluster kubeconfig (sensitive credentials — never commit)
 kubeconfig-test-cluster-b.yaml
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
+# kind dev runtime: abandoned OpenWhisk attempt + browser verification screenshots
+deploy/kind/openwhisk/
+deploy/kind/.uiout/
+
+# kind web-console build output (served by static-server.mjs)
+deploy/kind/web-console/dist/

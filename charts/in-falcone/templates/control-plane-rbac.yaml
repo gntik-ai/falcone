@@ -1,0 +1,48 @@
+{{- if and .Values.controlPlane.enabled .Values.controlPlane.functionExecutor.enabled }}
+{{- /*
+  RBAC for the control-plane function executor: it manages a Knative Service per
+  function (deploy = create/patch ksvc, invoke = HTTP) and reads execution logs.
+  Namespace-scoped (not privileged / not cluster-wide). On OpenShift this replaces
+  the standalone deploy/kind/control-plane/executor-rbac.yaml so the chart is
+  self-contained. Bound to the control-plane ServiceAccount.
+*/ -}}
+{{- $saName := default (printf "%s-control-plane" .Release.Name) .Values.controlPlane.serviceAccount.name -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-function-executor
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+rules:
+  # Knative-backed function execution: manage the per-function Knative Services.
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # legacy Job-based executor fallback + reading execution logs
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-function-executor
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-function-executor
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName }}
+    namespace: {{ .Values.global.namespace }}
+{{- end }}
