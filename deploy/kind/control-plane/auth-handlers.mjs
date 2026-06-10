@@ -128,6 +128,8 @@ async function signup(ctx) {
   }
 }
 
-function randomId() { return 'cs_' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+// Session identifier — cryptographically strong (not Math.random, which is a
+// security-sensitive context: this id identifies the console session).
+function randomId() { return 'cs_' + randomUUID().replace(/-/g, ''); }
 
 export const AUTH_HANDLERS = { login, refresh, logout, signupPolicy, signup };

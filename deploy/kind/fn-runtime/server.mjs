@@ -44,8 +44,11 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ status: 'success', result: result === undefined ? {} : result, logs }));
     } catch (e) {
+      // Full stack to pod stdout (operators); return only the message to the caller
+      // — never the stack trace (stack-trace exposure).
+      console.error('[fn-runtime] action threw:', e);
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ status: 'failure', result: { error: String((e && e.stack) || e) }, logs }));
+      res.end(JSON.stringify({ status: 'failure', result: { error: e instanceof Error ? e.message : String(e) }, logs }));
     }
   });
 });
