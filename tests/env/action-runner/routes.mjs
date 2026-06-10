@@ -168,6 +168,27 @@ export const routes = [
     mergeQueryIntoParams: true,
   },
 
+  // ---- plan change history (provisioning-orchestrator) ---------------------
+  // QUERY: GET /v1/plans/change-history?tenantId=<id>  -> plan-change-history-query::main
+  //   Per-tenant audit trail of plan assignments/supersessions. Requires
+  //   actor.type 'superadmin' or 'internal' (a tenant_owner -> 403). Reads flat
+  //   query fields (tenantId [required], page, pageSize) and the
+  //   tenant_plan_change_history table (migration 100). Returns 200 with
+  //   { items, total, page, pageSize } where each item carries changeDirection,
+  //   previousPlanId, newPlanId, effectiveAt + quota/capability impact arrays.
+  //   NOTE the more specific /v1/plans/change-history regex is distinct from the
+  //   exact /v1/plans regex above, so route order does not matter.
+  {
+    name: 'plan-change-history-query',
+    pathRegex: /^\/v1\/plans\/change-history\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/plan-change-history-query.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeQueryIntoParams: true,
+  },
+
   // ---- quota dimension catalog (provisioning-orchestrator) -----------------
   // LIST: GET /v1/quota-dimensions  -> quota-dimension-catalog-list::main
   //   No params beyond identity; reads the quota_dimension_catalog table
