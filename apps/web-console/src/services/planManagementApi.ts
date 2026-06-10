@@ -1,3 +1,6 @@
+import { requestConsoleSessionJson } from '@/lib/console-session'
+import type { ApiError, JsonValue } from '@/lib/http'
+
 export type PlanStatus = 'draft' | 'active' | 'deprecated' | 'archived'
 export type EffectiveValueKind = 'bounded' | 'unlimited' | 'missing'
 export type QuotaComparison = 'increased' | 'decreased' | 'unchanged' | 'added' | 'removed'
@@ -172,22 +175,25 @@ export class PlanApiError extends Error {
   }
 }
 
+// Route plan/quota calls through the authenticated console session client (Bearer
+// token + on-401 refresh). The previous implementation used a bare fetch with no
+// Authorization header, so every plan call 401'd against the control-plane.
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', 'X-API-Version': '2026-03-26' },
-    ...init
-  })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const error = payload?.error ?? payload ?? {}
-    throw new PlanApiError({
-      message: error.message ?? `Request failed with status ${response.status}`,
-      code: error.code,
-      detail: error.detail,
-      status: response.status
-    })
+  const method = (init?.method ?? 'GET') as 'GET' | 'POST' | 'PUT' | 'DELETE'
+  let body: JsonValue | undefined
+  if (typeof init?.body === 'string') {
+    try {
+      body = JSON.parse(init.body) as JsonValue
+    } catch {
+      body = undefined
+    }
   }
-  return payload as T
+  try {
+    return await requestConsoleSessionJson<T>(url, { method, body })
+  } catch (rawError) {
+    const error = rawError as ApiError
+    throw new PlanApiError({ message: error.message, code: error.code, detail: error.detail, status: error.status })
+  }
 }
 
 function withSearch(url: string, params: Record<string, string | number | undefined>) {
@@ -200,9 +206,15 @@ function withSearch(url: string, params: Record<string, string | number | undefi
 
 export const isConflictError = (error: unknown, code?: string) => error instanceof PlanApiError && error.status === 409 && (!code || error.code === code)
 
-export function listPlans(params: { status?: PlanStatus | 'all'; page?: number; pageSize?: number } = {}) {
+export async function listPlans(params: { status?: PlanStatus | 'all'; page?: number; pageSize?: number } = {}) {
   const { status, page = 1, pageSize = 20 } = params
-  return request<PaginationEnvelope<PlanRecord>>(withSearch('/v1/plans', { status: status === 'all' ? undefined : status, page, pageSize }))
+  // The control-plane plan-list action returns the collection under `plans`; the
+  // console expects `items`. Normalize so the catalog table populates.
+  const res = await request<PaginationEnvelope<PlanRecord> & { plans?: PlanRecord[] }>(
+    withSearch('/v1/plans', { status: status === 'all' ? undefined : status, page, pageSize })
+  )
+  const items = res.items ?? res.plans ?? []
+  return { items, total: res.total ?? items.length, page: res.page ?? page, pageSize: res.pageSize ?? pageSize }
 }
 
 export function createPlan(body: Record<string, unknown>) { return request<PlanRecord>('/v1/plans', { method: 'POST', body: JSON.stringify(body) }) }
