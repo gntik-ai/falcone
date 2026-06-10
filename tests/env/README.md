@@ -52,7 +52,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 
 These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
 | action-runner | `http://localhost:8090` (`/healthz`) | TEST-ONLY HTTP shim that runs real product actions with per-route dependency injection (HTTP-slice only) |
-| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/plans/change-history`, `/v1/quota-dimensions`, `/v1/tenant/entitlements`, `/v1/backups/status`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only). **Exception:** `/v1/backups/status` is a **plain proxy** — that family authenticates **in-action** (see below). |
+| APISIX   | `http://localhost:9080` (`/v1/scheduling/*`, `/v1/async-operations`, `/v1/admin/config/format-versions`, `/v1/plans`, `/v1/plans/change-history`, `/v1/quota-dimensions`, `/v1/tenant/entitlements`, `/v1/workspace-sub-quotas`, `/v1/backups/status`) | API gateway: validates the Keycloak JWT and injects identity headers (HTTP-slice only). **Exception:** `/v1/backups/status` is a **plain proxy** — that family authenticates **in-action** (see below). |
 
 ### Keycloak model (matches production)
 
@@ -118,6 +118,7 @@ Families behind the gateway (each exercised by the smoke test):
 | plan catalog | `POST /v1/plans`, `GET /v1/plans` | `provisioning-orchestrator/src/actions/plan-create.mjs` + `plan-list.mjs` | `params-callercontext-overrides` — `main(params, overrides)`, `overrides.db` = pg Pool, `params.callerContext` built from headers; **superadmin only** |
 | quota dimensions | `GET /v1/quota-dimensions` | `provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`; **superadmin only** |
 | plan change-history | `GET /v1/plans/change-history?tenantId=<id>` | `provisioning-orchestrator/src/actions/plan-change-history-query.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`, `?tenantId`/`?page` flattened (`mergeQueryIntoParams`); **superadmin/internal only** — reads `tenant_plan_change_history` (per-tenant plan-change audit trail) |
+| workspace sub-quota | `POST /v1/workspace-sub-quotas`, `GET /v1/workspace-sub-quotas` | `provisioning-orchestrator/src/actions/workspace-sub-quota-set.mjs` + `workspace-sub-quota-list.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext` (body merged for set, query for list); **tenant-scoped write** — a `tenant_owner` sets only within its own tenant (cross-tenant body `tenantId` → 403), an allocation over the tenant's effective limit → 422; writes `workspace_sub_quotas` (migration 105) |
 | tenant entitlements | `GET /v1/tenant/entitlements` | `provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs` | `params-callercontext-overrides` — db via `overrides.db`, identity via `params.callerContext`, `?tenantId` flattened (`mergeQueryIntoParams`); **first tenant-scoped family** — a `tenant_owner` reads only its own tenant (cross-tenant `?tenantId` → 403); superadmin may cross-scope |
 | backup-status | `GET /v1/backups/status` | `backup-status/src/api/backup-status.action.js` | `params-owhttp` — `main(params)`, **in-action JWKS auth** (NOT gateway headers): the action reads the Bearer token itself and verifies the JWT signature against `KEYCLOAK_JWKS_URL`, then derives tenant + scopes from the token's own claims; uses the product's OWN module-level pg client (shim primes it via `setClient`, `setClientModule`); `?tenant_id` flattened (`mergeQueryIntoParams`). **First in-action-auth family** — tenant/scope matrix: own-tenant `read:own` vs global `read:global` (cross-tenant `?tenant_id` → 403; global view without `read:global` → 403) |
 
@@ -182,6 +183,19 @@ The smoke run covers all seven families end-to-end:
   `GET /v1/plans/change-history?tenantId=<A>` → 200 whose `items` (`total` ≥ 2)
   include both an `initial_assignment` and an `upgrade` `changeDirection`. The
   Playwright mirror is `plan-change-history-http-slice.spec.ts`.
+- **workspace sub-quota** (tenant-scoped **write** family with an **IDOR probe**
+  AND a **quota-enforcement probe**) — allocates a per-workspace slice of a tenant
+  quota dimension. 401 unauthenticated; then the `tenant_owner` `e2e-user`
+  `POST /v1/workspace-sub-quotas` for `max_workspaces=10` (≤ tenant A's
+  plan-derived limit of 50) → **2xx** (`201` on first create, `200` on re-run —
+  the set is idempotent-but-stateful, so the smoke asserts any 2xx + the stored
+  value); then the **limit probe** `max_workspaces=999` (> 50) → **422**
+  (`SUB_QUOTA_EXCEEDS_TENANT_LIMIT`); then the **IDOR probe** — the same
+  `tenant_owner` POSTing with a body `tenantId` = `<TENANT_B>` → **403** (it may
+  write only within its own tenant); then `GET /v1/workspace-sub-quotas` → 200
+  whose `items` include the `max_workspaces=10` allocation. Needs migration
+  `105-effective-limit-resolution` (the `workspace_sub_quotas` table). The
+  Playwright mirror is `workspace-sub-quota-http-slice.spec.ts`.
 - **tenant entitlements** (the **first tenant-scoped family**, with a cross-tenant
   **IDOR probe**, over **real plan-derived limits**) — `up.sh` assigns plan
   `e2e-pro-plan` (`quota_dimensions={"max_workspaces":50}`) to tenant A, so the
