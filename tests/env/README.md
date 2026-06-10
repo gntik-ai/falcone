@@ -103,7 +103,7 @@ drives the actual `createKeycloakTenantNameResolver` against the live Keycloak
 `up.sh` also boots an **API-level vertical slice** that runs Falcone's real HTTP
 request chain end-to-end for several action families:
 
-```
+```text
 Keycloak (JWT)  ->  APISIX (auth + identity-header inject)  ->  action-runner shim
                 ->  product action (real, imported as-is)  ->  Postgres
 ```
