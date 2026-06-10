@@ -1,3 +1,19 @@
+## Implementation status (Phase 1 — DONE)
+
+Implemented + proven against real Postgres (`bash tests/env/executor/run.sh`):
+- Row CRUD (list/get/insert/update/delete) executed via the adapter plan in the Phase-0 keystone
+  (`apps/control-plane/src/runtime/postgres-data-executor.mjs`), under the caller's tenant scope;
+  insert/bulk stamp tenant_id/workspace_id from the verified identity (anti-spoof).
+- This change adds **bulk_insert** execution (multi-row INSERT via the adapter's batch plan) and
+  **countMode=exact** (runs the adapter's count plan), plus the HTTP routes (`server.mjs`): the
+  rows family + POST `.../rows/bulk/insert`.
+- Tests cover: insert→list roundtrip, filter, RLS-scoped get/delete (cross-tenant blocked),
+  WITH-CHECK-style anti-spoof on write, bulk_insert affected-count, countMode=exact, sanitized
+  errors (409 unique violation, 404 unknown table), 401 missing identity — over the executor and HTTP.
+
+DEFERRED (later): RPC execution (needs a DB function fixture); bulk_update/bulk_delete and
+keyset-pagination cursor round-trips beyond the single-page case.
+
 ## 1. Baseline
 
 - [ ] T01 Confirm baseline green: `bash tests/blackbox/run.sh`

@@ -160,6 +160,23 @@ test('delete by primary key is tenant-scoped (cannot delete another tenant row)'
   assert.equal(ownDel.affected, 1);
 });
 
+test('bulk_insert stamps tenant on every row and inserts all', async () => {
+  const res = await executePostgresData(registry, {
+    ...reqBase(TEN_A, WS_A),
+    operation: 'bulk_insert',
+    rows: [{ body: 'bulk1' }, { body: 'bulk2' }, { body: 'bulk3' }],
+  });
+  assert.equal(res.affected, 3);
+  assert.equal(res.items.length, 3);
+  assert.ok(res.items.every((r) => r.tenant_id === TEN_A));
+});
+
+test('list with countMode=exact returns a numeric count', async () => {
+  const res = await executePostgresData(registry, { ...reqBase(TEN_A, WS_A), operation: 'list', countMode: 'exact' });
+  assert.equal(typeof res.count, 'number');
+  assert.equal(res.count, res.items.length, 'count matches the returned rows (within one page)');
+});
+
 test('unknown table → 404 client error (sanitized)', async () => {
   await assert.rejects(
     () => executePostgresData(registry, { ...reqBase(TEN_A, WS_A), operation: 'list', tableName: 'does_not_exist' }),

@@ -52,7 +52,8 @@ before(async () => {
   await admin.query(`INSERT INTO public.notes (tenant_id, workspace_id, body) VALUES ($1,$2,'seed-a')`, [TEN_A, WS_A]);
 
   const appDsn = probeUrl(APP_LOGIN, APP_PW);
-  registry = createConnectionRegistry({ resolveConnection: () => ({ dsn: appDsn }) });
+  // data path = app role; DDL/admin path = superuser probe DSN.
+  registry = createConnectionRegistry({ resolveConnection: () => ({ dsn: appDsn, adminDsn: probeUrl() }) });
   server = createControlPlaneServer({ registry, logger: { error() {} } });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -96,6 +97,27 @@ test('GET rows lists only the caller tenant rows → 200', async () => {
 test('GET rows without tenant identity → 401', async () => {
   const res = await fetch(`${baseUrl}${rowsPath}`, { headers: { 'content-type': 'application/json' } });
   assert.equal(res.status, 401);
+});
+
+test('POST DDL create table → 201 and the table exists', async () => {
+  const res = await fetch(`${baseUrl}/v1/postgres/databases/appdb/schemas/public/tables`, {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({ tableName: 'http_items', columns: [
+      { columnName: 'id', dataType: 'uuid', nullable: false, constraints: { primaryKey: true } },
+      { columnName: 'label', dataType: 'text' },
+    ] }),
+  });
+  assert.equal(res.status, 201);
+  const r = await admin.query("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='http_items'");
+  assert.equal(r.rowCount, 1);
+});
+
+test('POST bulk insert → 201 affected=2', async () => {
+  const res = await fetch(`${baseUrl}${rowsPath}/bulk/insert`, {
+    method: 'POST', headers: authHeaders, body: JSON.stringify({ rows: [{ body: 'h1' }, { body: 'h2' }] }),
+  });
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).affected, 2);
 });
 
 test('GET unknown path → 404 NO_ROUTE', async () => {

@@ -1,17 +1,15 @@
-// Control-plane HTTP service (change: add-control-plane-executor).
+// Control-plane HTTP service (changes: add-control-plane-executor, add-postgres-ddl-execute,
+// add-postgres-data-crud-execute).
 //
-// The real, runnable control-plane that the gateway routes /v1/* to (replacing the
-// placeholder image). It trusts the identity headers APISIX injects from the verified
-// credential (x-tenant-id / x-workspace-id / x-auth-subject / x-actor-roles), maps the
-// request to a data-API operation, and runs it through the executor (which builds the
-// adapter plan and executes it against the workspace database). This first cut wires the
-// Postgres data-row family end-to-end; other families plug into the same dispatch.
+// The real, runnable control-plane the gateway routes /v1/* to. It trusts the identity
+// headers APISIX injects from the verified credential (x-tenant-id / x-workspace-id /
+// x-auth-subject / x-actor-roles), matches the request against a small route table, and
+// runs it through the executors (which build adapter plans and execute them against the
+// workspace database). Wires the Postgres data-row family (CRUD + bulk) and the Postgres
+// DDL family (schema/table/column/index); other OpenAPI families plug into the same table.
 import http from 'node:http';
 import { executePostgresData } from './postgres-data-executor.mjs';
-
-// /v1/postgres/workspaces/{wid}/data/{db}/schemas/{schema}/tables/{table}/rows[/by-primary-key]
-const ROWS_RE =
-  /^\/v1\/postgres\/workspaces\/([^/]+)\/data\/([^/]+)\/schemas\/([^/]+)\/tables\/([^/]+)\/rows(\/by-primary-key)?$/;
+import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 
 const META_QUERY_KEYS = new Set(['select', 'order', 'page[size]', 'page[after]', 'countMode']);
 
@@ -38,17 +36,13 @@ function identityFromHeaders(headers, pathWorkspaceId) {
     tenantId: headers['x-tenant-id'],
     workspaceId: headers['x-workspace-id'] || pathWorkspaceId,
     actorId: headers['x-auth-subject'],
-    // The gateway injects Keycloak roles; the DB application role is selected here
-    // (anon vs service maps to a DB role in the add-app-api-keys change).
     roleName: headers['x-pg-role'] || 'falcone_app',
   };
 }
 
 function primaryKeyFromQuery(searchParams) {
   const pk = {};
-  for (const [k, v] of searchParams.entries()) {
-    if (!META_QUERY_KEYS.has(k)) pk[k] = v;
-  }
+  for (const [k, v] of searchParams.entries()) if (!META_QUERY_KEYS.has(k)) pk[k] = v;
   return Object.keys(pk).length > 0 ? pk : undefined;
 }
 
@@ -59,47 +53,75 @@ function pageFromQuery(searchParams) {
   return { size: size != null ? Number(size) : undefined, after: after ?? undefined };
 }
 
+// Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
+// Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
+function buildRoutes(registry) {
+  const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
+  const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
+  return [
+    ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
+
+    // ---- Postgres data rows (CRUD + bulk) ----
+    ['GET', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'list', page: pageFromQuery(c.url.searchParams), countMode: c.url.searchParams.get('countMode') ?? undefined }, 200)],
+    ['POST', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.values ?? c.body }, 201)],
+    ['POST', new RegExp(`${data}/rows/bulk/insert$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'bulk_insert', rows: c.body.rows ?? c.body.items }, 201)],
+    ['GET', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'get', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
+    ['PATCH', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'update', primaryKey: primaryKeyFromQuery(c.url.searchParams), changes: c.body.changes ?? c.body }, 200)],
+    ['DELETE', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'delete', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
+
+    // ---- Postgres DDL (schema/table/column/index) ----
+    ['POST', new RegExp(`${ddl}$`), ([db], c) =>
+      runDdl(registry, 'schema', { databaseName: db, schemaName: c.body.schemaName ?? c.body.name }, c)],
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables$`), ([db, s], c) =>
+      runDdl(registry, 'table', { databaseName: db, schemaName: s, ...c.body }, c)],
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/columns$`), ([db, s, t], c) =>
+      runDdl(registry, 'column', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/indexes$`), ([db, s, t], c) =>
+      runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
+  ];
+}
+
+async function run(registry, fn, params, successStatus) {
+  const result = await fn(registry, params);
+  return { status: successStatus, body: result };
+}
+
+async function runDdl(registry, resourceKind, payload, c) {
+  const result = await executePostgresDdl(registry, {
+    resourceKind, action: 'create', payload, identity: c.identity,
+    executionMode: c.url.searchParams.get('mode') === 'preview' || payload.dryRun ? 'preview' : 'execute',
+  });
+  return { status: result.executed === false ? 200 : 201, body: result };
+}
+
 export function createControlPlaneServer({ registry, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
+  const routes = buildRoutes(registry);
 
   return http.createServer(async (req, res) => {
     try {
       const method = (req.method ?? 'GET').toUpperCase();
       const url = new URL(req.url, 'http://control-plane.local');
 
-      if (method === 'GET' && (url.pathname === '/healthz' || url.pathname === '/readyz')) {
-        return sendJson(res, 200, { status: 'ok' });
+      const match = routes.find(([m, re]) => m === method && re.test(url.pathname));
+      if (!match) return sendJson(res, 404, { code: 'NO_ROUTE', message: `No route for ${method} ${url.pathname}` });
+      const [, re, handler, opts] = match;
+      const groups = re.exec(url.pathname).slice(1);
+
+      const identity = identityFromHeaders(req.headers, groups[0]);
+      if (!opts?.noAuth && !identity.tenantId) {
+        return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
       }
-
-      const m = ROWS_RE.exec(url.pathname);
-      if (!m) return sendJson(res, 404, { code: 'NO_ROUTE', message: `No route for ${method} ${url.pathname}` });
-
-      const [, workspaceId, databaseName, schemaName, tableName, byPk] = m;
-      const identity = identityFromHeaders(req.headers, workspaceId);
-      if (!identity.tenantId) return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
-
       const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
-      const base = { workspaceId, databaseName, schemaName, tableName, identity };
 
-      let params;
-      let successStatus = 200;
-      if (!byPk && method === 'GET') {
-        params = { ...base, operation: 'list', filters: body.filters, order: url.searchParams.get('order') ?? undefined, page: pageFromQuery(url.searchParams), countMode: url.searchParams.get('countMode') ?? undefined };
-      } else if (!byPk && method === 'POST') {
-        params = { ...base, operation: 'insert', values: body.values ?? body };
-        successStatus = 201;
-      } else if (byPk && method === 'GET') {
-        params = { ...base, operation: 'get', primaryKey: primaryKeyFromQuery(url.searchParams) };
-      } else if (byPk && method === 'PATCH') {
-        params = { ...base, operation: 'update', primaryKey: primaryKeyFromQuery(url.searchParams), changes: body.changes ?? body };
-      } else if (byPk && method === 'DELETE') {
-        params = { ...base, operation: 'delete', primaryKey: primaryKeyFromQuery(url.searchParams) };
-      } else {
-        return sendJson(res, 405, { code: 'METHOD_NOT_ALLOWED', message: `${method} not allowed on ${url.pathname}` });
-      }
-
-      const result = await executePostgresData(registry, params);
-      return sendJson(res, successStatus, result);
+      const { status, body: out } = await handler(groups, { url, identity, body, registry });
+      return sendJson(res, status, out);
     } catch (err) {
       const statusCode = err.statusCode ?? 500;
       if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
