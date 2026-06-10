@@ -5,6 +5,7 @@
 
 import { compareResources, resolveAction, buildDiff } from '../reprovision/diff.mjs';
 import { REDACTED_MARKER, zeroCounts } from '../reprovision/types.mjs';
+import { assertRegionSupported } from './region-guard.mjs';
 
 const RESOURCE_TYPES = ['schemas', 'tables', 'views', 'extensions', 'grants'];
 const IGNORE_KEYS = ['oid', 'tableowner', 'schemaname'];
@@ -158,11 +159,14 @@ function _validateAll(domainData) {
  * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
  */
 export async function apply(tenantId, domainData, options = {}) {
-  const { dryRun = false, credentials = {}, log = console } = options;
+  const { dryRun = false, credentials = {}, regionRef = null, log = console } = options;
   const domain_key = 'postgres_metadata';
 
+  // Refuse an unsupported region BEFORE any I/O — no resource is created.
+  const region_ref = assertRegionSupported(regionRef);
+
   if (!domainData || _isEmpty(domainData)) {
-    return { domain_key, status: 'applied', resource_results: [], counts: zeroCounts(), message: 'empty domain' };
+    return { domain_key, status: 'applied', resource_results: [], counts: zeroCounts(), message: 'empty domain', region_ref };
   }
 
   const counts = zeroCounts();
@@ -197,7 +201,7 @@ export async function apply(tenantId, domainData, options = {}) {
         diff: null,
       };
     });
-    return { domain_key, status: 'error', resource_results: errorResults, counts: errorCounts, message: 'Validation failed' };
+    return { domain_key, status: 'error', resource_results: errorResults, counts: errorCounts, message: 'Validation failed', region_ref };
   }
 
   for (const resourceType of RESOURCE_TYPES) {
@@ -226,7 +230,7 @@ export async function apply(tenantId, domainData, options = {}) {
   }
 
   const status = _resolveStatus(counts, dryRun, hasWarnings);
-  return { domain_key, status, resource_results, counts, message: null };
+  return { domain_key, status, resource_results, counts, message: null, region_ref };
 }
 
 /**
