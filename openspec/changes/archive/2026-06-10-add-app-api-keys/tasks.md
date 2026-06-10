@@ -1,3 +1,23 @@
+## Implementation status (Phase 2 — DONE)
+
+Implemented + proven against real Postgres (`bash tests/env/executor/run.sh`):
+- `apps/control-plane/src/runtime/api-keys.mjs` — `createApiKeyStore({pool})`: issue ANON
+  (publishable, `flc_anon_…`) + SERVICE (`flc_service_…`) keys; **SHA-256 hashed at rest,
+  plaintext returned once**; `verifyKey` resolves a presented key → `{tenantId, workspaceId,
+  keyType, scopes, dbRole}` (anon→`falcone_anon`, service→`falcone_service`); list (no secret),
+  revoke, rotate. Decision D1 (Postgres-native key store, not Keycloak) implemented.
+- `connection-registry.mjs` assumes the key's DB role per transaction (`SET LOCAL ROLE`), so
+  RLS is enforced against an anon key.
+- `server.mjs`: API-key auth path (`Authorization: ApiKey|Bearer flc_…`, `apikey`/`x-api-key`)
+  → identity; key-management routes `POST/GET/DELETE /v1/workspaces/{id}/api-keys` +
+  `.../{id}/rotations`; an API key cannot manage API keys (403).
+- Tests: `tests/env/executor/app-api-keys-rls.test.mjs` (issue/verify/revoke/rotate; anon key →
+  RLS-filtered query) + HTTP key-lifecycle in `control-plane-http.test.mjs`.
+
+DEFERRED (gateway-side, deploy config): wiring the APISIX `key-auth` plugin + per-key
+`limit-count` + enabling `scope-enforcement` on the data routes — the control-plane enforces
+auth + tenant scope today; the gateway plugin is a production front-door optimization.
+
 ## 1. Baseline
 
 - [ ] T01 Confirm baseline green: `bash tests/blackbox/run.sh`

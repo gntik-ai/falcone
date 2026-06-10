@@ -136,7 +136,9 @@ export async function executePostgresData(registry, params) {
   };
 
   // Build the plan first (introspection needs a connection, so do both inside the txn).
-  return registry.withWorkspaceClient(workspaceId, { tenantId, workspaceId }, async (client) => {
+  // identity.dbRole (set by the API-key auth path: anon/service) is assumed via SET LOCAL
+  // ROLE so RLS is enforced against it; the gateway-header path leaves the role unchanged.
+  return registry.withWorkspaceClient(workspaceId, { tenantId, workspaceId, role: identity.dbRole }, async (client) => {
     const table = await introspectTable(client, params.schemaName, params.tableName);
 
     let plan;

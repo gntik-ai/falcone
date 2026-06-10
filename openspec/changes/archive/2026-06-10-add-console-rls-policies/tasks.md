@@ -1,3 +1,20 @@
+## Implementation status (Phase 2 — API/execution DONE; console UI in Phase 3)
+
+Implemented + proven against real Postgres (`bash tests/env/executor/run.sh`):
+- Authoring + applying RLS policies executes via the Phase-1 DDL governance path
+  (`postgres-ddl-executor.mjs` → `buildPostgresGovernanceSqlPlan`): `resourceKind: 'policy'`
+  with `autoEnableRls`/`forceRls` emits `ALTER TABLE … ENABLE/FORCE ROW LEVEL SECURITY` +
+  `CREATE POLICY … USING(…) WITH CHECK(…)` and runs it transactionally on the admin connection.
+  `resourceKind: 'table_security'` toggles RLS.
+- Proven enforced: `tests/env/executor/app-api-keys-rls.test.mjs` creates a tenant-isolation
+  policy via the executor, then shows (a) an anon-key query is filtered to the key's tenant and
+  (b) pure DB RLS (`SET ROLE falcone_anon` + unscoped SELECT) returns only the GUC tenant's rows.
+- HTTP: policies are created through the existing DDL routes; a dedicated console policy-builder
+  UI is delivered in `add-console-postgres-data-editor` (Phase 3).
+
+DEFERRED: the console policy-builder UI (Phase 3); restrictive-vs-permissive presets and
+default-deny UX affordances.
+
 ## 1. Baseline
 
 - [ ] 1.1 Confirm baseline green: `bash tests/blackbox/run.sh`

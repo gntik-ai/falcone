@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 import { createConnectionRegistry } from '../../../apps/control-plane/src/runtime/connection-registry.mjs';
 import { createControlPlaneServer } from '../../../apps/control-plane/src/runtime/server.mjs';
+import { createApiKeyStore } from '../../../apps/control-plane/src/runtime/api-keys.mjs';
 
 const { Pool } = pg;
 
@@ -54,7 +55,9 @@ before(async () => {
   const appDsn = probeUrl(APP_LOGIN, APP_PW);
   // data path = app role; DDL/admin path = superuser probe DSN.
   registry = createConnectionRegistry({ resolveConnection: () => ({ dsn: appDsn, adminDsn: probeUrl() }) });
-  server = createControlPlaneServer({ registry, logger: { error() {} } });
+  const apiKeyStore = createApiKeyStore({ pool: admin });
+  await apiKeyStore.ensureSchema();
+  server = createControlPlaneServer({ registry, apiKeyStore, logger: { error() {} } });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
@@ -118,6 +121,33 @@ test('POST bulk insert → 201 affected=2', async () => {
   });
   assert.equal(res.status, 201);
   assert.equal((await res.json()).affected, 2);
+});
+
+test('API-key lifecycle over HTTP: issue (201) → list → anon-key cannot manage keys (403) → revoke', async () => {
+  // issue an anon key (admin/JWT identity)
+  const issueRes = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, {
+    method: 'POST', headers: authHeaders, body: JSON.stringify({ keyType: 'anon' }),
+  });
+  assert.equal(issueRes.status, 201);
+  const issued = await issueRes.json();
+  assert.ok(issued.key.startsWith('flc_anon_'));
+
+  // list shows it (no secret)
+  const listRes = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, { headers: authHeaders });
+  assert.equal(listRes.status, 200);
+  const list = await listRes.json();
+  assert.ok(list.items.some((k) => k.id === issued.id));
+  assert.ok(list.items.every((k) => !('key' in k) && !('key_hash' in k)));
+
+  // an API key may NOT manage API keys
+  const escalate = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `ApiKey ${issued.key}` }, body: JSON.stringify({ keyType: 'service' }),
+  });
+  assert.equal(escalate.status, 403);
+
+  // revoke
+  const del = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys/${issued.id}`, { method: 'DELETE', headers: authHeaders });
+  assert.equal(del.status, 200);
 });
 
 test('GET unknown path → 404 NO_ROUTE', async () => {
