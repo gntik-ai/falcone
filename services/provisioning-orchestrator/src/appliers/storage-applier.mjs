@@ -5,19 +5,24 @@
 
 import { compareResources, resolveAction, buildDiff } from '../reprovision/diff.mjs';
 import { REDACTED_MARKER, zeroCounts } from '../reprovision/types.mjs';
+import { assertRegionSupported } from './region-guard.mjs';
 
 /**
  * @param {string} tenantId
  * @param {Object} domainData
  * @param {Object} options
+ * @param {string|null} [options.regionRef] - tenant's pinned residency region; refused if unsupported
  * @returns {Promise<import('../reprovision/types.mjs').DomainResult>}
  */
 export async function apply(tenantId, domainData, options = {}) {
-  const { dryRun = false, credentials = {}, log = console } = options;
+  const { dryRun = false, credentials = {}, regionRef = null, log = console } = options;
   const domain_key = 'storage';
 
+  // Refuse an unsupported region BEFORE any I/O — no resource is created.
+  const region_ref = assertRegionSupported(regionRef);
+
   if (!domainData || _isEmpty(domainData)) {
-    return { domain_key, status: 'applied', resource_results: [], counts: zeroCounts(), message: 'empty domain' };
+    return { domain_key, status: 'applied', resource_results: [], counts: zeroCounts(), message: 'empty domain', region_ref };
   }
 
   const counts = zeroCounts();
@@ -93,7 +98,7 @@ export async function apply(tenantId, domainData, options = {}) {
   }
 
   const status = _resolveStatus(counts, dryRun, hasWarnings);
-  return { domain_key, status, resource_results, counts, message: null };
+  return { domain_key, status, resource_results, counts, message: null, region_ref };
 }
 
 /**

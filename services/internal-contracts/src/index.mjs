@@ -43,6 +43,12 @@ export { default as workspaceCapabilityCatalogAccessedEvent } from './workspace-
 export { default as scopeEnforcementDenialEventSchema } from './scope-enforcement-denial-event.json' with { type: 'json' };
 export { default as scopeEnforcementDenialQueryResponseSchema } from './scope-enforcement-denial-query-response.json' with { type: 'json' };
 
+export {
+  getSupportedRegions,
+  deriveSupportedRegions,
+  isSupportedRegion
+} from './deployment-topology.mjs';
+
 let cachedInternalServiceMap;
 let cachedDeploymentTopology;
 let cachedAuthorizationModel;
