@@ -134,9 +134,11 @@ echo "==> applying provisioning-orchestrator plan + quota + entitlements migrati
 #   104 boolean_capability_catalog (+ seeds) — resolveUnifiedEntitlements queries
 #       it optionally (its 42P01 is caught), but seeding it exercises the full
 #       capability-resolution path
+#   105 workspace_sub_quotas (FK -> quota_dimension_catalog) — the table the
+#       workspace-sub-quota set/list family writes/reads
 for m in 097-plan-entity-tenant-assignment 098-plan-base-limits \
          100-plan-change-impact-history 103-hard-soft-quota-overrides \
-         104-plan-boolean-capabilities; do
+         104-plan-boolean-capabilities 105-effective-limit-resolution; do
   f="$PO_MIGRATIONS/$m.sql"
   [ -f "$f" ] || { echo "   MISSING $m.sql" >&2; continue; }
   docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test < "$f" >/dev/null 2>&1 \
@@ -291,7 +293,7 @@ echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin)
 echo "  MinIO console          : http://localhost:59001"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
-echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/plans/change-history, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/backups/status)"
+echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/plans/change-history, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/workspace-sub-quotas, /v1/backups/status)"
 echo "                            NOTE /v1/backups/status authenticates IN-ACTION (plain proxy, no gateway jwt-auth): the backup-status action verifies the Bearer JWT itself against the realm JWKS and reads tenant+scopes from the token's own claims."
 echo "                            backup_status_snapshots seeded with a tenant-A own row + a tenant-B SHARED row -> the smoke proves tenant A never sees tenant B's shared row (data-layer isolation), while a technical-scoped global view sees both."
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
