@@ -531,6 +531,93 @@ routes:
       nodes:
         "action-runner:8090": 1
 
+  # plan change history: GET returns a tenant's plan-change audit trail (200).
+  # superadmin-only (the action 403s a non-superadmin/internal actor); uses the
+  # SAME jwt-auth + identity-injection chain as the other superadmin routes
+  # (the chain is inlined per route since APISIX's tinyyaml has no YAML anchors).
+  # The /v1/plans/change-history uri is distinct from the /v1/plans exact-match
+  # route, so the plan-create/plan-list routes do not shadow it.
+  - id: plan-change-history
+    uri: /v1/plans/change-history
+    methods:
+      - GET
+    plugins:
+      openid-connect:
+        client_id: falcone-e2e-client
+        client_secret: unused-public-client
+        discovery: http://keycloak:8080/realms/falcone-e2e/.well-known/openid-configuration
+        realm: falcone-e2e
+        bearer_only: true
+        use_jwks: true
+        token_signing_alg_values_expected: RS256
+        scope: openid
+      serverless-pre-function:
+        phase: rewrite
+        functions:
+          - |
+            return function(conf, ctx)
+              local core = require("apisix.core")
+              local ngx = ngx
+              core.request.set_header(ctx, "X-Tenant-Id", nil)
+              core.request.set_header(ctx, "X-Workspace-Id", nil)
+              core.request.set_header(ctx, "X-Auth-Subject", nil)
+              core.request.set_header(ctx, "X-Actor-Roles", nil)
+              core.request.set_header(ctx, "X-Actor-Type", nil)
+              core.request.set_header(ctx, "X-Actor-Scopes", nil)
+              local auth = core.request.header(ctx, "Authorization")
+              if not auth then
+                return 401, { code = "UNAUTHENTICATED", message = "missing bearer token" }
+              end
+              local token = auth:gsub("^[Bb]earer%s+", "")
+              local b64 = token:match("^[^.]+%.([^.]+)%.")
+              if not b64 then
+                return 401, { code = "UNAUTHENTICATED", message = "malformed token" }
+              end
+              b64 = b64:gsub("-", "+"):gsub("_", "/")
+              local pad = #b64 % 4
+              if pad == 2 then b64 = b64 .. "=="
+              elseif pad == 3 then b64 = b64 .. "="
+              elseif pad == 1 then b64 = b64 .. "===" end
+              local payload = ngx.decode_base64(b64)
+              if not payload then
+                return 401, { code = "UNAUTHENTICATED", message = "undecodable token" }
+              end
+              local claims, err = core.json.decode(payload)
+              if not claims then
+                return 401, { code = "UNAUTHENTICATED", message = "unparseable claims: " .. tostring(err) }
+              end
+              if claims.tenant_id then
+                core.request.set_header(ctx, "X-Tenant-Id", tostring(claims.tenant_id))
+              end
+              if claims.workspace_id then
+                core.request.set_header(ctx, "X-Workspace-Id", tostring(claims.workspace_id))
+              end
+              if claims.sub then
+                core.request.set_header(ctx, "X-Auth-Subject", tostring(claims.sub))
+              end
+              local roles = claims.actor_roles
+              if type(roles) == "table" then
+                core.request.set_header(ctx, "X-Actor-Roles", table.concat(roles, ","))
+              elseif roles ~= nil then
+                core.request.set_header(ctx, "X-Actor-Roles", tostring(roles))
+              end
+              if claims.actor_type ~= nil then
+                core.request.set_header(ctx, "X-Actor-Type", tostring(claims.actor_type))
+              end
+              local scopes = claims.actor_scopes
+              if type(scopes) == "table" then
+                core.request.set_header(ctx, "X-Actor-Scopes", table.concat(scopes, ","))
+              elseif scopes ~= nil then
+                core.request.set_header(ctx, "X-Actor-Scopes", tostring(scopes))
+              end
+            end
+      proxy-rewrite:
+        scheme: http
+    upstream:
+      type: roundrobin
+      nodes:
+        "action-runner:8090": 1
+
   # tenant effective entitlements: GET resolves the caller's tenant entitlement
   # profile (200). This is the FIRST tenant-scoped (non-superadmin) route in the
   # slice: a tenant_owner token MUST pass the gateway (no superadmin gate here),
