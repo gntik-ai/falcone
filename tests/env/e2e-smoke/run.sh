@@ -14,6 +14,7 @@
 #   [17-20] entitlements        /v1/tenant/entitlements          (tenant-scoped: own 200 plan-derived limits + IDOR 403)
 #   [21-26] backup-status       /v1/backups/status               (IN-ACTION JWKS auth: seeded own 200 + data-leak probe + IDOR 403 + scope 403 + global 200 sees shared)
 #   [27-29] plan change-history /v1/plans/change-history          (superadmin-only: 401 + tenant_owner 403 + superadmin 200 seeded upgrade trail)
+#   [30-34] workspace sub-quota /v1/workspace-sub-quotas          (tenant-scoped write: 401 + set 2xx + over-limit 422 + IDOR 403 + list 200)
 #
 # Steps 0-10 use the tenant_owner user; steps 11-16 use the dedicated superadmin
 # user (the plan/quota actions require actor.type 'superadmin'). Steps 17-20 are
@@ -357,8 +358,60 @@ PCH_OK=$(printf '%s' "$PCHBODY" | node -e 'let d="";process.stdin.on("data",c=>d
 [ "$PCH_OK" = "true" ] || fail "plan change-history should contain the seeded initial_assignment + upgrade trail (total>=2): $PCHBODY"
 pass "superadmin plan change-history -> 200 (seeded trail: initial_assignment + upgrade, total>=2)"
 
+# ---- workspace sub-quota family (provisioning-orchestrator) -----------------
+# Tenant/workspace-scoped allocation of a tenant quota dimension. tenant_owner is
+# allowed within its OWN tenant; the action resolves the tenant's effective limit
+# (tenant A's plan sets max_workspaces=50) and rejects an over-limit allocation
+# with 422. Probes: 401 no-token, 201/200 set within limit, 422 over-limit, 403
+# cross-tenant (body tenantId != caller's tenant), 200 list shows the allocation.
+# The set is idempotent-but-stateful (re-running yields 200 not 201), so [31]
+# accepts any 2xx and checks the stored value rather than a hard 201.
+WSQ_WS="$E2E_WORKSPACE_ID"
+
+echo "==> [30] gateway rejects unauthenticated workspace-sub-quota request"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' \
+  -d '{"tenantId":"'"$E2E_TENANT_ID"'","workspaceId":"'"$WSQ_WS"'","dimensionKey":"max_workspaces","allocatedValue":10}' \
+  "$APISIX/v1/workspace-sub-quotas")
+[ "$code" = "401" ] || fail "expected 401 without token on /v1/workspace-sub-quotas, got $code"
+pass "workspace-sub-quota unauthenticated -> 401"
+
+echo "==> [31] tenant_owner POST set max_workspaces=10 (<= tenant limit 50) -> 2xx"
+SQ=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -X POST "$APISIX/v1/workspace-sub-quotas" \
+  -d '{"tenantId":"'"$E2E_TENANT_ID"'","workspaceId":"'"$WSQ_WS"'","dimensionKey":"max_workspaces","allocatedValue":10}')
+SQBODY=$(printf '%s' "$SQ" | sed '$d')
+SQCODE=$(printf '%s' "$SQ" | tail -n1)
+{ [ "$SQCODE" = "201" ] || [ "$SQCODE" = "200" ]; } || fail "expected 201/200 on sub-quota set within limit, got $SQCODE: $SQBODY"
+SQ_OK=$(printf '%s' "$SQBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);process.stdout.write(String(j.dimensionKey==="max_workspaces"&&Number(j.allocatedValue)===10))})')
+[ "$SQ_OK" = "true" ] || fail "sub-quota set body should reflect max_workspaces=10: $SQBODY"
+pass "tenant_owner sub-quota set max_workspaces=10 -> $SQCODE (allocatedValue=10)"
+
+echo "==> [32] LIMIT PROBE: tenant_owner POST set max_workspaces=999 (> tenant limit 50) -> 422"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -X POST "$APISIX/v1/workspace-sub-quotas" \
+  -d '{"tenantId":"'"$E2E_TENANT_ID"'","workspaceId":"'"$WSQ_WS"'","dimensionKey":"max_workspaces","allocatedValue":999}')
+[ "$code" = "422" ] || fail "expected 422 for sub-quota exceeding the tenant effective limit, got $code"
+pass "quota enforced: sub-quota max_workspaces=999 > tenant limit 50 -> 422"
+
+echo "==> [33] IDOR PROBE: tenant_owner POST set for tenantId=<TENANT_B> -> 403 (cross-tenant write blocked)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -X POST "$APISIX/v1/workspace-sub-quotas" \
+  -d '{"tenantId":"'"$TENANT_B"'","workspaceId":"'"$WSQ_WS"'","dimensionKey":"max_workspaces","allocatedValue":10}')
+[ "$code" = "403" ] || fail "expected 403 for tenant_owner setting a sub-quota in another tenant (IDOR), got $code"
+pass "IDOR blocked: tenant_owner cross-tenant sub-quota set -> 403"
+
+echo "==> [34] tenant_owner GET list -> 200 includes the max_workspaces=10 allocation"
+SQL=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $TOKEN" \
+  "$APISIX/v1/workspace-sub-quotas?tenantId=$E2E_TENANT_ID&workspaceId=$WSQ_WS")
+SQLBODY=$(printf '%s' "$SQL" | sed '$d')
+SQLCODE=$(printf '%s' "$SQL" | tail -n1)
+[ "$SQLCODE" = "200" ] || fail "expected 200 on sub-quota list, got $SQLCODE: $SQLBODY"
+SQL_OK=$(printf '%s' "$SQLBODY" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const it=(j.items||[]).find(x=>x.dimensionKey==="max_workspaces"&&x.workspaceId);process.stdout.write(String(Array.isArray(j.items)&&!!it&&Number(it.allocatedValue)===10))})')
+[ "$SQL_OK" = "true" ] || fail "sub-quota list should include the max_workspaces=10 allocation: $SQLBODY"
+pass "tenant_owner sub-quota list -> 200 (max_workspaces=10 allocation present)"
+
 echo
-echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements, backup-status, plan-change-history} actions -> Postgres."
+echo "E2E SMOKE PASSED: Keycloak -> APISIX -> action-runner -> {scheduling, async-operation, tenant-config, plan, quota, entitlements, backup-status, plan-change-history, workspace-sub-quota} actions -> Postgres."
 echo "  scheduling           : 401 + POST 201 + list"
 echo "  async-operation      : 401 + POST 200 + detail + list"
 echo "  tenant-config formats: 401 + GET 200 + body"
@@ -367,3 +420,4 @@ echo "  quota dimensions     : 401 + superadmin GET 200 + seeded catalog"
 echo "  entitlements (tenant): 401 + tenant_owner own 200 (plan e2e-pro-plan, max_workspaces source=plan=50) + IDOR cross-tenant 403 + superadmin scoped 200"
 echo "  backup-status (JWKS) : scopes claim verified + in-action 401 + own 200 (seeded row) + DATA-LEAK probe (no tenant-B shared row) + IDOR 403 + scope-403 + superadmin global 200 (sees own + shared)"
 echo "  plan change-history   : 401 + tenant_owner 403 (superadmin-only) + superadmin GET 200 (seeded initial_assignment + upgrade trail)"
+echo "  workspace sub-quota   : 401 + tenant_owner set 2xx (<=limit) + LIMIT 422 (>tenant limit) + IDOR cross-tenant 403 + list 200"
