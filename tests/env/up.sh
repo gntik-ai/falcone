@@ -220,6 +220,53 @@ else
   echo "   skipped plan assignment seed (tables missing or already assigned?)"
 fi
 
+# ---- plan change-history fixture (per-tenant plan-change audit trail) -------
+# Give tenant A a realistic plan-change trail WITHOUT disturbing its ACTIVE plan
+# (still e2e-pro-plan, so the entitlements assertions hold): seed a PRIOR,
+# superseded 'e2e-starter-plan' assignment, then two tenant_plan_change_history
+# rows (migration 100) — an 'initial_assignment' onto starter and an 'upgrade'
+# starter -> pro (the upgrade row keys off the existing ACTIVE pro assignment).
+# plan-change-history-query reads this table. Idempotent: plan upserts on its
+# unique LOWER(slug) index, the prior assignment is guarded by NOT EXISTS, and
+# the history rows ON CONFLICT (plan_assignment_id) DO NOTHING.
+echo "==> seeding plan change-history fixture (starter -> pro upgrade trail for tenant A)"
+if docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test >/dev/null 2>&1 <<SQL
+INSERT INTO plans (slug, display_name, description, status, quota_dimensions, capabilities, created_by, updated_by)
+VALUES ('e2e-starter-plan', 'E2E Starter Plan', 'Seeded prior plan for the change-history slice', 'active',
+        '{"max_workspaces": 5}'::jsonb, '{}'::jsonb, 'e2e-seed', 'e2e-seed')
+ON CONFLICT (LOWER(slug)) DO NOTHING;
+
+INSERT INTO tenant_plan_assignments (tenant_id, plan_id, effective_from, superseded_at, assigned_by)
+SELECT '$E2E_TENANT_ID', p.id, NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day', 'e2e-seed'
+FROM plans p
+WHERE LOWER(p.slug) = LOWER('e2e-starter-plan')
+  AND NOT EXISTS (
+    SELECT 1 FROM tenant_plan_assignments tpa WHERE tpa.tenant_id = '$E2E_TENANT_ID' AND tpa.plan_id = p.id
+  );
+
+INSERT INTO tenant_plan_change_history
+  (plan_assignment_id, tenant_id, previous_plan_id, new_plan_id, actor_id, effective_at, change_direction, usage_collection_status, over_limit_dimension_count)
+SELECT tpa.id, '$E2E_TENANT_ID', NULL, sp.id, 'e2e-seed', NOW() - INTERVAL '2 days', 'initial_assignment', 'complete', 0
+FROM tenant_plan_assignments tpa
+JOIN plans sp ON sp.id = tpa.plan_id AND LOWER(sp.slug) = LOWER('e2e-starter-plan')
+WHERE tpa.tenant_id = '$E2E_TENANT_ID'
+ON CONFLICT (plan_assignment_id) DO NOTHING;
+
+INSERT INTO tenant_plan_change_history
+  (plan_assignment_id, tenant_id, previous_plan_id, new_plan_id, actor_id, effective_at, change_direction, usage_collection_status, over_limit_dimension_count)
+SELECT pro_a.id, '$E2E_TENANT_ID', sp.id, pp.id, 'e2e-seed', NOW() - INTERVAL '1 day', 'upgrade', 'complete', 0
+FROM tenant_plan_assignments pro_a
+JOIN plans pp ON pp.id = pro_a.plan_id AND LOWER(pp.slug) = LOWER('e2e-pro-plan')
+JOIN plans sp ON LOWER(sp.slug) = LOWER('e2e-starter-plan')
+WHERE pro_a.tenant_id = '$E2E_TENANT_ID' AND pro_a.superseded_at IS NULL
+ON CONFLICT (plan_assignment_id) DO NOTHING;
+SQL
+then
+  echo "   seeded change history (initial_assignment starter + upgrade starter->pro) for tenant A"
+else
+  echo "   skipped change-history seed (tables missing or already seeded?)"
+fi
+
 echo "==> provisioning Keycloak realm falcone-e2e (ROPC client + user + claim mappers)"
 E2E_TENANT_ID="$E2E_TENANT_ID" E2E_WORKSPACE_ID="$E2E_WORKSPACE_ID" bash ./keycloak-e2e-provision.sh
 
@@ -244,7 +291,7 @@ echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin)
 echo "  MinIO console          : http://localhost:59001"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
-echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/backups/status)"
+echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/plans/change-history, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/backups/status)"
 echo "                            NOTE /v1/backups/status authenticates IN-ACTION (plain proxy, no gateway jwt-auth): the backup-status action verifies the Bearer JWT itself against the realm JWKS and reads tenant+scopes from the token's own claims."
 echo "                            backup_status_snapshots seeded with a tenant-A own row + a tenant-B SHARED row -> the smoke proves tenant A never sees tenant B's shared row (data-layer isolation), while a technical-scoped global view sees both."
 echo "  action-runner shim     : http://localhost:8090  (/healthz, bypasses gateway)"
