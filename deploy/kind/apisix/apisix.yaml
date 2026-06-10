@@ -1,0 +1,251 @@
+routes:
+  - id: "1001"
+    uri: "/control-plane/*"
+    priority: 100
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "1002"
+    uri: "/auth/*"
+    priority: 90
+    plugins:
+      proxy-rewrite:
+        regex_uri: ["^/auth/(.*)", "/$1"]
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-keycloak.falcone.svc.cluster.local:8080": 1
+  - id: "1003"
+    uri: "/realtime/*"
+    priority: 80
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "1004"
+    uri: "/*"
+    priority: 10
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-web-console.falcone.svc.cluster.local:3000": 1
+  - id: "1010"
+    uri: "/health"
+    priority: 300
+    methods: ["GET"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2001"
+    uri: "/v1/platform/*"
+    priority: 239
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2002"
+    uri: "/v1/tenants/*"
+    priority: 238
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2003"
+    uri: "/v1/workspaces/*"
+    priority: 237
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2004-iam"
+    uri: "/v1/iam/*"
+    priority: 235
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2004"
+    uri: "/v1/auth/*"
+    priority: 236
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2005"
+    uri: "/v1/postgres/*"
+    priority: 235
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2006"
+    uri: "/v1/mongo/*"
+    priority: 234
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2007"
+    uri: "/v1/events/*"
+    priority: 233
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2008"
+    uri: "/v1/functions/*"
+    priority: 232
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2009"
+    uri: "/v1/storage/*"
+    priority: 231
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2010"
+    uri: "/v1/metrics/*"
+    priority: 230
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2011"
+    uri: "/v1/websockets/*"
+    priority: 229
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2012"
+    uri: "/v1/workspaces/{workspaceId}/pg-captures/*"
+    priority: 228
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2013"
+    uri: "/v1/tenants/{tenantId}/pg-captures/summary/*"
+    priority: 227
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2014"
+    uri: "/v1/realtime/workspaces/{workspaceId}/mongo-captures/*"
+    priority: 226
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2015"
+    uri: "/v1/realtime/tenants/{tenantId}/mongo-captures/summary/*"
+    priority: 225
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "3001"
+    uri: "/_native/keycloak/admin/*"
+    priority: 330
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-keycloak.falcone.svc.cluster.local:8080": 1
+  # Catch-all so EVERY /v1/* the console calls reaches the control-plane server,
+  # which validates the Bearer JWT itself and dispatches to the real action
+  # (unmapped paths -> a clean 404 from the control-plane, not the gateway).
+  # Priority above the web-console SPA catch-all (/* @ 10) so /v1 wins; below the
+  # specific /v1/<family> routes above (which target the same upstream anyway).
+  - id: "5000"
+    uri: "/v1/*"
+    priority: 50
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+#END

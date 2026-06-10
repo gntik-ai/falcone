@@ -1748,7 +1748,11 @@ kafka:
         drop:
           - ALL
 openwhisk:
-  enabled: true
+  # DISABLED: functions migrated to Knative (the control-plane function executor
+  # creates a Knative Service per function). On OpenShift use OpenShift Serverless;
+  # on kind, Knative Serving + Kourier (see deploy/kind/knative/). The OpenWhisk
+  # Python2/ansible init images are also incompatible with newer kernels.
+  enabled: false
   wrapper:
     componentId: openwhisk
     workload:
@@ -2089,14 +2093,25 @@ controlPlane:
     workload:
       kind: Deployment
   image:
-    repository: ghcr.io/example/in-falcone-control-plane
-    tag: 0.1.0
+    repository: ghcr.io/gntik-ai/in-falcone-control-plane
+    tag: 0.6.2
     pullPolicy: IfNotPresent
   replicas: 2
   serviceAccount:
     create: true
     name: ""
-    automountToken: false
+    # The control-plane runs the function executor (creates Knative Services via the
+    # k8s API), so it needs its SA token mounted. RBAC granted by
+    # templates/control-plane-rbac.yaml (functionExecutor.enabled).
+    automountToken: true
+  # Function executor (Knative): RBAC + the per-function runtime image. The data-plane
+  # connection env (PG/KEYCLOAK/MINIO/MONGO/KAFKA host+secret refs) is environment-
+  # specific (release-prefixed service DNS + external secrets) and lives in the overlay
+  # values (deploy/kind/values-kind.yaml, deploy/openshift/values-openshift.yaml).
+  functionExecutor:
+    enabled: true   # gates templates/control-plane-rbac.yaml (ksvc/jobs/pods RBAC)
+    # The per-function runtime image is read by the executor from the FN_RUNTIME_IMAGE
+    # env var (set in the overlay: kind -> localhost:30500, OpenShift -> Harbor).
   service:
     enabled: true
     type: ClusterIP

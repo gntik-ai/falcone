@@ -1,0 +1,169 @@
+# Falcone — OpenShift + Harbor (restricted network) install values.
+#
+# SKELETON / starting point (see ../OPENSHIFT-HARBOR-REVIEW.md). This drives the
+# product chart's existing knobs instead of the kind-only hacks in
+# deploy/kind/values-kind.yaml. Fill in the <PLACEHOLDERS>.
+#
+#   helm install falcone charts/in-falcone -n falcone-prod -f deploy/openshift/values-openshift.yaml
+#
+# Prereqs on the cluster:
+#   - OpenShift Serverless Operator installed + a KnativeServing CR (provides Knative + Kourier).
+#   - Harbor pull secret(s) created in the namespace; optionally Harbor CA in a ConfigMap.
+#   - All images mirrored into Harbor (see the review's mirror list).
+#   - ESO/Vault providing the data-plane secrets (or pre-create the *-credentials Secrets).
+
+global:
+  namespace: falcone-prod
+  createNamespace: false            # let cluster-admin/GitOps own the namespace + SCC
+  # Harbor: every image's registry host is rewritten to this prefix automatically.
+  imageRegistry: "harbor.example.com/falcone"
+  imagePullSecrets:
+    - name: harbor-pull             # robot account pull secret (pre-created)
+  privateRegistry:
+    enabled: true
+    registry: "harbor.example.com"
+    # Strings (per values.schema.json). The chart's workload template was fixed to
+    # normalize imagePullSecrets({name}) + pullSecretNames(strings) into one list
+    # (previously it crashed on strings — see the review).
+    pullSecretNames:
+      - harbor-pull
+    caBundleConfigMap: "harbor-ca"  # ConfigMap with the Harbor CA (restricted TLS)
+  airgap:
+    enabled: true
+  defaultStorageClass: "<OCP_DEFAULT_CSI_STORAGECLASS>"
+  # OpenShift restricted-v2 assigns uid + fsGroup from the namespace range.
+  # Do NOT pin fsGroup/runAsUser; only assert non-root + seccomp.
+  podSecurity:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+    fsGroup: null                   # <- unset: let the SCC inject it (was 1001)
+
+# Functions: Knative is provided by OpenShift Serverless; the chart's bundled
+# OpenWhisk component is disabled (migration OpenWhisk -> Knative).
+openwhisk:
+  enabled: false
+
+# SCC: stateless components also pin podSecurityContext.fsGroup: 1001 (inherited
+# from global.podSecurity in the chart defaults). global.podSecurity.fsGroup:null
+# does NOT override it — Helm drops nil entries during the global-table coalesce,
+# so it must be nulled per-component. (Data-plane components are nulled below.)
+apisix:
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+keycloak:
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+
+# Control-plane runtime. The chart now ships the executor RBAC
+# (templates/control-plane-rbac.yaml, gated by controlPlane.functionExecutor.enabled)
+# and defaults serviceAccount.automountToken: true, so only the env (environment-
+# specific) is set here. NOTE: the *HOST values below are <release>-<component>
+# service DNS — they assume `helm install <RELEASE>` with RELEASE matching the prefix
+# (here: falcone). Adjust if you use a different release name. Secret refs should be
+# satisfied by ESO/Vault-provisioned Secrets (the chart creates none).
+controlPlane:
+  image:
+    repository: ghcr.io/gntik-ai/in-falcone-control-plane   # global.imageRegistry => harbor.example.com/falcone/gntik-ai/in-falcone-control-plane
+    tag: "0.6.2"
+  podSecurityContext:                                       # SCC: let the namespace range set fsGroup
+    fsGroup: null
+    fsGroupChangePolicy: null
+  env:
+    - { name: NODE_ENV, value: production }
+    - { name: ROUTE_MAP_FILE, value: /app/route-map.runtime.json }
+    - { name: PGHOST, value: falcone-postgresql }
+    - { name: PGPORT, value: "5432" }
+    - { name: PGUSER, value: falcone }
+    - { name: PGDATABASE, value: in_falcone }
+    - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
+    - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
+    - { name: KEYCLOAK_BASE_URL, value: "http://falcone-keycloak:8080" }
+    - { name: KEYCLOAK_ADMIN_USERNAME, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: username } } }
+    - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: password } } }
+    - { name: MINIO_ENDPOINT, value: "http://falcone-storage:9000" }
+    - { name: MINIO_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_USER } } }
+    - { name: MINIO_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_PASSWORD } } }
+    - { name: MONGO_HOST, value: "falcone-mongodb:27017" }
+    - { name: MONGO_USER, value: root }
+    - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } } }
+    - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
+    # Functions: the executor reads this to template each function's Knative Service.
+    - { name: FN_RUNTIME_IMAGE, value: "harbor.example.com/falcone/gntik-ai/in-falcone-fn-runtime:0.1.0" }
+
+webConsole:
+  image:
+    repository: in-falcone/in-falcone-web-console
+    tag: "0.2.11"
+  podSecurityContext:                                       # SCC: let the namespace range set fsGroup
+    fsGroup: null
+    fsGroupChangePolicy: null
+
+# Stateful data plane: prefer Red Hat-certified operators already on the cluster
+# (Strimzi for Kafka, CloudNativePG for Postgres) OR grant the data-plane SAs a
+# suitable SCC. If keeping the in-chart Bitnami images, mirror to Harbor and verify
+# arbitrary-uid behavior. Keep volumePermissions DISABLED (restricted SCC).
+#
+# SCC: every stateful component pins podSecurityContext.fsGroup: 1001 in the chart
+# defaults, which restricted-v2 REJECTS (fsGroup must come from the namespace's
+# assigned range). Null it per-component so the SCC injects a valid fsGroup — the
+# Bitnami/MinIO/Prometheus images all support an arbitrary uid+fsGroup. (Setting
+# only global.podSecurity.fsGroup:null is not enough: the per-component value wins
+# via mergeOverwrite.) Drop fsGroupChangePolicy too (irrelevant once fsGroup is SCC-set).
+postgresql:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+mongodb:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+kafka:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+storage:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+observability:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+
+# Exposure: OpenShift Routes. The Route templates render only when
+# platform.network.exposureKind == "Route" (default is "Ingress").
+platform:
+  openshift:
+    enabled: true                  # required: gates Route exposure + OCP behaviors
+  network:
+    exposureKind: Route
+publicSurface:
+  hostnames:
+    api: "api.apps.<ocp-cluster-domain>"
+    console: "console.apps.<ocp-cluster-domain>"
+    identity: "iam.apps.<ocp-cluster-domain>"
+    realtime: "realtime.apps.<ocp-cluster-domain>"
+  route:
+    tls:
+      termination: edge            # or reencrypt
+  # align Keycloak KC_HOSTNAME with the identity/console Route hostname for browser OIDC.
+
+# Bootstrap: fix the realm payload so the install validates without
+# --skip-schema-validation, and reconcile the APISIX reconcile-vs-standalone choice
+# (use the Admin API on OpenShift, or keep routes config-driven + reconcile off).
+# AIRGAP: the bootstrap job image is NOT rewritten by global.imageRegistry (it
+# bypasses the component-wrapper image helper), so pin it to Harbor explicitly.
+bootstrap:
+  enabled: true
+  job:
+    image:
+      repository: "harbor.example.com/falcone/bitnami/kubectl"
+      tag: "1.32.2"
