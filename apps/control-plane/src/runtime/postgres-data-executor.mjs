@@ -18,6 +18,30 @@ function clientError(message, statusCode, code) {
   return Object.assign(new Error(message), { statusCode, code });
 }
 
+// Map a raw Postgres driver error to a sanitized client error. Never surfaces the
+// pg message/detail/hint or the SQL text — only a stable code + a generic message.
+// Codes: https://www.postgresql.org/docs/current/errcodes-appendix.html
+function mapPgError(error) {
+  const pgCode = error?.code;
+  if (typeof pgCode === 'string') {
+    switch (pgCode) {
+      case '23505': return clientError('Unique constraint violation', 409, 'UNIQUE_VIOLATION');
+      case '23503': return clientError('Foreign key violation', 422, 'FOREIGN_KEY_VIOLATION');
+      case '23502': return clientError('Not-null constraint violation', 400, 'NOT_NULL_VIOLATION');
+      case '23514': return clientError('Check constraint violation', 400, 'CHECK_VIOLATION');
+      case '42501': return clientError('Insufficient privilege', 403, 'INSUFFICIENT_PRIVILEGE');
+      case '42703': return clientError('Unknown column', 400, 'UNDEFINED_COLUMN');
+      case '42P01': return clientError('Table not found', 404, 'TABLE_NOT_FOUND');
+      default: break;
+    }
+    if (pgCode.startsWith('22')) return clientError('Invalid data value', 400, 'DATA_EXCEPTION');
+    if (pgCode.startsWith('08')) return clientError('Database connection error', 503, 'DB_CONNECTION_ERROR');
+    if (pgCode.startsWith('57')) return clientError('Database unavailable', 503, 'DB_UNAVAILABLE');
+  }
+  // Unknown/internal: opaque 500 (the caller logs the original server-side).
+  return Object.assign(new Error('Internal server error'), { statusCode: 500, code: 'INTERNAL_ERROR', cause: error });
+}
+
 // Introspect a table into the shape buildPostgresDataApiPlan expects:
 // { schemaName, tableName, columns:[{columnName,dataType}], primaryKey:[...] }.
 export async function introspectTable(client, schemaName, tableName) {
@@ -148,7 +172,14 @@ export async function executePostgresData(registry, params) {
       await client.query('SELECT set_config($1, $2, true)', [setting.key, String(setting.value)]);
     }
 
-    const result = await client.query(plan.sql.text, plan.sql.values);
+    let result;
+    let count;
+    try {
+      result = await client.query(plan.sql.text, plan.sql.values);
+      count = await runCount(client, plan.response?.count);
+    } catch (error) {
+      throw mapPgError(error);
+    }
 
     if (plan.operation === 'get') {
       return { found: result.rowCount > 0, item: result.rows[0] ?? null, access: plan.access };
@@ -156,7 +187,6 @@ export async function executePostgresData(registry, params) {
     if (['insert', 'update', 'delete'].includes(plan.operation)) {
       return { item: result.rows[0] ?? null, affected: result.rowCount, access: plan.access };
     }
-    const count = await runCount(client, plan.response?.count);
     return {
       items: result.rows,
       page: { size: plan.page?.size ?? result.rowCount, returned: result.rowCount },

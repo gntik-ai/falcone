@@ -2089,8 +2089,11 @@ controlPlane:
     workload:
       kind: Deployment
   image:
-    repository: ghcr.io/example/in-falcone-control-plane
-    tag: 0.1.0
+    # Real control-plane executor service (apps/control-plane/Dockerfile). The data
+    # connection env (DATA_DB_URL / PG* via secretKeyRef) is environment-specific and
+    # set in the deployment overlays, not in chart defaults.
+    repository: ghcr.io/gntik-ai/in-falcone-control-plane
+    tag: 0.7.0
     pullPolicy: IfNotPresent
   replicas: 2
   serviceAccount:
