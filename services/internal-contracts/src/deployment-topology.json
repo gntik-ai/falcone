@@ -239,6 +239,9 @@
     ],
     "routing_rule": "DNS and gateway policy may shift traffic between clusters or regions without changing public URI prefixes or tenant-visible hostnames."
   },
+  "supported_regions": [
+    "eu-west-1"
+  ],
   "configuration_policy": {
     "helm_value_layers": [
       "common",
