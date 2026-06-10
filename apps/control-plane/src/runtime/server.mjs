@@ -40,6 +40,39 @@ function identityFromHeaders(headers, pathWorkspaceId) {
   };
 }
 
+// Extract a presented API key from the request headers (Supabase-style):
+//   Authorization: ApiKey flc_... | Authorization: Bearer flc_... | apikey: flc_... | x-api-key: flc_...
+function apiKeyFromHeaders(headers) {
+  const auth = headers['authorization'];
+  if (auth) {
+    const m = /^(?:ApiKey|Bearer)\s+(flc_\S+)$/i.exec(auth);
+    if (m) return m[1];
+  }
+  const direct = headers['apikey'] || headers['x-api-key'];
+  return typeof direct === 'string' && direct.startsWith('flc_') ? direct : undefined;
+}
+
+// Resolve identity: gateway-injected JWT headers first, else verify an API key.
+async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore) {
+  const fromHeaders = identityFromHeaders(headers, pathWorkspaceId);
+  if (fromHeaders.tenantId) return fromHeaders;
+  const key = apiKeyFromHeaders(headers);
+  if (key && apiKeyStore) {
+    const resolved = await apiKeyStore.verifyKey(key);
+    if (resolved) {
+      return {
+        tenantId: resolved.tenantId,
+        workspaceId: resolved.workspaceId,
+        actorId: `apikey:${resolved.keyType}`,
+        roleName: resolved.roleName,
+        dbRole: resolved.dbRole, // assumed via SET LOCAL ROLE → RLS enforced for anon keys
+        scopes: resolved.scopes,
+      };
+    }
+  }
+  return fromHeaders; // no tenant → 401
+}
+
 function primaryKeyFromQuery(searchParams) {
   const pk = {};
   for (const [k, v] of searchParams.entries()) if (!META_QUERY_KEYS.has(k)) pk[k] = v;
@@ -55,11 +88,22 @@ function pageFromQuery(searchParams) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry) {
+function buildRoutes(registry, apiKeyStore) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
+  const keys = '^/v1/workspaces/([^/]+)/api-keys';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
+
+    // ---- Workspace API keys (issue/list/rotate/revoke) — admin (JWT) identity ----
+    ['POST', new RegExp(`${keys}$`), ([w], c) =>
+      requireStore(apiKeyStore).issueKey({ tenantId: c.identity.tenantId, workspaceId: w, keyType: c.body.keyType, scopes: c.body.scopes }).then((r) => ({ status: 201, body: r }))],
+    ['GET', new RegExp(`${keys}$`), ([w]) =>
+      requireStore(apiKeyStore).listKeys(w).then((items) => ({ status: 200, body: { items } }))],
+    ['POST', new RegExp(`${keys}/([^/]+)/rotations$`), ([w, id], c) =>
+      requireStore(apiKeyStore).rotateKey({ id, workspaceId: w }).then((r) => ({ status: 201, body: r }))],
+    ['DELETE', new RegExp(`${keys}/([^/]+)$`), ([w, id]) =>
+      requireStore(apiKeyStore).revokeKey({ id, workspaceId: w }).then((r) => ({ status: 200, body: r }))],
 
     // ---- Postgres data rows (CRUD + bulk) ----
     ['GET', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
@@ -87,6 +131,11 @@ function buildRoutes(registry) {
   ];
 }
 
+function requireStore(apiKeyStore) {
+  if (!apiKeyStore) throw Object.assign(new Error('API keys are not enabled'), { statusCode: 501, code: 'API_KEYS_DISABLED' });
+  return apiKeyStore;
+}
+
 async function run(registry, fn, params, successStatus) {
   const result = await fn(registry, params);
   return { status: successStatus, body: result };
@@ -100,9 +149,9 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
-  const routes = buildRoutes(registry);
+  const routes = buildRoutes(registry, apiKeyStore);
 
   return http.createServer(async (req, res) => {
     try {
@@ -114,9 +163,14 @@ export function createControlPlaneServer({ registry, logger = console } = {}) {
       const [, re, handler, opts] = match;
       const groups = re.exec(url.pathname).slice(1);
 
-      const identity = identityFromHeaders(req.headers, groups[0]);
+      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore);
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
+      }
+      // Key management must not be performed with an anon/service API key — admin (JWT) only.
+      const isKeyMgmt = url.pathname.includes('/api-keys');
+      if (isKeyMgmt && identity.dbRole) {
+        return sendJson(res, 403, { code: 'FORBIDDEN', message: 'API keys cannot manage API keys' });
       }
       const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
 

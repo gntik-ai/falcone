@@ -49,7 +49,18 @@ export function createConnectionRegistry(options = {}) {
     return conn;
   }
 
+  const ROLE_IDENT = /^[a-z_][a-z0-9_]*$/;
+
   async function applyRlsContext(client, context = {}) {
+    // Assume the credential's DB role for this transaction so RLS is evaluated
+    // against it (e.g. an anon key drops to a non-BYPASSRLS role). SET LOCAL ROLE is
+    // transaction-scoped, so it never leaks to the next pooled borrower.
+    if (context.role) {
+      if (!ROLE_IDENT.test(context.role)) {
+        throw failClosed(`Invalid database role ${context.role}`, 'INVALID_DB_ROLE');
+      }
+      await client.query(`SET LOCAL ROLE "${context.role}"`);
+    }
     if (context.tenantId) {
       await client.query('SELECT set_config($1, $2, true)', ['app.tenant_id', String(context.tenantId)]);
     }
