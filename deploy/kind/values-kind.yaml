@@ -1,0 +1,214 @@
+# Kind test-cluster-b install values.
+# - Replaces chart-pinned images that no longer exist on public registries
+#   (Bitnami purged public tags -> bitnamilegacy; apisix/prometheus/minio tag
+#   conventions; openwhisk standalone serves :3233).
+# - Points the two placeholder app images (ghcr.io/example/...) at the
+#   in-cluster registry (NodePort 30500; containerd allows plain-HTTP localhost).
+# - Installs into namespace `falcone` (shared cluster; musematic untouched).
+global:
+  namespace: falcone
+  createNamespace: false
+  imagePullSecrets: []
+bootstrap:
+  # The one-shot Keycloak provisioning (realm in-falcone-platform + roles +
+  # client scopes + in-falcone-console/in-falcone-gateway clients + superadmin)
+  # already completed successfully on an earlier revision and is live in Keycloak.
+  # The hook's *reconcile* phase is structurally incompatible with this profile
+  # (it PUTs routes to an APISIX Admin API that does not exist under
+  # APISIX_STAND_ALONE=true), so it can never complete. Disable the hook so Helm
+  # converges; the keycloak state it created persists.
+  enabled: false
+  job:
+    image:
+      # needs kubectl AND curl AND bash (the bootstrap script drives the
+      # Keycloak/APISIX admin APIs with curl); bitnami(legacy)/kubectl has no curl
+      repository: docker.io/alpine/k8s
+      tag: 1.32.2
+    securityContext:
+      runAsUser: 1000  # alpine/k8s image defaults to root
+      runAsGroup: 1000
+  oneShot:
+    keycloak:
+      realm:
+        # CHART FIX: the default values nest these flags under `login`, which is
+        # not a field of Keycloak's RealmRepresentation -> KC 26 rejects the
+        # whole payload (400 "unable to read contents from stream"). Delete the
+        # nested map (null) and set the real top-level fields instead.
+        login: null
+        loginWithEmailAllowed: true
+        registrationAllowed: true
+        rememberMe: true
+        verifyEmail: true
+        resetPasswordAllowed: true
+  reconcile:
+    apisix:
+      # CHART MISMATCH: APISIX runs with APISIX_STAND_ALONE=true (no Admin API on
+      # :9180); routes are loaded from config, not pushed via the admin API. The
+      # post-install bootstrap's reconciliation phase POSTs each route to the
+      # (absent) admin API and fails ("Could not connect to :9180"). The schema
+      # forbids an empty list (minItems:1), and the script template only emits an
+      # ensure_apisix_route call for a route whose `enabledInModes` includes the
+      # active gatewayPolicy.passthrough.mode (`enabled`). So we keep ONE
+      # placeholder route gated to a non-active mode -> zero admin-API calls ->
+      # the Job completes. (The one-shot Keycloak phase still runs in full.)
+      routes:
+        - routeId: "0000"
+          name: noop-standalone-placeholder
+          uri: /__noop__
+          priority: 1
+          enabledInModes:
+            - disabled
+          upstream:
+            component: controlPlane
+            port: 8080
+apisix:
+  image:
+    repository: docker.io/apache/apisix
+    tag: 3.10.0-debian
+  securityContext:
+    runAsUser: 636   # apache/apisix image USER is the non-numeric "apisix" (uid 636)
+  # Mount the standalone route table at the path apache/apisix reads when
+  # APISIX_STAND_ALONE=true. Without it APISIX starts with zero routes (every
+  # request 404s). The ConfigMap `falcone-apisix-standalone` is created from
+  # deploy/kind/apisix/apisix.yaml (apply-apisix-routes.sh). subPath keeps the
+  # rest of /usr/local/apisix/conf intact.
+  extraVolumes:
+    - name: standalone-config
+      configMap:
+        name: falcone-apisix-standalone
+  extraVolumeMounts:
+    - name: standalone-config
+      mountPath: /usr/local/apisix/conf/apisix.yaml
+      subPath: apisix.yaml
+postgresql:
+  image:
+    repository: docker.io/bitnamilegacy/postgresql
+    tag: 17.2.0
+mongodb:
+  image:
+    repository: docker.io/bitnamilegacy/mongodb
+    tag: 8.0.0
+kafka:
+  # single-broker KRaft (the in-falcone-kafka secret pins NODE_ID=0 with a
+  # localhost quorum; >1 replica would yield independent brokers, not a cluster)
+  replicas: 1
+  image:
+    repository: docker.io/bitnamilegacy/kafka
+    tag: 3.9.0
+openwhisk:
+  # openwhisk/standalone REQUIRES the docker socket (it spawns action containers
+  # via docker) and exits immediately without it; this chart profile also ships
+  # no invokers, so real action execution is out of scope on kind. A clearly
+  # labeled stub keeps the service surface (:3233) present and healthy.
+  image:
+    repository: localhost:30500/falcone-svc-stub
+    tag: "0.1.0"
+  env:
+    - name: OPENWHISK_RUNTIME_ENV
+      value: kubernetes
+    - name: PORT
+      value: "3233"
+    - name: SERVICE_NAME
+      value: openwhisk
+storage:
+  image:
+    repository: docker.io/minio/minio
+    tag: RELEASE.2025-04-22T22-12-26Z
+  securityContext:
+    runAsUser: 1000  # minio image defaults to root; any uid works with fsGroup on /data
+observability:
+  image:
+    repository: docker.io/prom/prometheus
+    tag: v3.2.1
+  securityContext:
+    runAsUser: 65534  # prom image USER is the non-numeric "nobody" (uid 65534)
+controlPlane:
+  # Real control-plane runtime (server.mjs): validates the Keycloak JWT and
+  # dispatches /v1/* to the repo's action modules (was a health-only stub).
+  # Mount the SA token: the function executor calls the k8s API (create Jobs) with
+  # the falcone-control-plane SA (granted jobs/pods RBAC via executor-rbac.yaml).
+  serviceAccount:
+    automountToken: true
+  image:
+    repository: localhost:30500/in-falcone-control-plane
+    tag: "0.6.2"
+  env:
+    # Postgres via PG* vars; password from the postgres Secret (no plaintext).
+    - name: PGHOST
+      value: falcone-postgresql
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      value: falcone
+    - name: PGDATABASE
+      value: in_falcone
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    - name: KEYCLOAK_JWKS_URL
+      value: http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs
+    - name: ROUTE_MAP_FILE
+      value: /app/route-map.runtime.json
+    # Domain B: Keycloak admin client (create tenant realms + users). Admin creds
+    # from the in-falcone-keycloak-admin Secret (no plaintext).
+    - name: KEYCLOAK_BASE_URL
+      value: http://falcone-keycloak:8080
+    - name: KEYCLOAK_ADMIN_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: username
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: password
+    # Object storage: MinIO S3 API + root credentials (no plaintext).
+    - name: MINIO_ENDPOINT
+      value: http://falcone-storage:9000
+    - name: MINIO_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_USER
+    - name: MINIO_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_PASSWORD
+    # Document store: MongoDB (bitnami root user + secret password, no plaintext).
+    - name: MONGO_HOST
+      value: falcone-mongodb:27017
+    - name: MONGO_USER
+      value: root
+    - name: MONGO_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-mongodb
+          key: MONGODB_ROOT_PASSWORD
+    # Event store: Kafka broker (PLAINTEXT listener, no auth).
+    - name: KAFKA_BROKERS
+      value: falcone-kafka:9092
+    # Functions: the nodejs runtime image each function's Knative Service runs
+    # (Harbor path in prod). Each function = a ksvc; invoke = HTTP, scale-to-zero.
+    - name: FN_RUNTIME_IMAGE
+      value: localhost:30500/in-falcone-fn-runtime:0.1.0
+webConsole:
+  image:
+    repository: localhost:30500/in-falcone-web-console
+    tag: "0.2.11"
+deployment:
+  upgrade:
+    # required by the chart's validate.yaml on every in-place upgrade
+    currentVersion: "0.2.0"
+keycloak:
+  # KC 26 re-augments the server on every start; 1Gi gets OOM-killed (exit 137)
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
