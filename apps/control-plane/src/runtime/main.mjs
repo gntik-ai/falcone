@@ -9,9 +9,18 @@ import pg from 'pg';
 import { createConnectionRegistry } from './connection-registry.mjs';
 import { createControlPlaneServer } from './server.mjs';
 import { createApiKeyStore } from './api-keys.mjs';
+import { createMongoExecutor } from './mongo-data-executor.mjs';
 
 const { Pool } = pg;
 const PORT = Number(process.env.PORT ?? 8080);
+
+function mongoUri() {
+  if (process.env.MONGO_URI) return process.env.MONGO_URI;
+  const host = process.env.MONGO_HOST;
+  if (!host) return undefined; // Mongo disabled when no URI/host configured
+  const auth = process.env.MONGO_USER ? `${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD ?? ''}@` : '';
+  return `mongodb://${auth}${host}`;
+}
 
 function dataDsn() {
   if (process.env.DATA_DB_URL) return process.env.DATA_DB_URL;
@@ -32,7 +41,11 @@ const registry = createConnectionRegistry({ resolveConnection: () => ({ dsn }) }
 const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 });
 const apiKeyStore = createApiKeyStore({ pool: keyPool });
 
-const server = createControlPlaneServer({ registry, apiKeyStore });
+// Mongo executor (enabled when a MONGO_URI/MONGO_HOST is configured).
+const mUri = mongoUri();
+const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: () => mUri }) : undefined;
+
+const server = createControlPlaneServer({ registry, apiKeyStore, mongoExecutor });
 
 apiKeyStore.ensureSchema()
   .catch((error) => console.error('[control-plane] api-key schema init failed:', error))
@@ -45,6 +58,7 @@ async function shutdown(signal) {
   server.close(() => {});
   await registry.end().catch(() => {});
   await keyPool.end().catch(() => {});
+  await mongoExecutor?.close().catch(() => {});
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
