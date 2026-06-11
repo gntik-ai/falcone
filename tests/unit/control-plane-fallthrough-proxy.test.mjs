@@ -9,6 +9,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
 
 // Dummy registry: the proxied (unmatched) path never touches it; createControlPlaneServer
@@ -95,6 +96,32 @@ test('without an upstream configured, an unmatched path still returns 404 NO_ROU
     const res = await fetch(`${base}/v1/postgres/workspaces/ws-a/inventory`, { headers: idHeaders });
     assert.equal(res.status, 404);
     assert.equal((await res.json()).code, 'NO_ROUTE');
+  });
+});
+
+test('a hostile request-target cannot redirect the proxy off the configured upstream host (SSRF)', async () => {
+  // fetch normalizes the request-target, so craft a raw absolute/protocol-relative target
+  // (`//169.254.169.254/…`, the cloud metadata IP) over a TCP socket. The proxy must pin the
+  // host to the configured upstream and forward only the path → our stub upstream receives it,
+  // and nothing ever leaves for 169.254.169.254.
+  await withServer({ controlPlaneUpstream: upstreamBase }, async (base) => {
+    upstreamCalls.length = 0;
+    const { hostname, port } = new URL(base);
+    const raw = await new Promise((resolve, reject) => {
+      const sock = net.connect(Number(port), hostname, () => {
+        sock.write(
+          'GET //169.254.169.254/v1/postgres/workspaces/ws-a/inventory HTTP/1.1\r\n' +
+          'Host: x\r\nx-tenant-id: ten-a\r\nConnection: close\r\n\r\n',
+        );
+      });
+      let buf = '';
+      sock.on('data', (d) => { buf += d; });
+      sock.on('end', () => resolve(buf));
+      sock.on('error', reject);
+    });
+    assert.match(raw, /HTTP\/1\.1 200/);
+    assert.equal(upstreamCalls.length, 1); // reached OUR upstream, not the metadata host
+    assert.equal(upstreamCalls[0].url, '/v1/postgres/workspaces/ws-a/inventory');
   });
 });
 
