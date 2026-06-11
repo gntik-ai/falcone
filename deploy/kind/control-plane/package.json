@@ -1,0 +1,14 @@
+{
+  "name": "in-falcone-control-plane-server",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Runtime HTTP server for the kind deploy: validates the Keycloak JWT, builds a trusted callerContext, and dispatches /v1/* to the repo's real control-plane/provisioning action modules.",
+  "main": "server.mjs",
+  "dependencies": {
+    "pg": "^8.16.3",
+    "jose": "^5.10.0",
+    "mongodb": "^6.12.0",
+    "kafkajs": "^2.2.4"
+  }
+}

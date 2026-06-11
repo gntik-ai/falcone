@@ -2174,6 +2174,22 @@
         ],
         "type": "string"
       },
+      "TopologyRegionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "regions": {
+            "description": "Supported data residency region identifiers, valid values for dataResidency.region at provisioning time.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "regions"
+        ],
+        "type": "object"
+      },
       "WorkspaceEnvironment": {
         "enum": [
           "dev",
@@ -3793,6 +3809,103 @@
         "x-owning-service": "control_api",
         "x-rate-limit-class": "data-read",
         "x-resource-type": "storage_provider",
+        "x-scope": "platform",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/platform/topology/regions": {
+      "get": {
+        "operationId": "listTopologyRegions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopologyRegionsResponse"
+                }
+              }
+            },
+            "description": "Supported data residency regions returned."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for platform topology discovery."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected gateway discovery error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the supported data residency regions for tenant provisioning",
+        "tags": [
+          "Catalog",
+          "Platform"
+        ],
+        "x-audiences": [
+          "platform_team",
+          "superadmin"
+        ],
+        "x-console-discovery-surface": true,
+        "x-console-tier": "platform",
+        "x-family": "platform",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "catalog",
+        "x-resource-type": "topology_region",
         "x-scope": "platform",
         "x-visibility": "public"
       }
