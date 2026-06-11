@@ -1,7 +1,7 @@
 // MongoDB document data client for the console (change: add-console-mongo-data-editor).
 // Calls the control-plane executor's Mongo document routes exactly. URLs match the executor.
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestJson, type JsonValue } from '@/lib/http'
 
 const enc = encodeURIComponent
 
@@ -92,5 +92,52 @@ export function deleteDocument(
   return requestConsoleSessionJson<{ deleted: boolean }>(
     `${docsBase(workspaceId, databaseName, collectionName)}/${enc(documentId)}`,
     { method: 'DELETE' }
+  )
+}
+
+// ---- Anon-key embeds (Supabase-style) ----
+export interface MongoEmbedParams {
+  apiKey: string
+  workspaceId: string
+  databaseName: string
+  collectionName: string
+  origin?: string
+}
+
+function embedDocsUrl(params: MongoEmbedParams): string {
+  return `${params.origin ?? 'https://<your-falcone-host>'}/v1/mongo/workspaces/${params.workspaceId}/data/${params.databaseName}/collections/${params.collectionName}/documents`
+}
+
+// fetch() snippet a developer pastes into their frontend. The gateway routes anon/service
+// keys by the `apikey` HEADER (not Authorization), so the snippet must send `apikey`.
+export function buildMongoFrontendSnippet(params: MongoEmbedParams): string {
+  return [
+    `const res = await fetch(`,
+    `  '${embedDocsUrl(params)}',`,
+    `  { headers: { apikey: '${params.apiKey}' } }`,
+    `)`,
+    `const { items } = await res.json()`
+  ].join('\n')
+}
+
+export function buildMongoCurlSnippet(params: MongoEmbedParams): string {
+  return [`curl -H 'apikey: ${params.apiKey}' \\`, `  '${embedDocsUrl(params)}'`].join('\n')
+}
+
+// Live read-only preview AS the anon key: a bare request carrying only the `apikey` header
+// (no console session JWT) — exactly what a frontend app does.
+export function previewDocumentsWithApiKey(
+  apiKey: string,
+  workspaceId: string,
+  databaseName: string,
+  collectionName: string,
+  options: { pageSize?: number } = {}
+): Promise<DocumentListResult> {
+  const params = new URLSearchParams()
+  if (options.pageSize != null) params.set('page[size]', String(options.pageSize))
+  const qs = params.toString()
+  return requestJson<DocumentListResult>(
+    `${docsBase(workspaceId, databaseName, collectionName)}${qs ? `?${qs}` : ''}`,
+    { headers: { apikey: apiKey } }
   )
 }
