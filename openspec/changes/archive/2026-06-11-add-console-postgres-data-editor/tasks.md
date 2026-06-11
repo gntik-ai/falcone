@@ -1,3 +1,29 @@
+## Implementation status (Phase 3 — DONE)
+
+Implemented + tested (web-console vitest; `pnpm -C apps/web-console exec vitest run` of the new files):
+- `apps/web-console/src/services/postgresApi.ts` — typed client centralizing the calls to the
+  control-plane executor (Phases 0-2): DDL (createSchema/createTable/addColumn/createIndex),
+  data (listRows/insertRow/updateRow/deleteRow/bulkInsert), API keys (issue/list/revoke/rotate),
+  and `buildFrontendSnippet`. URLs match the executor routes exactly. 15 unit tests assert
+  every URL/method/payload (`postgresApi.test.ts`).
+- `apps/web-console/src/components/console/PostgresDataEditor.tsx` — row data-grid (list +
+  insert via JSON editor + delete), and an API-keys panel that issues anon/service keys, shows
+  the plaintext **once** with a copy-paste frontend snippet, lists + revokes keys. 5 component
+  tests (`__tests__/PostgresDataEditor.test.tsx`): rows render, insert, invalid-JSON guard,
+  delete, issue-anon-key shows key + snippet.
+- `apps/web-console/src/pages/ConsolePostgresDataPage.tsx` + route `postgres/data` in router.tsx.
+- Enabling change: added `PATCH` to the console HTTP method unions (`lib/http.ts`,
+  `lib/console-session.ts`) so row updates work.
+
+NOTES: the web-console **vitest suite is pre-existing-broken on main** (vitest 4.1.0 vs
+coverage-v8 2.1.9 mismatch) — my new tests pass and my files typecheck clean; that suite is
+not run by CI (CI quality = `pnpm lint` + node `test:*`). Full browser E2E (real backend +
+Playwright) requires deploying the executor image — tracked separately.
+
+DEFERRED: create-table form in the UI (the service supports it + is tested; the page exposes
+data-grid + keys first); inline row editing (update is in the client, grid edit UX later);
+the RLS-policy builder UI (`add-console-rls-policies` follow-up).
+
 ## T01: Confirm baseline green
 
 - [ ] T01.1 Run `bash tests/blackbox/run.sh` — all existing tests pass

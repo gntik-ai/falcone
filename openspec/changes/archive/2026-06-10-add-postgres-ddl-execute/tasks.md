@@ -1,3 +1,23 @@
+## Implementation status (Phase 1 — DONE)
+
+Implemented + proven against real Postgres (`bash tests/env/executor/run.sh`):
+- `apps/control-plane/src/runtime/postgres-ddl-executor.mjs` — `executePostgresDdl` drives the
+  self-contained adapter SQL builders (`buildPostgresStructuralSqlPlan` +
+  `buildPostgresGovernanceSqlPlan`) and EXECUTES the rendered statements as ONE transaction on
+  the ADMIN connection (the app role can't create objects); `executionMode: preview` returns
+  statements without running; sanitized PG error mapping (`errors.mjs`); schema-create rendered inline.
+- HTTP DDL routes wired in `server.mjs`: POST `/v1/postgres/databases/{db}/schemas`,
+  `.../schemas/{s}/tables`, `.../tables/{t}/columns`, `.../tables/{t}/indexes`.
+- Tests: `tests/env/executor/postgres-ddl-executor.test.mjs` (create schema/table/column/index
+  actually exist; preview no-ops; invalid→400; duplicate→409 rolled back) + an HTTP create-table test.
+
+BUG FIXED (surfaced by real execution): `postgresql-structural-admin.mjs::renderIndexCreateStatement`
+emitted a schema-qualified index name (`CREATE INDEX "s"."i" ...`) which is invalid Postgres syntax —
+changed to a bare index name. Adapter test still green (it only asserts `includes('CREATE INDEX')`).
+
+DEFERRED (later): constraint/view/function DDL execution; richer plan-tier gating + risk/audit
+from the full `buildPostgresAdminAdapterCall` path (this uses the lighter self-contained builders).
+
 ## 1. Baseline
 
 - [ ] 1.1 Confirm baseline green: `bash tests/blackbox/run.sh`

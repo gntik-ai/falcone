@@ -29,6 +29,7 @@ import { ConsoleServiceAccountsPage } from '@/pages/ConsoleServiceAccountsPage'
 import { ConsoleStoragePage } from '@/pages/ConsoleStoragePage'
 import { ConsoleMongoPage } from '@/pages/ConsoleMongoPage'
 import { ConsolePostgresPage } from '@/pages/ConsolePostgresPage'
+import { ConsolePostgresDataPage } from '@/pages/ConsolePostgresDataPage'
 import { ConsoleKafkaPage } from '@/pages/ConsoleKafkaPage'
 import { ConsoleOperationsPage } from '@/pages/ConsoleOperationsPage'
 import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
@@ -163,6 +164,10 @@ export const appRoutes = [
           {
             path: 'postgres',
             element: <ConsolePostgresPage />
+          },
+          {
+            path: 'postgres/data',
+            element: <ConsolePostgresDataPage />
           },
           {
             path: 'mongo',

@@ -1,6 +1,7 @@
 # Keep docker build contexts small and avoid copying pnpm symlinked node_modules
 # (which point outside the build context and would break COPY). Image deps are
 # installed inside the Dockerfile instead.
+node_modules
 **/node_modules
 .git
 **/dist
@@ -10,6 +11,8 @@
 **/playwright-report
 tests/e2e/test-results
 deploy/kind/web-console/dist
+deploy/kind/.uiout
 deploy/kind/credentials.env
 deploy/kind/tls
+*.tsbuildinfo
 **/*.log

@@ -1,3 +1,33 @@
+## Implementation status (increment 1 — keystone proven)
+
+DONE and green against real Postgres (`bash tests/env/executor/run.sh`, 13/13):
+- Executor-over-adapter-plans for the Postgres data-row family (list/get/insert/update/delete):
+  `apps/control-plane/src/runtime/postgres-data-executor.mjs` introspects the table, calls
+  `buildPostgresDataApiPlan`, and EXECUTES the returned `sql:{text,values}` against the
+  workspace DB (closing the spec-only gap). Insert stamps tenant_id/workspace_id from the
+  verified identity (anti-spoof); reads are tenant-scoped by the adapter's injected predicate.
+- Runnable HTTP service `apps/control-plane/src/runtime/server.mjs`: identity from gateway
+  headers (x-tenant-id/x-workspace-id/x-auth-subject), route matching, `/healthz`, sanitized
+  errors (no stack/SQL leak), 401 missing identity, 404 NO_ROUTE / TABLE_NOT_FOUND.
+- Real-stack tests: `tests/env/executor/postgres-data-executor.test.mjs` +
+  `control-plane-http.test.mjs`.
+
+ALSO DONE (Phase-0 completion):
+- PG error-code mapping (`mapPgError`): 23505→409, 23503→422, 23502/23514/22*→400, 42501→403,
+  42P01→404, 08*/57*→503, else opaque 500 — sanitized (no pg message/detail/SQL leak); tested.
+- Container entrypoint `apps/control-plane/src/runtime/main.mjs` + `apps/control-plane/Dockerfile`
+  (built `in-falcone-control-plane:0.7.0`; smoke-tested: /healthz 200, 401, 404).
+- Helm wiring: `charts/in-falcone/values.yaml` controlPlane image → `ghcr.io/gntik-ai/in-falcone-control-plane:0.7.0`
+  (replaces the `ghcr.io/example/...` placeholder); `helm lint`/`template` green.
+
+DEVIATIONS from the plan below (intentional): code lives under `src/runtime/`; identity header
+is `x-tenant-id` (align to `X-Verified-*` once the gateway header contract is finalized).
+
+DEFERRED to later phases (per this proposal's scope — "other families plug in later"):
+generalizing the route loader from the postgres-data row family to the OTHER OpenAPI families
+(mongo/events/functions/storage) happens in their respective changes; building/pushing the
+image to the registry + per-environment DB-connection env are ops/overlay steps.
+
 ## 0. Prerequisite check
 
 - [ ] 0.1 Confirm `add-workspace-db-connection-registry` is applied (or confirm tests/env PG* env-var fallback is sufficient for the first slice); document which path is taken
