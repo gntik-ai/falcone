@@ -57,16 +57,25 @@ test('a tenant-scoped change stream delivers the caller tenant inserts and NOT a
   await dataExec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_B, workspaceId: WS_B }, operation: 'insert', payload: { document: { _id: 'rt-b1', body: 'b-one' } } })
   // tenant A update → should arrive
   await dataExec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_A, workspaceId: WS_A }, operation: 'update', documentId: 'rt-a1', payload: { update: { $set: { body: 'a-one-edited' } } } })
+  // tenant A delete → should arrive (tenant-scoped via the pre-image)
+  await dataExec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_A, workspaceId: WS_A }, operation: 'delete', documentId: 'rt-a1' })
+  // tenant B delete → must NOT reach tenant A's subscriber
+  await dataExec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_B, workspaceId: WS_B }, operation: 'delete', documentId: 'rt-b1' })
 
-  await delay(700) // let change events flush
+  await delay(900) // let change events flush
   controller.abort()
   await sub.close()
 
   const ids = events.map((e) => e.documentId)
   assert.ok(ids.includes('rt-a1'), 'tenant A insert delivered')
-  assert.ok(!ids.includes('rt-b1'), 'tenant B insert must NOT reach tenant A subscriber')
-  assert.ok(events.every((e) => e.document?.tenantId === TEN_A), 'every delivered doc is tenant A')
+  assert.ok(!ids.includes('rt-b1'), 'no tenant B change (insert or delete) reaches tenant A subscriber')
+  assert.ok(events.every((e) => e.document == null || e.document.tenantId === TEN_A), 'every delivered doc is tenant A')
   assert.ok(events.some((e) => e.type === 'update' && e.document?.body === 'a-one-edited'), 'update delivered with fullDocument')
+  // the delete is delivered, tenant-scoped, and carries the pre-image (prior document)
+  const del = events.find((e) => e.type === 'delete')
+  assert.ok(del, 'tenant A delete delivered (pre-image keeps it tenant-scoped)')
+  assert.equal(del.documentId, 'rt-a1')
+  assert.equal(del.document?.tenantId, TEN_A, 'delete carries the prior tenant-A document')
 })
 
 test('subscribe without tenant identity → 401', async () => {
