@@ -190,13 +190,14 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
   const mdoc = '^/v1/mongo/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/documents';
   const evt = '^/v1/events/workspaces/([^/]+)/topics';
   const fn = '^/v1/functions/workspaces/([^/]+)/actions';
+  const rt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/changes';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -281,7 +282,45 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'invoke', name, payload: c.body }, 200)],
     ['GET', new RegExp(`${fn}/([^/]+)/activations$`), ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
+
+    // ---- Realtime: subscribe to a collection's tenant-scoped changes (SSE stream) ----
+    ['GET', new RegExp(`${rt}$`), ([w, db, coll], c) =>
+      runRealtimeSse(realtimeExecutor, { workspaceId: w, databaseName: db, collectionName: coll }, c), { sse: true }],
   ];
+}
+
+// Stream a tenant-scoped Mongo change stream to the client as Server-Sent Events. The handler
+// owns the response (no sendJson); it cleans up the subscription when the client disconnects.
+async function runRealtimeSse(realtimeExecutor, target, c) {
+  if (!realtimeExecutor) throw Object.assign(new Error('Realtime is not enabled'), { statusCode: 501, code: 'REALTIME_DISABLED' });
+  const { req, res, identity } = c;
+  res.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no', // ask proxies (nginx/APISIX) not to buffer the stream
+  });
+  res.write('retry: 3000\n\n');
+  const controller = new AbortController();
+  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+  let sub;
+  const stop = () => { clearInterval(ping); controller.abort(); void sub?.close?.(); };
+  req.on('close', stop);
+  try {
+    sub = await realtimeExecutor.subscribe({
+      ...target,
+      identity,
+      signal: controller.signal,
+      onChange: (event) => res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`),
+      onError: () => res.write('event: error\ndata: {"code":"REALTIME_STREAM_ERROR"}\n\n'),
+    });
+    // The client may have already disconnected while we were connecting.
+    if (controller.signal.aborted) void sub.close?.();
+  } catch (err) {
+    res.write(`event: error\ndata: ${JSON.stringify({ code: err.code ?? 'REALTIME_ERROR' })}\n\n`);
+    stop();
+    res.end();
+  }
 }
 
 async function runFunctions(functionsExecutor, params, successStatus) {
@@ -320,12 +359,12 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor);
 
   return http.createServer(async (req, res) => {
     try {
@@ -350,6 +389,11 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const isKeyMgmt = url.pathname.includes('/api-keys');
       if (isKeyMgmt && identity.dbRole) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'API keys cannot manage API keys' });
+      }
+      // SSE routes own the response (streaming); pass req/res and skip the JSON path.
+      if (opts?.sse) {
+        await handler(groups, { url, identity, registry, req, res });
+        return;
       }
       const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
 

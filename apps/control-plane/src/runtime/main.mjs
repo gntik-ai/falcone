@@ -10,6 +10,7 @@ import { createConnectionRegistry } from './connection-registry.mjs';
 import { createControlPlaneServer } from './server.mjs';
 import { createApiKeyStore } from './api-keys.mjs';
 import { createMongoExecutor } from './mongo-data-executor.mjs';
+import { createRealtimeExecutor } from './realtime-executor.mjs';
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
@@ -51,6 +52,9 @@ const apiKeyStore = createApiKeyStore({ pool: keyPool });
 const mUri = mongoUri();
 const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: () => mUri }) : undefined;
 
+// Realtime executor (Mongo change streams; needs a replica set). Enabled with Mongo.
+const realtimeExecutor = mUri ? createRealtimeExecutor({ resolveUri: () => mUri }) : undefined;
+
 // Events executor (enabled when KAFKA_BROKERS is configured).
 const eventsExecutor = process.env.KAFKA_BROKERS ? createEventsExecutor({ brokers: process.env.KAFKA_BROKERS }) : undefined;
 
@@ -72,7 +76,7 @@ const jwtVerifier = createJwtVerifier({
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
@@ -88,6 +92,7 @@ async function shutdown(signal) {
   await registry.end().catch(() => {});
   await keyPool.end().catch(() => {});
   await mongoExecutor?.close().catch(() => {});
+  await realtimeExecutor?.close().catch(() => {});
   await eventsExecutor?.close().catch(() => {});
   process.exit(0);
 }
