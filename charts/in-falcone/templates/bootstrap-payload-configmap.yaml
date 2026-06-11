@@ -41,7 +41,13 @@ data:
 {{- $mode := .Values.gatewayPolicy.passthrough.mode -}}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
 {{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
-{{- $routeBody := dict "name" .name "priority" .priority "uri" .uri "upstream" (dict "type" "roundrobin" "nodes" (dict (printf "%s.%s.svc.cluster.local:%v" (include "in-falcone.componentServiceNameByAlias" (dict "root" $ "component" .upstream.component "serviceName" (.upstream.serviceName | default ""))) $.Release.Namespace .upstream.port) 1)) -}}
+{{- /* Data-plane routes (upstream.dataPlane: true) go to the dedicated control-plane
+       executor when it is enabled; otherwise they stay on the default control-plane. */ -}}
+{{- $upstreamComponent := .upstream.component -}}
+{{- if and (.upstream.dataPlane) ($.Values.controlPlaneExecutor).enabled -}}
+{{- $upstreamComponent = "controlPlaneExecutor" -}}
+{{- end -}}
+{{- $routeBody := dict "name" .name "priority" .priority "uri" .uri "upstream" (dict "type" "roundrobin" "nodes" (dict (printf "%s.%s.svc.cluster.local:%v" (include "in-falcone.componentServiceNameByAlias" (dict "root" $ "component" $upstreamComponent "serviceName" (.upstream.serviceName | default ""))) $.Release.Namespace .upstream.port) 1)) -}}
 {{- $familyId := "" -}}
 {{- $passthroughId := "" -}}
 {{- if .labels -}}
