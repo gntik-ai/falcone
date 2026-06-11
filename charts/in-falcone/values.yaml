@@ -2735,6 +2735,18 @@ gatewayPolicy:
         maxBodyBytes: 524288
         requireIdempotencyHeaderOnMutations: false
         rejectSpoofedContextHeaders: true
+  # APISIX limit-count storage policy for ALL gateway rate limits.
+  #   local (default): per-gateway-node counters — with N replicas the effective limit is ~N×.
+  #   redis: counters shared across replicas → globally EXACT limits. Set redis.host to an
+  #   in-cluster Redis (e.g. <release>-redis-master); no-auth redis (password isn't supported
+  #   here to keep credentials out of the route config).
+  rateLimit:
+    policy: local
+    redis:
+      host: ""
+      port: 6379
+      database: 0
+      timeoutMs: 1000
   qos:
     responseHeaders:
       - X-RateLimit-Limit
