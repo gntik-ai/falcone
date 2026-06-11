@@ -1,0 +1,42 @@
+# Observability
+
+In Falcone ships a Prometheus-based observability stack (chart alias `observability`) and surfaces per-tenant signals in the console's **Observability** and **Operations** views.
+
+![Observability](/screens/13-observability.png)
+
+## What's collected
+
+| Signal | Purpose |
+| --- | --- |
+| **Platform metrics** | Service health, request rates, latencies |
+| **Usage / consumption** | Per-tenant resource usage (drives quotas & billing inputs) |
+| **Quota / limit signals** | Threshold alerts, hard-limit enforcement decisions |
+| **Audit pipeline** | Query-safe audit records for governed actions (e.g. function lifecycle) |
+| **Business metrics** | Higher-level platform KPIs |
+
+The repository enforces the schema and presence of these via `npm run validate:observability-*` checks (metrics stack, dashboards, health checks, business metrics, usage/consumption, quota policies, threshold alerts, hard-limit enforcement, console alerts, audit pipeline/event-schema/query/export/correlation surfaces).
+
+## Per-tenant visibility
+
+Metrics, usage and audit are **tenant-keyed**, so the console can show one tenant's consumption and operations without exposing another's. Operations records (with detail views) track governed actions and their outcomes.
+
+![Operations](/screens/24-operations.png)
+
+## Quotas & hard limits
+
+A plan's `quota_policy` defines enforced limits and overage behaviour ([Domain Model](/architecture/domain-model#plans-quotas-entitlements)). The observability stack raises **threshold alerts** as usage approaches a limit and records **hard-limit enforcement** decisions when a limit is hit — both visible in the console's Quotas view.
+
+![Quotas](/screens/12-quotas.png)
+
+## Health checks
+
+Each component exposes health/readiness endpoints; `helm upgrade --install` gates on rollout completion. After install:
+
+```bash
+kubectl -n falcone rollout status deploy --timeout=300s
+kubectl -n falcone get pods
+```
+
+## Audit
+
+Governed operations (function deployments, admin actions, rollbacks, quota enforcement) produce **query-safe audit records** (`domain-model.json`), retained for compliance and surfaced through the audit query/export/correlation surfaces.
