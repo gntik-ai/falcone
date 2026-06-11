@@ -34,6 +34,20 @@ describe('mongoApi — document routes (workspace-scoped, executor)', () => {
     expect(lastCall()).toEqual([base])
   })
 
+  it('listDocuments forwards the cursor, filter, and sort', async () => {
+    await listDocuments('ws1', 'appdb', 'notes', {
+      pageSize: 10,
+      after: 'CURSOR1',
+      filter: { status: 'active' },
+      sort: { created_at: -1 }
+    })
+    const sp = new URL(`http://x${lastCall()[0]}`).searchParams
+    expect(sp.get('page[size]')).toBe('10')
+    expect(sp.get('page[after]')).toBe('CURSOR1')
+    expect(JSON.parse(sp.get('filter') as string)).toEqual({ status: 'active' })
+    expect(JSON.parse(sp.get('sort') as string)).toEqual({ created_at: -1 })
+  })
+
   it('insertDocument → POST documents { document }', async () => {
     await insertDocument('ws1', 'appdb', 'notes', { body: 'a' })
     expect(lastCall()).toEqual([base, { method: 'POST', body: { document: { body: 'a' } } }])

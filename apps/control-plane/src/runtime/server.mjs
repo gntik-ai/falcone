@@ -177,6 +177,17 @@ function filtersFromQuery(searchParams) {
   return filters.length > 0 ? filters : undefined;
 }
 
+// Parse a JSON value from a query param (e.g. Mongo ?filter={...}); 400 on malformed JSON.
+function jsonQueryParam(searchParams, key) {
+  const raw = searchParams.get(key);
+  if (raw == null || raw === '') return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw Object.assign(new Error(`Query parameter ${key} must be valid JSON`), { statusCode: 400, code: 'INVALID_QUERY_JSON' });
+  }
+}
+
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
 function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor) {
@@ -234,7 +245,10 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
 
     // ---- MongoDB documents (CRUD) ----
     ['GET', new RegExp(`${mdoc}$`), ([w, db, coll], c) =>
-      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'list', filter: c.body.filter, page: { size: c.url.searchParams.get('page[size]') ?? undefined } }, 200)],
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'list',
+        filter: jsonQueryParam(c.url.searchParams, 'filter'),
+        sort: jsonQueryParam(c.url.searchParams, 'sort'),
+        page: pageFromQuery(c.url.searchParams) }, 200)],
     ['POST', new RegExp(`${mdoc}$`), ([w, db, coll], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'insert', payload: { document: c.body.document ?? c.body } }, 201)],
     ['GET', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
