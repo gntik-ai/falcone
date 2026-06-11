@@ -11,6 +11,7 @@ import { createControlPlaneServer } from './server.mjs';
 import { createApiKeyStore } from './api-keys.mjs';
 import { createMongoExecutor } from './mongo-data-executor.mjs';
 import { createRealtimeExecutor } from './realtime-executor.mjs';
+import { createPostgresRealtimeExecutor } from './postgres-realtime-executor.mjs';
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
@@ -42,7 +43,12 @@ function dataDsn() {
 }
 
 const dsn = dataDsn();
-const registry = createConnectionRegistry({ resolveConnection: () => ({ dsn }) });
+const resolveConnection = () => ({ dsn });
+const registry = createConnectionRegistry({ resolveConnection });
+
+// Postgres realtime executor (trigger + LISTEN/NOTIFY; needs a connection that can create
+// the capture trigger — the executor's role is a superuser in the data plane).
+const pgRealtimeExecutor = createPostgresRealtimeExecutor({ resolveConnection });
 
 // API-key store on the control-plane metadata DB (defaults to the data DSN for now).
 const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 });
@@ -76,7 +82,7 @@ const jwtVerifier = createJwtVerifier({
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
@@ -93,6 +99,7 @@ async function shutdown(signal) {
   await keyPool.end().catch(() => {});
   await mongoExecutor?.close().catch(() => {});
   await realtimeExecutor?.close().catch(() => {});
+  await pgRealtimeExecutor?.close().catch(() => {});
   await eventsExecutor?.close().catch(() => {});
   process.exit(0);
 }

@@ -26,4 +26,5 @@ fi
 echo "==> running control-plane executor + HTTP tests (Postgres)"
 # Mongo executor tests run separately via run-mongo.sh (they need the Mongo replica set).
 node --test "$HERE"/postgres-data-executor.test.mjs "$HERE"/postgres-ddl-executor.test.mjs \
-  "$HERE"/control-plane-http.test.mjs "$HERE"/app-api-keys-rls.test.mjs
+  "$HERE"/control-plane-http.test.mjs "$HERE"/app-api-keys-rls.test.mjs \
+  "$HERE"/postgres-realtime-executor.test.mjs
