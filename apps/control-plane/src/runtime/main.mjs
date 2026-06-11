@@ -10,6 +10,7 @@ import { createConnectionRegistry } from './connection-registry.mjs';
 import { createControlPlaneServer } from './server.mjs';
 import { createApiKeyStore } from './api-keys.mjs';
 import { createMongoExecutor } from './mongo-data-executor.mjs';
+import { createEventsExecutor } from './events-executor.mjs';
 
 const { Pool } = pg;
 const PORT = Number(process.env.PORT ?? 8080);
@@ -45,7 +46,10 @@ const apiKeyStore = createApiKeyStore({ pool: keyPool });
 const mUri = mongoUri();
 const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: () => mUri }) : undefined;
 
-const server = createControlPlaneServer({ registry, apiKeyStore, mongoExecutor });
+// Events executor (enabled when KAFKA_BROKERS is configured).
+const eventsExecutor = process.env.KAFKA_BROKERS ? createEventsExecutor({ brokers: process.env.KAFKA_BROKERS }) : undefined;
+
+const server = createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor });
 
 apiKeyStore.ensureSchema()
   .catch((error) => console.error('[control-plane] api-key schema init failed:', error))
@@ -59,6 +63,7 @@ async function shutdown(signal) {
   await registry.end().catch(() => {});
   await keyPool.end().catch(() => {});
   await mongoExecutor?.close().catch(() => {});
+  await eventsExecutor?.close().catch(() => {});
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));

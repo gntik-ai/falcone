@@ -47,6 +47,9 @@ importers:
 
   apps/control-plane:
     dependencies:
+      kafkajs:
+        specifier: 2.2.4
+        version: 2.2.4
       mongodb:
         specifier: 6.15.0
         version: 6.15.0(socks@2.8.7)
