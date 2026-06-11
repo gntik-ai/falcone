@@ -87,6 +87,11 @@ data:
   "read" ($timeoutProfile.readSeconds | default 20)
 ) -}}
 {{- end }}
+{{- /* SSE routes (upstream.sse) hold a long-lived stream — use a long read/send timeout
+       so the gateway does not cut the connection. */ -}}
+{{- if .upstream.sse }}
+{{- $_ := set (index $routeBody "upstream") "timeout" (dict "connect" 5 "send" 3600 "read" 3600) -}}
+{{- end }}
 {{- if .plugins }}
 {{- $plugins := fromJson (toJson .plugins) -}}
 {{- if hasKey $plugins "openid-connect" }}

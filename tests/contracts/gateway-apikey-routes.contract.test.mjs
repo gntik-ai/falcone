@@ -62,6 +62,23 @@ test('api-key issuance route targets the executor with admin (JWT) auth, scoped 
   assert.ok(route.priority > workspaces.priority, 'issuance route must outrank public-api-workspaces');
 });
 
+test('realtime SSE route streams to the executor, anon-keyed, OIDC-free, long timeout', () => {
+  const route = byName('public-api-realtime-changes')
+  assert.ok(route, 'public-api-realtime-changes must be declared')
+  assert.equal(route.upstream?.requiresExecutor, true)
+  assert.equal(route.upstream?.dataPlane, true)
+  assert.equal(route.upstream?.sse, true) // template gives it a long upstream timeout
+  // matches only the change-stream endpoint
+  assert.deepEqual(route.vars, [['uri', '~~', '/data/[^/]+/collections/[^/]+/changes$']])
+  // anon/read: no JWT at the gateway (EventSource sends ?apikey=, executor verifies)
+  assert.ok(!('openid-connect' in (route.plugins ?? {})), 'realtime route must not enable openid-connect')
+  // rate-limited per key whether the key is a header or ?apikey=
+  const limit = route.plugins?.['limit-count']
+  assert.ok(limit && limit.rejected_code === 429, 'realtime route must rate-limit')
+  assert.equal(limit.key_type, 'var_combination')
+  assert.ok(String(limit.key).includes('$arg_apikey'), 'realtime rate limit must consider the ?apikey= query arg')
+})
+
 test('every requiresExecutor route is also a data-plane route (so the split sends it to the executor)', () => {
   for (const route of routes.filter((r) => r.upstream?.requiresExecutor)) {
     assert.equal(route.upstream?.dataPlane, true, `${route.name} requiresExecutor must imply dataPlane`);

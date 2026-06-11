@@ -23,8 +23,17 @@ let server;
 let base;
 const path = '/v1/realtime/workspaces/ws1/data/appdb/collections/notes/changes';
 
+// Stub key store so the ?apikey= (EventSource) auth path can resolve a valid anon key.
+const apiKeyStore = {
+  async verifyKey(key) {
+    return key === 'flc_anon_good'
+      ? { tenantId: 'ten-a', workspaceId: 'ws1', keyType: 'anon', roleName: 'falcone_app', dbRole: 'falcone_anon', scopes: [] }
+      : undefined;
+  }
+};
+
 before(async () => {
-  server = createControlPlaneServer({ registry, realtimeExecutor, logger: { error() {} } });
+  server = createControlPlaneServer({ registry, realtimeExecutor, apiKeyStore, logger: { error() {} } });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -67,6 +76,21 @@ test('streams change events as SSE, tenant identity passed through, and tears do
 
 test('realtime route requires tenant identity → 401', async () => {
   const res = await fetch(`${base}${path}`);
+  assert.equal(res.status, 401);
+  await res.body?.cancel?.();
+});
+
+test('authenticates via ?apikey= (EventSource cannot set headers)', async () => {
+  lastSubscribe = undefined;
+  const res = await fetch(`${base}${path}?apikey=flc_anon_good`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/);
+  assert.equal(lastSubscribe.identity.tenantId, 'ten-a'); // tenant from the verified key, not headers
+  await res.body?.cancel?.();
+});
+
+test('an invalid ?apikey= → 401 (no stream)', async () => {
+  const res = await fetch(`${base}${path}?apikey=flc_anon_bogus`);
   assert.equal(res.status, 401);
   await res.body?.cancel?.();
 });

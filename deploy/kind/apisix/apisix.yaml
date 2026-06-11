@@ -322,6 +322,33 @@ routes:
       scheme: http
       nodes:
         "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  # ---- Realtime change stream (SSE) -> executor ----
+  # Read-only; a browser EventSource cannot set headers, so the anon key arrives as ?apikey=
+  # and the executor verifies it. Long upstream timeout keeps the SSE stream open.
+  - id: "2016-rt"
+    uri: "/v1/realtime/*"
+    priority: 340
+    methods: ["GET", "OPTIONS"]
+    vars:
+      - ["uri", "~~", "/data/[^/]+/collections/[^/]+/changes$"]
+    plugins:
+      cors: {}
+      limit-count:
+        count: 120
+        time_window: 60
+        rejected_code: 429
+        key_type: var_combination
+        key: $http_apikey$arg_apikey
+        allow_degradation: false
+    upstream:
+      type: roundrobin
+      scheme: http
+      timeout:
+        connect: 5
+        send: 3600
+        read: 3600
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
   # ---- API-key issuance/management -> executor ----
   # Matches just the api-keys subpath at higher priority than the generic /v1/workspaces/*
   # route (2003 -> control-plane). Admin (Bearer JWT) auth: APISIX forwards the Authorization
