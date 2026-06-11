@@ -140,3 +140,34 @@ jobs:
 
       - name: Image supply-chain policy validation
         run: pnpm security:images
+
+  real-stack:
+    # Boots the tests/env Postgres (pgvector image) and runs the control-plane
+    # executor real-stack slice — incl. the vector-search cross-tenant KNN probe,
+    # RLS, data/DDL/realtime executors — against a REAL database. These prove the
+    # tenant-isolation guarantees that in-memory unit tests cannot.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Executor real-stack tests (Postgres + pgvector)
+        run: bash tests/env/executor/run.sh
+
+      - name: Tear down compose
+        if: always()
+        run: docker compose -f tests/env/docker-compose.yml down -v
