@@ -6,10 +6,12 @@ import type { JsonValue } from '@/lib/http'
 const enc = encodeURIComponent
 
 export type MongoDocument = Record<string, JsonValue>
+export type MongoFilter = Record<string, JsonValue>
+export type MongoSort = Record<string, 1 | -1 | 'asc' | 'desc'>
 
 export interface DocumentListResult {
   items: MongoDocument[]
-  page?: { size?: number; returned?: number }
+  page?: { size?: number; returned?: number; after?: string }
 }
 
 const docsBase = (workspaceId: string, db: string, collection: string) =>
@@ -19,10 +21,13 @@ export function listDocuments(
   workspaceId: string,
   databaseName: string,
   collectionName: string,
-  options: { pageSize?: number } = {}
+  options: { pageSize?: number; after?: string; filter?: MongoFilter; sort?: MongoSort } = {}
 ): Promise<DocumentListResult> {
   const params = new URLSearchParams()
   if (options.pageSize != null) params.set('page[size]', String(options.pageSize))
+  if (options.after != null) params.set('page[after]', options.after)
+  if (options.filter && Object.keys(options.filter).length > 0) params.set('filter', JSON.stringify(options.filter))
+  if (options.sort && Object.keys(options.sort).length > 0) params.set('sort', JSON.stringify(options.sort))
   const qs = params.toString()
   return requestConsoleSessionJson<DocumentListResult>(
     `${docsBase(workspaceId, databaseName, collectionName)}${qs ? `?${qs}` : ''}`
