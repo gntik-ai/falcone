@@ -24,7 +24,7 @@ export interface ConsoleShellSession {
 }
 
 export interface ConsoleSessionRequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: JsonValue
   headers?: HeadersInit
   idempotent?: boolean
