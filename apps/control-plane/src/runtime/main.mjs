@@ -12,6 +12,7 @@ import { createApiKeyStore } from './api-keys.mjs';
 import { createMongoExecutor } from './mongo-data-executor.mjs';
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
+import { createJwtVerifier } from './jwt-verify.mjs';
 
 const { Pool } = pg;
 const PORT = Number(process.env.PORT ?? 8080);
@@ -57,12 +58,21 @@ const eventsExecutor = process.env.KAFKA_BROKERS ? createEventsExecutor({ broker
 // runs user code in-thread); production injects a Knative backend (FN_BACKEND=knative).
 const functionsExecutor = process.env.FN_BACKEND === 'off' ? undefined : createFunctionsExecutor();
 
+// Bearer-JWT verifier (Keycloak/OIDC). Enabled when KEYCLOAK_JWKS_URL is set; lets the
+// executor authenticate admin/user requests directly (e.g. API-key issuance) without the
+// gateway injecting x-tenant-id. Unset → the executor trusts gateway-injected identity headers.
+const jwtVerifier = createJwtVerifier({
+  jwksUrl: process.env.KEYCLOAK_JWKS_URL,
+  issuer: process.env.KEYCLOAK_ISSUER,
+  audience: process.env.KEYCLOAK_AUDIENCE,
+});
+
 // When the executor fronts the data-family wildcard (gateway route-split), it serves the
 // data-plane + DDL slice itself and proxies every other path under those prefixes
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
