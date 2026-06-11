@@ -330,7 +330,8 @@ routes:
     priority: 340
     methods: ["GET", "OPTIONS"]
     vars:
-      - ["uri", "~~", "/data/[^/]+/collections/[^/]+/changes$"]
+      # matches both Mongo (collections/{c}/changes) and Postgres (tables/{t}/changes)
+      - ["uri", "~~", "/changes$"]
     plugins:
       cors: {}
       limit-count:
