@@ -11,9 +11,11 @@ WORKDIR /app
 COPY apps/control-plane/package.json /app/apps/control-plane/package.json
 RUN cd /app/apps/control-plane && npm install --omit=dev --no-package-lock
 
-# App sources + the adapter plan-builder layer the executor imports.
+# App sources + the adapter plan-builder layer the executor imports. The Mongo data
+# adapter loads internal-contracts (JSON read at runtime), so ship that src too.
 COPY apps/control-plane/src /app/apps/control-plane/src
 COPY services/adapters/src /app/services/adapters/src
+COPY services/internal-contracts/src /app/services/internal-contracts/src
 
 ENV NODE_ENV=production \
     PORT=8080

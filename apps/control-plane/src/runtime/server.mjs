@@ -88,10 +88,11 @@ function pageFromQuery(searchParams) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
+  const mdoc = '^/v1/mongo/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/documents';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -132,7 +133,27 @@ function buildRoutes(registry, apiKeyStore) {
       runDdl(registry, 'policy', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/security$`), ([db, s, t], c) =>
       runDdl(registry, 'table_security', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
+
+    // ---- MongoDB documents (CRUD) ----
+    ['GET', new RegExp(`${mdoc}$`), ([w, db, coll], c) =>
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'list', filter: c.body.filter, page: { size: c.url.searchParams.get('page[size]') ?? undefined } }, 200)],
+    ['POST', new RegExp(`${mdoc}$`), ([w, db, coll], c) =>
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'insert', payload: { document: c.body.document ?? c.body } }, 201)],
+    ['GET', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'get', documentId: id }, 200)],
+    ['PATCH', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'update', documentId: id, payload: { update: c.body.update ?? c.body } }, 200)],
+    ['PUT', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'replace', documentId: id, payload: { document: c.body.document ?? c.body } }, 200)],
+    ['DELETE', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+      runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'delete', documentId: id }, 200)],
   ];
+}
+
+async function runMongo(mongoExecutor, params, successStatus) {
+  if (!mongoExecutor) throw Object.assign(new Error('MongoDB is not enabled'), { statusCode: 501, code: 'MONGO_DISABLED' });
+  const result = await mongoExecutor.executeMongoData(params);
+  return { status: successStatus, body: result };
 }
 
 function requireStore(apiKeyStore) {
@@ -153,9 +174,9 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
-  const routes = buildRoutes(registry, apiKeyStore);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor);
 
   return http.createServer(async (req, res) => {
     try {
