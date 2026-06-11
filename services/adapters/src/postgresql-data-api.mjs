@@ -18,8 +18,16 @@ export const POSTGRES_DATA_API_OPERATIONS = Object.freeze([
   'import',
   'export',
   'saved_query_execute',
-  'stable_endpoint_invoke'
+  'stable_endpoint_invoke',
+  'knn_search'
 ]);
+// pgvector KNN distance metric → operator map (add-vector-search). cosine is the
+// default; the operator is rendered into the ORDER BY clause against the query vector.
+export const POSTGRES_VECTOR_DISTANCE_OPERATORS = Object.freeze({
+  cosine: '<=>',
+  l2: '<->',
+  inner_product: '<#>'
+});
 export const POSTGRES_DATA_API_COMMANDS = Object.freeze(['select', 'insert', 'update', 'delete', 'execute']);
 export const POSTGRES_DATA_COUNT_MODES = Object.freeze(['none', 'exact', 'estimated']);
 export const POSTGRES_DATA_PAGINATION_METADATA_MODES = Object.freeze(['basic', 'full']);
@@ -52,7 +60,8 @@ export const POSTGRES_DATA_API_CAPABILITIES = Object.freeze({
   import: 'postgres_data_import',
   export: 'postgres_data_export',
   saved_query_execute: 'postgres_data_saved_query_execute',
-  stable_endpoint_invoke: 'postgres_data_stable_endpoint_invoke'
+  stable_endpoint_invoke: 'postgres_data_stable_endpoint_invoke',
+  knn_search: 'postgres_data_knn_search'
 });
 
 export const POSTGRES_DATA_MANAGEMENT_CAPABILITIES = Object.freeze({
@@ -348,7 +357,7 @@ function ensureColumn(table, columnName) {
 }
 
 function commandForOperation(operation) {
-  if (['list', 'get', 'export', 'saved_query_execute', 'stable_endpoint_invoke'].includes(operation)) return 'select';
+  if (['list', 'get', 'export', 'saved_query_execute', 'stable_endpoint_invoke', 'knn_search'].includes(operation)) return 'select';
   if (operation === 'rpc') return 'execute';
   if (operation === 'bulk_insert' || operation === 'import') return 'insert';
   if (operation === 'bulk_update') return 'update';
@@ -1790,6 +1799,125 @@ export function buildPostgresDataStableEndpointInvocationPlan(request = {}) {
   };
 }
 
+// Detect the vector column on a normalized table definition. The executor's
+// introspection sets dataType.displayName from information_schema (pgvector reports
+// `USER-DEFINED` with udt_name `vector`, normalized upstream to `vector`); callers may
+// also tag a column { vector: true } or pass an explicit request.vectorColumn.
+function findVectorColumn(table, requestedColumn) {
+  if (requestedColumn) {
+    const column = table.columnMap.get(normalizeIdentifier(requestedColumn, 'vectorColumn'));
+    if (!column) {
+      throw new Error(`Unknown vector column ${requestedColumn} on ${table.schemaName}.${table.tableName}.`);
+    }
+    return column;
+  }
+  return table.columns.find((column) => /vector/i.test(column.dataType?.displayName ?? '') || column.vector === true);
+}
+
+// Build a KNN (k-nearest-neighbour) similarity search plan over a vector column.
+// Reuses the existing access evaluation + RLS clause + scalar filter builders unchanged;
+// the only vector-specific SQL is the `ORDER BY <col> <op> $queryVector LIMIT k` tail.
+function buildPostgresKnnSearchPlan(request = {}, context = {}) {
+  const { workspaceId, databaseName, candidateRoles, trace } = context;
+  const table = normalizeTableDefinition(request.table ?? {}, request.schemaName, request.tableName);
+
+  const metric = String(request.metric ?? 'cosine').trim().toLowerCase();
+  const distanceOperator = POSTGRES_VECTOR_DISTANCE_OPERATORS[metric];
+  if (!distanceOperator) {
+    throw new Error(`Unsupported KNN metric ${metric}; expected one of ${Object.keys(POSTGRES_VECTOR_DISTANCE_OPERATORS).join(', ')}.`);
+  }
+
+  const hasQueryVector = Array.isArray(request.queryVector) && request.queryVector.length > 0;
+  const hasQueryText = typeof request.queryText === 'string' && request.queryText.trim().length > 0;
+  if (!hasQueryVector && !hasQueryText) {
+    throw new Error('KNN search requires one of queryVector or queryText.');
+  }
+
+  const vectorColumn = findVectorColumn(table, request.vectorColumn);
+  if (!vectorColumn) {
+    throw new Error(`KNN search requires a vector column on ${table.schemaName}.${table.tableName}; none found.`);
+  }
+  // queryText needs an in-platform embedding step before a vector exists; the executor
+  // resolves it and re-calls with queryVector. Reject planning a text query with no vector.
+  if (!hasQueryVector) {
+    throw new Error('KNN search with queryText must be resolved to a queryVector by the embedding provider before planning.');
+  }
+
+  const rawTopK = request.topK ?? request.limit ?? 10;
+  const topK = Number(rawTopK);
+  if (!Number.isInteger(topK) || topK < 1) {
+    throw new Error('KNN search topK must be a positive integer.');
+  }
+
+  const select = normalizeSelect(request.select, table);
+  // Hybrid scalar filter accepts `filter` (spec naming) or `filters` (CRUD naming).
+  const filters = normalizeFilters(request.filters ?? request.filter, table);
+  const { effectiveRoleName, accessDecision } = resolveEffectiveRole({
+    candidateRoles,
+    command: 'select',
+    schemaGrants: request.schemaGrants,
+    objectGrants: request.objectGrants,
+    tableSecurity: request.tableSecurity,
+    policies: request.policies,
+    sessionContext: request.sessionContext,
+    table,
+    joins: []
+  });
+
+  const values = [];
+  const baseSelectExpressions = select.map((columnName) => `base.${quoteIdent(columnName)} AS ${quoteIdent(columnName)}`);
+  // The query vector is a bound parameter, cast to ::vector; never interpolated.
+  const vectorLiteral = `[${request.queryVector.map((entry) => Number(entry)).join(',')}]`;
+  const queryVectorPlaceholder = pushValue(values, vectorLiteral, 'vector');
+  const distanceExpression = `base.${quoteIdent(vectorColumn.columnName)} ${distanceOperator} ${queryVectorPlaceholder}`;
+  const baseWhereClauses = [];
+  const rlsClause = buildRlsClause({ alias: 'base', accessDecision, sessionContext: request.sessionContext, values });
+  if (rlsClause) baseWhereClauses.push(rlsClause);
+  baseWhereClauses.push(...buildFilterClauses({ alias: 'base', filters, values }));
+
+  const sql = [
+    `SELECT ${[...baseSelectExpressions, `${distanceExpression} AS ${quoteIdent('distance')}`].join(', ')}`,
+    `FROM ${qualifiedTableName(table.schemaName, table.tableName)} AS base`,
+    baseWhereClauses.length > 0 ? `WHERE ${baseWhereClauses.join(' AND ')}` : undefined,
+    `ORDER BY ${distanceExpression}`,
+    `LIMIT ${topK}`
+  ].filter(Boolean).join('\n');
+
+  return {
+    operation: 'knn_search',
+    command: 'select',
+    capability: POSTGRES_DATA_API_CAPABILITIES.knn_search,
+    effectiveRoleName,
+    resource: {
+      workspaceId,
+      databaseName,
+      schemaName: table.schemaName,
+      tableName: table.tableName
+    },
+    selection: select,
+    filters,
+    knn: {
+      vectorColumn: vectorColumn.columnName,
+      metric,
+      distanceOperator,
+      topK
+    },
+    access: {
+      reason: accessDecision.reason,
+      rlsEnforced: request.tableSecurity?.rlsEnabled !== false,
+      rowPredicateRequired: accessDecision.rowPredicateRequired === true
+    },
+    sql: {
+      text: sql,
+      values
+    },
+    trace: {
+      ...trace,
+      sessionSettings: buildTraceSettings(trace)
+    }
+  };
+}
+
 export function buildPostgresDataApiPlan(request = {}) {
   const operation = String(request.operation ?? 'list').trim().toLowerCase();
   if (!POSTGRES_DATA_API_OPERATIONS.includes(operation)) {
@@ -1837,6 +1965,10 @@ export function buildPostgresDataApiPlan(request = {}) {
 
   if (operation === 'stable_endpoint_invoke') {
     return buildPostgresDataStableEndpointInvocationPlan(request);
+  }
+
+  if (operation === 'knn_search') {
+    return buildPostgresKnnSearchPlan(request, { workspaceId, databaseName, candidateRoles, trace });
   }
 
   const table = normalizeTableDefinition(request.table ?? {}, request.schemaName, request.tableName);
