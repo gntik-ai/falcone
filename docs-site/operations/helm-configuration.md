@@ -1,6 +1,6 @@
 # Helm Configuration
 
-In Falcone is configured through the umbrella chart `charts/in-falcone`. This page covers the structure of `values.yaml` and how to compose it. For full install walkthroughs see [Installation](/guide/installation).
+In Falcone is configured through the umbrella chart `charts/in-falcone`. This page covers the structure of `values.yaml` and how to compose it. For a key-by-key description of every value you can set, see the [Helm Values Reference](/operations/values-reference); for full install walkthroughs see [Installation](/guide/installation).
 
 ## Top-level value sections
 
