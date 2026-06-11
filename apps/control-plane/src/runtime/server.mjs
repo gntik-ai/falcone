@@ -92,14 +92,23 @@ function apiKeyFromHeaders(headers) {
   return typeof direct === 'string' && direct.startsWith('flc_') ? direct : undefined;
 }
 
-// Resolve identity. A presented API key is AUTHORITATIVE: its tenant/workspace come from
-// the verified key, never from request headers — otherwise a caller on the no-JWT api-key
-// gateway route could send `apikey: flc_…` together with a spoofed `x-tenant-id: victim`
-// and the executor would trust the header (cross-tenant access). An invalid key fails closed
-// (no fallback to spoofable headers). Only when NO key is presented do we trust the
-// gateway-injected JWT identity headers (the gateway strips client-supplied context headers
-// and sets them from verified JWT claims).
-async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore) {
+// Extract a Bearer JWT (NOT an flc_ api-key, which apiKeyFromHeaders handles).
+function bearerJwtFromHeaders(headers) {
+  const m = /^Bearer\s+(\S+)$/i.exec(headers['authorization'] ?? '');
+  if (!m || m[1].startsWith('flc_')) return undefined;
+  return m[1];
+}
+
+// Resolve identity, in precedence order — each authoritative credential derives the
+// tenant/workspace from the credential itself, never from spoofable request headers:
+//   1. API key (Supabase-style) → tenant/workspace from the verified key (RLS dbRole).
+//   2. Bearer JWT (when a verifier is configured) → identity from verified token claims.
+//      This lets admin/user requests authenticate WITHOUT the gateway injecting x-tenant-id,
+//      so e.g. API-key issuance works through an OIDC-less gateway (kind standalone).
+//   3. Otherwise → gateway-injected JWT identity headers (the gateway validated the token
+//      and stripped client-supplied context headers).
+// A presented-but-invalid key or JWT fails closed (401) — no fallback to spoofable headers.
+async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifier) {
   const key = apiKeyFromHeaders(headers);
   if (key) {
     const resolved = apiKeyStore ? await apiKeyStore.verifyKey(key) : undefined;
@@ -115,7 +124,12 @@ async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore) {
     }
     return { tenantId: undefined }; // key presented but invalid/unverifiable → 401, fail closed
   }
-  return identityFromHeaders(headers, pathWorkspaceId); // no key → trust gateway JWT headers
+  const jwt = bearerJwtFromHeaders(headers);
+  if (jwt && jwtVerifier) {
+    const verified = await jwtVerifier.verify(jwt, pathWorkspaceId).catch(() => undefined);
+    return verified ?? { tenantId: undefined }; // invalid JWT → 401, fail closed
+  }
+  return identityFromHeaders(headers, pathWorkspaceId); // no credential → trust gateway headers
 }
 
 function primaryKeyFromQuery(searchParams) {
@@ -255,7 +269,7 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, controlPlaneUpstream, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
@@ -277,7 +291,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const [, re, handler, opts] = match;
       const groups = re.exec(url.pathname).slice(1);
 
-      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore);
+      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier);
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
       }
