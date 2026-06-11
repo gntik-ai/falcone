@@ -3,10 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/console-session', () => ({
   requestConsoleSessionJson: vi.fn().mockResolvedValue({})
 }))
+vi.mock('@/lib/http', () => ({
+  requestJson: vi.fn().mockResolvedValue({})
+}))
 
 import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestJson } from '@/lib/http'
 import {
   addColumn,
+  buildCurlSnippet,
   buildFrontendSnippet,
   createIndex,
   createSchema,
@@ -16,12 +21,14 @@ import {
   issueApiKey,
   listApiKeys,
   listRows,
+  previewRowsWithApiKey,
   revokeApiKey,
   rotateApiKey,
   updateRow
 } from './postgresApi'
 
 const mock = requestConsoleSessionJson as unknown as ReturnType<typeof vi.fn>
+const rawMock = requestJson as unknown as ReturnType<typeof vi.fn>
 const lastCall = () => mock.mock.calls[mock.mock.calls.length - 1]
 
 beforeEach(() => {
@@ -128,12 +135,34 @@ describe('postgresApi — workspace API keys', () => {
   })
 })
 
-describe('buildFrontendSnippet', () => {
-  it('embeds the anon key + the workspace-scoped rows URL', () => {
-    const snippet = buildFrontendSnippet({
-      apiKey: 'flc_anon_abc', workspaceId: 'ws1', databaseName: 'appdb', schemaName: 'app1', tableName: 'items', origin: 'https://api.example.com'
-    })
-    expect(snippet).toContain("Authorization: 'ApiKey flc_anon_abc'")
-    expect(snippet).toContain('https://api.example.com/v1/postgres/workspaces/ws1/data/appdb/schemas/app1/tables/items/rows')
+describe('anon-key embeds', () => {
+  const params = {
+    apiKey: 'flc_anon_abc', workspaceId: 'ws1', databaseName: 'appdb', schemaName: 'app1', tableName: 'items', origin: 'https://api.example.com'
+  }
+  const rowsUrl = 'https://api.example.com/v1/postgres/workspaces/ws1/data/appdb/schemas/app1/tables/items/rows'
+
+  it('buildFrontendSnippet uses the apikey header (the gateway routes by it, not Authorization)', () => {
+    const snippet = buildFrontendSnippet(params)
+    expect(snippet).toContain("apikey: 'flc_anon_abc'")
+    expect(snippet).not.toContain('Authorization')
+    expect(snippet).toContain(rowsUrl)
+  })
+
+  it('buildCurlSnippet sends the apikey header', () => {
+    const snippet = buildCurlSnippet(params)
+    expect(snippet).toContain("-H 'apikey: flc_anon_abc'")
+    expect(snippet).toContain(rowsUrl)
+  })
+
+  it('previewRowsWithApiKey does a bare apikey request (no console session) to the rows route', async () => {
+    rawMock.mockClear()
+    rawMock.mockResolvedValue({ items: [] })
+    await previewRowsWithApiKey('flc_anon_abc', 'ws1', 'appdb', 'app1', 'items', { pageSize: 10 })
+    expect(rawMock).toHaveBeenCalledWith(
+      '/v1/postgres/workspaces/ws1/data/appdb/schemas/app1/tables/items/rows?page%5Bsize%5D=10',
+      { headers: { apikey: 'flc_anon_abc' } }
+    )
+    // it must NOT go through the console session (which would attach the admin JWT)
+    expect(mock).not.toHaveBeenCalled()
   })
 })

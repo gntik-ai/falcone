@@ -9,7 +9,9 @@ vi.mock('@/services/postgresApi', () => ({
   deleteRow: vi.fn(),
   issueApiKey: vi.fn(),
   revokeApiKey: vi.fn(),
-  buildFrontendSnippet: vi.fn(() => 'SNIPPET')
+  previewRowsWithApiKey: vi.fn(),
+  buildFrontendSnippet: vi.fn(() => 'FETCH_SNIPPET'),
+  buildCurlSnippet: vi.fn(() => 'CURL_SNIPPET')
 }))
 
 import { PostgresDataEditor } from './PostgresDataEditor'
@@ -19,6 +21,7 @@ import {
   issueApiKey,
   listApiKeys,
   listRows,
+  previewRowsWithApiKey,
   updateRow
 } from '@/services/postgresApi'
 
@@ -28,7 +31,8 @@ const mocked = {
   insertRow: insertRow as unknown as ReturnType<typeof vi.fn>,
   updateRow: updateRow as unknown as ReturnType<typeof vi.fn>,
   deleteRow: deleteRow as unknown as ReturnType<typeof vi.fn>,
-  issueApiKey: issueApiKey as unknown as ReturnType<typeof vi.fn>
+  issueApiKey: issueApiKey as unknown as ReturnType<typeof vi.fn>,
+  previewRowsWithApiKey: previewRowsWithApiKey as unknown as ReturnType<typeof vi.fn>
 }
 
 function renderEditor() {
@@ -140,12 +144,30 @@ describe('PostgresDataEditor — richer UX', () => {
     expect(screen.getByRole('button', { name: 'Previous' })).not.toBeDisabled()
   })
 
-  it('issues an anon key and reveals the plaintext once with a copy button', async () => {
+  it('issues an anon key and reveals the plaintext once with copy + embed snippets', async () => {
     mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
     renderEditor()
     await screen.findByText('hello')
     fireEvent.click(screen.getByRole('button', { name: 'Issue anon key' }))
     expect(await screen.findByText('flc_anon_secret')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy key' })).toBeInTheDocument()
+    // fetch + curl embed snippets are shown
+    expect(screen.getByText('FETCH_SNIPPET')).toBeInTheDocument()
+    expect(screen.getByText('CURL_SNIPPET')).toBeInTheDocument()
+  })
+
+  it('runs a read-only preview AS the issued anon key and shows the rows', async () => {
+    mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
+    mocked.previewRowsWithApiKey.mockResolvedValue({ items: [{ id: 'r9', body: 'as-anon' }] })
+    renderEditor()
+    await screen.findByText('hello')
+    fireEvent.click(screen.getByRole('button', { name: 'Issue anon key' }))
+    await screen.findByText('flc_anon_secret')
+    fireEvent.click(screen.getByRole('button', { name: 'Run read-only preview' }))
+    await waitFor(() =>
+      expect(mocked.previewRowsWithApiKey).toHaveBeenCalledWith('flc_anon_secret', 'ws1', 'appdb', 'public', 'notes', { pageSize: 10 })
+    )
+    expect(await screen.findByText('as-anon')).toBeInTheDocument()
+    expect(screen.getByText(/Preview as this key — 1 row/)).toBeInTheDocument()
   })
 })
