@@ -98,49 +98,54 @@ that opt out of the Functions capability fail fast rather than silently.
 
 ### Requirement: Pluggable embedding-provider backend is registered per workspace
 
-The system SHALL support a pluggable embedding-provider backend following the same
-`{ invoke(text, params) }` interface pattern established in
-`apps/control-plane/src/runtime/functions-executor.mjs::localWorkerBackend` (lines
-34-49). The provider SHALL be registered per workspace (tenant-scoped), configurable
-via `PUT /v1/workspaces/{id}/embedding-provider` (`structural_admin` privilege),
-and the provider API key SHALL be supplied as a `secretRef` resolving via the existing
-Vault + External Secrets (ESO) secret path, never as a plaintext value. A `null`
-provider configuration means in-platform embedding is disabled for that workspace.
+The system SHALL persist the embedding-provider configuration durably in a Postgres-backed store
+(`workspace_embedding_providers` table on the `CONTROL_DB_URL ?? DATA_DB_URL` metadata pool,
+mirroring the `createApiKeyStore` pattern in
+`apps/control-plane/src/runtime/api-keys.mjs::createApiKeyStore`) so that provider configuration
+survives a control-plane process restart and is visible to all replicas sharing the same metadata
+database. The system SHALL store ONLY the `secretRef` JSON object — never the resolved plaintext
+API key — in the `secret_ref` column (the `deployProvider` upsert strips any caller-supplied
+`apiKey`/`secret` via `const { apiKey, secret, tenantId, ...safe } = config`), consistent with the
+fail-closed secret-resolution contract enforced in
+`apps/control-plane/src/runtime/embedding-executor.mjs::httpEmbeddingBackend` (the
+`EMBEDDING_SECRET_UNRESOLVED` 500 when a secret cannot be resolved).
 
-#### Scenario: Workspace embedding provider is set via structural admin route
+#### Scenario: Provider configuration survives a control-plane restart
 
-- **WHEN** a structural admin submits `PUT /v1/workspaces/{id}/embedding-provider`
-  with `{ "providerType": "openai", "model": "text-embedding-3-small",
-  "secretRef": { "vaultPath": "secret/ws-abc/openai-key" } }`
-- **THEN** the system persists the provider configuration (without the resolved secret
-  value), returns HTTP 200, and subsequent KNN searches with `queryText` on that
-  workspace use this provider
+- **WHEN** a structural admin configures an embedding provider on a workspace via
+  `PUT /v1/workspaces/{id}/embedding-provider` and the control-plane process is subsequently
+  restarted (new process, fresh in-memory state)
+- **THEN** a subsequent `queryText` KNN search against that workspace resolves the same provider
+  configuration from the Postgres-backed store without requiring reconfiguration
 
-#### Scenario: Embedding provider is invoked with the workspace-scoped secret
+#### Scenario: Provider is visible to a second replica sharing the metadata DB
 
-- **WHEN** a KNN search with `queryText` triggers the embedding provider for workspace A
-- **THEN** the provider backend resolves the secret from the Vault path stored in
-  workspace A's provider config and calls the provider API using that credential;
-  workspace B's secret is never accessed
+- **WHEN** an embedding provider is configured on workspace W through control-plane replica R1
+  (which writes to the shared `CONTROL_DB_URL` Postgres pool)
+- **THEN** control-plane replica R2 sharing the same `CONTROL_DB_URL` MUST read the identical
+  provider configuration for workspace W, so `queryText` KNN searches routed to R2 succeed using
+  the same provider
 
-#### Scenario: Removing the provider disables in-platform embedding
+#### Scenario: Plaintext API key is never persisted
 
-- **WHEN** a structural admin submits `DELETE /v1/workspaces/{id}/embedding-provider`
-- **THEN** subsequent KNN searches with `queryText` on that workspace return HTTP 422
-  with an error indicating no provider is configured, and no provider API call is made
+- **WHEN** a structural admin submits `PUT /v1/workspaces/{id}/embedding-provider` with a body
+  that includes both a `secretRef` and any plaintext `apiKey` or `secret` field
+- **THEN** the system SHALL persist only the `secretRef` value; the plaintext field is stripped
+  before writing and is absent from any subsequent read of the stored configuration
 
 ### Requirement: Embedding provider backend is replaceable without data migration
 
-The system SHALL allow the embedding provider to be replaced on a workspace (via a
-subsequent `PUT`) without affecting existing stored vectors. Replacing the provider does
-NOT trigger re-embedding of stored data; the platform SHALL warn in the response that
-existing vectors may have been generated with a different model and dimension.
+The system SHALL preserve the re-index warning behaviour when a provider is replaced via the
+Postgres-backed store, identical to the in-memory behaviour in
+`apps/control-plane/src/runtime/embedding-executor.mjs::createEmbeddingProviderStore` (both
+the in-memory and Postgres paths share the `REINDEX_WARNING` constant): replacing an existing
+provider record MUST include a `warning` field in the response stating that existing vectors may
+require re-indexing.
 
-#### Scenario: Provider replacement is accepted and returns a migration warning
+#### Scenario: Provider replacement via Postgres-backed store preserves the re-index warning
 
-- **WHEN** a structural admin replaces an existing embedding provider on a workspace
-  with a provider of different `model` or `dimension`
-- **THEN** the system accepts the update (HTTP 200), persists the new configuration,
-  and includes a `warning` field in the response body stating that existing vectors
-  were generated by the previous provider and may require re-indexing
+- **WHEN** a structural admin replaces an already-persisted embedding provider on a workspace
+  (second `PUT` to the same workspace) using the Postgres-backed store
+- **THEN** the response SHALL include the `warning` field stating existing vectors may require
+  re-indexing, identical to the behaviour of the in-memory store
 

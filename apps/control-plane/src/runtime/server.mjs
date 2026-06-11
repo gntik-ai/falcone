@@ -304,10 +304,12 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
 
     // ---- Embedding provider (workspace-scoped): set / remove (structural admin) ----
+    // The verified identity's tenantId is injected so the Postgres-backed store keys the
+    // record by (tenant_id, workspace_id) — never trusting a tenantId in the request body.
     ['PUT', new RegExp(`${emb}$`), ([w], c) =>
-      runEmbeddingProvider(embeddingExecutor, 'set', { workspaceId: w, config: c.body }, 200)],
-    ['DELETE', new RegExp(`${emb}$`), ([w]) =>
-      runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w }, 200)],
+      runEmbeddingProvider(embeddingExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
+    ['DELETE', new RegExp(`${emb}$`), ([w], c) =>
+      runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
 
     // ---- Realtime: subscribe to tenant-scoped changes (SSE stream) ----
     // Mongo collection change stream:
@@ -400,10 +402,12 @@ async function runDdlAction(registry, resourceKind, action, payload, c) {
 async function runEmbeddingProvider(embeddingExecutor, action, params, successStatus) {
   if (!embeddingExecutor) throw Object.assign(new Error('Embedding provider is not enabled'), { statusCode: 501, code: 'EMBEDDING_DISABLED' });
   if (action === 'set') {
-    const result = await embeddingExecutor.store.deployProvider(params.workspaceId, params.config ?? {});
+    // The tenantId comes from the verified identity (never the body); the store keys the
+    // record by (tenant_id, workspace_id). deployProvider strips any plaintext apiKey/secret.
+    const result = await embeddingExecutor.store.deployProvider(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
     return { status: successStatus, body: result };
   }
-  const result = await embeddingExecutor.store.removeProvider(params.workspaceId);
+  const result = await embeddingExecutor.store.removeProvider(params.workspaceId, params.tenantId);
   return { status: successStatus, body: result };
 }
 

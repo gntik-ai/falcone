@@ -120,55 +120,45 @@ returned even if their vectors are numerically closer.
 
 ### Requirement: In-platform embedding generation translates query text to a vector
 
-The system SHALL, when a `POST /v1/collections/{name}/search` or insert request
-supplies `queryText` (or a text field marked for embedding) instead of a raw vector, call
-the tenant-scoped embedding provider configured on the workspace to obtain the
-embedding, then proceed with the search or insert using the returned vector. The
-embedding dimension returned by the provider MUST match the declared column dimension;
-a mismatch SHALL cause the request to fail with HTTP 422.
+The running control-plane SHALL construct an `embeddingExecutor` (via `createEmbeddingExecutor`
+from `apps/control-plane/src/runtime/embedding-executor.mjs`) backed by a Postgres-persistent
+`createEmbeddingProviderStore({ pool })` and SHALL pass it as `embeddingExecutor` to
+`createControlPlaneServer`, so that the `queryText` KNN path (the `POST .../search` route in
+`apps/control-plane/src/runtime/server.mjs`) and the
+`PUT/DELETE /v1/workspaces/{id}/embedding-provider` routes are operational
+rather than returning HTTP 501 `EMBEDDING_DISABLED`.
 
-#### Scenario: Query text is embedded and search proceeds
+#### Scenario: queryText KNN search succeeds when a provider is configured
 
-- **WHEN** a data-access caller submits a KNN search with `queryText: "semantic query"`
-  and the workspace has an embedding provider configured
-- **THEN** the system calls the provider, obtains a vector of the correct dimension,
-  and returns KNN results as if the caller had supplied the vector directly
+- **WHEN** a structural admin has configured an embedding provider via
+  `PUT /v1/workspaces/{id}/embedding-provider` and a data-access caller submits a
+  `POST /v1/.../search` with `queryText`
+- **THEN** the system SHALL return KNN results (HTTP 200) rather than HTTP 501
+  `EMBEDDING_DISABLED`, because the `embeddingExecutor` is wired in the running control-plane
 
-#### Scenario: Embedding dimension mismatch is rejected
+#### Scenario: Embedding provider routes return 422 not 501 when no provider is configured
 
-- **WHEN** the embedding provider returns a vector whose length differs from the
-  declared column dimension
-- **THEN** the system rejects the request with HTTP 422 citing a dimension mismatch,
-  and no database query is executed
-
-#### Scenario: Search with queryText fails when no provider is configured
-
-- **WHEN** a data-access caller submits a KNN search with `queryText` but the workspace
-  has no embedding provider configured
-- **THEN** the system rejects the request with HTTP 422 indicating that in-platform
-  embedding requires a configured provider
+- **WHEN** the control-plane starts with a Postgres-backed `embeddingExecutor` wired and a
+  `queryText` KNN request targets a workspace with no configured provider
+- **THEN** the system MUST return HTTP 422 with `code: "EMBEDDING_PROVIDER_MISSING"` (the
+  `createEmbeddingExecutor::resolveBackend` error in `embedding-executor.mjs`) rather
+  than HTTP 501, confirming the executor is active
 
 ### Requirement: Embedding provider is tenant-scoped and credentials are stored via secret refs
 
-The system SHALL persist the embedding provider configuration per workspace using the
-existing `config.secretRefs` / Vault + External Secrets (ESO) pattern so that provider
-API keys are never stored in plaintext and are injected at request time. The provider
-SHALL be replaceable (PUT) and removable (DELETE) without affecting previously stored
-vectors.
+The system SHALL scope reads and writes of a workspace's embedding-provider record to the
+`(tenant_id, workspace_id)` pair so that a write for workspace W under tenant A cannot
+overwrite or shadow the provider record of workspace W under tenant B, consistent with the
+`workspace_api_keys` scoping pattern in
+`apps/control-plane/src/runtime/api-keys.mjs` (lines 36-48).
 
-#### Scenario: Provider configured with a secret ref is usable for embedding
+#### Scenario: Embedding provider write is scoped to tenant and workspace
 
-- **WHEN** a structural admin configures an embedding provider on a workspace using a
-  `secretRef` pointing to a Vault path that resolves to an API key
-- **THEN** a subsequent KNN search with `queryText` calls the provider using the
-  resolved key and returns results
-
-#### Scenario: Provider from workspace A is not accessible to workspace B
-
-- **WHEN** workspace A configures an embedding provider and workspace B submits a KNN
-  search with `queryText`
-- **THEN** workspace B's request fails with HTTP 422 (no provider configured) because
-  the provider is scoped to workspace A
+- **WHEN** tenant A configures an embedding provider on workspace W and tenant B subsequently
+  configures a different provider on a workspace with the same `workspaceId` value W
+- **THEN** each tenant's provider record SHALL be stored independently keyed by
+  `(tenant_id, workspace_id)`; a `queryText` KNN search by tenant A MUST use tenant A's
+  provider and tenant B MUST use tenant B's provider, with no cross-tenant leakage
 
 ### Requirement: Cross-tenant KNN probe never returns another tenant's vectors
 
