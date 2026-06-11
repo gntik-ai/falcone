@@ -70,7 +70,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane
-          image: localhost:30500/in-falcone-control-plane-executor:0.7.0
+          image: localhost:30500/in-falcone-control-plane-executor:0.9.0
           imagePullPolicy: IfNotPresent
           ports:
             - { containerPort: 8080, name: http }
@@ -83,6 +83,14 @@ spec:
             - { name: PGDATABASE, value: in_falcone }
             - name: PGPASSWORD
               valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } }
+            # Mongo (enables the document API) — root user authenticates against admin.
+            - { name: MONGO_HOST, value: "falcone-mongodb:27017" }
+            - { name: MONGO_USER, value: root }
+            - { name: MONGO_AUTH_SOURCE, value: admin }
+            - name: MONGO_PASSWORD
+              valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } }
+            # Kafka (enables the events API); Functions use the local backend by default.
+            - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
           readinessProbe:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 3
