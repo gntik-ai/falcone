@@ -74,6 +74,40 @@ describe('MongoDataEditor — richer UX', () => {
     )
   })
 
+  it('applies a JSON filter and requeries', async () => {
+    renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    fireEvent.change(screen.getByLabelText(/Filter \(MongoDB query JSON\)/), { target: { value: '{"status":"active"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await waitFor(() =>
+      expect(mocked.listDocuments).toHaveBeenLastCalledWith(
+        'ws1', 'appdb', 'notes', expect.objectContaining({ filter: { status: 'active' } })
+      )
+    )
+  })
+
+  it('rejects an invalid filter JSON without querying', async () => {
+    renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    mocked.listDocuments.mockClear()
+    fireEvent.change(screen.getByLabelText(/Filter \(MongoDB query JSON\)/), { target: { value: '{bad' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filter' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Filter: Not valid JSON')
+    expect(mocked.listDocuments).not.toHaveBeenCalled()
+  })
+
+  it('paginates with the keyset cursor', async () => {
+    mocked.listDocuments.mockResolvedValue({ items: [{ _id: 'd1', body: 'hello' }], page: { after: 'CUR1' } })
+    renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    const next = screen.getByRole('button', { name: 'Next' })
+    expect(next).not.toBeDisabled()
+    fireEvent.click(next)
+    await waitFor(() =>
+      expect(mocked.listDocuments).toHaveBeenLastCalledWith('ws1', 'appdb', 'notes', expect.objectContaining({ after: 'CUR1' }))
+    )
+  })
+
   it('deletes a document by _id', async () => {
     mocked.deleteDocument.mockResolvedValue({ deleted: true })
     renderEditor()
