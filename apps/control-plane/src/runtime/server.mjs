@@ -88,12 +88,13 @@ function pageFromQuery(searchParams) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
   const mdoc = '^/v1/mongo/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/documents';
   const evt = '^/v1/events/workspaces/([^/]+)/topics';
+  const fn = '^/v1/functions/workspaces/([^/]+)/actions';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -158,7 +159,25 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor) {
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'publish', topic, payload: c.body }, 202)],
     ['GET', new RegExp(`${evt}/([^/]+)/messages$`), ([w, topic], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'consume', topic, payload: { maxMessages: Number(c.url.searchParams.get('maxMessages') ?? 10), timeoutMs: Number(c.url.searchParams.get('timeoutMs') ?? 3000) } }, 200)],
+
+    // ---- Functions: deploy / list / get / invoke / activations (workspace-scoped) ----
+    ['GET', new RegExp(`${fn}$`), ([w], c) =>
+      runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'list' }, 200)],
+    ['POST', new RegExp(`${fn}$`), ([w], c) =>
+      runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'deploy', name: c.body.name, payload: c.body }, 201)],
+    ['GET', new RegExp(`${fn}/([^/]+)$`), ([w, name], c) =>
+      runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'get', name }, 200)],
+    ['POST', new RegExp(`${fn}/([^/]+)/invocations$`), ([w, name], c) =>
+      runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'invoke', name, payload: c.body }, 200)],
+    ['GET', new RegExp(`${fn}/([^/]+)/activations$`), ([w, name], c) =>
+      runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
   ];
+}
+
+async function runFunctions(functionsExecutor, params, successStatus) {
+  if (!functionsExecutor) throw Object.assign(new Error('Functions are not enabled'), { statusCode: 501, code: 'FUNCTIONS_DISABLED' });
+  const result = await functionsExecutor.executeFunctions(params);
+  return { status: successStatus, body: result };
 }
 
 async function runMongo(mongoExecutor, params, successStatus) {
@@ -191,9 +210,9 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor);
 
   return http.createServer(async (req, res) => {
     try {
