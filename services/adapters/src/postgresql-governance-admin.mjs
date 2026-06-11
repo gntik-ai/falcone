@@ -168,6 +168,15 @@ function findAuthorizedExtension(extensionName, context = {}, profile = {}) {
   return resolveExtensionCatalog(context, profile).find((entry) => entry.extensionName === normalized);
 }
 
+// Resolve an extension entry IGNORING placement-mode filtering. Used by the validator's
+// placement guard so a known-but-placement-incompatible extension (e.g. `vector` on
+// schema_per_tenant) produces the precise "not available for placement mode" violation
+// rather than a generic "not in catalog" one. See add-vector-search.
+function findCatalogedExtension(extensionName, context = {}) {
+  const normalized = normalizeIdentifier(extensionName);
+  return resolveExtensionCatalog(context, {}).find((entry) => entry.extensionName === normalized);
+}
+
 function normalizeTemplateDefaults(payload = {}) {
   return compactDefined({
     ownerRoleName: payload.defaults?.ownerRoleName ?? payload.ownerRoleName,
@@ -469,6 +478,9 @@ export function validatePostgresGovernanceRequest({ resourceKind, action, payloa
   if (resourceKind === 'extension') {
     const extensionName = normalizeIdentifier(normalized.extensionName);
     const authorizedEntry = findAuthorizedExtension(extensionName, context, profile);
+    // Placement evaluation looks at the unfiltered catalog so a known extension that is
+    // merely placement-incompatible yields the precise placement violation below.
+    const placementEntry = authorizedEntry ?? findCatalogedExtension(extensionName, context);
 
     if (!normalized.databaseName && action !== 'list') {
       violations.push('Extensions must declare databaseName.');
@@ -479,10 +491,13 @@ export function validatePostgresGovernanceRequest({ resourceKind, action, payloa
     if (extensionName && (!IDENTIFIER_PATTERN.test(extensionName) || RESERVED_PREFIX_PATTERN.test(extensionName))) {
       violations.push(`Extension ${extensionName} must use a safe, non-system identifier.`);
     }
-    if ((action === 'create' || action === 'update' || action === 'delete') && !authorizedEntry) {
+    const placementIncompatible = Boolean(
+      placementEntry?.placementModes?.length && profile.placementMode && !placementEntry.placementModes.includes(profile.placementMode)
+    );
+    if ((action === 'create' || action === 'update' || action === 'delete') && !authorizedEntry && !placementIncompatible) {
       violations.push(`Extension ${normalized.extensionName} is not present in the authorized extension catalog.`);
     }
-    if (authorizedEntry?.placementModes?.length && profile.placementMode && !authorizedEntry.placementModes.includes(profile.placementMode)) {
+    if (placementIncompatible) {
       violations.push(`Extension ${normalized.extensionName} is not available for placement mode ${profile.placementMode}.`);
     }
   }
