@@ -32,6 +32,12 @@ for (const r of USAGE) {
     // NO JWT enforcement at the gateway — the executor verifies the key
     assert.ok(!('openid-connect' in (route.plugins ?? {})), `${r.name} must not enable openid-connect`);
     assert.ok('cors' in (route.plugins ?? {}), `${r.name} must keep cors for browser callers`);
+    // per-key rate limit (noisy-neighbor guard) keyed by the apikey header, 429 on breach
+    const limit = route.plugins?.['limit-count'];
+    assert.ok(limit, `${r.name} must rate-limit the public anon/service surface`);
+    assert.equal(limit.key, '$http_apikey', `${r.name} rate limit must be keyed per api-key`);
+    assert.equal(limit.rejected_code, 429);
+    assert.ok(Number(limit.count) > 0, `${r.name} rate limit must declare a positive count`);
     // higher priority than the JWT route so a key request wins when the header is present
     const jwt = byName(r.jwt);
     assert.ok(jwt, `${r.jwt} must exist`);
