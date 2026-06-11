@@ -21,7 +21,10 @@ function mongoUri() {
   const host = process.env.MONGO_HOST;
   if (!host) return undefined; // Mongo disabled when no URI/host configured
   const auth = process.env.MONGO_USER ? `${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD ?? ''}@` : '';
-  return `mongodb://${auth}${host}`;
+  // When authenticating, default the auth db to admin (where root users live, e.g. Bitnami);
+  // override with MONGO_AUTH_SOURCE.
+  const authSource = process.env.MONGO_USER ? `/?authSource=${process.env.MONGO_AUTH_SOURCE ?? 'admin'}` : '';
+  return `mongodb://${auth}${host}${authSource}`;
 }
 
 function dataDsn() {
