@@ -395,7 +395,8 @@ data:
     run_upgrade_reconciliation() {
 {{- $mode := .Values.gatewayPolicy.passthrough.mode }}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
-{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
+{{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled. */ -}}
+{{- if and (or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes)) (or (not .upstream.requiresExecutor) ($.Values.controlPlaneExecutor).enabled) }}
       ensure_apisix_route "{{ .routeId }}" "$PAYLOAD_DIR/route-{{ .routeId }}.json"
 {{- end }}
 {{- end }}
