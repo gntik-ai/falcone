@@ -92,13 +92,17 @@ function apiKeyFromHeaders(headers) {
   return typeof direct === 'string' && direct.startsWith('flc_') ? direct : undefined;
 }
 
-// Resolve identity: gateway-injected JWT headers first, else verify an API key.
+// Resolve identity. A presented API key is AUTHORITATIVE: its tenant/workspace come from
+// the verified key, never from request headers — otherwise a caller on the no-JWT api-key
+// gateway route could send `apikey: flc_…` together with a spoofed `x-tenant-id: victim`
+// and the executor would trust the header (cross-tenant access). An invalid key fails closed
+// (no fallback to spoofable headers). Only when NO key is presented do we trust the
+// gateway-injected JWT identity headers (the gateway strips client-supplied context headers
+// and sets them from verified JWT claims).
 async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore) {
-  const fromHeaders = identityFromHeaders(headers, pathWorkspaceId);
-  if (fromHeaders.tenantId) return fromHeaders;
   const key = apiKeyFromHeaders(headers);
-  if (key && apiKeyStore) {
-    const resolved = await apiKeyStore.verifyKey(key);
+  if (key) {
+    const resolved = apiKeyStore ? await apiKeyStore.verifyKey(key) : undefined;
     if (resolved) {
       return {
         tenantId: resolved.tenantId,
@@ -109,8 +113,9 @@ async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore) {
         scopes: resolved.scopes,
       };
     }
+    return { tenantId: undefined }; // key presented but invalid/unverifiable → 401, fail closed
   }
-  return fromHeaders; // no tenant → 401
+  return identityFromHeaders(headers, pathWorkspaceId); // no key → trust gateway JWT headers
 }
 
 function primaryKeyFromQuery(searchParams) {
