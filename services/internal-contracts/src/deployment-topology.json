@@ -354,6 +354,7 @@
       "storage",
       "observability",
       "controlPlane",
+      "controlPlaneExecutor",
       "webConsole"
     ],
     "deployment_profiles": [

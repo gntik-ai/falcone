@@ -43,6 +43,7 @@ const REQUIRED_COMPONENT_ALIASES = [
   'storage',
   'observability',
   'controlPlane',
+  'controlPlaneExecutor',
   'webConsole'
 ];
 const REQUIRED_DEPLOYMENT_PROFILES = ['all-in-one', 'standard', 'ha'];
