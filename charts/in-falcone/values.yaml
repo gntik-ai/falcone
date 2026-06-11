@@ -1073,6 +1073,7 @@ bootstrap:
           upstream:
             component: controlPlane
             port: 8080
+            dataPlane: true
         - routeId: "2006"
           name: public-api-mongo
           uri: /v1/mongo/*
@@ -1089,6 +1090,7 @@ bootstrap:
           upstream:
             component: controlPlane
             port: 8080
+            dataPlane: true
         - routeId: "2007"
           name: public-api-events
           uri: /v1/events/*
@@ -1105,6 +1107,7 @@ bootstrap:
           upstream:
             component: controlPlane
             port: 8080
+            dataPlane: true
         - routeId: "2008"
           name: public-api-functions
           uri: /v1/functions/*
@@ -1121,6 +1124,7 @@ bootstrap:
           upstream:
             component: controlPlane
             port: 8080
+            dataPlane: true
         - routeId: "2009"
           name: public-api-storage
           uri: /v1/storage/*
@@ -2183,6 +2187,67 @@ controlPlane:
       capabilities:
         drop:
           - ALL
+
+# Control-plane EXECUTOR: the runnable data control-plane (apps/control-plane) that
+# EXECUTES the adapter plans against the workspace backends (Postgres/Mongo/Kafka +
+# Functions). OPT-IN (disabled by default): when enabled, the data-plane APISIX routes
+# (upstream.dataPlane:true — /v1/postgres|mongo|events|functions/*) are sent here instead
+# of the default control-plane (see templates/bootstrap-payload-configmap.yaml). The data
+# connection env (PG*/MONGO_*/KAFKA_BROKERS via secretKeyRef) is environment-specific and
+# set in the overlay. NOTE: the executor serves the data-plane + DDL + API-keys surface;
+# if a deployment also needs the legacy read-only browse/inventory routes under those
+# prefixes (served by the default control-plane), keep those on controlPlane via finer
+# routing or extend the executor — tracked follow-up.
+controlPlaneExecutor:
+  enabled: false
+  wrapper:
+    componentId: control-plane-executor
+    workload:
+      kind: Deployment
+  image:
+    repository: ghcr.io/gntik-ai/in-falcone-control-plane-executor
+    tag: 0.9.0
+    pullPolicy: IfNotPresent
+  replicas: 2
+  serviceAccount:
+    create: true
+    name: ""
+    automountToken: false
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    portName: http
+    annotations: {}
+  ports:
+    - name: http
+      containerPort: 8080
+  # Data connection env is environment-specific (release-prefixed DNS + external secrets);
+  # set it in the overlay, e.g.:
+  #   env:
+  #     - { name: PGHOST, value: <release>-postgresql }
+  #     - { name: PGUSER, value: falcone }
+  #     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
+  #     - { name: MONGO_HOST, value: <release>-mongodb:27017 }
+  #     - { name: MONGO_USER, value: root }
+  #     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } } }
+  #     - { name: KAFKA_BROKERS, value: <release>-kafka:9092 }
+  env: []
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 3
+    periodSeconds: 5
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
 webConsole:
   enabled: true
   wrapper:
