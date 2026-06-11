@@ -1,7 +1,8 @@
-// Realtime change-stream client for the console (change: add-realtime-gateway-console).
-// Subscribes to a collection's tenant-scoped changes via Server-Sent Events. A browser
-// EventSource cannot set headers, so the anon key is passed as ?apikey= (the gateway routes
-// it to the executor, which verifies the key). URL matches the executor's SSE route exactly.
+// Realtime change-stream client for the console (changes: add-realtime-gateway-console,
+// add-realtime-unify). Subscribes to a tenant-scoped change stream via Server-Sent Events,
+// for EITHER a Mongo collection or a Postgres table. A browser EventSource cannot set headers,
+// so the anon key is passed as ?apikey= (the gateway routes it to the executor, which verifies
+// the key). URLs match the executor's SSE routes exactly.
 import type { JsonValue } from '@/lib/http'
 
 const enc = encodeURIComponent
@@ -16,23 +17,25 @@ export interface RealtimeSubscription {
   close: () => void
 }
 
-const CHANGE_EVENTS = ['insert', 'update', 'replace']
+export type RealtimeTarget =
+  | { source: 'mongo'; databaseName: string; collectionName: string }
+  | { source: 'postgres'; databaseName: string; schemaName: string; tableName: string }
 
-export function realtimeChangesUrl(params: {
-  workspaceId: string
-  databaseName: string
-  collectionName: string
-  apiKey: string
-  origin?: string
-}): string {
-  const base = `${params.origin ?? ''}/v1/realtime/workspaces/${enc(params.workspaceId)}/data/${enc(params.databaseName)}/collections/${enc(params.collectionName)}/changes`
-  return `${base}?apikey=${enc(params.apiKey)}`
+// Postgres can also emit deletes (the Mongo change stream does not).
+const CHANGE_EVENTS = ['insert', 'update', 'replace', 'delete']
+
+export function realtimeChangesUrl(params: { workspaceId: string; target: RealtimeTarget; apiKey: string; origin?: string }): string {
+  const t = params.target
+  const wp = `${params.origin ?? ''}/v1/realtime/workspaces/${enc(params.workspaceId)}/data/${enc(t.databaseName)}`
+  const path = t.source === 'mongo'
+    ? `${wp}/collections/${enc(t.collectionName)}/changes`
+    : `${wp}/schemas/${enc(t.schemaName)}/tables/${enc(t.tableName)}/changes`
+  return `${path}?apikey=${enc(params.apiKey)}`
 }
 
 export function subscribeRealtimeChanges(params: {
   workspaceId: string
-  databaseName: string
-  collectionName: string
+  target: RealtimeTarget
   apiKey: string
   onChange: (change: RealtimeChange) => void
   onError?: (event: Event) => void
