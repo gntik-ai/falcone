@@ -106,7 +106,10 @@ data:
 {{- $_ := set $cors "allow_credential" $.Values.gatewayPolicy.cors.allowCredentials -}}
 {{- $_ := set $cors "max_age" $.Values.gatewayPolicy.cors.maxAgeSeconds -}}
 {{- end }}
-{{- if and $qosProfileName (hasKey $plugins "limit-count") }}
+{{- /* Executor (api-key) routes carry their own limit-count keyed by the apikey header —
+       the per-tenant qos override (keyed by x-tenant-id, absent on the no-JWT api-key path)
+       must NOT clobber it. */ -}}
+{{- if and $qosProfileName (hasKey $plugins "limit-count") (not .upstream.requiresExecutor) }}
 {{- /* Static requestsPerMinute is the grace-period floor (limitCeiling: max_of_plan_and_static);
        the scope-enforcement plugin raises it to the resolved per-tenant plan quota at runtime. */ -}}
 {{- $_ := set (index $plugins "limit-count") "count" ($qosProfile.requestsPerMinute | default 60) -}}

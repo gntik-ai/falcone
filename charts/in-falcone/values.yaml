@@ -1150,6 +1150,15 @@ bootstrap:
             gateway.in-falcone.io/audit-required: "false"
           plugins:
             cors: *a1
+            # Per-key rate limit for the public anon/service surface (noisy-neighbor guard).
+            # Keyed by the apikey header (no JWT/x-tenant-id here); count is the floor.
+            limit-count:
+              count: 120
+              time_window: 60
+              rejected_code: 429
+              key_type: var
+              key: $http_apikey
+              allow_degradation: false
           upstream:
             component: controlPlane
             port: 8080
@@ -1171,6 +1180,15 @@ bootstrap:
             gateway.in-falcone.io/audit-required: "false"
           plugins:
             cors: *a1
+            # Per-key rate limit for the public anon/service surface (noisy-neighbor guard).
+            # Keyed by the apikey header (no JWT/x-tenant-id here); count is the floor.
+            limit-count:
+              count: 120
+              time_window: 60
+              rejected_code: 429
+              key_type: var
+              key: $http_apikey
+              allow_degradation: false
           upstream:
             component: controlPlane
             port: 8080
@@ -1192,6 +1210,15 @@ bootstrap:
             gateway.in-falcone.io/audit-required: "false"
           plugins:
             cors: *a1
+            # Per-key rate limit for the public anon/service surface (noisy-neighbor guard).
+            # Keyed by the apikey header (no JWT/x-tenant-id here); count is the floor.
+            limit-count:
+              count: 120
+              time_window: 60
+              rejected_code: 429
+              key_type: var
+              key: $http_apikey
+              allow_degradation: false
           upstream:
             component: controlPlane
             port: 8080
@@ -1213,6 +1240,15 @@ bootstrap:
             gateway.in-falcone.io/audit-required: "false"
           plugins:
             cors: *a1
+            # Per-key rate limit for the public anon/service surface (noisy-neighbor guard).
+            # Keyed by the apikey header (no JWT/x-tenant-id here); count is the floor.
+            limit-count:
+              count: 120
+              time_window: 60
+              rejected_code: 429
+              key_type: var
+              key: $http_apikey
+              allow_degradation: false
           upstream:
             component: controlPlane
             port: 8080
