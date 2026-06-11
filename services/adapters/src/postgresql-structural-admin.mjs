@@ -1893,12 +1893,15 @@ function renderIndexKey(key) {
 }
 
 function renderIndexCreateStatement(index) {
-  const qualifiedIndexName = renderQualifiedName(index.schemaName, index.indexName);
+  // CREATE INDEX takes a BARE index name — it is created in the table's schema.
+  // Schema-qualifying it (CREATE INDEX "s"."i" ...) is a Postgres syntax error.
+  // (DROP/ALTER/COMMENT ON INDEX, below, do use the schema-qualified form.)
+  const indexName = quoteIdent(index.indexName);
   const qualifiedRelation = renderQualifiedName(index.schemaName, index.tableName);
   const includeClause = (index.includeColumns ?? []).length > 0 ? ` INCLUDE (${index.includeColumns.map((column) => quoteIdent(column)).join(', ')})` : '';
   const predicateClause = index.predicateExpression ? ` WHERE ${index.predicateExpression}` : '';
 
-  return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${qualifiedIndexName} ON ${qualifiedRelation} USING ${index.indexMethod.toUpperCase()} (${(index.keys ?? [])
+  return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${indexName} ON ${qualifiedRelation} USING ${index.indexMethod.toUpperCase()} (${(index.keys ?? [])
     .map((key) => renderIndexKey(key))
     .join(', ')})${includeClause}${predicateClause}`;
 }
