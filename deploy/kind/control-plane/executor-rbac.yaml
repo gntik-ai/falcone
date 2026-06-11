@@ -1,0 +1,37 @@
+# RBAC for the real function executor: lets the control-plane ServiceAccount
+# create/manage ephemeral Kubernetes Jobs (one per function invocation) and read
+# their pod logs. Namespace-scoped (falcone), NOT privileged / not cluster-wide.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: falcone-function-executor
+  namespace: falcone
+rules:
+  # Knative-backed function execution: manage the per-function Knative Services.
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # (legacy Job-based executor — kept harmless)
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: falcone-function-executor
+  namespace: falcone
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: falcone-function-executor
+subjects:
+  - kind: ServiceAccount
+    name: falcone-control-plane
+    namespace: falcone

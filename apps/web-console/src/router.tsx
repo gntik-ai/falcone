@@ -18,64 +18,25 @@ import { ConsoleTenantPlanOverviewPage } from '@/pages/ConsoleTenantPlanOverview
 import { ConsoleTenantAllocationSummaryPage } from '@/pages/ConsoleTenantAllocationSummaryPage'
 import { ConsoleWorkspaceDashboardPage } from '@/pages/ConsoleWorkspaceDashboardPage'
 import { ConsoleWorkspacesPage } from '@/pages/ConsoleWorkspacesPage'
+import { ConsoleWorkspaceDatabasePage } from '@/pages/ConsoleWorkspaceDatabasePage'
+import { ConsoleFunctionRegistryPage } from '@/pages/ConsoleFunctionRegistryPage'
+import { ConsoleIamAccessPage } from '@/pages/ConsoleIamAccessPage'
+// Eager (not lazy): clicking a NavLink to a lazy route suspends synchronously and
+// throws React #426 in this build; import these wired pages directly.
+import { ConsoleQuotasPage } from '@/pages/ConsoleQuotasPage'
+import { ConsoleObservabilityPage } from '@/pages/ConsoleObservabilityPage'
+import { ConsoleServiceAccountsPage } from '@/pages/ConsoleServiceAccountsPage'
+import { ConsoleStoragePage } from '@/pages/ConsoleStoragePage'
+import { ConsoleMongoPage } from '@/pages/ConsoleMongoPage'
+import { ConsolePostgresPage } from '@/pages/ConsolePostgresPage'
+import { ConsolePostgresDataPage } from '@/pages/ConsolePostgresDataPage'
+import { ConsoleKafkaPage } from '@/pages/ConsoleKafkaPage'
+import { ConsoleOperationsPage } from '@/pages/ConsoleOperationsPage'
+import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
+import { ConsoleFunctionsPage } from '@/pages/ConsoleFunctionsPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { WelcomePage } from '@/pages/WelcomePage'
-
-const ConsolePostgresPage = lazy(async () => {
-  const module = await import('@/pages/ConsolePostgresPage')
-  return { default: module.ConsolePostgresPage }
-})
-
-const ConsolePostgresDataPage = lazy(async () => {
-  const module = await import('@/pages/ConsolePostgresDataPage')
-  return { default: module.ConsolePostgresDataPage }
-})
-
-const ConsoleMongoPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleMongoPage')
-  return { default: module.ConsoleMongoPage }
-})
-
-const ConsoleKafkaPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleKafkaPage')
-  return { default: module.ConsoleKafkaPage }
-})
-
-const ConsoleFunctionsPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleFunctionsPage')
-  return { default: module.ConsoleFunctionsPage }
-})
-
-const ConsoleStoragePage = lazy(async () => {
-  const module = await import('@/pages/ConsoleStoragePage')
-  return { default: module.ConsoleStoragePage }
-})
-
-const ConsoleObservabilityPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleObservabilityPage')
-  return { default: module.ConsoleObservabilityPage }
-})
-
-const ConsoleServiceAccountsPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleServiceAccountsPage')
-  return { default: module.ConsoleServiceAccountsPage }
-})
-
-const ConsoleQuotasPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleQuotasPage')
-  return { default: module.ConsoleQuotasPage }
-})
-
-const ConsoleOperationsPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleOperationsPage')
-  return { default: module.ConsoleOperationsPage }
-})
-
-const ConsoleOperationDetailPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleOperationDetailPage')
-  return { default: module.ConsoleOperationDetailPage }
-})
 
 const ConsoleRealtimePage = lazy(async () => {
   const module = await import('@/pages/ConsoleRealtimePage')
@@ -150,6 +111,18 @@ export const appRoutes = [
           {
             path: 'workspaces',
             element: <ConsoleWorkspacesPage />
+          },
+          {
+            path: 'database',
+            element: <ConsoleWorkspaceDatabasePage />
+          },
+          {
+            path: 'functions-registry',
+            element: <ConsoleFunctionRegistryPage />
+          },
+          {
+            path: 'iam-access',
+            element: <RequireSuperadminRoute><ConsoleIamAccessPage /></RequireSuperadminRoute>
           },
           {
             path: 'members',

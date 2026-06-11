@@ -34,11 +34,19 @@ spec:
     spec:
       restartPolicy: OnFailure
       serviceAccountName: {{ include "in-falcone.bootstrapServiceAccountName" . }}
-      {{- $imagePullSecrets := .Values.global.imagePullSecrets | default list }}
+      {{- /* normalize imagePullSecrets({name} maps) + privateRegistry.pullSecretNames(strings) */ -}}
+      {{- $imagePullSecrets := list -}}
+      {{- range (default (list) .Values.global.imagePullSecrets) -}}
+        {{- $imagePullSecrets = append $imagePullSecrets (.name | default .) -}}
+      {{- end -}}
+      {{- range (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+        {{- $imagePullSecrets = append $imagePullSecrets . -}}
+      {{- end -}}
+      {{- $imagePullSecrets = $imagePullSecrets | uniq -}}
       {{- if gt (len $imagePullSecrets) 0 }}
       imagePullSecrets:
         {{- range $imagePullSecrets }}
-        - name: {{ .name | default . }}
+        - name: {{ . }}
         {{- end }}
       {{- end }}
       {{- with .Values.bootstrap.job.podSecurityContext }}
@@ -47,7 +55,8 @@ spec:
       {{- end }}
       containers:
         - name: bootstrap
-          image: "{{ .Values.bootstrap.job.image.repository }}:{{ .Values.bootstrap.job.image.tag }}"
+          {{- /* route through the shared image helper so global.imageRegistry (Harbor) rewrites it */}}
+          image: "{{ include "component-wrapper.normalizeRepository" (dict "Values" .Values "repository" .Values.bootstrap.job.image.repository) }}:{{ .Values.bootstrap.job.image.tag }}"
           imagePullPolicy: {{ .Values.bootstrap.job.image.pullPolicy }}
           command:
             - /bin/bash

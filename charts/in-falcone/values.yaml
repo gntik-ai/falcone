@@ -1748,7 +1748,11 @@ kafka:
         drop:
           - ALL
 openwhisk:
-  enabled: true
+  # DISABLED: functions migrated to Knative (the control-plane function executor
+  # creates a Knative Service per function). On OpenShift use OpenShift Serverless;
+  # on kind, Knative Serving + Kourier (see deploy/kind/knative/). The OpenWhisk
+  # Python2/ansible init images are also incompatible with newer kernels.
+  enabled: false
   wrapper:
     componentId: openwhisk
     workload:
@@ -2089,17 +2093,27 @@ controlPlane:
     workload:
       kind: Deployment
   image:
-    # Real control-plane executor service (apps/control-plane/Dockerfile). The data
-    # connection env (DATA_DB_URL / PG* via secretKeyRef) is environment-specific and
-    # set in the deployment overlays, not in chart defaults.
     repository: ghcr.io/gntik-ai/in-falcone-control-plane
-    tag: 0.7.0
+    tag: 0.6.2
     pullPolicy: IfNotPresent
   replicas: 2
   serviceAccount:
     create: true
     name: ""
+    # Least-privilege baseline: SA token NOT mounted by default (enforced by
+    # scripts/validate-deployment-chart.mjs for every component). The function
+    # executor needs the token to create Knative Services via the k8s API, so
+    # overlays that enable functions set this to true (deploy/kind/values-kind.yaml,
+    # deploy/openshift/values-openshift.yaml). RBAC: templates/control-plane-rbac.yaml.
     automountToken: false
+  # Function executor (Knative): RBAC + the per-function runtime image. The data-plane
+  # connection env (PG/KEYCLOAK/MINIO/MONGO/KAFKA host+secret refs) is environment-
+  # specific (release-prefixed service DNS + external secrets) and lives in the overlay
+  # values (deploy/kind/values-kind.yaml, deploy/openshift/values-openshift.yaml).
+  functionExecutor:
+    enabled: true   # gates templates/control-plane-rbac.yaml (ksvc/jobs/pods RBAC)
+    # The per-function runtime image is read by the executor from the FN_RUNTIME_IMAGE
+    # env var (set in the overlay: kind -> localhost:30500, OpenShift -> Harbor).
   service:
     enabled: true
     type: ClusterIP

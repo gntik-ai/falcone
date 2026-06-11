@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 
-import { InviteUserWizard } from '@/components/console/wizards/InviteUserWizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
@@ -104,7 +103,7 @@ export function ConsoleMembersPage() {
   const [rolesError, setRolesError] = useState<string | null>(null)
   const [usersReloadKey, setUsersReloadKey] = useState(0)
   const [rolesReloadKey, setRolesReloadKey] = useState(0)
-  const [inviteWizardOpen, setInviteWizardOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const reloadUsers = useCallback(() => {
     setUsersReloadKey((current) => current + 1)
@@ -226,10 +225,23 @@ export function ConsoleMembersPage() {
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">Tenant: {activeTenant.label}</Badge>
             <Badge variant="secondary">Realm: {realmId}</Badge>
-            <Button type="button" onClick={() => setInviteWizardOpen(true)}>Invitar usuario</Button>
+            <Button type="button" onClick={() => setCreateOpen((current) => !current)}>
+              {createOpen ? 'Cerrar' : 'Crear usuario'}
+            </Button>
           </div>
         </div>
       </header>
+
+      {createOpen ? (
+        <CreateUserPanel
+          tenantId={activeTenant.tenantId}
+          roles={roles}
+          onCreated={() => {
+            setCreateOpen(false)
+            reloadUsers()
+          }}
+        />
+      ) : null}
 
       <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="console-members-users-heading">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -272,7 +284,117 @@ export function ConsoleMembersPage() {
         {!rolesLoading && !rolesError && roles.length === 0 ? <ConsoleSectionEmpty message="No hay roles IAM registrados en este realm." /> : null}
         {!rolesLoading && !rolesError && roles.length > 0 ? <RolesTable roles={roles} /> : null}
       </section>
-      {inviteWizardOpen ? <InviteUserWizard open={inviteWizardOpen} onOpenChange={setInviteWizardOpen} /> : null}
+    </section>
+  )
+}
+
+function CreateUserPanel({
+  tenantId,
+  roles,
+  onCreated
+}: {
+  tenantId: string
+  roles: IamRole[]
+  onCreated: () => void
+}) {
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState('tenant_developer')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const assignableRoles = roles.map((entry) => entry.roleName).filter((name) => name && !name.startsWith('default-roles'))
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    if (!username.trim() || !password.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      await requestConsoleSessionJson(`/v1/tenants/${encodeURIComponent(tenantId)}/users`, {
+        method: 'POST',
+        body: {
+          username: username.trim(),
+          email: email.trim() || undefined,
+          password: password.trim(),
+          roles: role ? [role] : undefined
+        }
+      })
+      setUsername('')
+      setEmail('')
+      setPassword('')
+      onCreated()
+    } catch (rawError) {
+      setError(getApiErrorMessage(rawError, 'No se pudo crear el usuario en el realm del tenant.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-label="Crear usuario en el realm del tenant">
+      <h2 className="text-lg font-semibold text-foreground">Crear usuario</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Crea un usuario directamente en el realm del tenant (Keycloak) y asígnale un rol inicial.
+      </p>
+      {error ? (
+        <div role="alert" className="mt-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+      <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={submit}>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Usuario</span>
+          <input
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="jdoe"
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            required
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Email</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="jdoe@tenant.example"
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Contraseña</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            required
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Rol inicial</span>
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value)}
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {assignableRoles.length === 0 ? <option value="tenant_developer">tenant_developer</option> : null}
+            {assignableRoles.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="sm:col-span-2">
+          <Button type="submit" disabled={busy || !username.trim() || !password.trim()}>
+            {busy ? 'Creando…' : 'Crear usuario'}
+          </Button>
+        </div>
+      </form>
     </section>
   )
 }

@@ -72,6 +72,15 @@ export async function main(params = {}, overrides = {}) {
     return { statusCode: 404, body: { error: `Tenant '${tenantId}' not found` } };
   }
 
+  // --- Data residency region ---
+  // Resolve the tenant's pinned region (feature add-data-residency-pinning, #272)
+  // so every applier provisions into that region. Default: explicit request
+  // param. Deployments that persist the tenant record can inject a resolver that
+  // reads `data_residency_region`. A null/undefined region is a no-op for the
+  // appliers (backward compatibility).
+  const resolveTenantRegionFn = overrides.resolveTenantRegion ?? (async () => params.region_ref ?? null);
+  const regionRef = await resolveTenantRegionFn(tenantId);
+
   // --- Parse body ---
   const artifact = params.artifact;
   if (!artifact) {
@@ -217,7 +226,7 @@ export async function main(params = {}, overrides = {}) {
       try {
         const domainData = domainEntry?.data ?? null;
         const result = await withTimeout(
-          applierFn(tenantId, domainData, { dryRun, credentials: overrides.credentials ?? {}, log }),
+          applierFn(tenantId, domainData, { dryRun, credentials: overrides.credentials ?? {}, regionRef, log }),
           timeoutMs,
           domainKey,
         );
