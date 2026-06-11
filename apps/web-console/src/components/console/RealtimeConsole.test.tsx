@@ -38,7 +38,11 @@ describe('RealtimeConsole', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
 
     expect(mocked).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws1', databaseName: 'appdb', collectionName: 'notes', apiKey: 'flc_anon_x' })
+      expect.objectContaining({
+        workspaceId: 'ws1',
+        apiKey: 'flc_anon_x',
+        target: { source: 'mongo', databaseName: 'appdb', collectionName: 'notes' }
+      })
     )
     expect(screen.getByText(/Listening…/)).toBeInTheDocument()
 
@@ -46,6 +50,23 @@ describe('RealtimeConsole', () => {
     act(() => onChange?.({ type: 'insert', documentId: 'd1', document: { _id: 'd1', body: 'live' } }))
     expect(await screen.findByText(/"body":"live"/)).toBeInTheDocument()
     expect(screen.getByText('insert')).toBeInTheDocument()
+  })
+
+  it('subscribes to a Postgres table when the source is switched', () => {
+    mocked.mockReturnValue({ close: vi.fn() })
+    render(<RealtimeConsole workspaceId="ws1" />)
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'postgres' } })
+    fireEvent.change(screen.getByLabelText('Database'), { target: { value: 'appdb' } })
+    fireEvent.change(screen.getByLabelText('Schema'), { target: { value: 'public' } })
+    fireEvent.change(screen.getByLabelText('Table'), { target: { value: 'notes' } })
+    fireEvent.change(screen.getByLabelText('Anon key'), { target: { value: 'flc_anon_x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
+    expect(mocked).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws1',
+        target: { source: 'postgres', databaseName: 'appdb', schemaName: 'public', tableName: 'notes' }
+      })
+    )
   })
 
   it('Stop closes the subscription', () => {
