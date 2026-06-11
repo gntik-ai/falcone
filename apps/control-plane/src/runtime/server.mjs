@@ -108,8 +108,10 @@ function bearerJwtFromHeaders(headers) {
 //   3. Otherwise → gateway-injected JWT identity headers (the gateway validated the token
 //      and stripped client-supplied context headers).
 // A presented-but-invalid key or JWT fails closed (401) — no fallback to spoofable headers.
-async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifier) {
-  const key = apiKeyFromHeaders(headers);
+async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifier, queryApiKey) {
+  // queryApiKey is only supplied for SSE routes: a browser EventSource cannot set headers,
+  // so the (low-privilege, read-only) anon key arrives as ?apikey=. Header still wins.
+  const key = apiKeyFromHeaders(headers) ?? (typeof queryApiKey === 'string' && queryApiKey.startsWith('flc_') ? queryApiKey : undefined);
   if (key) {
     const resolved = apiKeyStore ? await apiKeyStore.verifyKey(key) : undefined;
     if (resolved) {
@@ -381,7 +383,9 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const [, re, handler, opts] = match;
       const groups = re.exec(url.pathname).slice(1);
 
-      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier);
+      // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
+      const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;
+      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey);
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
       }
