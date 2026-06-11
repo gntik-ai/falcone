@@ -30,5 +30,5 @@ if [ -z "${MONGO_URI:-}" ]; then
   export MONGO_URI="mongodb://localhost:57017/?replicaSet=rs0&directConnection=true"
 fi
 
-echo "==> running Mongo data executor test"
-node --test "$HERE/mongo-data-executor.test.mjs"
+echo "==> running Mongo data + realtime executor tests"
+node --test "$HERE/mongo-data-executor.test.mjs" "$HERE/realtime-executor.test.mjs"
