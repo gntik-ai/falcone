@@ -25,15 +25,26 @@ function sendJson(res, statusCode, body) {
 // prefixes (browse/inventory/management) is served by the legacy control-plane. The request
 // stream is piped through untouched (method/path/query/headers/body) and the upstream response
 // is streamed back, so this never buffers the body.
+//
+// SSRF-safe by construction: protocol/host/port are pinned to the operator-configured
+// `upstream` (a URL parsed at startup); ONLY the path+query are taken from the request. A
+// hostile request-target (absolute- or protocol-relative form, e.g. `//169.254.169.254/…`)
+// therefore cannot redirect the proxy off the configured control-plane host.
 const PROXY_TIMEOUT_MS = 30000;
-function proxyRequest(req, res, upstreamBase, logger) {
-  const target = new URL(req.url, upstreamBase);
-  const client = target.protocol === 'https:' ? https : http;
-  const headers = { ...req.headers, host: target.host };
+function proxyRequest(req, res, upstream, logger) {
+  const incoming = new URL(req.url, 'http://upstream.invalid');
+  const client = upstream.protocol === 'https:' ? https : http;
+  const headers = { ...req.headers, host: upstream.host };
   delete headers.connection;
   const upstreamReq = client.request(
-    target,
-    { method: req.method, headers },
+    {
+      protocol: upstream.protocol,
+      hostname: upstream.hostname,
+      port: upstream.port,
+      method: req.method,
+      path: `${incoming.pathname}${incoming.search}`,
+      headers,
+    },
     (upstreamRes) => {
       res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
       upstreamRes.pipe(res);
@@ -241,8 +252,9 @@ async function runDdl(registry, resourceKind, payload, c) {
 
 export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, controlPlaneUpstream, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
-  // Validate the upstream at startup (fail-fast) so a bad value never surfaces per-request.
-  const upstreamBase = controlPlaneUpstream ? new URL(controlPlaneUpstream).origin : undefined;
+  // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
+  // per-request proxy can never be steered to a different host (SSRF).
+  const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
   const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor);
 
   return http.createServer(async (req, res) => {
@@ -254,7 +266,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       if (!match) {
         // Not part of the executor's data-plane/DDL slice → fall through to the control-plane
         // (browse/inventory/management routes under the same prefixes) when an upstream is set.
-        if (upstreamBase) return proxyRequest(req, res, upstreamBase, logger);
+        if (upstream) return proxyRequest(req, res, upstream, logger);
         return sendJson(res, 404, { code: 'NO_ROUTE', message: `No route for ${method} ${url.pathname}` });
       }
       const [, re, handler, opts] = match;
