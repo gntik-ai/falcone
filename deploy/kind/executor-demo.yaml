@@ -1,0 +1,107 @@
+# Live demo of the BaaS data-API executor (apps/control-plane) on kind.
+# Standalone Deployment in the `falcone` namespace — does NOT touch the existing
+# control-plane/SPA. Credentials come from the existing in-falcone-postgresql secret
+# via secretKeyRef (no plaintext, no probing).
+#
+#   kubectl apply -f deploy/kind/executor-demo.yaml
+#   kubectl -n falcone wait --for=condition=complete job/cp-executor-setup --timeout=120s
+#   kubectl -n falcone rollout status deploy/falcone-cp-executor
+#   kubectl -n falcone port-forward svc/falcone-cp-executor 8088:8080
+---
+# One-time setup (runs as the postgres SUPERUSER): pgcrypto + the non-superuser roles
+# the API keys resolve to, granted to `falcone` so the executor can SET ROLE to them.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cp-executor-setup
+  namespace: falcone
+  labels: { app: falcone-cp-executor, role: setup }
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels: { app: falcone-cp-executor, role: setup }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql
+          image: docker.io/bitnamilegacy/postgresql:17.2.0
+          env:
+            - { name: PGHOST, value: falcone-postgresql }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGUSER, value: postgres }
+            - { name: PGDATABASE, value: in_falcone }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_POSTGRES_PASSWORD } }
+          command: ["bash", "-ec"]
+          args:
+            - |
+              psql -v ON_ERROR_STOP=1 <<'SQL'
+              CREATE EXTENSION IF NOT EXISTS pgcrypto;
+              SELECT 'CREATE ROLE falcone_anon NOSUPERUSER NOBYPASSRLS'
+                WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname='falcone_anon')\gexec
+              SELECT 'CREATE ROLE falcone_service NOSUPERUSER NOBYPASSRLS'
+                WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname='falcone_service')\gexec
+              GRANT falcone_anon TO falcone;
+              GRANT falcone_service TO falcone;
+              GRANT CREATE, USAGE ON SCHEMA public TO falcone;
+              GRANT USAGE ON SCHEMA public TO falcone_anon, falcone_service;
+              ALTER DEFAULT PRIVILEGES FOR ROLE falcone IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO falcone_anon, falcone_service;
+              SQL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: falcone-cp-executor
+  namespace: falcone
+  labels: { app: falcone-cp-executor }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: falcone-cp-executor }
+  template:
+    metadata:
+      labels: { app: falcone-cp-executor }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000          # node:22-alpine "node" user (numeric, so k8s can verify non-root)
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: control-plane
+          image: localhost:30500/in-falcone-control-plane-executor:0.7.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8080, name: http }
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: PORT, value: "8080" }
+            - { name: PGHOST, value: falcone-postgresql }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGUSER, value: falcone }
+            - { name: PGDATABASE, value: in_falcone }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: falcone-cp-executor
+  namespace: falcone
+  labels: { app: falcone-cp-executor }
+spec:
+  selector: { app: falcone-cp-executor }
+  ports:
+    - { port: 8080, targetPort: 8080, name: http }
