@@ -8,7 +8,7 @@
 // surface that never ran. Tenant isolation is enforced two ways: the adapter injects
 // a session-scoped row predicate into the SQL, and the query runs under the
 // per-workspace RLS context (app.tenant_id/app.workspace_id) as a non-superuser role.
-import { buildPostgresDataApiPlan } from '../../../../services/adapters/src/postgresql-data-api.mjs';
+import { buildPostgresDataApiPlan, serializePostgresDataApiCursor } from '../../../../services/adapters/src/postgresql-data-api.mjs';
 import { clientError, mapPgError } from './errors.mjs';
 
 const DEFAULT_DATA_ROLE = 'falcone_app';
@@ -173,9 +173,20 @@ export async function executePostgresData(registry, params) {
     if (['insert', 'update', 'delete'].includes(plan.operation)) {
       return { item: result.rows[0] ?? null, affected: result.rowCount, access: plan.access };
     }
+    // Keyset pagination: when a full page came back, emit a next cursor built from the last
+    // row's order-column values (the adapter's buildCursorClause decodes `order` to resume).
+    const items = result.rows;
+    const pageSize = plan.page?.size ?? items.length;
+    let after;
+    if (plan.order?.length && items.length > 0 && items.length >= pageSize) {
+      const lastRow = items[items.length - 1];
+      after = serializePostgresDataApiCursor({
+        order: plan.order.map((entry) => ({ columnName: entry.columnName, direction: entry.direction, value: lastRow[entry.columnName] })),
+      });
+    }
     return {
-      items: result.rows,
-      page: { size: plan.page?.size ?? result.rowCount, returned: result.rowCount },
+      items,
+      page: { size: pageSize, returned: result.rowCount, after },
       count,
       access: plan.access,
     };

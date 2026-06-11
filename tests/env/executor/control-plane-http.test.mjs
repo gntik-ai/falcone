@@ -161,3 +161,40 @@ test('GET rows on unknown table → 404 TABLE_NOT_FOUND (sanitized)', async () =
   assert.equal(res.status, 404);
   assert.equal((await res.json()).code, 'TABLE_NOT_FOUND');
 });
+
+test('list supports PostgREST-style filters + keyset pagination (cursor)', async () => {
+  // Seed three rows sharing a marker so a filter can isolate them from earlier test rows.
+  for (const body of ['pg1', 'pg2', 'pg3']) {
+    const r = await fetch(`${baseUrl}${rowsPath}`, { method: 'POST', headers: authHeaders, body: JSON.stringify({ values: { body } }) });
+    assert.equal(r.status, 201);
+  }
+  const filtered = `${baseUrl}${rowsPath}?body=ilike.pg%25&page[size]=2&countMode=exact`;
+
+  // Page 1: filter matches the 3 pg rows; page size 2 → 2 items + a next cursor + exact count.
+  const res1 = await fetch(filtered, { headers: authHeaders });
+  assert.equal(res1.status, 200);
+  const page1 = await res1.json();
+  assert.equal(page1.items.length, 2);
+  assert.ok(page1.items.every((row) => /^pg/.test(row.body)));
+  assert.equal(page1.count, 3);
+  assert.ok(typeof page1.page.after === 'string' && page1.page.after.length > 0, 'a next cursor for a full page');
+
+  // Page 2 via the cursor: the remaining pg row, distinct from page 1, and no further cursor.
+  const res2 = await fetch(`${filtered}&page[after]=${encodeURIComponent(page1.page.after)}`, { headers: authHeaders });
+  const page2 = await res2.json();
+  assert.equal(page2.items.length, 1);
+  const page1Ids = new Set(page1.items.map((row) => row.id));
+  assert.ok(!page1Ids.has(page2.items[0].id), 'page 2 does not repeat page 1 rows');
+  assert.equal(page2.page.after, undefined);
+
+  // eq filter narrows to a single row.
+  const res3 = await fetch(`${baseUrl}${rowsPath}?body=eq.pg2`, { headers: authHeaders });
+  const page3 = await res3.json();
+  assert.equal(page3.items.length, 1);
+  assert.equal(page3.items[0].body, 'pg2');
+});
+
+test('list rejects a filter on an unknown column → 400', async () => {
+  const res = await fetch(`${baseUrl}${rowsPath}?nope=eq.x`, { headers: authHeaders });
+  assert.equal(res.status, 400);
+});

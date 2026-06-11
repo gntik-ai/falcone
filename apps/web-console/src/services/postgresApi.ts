@@ -23,9 +23,17 @@ export interface DdlResult {
 
 export type PgRow = Record<string, JsonValue>
 
+export type PgFilterOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'like' | 'ilike'
+
+export interface PgFilter {
+  columnName: string
+  operator: PgFilterOperator
+  value: string | number | boolean | Array<string | number>
+}
+
 export interface RowListResult {
   items: PgRow[]
-  page?: { size?: number; returned?: number }
+  page?: { size?: number; returned?: number; after?: string }
   count?: number
 }
 
@@ -106,16 +114,37 @@ function pkQuery(primaryKey: Record<string, string | number>): string {
   return params.toString()
 }
 
+function filterToQueryValue(filter: PgFilter): string {
+  if (filter.operator === 'in' && Array.isArray(filter.value)) {
+    return `in.(${filter.value.join(',')})`
+  }
+  return `${filter.operator}.${String(filter.value)}`
+}
+
 export function listRows(
   workspaceId: string,
   databaseName: string,
   schemaName: string,
   tableName: string,
-  options: { pageSize?: number; countMode?: 'none' | 'exact' } = {}
+  options: {
+    pageSize?: number
+    after?: string
+    countMode?: 'none' | 'exact'
+    select?: string[]
+    order?: Array<{ columnName: string; direction?: 'asc' | 'desc' }>
+    filters?: PgFilter[]
+  } = {}
 ): Promise<RowListResult> {
   const params = new URLSearchParams()
   if (options.pageSize != null) params.set('page[size]', String(options.pageSize))
+  if (options.after != null) params.set('page[after]', options.after)
   if (options.countMode) params.set('countMode', options.countMode)
+  if (options.select && options.select.length > 0) params.set('select', options.select.join(','))
+  if (options.order && options.order.length > 0) {
+    params.set('order', options.order.map((entry) => `${entry.columnName}:${entry.direction ?? 'asc'}`).join(','))
+  }
+  // PostgREST-style filters: one query param per filter (duplicates allowed).
+  for (const filter of options.filters ?? []) params.append(filter.columnName, filterToQueryValue(filter))
   const qs = params.toString()
   return requestConsoleSessionJson<RowListResult>(`${dataBase(workspaceId, databaseName, schemaName, tableName)}/rows${qs ? `?${qs}` : ''}`)
 }

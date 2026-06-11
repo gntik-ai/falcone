@@ -145,6 +145,38 @@ function pageFromQuery(searchParams) {
   return { size: size != null ? Number(size) : undefined, after: after ?? undefined };
 }
 
+const FILTER_OPERATORS = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'like', 'ilike', 'json_path_eq']);
+
+// Coerce a query-string scalar so numeric/boolean comparisons reach Postgres with the right
+// type (e.g. age=gte.18 → 18, not "18").
+function coerceScalar(raw) {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  if (raw !== '' && /^-?\d+(\.\d+)?$/.test(raw)) return Number(raw);
+  return raw;
+}
+
+// PostgREST-style list filters: each non-meta query param `column=operator.value`
+// (e.g. ?status=eq.active&age=gte.18&id=in.(1,2,3)). Bare `column=value` defaults to eq.
+function filtersFromQuery(searchParams) {
+  const filters = [];
+  for (const [k, v] of searchParams.entries()) {
+    if (META_QUERY_KEYS.has(k)) continue;
+    const m = /^([a-z_]+)\.(.*)$/s.exec(v);
+    if (m && FILTER_OPERATORS.has(m[1])) {
+      const operator = m[1];
+      const rest = m[2];
+      const value = operator === 'in'
+        ? rest.replace(/^\(|\)$/g, '').split(',').map((entry) => coerceScalar(entry.trim()))
+        : coerceScalar(rest);
+      filters.push({ columnName: k, operator, value });
+    } else {
+      filters.push({ columnName: k, operator: 'eq', value: coerceScalar(v) });
+    }
+  }
+  return filters.length > 0 ? filters : undefined;
+}
+
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
 function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor) {
@@ -169,7 +201,12 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
 
     // ---- Postgres data rows (CRUD + bulk) ----
     ['GET', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
-      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'list', page: pageFromQuery(c.url.searchParams), countMode: c.url.searchParams.get('countMode') ?? undefined }, 200)],
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'list',
+        select: c.url.searchParams.get('select') ?? undefined,
+        order: c.url.searchParams.get('order') ?? undefined,
+        filters: filtersFromQuery(c.url.searchParams),
+        page: pageFromQuery(c.url.searchParams),
+        countMode: c.url.searchParams.get('countMode') ?? undefined }, 200)],
     ['POST', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.values ?? c.body }, 201)],
     ['POST', new RegExp(`${data}/rows/bulk/insert$`), ([w, db, s, t], c) =>
