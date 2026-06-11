@@ -178,7 +178,7 @@ export async function executePostgresData(registry, params) {
       }
       const vectorColumnName = params.vectorColumn ?? table.vectorColumns?.[0];
       const expectedDimension = vectorColumnName ? await columnVectorDimension(client, params.schemaName, params.tableName, vectorColumnName) : undefined;
-      knnParams.queryVector = await params.embeddingExecutor.embedForWorkspace(workspaceId, params.queryText, { expectedDimension });
+      knnParams.queryVector = await params.embeddingExecutor.embedForWorkspace(workspaceId, params.queryText, { expectedDimension, tenantId });
     }
 
     let plan;
