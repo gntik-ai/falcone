@@ -8,6 +8,7 @@
 // workspace database). Wires the Postgres data-row family (CRUD + bulk) and the Postgres
 // DDL family (schema/table/column/index); other OpenAPI families plug into the same table.
 import http from 'node:http';
+import https from 'node:https';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 
@@ -17,6 +18,45 @@ function sendJson(res, statusCode, body) {
   const payload = body == null ? '' : JSON.stringify(body);
   res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) });
   res.end(payload);
+}
+
+// Reverse-proxy a request the executor does not itself serve to the control-plane upstream.
+// The executor only handles the data-plane + DDL slice; every other path under the data
+// prefixes (browse/inventory/management) is served by the legacy control-plane. The request
+// stream is piped through untouched (method/path/query/headers/body) and the upstream response
+// is streamed back, so this never buffers the body.
+//
+// SSRF-safe by construction: protocol/host/port are pinned to the operator-configured
+// `upstream` (a URL parsed at startup); ONLY the path+query are taken from the request. A
+// hostile request-target (absolute- or protocol-relative form, e.g. `//169.254.169.254/…`)
+// therefore cannot redirect the proxy off the configured control-plane host.
+const PROXY_TIMEOUT_MS = 30000;
+function proxyRequest(req, res, upstream, logger) {
+  const incoming = new URL(req.url, 'http://upstream.invalid');
+  const client = upstream.protocol === 'https:' ? https : http;
+  const headers = { ...req.headers, host: upstream.host };
+  delete headers.connection;
+  const upstreamReq = client.request(
+    {
+      protocol: upstream.protocol,
+      hostname: upstream.hostname,
+      port: upstream.port,
+      method: req.method,
+      path: `${incoming.pathname}${incoming.search}`,
+      headers,
+    },
+    (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
+      upstreamRes.pipe(res);
+    },
+  );
+  upstreamReq.setTimeout(PROXY_TIMEOUT_MS, () => upstreamReq.destroy(Object.assign(new Error('upstream timeout'), { code: 'ETIMEDOUT' })));
+  upstreamReq.on('error', (err) => {
+    logger.error?.('[control-plane] upstream proxy failed:', err);
+    if (!res.headersSent) sendJson(res, 502, { code: 'UPSTREAM_UNAVAILABLE', message: 'Control-plane upstream unavailable' });
+    else res.destroy();
+  });
+  req.pipe(upstreamReq);
 }
 
 function readJsonBody(req) {
@@ -210,8 +250,11 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, controlPlaneUpstream, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
+  // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
+  // per-request proxy can never be steered to a different host (SSRF).
+  const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
   const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor);
 
   return http.createServer(async (req, res) => {
@@ -220,7 +263,12 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const url = new URL(req.url, 'http://control-plane.local');
 
       const match = routes.find(([m, re]) => m === method && re.test(url.pathname));
-      if (!match) return sendJson(res, 404, { code: 'NO_ROUTE', message: `No route for ${method} ${url.pathname}` });
+      if (!match) {
+        // Not part of the executor's data-plane/DDL slice → fall through to the control-plane
+        // (browse/inventory/management routes under the same prefixes) when an upstream is set.
+        if (upstream) return proxyRequest(req, res, upstream, logger);
+        return sendJson(res, 404, { code: 'NO_ROUTE', message: `No route for ${method} ${url.pathname}` });
+      }
       const [, re, handler, opts] = match;
       const groups = re.exec(url.pathname).slice(1);
 
