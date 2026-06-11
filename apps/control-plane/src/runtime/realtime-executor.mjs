@@ -1,11 +1,11 @@
-// Realtime executor (change: add-realtime-changestream).
+// Realtime executor (changes: add-realtime-changestream, add-realtime-mongo-deletes).
 //
 // The realtime engine over the executor: subscribe to a workspace collection's changes via
 // a MongoDB change stream and push them to the caller. Tenant isolation is enforced IN the
-// change-stream pipeline ($match on fullDocument.tenantId === the verified tenant), so a
-// subscriber only ever sees its own tenant's changes. Deletes are excluded for now — a change
-// stream delete carries only documentKey._id (no fullDocument), so it cannot be tenant-scoped
-// without collection pre-images (a tracked follow-up); insert/update/replace carry the doc.
+// change-stream pipeline ($match on the verified tenant), so a subscriber only ever sees its
+// own tenant's changes. insert/update/replace are tenant-scoped on fullDocument.tenantId;
+// DELETE is tenant-scoped on fullDocumentBeforeChange.tenantId, which requires collection
+// pre-images (changeStreamPreAndPostImages, MongoDB 6.0+) — enabled best-effort on subscribe.
 import { MongoClient } from 'mongodb'
 
 import { clientError } from './errors.mjs'
@@ -43,17 +43,27 @@ export function createRealtimeExecutor(options = {}) {
 
     const uri = await resolve(workspaceId)
     const client = await clientFor(uri)
-    const collection = client.db(params.databaseName).collection(params.collectionName)
+    const db = client.db(params.databaseName)
+    const collection = db.collection(params.collectionName)
 
-    // Tenant scope is enforced server-side by the pipeline: only this tenant's documents,
-    // and only operations that carry the document (so the tenant predicate can apply).
+    // Enable change-stream pre-images (MongoDB 6.0+) so DELETE events carry the deleted
+    // document's prior state (fullDocumentBeforeChange) — the only way to tenant-scope a
+    // delete (its change event otherwise has just documentKey._id). Best-effort + idempotent:
+    // if it can't be enabled (older Mongo, missing collection, permissions) inserts/updates
+    // still stream and deletes are simply not delivered (never leaked).
+    await db.command({ collMod: params.collectionName, changeStreamPreAndPostImages: { enabled: true } }).catch(() => {})
+
+    // Tenant scope is enforced server-side by the pipeline: only this tenant's documents.
+    // insert/update/replace carry fullDocument; delete carries fullDocumentBeforeChange.
     const pipeline = [{
       $match: {
-        operationType: { $in: ['insert', 'update', 'replace'] },
-        'fullDocument.tenantId': tenantId
+        $or: [
+          { operationType: { $in: ['insert', 'update', 'replace'] }, 'fullDocument.tenantId': tenantId },
+          { operationType: 'delete', 'fullDocumentBeforeChange.tenantId': tenantId }
+        ]
       }
     }]
-    const stream = collection.watch(pipeline, { fullDocument: 'updateLookup' })
+    const stream = collection.watch(pipeline, { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' })
 
     let closed = false
     const close = async () => {
@@ -69,7 +79,8 @@ export function createRealtimeExecutor(options = {}) {
       params.onChange?.({
         type: event.operationType,
         documentId: event.documentKey?._id ?? null,
-        document: event.fullDocument ?? null
+        // delete carries the prior doc as fullDocumentBeforeChange
+        document: event.fullDocument ?? event.fullDocumentBeforeChange ?? null
       })
     })
     stream.on('error', (error) => {
