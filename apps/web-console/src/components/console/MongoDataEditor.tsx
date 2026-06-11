@@ -4,15 +4,20 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { ApiError } from '@/lib/http'
-import { parseJsonObject, prettyJson } from '@/lib/editor-ux'
+import { copyToClipboard, parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import {
+  buildMongoCurlSnippet,
+  buildMongoFrontendSnippet,
   deleteDocument,
   insertDocument,
   listDocuments,
+  previewDocumentsWithApiKey,
   updateDocument,
   type MongoDocument,
   type MongoFilter
 } from '@/services/mongoApi'
+// API-key issuance is a workspace-scoped surface (engine-agnostic); reuse it here.
+import { issueApiKey, type IssuedApiKey } from '@/services/postgresApi'
 
 const PAGE_SIZES = [10, 25, 50, 100]
 
@@ -47,6 +52,12 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [issued, setIssued] = useState<IssuedApiKey | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [previewDocs, setPreviewDocs] = useState<MongoDocument[] | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
+  const embedOrigin = typeof window !== 'undefined' ? window.location.origin : undefined
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -108,6 +119,39 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
     const previous = stack.pop()
     setCursorStack(stack)
     setCursor(previous === '' ? undefined : previous)
+  }
+
+  async function handleIssueKey() {
+    setError(null)
+    try {
+      const key = await issueApiKey(workspaceId, 'anon')
+      setIssued(key)
+      setCopied(false)
+      setPreviewDocs(null)
+      setPreviewError(null)
+    } catch (caught) {
+      setError(errorMessage(caught))
+    }
+  }
+
+  async function handleCopyKey() {
+    if (!issued) return
+    setCopied(await copyToClipboard(issued.key))
+  }
+
+  // Read-only preview AS the issued key — a bare apikey request, exactly what a frontend does.
+  async function handlePreviewEmbed() {
+    if (!issued) return
+    setPreviewError(null)
+    setPreviewBusy(true)
+    try {
+      const result = await previewDocumentsWithApiKey(issued.key, workspaceId, databaseName, collectionName, { pageSize: 10 })
+      setPreviewDocs(result.items)
+    } catch (caught) {
+      setPreviewError(errorMessage(caught))
+    } finally {
+      setPreviewBusy(false)
+    }
   }
 
   async function handleInsert() {
@@ -259,6 +303,40 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
       <button type="button" onClick={() => void handleInsert()} disabled={busy}>
         Insert
       </button>
+
+      <h3>Anon-key embed</h3>
+      <button type="button" onClick={() => void handleIssueKey()}>
+        Issue anon key
+      </button>
+      {issued ? (
+        <div role="status" aria-label="Anon-key embed">
+          <p>Copy this key now — it will not be shown again:</p>
+          <code>{issued.key}</code>
+          <button type="button" onClick={() => void handleCopyKey()}>
+            {copied ? 'Copied!' : 'Copy key'}
+          </button>
+          <h4>Embed (fetch)</h4>
+          <pre>{buildMongoFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}</pre>
+          <h4>Embed (curl)</h4>
+          <pre>{buildMongoCurlSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}</pre>
+          <button type="button" onClick={() => void handlePreviewEmbed()} disabled={previewBusy}>
+            Run read-only preview
+          </button>
+          {previewError ? <p role="alert">{previewError}</p> : null}
+          {previewDocs != null ? (
+            <div aria-label="Embed preview">
+              <p>Preview as this key — {previewDocs.length} document(s):</p>
+              <ul>
+                {previewDocs.map((doc, index) => (
+                  <li key={documentId(doc) ?? index}>
+                    <code>{JSON.stringify(doc)}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }
