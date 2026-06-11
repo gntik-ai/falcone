@@ -27,6 +27,11 @@ const ConsolePostgresPage = lazy(async () => {
   return { default: module.ConsolePostgresPage }
 })
 
+const ConsolePostgresDataPage = lazy(async () => {
+  const module = await import('@/pages/ConsolePostgresDataPage')
+  return { default: module.ConsolePostgresDataPage }
+})
+
 const ConsoleMongoPage = lazy(async () => {
   const module = await import('@/pages/ConsoleMongoPage')
   return { default: module.ConsoleMongoPage }
@@ -186,6 +191,10 @@ export const appRoutes = [
           {
             path: 'postgres',
             element: <ConsolePostgresPage />
+          },
+          {
+            path: 'postgres/data',
+            element: <ConsolePostgresDataPage />
           },
           {
             path: 'mongo',
