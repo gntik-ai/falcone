@@ -1,10 +1,11 @@
-// Postgres data editor (change: add-console-postgres-data-editor).
-// A real row data-grid (list/insert/delete via the data API) + an API-keys panel
-// (issue anon/service keys, show the plaintext once, copy-paste frontend snippet, revoke).
-// Wired to the control-plane executor through @/services/postgresApi.
+// Postgres data editor (changes: add-console-postgres-data-editor, add-console-richer-data-editors).
+// A real row data-grid (list/insert/EDIT/delete via the data API) with loading/empty states and
+// an exact row count, plus an API-keys panel (issue anon/service keys, copy the plaintext once,
+// copy-paste frontend snippet, revoke). Wired to the control-plane executor via @/services/postgresApi.
 import { useCallback, useEffect, useState } from 'react'
 
 import type { ApiError } from '@/lib/http'
+import { collectColumns, copyToClipboard, formatCell, parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import {
   buildFrontendSnippet,
   deleteRow,
@@ -13,6 +14,7 @@ import {
   listApiKeys,
   listRows,
   revokeApiKey,
+  updateRow,
   type ApiKeyRecord,
   type IssuedApiKey,
   type PgRow
@@ -30,26 +32,30 @@ function errorMessage(error: unknown): string {
   return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
 }
 
-function formatCell(value: unknown): string {
-  if (value == null) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
-
 export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tableName }: PostgresDataEditorProps) {
   const [rows, setRows] = useState<PgRow[]>([])
+  const [count, setCount] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
   const [keys, setKeys] = useState<ApiKeyRecord[]>([])
   const [issued, setIssued] = useState<IssuedApiKey | null>(null)
+  const [copied, setCopied] = useState(false)
   const [newRowJson, setNewRowJson] = useState('{}')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editJson, setEditJson] = useState('{}')
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const reloadRows = useCallback(async () => {
+    setLoading(true)
     try {
       const result = await listRows(workspaceId, databaseName, schemaName, tableName, { countMode: 'exact' })
       setRows(result.items)
+      setCount(typeof result.count === 'number' ? result.count : null)
     } catch (caught) {
       setError(errorMessage(caught))
+    } finally {
+      setLoading(false)
     }
   }, [workspaceId, databaseName, schemaName, tableName])
 
@@ -67,18 +73,56 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     void reloadKeys()
   }, [reloadRows, reloadKeys])
 
-  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
+  const columns = collectColumns(rows)
 
   async function handleInsert() {
     setError(null)
+    setStatus(null)
+    const parsed = parseJsonObject(newRowJson)
+    if (!parsed.ok) {
+      setError(`New row: ${parsed.error}`)
+      return
+    }
     setBusy(true)
     try {
-      const values = JSON.parse(newRowJson) as PgRow
-      await insertRow(workspaceId, databaseName, schemaName, tableName, values)
+      await insertRow(workspaceId, databaseName, schemaName, tableName, parsed.value)
       setNewRowJson('{}')
+      setStatus('Row inserted')
       await reloadRows()
     } catch (caught) {
-      setError(caught instanceof SyntaxError ? 'New row is not valid JSON' : errorMessage(caught))
+      setError(errorMessage(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function beginEdit(row: PgRow) {
+    if (row.id == null) {
+      setError('Row has no "id" primary key to edit by')
+      return
+    }
+    setError(null)
+    setStatus(null)
+    setEditingId(String(row.id))
+    setEditJson(prettyJson(row))
+  }
+
+  async function saveEdit() {
+    if (editingId == null) return
+    const parsed = parseJsonObject(editJson)
+    if (!parsed.ok) {
+      setError(`Edited row: ${parsed.error}`)
+      return
+    }
+    const { id: _id, ...changes } = parsed.value
+    setBusy(true)
+    try {
+      await updateRow(workspaceId, databaseName, schemaName, tableName, { id: editingId }, changes)
+      setEditingId(null)
+      setStatus('Row updated')
+      await reloadRows()
+    } catch (caught) {
+      setError(errorMessage(caught))
     } finally {
       setBusy(false)
     }
@@ -92,6 +136,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     setBusy(true)
     try {
       await deleteRow(workspaceId, databaseName, schemaName, tableName, { id: String(row.id) })
+      setStatus('Row deleted')
       await reloadRows()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -105,6 +150,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     try {
       const key = await issueApiKey(workspaceId, keyType)
       setIssued(key)
+      setCopied(false)
       await reloadKeys()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -120,46 +166,71 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     }
   }
 
+  async function handleCopyKey() {
+    if (!issued) return
+    setCopied(await copyToClipboard(issued.key))
+  }
+
   return (
     <section aria-label="Postgres data editor">
       <h2>
         {schemaName}.{tableName}
       </h2>
       {error ? <p role="alert">{error}</p> : null}
+      {status ? <p role="status">{status}</p> : null}
 
-      <h3>Rows</h3>
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column}>{column}</th>
-            ))}
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={typeof row.id === 'string' ? row.id : index}>
+      <h3>Rows{count != null ? ` (${count})` : ''}</h3>
+      {loading ? (
+        <p>Loading rows…</p>
+      ) : rows.length === 0 ? (
+        <p>No rows yet.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
               {columns.map((column) => (
-                <td key={column}>{formatCell(row[column])}</td>
+                <th key={column}>{column}</th>
               ))}
-              <td>
-                <button type="button" onClick={() => void handleDelete(row)} disabled={busy}>
-                  Delete
-                </button>
-              </td>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={typeof row.id === 'string' ? row.id : index}>
+                {columns.map((column) => (
+                  <td key={column}>{formatCell(row[column])}</td>
+                ))}
+                <td>
+                  <button type="button" onClick={() => beginEdit(row)} disabled={busy}>
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => void handleDelete(row)} disabled={busy}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {editingId != null ? (
+        <div aria-label="Edit row">
+          <h3>Edit row {editingId}</h3>
+          <label htmlFor="edit-row-json">Row (JSON)</label>
+          <textarea id="edit-row-json" value={editJson} onChange={(event) => setEditJson(event.target.value)} />
+          <button type="button" onClick={() => void saveEdit()} disabled={busy}>
+            Save
+          </button>
+          <button type="button" onClick={() => setEditingId(null)} disabled={busy}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
 
       <h3>Insert row</h3>
       <label htmlFor="new-row-json">New row (JSON)</label>
-      <textarea
-        id="new-row-json"
-        value={newRowJson}
-        onChange={(event) => setNewRowJson(event.target.value)}
-      />
+      <textarea id="new-row-json" value={newRowJson} onChange={(event) => setNewRowJson(event.target.value)} />
       <button type="button" onClick={() => void handleInsert()} disabled={busy}>
         Insert
       </button>
@@ -175,6 +246,9 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
         <div role="status">
           <p>Copy this key now — it will not be shown again:</p>
           <code>{issued.key}</code>
+          <button type="button" onClick={() => void handleCopyKey()}>
+            {copied ? 'Copied!' : 'Copy key'}
+          </button>
           <pre>
             {buildFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, schemaName, tableName })}
           </pre>
