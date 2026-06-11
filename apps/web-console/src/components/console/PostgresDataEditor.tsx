@@ -7,12 +7,14 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ApiError } from '@/lib/http'
 import { collectColumns, copyToClipboard, formatCell, parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import {
+  buildCurlSnippet,
   buildFrontendSnippet,
   deleteRow,
   insertRow,
   issueApiKey,
   listApiKeys,
   listRows,
+  previewRowsWithApiKey,
   revokeApiKey,
   updateRow,
   type ApiKeyRecord,
@@ -52,6 +54,9 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
   const [keys, setKeys] = useState<ApiKeyRecord[]>([])
   const [issued, setIssued] = useState<IssuedApiKey | null>(null)
   const [copied, setCopied] = useState(false)
+  const [previewRows, setPreviewRows] = useState<PgRow[] | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
   const [newRowJson, setNewRowJson] = useState('{}')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editJson, setEditJson] = useState('{}')
@@ -135,6 +140,8 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
   }, [reloadRows, reloadKeys])
 
   const columns = collectColumns(rows)
+  // The real host a frontend would call (so the copy-paste embed is runnable as-is).
+  const embedOrigin = typeof window !== 'undefined' ? window.location.origin : undefined
 
   async function handleInsert() {
     setError(null)
@@ -212,9 +219,27 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
       const key = await issueApiKey(workspaceId, keyType)
       setIssued(key)
       setCopied(false)
+      setPreviewRows(null)
+      setPreviewError(null)
       await reloadKeys()
     } catch (caught) {
       setError(errorMessage(caught))
+    }
+  }
+
+  // Run a read-only preview AS the issued key — a bare apikey-header request, exactly what a
+  // frontend embed does — to prove the key works end-to-end through the gateway.
+  async function handlePreview() {
+    if (!issued) return
+    setPreviewError(null)
+    setPreviewBusy(true)
+    try {
+      const result = await previewRowsWithApiKey(issued.key, workspaceId, databaseName, schemaName, tableName, { pageSize: 10 })
+      setPreviewRows(result.items)
+    } catch (caught) {
+      setPreviewError(errorMessage(caught))
+    } finally {
+      setPreviewBusy(false)
     }
   }
 
@@ -355,9 +380,40 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
           <button type="button" onClick={() => void handleCopyKey()}>
             {copied ? 'Copied!' : 'Copy key'}
           </button>
-          <pre>
-            {buildFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, schemaName, tableName })}
-          </pre>
+
+          <div aria-label="Anon-key embed">
+            <h4>Embed (fetch)</h4>
+            <pre>{buildFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, schemaName, tableName, origin: embedOrigin })}</pre>
+            <h4>Embed (curl)</h4>
+            <pre>{buildCurlSnippet({ apiKey: issued.key, workspaceId, databaseName, schemaName, tableName, origin: embedOrigin })}</pre>
+            <button type="button" onClick={() => void handlePreview()} disabled={previewBusy}>
+              Run read-only preview
+            </button>
+            {previewError ? <p role="alert">{previewError}</p> : null}
+            {previewRows != null ? (
+              <div aria-label="Embed preview">
+                <p>Preview as this key — {previewRows.length} row(s):</p>
+                <table>
+                  <thead>
+                    <tr>
+                      {collectColumns(previewRows).map((column) => (
+                        <th key={column}>{column}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewRows.map((row, index) => (
+                      <tr key={typeof row.id === 'string' ? row.id : index}>
+                        {collectColumns(previewRows).map((column) => (
+                          <td key={column}>{formatCell(row[column])}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
       <ul>
