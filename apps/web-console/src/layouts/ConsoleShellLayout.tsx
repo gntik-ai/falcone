@@ -114,6 +114,30 @@ const consoleNavigationItems = [
     description: 'Entrada persistente al dominio serverless del producto.'
   },
   {
+    label: 'Data: Postgres',
+    to: '/console/postgres/data',
+    icon: Database,
+    description: 'Editor de filas (CRUD) y claves API anon/service sobre el ejecutor de datos.'
+  },
+  {
+    label: 'Data: Mongo',
+    to: '/console/mongo/data',
+    icon: Database,
+    description: 'Editor de documentos (CRUD) de una colección sobre el ejecutor de datos.'
+  },
+  {
+    label: 'Data: Events',
+    to: '/console/events/data',
+    icon: Activity,
+    description: 'Topics, publish y consume sobre el ejecutor de eventos del workspace.'
+  },
+  {
+    label: 'Data: Functions',
+    to: '/console/functions/data',
+    icon: Workflow,
+    description: 'Deploy e invocación de funciones sobre el ejecutor del workspace.'
+  },
+  {
     label: 'Operaciones',
     to: '/console/operations',
     icon: Activity,
