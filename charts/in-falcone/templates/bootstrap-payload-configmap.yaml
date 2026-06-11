@@ -40,7 +40,9 @@ data:
 {{ toPrettyJson .Values.bootstrap.oneShot.internalNamespaces | nindent 4 }}
 {{- $mode := .Values.gatewayPolicy.passthrough.mode -}}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
-{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
+{{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled —
+       only the executor verifies anon/service keys; the control-plane cannot. */ -}}
+{{- if and (or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes)) (or (not .upstream.requiresExecutor) ($.Values.controlPlaneExecutor).enabled) }}
 {{- /* Data-plane routes (upstream.dataPlane: true) go to the dedicated control-plane
        executor when it is enabled; otherwise they stay on the default control-plane. */ -}}
 {{- $upstreamComponent := .upstream.component -}}
