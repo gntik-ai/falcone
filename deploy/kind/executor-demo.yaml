@@ -70,13 +70,16 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane
-          image: localhost:30500/in-falcone-control-plane-executor:0.9.0
+          image: localhost:30500/in-falcone-control-plane-executor:0.9.1
           imagePullPolicy: IfNotPresent
           ports:
             - { containerPort: 8080, name: http }
           env:
             - { name: NODE_ENV, value: production }
             - { name: PORT, value: "8080" }
+            # Fallthrough proxy: routes the executor does NOT serve (browse/inventory/
+            # management) are forwarded to the real control-plane runtime.
+            - { name: CONTROL_PLANE_UPSTREAM, value: "http://falcone-control-plane:8080" }
             - { name: PGHOST, value: falcone-postgresql }
             - { name: PGPORT, value: "5432" }
             - { name: PGUSER, value: falcone }
