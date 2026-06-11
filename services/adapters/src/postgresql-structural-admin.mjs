@@ -265,8 +265,34 @@ const BUILTIN_TYPE_CATALOG = Object.freeze([
     featureFlag: 'text_search',
     arraySupported: true,
     typeClass: 'base'
+  },
+  {
+    // pgvector similarity type (add-vector-search). Lives in `public` (extension schema)
+    // and is gated on the `vector` extension being enabled for the (dedicated-DB) tenant.
+    // The fixed dimension N is carried through the column `precision` slot → vector(N).
+    schemaName: 'public',
+    typeName: 'vector',
+    aliases: [],
+    category: 'extension',
+    extensionName: 'vector',
+    kind: 'vector',
+    advanced: true,
+    featureFlag: 'vector',
+    arraySupported: false,
+    typeClass: 'base'
   }
 ]);
+
+// pgvector index metric → opclass map (add-vector-search). HNSW/IVFFlat both accept
+// these access-method operator classes; `cosine` is the default for normalised embeddings.
+export const POSTGRES_VECTOR_INDEX_METHODS = Object.freeze(['hnsw', 'ivfflat']);
+export const POSTGRES_VECTOR_METRIC_OPCLASS = Object.freeze({
+  cosine: 'vector_cosine_ops',
+  l2: 'vector_l2_ops',
+  inner_product: 'vector_ip_ops'
+});
+const VECTOR_MIN_DIMENSION = 1;
+const VECTOR_MAX_DIMENSION = 16000;
 
 function compactDefined(values) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
@@ -381,6 +407,10 @@ function shouldIncludeBuiltinType(entry, options) {
       return options.enableRangeTypes !== false;
     case 'text_search':
       return options.enableTextSearchTypes !== false;
+    case 'vector':
+      // pgvector is database-level + dedicated-DB only: only surface the `vector`
+      // type when the extension is actually enabled for the tenant cluster.
+      return (options.enabledExtensions ?? []).map((e) => normalizeTypeName(e)).includes('vector');
     default:
       return options.includeAdvancedTypes !== false;
   }
@@ -602,7 +632,10 @@ function renderQualifiedName(schemaName, objectName) {
 
 function renderDataType(typeDescriptor, catalog = []) {
   const normalized = normalizeDataType(typeDescriptor, catalog);
-  const schemaPrefix = normalized.schemaName && normalized.schemaName !== 'pg_catalog' ? `${quoteIdent(normalized.schemaName)}.` : '';
+  // pgvector's `vector` type is installed in `public` (on the search_path); render it
+  // unqualified as `vector(N)` to match the canonical pgvector DDL surface.
+  const omitSchemaPrefix = normalized.schemaName === 'pg_catalog' || (normalized.schemaName === 'public' && normalized.typeName === 'vector');
+  const schemaPrefix = normalized.schemaName && !omitSchemaPrefix ? `${quoteIdent(normalized.schemaName)}.` : '';
   const baseType = normalized.precision
     ? `${schemaPrefix}${normalizeIdentifier(normalized.typeName)}(${normalized.precision})`
     : `${schemaPrefix}${normalizeIdentifier(normalized.typeName)}`;
@@ -634,8 +667,22 @@ function normalizeConstraints(constraints = {}) {
   return Object.keys(normalized).length > 0 ? normalized : {};
 }
 
+// pgvector columns are declared as `dataType: "vector"` + a required integer
+// `dimension`. The dimension flows through the column type `precision` slot so
+// renderDataType emits `vector(N)` — reusing the existing precision-aware renderer.
+function foldVectorDimension(rawDataType, dimension) {
+  const descriptor = parseTypeDescriptor(rawDataType);
+  if (descriptor.typeName !== 'vector') return rawDataType;
+  if (descriptor.precision !== undefined) return rawDataType; // already vector(N)
+  if (dimension === undefined || dimension === null) {
+    return { typeName: 'vector', schemaName: descriptor.schemaName ?? 'public' };
+  }
+  return { typeName: 'vector', schemaName: descriptor.schemaName ?? 'public', precision: String(dimension) };
+}
+
 function normalizeColumnSpec(column = {}, catalog = []) {
-  const dataType = normalizeDataType(column.dataType ?? column.type ?? column.typeName, catalog);
+  const rawDataType = foldVectorDimension(column.dataType ?? column.type ?? column.typeName, column.dimension);
+  const dataType = normalizeDataType(rawDataType, catalog);
   const constraints = normalizeConstraints(column.constraints);
   const identity = normalizeIdentity(column.identity);
   const generated = column.generatedExpression || column.generated?.expression
@@ -896,6 +943,18 @@ function validateColumnRules(column, context = {}, { onTableCreate = false, acti
     violations.push(`Column type ${normalized.dataType.fullName ?? normalized.dataType.typeName} is not present in the allowed type catalog for this cluster.`);
   }
 
+  if (normalized.dataType?.typeName === 'vector' && action !== 'list' && action !== 'delete') {
+    // The dimension is rendered into the precision slot by foldVectorDimension; an
+    // absent dimension surfaces as a vector column with no precision.
+    const rawDimension = column.dimension ?? (normalized.dataType.precision !== undefined ? Number(normalized.dataType.precision) : undefined);
+    const dimension = Number(rawDimension);
+    if (rawDimension === undefined || rawDimension === null || normalized.dataType.precision === undefined) {
+      violations.push(`Vector column ${normalized.columnName ?? 'unnamed'} requires a positive integer dimension attribute.`);
+    } else if (!Number.isInteger(dimension) || dimension < VECTOR_MIN_DIMENSION || dimension > VECTOR_MAX_DIMENSION) {
+      violations.push(`Vector column ${normalized.columnName ?? 'unnamed'} dimension must be an integer in range ${VECTOR_MIN_DIMENSION}-${VECTOR_MAX_DIMENSION}.`);
+    }
+  }
+
   if (normalized.identity && normalized.generated) {
     violations.push('Columns cannot combine identity and generated expressions.');
   }
@@ -1018,7 +1077,16 @@ function normalizeIndexKey(entry) {
 }
 
 function normalizeIndexSpec(payload = {}) {
-  const keys = (payload.keys ?? payload.columns ?? payload.expressions ?? []).map((entry) => normalizeIndexKey(entry)).filter(Boolean);
+  const indexMethod = normalizeTypeName(payload.indexMethod ?? payload.method ?? 'btree');
+  const isVector = POSTGRES_VECTOR_INDEX_METHODS.includes(indexMethod);
+  // For a vector index, the metric selects the access-method opclass applied to the
+  // (single) vector key column. Default to cosine for normalised embeddings.
+  const metric = isVector ? normalizeTypeName(payload.metric ?? 'cosine') : undefined;
+  const opclass = isVector ? POSTGRES_VECTOR_METRIC_OPCLASS[metric] : undefined;
+  const keys = (payload.keys ?? payload.columns ?? payload.expressions ?? [])
+    .map((entry) => normalizeIndexKey(entry))
+    .filter(Boolean)
+    .map((key) => (isVector && opclass && !key.operatorClass ? { ...key, operatorClass: opclass } : key));
   const includeColumns = normalizeIdentifierList(payload.includeColumns ?? []);
 
   return compactDefined({
@@ -1026,7 +1094,8 @@ function normalizeIndexSpec(payload = {}) {
     schemaName: safeIdentifier(payload.schemaName),
     tableName: safeIdentifier(payload.tableName),
     indexName: safeIdentifier(payload.indexName ?? payload.name),
-    indexMethod: normalizeTypeName(payload.indexMethod ?? payload.method ?? 'btree'),
+    indexMethod,
+    metric,
     unique: payload.unique === true,
     keys,
     includeColumns: includeColumns.length > 0 ? includeColumns : undefined,
@@ -1241,12 +1310,31 @@ function validateIndexRequest(payload, context = {}, profile = {}) {
   const currentIndex = context.currentIndex ?? {};
   const currentColumns = new Set((context.currentTable?.columns ?? []).map((column) => normalizeIdentifier(column.columnName ?? column.name)).filter(Boolean));
 
+  const isVectorIndex = POSTGRES_VECTOR_INDEX_METHODS.includes(normalized.indexMethod);
+  const currentColumnTypes = new Map(
+    (context.currentTable?.columns ?? []).map((column) => [
+      normalizeIdentifier(column.columnName ?? column.name),
+      normalizeTypeName(column.dataType?.typeName ?? column.dataType?.fullName ?? column.dataType ?? '')
+    ])
+  );
+
   if (!normalized.databaseName) violations.push('Indexes must declare databaseName.');
   if (!normalized.schemaName) violations.push('Indexes must declare schemaName.');
   if (!normalized.tableName) violations.push('Indexes must declare tableName.');
   if (!normalized.indexName && context.action !== 'list') violations.push('Indexes must declare indexName.');
-  if (!POSTGRES_INDEX_METHODS.includes(normalized.indexMethod)) {
+  if (!POSTGRES_INDEX_METHODS.includes(normalized.indexMethod) && !isVectorIndex) {
     violations.push(`Unsupported PostgreSQL index method ${String(normalized.indexMethod)}.`);
+  }
+
+  if (isVectorIndex) {
+    if (!POSTGRES_VECTOR_METRIC_OPCLASS[normalized.metric]) {
+      violations.push(`Unsupported vector index metric ${String(normalized.metric)}; expected one of ${Object.keys(POSTGRES_VECTOR_METRIC_OPCLASS).join(', ')}.`);
+    }
+    for (const key of normalized.keys ?? []) {
+      if (key.columnName && currentColumnTypes.size > 0 && currentColumnTypes.get(key.columnName) !== 'vector') {
+        violations.push(`Vector index ${normalized.indexName ?? ''} target column ${key.columnName} is not a vector column.`);
+      }
+    }
   }
   if ((normalized.keys ?? []).length === 0 && context.action !== 'list' && context.action !== 'delete') {
     violations.push('Indexes must declare at least one key column or safe expression.');
@@ -1888,7 +1976,13 @@ function renderConstraintDefinition(constraint, catalog = []) {
 
 function renderIndexKey(key) {
   const base = key.expression ? `(${key.expression})` : quoteIdent(key.columnName);
-  const fragments = [base, key.order === 'desc' ? 'DESC' : undefined, key.nulls ? `NULLS ${String(key.nulls).toUpperCase()}` : undefined].filter(Boolean);
+  // operatorClass carries the pgvector opclass (vector_cosine_ops, etc.) for ANN indexes.
+  const fragments = [
+    base,
+    key.operatorClass ? key.operatorClass : undefined,
+    key.order === 'desc' ? 'DESC' : undefined,
+    key.nulls ? `NULLS ${String(key.nulls).toUpperCase()}` : undefined
+  ].filter(Boolean);
   return fragments.join(' ');
 }
 
