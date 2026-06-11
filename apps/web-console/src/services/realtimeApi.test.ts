@@ -31,15 +31,20 @@ afterEach(() => {
 })
 
 describe('realtimeApi', () => {
-  it('builds the SSE URL with the anon key as ?apikey=', () => {
-    const url = realtimeChangesUrl({ workspaceId: 'ws1', databaseName: 'appdb', collectionName: 'notes', apiKey: 'flc_anon_x', origin: 'https://api.example.com' })
+  it('builds the Mongo SSE URL with the anon key as ?apikey=', () => {
+    const url = realtimeChangesUrl({ workspaceId: 'ws1', target: { source: 'mongo', databaseName: 'appdb', collectionName: 'notes' }, apiKey: 'flc_anon_x', origin: 'https://api.example.com' })
     expect(url).toBe('https://api.example.com/v1/realtime/workspaces/ws1/data/appdb/collections/notes/changes?apikey=flc_anon_x')
+  })
+
+  it('builds the Postgres SSE URL (schemas/tables)', () => {
+    const url = realtimeChangesUrl({ workspaceId: 'ws1', target: { source: 'postgres', databaseName: 'appdb', schemaName: 'public', tableName: 'notes' }, apiKey: 'flc_anon_x', origin: 'https://api.example.com' })
+    expect(url).toBe('https://api.example.com/v1/realtime/workspaces/ws1/data/appdb/schemas/public/tables/notes/changes?apikey=flc_anon_x')
   })
 
   it('subscribes via EventSource and delivers insert/update/replace changes', () => {
     const changes: unknown[] = []
     const sub = subscribeRealtimeChanges({
-      workspaceId: 'ws1', databaseName: 'appdb', collectionName: 'notes', apiKey: 'flc_anon_x',
+      workspaceId: 'ws1', target: { source: 'mongo', databaseName: 'appdb', collectionName: 'notes' }, apiKey: 'flc_anon_x',
       onChange: (c) => changes.push(c)
     })
     const es = FakeEventSource.last as FakeEventSource
@@ -53,7 +58,7 @@ describe('realtimeApi', () => {
   })
 
   it('close() closes the EventSource', () => {
-    const sub = subscribeRealtimeChanges({ workspaceId: 'ws1', databaseName: 'appdb', collectionName: 'notes', apiKey: 'k', onChange: () => {} })
+    const sub = subscribeRealtimeChanges({ workspaceId: 'ws1', target: { source: 'mongo', databaseName: 'appdb', collectionName: 'notes' }, apiKey: 'k', onChange: () => {} })
     sub.close()
     expect((FakeEventSource.last as FakeEventSource).closed).toBe(true)
   })

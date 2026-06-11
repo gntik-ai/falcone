@@ -68,8 +68,8 @@ test('realtime SSE route streams to the executor, anon-keyed, OIDC-free, long ti
   assert.equal(route.upstream?.requiresExecutor, true)
   assert.equal(route.upstream?.dataPlane, true)
   assert.equal(route.upstream?.sse, true) // template gives it a long upstream timeout
-  // matches only the change-stream endpoint
-  assert.deepEqual(route.vars, [['uri', '~~', '/data/[^/]+/collections/[^/]+/changes$']])
+  // matches any change-stream endpoint (Mongo collections + Postgres tables)
+  assert.deepEqual(route.vars, [['uri', '~~', '/changes$']])
   // anon/read: no JWT at the gateway (EventSource sends ?apikey=, executor verifies)
   assert.ok(!('openid-connect' in (route.plugins ?? {})), 'realtime route must not enable openid-connect')
   // rate-limited per key whether the key is a header or ?apikey=

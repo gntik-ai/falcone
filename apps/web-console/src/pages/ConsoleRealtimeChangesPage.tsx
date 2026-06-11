@@ -14,7 +14,7 @@ export function ConsoleRealtimeChangesPage() {
   return (
     <div>
       <h1>Realtime changes</h1>
-      <p>Subscribe to a collection&apos;s tenant-scoped change stream with an anon key and watch changes live.</p>
+      <p>Subscribe to a Mongo collection&apos;s or Postgres table&apos;s tenant-scoped change stream with an anon key and watch changes live.</p>
       <RealtimeConsole workspaceId={activeWorkspaceId} />
     </div>
   )
