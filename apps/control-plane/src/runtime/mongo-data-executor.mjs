@@ -8,7 +8,7 @@
 // write cannot forge another tenant. (Mongo has no RLS/SET ROLE; the filter IS the guard.)
 import { MongoClient } from 'mongodb'
 
-import { buildMongoDataApiPlan } from '../../../../services/adapters/src/mongodb-data-api.mjs'
+import { buildMongoDataApiPlan, encodeMongoDataCursor } from '../../../../services/adapters/src/mongodb-data-api.mjs'
 import { clientError } from './errors.mjs'
 
 export function createMongoExecutor(options = {}) {
@@ -72,12 +72,24 @@ export function createMongoExecutor(options = {}) {
     try {
       if (op === 'list') {
         const query = plan.query ?? {}
+        const sort = query.sort ?? { _id: 1 }
+        const limit = query.limit ?? 25
         const items = await collection
           .find(query.filter ?? {}, { projection: query.projection })
-          .sort(query.sort ?? { _id: 1 })
-          .limit(query.limit ?? 25)
+          .sort(sort)
+          .limit(limit)
           .toArray()
-        return { items, page: { size: query.limit, returned: items.length } }
+        // Keyset cursor: when a full page came back, emit a next cursor from the last
+        // document's sort-field values (the adapter decodes `values` to resume).
+        let after
+        if (items.length > 0 && items.length >= limit) {
+          const lastDoc = items[items.length - 1]
+          const fields = Object.keys(sort)
+          if (fields.every((field) => lastDoc[field] !== undefined)) {
+            after = encodeMongoDataCursor({ values: Object.fromEntries(fields.map((field) => [field, lastDoc[field]])) })
+          }
+        }
+        return { items, page: { size: limit, returned: items.length, after } }
       }
       if (op === 'get') {
         const doc = await collection.findOne(plan.query.filter, { projection: plan.query.projection })
