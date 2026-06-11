@@ -33,6 +33,7 @@ import { ConsolePostgresDataPage } from '@/pages/ConsolePostgresDataPage'
 import { ConsoleMongoDataPage } from '@/pages/ConsoleMongoDataPage'
 import { ConsoleEventsDataPage } from '@/pages/ConsoleEventsDataPage'
 import { ConsoleFunctionsDataPage } from '@/pages/ConsoleFunctionsDataPage'
+import { ConsoleRealtimeChangesPage } from '@/pages/ConsoleRealtimeChangesPage'
 import { ConsoleKafkaPage } from '@/pages/ConsoleKafkaPage'
 import { ConsoleOperationsPage } from '@/pages/ConsoleOperationsPage'
 import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
@@ -195,6 +196,10 @@ export const appRoutes = [
           {
             path: 'functions/data',
             element: <ConsoleFunctionsDataPage />
+          },
+          {
+            path: 'realtime/changes',
+            element: <ConsoleRealtimeChangesPage />
           },
           {
             path: 'storage',

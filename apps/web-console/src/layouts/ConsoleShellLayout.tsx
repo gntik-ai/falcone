@@ -138,6 +138,12 @@ const consoleNavigationItems = [
     description: 'Deploy e invocación de funciones sobre el ejecutor del workspace.'
   },
   {
+    label: 'Data: Realtime',
+    to: '/console/realtime/changes',
+    icon: Activity,
+    description: 'Stream de cambios (SSE) de una colección con anon key sobre el ejecutor.'
+  },
+  {
     label: 'Operaciones',
     to: '/console/operations',
     icon: Activity,
