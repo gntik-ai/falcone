@@ -1125,6 +1125,122 @@ bootstrap:
             component: controlPlane
             port: 8080
             dataPlane: true
+        # ---- Anon/service API-key data-plane routes (Supabase-style) — OPT-IN ----
+        # Frontend apps authenticate with an `apikey: flc_anon_...|flc_service_...` header
+        # instead of a Keycloak JWT. These routes are selected by the apikey header (vars),
+        # carry NO openid-connect, and forward straight to the executor, which verifies the
+        # key and derives tenant/workspace FROM the key — the key is authoritative over any
+        # client-supplied x-* identity header (no spoofing). Priority is higher than the
+        # matching JWT route so a key request wins; without the header the request falls
+        # through to the JWT route. requiresExecutor:true → these render only when the
+        # executor is enabled (only it can verify keys).
+        - routeId: "2005-key"
+          name: public-api-postgres-apikey
+          uri: /v1/postgres/*
+          methods: *a2
+          priority: 335
+          vars:
+            - ["http_apikey", "~~", "^flc_"]
+          labels:
+            gateway.in-falcone.io/route-kind: product_api_apikey
+            gateway.in-falcone.io/family: postgres
+            gateway.in-falcone.io/tenant-binding: api-key
+            gateway.in-falcone.io/workspace-binding: api-key
+            gateway.in-falcone.io/plan-capabilities: data.postgresql.shared,data.postgresql.dedicated
+            gateway.in-falcone.io/audit-required: "false"
+          plugins:
+            cors: *a1
+          upstream:
+            component: controlPlane
+            port: 8080
+            dataPlane: true
+            requiresExecutor: true
+        - routeId: "2006-key"
+          name: public-api-mongo-apikey
+          uri: /v1/mongo/*
+          methods: *a2
+          priority: 334
+          vars:
+            - ["http_apikey", "~~", "^flc_"]
+          labels:
+            gateway.in-falcone.io/route-kind: product_api_apikey
+            gateway.in-falcone.io/family: mongo
+            gateway.in-falcone.io/tenant-binding: api-key
+            gateway.in-falcone.io/workspace-binding: api-key
+            gateway.in-falcone.io/plan-capabilities: ""
+            gateway.in-falcone.io/audit-required: "false"
+          plugins:
+            cors: *a1
+          upstream:
+            component: controlPlane
+            port: 8080
+            dataPlane: true
+            requiresExecutor: true
+        - routeId: "2007-key"
+          name: public-api-events-apikey
+          uri: /v1/events/*
+          methods: *a2
+          priority: 333
+          vars:
+            - ["http_apikey", "~~", "^flc_"]
+          labels:
+            gateway.in-falcone.io/route-kind: product_api_apikey
+            gateway.in-falcone.io/family: events
+            gateway.in-falcone.io/tenant-binding: api-key
+            gateway.in-falcone.io/workspace-binding: api-key
+            gateway.in-falcone.io/plan-capabilities: data.kafka.topics
+            gateway.in-falcone.io/audit-required: "false"
+          plugins:
+            cors: *a1
+          upstream:
+            component: controlPlane
+            port: 8080
+            dataPlane: true
+            requiresExecutor: true
+        - routeId: "2008-key"
+          name: public-api-functions-apikey
+          uri: /v1/functions/*
+          methods: *a2
+          priority: 332
+          vars:
+            - ["http_apikey", "~~", "^flc_"]
+          labels:
+            gateway.in-falcone.io/route-kind: product_api_apikey
+            gateway.in-falcone.io/family: functions
+            gateway.in-falcone.io/tenant-binding: api-key
+            gateway.in-falcone.io/workspace-binding: api-key
+            gateway.in-falcone.io/plan-capabilities: data.openwhisk.actions
+            gateway.in-falcone.io/audit-required: "false"
+          plugins:
+            cors: *a1
+          upstream:
+            component: controlPlane
+            port: 8080
+            dataPlane: true
+            requiresExecutor: true
+        # ---- API-key issuance/management → executor (OPT-IN). Admin (JWT) identity only;
+        #      the executor rejects key-managed-by-key (403). Matches just the api-keys
+        #      subpath at higher priority than the generic /v1/workspaces/* route. ----
+        - routeId: "2003-keys"
+          name: public-api-workspace-api-keys
+          uri: /v1/workspaces/*
+          methods: *a2
+          priority: 337
+          vars:
+            - ["uri", "~~", "^/v1/workspaces/[^/]+/api-keys"]
+          labels:
+            gateway.in-falcone.io/route-kind: product_api_apikey
+            gateway.in-falcone.io/family: workspaces
+            gateway.in-falcone.io/tenant-binding: required
+            gateway.in-falcone.io/workspace-binding: required
+            gateway.in-falcone.io/plan-capabilities: ""
+            gateway.in-falcone.io/audit-required: "true"
+          plugins: *a3
+          upstream:
+            component: controlPlane
+            port: 8080
+            dataPlane: true
+            requiresExecutor: true
         - routeId: "2009"
           name: public-api-storage
           uri: /v1/storage/*
