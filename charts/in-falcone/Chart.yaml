@@ -51,6 +51,11 @@ dependencies:
     repository: file://./charts/component-wrapper
     condition: controlPlane.enabled
   - name: component-wrapper
+    alias: controlPlaneExecutor
+    version: 0.2.0
+    repository: file://./charts/component-wrapper
+    condition: controlPlaneExecutor.enabled
+  - name: component-wrapper
     alias: webConsole
     version: 0.2.0
     repository: file://./charts/component-wrapper
