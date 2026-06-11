@@ -50,7 +50,10 @@ after(async () => {
   await registry?.end().catch(() => {});
   await admin?.end().catch(() => {});
   if (bootstrap) {
-    await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB} WITH (FORCE)`).catch(() => {});
+    // Plain (non-FORCE) drop — pools are already ended; FORCE could kill a still-closing
+    // local connection, which node:test flags as async-after-teardown. Residue is cleaned by
+    // the next run's before() FORCE-drop (fresh process, no live local connection).
+    await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB}`).catch(() => {});
     await bootstrap.end().catch(() => {});
   }
 });

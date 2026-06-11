@@ -24,7 +24,10 @@ name: falcone-testenv
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector:pg16 = official postgres:16 + the pgvector extension preinstalled.
+    # Drop-in for the stock image (same POSTGRES_* env, entrypoint, pg_isready); required so
+    # the vector-search real-stack probe can `CREATE EXTENSION vector` instead of self-skipping.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: falcone
       POSTGRES_PASSWORD: falcone
