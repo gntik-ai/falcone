@@ -18,8 +18,10 @@ const WORKSPACE_COLUMN = 'workspace_id';
 // Introspect a table into the shape buildPostgresDataApiPlan expects:
 // { schemaName, tableName, columns:[{columnName,dataType}], primaryKey:[...] }.
 export async function introspectTable(client, schemaName, tableName) {
+  // udt_name is needed to recognise pgvector columns: information_schema reports
+  // data_type='USER-DEFINED' with udt_name='vector' for a vector(N) column.
   const cols = await client.query(
-    `SELECT column_name, data_type
+    `SELECT column_name, data_type, udt_name
        FROM information_schema.columns
       WHERE table_schema = $1 AND table_name = $2
       ORDER BY ordinal_position`,
@@ -36,13 +38,31 @@ export async function introspectTable(client, schemaName, tableName) {
         AND i.indisprimary`,
     [schemaName, tableName],
   );
+  // Normalise the data type the adapter sees so /vector/i detection fires for pgvector.
+  const displayType = (r) => (r.udt_name === 'vector' ? 'vector' : r.data_type);
   return {
     schemaName,
     tableName,
-    columns: cols.rows.map((r) => ({ columnName: r.column_name, dataType: r.data_type })),
+    columns: cols.rows.map((r) => ({ columnName: r.column_name, dataType: displayType(r), vector: r.udt_name === 'vector' })),
     columnNames: new Set(cols.rows.map((r) => r.column_name)),
+    vectorColumns: cols.rows.filter((r) => r.udt_name === 'vector').map((r) => r.column_name),
     primaryKey: pk.rows.map((r) => r.column_name),
   };
+}
+
+// Resolve the declared dimension N of a vector(N) column from pgvector's type modifier
+// (atttypmod). Used to validate an embedding-provider vector length before querying.
+async function columnVectorDimension(client, schemaName, tableName, columnName) {
+  const res = await client.query(
+    `SELECT a.atttypmod AS typmod
+       FROM pg_attribute a
+      WHERE a.attrelid = (quote_ident($1) || '.' || quote_ident($2))::regclass
+        AND a.attname = $3 AND NOT a.attisdropped`,
+    [schemaName, tableName, columnName],
+  );
+  const typmod = res.rows[0]?.typmod;
+  // pgvector stores the dimension directly in atttypmod (no -4 VARHDRSZ adjustment).
+  return typmod && typmod > 0 ? Number(typmod) : undefined;
 }
 
 // Assemble the adapter request. Access metadata (grants/policies) is synthesised for
@@ -86,12 +106,20 @@ function buildRequest(params, table, ctx) {
     table: { schemaName: table.schemaName, tableName: table.tableName, columns: table.columns, primaryKey: table.primaryKey },
     select: params.select,
     filters: params.filters,
+    filter: params.filter,
     order: params.order ?? [],
     page: params.page,
     primaryKey: params.primaryKey,
     values,
     rows,
     changes: params.changes,
+    // KNN search fields (add-vector-search): queryVector is set by the executor either
+    // directly or after resolving queryText through the embedding provider.
+    queryVector: params.queryVector,
+    queryText: params.queryText,
+    vectorColumn: params.vectorColumn,
+    metric: params.metric,
+    topK: params.topK,
     responseOptions: { countMode: params.countMode ?? 'none' },
     actorRoleName: role,
     effectiveRoles: [role],
@@ -141,9 +169,21 @@ export async function executePostgresData(registry, params) {
   return registry.withWorkspaceClient(workspaceId, { tenantId, workspaceId, role: identity.dbRole }, async (client) => {
     const table = await introspectTable(client, params.schemaName, params.tableName);
 
+    // KNN with queryText: resolve the in-platform embedding (workspace-scoped provider)
+    // BEFORE building the plan; validate the returned dimension matches the column.
+    const knnParams = { ...params };
+    if (params.operation === 'knn_search' && !params.queryVector && params.queryText) {
+      if (!params.embeddingExecutor) {
+        throw clientError('In-platform embedding requires a configured provider', 422, 'EMBEDDING_PROVIDER_MISSING');
+      }
+      const vectorColumnName = params.vectorColumn ?? table.vectorColumns?.[0];
+      const expectedDimension = vectorColumnName ? await columnVectorDimension(client, params.schemaName, params.tableName, vectorColumnName) : undefined;
+      knnParams.queryVector = await params.embeddingExecutor.embedForWorkspace(workspaceId, params.queryText, { expectedDimension });
+    }
+
     let plan;
     try {
-      plan = buildPostgresDataApiPlan(buildRequest(params, table, ctx));
+      plan = buildPostgresDataApiPlan(buildRequest(knnParams, table, ctx));
     } catch (error) {
       // Plan-time validation failure (bad filter, unknown column, access denied) → 4xx.
       const status = /No effective role/i.test(error.message) ? 403 : 400;
@@ -164,6 +204,10 @@ export async function executePostgresData(registry, params) {
       throw mapPgError(error);
     }
 
+    if (plan.operation === 'knn_search') {
+      // Rows are already RLS-scoped to the session tenant; each carries a `distance`.
+      return { items: result.rows, returned: result.rowCount, knn: plan.knn, access: plan.access };
+    }
     if (plan.operation === 'get') {
       return { found: result.rowCount > 0, item: result.rows[0] ?? null, access: plan.access };
     }

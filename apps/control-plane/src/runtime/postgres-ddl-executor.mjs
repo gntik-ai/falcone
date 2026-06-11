@@ -37,10 +37,19 @@ function buildDdlPlan({ resourceKind, action, payload }) {
     return { statements: [`CREATE SCHEMA IF NOT EXISTS ${name}`], transactionMode: 'transactional_ddl' };
   }
 
+  // Surface the pgvector `vector` type in the allowed type catalog when this DDL declares
+  // a vector column or a vector index (add-vector-search). The structural builder gates
+  // the `vector` type on enabledExtensions; if the extension is not actually installed the
+  // CREATE will fail at execution and be mapped by mapPgError. Vector currentTable column
+  // types let the index validator confirm the target column is a vector.
+  const declaresVector =
+    /vector/i.test(String(payload.dataType ?? payload.type ?? '')) ||
+    ['hnsw', 'ivfflat'].includes(String(payload.indexMethod ?? payload.method ?? '').toLowerCase());
   const context = {
     databaseName: payload.databaseName,
     schemaName: payload.schemaName,
     tableName: payload.tableName,
+    ...(declaresVector ? { clusterFeatures: { enabledExtensions: ['vector'] } } : {}),
   };
 
   try {

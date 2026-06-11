@@ -1695,6 +1695,13 @@ postgresql:
     workload:
       kind: StatefulSet
   image:
+    # NOTE (add-vector-search): the default bitnami/postgresql image does NOT bundle the
+    # pgvector extension. Dedicated-DB tenants (database_per_tenant) that enable the
+    # `vector` extension for KNN similarity search MUST run on a pgvector-capable image —
+    # e.g. repository: pgvector/pgvector with tag: pg17 (or a Bitnami-compatible image with
+    # pgvector built in). The provisioning pre-flight check rejects `CREATE EXTENSION vector`
+    # when the resolved image does not advertise pgvector support. Do not change the default
+    # here; configure a pgvector image per dedicated-DB tenant Postgres instance instead.
     repository: docker.io/bitnami/postgresql
     tag: 17.2.0
     pullPolicy: IfNotPresent

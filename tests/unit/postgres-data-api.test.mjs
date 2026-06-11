@@ -138,7 +138,8 @@ test('postgres data API control-plane helpers expose the expanded CRUD/governanc
     'import',
     'export',
     'saved_query_execute',
-    'stable_endpoint_invoke'
+    'stable_endpoint_invoke',
+    'knn_search'
   ]);
   assert.equal(summary.routeCount, 27);
   assert.equal(summary.operations.find((entry) => entry.operation === 'bulk_insert').routeCount, 1);
