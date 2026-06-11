@@ -54,6 +54,24 @@ const consoleNavigationItems = [
     description: 'Superficie incremental para la organización por workspaces.'
   },
   {
+    label: 'Workspace DB',
+    to: '/console/database',
+    icon: Database,
+    description: 'Aprovisiona y rota la base de datos PostgreSQL dedicada del workspace activo.'
+  },
+  {
+    label: 'Functions (Registry)',
+    to: '/console/functions-registry',
+    icon: Workflow,
+    description: 'Registra funciones del workspace activo (ejecución pendiente del plano de datos).'
+  },
+  {
+    label: 'IAM Access',
+    to: '/console/iam-access',
+    icon: Shield,
+    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm del tenant activo.'
+  },
+  {
     label: 'Members',
     to: '/console/members',
     icon: Users,
