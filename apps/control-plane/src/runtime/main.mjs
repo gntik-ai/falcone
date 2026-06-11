@@ -14,6 +14,7 @@ import { createRealtimeExecutor } from './realtime-executor.mjs';
 import { createPostgresRealtimeExecutor } from './postgres-realtime-executor.mjs';
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
+import { createEmbeddingProviderStore, createEmbeddingExecutor } from './embedding-executor.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 
 const { Pool } = pg;
@@ -54,6 +55,20 @@ const pgRealtimeExecutor = createPostgresRealtimeExecutor({ resolveConnection })
 const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 });
 const apiKeyStore = createApiKeyStore({ pool: keyPool });
 
+// Embedding-provider executor (in-platform embedding for KNN queryText). The provider
+// store is Postgres-backed on the SAME metadata pool as the API-key store, so provider
+// configuration survives a restart and is shared across all control-plane replicas.
+// secretResolver bridges a stored secretRef to the actual key value: ESO/Vault mounts the
+// resolved secret as an env var named by secretRef.name (no plaintext is ever persisted).
+const embeddingStore = createEmbeddingProviderStore({ pool: keyPool });
+const embeddingExecutor = createEmbeddingExecutor({
+  store: embeddingStore,
+  secretResolver: (secretRef) => {
+    if (secretRef?.name) return Promise.resolve(process.env[secretRef.name] ?? null);
+    return Promise.resolve(null);
+  },
+});
+
 // Mongo executor (enabled when a MONGO_URI/MONGO_HOST is configured).
 const mUri = mongoUri();
 const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: () => mUri }) : undefined;
@@ -82,12 +97,13 @@ const jwtVerifier = createJwtVerifier({
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
-apiKeyStore.ensureSchema()
-  .catch((error) => console.error('[control-plane] api-key schema init failed:', error))
+// Initialise both metadata schemas (they share keyPool) before listening.
+Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema()])
+  .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
   .finally(() => {
     server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
   });
@@ -96,6 +112,7 @@ async function shutdown(signal) {
   console.log(`[control-plane] ${signal} received, shutting down`);
   server.close(() => {});
   await registry.end().catch(() => {});
+  // keyPool backs BOTH apiKeyStore and embeddingStore; ending it once covers both.
   await keyPool.end().catch(() => {});
   await mongoExecutor?.close().catch(() => {});
   await realtimeExecutor?.close().catch(() => {});
