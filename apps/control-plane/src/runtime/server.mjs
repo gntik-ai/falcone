@@ -128,6 +128,10 @@ function buildRoutes(registry, apiKeyStore) {
       runDdl(registry, 'column', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/indexes$`), ([db, s, t], c) =>
       runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/policies$`), ([db, s, t], c) =>
+      runDdl(registry, 'policy', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/security$`), ([db, s, t], c) =>
+      runDdl(registry, 'table_security', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
   ];
 }
 
