@@ -10,8 +10,11 @@ import {
   insertDocument,
   listDocuments,
   updateDocument,
-  type MongoDocument
+  type MongoDocument,
+  type MongoFilter
 } from '@/services/mongoApi'
+
+const PAGE_SIZES = [10, 25, 50, 100]
 
 export interface MongoDataEditorProps {
   workspaceId: string
@@ -32,6 +35,12 @@ function documentId(doc: MongoDocument): string | undefined {
 export function MongoDataEditor({ workspaceId, databaseName, collectionName }: MongoDataEditorProps) {
   const [docs, setDocs] = useState<MongoDocument[]>([])
   const [loading, setLoading] = useState(true)
+  const [filterJson, setFilterJson] = useState('{}')
+  const [appliedFilter, setAppliedFilter] = useState<MongoFilter>({})
+  const [pageSize, setPageSize] = useState(25)
+  const [cursor, setCursor] = useState<string | undefined>(undefined)
+  const [cursorStack, setCursorStack] = useState<string[]>([])
+  const [nextAfter, setNextAfter] = useState<string | undefined>(undefined)
   const [newDocJson, setNewDocJson] = useState('{}')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editJson, setEditJson] = useState('{}')
@@ -42,18 +51,64 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
   const reload = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await listDocuments(workspaceId, databaseName, collectionName, { pageSize: 50 })
+      const result = await listDocuments(workspaceId, databaseName, collectionName, { pageSize, after: cursor, filter: appliedFilter })
       setDocs(result.items)
+      setNextAfter(result.page?.after)
     } catch (caught) {
       setError(errorMessage(caught))
     } finally {
       setLoading(false)
     }
-  }, [workspaceId, databaseName, collectionName])
+  }, [workspaceId, databaseName, collectionName, pageSize, cursor, appliedFilter])
 
   useEffect(() => {
     void reload()
   }, [reload])
+
+  // Reset pagination to the first page when the collection identity changes.
+  useEffect(() => {
+    setCursor(undefined)
+    setCursorStack([])
+  }, [workspaceId, databaseName, collectionName])
+
+  function applyFilter() {
+    setError(null)
+    const parsed = parseJsonObject(filterJson)
+    if (!parsed.ok) {
+      setError(`Filter: ${parsed.error}`)
+      return
+    }
+    setAppliedFilter(parsed.value)
+    setCursor(undefined)
+    setCursorStack([])
+  }
+
+  function clearFilter() {
+    setFilterJson('{}')
+    setAppliedFilter({})
+    setCursor(undefined)
+    setCursorStack([])
+  }
+
+  function changePageSize(size: number) {
+    setPageSize(size)
+    setCursor(undefined)
+    setCursorStack([])
+  }
+
+  function nextPage() {
+    if (!nextAfter) return
+    setCursorStack([...cursorStack, cursor ?? ''])
+    setCursor(nextAfter)
+  }
+
+  function prevPage() {
+    if (cursorStack.length === 0) return
+    const stack = [...cursorStack]
+    const previous = stack.pop()
+    setCursorStack(stack)
+    setCursor(previous === '' ? undefined : previous)
+  }
 
   async function handleInsert() {
     setError(null)
@@ -135,7 +190,35 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
       {error ? <p role="alert">{error}</p> : null}
       {status ? <p role="status">{status}</p> : null}
 
+      <div aria-label="Filter">
+        <h3>Filter</h3>
+        <label htmlFor="mongo-filter-json">Filter (MongoDB query JSON)</label>
+        <textarea id="mongo-filter-json" value={filterJson} onChange={(event) => setFilterJson(event.target.value)} />
+        <button type="button" onClick={applyFilter}>
+          Apply filter
+        </button>
+        <button type="button" onClick={clearFilter}>
+          Clear
+        </button>
+      </div>
+
       <h3>Documents{docs.length > 0 ? ` (${docs.length})` : ''}</h3>
+      <div aria-label="Pagination">
+        <label htmlFor="mongo-page-size">Page size</label>
+        <select id="mongo-page-size" value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
+          {PAGE_SIZES.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={prevPage} disabled={cursorStack.length === 0 || busy}>
+          Previous
+        </button>
+        <button type="button" onClick={nextPage} disabled={!nextAfter || busy}>
+          Next
+        </button>
+      </div>
       {loading ? (
         <p>Loading documents…</p>
       ) : docs.length === 0 ? (

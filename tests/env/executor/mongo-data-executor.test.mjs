@@ -106,6 +106,26 @@ test('delete is tenant-scoped', async () => {
   assert.equal(own.deleted, 1)
 })
 
+test('list supports keyset pagination via page.after (default _id sort)', async () => {
+  for (const _id of ['pg1', 'pg2', 'pg3']) {
+    await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'insert', payload: { document: { _id, body: 'page' } } })
+  }
+  const filter = { body: { $eq: 'page' } }
+
+  // Page 1: 2 of the 3 marked docs + a next cursor.
+  const p1 = await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'list', filter, page: { size: 2 } })
+  assert.equal(p1.items.length, 2)
+  assert.ok(p1.items.every((d) => d.body === 'page'))
+  assert.ok(typeof p1.page.after === 'string' && p1.page.after.length > 0, 'next cursor for a full page')
+
+  // Page 2 via the cursor: the remaining doc, distinct from page 1, and no further cursor.
+  const p2 = await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'list', filter, page: { size: 2, after: p1.page.after } })
+  assert.equal(p2.items.length, 1)
+  const ids1 = new Set(p1.items.map((d) => d._id))
+  assert.ok(!ids1.has(p2.items[0]._id), 'page 2 does not repeat page 1')
+  assert.equal(p2.page.after, undefined)
+})
+
 test('missing tenant identity → 401', async () => {
   await assert.rejects(
     () => exec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: {}, operation: 'list' }),
