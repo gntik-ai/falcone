@@ -30,6 +30,9 @@ import { ConsoleStoragePage } from '@/pages/ConsoleStoragePage'
 import { ConsoleMongoPage } from '@/pages/ConsoleMongoPage'
 import { ConsolePostgresPage } from '@/pages/ConsolePostgresPage'
 import { ConsolePostgresDataPage } from '@/pages/ConsolePostgresDataPage'
+import { ConsoleMongoDataPage } from '@/pages/ConsoleMongoDataPage'
+import { ConsoleEventsDataPage } from '@/pages/ConsoleEventsDataPage'
+import { ConsoleFunctionsDataPage } from '@/pages/ConsoleFunctionsDataPage'
 import { ConsoleKafkaPage } from '@/pages/ConsoleKafkaPage'
 import { ConsoleOperationsPage } from '@/pages/ConsoleOperationsPage'
 import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
@@ -174,12 +177,24 @@ export const appRoutes = [
             element: <ConsoleMongoPage />
           },
           {
+            path: 'mongo/data',
+            element: <ConsoleMongoDataPage />
+          },
+          {
             path: 'kafka',
             element: <ConsoleKafkaPage />
           },
           {
+            path: 'events/data',
+            element: <ConsoleEventsDataPage />
+          },
+          {
             path: 'functions',
             element: <ConsoleFunctionsPage />
+          },
+          {
+            path: 'functions/data',
+            element: <ConsoleFunctionsDataPage />
           },
           {
             path: 'storage',
