@@ -57,7 +57,14 @@ const eventsExecutor = process.env.KAFKA_BROKERS ? createEventsExecutor({ broker
 // runs user code in-thread); production injects a Knative backend (FN_BACKEND=knative).
 const functionsExecutor = process.env.FN_BACKEND === 'off' ? undefined : createFunctionsExecutor();
 
-const server = createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor });
+// When the executor fronts the data-family wildcard (gateway route-split), it serves the
+// data-plane + DDL slice itself and proxies every other path under those prefixes
+// (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
+// Unset → unmatched paths return 404 (standalone/pure-executor mode).
+const server = createControlPlaneServer({
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor,
+  controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
+});
 
 apiKeyStore.ensureSchema()
   .catch((error) => console.error('[control-plane] api-key schema init failed:', error))
