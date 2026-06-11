@@ -70,7 +70,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane
-          image: localhost:30500/in-falcone-control-plane-executor:0.9.2
+          image: localhost:30500/in-falcone-control-plane-executor:0.9.3
           imagePullPolicy: IfNotPresent
           ports:
             - { containerPort: 8080, name: http }
@@ -94,6 +94,9 @@ spec:
               valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } }
             # Kafka (enables the events API); Functions use the local backend by default.
             - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
+            # Verify Bearer JWTs directly (Keycloak platform realm) so admin requests —
+            # e.g. API-key issuance — authenticate without the gateway injecting x-tenant-id.
+            - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
           readinessProbe:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 3
