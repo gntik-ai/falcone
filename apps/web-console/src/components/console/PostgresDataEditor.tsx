@@ -17,8 +17,13 @@ import {
   updateRow,
   type ApiKeyRecord,
   type IssuedApiKey,
+  type PgFilter,
+  type PgFilterOperator,
   type PgRow
 } from '@/services/postgresApi'
+
+const FILTER_OPERATORS: PgFilterOperator[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in']
+const PAGE_SIZES = [10, 25, 50, 100]
 
 export interface PostgresDataEditorProps {
   workspaceId: string
@@ -36,6 +41,14 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
   const [rows, setRows] = useState<PgRow[]>([])
   const [count, setCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [filters, setFilters] = useState<PgFilter[]>([])
+  const [draftColumn, setDraftColumn] = useState('')
+  const [draftOp, setDraftOp] = useState<PgFilterOperator>('eq')
+  const [draftValue, setDraftValue] = useState('')
+  const [pageSize, setPageSize] = useState(25)
+  const [cursor, setCursor] = useState<string | undefined>(undefined)
+  const [cursorStack, setCursorStack] = useState<string[]>([])
+  const [nextAfter, setNextAfter] = useState<string | undefined>(undefined)
   const [keys, setKeys] = useState<ApiKeyRecord[]>([])
   const [issued, setIssued] = useState<IssuedApiKey | null>(null)
   const [copied, setCopied] = useState(false)
@@ -49,15 +62,63 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
   const reloadRows = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await listRows(workspaceId, databaseName, schemaName, tableName, { countMode: 'exact' })
+      const result = await listRows(workspaceId, databaseName, schemaName, tableName, {
+        countMode: 'exact',
+        pageSize,
+        after: cursor,
+        filters
+      })
       setRows(result.items)
       setCount(typeof result.count === 'number' ? result.count : null)
+      setNextAfter(result.page?.after)
     } catch (caught) {
       setError(errorMessage(caught))
     } finally {
       setLoading(false)
     }
+  }, [workspaceId, databaseName, schemaName, tableName, pageSize, cursor, filters])
+
+  // Reset pagination to the first page whenever the table identity changes.
+  useEffect(() => {
+    setCursor(undefined)
+    setCursorStack([])
   }, [workspaceId, databaseName, schemaName, tableName])
+
+  function addFilter() {
+    if (draftColumn.trim() === '') return
+    const value = draftOp === 'in' ? draftValue.split(',').map((entry) => entry.trim()) : draftValue
+    setFilters([...filters, { columnName: draftColumn.trim(), operator: draftOp, value }])
+    setDraftColumn('')
+    setDraftValue('')
+    setCursor(undefined)
+    setCursorStack([])
+  }
+
+  function removeFilter(index: number) {
+    setFilters(filters.filter((_, i) => i !== index))
+    setCursor(undefined)
+    setCursorStack([])
+  }
+
+  function changePageSize(size: number) {
+    setPageSize(size)
+    setCursor(undefined)
+    setCursorStack([])
+  }
+
+  function nextPage() {
+    if (!nextAfter) return
+    setCursorStack([...cursorStack, cursor ?? ''])
+    setCursor(nextAfter)
+  }
+
+  function prevPage() {
+    if (cursorStack.length === 0) return
+    const stack = [...cursorStack]
+    const previous = stack.pop()
+    setCursorStack(stack)
+    setCursor(previous === '' ? undefined : previous)
+  }
 
   const reloadKeys = useCallback(async () => {
     try {
@@ -179,7 +240,52 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
       {error ? <p role="alert">{error}</p> : null}
       {status ? <p role="status">{status}</p> : null}
 
+      <div aria-label="Filters">
+        <h3>Filters</h3>
+        <ul>
+          {filters.map((filter, index) => (
+            <li key={`${filter.columnName}-${filter.operator}-${index}`}>
+              {filter.columnName} {filter.operator} {String(filter.value)}
+              <button type="button" onClick={() => removeFilter(index)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+        <label htmlFor="filter-column">Column</label>
+        <input id="filter-column" value={draftColumn} onChange={(event) => setDraftColumn(event.target.value)} />
+        <label htmlFor="filter-op">Operator</label>
+        <select id="filter-op" value={draftOp} onChange={(event) => setDraftOp(event.target.value as PgFilterOperator)}>
+          {FILTER_OPERATORS.map((op) => (
+            <option key={op} value={op}>
+              {op}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="filter-value">Value{draftOp === 'in' ? ' (comma-separated)' : ''}</label>
+        <input id="filter-value" value={draftValue} onChange={(event) => setDraftValue(event.target.value)} />
+        <button type="button" onClick={addFilter}>
+          Add filter
+        </button>
+      </div>
+
       <h3>Rows{count != null ? ` (${count})` : ''}</h3>
+      <div aria-label="Pagination">
+        <label htmlFor="page-size">Page size</label>
+        <select id="page-size" value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
+          {PAGE_SIZES.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={prevPage} disabled={cursorStack.length === 0 || busy}>
+          Previous
+        </button>
+        <button type="button" onClick={nextPage} disabled={!nextAfter || busy}>
+          Next
+        </button>
+      </div>
       {loading ? (
         <p>Loading rows…</p>
       ) : rows.length === 0 ? (

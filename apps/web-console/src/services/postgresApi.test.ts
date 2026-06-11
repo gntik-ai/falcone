@@ -72,6 +72,27 @@ describe('postgresApi — data routes (workspace-scoped)', () => {
     expect(lastCall()[0]).toBe(`${dataPath}/rows`)
   })
 
+  it('listRows forwards the keyset cursor (page[after])', async () => {
+    await listRows('ws1', 'appdb', 'app1', 'items', { pageSize: 2, after: 'CURSOR123' })
+    expect(lastCall()[0]).toBe(`${dataPath}/rows?page%5Bsize%5D=2&page%5Bafter%5D=CURSOR123`)
+  })
+
+  it('listRows encodes select + order', async () => {
+    await listRows('ws1', 'appdb', 'app1', 'items', { select: ['id', 'name'], order: [{ columnName: 'name', direction: 'desc' }] })
+    expect(lastCall()[0]).toBe(`${dataPath}/rows?select=id%2Cname&order=name%3Adesc`)
+  })
+
+  it('listRows encodes PostgREST-style filters (incl. in.(...))', async () => {
+    await listRows('ws1', 'appdb', 'app1', 'items', {
+      filters: [
+        { columnName: 'status', operator: 'eq', value: 'active' },
+        { columnName: 'age', operator: 'gte', value: 18 },
+        { columnName: 'id', operator: 'in', value: [1, 2, 3] }
+      ]
+    })
+    expect(lastCall()[0]).toBe(`${dataPath}/rows?status=eq.active&age=gte.18&id=in.%281%2C2%2C3%29`)
+  })
+
   it('insertRow → POST rows { values }', async () => {
     await insertRow('ws1', 'appdb', 'app1', 'items', { name: 'a' })
     expect(lastCall()).toEqual([`${dataPath}/rows`, { method: 'POST', body: { values: { name: 'a' } } }])
