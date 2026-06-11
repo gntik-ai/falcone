@@ -192,7 +192,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -200,6 +200,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   const evt = '^/v1/events/workspaces/([^/]+)/topics';
   const fn = '^/v1/functions/workspaces/([^/]+)/actions';
   const rt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/changes';
+  const pgrt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)/changes';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -285,9 +286,13 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     ['GET', new RegExp(`${fn}/([^/]+)/activations$`), ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
 
-    // ---- Realtime: subscribe to a collection's tenant-scoped changes (SSE stream) ----
+    // ---- Realtime: subscribe to tenant-scoped changes (SSE stream) ----
+    // Mongo collection change stream:
     ['GET', new RegExp(`${rt}$`), ([w, db, coll], c) =>
       runRealtimeSse(realtimeExecutor, { workspaceId: w, databaseName: db, collectionName: coll }, c), { sse: true }],
+    // Postgres table change capture (trigger + LISTEN/NOTIFY):
+    ['GET', new RegExp(`${pgrt}$`), ([w, db, s, t], c) =>
+      runRealtimeSse(pgRealtimeExecutor, { workspaceId: w, databaseName: db, schemaName: s, tableName: t }, c), { sse: true }],
   ];
 }
 
@@ -361,12 +366,12 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor);
 
   return http.createServer(async (req, res) => {
     try {
