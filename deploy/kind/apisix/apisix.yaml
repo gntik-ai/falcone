@@ -290,6 +290,24 @@ routes:
       scheme: http
       nodes:
         "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  # ---- API-key issuance/management -> executor ----
+  # Matches just the api-keys subpath at higher priority than the generic /v1/workspaces/*
+  # route (2003 -> control-plane). Admin (Bearer JWT) auth: APISIX forwards the Authorization
+  # header and the executor verifies the JWT itself (KEYCLOAK_JWKS_URL) — the standalone
+  # gateway does not inject x-tenant-id, so the executor is the auth authority here.
+  - id: "2003-keys"
+    uri: "/v1/workspaces/*"
+    priority: 337
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["uri", "~~", "^/v1/workspaces/[^/]+/api-keys"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
   # Catch-all so EVERY /v1/* the console calls reaches the control-plane server,
   # which validates the Bearer JWT itself and dispatches to the real action
   # (unmapped paths -> a clean 404 from the control-plane, not the gateway).
