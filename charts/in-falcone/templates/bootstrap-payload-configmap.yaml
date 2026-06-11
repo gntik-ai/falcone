@@ -126,6 +126,20 @@ data:
 {{- $_ := set (index $plugins "limit-count") "key" ($qosProfile.limitKeyVar | default "$http_x_tenant_id") -}}
 {{- $_ := set (index $plugins "limit-count") "allow_degradation" false -}}
 {{- end }}
+{{- /* Rate-limit storage policy (gatewayPolicy.rateLimit): "local" (default, per-gateway-node
+       counters) or "redis" (counters shared across all gateway replicas → globally exact
+       limits). Applies to EVERY limit-count (JWT family routes + executor api-key/realtime). */ -}}
+{{- if hasKey $plugins "limit-count" }}
+{{- $rl := ($.Values.gatewayPolicy.rateLimit | default (dict)) -}}
+{{- $_ := set (index $plugins "limit-count") "policy" ($rl.policy | default "local") -}}
+{{- if eq ($rl.policy | default "local") "redis" }}
+{{- $redis := ($rl.redis | default (dict)) -}}
+{{- $_ := set (index $plugins "limit-count") "redis_host" $redis.host -}}
+{{- $_ := set (index $plugins "limit-count") "redis_port" ($redis.port | default 6379) -}}
+{{- $_ := set (index $plugins "limit-count") "redis_database" ($redis.database | default 0) -}}
+{{- $_ := set (index $plugins "limit-count") "redis_timeout" ($redis.timeoutMs | default 1000) -}}
+{{- end }}
+{{- end }}
 {{- if and $validationProfileName (hasKey $plugins "client-control") }}
 {{- $_ := set (index $plugins "client-control") "max_body_size" ($validationProfile.maxBodyBytes | default 262144) -}}
 {{- end }}
