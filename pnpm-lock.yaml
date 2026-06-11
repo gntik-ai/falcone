@@ -47,6 +47,9 @@ importers:
 
   apps/control-plane:
     dependencies:
+      mongodb:
+        specifier: 6.15.0
+        version: 6.15.0(socks@2.8.7)
       pg:
         specifier: 8.14.1
         version: 8.14.1
