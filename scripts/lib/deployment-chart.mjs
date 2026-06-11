@@ -20,6 +20,7 @@ export const REQUIRED_COMPONENT_ALIASES = [
   'storage',
   'observability',
   'controlPlane',
+  'controlPlaneExecutor',
   'webConsole'
 ];
 export const REQUIRED_VALUE_LAYERS = ['common', 'environment', 'customer', 'platform', 'airgap', 'localOverride'];

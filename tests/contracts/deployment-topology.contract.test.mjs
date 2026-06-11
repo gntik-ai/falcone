@@ -36,6 +36,7 @@ test('deployment topology contract exposes the required descriptors and promotio
     'storage',
     'observability',
     'controlPlane',
+    'controlPlaneExecutor',
     'webConsole'
   ]);
   assert.deepEqual(topology.packaging_guidance.deployment_profiles, ['all-in-one', 'standard', 'ha']);
