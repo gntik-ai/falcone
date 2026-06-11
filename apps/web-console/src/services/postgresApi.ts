@@ -2,7 +2,7 @@
 // Centralizes the calls to the control-plane executor (Phases 0-2): DDL execution, row CRUD,
 // and workspace API keys. URLs match the executor's HTTP routes exactly.
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestJson, type JsonValue } from '@/lib/http'
 
 const enc = encodeURIComponent
 
@@ -223,21 +223,53 @@ export function rotateApiKey(workspaceId: string, id: string): Promise<IssuedApi
   return requestConsoleSessionJson<IssuedApiKey>(`${keysBase(workspaceId)}/${enc(id)}/rotations`, { method: 'POST' })
 }
 
-// A copy-paste snippet a developer pastes into their frontend to query the table with an anon key.
-export function buildFrontendSnippet(params: {
+export interface EmbedSnippetParams {
   apiKey: string
   workspaceId: string
   databaseName: string
   schemaName: string
   tableName: string
   origin?: string
-}): string {
-  const base = `${params.origin ?? 'https://<your-falcone-host>'}/v1/postgres/workspaces/${params.workspaceId}/data/${params.databaseName}/schemas/${params.schemaName}/tables/${params.tableName}/rows`
+}
+
+function embedRowsUrl(params: EmbedSnippetParams): string {
+  return `${params.origin ?? 'https://<your-falcone-host>'}/v1/postgres/workspaces/${params.workspaceId}/data/${params.databaseName}/schemas/${params.schemaName}/tables/${params.tableName}/rows`
+}
+
+// A copy-paste fetch() snippet a developer pastes into their frontend. NOTE: the gateway
+// routes anon/service keys by the `apikey` header (not Authorization), so the snippet must
+// send `apikey` for the request to reach the data executor.
+export function buildFrontendSnippet(params: EmbedSnippetParams): string {
   return [
     `const res = await fetch(`,
-    `  '${base}',`,
-    `  { headers: { Authorization: 'ApiKey ${params.apiKey}' } }`,
+    `  '${embedRowsUrl(params)}',`,
+    `  { headers: { apikey: '${params.apiKey}' } }`,
     `)`,
     `const { items } = await res.json()`
   ].join('\n')
+}
+
+// A copy-paste curl snippet (same apikey-header contract).
+export function buildCurlSnippet(params: EmbedSnippetParams): string {
+  return [`curl -H 'apikey: ${params.apiKey}' \\`, `  '${embedRowsUrl(params)}'`].join('\n')
+}
+
+// Run a live, read-only preview AS the anon/service key: a bare request carrying only the
+// `apikey` header (no console session JWT) — exactly what a frontend app does. Proves the
+// key works end-to-end through the gateway and shows the RLS-scoped rows.
+export function previewRowsWithApiKey(
+  apiKey: string,
+  workspaceId: string,
+  databaseName: string,
+  schemaName: string,
+  tableName: string,
+  options: { pageSize?: number } = {}
+): Promise<RowListResult> {
+  const params = new URLSearchParams()
+  if (options.pageSize != null) params.set('page[size]', String(options.pageSize))
+  const qs = params.toString()
+  return requestJson<RowListResult>(
+    `${dataBase(workspaceId, databaseName, schemaName, tableName)}/rows${qs ? `?${qs}` : ''}`,
+    { headers: { apikey: apiKey } }
+  )
 }
