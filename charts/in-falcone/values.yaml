@@ -1263,7 +1263,8 @@ bootstrap:
           methods: ["GET", "OPTIONS"]
           priority: 340
           vars:
-            - ["uri", "~~", "/data/[^/]+/collections/[^/]+/changes$"]
+            # matches both Mongo (collections/{c}/changes) and Postgres (tables/{t}/changes)
+            - ["uri", "~~", "/changes$"]
           labels:
             gateway.in-falcone.io/route-kind: product_api_apikey
             gateway.in-falcone.io/family: realtime
