@@ -251,7 +251,7 @@ routes:
         count: 120
         time_window: 60
         rejected_code: 429
-        key_type: var
+        key_type: var_combination
         key: $http_apikey
         allow_degradation: false
     upstream:
@@ -272,7 +272,7 @@ routes:
         count: 120
         time_window: 60
         rejected_code: 429
-        key_type: var
+        key_type: var_combination
         key: $http_apikey
         allow_degradation: false
     upstream:
@@ -293,7 +293,7 @@ routes:
         count: 120
         time_window: 60
         rejected_code: 429
-        key_type: var
+        key_type: var_combination
         key: $http_apikey
         allow_degradation: false
     upstream:
@@ -314,7 +314,7 @@ routes:
         count: 120
         time_window: 60
         rejected_code: 429
-        key_type: var
+        key_type: var_combination
         key: $http_apikey
         allow_degradation: false
     upstream:
