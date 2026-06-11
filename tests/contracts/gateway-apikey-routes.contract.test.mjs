@@ -36,6 +36,8 @@ for (const r of USAGE) {
     const limit = route.plugins?.['limit-count'];
     assert.ok(limit, `${r.name} must rate-limit the public anon/service surface`);
     assert.equal(limit.key, '$http_apikey', `${r.name} rate limit must be keyed per api-key`);
+    // var_combination interpolates $http_apikey → per-key buckets (var would key globally)
+    assert.equal(limit.key_type, 'var_combination', `${r.name} rate limit must use var_combination for per-key buckets`);
     assert.equal(limit.rejected_code, 429);
     assert.ok(Number(limit.count) > 0, `${r.name} rate limit must declare a positive count`);
     // higher priority than the JWT route so a key request wins when the header is present
