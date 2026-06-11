@@ -2352,6 +2352,12 @@ controlPlaneExecutor:
   #     - { name: MONGO_USER, value: root }
   #     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } } }
   #     - { name: KAFKA_BROKERS, value: <release>-kafka:9092 }
+  #     # Optional: verify Bearer JWTs in the executor (Keycloak/OIDC). Enables admin/user
+  #     # auth WITHOUT the gateway injecting x-tenant-id (e.g. API-key issuance via an
+  #     # OIDC-less gateway). Unset → the executor trusts gateway-injected identity headers.
+  #     - { name: KEYCLOAK_JWKS_URL, value: "http://<release>-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
+  #     # - { name: KEYCLOAK_ISSUER, value: "https://iam.<env>.in-falcone.example.com/realms/in-falcone-platform" }
+  #     # - { name: KEYCLOAK_AUDIENCE, value: in-falcone-console }
   env: []
   readinessProbe:
     httpGet:
