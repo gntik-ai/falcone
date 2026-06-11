@@ -5,17 +5,26 @@ vi.mock('@/services/mongoApi', () => ({
   listDocuments: vi.fn(),
   insertDocument: vi.fn(),
   updateDocument: vi.fn(),
-  deleteDocument: vi.fn()
+  deleteDocument: vi.fn(),
+  previewDocumentsWithApiKey: vi.fn(),
+  buildMongoFrontendSnippet: vi.fn(() => 'MONGO_FETCH_SNIPPET'),
+  buildMongoCurlSnippet: vi.fn(() => 'MONGO_CURL_SNIPPET')
+}))
+vi.mock('@/services/postgresApi', () => ({
+  issueApiKey: vi.fn()
 }))
 
 import { MongoDataEditor } from './MongoDataEditor'
-import { deleteDocument, insertDocument, listDocuments, updateDocument } from '@/services/mongoApi'
+import { deleteDocument, insertDocument, listDocuments, previewDocumentsWithApiKey, updateDocument } from '@/services/mongoApi'
+import { issueApiKey } from '@/services/postgresApi'
 
 const mocked = {
   listDocuments: listDocuments as unknown as ReturnType<typeof vi.fn>,
   insertDocument: insertDocument as unknown as ReturnType<typeof vi.fn>,
   updateDocument: updateDocument as unknown as ReturnType<typeof vi.fn>,
-  deleteDocument: deleteDocument as unknown as ReturnType<typeof vi.fn>
+  deleteDocument: deleteDocument as unknown as ReturnType<typeof vi.fn>,
+  previewDocumentsWithApiKey: previewDocumentsWithApiKey as unknown as ReturnType<typeof vi.fn>,
+  issueApiKey: issueApiKey as unknown as ReturnType<typeof vi.fn>
 }
 
 function renderEditor() {
@@ -114,5 +123,21 @@ describe('MongoDataEditor — richer UX', () => {
     await screen.findByText(/"body":"hello"/)
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(mocked.deleteDocument).toHaveBeenCalledWith('ws1', 'appdb', 'notes', 'd1'))
+  })
+
+  it('issues an anon key with embed snippets and runs a read-only preview AS the key', async () => {
+    mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
+    mocked.previewDocumentsWithApiKey.mockResolvedValue({ items: [{ _id: 'p1', body: 'as-anon' }] })
+    renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    fireEvent.click(screen.getByRole('button', { name: 'Issue anon key' }))
+    expect(await screen.findByText('flc_anon_secret')).toBeInTheDocument()
+    expect(screen.getByText('MONGO_FETCH_SNIPPET')).toBeInTheDocument()
+    expect(screen.getByText('MONGO_CURL_SNIPPET')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Run read-only preview' }))
+    await waitFor(() =>
+      expect(mocked.previewDocumentsWithApiKey).toHaveBeenCalledWith('flc_anon_secret', 'ws1', 'appdb', 'notes', { pageSize: 10 })
+    )
+    expect(await screen.findByText(/"body":"as-anon"/)).toBeInTheDocument()
   })
 })
