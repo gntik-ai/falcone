@@ -63,7 +63,11 @@ after(async () => {
   await registry?.end().catch(() => {});
   await admin?.end().catch(() => {});
   if (bootstrap) {
-    await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB} WITH (FORCE)`).catch(() => {});
+    // Pools to PROBE_DB are fully ended above; use a plain (non-FORCE) drop so we never
+    // force-kill a local connection that is still closing — node:test would flag that as
+    // "async activity after the test ended". Any residue is FORCE-dropped by the next run's
+    // before() hook, which runs in a fresh process where no live local connection exists.
+    await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB}`).catch(() => {});
     await bootstrap.end().catch(() => {});
   }
 });
