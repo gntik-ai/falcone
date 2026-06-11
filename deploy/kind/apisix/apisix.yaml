@@ -232,6 +232,64 @@ routes:
       scheme: http
       nodes:
         "falcone-keycloak.falcone.svc.cluster.local:8080": 1
+  # ---- Anon/service API-key data-plane routes (Supabase-style) ----
+  # Selected by the `apikey: flc_...` header (vars), at higher priority than the JWT
+  # data routes (2005-2008 above) so a key request wins; without the header the request
+  # falls through to the JWT route -> control-plane. These forward to the EXECUTOR, which
+  # verifies the key and derives tenant/workspace FROM the key (authoritative over any
+  # client-supplied identity header). cors-only — no JWT enforcement at the gateway.
+  - id: "2005-key"
+    uri: "/v1/postgres/*"
+    priority: 335
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["http_apikey", "~~", "^flc_"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  - id: "2006-key"
+    uri: "/v1/mongo/*"
+    priority: 334
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["http_apikey", "~~", "^flc_"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  - id: "2007-key"
+    uri: "/v1/events/*"
+    priority: 333
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["http_apikey", "~~", "^flc_"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  - id: "2008-key"
+    uri: "/v1/functions/*"
+    priority: 332
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["http_apikey", "~~", "^flc_"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
   # Catch-all so EVERY /v1/* the console calls reaches the control-plane server,
   # which validates the Bearer JWT itself and dispatches to the real action
   # (unmapped paths -> a clean 404 from the control-plane, not the gateway).
