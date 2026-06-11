@@ -274,6 +274,17 @@ function collectObservabilityViolations(values, violations) {
   }
 }
 
+function collectRateLimitViolations(values, violations) {
+  const rl = values?.gatewayPolicy?.rateLimit;
+  if (rl === undefined) return; // optional; absent → APISIX/template default (local)
+  if (!['local', 'redis'].includes(rl.policy)) {
+    violations.push("gatewayPolicy.rateLimit.policy must be 'local' or 'redis'.");
+  }
+  if (rl.policy === 'redis' && (typeof rl.redis?.host !== 'string' || rl.redis.host.trim() === '')) {
+    violations.push('gatewayPolicy.rateLimit.redis.host must be a non-empty host when policy is redis.');
+  }
+}
+
 function collectQosViolations(values, gatewayRouting, violations) {
   const qos = values?.gatewayPolicy?.qos ?? {};
   const requestValidation = values?.gatewayPolicy?.requestValidation ?? {};
@@ -513,6 +524,7 @@ export function collectGatewayPolicyViolations({
   collectHardeningViolations(values, gatewayRouting, violations);
   collectObservabilityViolations(values, violations);
   collectQosViolations(values, gatewayRouting, violations);
+  collectRateLimitViolations(values, violations);
   collectRoutingAlignmentViolations(values, gatewayRouting, routeCatalog, violations);
   collectApisixRouteViolations(values, gatewayRouting, violations);
   collectAccessMatrixViolations(values, routeCatalog, domainModel, violations);
