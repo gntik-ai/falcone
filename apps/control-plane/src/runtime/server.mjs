@@ -192,10 +192,11 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
+  const emb = '^/v1/workspaces/([^/]+)/embedding-provider';
   const mdoc = '^/v1/mongo/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/documents';
   const evt = '^/v1/events/workspaces/([^/]+)/topics';
   const fn = '^/v1/functions/workspaces/([^/]+)/actions';
@@ -233,6 +234,16 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     ['DELETE', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'delete', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
 
+    // ---- Vector search (KNN over a vector(N) column) ----
+    // queryVector OR queryText (in-platform embedding); RLS-scoped under falcone_app.
+    ['POST', new RegExp(`${data}/search$`), ([w, db, s, t], c) =>
+      run(registry, executePostgresData, {
+        workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'knn_search',
+        queryVector: c.body.queryVector, queryText: c.body.queryText, vectorColumn: c.body.vectorColumn,
+        metric: c.body.metric, topK: c.body.topK, filter: c.body.filter ?? c.body.filters, select: c.body.select,
+        embeddingExecutor,
+      }, 200)],
+
     // ---- Postgres DDL (schema/table/column/index) ----
     ['POST', new RegExp(`${ddl}$`), ([db], c) =>
       runDdl(registry, 'schema', { databaseName: db, schemaName: c.body.schemaName ?? c.body.name }, c)],
@@ -242,6 +253,12 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runDdl(registry, 'column', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/indexes$`), ([db, s, t], c) =>
       runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
+    // Vector index management → the same DDL executor (structural index plan with
+    // indexMethod hnsw|ivfflat + metric → opclass). Create + delete.
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes$`), ([db, s, t], c) =>
+      runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, indexMethod: c.body.indexType ?? c.body.indexMethod ?? 'hnsw', ...c.body }, c)],
+    ['DELETE', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes/([^/]+)$`), ([db, s, t, idx], c) =>
+      runDdlAction(registry, 'index', 'delete', { databaseName: db, schemaName: s, tableName: t, indexName: idx }, c)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/policies$`), ([db, s, t], c) =>
       runDdl(registry, 'policy', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/security$`), ([db, s, t], c) =>
@@ -285,6 +302,12 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'invoke', name, payload: c.body }, 200)],
     ['GET', new RegExp(`${fn}/([^/]+)/activations$`), ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
+
+    // ---- Embedding provider (workspace-scoped): set / remove (structural admin) ----
+    ['PUT', new RegExp(`${emb}$`), ([w], c) =>
+      runEmbeddingProvider(embeddingExecutor, 'set', { workspaceId: w, config: c.body }, 200)],
+    ['DELETE', new RegExp(`${emb}$`), ([w]) =>
+      runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w }, 200)],
 
     // ---- Realtime: subscribe to tenant-scoped changes (SSE stream) ----
     // Mongo collection change stream:
@@ -366,12 +389,30 @@ async function runDdl(registry, resourceKind, payload, c) {
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+async function runDdlAction(registry, resourceKind, action, payload, c) {
+  const result = await executePostgresDdl(registry, {
+    resourceKind, action, payload, identity: c.identity,
+    executionMode: c.url.searchParams.get('mode') === 'preview' || payload.dryRun ? 'preview' : 'execute',
+  });
+  return { status: 200, body: result };
+}
+
+async function runEmbeddingProvider(embeddingExecutor, action, params, successStatus) {
+  if (!embeddingExecutor) throw Object.assign(new Error('Embedding provider is not enabled'), { statusCode: 501, code: 'EMBEDDING_DISABLED' });
+  if (action === 'set') {
+    const result = await embeddingExecutor.store.deployProvider(params.workspaceId, params.config ?? {});
+    return { status: successStatus, body: result };
+  }
+  const result = await embeddingExecutor.store.removeProvider(params.workspaceId);
+  return { status: successStatus, body: result };
+}
+
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor);
 
   return http.createServer(async (req, res) => {
     try {

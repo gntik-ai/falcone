@@ -128,6 +128,31 @@
     "privilege_domain": "data_access"
   },
   {
+    "method": "POST",
+    "path": "/v1/collections/{name}/search",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/collections/{name}/vector-indexes",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/collections/{name}/vector-indexes/{indexName}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/workspaces/{id}/embedding-provider",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/workspaces/{id}/embedding-provider",
+    "privilege_domain": "structural_admin"
+  },
+  {
     "method": "GET",
     "path": "/v1/objects/{bucket}/{key}",
     "privilege_domain": "data_access"
