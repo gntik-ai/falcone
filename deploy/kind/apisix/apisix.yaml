@@ -246,6 +246,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
+      limit-count:
+        count: 120
+        time_window: 60
+        rejected_code: 429
+        key_type: var_combination
+        key: $http_apikey
+        allow_degradation: false
     upstream:
       type: roundrobin
       scheme: http
@@ -259,6 +267,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
+      limit-count:
+        count: 120
+        time_window: 60
+        rejected_code: 429
+        key_type: var_combination
+        key: $http_apikey
+        allow_degradation: false
     upstream:
       type: roundrobin
       scheme: http
@@ -272,6 +288,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
+      limit-count:
+        count: 120
+        time_window: 60
+        rejected_code: 429
+        key_type: var_combination
+        key: $http_apikey
+        allow_degradation: false
     upstream:
       type: roundrobin
       scheme: http
@@ -285,6 +309,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
+      limit-count:
+        count: 120
+        time_window: 60
+        rejected_code: 429
+        key_type: var_combination
+        key: $http_apikey
+        allow_degradation: false
     upstream:
       type: roundrobin
       scheme: http
