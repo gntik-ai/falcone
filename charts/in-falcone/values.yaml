@@ -2194,10 +2194,11 @@ controlPlane:
 # (upstream.dataPlane:true — /v1/postgres|mongo|events|functions/*) are sent here instead
 # of the default control-plane (see templates/bootstrap-payload-configmap.yaml). The data
 # connection env (PG*/MONGO_*/KAFKA_BROKERS via secretKeyRef) is environment-specific and
-# set in the overlay. NOTE: the executor serves the data-plane + DDL + API-keys surface;
-# if a deployment also needs the legacy read-only browse/inventory routes under those
-# prefixes (served by the default control-plane), keep those on controlPlane via finer
-# routing or extend the executor — tracked follow-up.
+# set in the overlay. The executor serves the data-plane + DDL slice and TRANSPARENTLY
+# PROXIES every other path under those prefixes (browse/inventory/management routes) to the
+# legacy control-plane via CONTROL_PLANE_UPSTREAM — so enabling the executor keeps the full
+# product API working. Set CONTROL_PLANE_UPSTREAM in the overlay (required when enabling);
+# if it is unset the executor 404s the non-data-plane routes.
 controlPlaneExecutor:
   enabled: false
   wrapper:
@@ -2226,6 +2227,8 @@ controlPlaneExecutor:
   # Data connection env is environment-specific (release-prefixed DNS + external secrets);
   # set it in the overlay, e.g.:
   #   env:
+  #     # REQUIRED: where to proxy non-data-plane (browse/inventory/management) routes.
+  #     - { name: CONTROL_PLANE_UPSTREAM, value: http://<release>-control-plane:8080 }
   #     - { name: PGHOST, value: <release>-postgresql }
   #     - { name: PGUSER, value: falcone }
   #     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
