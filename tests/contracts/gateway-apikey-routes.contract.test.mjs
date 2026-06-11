@@ -84,3 +84,10 @@ test('every requiresExecutor route is also a data-plane route (so the split send
     assert.equal(route.upstream?.dataPlane, true, `${route.name} requiresExecutor must imply dataPlane`);
   }
 });
+
+test('rate-limit storage policy defaults to local (redis is opt-in for globally-exact limits)', () => {
+  const rl = readGatewayPolicyValues()?.gatewayPolicy?.rateLimit;
+  assert.ok(rl, 'gatewayPolicy.rateLimit must be declared');
+  assert.equal(rl.policy, 'local'); // node-local by default; the template injects this onto every limit-count
+  assert.equal(typeof rl.redis?.port, 'number'); // redis connection shape present for the redis policy
+});
