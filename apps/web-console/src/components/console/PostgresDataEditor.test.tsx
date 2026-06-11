@@ -98,6 +98,48 @@ describe('PostgresDataEditor — richer UX', () => {
     await waitFor(() => expect(mocked.deleteRow).toHaveBeenCalledWith('ws1', 'appdb', 'public', 'notes', { id: 'r1' }))
   })
 
+  it('adds a filter and requeries the rows with it', async () => {
+    renderEditor()
+    await screen.findByText('hello')
+    fireEvent.change(screen.getByLabelText('Column'), { target: { value: 'status' } })
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'active' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add filter' }))
+    await waitFor(() =>
+      expect(mocked.listRows).toHaveBeenLastCalledWith(
+        'ws1', 'appdb', 'public', 'notes',
+        expect.objectContaining({ filters: [{ columnName: 'status', operator: 'eq', value: 'active' }] })
+      )
+    )
+    expect(screen.getByText(/status eq active/)).toBeInTheDocument()
+  })
+
+  it('changing the page size requeries from the first page', async () => {
+    renderEditor()
+    await screen.findByText('hello')
+    fireEvent.change(screen.getByLabelText('Page size'), { target: { value: '50' } })
+    await waitFor(() =>
+      expect(mocked.listRows).toHaveBeenLastCalledWith(
+        'ws1', 'appdb', 'public', 'notes', expect.objectContaining({ pageSize: 50, after: undefined })
+      )
+    )
+  })
+
+  it('paginates with the keyset cursor (Next enabled only when a cursor is returned)', async () => {
+    mocked.listRows.mockResolvedValue({ items: [{ id: 'r1', body: 'hello' }], count: 5, page: { after: 'CUR1' } })
+    renderEditor()
+    await screen.findByText('hello')
+    const next = screen.getByRole('button', { name: 'Next' })
+    expect(next).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    fireEvent.click(next)
+    await waitFor(() =>
+      expect(mocked.listRows).toHaveBeenLastCalledWith(
+        'ws1', 'appdb', 'public', 'notes', expect.objectContaining({ after: 'CUR1' })
+      )
+    )
+    expect(screen.getByRole('button', { name: 'Previous' })).not.toBeDisabled()
+  })
+
   it('issues an anon key and reveals the plaintext once with a copy button', async () => {
     mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
     renderEditor()
