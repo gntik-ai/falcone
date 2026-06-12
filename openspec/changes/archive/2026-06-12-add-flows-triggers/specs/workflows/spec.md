@@ -75,12 +75,12 @@ The system SHALL derive a Temporal workflow-ID deduplication key from a delivery
 
 ---
 
-### Requirement: Inbound webhook trigger — rate-limit class in route catalog
-The system SHALL register the webhook trigger ingestion route in `services/internal-contracts/src/public-route-catalog.json` with `rateLimitClass: "event-gateway-publish"` and `gatewayRouteClass: "event"`, consistent with `POST /v1/events/topics/{resourceId}/publish` which uses the same class for high-frequency inbound event traffic.
+### Requirement: Inbound webhook trigger — registered in the gateway allow-list
+The system SHALL register the webhook trigger ingestion route in the authoritative gateway allow-list `services/gateway-config/public-route-catalog.json` with `privilege_domain: "data_access"`, consistent with the existing flows execution routes (which the gateway treats as high-frequency event-class data traffic). This follows the established convention for the `flows` family, whose routes live in the gateway-config allow-list rather than the generated `services/internal-contracts/src/public-route-catalog.json` (which is regenerated from the OpenAPI source by `validate:public-api` and does not carry the flows family — see `tests/blackbox/flows-api-route-catalog.test.mjs`).
 
-#### Scenario: Route catalog entry carries correct rate-limit metadata
-- **WHEN** the route catalog is inspected for `POST /v1/flows/workspaces/{workspaceId}/triggers/webhooks/{triggerId}`
-- **THEN** the entry has `rateLimitClass` equal to `"event-gateway-publish"` and `gatewayRouteClass` equal to `"event"`
+#### Scenario: Route catalog entry is present in the gateway allow-list with the data-access domain
+- **WHEN** the gateway allow-list is inspected for `POST /v1/flows/workspaces/{workspaceId}/triggers/webhooks/{triggerId}`
+- **THEN** the entry is present with `privilege_domain` equal to `"data_access"`
 
 ---
 
