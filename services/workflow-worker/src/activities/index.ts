@@ -2,10 +2,17 @@
  * Activity implementations for the DSL interpreter worker.
  *
  * Activities run OUTSIDE the Temporal deterministic workflow sandbox, so they may use
- * non-deterministic host APIs (clock, random, I/O, the CEL engine). This change ships
- * only the HARNESS/STUB activities; the real task catalog is the sibling change
- * add-flows-activity-catalog (#360), which implements `executeTask` against the
- * ActivityInput envelope (src/shared/types.ts).
+ * non-deterministic host APIs (clock, random, I/O, the CEL engine).
+ *
+ * `executeTask` is the interpreter's task-dispatch seam (src/shared/types.ts
+ * ActivityInput → ActivityResult). This change (add-flows-activity-catalog / #360) wires
+ * it to the REAL first-party task-type catalog, which is authored as native ESM `.mjs`
+ * modules under ./activities/ (so the unit + black-box suites can import the public
+ * surface without a tsc build, and so each activity can import the CommonJS
+ * @temporalio/activity package via Node's ESM↔CJS interop). Because this package compiles
+ * to CommonJS (a hard Temporal SDK constraint), the catalog is loaded at runtime via a
+ * genuine dynamic ESM `import()` that tsc must NOT downlevel into `require()` — see
+ * `loadCatalog` below.
  */
 import { evaluate as celEvaluate } from 'cel-js';
 import { ApplicationFailure } from '@temporalio/activity';
@@ -17,24 +24,47 @@ import type {
   FlowDefinition,
 } from '../shared/types';
 
+// Runtime ESM loader. `import()` under `module: CommonJS` is rewritten by tsc to
+// `Promise.resolve().then(() => require(...))`, which cannot load an ESM `.mjs`. The
+// `new Function` indirection produces a real, un-rewritten dynamic `import()` so the CJS
+// worker bundle can load the ESM activity catalog. Memoised — the registry populates once.
+const dynamicImport: (spec: string) => Promise<any> = new Function(
+  'spec',
+  'return import(spec)',
+) as (spec: string) => Promise<any>;
+
+let catalogPromise: Promise<any> | undefined;
+function loadCatalog(): Promise<any> {
+  if (!catalogPromise) {
+    catalogPromise = dynamicImport('./catalog.mjs');
+  }
+  return catalogPromise;
+}
+
 /**
- * Generic task execution seam. The #360 catalog replaces this body with the real
- * per-taskType dispatch; the ENVELOPE (ActivityInput → ActivityResult) is the stable
- * contract and must not change here.
- *
- * Stub behaviour: echo the node so harness/real-stack tests can assert dispatch + the
- * node-ID naming convention without a real task catalog.
+ * Inject the platform surfaces + per-execution tenant-scoped credential the catalog
+ * activities consume. In the worker process these are resolved from the environment /
+ * the tenancy-isolation runtime (#362); the harness/black-box suites inject doubles. Kept
+ * as a settable seam so worker.ts (or a test) can provide concrete dependencies without
+ * threading them through Temporal's activity registration.
+ */
+let activityDeps: Record<string, unknown> = {};
+export function setActivityDeps(deps: Record<string, unknown>): void {
+  activityDeps = deps ?? {};
+}
+
+/**
+ * Generic task execution seam: dispatch the ActivityInput envelope to the matching catalog
+ * activity (db.query / storage.* / functions.invoke / events.publish / http.request /
+ * email.send). The ENVELOPE (ActivityInput → ActivityResult) is the stable contract.
  */
 export async function executeTask(input: ActivityInput): Promise<ActivityResult> {
   if (!input?.tenant?.tenantId) {
     // Isolation guard: never run a task without a tenant scope.
-    throw ApplicationFailure.nonRetryable('executeTask invoked without a tenant context', 'MissingTenantContext');
+    throw ApplicationFailure.nonRetryable('executeTask invoked without a tenant context', 'UNAUTHENTICATED');
   }
-  return {
-    nodeId: input.nodeId,
-    taskType: input.taskType,
-    output: { executed: true, taskType: input.taskType, params: input.params ?? {} },
-  };
+  const catalog = await loadCatalog();
+  return catalog.dispatchTask(input, activityDeps) as Promise<ActivityResult>;
 }
 
 /**

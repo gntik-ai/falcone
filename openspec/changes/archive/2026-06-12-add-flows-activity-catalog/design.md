@@ -78,7 +78,33 @@ Rollback: remove the `services/workflow-worker/` deployment; no data migration r
 
 ## Open Questions
 
-1. Should `isBlockedIp` be extracted to `services/internal-contracts/` immediately, or imported directly from `webhook-engine`? Decision deferred to implementation; the spec requires functional parity, not a specific import path.
-2. Exact key TTL for the execution-scoped `flc_service_…` credential: co-designed with #362; placeholder of 15 min used in tests.
+1. Should `isBlockedIp` be extracted to `services/internal-contracts/` immediately, or imported directly from `webhook-engine`? Decision deferred to implementation; the spec requires functional parity, not a specific import path. **Resolved at apply time**: imported directly from `services/webhook-engine/src/webhook-subscription.mjs` via a relative path that is stable across `src/` and `dist/`; no extraction needed yet.
+2. Exact key TTL for the execution-scoped `flc_service_…` credential: co-designed with #362; placeholder of 15 min used in tests. The activity layer CONSUMES an injected `credential` (it never mints one); minting/expiry remains #362's.
+
+## Implementation deviations (recorded at apply)
+
+**ID1 — Catalog authored as native ESM `.mjs`, bridged into the CJS worker.** `workflow-worker`
+is TypeScript + CommonJS by a hard Temporal SDK constraint. Authoring the catalog as `.mjs`
+keeps it directly importable by the `node --test` unit/black-box suites (no build) and lets each
+activity import the CJS `@temporalio/activity` via interop. `index.ts` `executeTask` loads the
+catalog at runtime via a real dynamic `import()` (a `new Function` indirection so tsc does not
+rewrite it to `require()`); a build step copies the `.mjs` into `dist/` for the Temporal harness.
+
+**ID2 — Dispatch falls back to the interpreter echo seam for UNREGISTERED task types.** The
+registry is authoritative for FLW-E006 and `resolveActivity` fails closed with
+`UNKNOWN_TASK_TYPE`, but `dispatchTask` must not break the upstream interpreter harness, which
+exercises graph-walking with placeholder task types (`fetch-record`, `noop-a`, …). Production
+definitions cannot reach the worker with an unknown type (FLW-E006 rejects them at the API first,
+verified: validate → 422 / FLW-E006). Payload-size + tenant guards still run for every type.
+
+**ID3 — `storage.put` / `storage.get` use an injected HTTP client.** Storage has no importable
+control-plane executor (it is served over the HTTP API / proxied), so the storage activities call
+the `uploadStorageObject` / `downloadStorageObject` routes over an injected fetch-shaped client.
+D1's direct-executor-import decision applies to `db.query` / `events.publish` / `functions.invoke`.
+
+**ID4 — Validate-endpoint wiring consumes a Temporal-FREE name list.** `apps/control-plane/.../main.mjs`
+imports `TASK_TYPE_NAMES` from the worker's `catalog-names.mjs` (pure data, no `@temporalio/*`)
+and passes it as `createFlowExecutor({ taskTypeCatalog })`, so the control-plane process never
+loads the Temporal SDK that lives only in the worker's `node_modules`.
 </content>
 </invoke>
