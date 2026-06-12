@@ -31,10 +31,11 @@ The upstream Temporal Helm chart (https://github.com/temporalio/helm-charts) sup
 
 ## Decisions
 
-**Decision 1: component-wrapper alias vs. direct upstream chart dependency**
-Use the same `component-wrapper` alias pattern as all other components rather than adding the upstream Temporal chart as a direct named dependency.
-Rationale: keeps the upgrade surface uniform; the `component-wrapper` abstraction handles image registry rewriting (`global.imageRegistry`) and pull-secret injection, which are required for the Harbor/OpenShift airgap path (`deploy/openshift/values-openshift.yaml`). Direct upstream chart would bypass those helpers.
-Alternative: add `temporalio/temporal` directly as a Chart.yaml dependency — rejected because it bypasses the image-rewrite helper and introduces a new dependency pattern.
+**Decision 1: first-class umbrella templates vs. component-wrapper alias (IMPLEMENTATION DEVIATION)**
+Render Temporal via purpose-built umbrella templates under `charts/in-falcone/templates/temporal/**`, gated by `temporal.enabled`, rather than as a `component-wrapper` alias dependency in `Chart.yaml`.
+Rationale for the deviation from the original sketch: the shared `component-wrapper` sub-chart (`charts/in-falcone/charts/component-wrapper/templates/workload.yaml`) renders **exactly one Deployment + one Service per release alias**. Temporal is a four-role server (frontend / history / matching / worker) plus a Web UI, two lifecycle Jobs (schema + bootstrap), five Services, and a NetworkPolicy — it cannot be expressed by a single component-wrapper alias. Adding a `temporal` alias would also emit a stray generic Deployment/Service that conflicts with the role workloads. The umbrella already ships first-class templates for multi-resource concerns (e.g. `templates/bootstrap-job.yaml`, `templates/bootstrap-*-configmap.yaml`), so Temporal follows that established pattern. Image references still flow through the shared `component-wrapper.normalizeRepository` helper (via the new `in-falcone.temporal.image` helper), so `global.imageRegistry` (Harbor) rewriting and the airgap path keep working — the helper is reused exactly as `templates/bootstrap-job.yaml` reuses it. **No new dependency is added to `Chart.yaml`; `Chart.lock` is unchanged** (all existing dependencies remain local `file://` charts).
+Alternative considered: a single `component-wrapper` alias — rejected because it physically cannot render four distinct role Deployments with per-role ports/SERVICES env, two Jobs, and a NetworkPolicy.
+Alternative considered: the upstream `temporalio/temporal` chart as a direct Chart.yaml dependency — rejected because it bypasses the `global.imageRegistry` image-rewrite helper and introduces a new (non-uniform) dependency/upgrade pattern.
 
 **Decision 2: SQL visibility, no Elasticsearch**
 Temporal supports two visibility backends: standard (SQL) and advanced (Elasticsearch). Use SQL visibility backed by PostgreSQL.
@@ -68,7 +69,7 @@ Rationale: `additionalProperties: true` allows the upstream Temporal chart's own
 
 ## Migration Plan
 
-1. Add `temporal` dependency entry to `Chart.yaml`; run `helm dependency update charts/in-falcone`.
+1. (Deviation — no Chart.yaml dependency, see Decision 1.) Add the Temporal helpers to `templates/_helpers.tpl` and the first-class templates under `templates/temporal/**`; `Chart.lock` is unchanged.
 2. Add `temporal:` block to `values.yaml` with `enabled: false` as default.
 3. Extend `values.schema.json` with the `temporal` property.
 4. Add OpenShift overlay section to `deploy/openshift/values-openshift.yaml`.
@@ -77,8 +78,22 @@ Rationale: `additionalProperties: true` allows the upstream Temporal chart's own
 7. Kind cluster smoke test: `helm upgrade --install` with `temporal.enabled=true`; verify all four Temporal role pods reach `Running` state.
 8. Rollback: `helm upgrade` with `temporal.enabled=false` removes all Temporal resources; no platform downtime (other components unaffected).
 
+## Kind deploy findings (implementation notes from the smoke test)
+
+The kind smoke test (3-node test-cluster-b, helm v4.1.4, temporal-only minimal install against a tiny in-namespace PostgreSQL) surfaced several real constraints that shaped the templates:
+
+1. **Image tags.** The spike's `auto-setup:1.25.2` per-component tags (`server`/`admin-tools`/`ui` 1.25.2) are no longer on Docker Hub. Pinned to available, aligned tags: `temporalio/server:1.31.1`, `temporalio/admin-tools:1.31.1` (bundles both `temporal-sql-tool` and the `temporal` CLI), `temporalio/ui:2.51.0`.
+2. **Plain `server` image, not `auto-setup`.** Used `temporalio/server` with one Deployment per role (`SERVICES`/`TEMPORAL_SERVICES` selects the role). It does NOT auto-render config from env vars (that is an auto-setup/dockerize feature), so the config ConfigMap is rendered from Helm values, and the per-pod broadcast/bind IP is substituted from `POD_IP` by a small `sh` start wrapper.
+3. **`/bin/sh` only.** The admin-tools image is alpine-based and ships `/bin/sh` (no bash); the schema + bootstrap Jobs are POSIX-sh. `temporal-sql-tool` has no `ping` subcommand — connectivity is probed via an idempotent `create-database` against the `postgres` DB.
+4. **IPv4 bind.** A `bindOnIP: 0.0.0.0` makes the Go gRPC server listen on the IPv6 wildcard `[::]`, which this CNI does not route to IPv4 clients/Service. Binding the concrete IPv4 pod IP (substituted into `bindOnIP` + `BIND_ON_IP`) yields a reachable IPv4 listener.
+5. **NetworkPolicy must admit Temporal's own internals.** The frontend NetworkPolicy (port 7233) blocks everything except the allowed labels. The Temporal **worker role** (embeds an SDK client) and the **bootstrap Job** both connect to 7233 and were being blocked → added an ingress rule admitting `in-falcone.io/component: temporal` (every Temporal pod, incl. the Jobs). This is required for the deployment to be functional standalone.
+6. **Worker startup ordering.** The worker role crashes on a hard fx deadline if the frontend is not yet SERVING, which also pollutes `cluster_membership` on restart. Added a `wait-for-frontend` init container (admin-tools, gated on `cluster health`) to the worker Deployment only.
+7. **Bootstrap SA registration is retried.** A freshly-created namespace can briefly reject search-attribute registration; the bootstrap now retries each attribute until it is listed (instead of fire-and-forget), guaranteeing all five CSAs land.
+
+Verified: all four role pods + Web UI Running (0 restarts), schema + bootstrap hooks completed (`helm install` exit 0), `falcone-flows` namespace + all five Keyword CSAs registered and queryable, all Services ClusterIP, no Ingress/Route/LB/NodePort for Temporal, Web UI HTTP 200 via port-forward only.
+
 ## Open Questions
 
-- Which version of the Temporal server chart / images to pin? (Depends on #356 for the minimum Temporal version that supports the required custom search attribute types on PostgreSQL.)
-- Should the bootstrap Job create a single `default` namespace or also a `flows` namespace? (Depends on #356 tenancy model.)
-- Are `temporal_visibility` and `temporal` databases to be created as separate PG databases, or as separate schemas within `in_falcone`? (Recommend separate databases to avoid migration coupling; confirm with #356.)
+- Which version of the Temporal server chart / images to pin? RESOLVED for the kind smoke test: `server`/`admin-tools` `1.31.1`, `ui` `2.51.0` (the older per-component tags were pruned from Docker Hub). Operators may pin a different supported release via `temporal.image.tag` etc.
+- Should the bootstrap Job create a single `default` namespace or also a `flows` namespace? RESOLVED (ADR-11): a single shared namespace, default `falcone-flows` (`temporal.bootstrap.namespace`).
+- Are `temporal_visibility` and `temporal` databases to be created as separate PG databases, or as separate schemas within `in_falcone`? RESOLVED: separate databases (`temporal` + `temporal_visibility`), distinct from the platform `in_falcone` DB, to avoid migration coupling.

@@ -1,0 +1,150 @@
+{{- if .Values.temporal.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- /*
+  One Deployment per Temporal server role. The temporalio/server image selects which
+  role(s) it runs via the SERVICES env var, so each Deployment runs exactly one role
+  (frontend, history, matching, worker). Persistence + SQL visibility (no Elasticsearch)
+  are supplied through the shared persistenceEnv helper. All pods are non-root with a
+  RuntimeDefault seccomp profile and no pinned fsGroup (OpenShift SCC-compatible).
+*/ -}}
+{{- $roles := list
+  (dict "role" "frontend" "service" "frontend" "cfg" $t.frontend)
+  (dict "role" "history"  "service" "history"  "cfg" $t.history)
+  (dict "role" "matching" "service" "matching" "cfg" $t.matching)
+  (dict "role" "worker"   "service" "worker"   "cfg" $t.worker)
+-}}
+{{- range $r := $roles }}
+{{- $cfg := $r.cfg }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "in-falcone.temporal.roleName" (dict "root" $root "role" $r.role) }}
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" $r.role) | nindent 4 }}
+spec:
+  replicas: {{ $cfg.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "in-falcone.temporal.roleSelectorLabels" (dict "root" $root "role" $r.role) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" $r.role) | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      {{- include "in-falcone.temporal.imagePullSecrets" $root | nindent 6 }}
+      {{- with $t.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if eq $r.role "worker" }}
+      # The worker role embeds a Temporal SDK client that connects to the frontend at
+      # startup and CRASHES on a hard fx deadline if the frontend is not yet SERVING. The
+      # frontend reaches SERVING once frontend+history+matching form the ring (the worker
+      # is NOT required for that), so gate the worker on frontend health to avoid a
+      # crash/restart loop that would also pollute the cluster_membership table.
+      initContainers:
+        - name: wait-for-frontend
+          image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $t.adminTools.image) | quote }}
+          imagePullPolicy: {{ $t.adminTools.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              i=0
+              while [ "$i" -lt 90 ]; do
+                if temporal operator cluster health \
+                    --address "{{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "frontend") }}:{{ $t.frontend.grpcPort }}" \
+                    --namespace temporal-system >/dev/null 2>&1; then
+                  echo "frontend is serving"; exit 0
+                fi
+                i=$((i + 1)); echo "waiting for frontend to serve (${i}/90)"; sleep 5
+              done
+              echo "frontend did not become healthy in time" >&2; exit 1
+          {{- with $t.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
+      containers:
+        - name: temporal-{{ $r.role }}
+          image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $t.image) | quote }}
+          imagePullPolicy: {{ $t.image.pullPolicy | default "IfNotPresent" }}
+          # The plain server image does not template config from env vars, so the broadcast
+          # address (required when binding 0.0.0.0) cannot be injected via env. Copy the
+          # read-only ConfigMap into a writable dir, substitute the pod IP, then start.
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p /tmp/temporal/config /tmp/temporal/dynamicconfig
+              sed -e "s/__BROADCAST_ADDRESS__/${POD_IP}/g" \
+                  -e "s/__BIND_IP__/${POD_IP}/g" \
+                /etc/temporal/config-src/docker.yaml > /tmp/temporal/config/docker.yaml
+              cp /etc/temporal/config-src/dynamic_config.yaml /tmp/temporal/dynamicconfig/docker.yaml
+              exec /etc/temporal/entrypoint.sh
+          ports:
+            - name: grpc
+              containerPort: {{ $cfg.grpcPort }}
+              protocol: TCP
+            - name: membership
+              containerPort: {{ $cfg.membershipPort }}
+              protocol: TCP
+          env:
+            # The server image entrypoint runs `temporal-server start`; SERVICES selects
+            # the single role this Deployment runs.
+            - name: SERVICES
+              value: {{ $r.service | quote }}
+            - name: TEMPORAL_SERVICES
+              value: {{ $r.service | quote }}
+            # Config: load <root>/config/<env>.yaml from the writable copy we render above.
+            - name: TEMPORAL_ROOT
+              value: /tmp/temporal
+            - name: TEMPORAL_CONFIG_DIR
+              value: config
+            - name: TEMPORAL_ENVIRONMENT
+              value: docker
+            # Bind to the concrete IPv4 pod IP (see config.yaml note): a 0.0.0.0 bind makes
+            # the Go gRPC server listen on the IPv6 wildcard [::], unreachable by IPv4
+            # clients on this CNI. The entrypoint reads BIND_ON_IP and the config's
+            # per-service bindOnIP mirrors it (both the IPv4 pod IP).
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: BIND_ON_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: TEMPORAL_BROADCAST_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: TEMPORAL_ADDRESS
+              value: "{{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "frontend") }}:{{ $t.frontend.grpcPort }}"
+            {{- include "in-falcone.temporal.persistenceEnv" $root | nindent 12 }}
+          volumeMounts:
+            - name: config-src
+              mountPath: /etc/temporal/config-src
+              readOnly: true
+            - name: runtime
+              mountPath: /tmp/temporal
+          {{- with $cfg.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config-src
+          configMap:
+            name: {{ include "in-falcone.temporal.fullname" $root }}-config
+        - name: runtime
+          emptyDir: {}
+{{- end }}
+{{- end }}
