@@ -16,6 +16,7 @@ import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
+import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { createFlowTriggerRegistry, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
@@ -201,12 +202,38 @@ if (flowExecutor) {
   flowExecutor.setTriggerRegistry(flowTriggerRegistry);
 }
 
+// Flow-monitoring executor (change: add-console-flow-monitoring / #366). The execution
+// observability SSE stream: follows a single Temporal execution's history and emits node-status
+// / log-line frames to the console run view. Wired WITH the flow executor (it needs a Temporal
+// client) and gated on the same TEMPORAL_ADDRESS guard; FLOWS_ENABLED=false force-disables it so
+// an operator can keep the flows API while suppressing the streaming endpoint (which then falls
+// through to the 501 guard). The history provider lazily connects its own Temporal client over the
+// same address — mirroring the trigger registry's lazy-connect boundary.
+let monitoringClientP = null;
+const flowMonitoringExecutor = flowExecutor && process.env.FLOWS_ENABLED !== 'false'
+  ? createFlowMonitoringExecutor({
+      workflowHistoryProvider: createTemporalHistoryProvider({
+        getClient: async () => {
+          if (!monitoringClientP) {
+            monitoringClientP = (async () => {
+              const { Connection, Client } = await import('@temporalio/client');
+              const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS });
+              return new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows' });
+            })();
+          }
+          return monitoringClientP;
+        },
+      }),
+      pollIntervalMs: Number(process.env.FLOW_MONITORING_POLL_MS ?? 1000),
+    })
+  : undefined;
+
 // When the executor fronts the data-family wildcard (gateway route-split), it serves the
 // data-plane + DDL slice itself and proxies every other path under those prefixes
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
