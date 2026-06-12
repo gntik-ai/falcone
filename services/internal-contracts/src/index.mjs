@@ -21,6 +21,14 @@ const OBSERVABILITY_CONSOLE_ALERTS_URL = new URL('./observability-console-alerts
 const OBSERVABILITY_QUOTA_USAGE_VIEW_URL = new URL('./observability-quota-usage-view.json', import.meta.url);
 const PUBLIC_API_TAXONOMY_URL = new URL('./public-api-taxonomy.json', import.meta.url);
 const PUBLIC_ROUTE_CATALOG_URL = new URL('./public-route-catalog.json', import.meta.url);
+export const FLOW_DEFINITION_SCHEMA_URL = new URL('./flow-definition.json', import.meta.url);
+export const FLOW_DEFINITION_MAPPING_URL = new URL('./flow-definition-mapping.json', import.meta.url);
+export { default as flowDefinitionSchema } from './flow-definition.json' with { type: 'json' };
+export { default as flowDefinitionMapping } from './flow-definition-mapping.json' with { type: 'json' };
+export {
+  FLOW_VALIDATION_ERROR_CODES,
+  validateFlowDefinition
+} from './flow-definition-validator.mjs';
 export { default as sagaContract } from './saga-contract.json' with { type: 'json' };
 export { default as consoleWorkflowAuditPolicy } from './console-workflow-audit-policy.json' with { type: 'json' };
 export { default as asyncOperationStateChangedSchema } from './async-operation-state-changed.json' with { type: 'json' };

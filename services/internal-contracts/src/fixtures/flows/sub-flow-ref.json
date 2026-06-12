@@ -1,0 +1,40 @@
+{
+  "apiVersion": "v1.0",
+  "name": "parent-with-sub-flow",
+  "description": "Flow with a sub-flow node referencing a named child flow by flowId and flowVersion.",
+  "triggers": [
+    {
+      "kind": "cron",
+      "schedule": "0 9 * * 1-5"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "prepare",
+      "type": "task",
+      "taskType": "prepare-batch",
+      "next": "run-child"
+    },
+    {
+      "id": "run-child",
+      "type": "sub-flow",
+      "flowId": "send-notifications",
+      "flowVersion": "v1.0",
+      "input": {
+        "channel": "email"
+      },
+      "next": "wrap-up"
+    },
+    {
+      "id": "wrap-up",
+      "type": "wait",
+      "duration": "PT30S",
+      "next": "finalize"
+    },
+    {
+      "id": "finalize",
+      "type": "task",
+      "taskType": "record-completion"
+    }
+  ]
+}
