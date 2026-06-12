@@ -137,13 +137,81 @@ depending on a layout engine library.
 No backend migration steps. Rollback: revert the `router.tsx` lazy-import addition and
 remove the new files — no persistent state is created until a user saves a draft.
 
+## Implementation Deviations (recorded during apply)
+
+- **DV1 — package name**: the contract package is published as
+  `@in-falcone/internal-contracts` (not `@falcone/internal-contracts` as written in the
+  prose above). The console imports the shared validator + fixtures from that name. The
+  designer imports `validateFlowDefinition` and `FLOW_VALIDATION_ERROR_CODES` directly from
+  `services/internal-contracts/src/flow-definition-validator.mjs` (plain ESM + `cel-js`,
+  bundler-friendly) so client-side validation reuses the IDENTICAL rule set as the server.
+
+- **DV2 — task-type catalog endpoint**: `add-flows-activity-catalog` (#360) shipped the
+  task-type *registry* (`services/workflow-worker/src/activities/catalog.mjs` with
+  `{ activity, inputSchema, outputSchema }`) and a Temporal-free name list
+  (`catalog-names.mjs :: TASK_TYPE_NAMES`), but NOT a public HTTP endpoint serving the
+  descriptors. The worker's per-activity `*InputSchema` exports are Temporal-coupled
+  (they import `./limits.mjs` / `./errors.mjs`, which import `@temporalio/activity`), so the
+  Temporal-free control-plane cannot import them. This change therefore adds, minimally:
+  - `apps/control-plane/src/runtime/flow-task-types.mjs` — a Temporal-free descriptor catalog
+    (`{ id, label, category, inputSchema }`) whose ids are cross-checked at build time against
+    `TASK_TYPE_NAMES` (fail-closed on drift, mirroring `catalog.mjs`'s self-check), with the
+    `inputSchema` objects mirroring the worker exports verbatim and `x-falcone-expression`
+    annotations per D5.
+  - `GET /v1/flows/workspaces/{workspaceId}/task-types` in `flow-executor.mjs`
+    (`list_task_types` operation) + `server.mjs` (registered only when `flowExecutor` is wired)
+    + the gateway allow-list (`public-route-catalog.json`, `structural_admin`).
+  The console `taskTypeRegistryApi.ts :: listTaskTypes(workspaceId)` calls this route.
+
+- **DV3 — `ApiError.errors` passthrough**: the console HTTP layer's `normalizeApiError`
+  (`apps/web-console/src/lib/http.ts`) previously stripped the server's top-level `errors`
+  array from 4xx envelopes. An additive optional `errors` field is now preserved so the flows
+  service module can map 422 `FLOW_VALIDATION_FAILED` node-scoped errors
+  (`[{ code, nodeId, message }]`) back onto canvas nodes. This is additive and does not change
+  any existing field.
+
+- **DV4 — publish endpoint shape**: the #361 flow API has no `POST .../publish`; publishing a
+  draft is `POST /v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions` (validates then
+  pins a new immutable version → `{ flowId, version, createdAt }`). `validateFlow` is
+  `POST .../flows/{flowId}/validate`. The service module + designer use these real shapes.
+
+- **DV5 — shared validator wiring**: the console consumes the shared validator through a
+  real workspace dependency (`@in-falcone/internal-contracts: workspace:*` in
+  `apps/web-console/package.json`) plus a local ambient declaration
+  (`src/types/flow-definition-validator.d.ts`) typing only the consumed exports, since the
+  contracts package ships untyped `.mjs`. `cel-js` resolves transitively.
+
+- **DV6 — extra designer semantics beyond the spec minimum**:
+  - a `sequence` custom node is registered in `nodeTypes` (the DSL has 7 constructs; the
+    spec lists 6 palette constructs, but loaded definitions may contain sequences);
+  - connection rules also enforce *single-next arity* (a second outgoing edge from
+    task/wait/approval/sub-flow is rejected) because the DSL has a single `next` field and
+    a second edge would otherwise be silently dropped on save projection;
+  - the publish action saves the draft first (the #361 publish pins the PERSISTED draft),
+    then calls `POST .../versions`.
+
+- **DV7 — capability gate + back-end contract pin**: the Flows pages are wrapped in
+  `CapabilityGate capability="workflows" mode="disable"` (mirroring `functions_public` on
+  `ConsoleFunctionsPage`; capability keys are plan-defined). The DV2 task-types endpoint
+  is pinned by a black-box suite `tests/blackbox/flows-task-types.test.mjs`
+  (bbx-flows-task-types-01…04: 200 + items shape, descriptor contract, 401 without
+  identity, 404 without flowExecutor).
+
 ## Open Questions
 
 - **Q1**: Should `ConsoleFlowsPage` (list) also be lazy-loaded, or only
   `ConsoleFlowDesignerPage`? Given the list page has no canvas dependency, eager import
   may be preferable to avoid a loading state on the nav link click.
+  → Resolved: BOTH are lazy. The list page navigates straight into the designer, the two
+  routes share the flows service chunk, and the route registration uses `router.tsx`'s
+  existing lazy pattern; the list chunk is 3.65 kB so the loading state is negligible.
 - **Q2**: Is a CI bundle-size gate needed for this change, or is it deferred to a
   separate `add-flows-bundle-audit` change?
+  → Deferred (not part of this change). Measured: designer chunk 356.00 kB
+  (gzip 110.01 kB) + 15.87 kB CSS, fully code-split — `@xyflow` does not appear in the
+  initial `index` chunk.
 - **Q3**: What auto-layout algorithm should be used when `canvasMetadata` is absent —
   simple vertical stack, or dagre (adds a dependency)? Dagre is more readable for
   branching graphs but adds ~30 kB. Decision deferred to implementation.
+  → Resolved: deterministic vertical stack (`flowGraphModel.ts::autoLayout`), no new
+  dependency.
