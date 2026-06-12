@@ -529,11 +529,11 @@ The system SHALL ensure all workflow code (everything inside `DslInterpreterWork
 ---
 
 ### Requirement: Worker deployment — Dockerfile and runtime
-The system SHALL build the workflow worker from a `services/workflow-worker/Dockerfile` using the `node:22-alpine` base image, running as the non-root `node` user, built from the repository root context consistent with `apps/control-plane/Dockerfile`.
+The system SHALL build the workflow worker from a `services/workflow-worker/Dockerfile` using the `node:22-slim` base image (glibc — required by the `@temporalio/core-bridge` native binary, which cannot load on Alpine/musl), running as the non-root `node` user, built from the repository root context consistent with `apps/control-plane/Dockerfile`.
 
 #### Scenario: Container starts as non-root user
 - **WHEN** the workflow worker container image is started
-- **THEN** the process runs as UID corresponding to the `node` user in the `node:22-alpine` image
+- **THEN** the process runs as UID corresponding to the `node` user in the `node:22-slim` image
 - **AND** the process does not have `root` privileges
 
 ---
