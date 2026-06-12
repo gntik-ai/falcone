@@ -14,6 +14,10 @@ export interface ApiError {
   requestId?: string
   detail?: JsonValue
   resource?: JsonValue
+  // Node-scoped validation errors surfaced on 4xx envelopes (e.g. flows 422
+  // FLOW_VALIDATION_FAILED carries `errors: [{ code, nodeId, message }]`). Preserved
+  // verbatim so callers can map them back onto UI elements (e.g. canvas nodes).
+  errors?: JsonValue
 }
 
 export interface JsonRequestOptions {
@@ -89,6 +93,9 @@ function normalizeApiError(payload: unknown, fallbackError: ApiError): ApiError 
     correlationId: typeof maybeError.correlationId === 'string' ? maybeError.correlationId : undefined,
     requestId: typeof maybeError.requestId === 'string' ? maybeError.requestId : undefined,
     detail: maybeError.detail,
-    resource: maybeError.resource
+    resource: maybeError.resource,
+    errors: Array.isArray((maybeError as { errors?: unknown }).errors)
+      ? ((maybeError as { errors?: JsonValue }).errors)
+      : undefined
   }
 }

@@ -205,6 +205,9 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   // Flows: registered ONLY when a flowExecutor is injected (TEMPORAL_ADDRESS set). When absent,
   // these tuples are omitted and a flows path falls through to 404 / upstream proxy unchanged.
   const fl = '^/v1/flows/workspaces/([^/]+)/flows';
+  // Task-type catalog (palette source for the console flow designer): a sibling of the
+  // /flows collection under the same workspace prefix. Static first-party descriptors.
+  const flt = '^/v1/flows/workspaces/([^/]+)/task-types';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -340,6 +343,9 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // resolveIdentity; the workspaceId path segment is the public-surface address, never the
     // tenant authority.
     ...(flowExecutor ? [
+      // Task-type catalog — the designer palette source (driven by the activity registry).
+      ['GET', new RegExp(`${flt}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'list_task_types', identity: c.identity }, 200)],
       ['GET', new RegExp(`${fl}$`), ([w], c) =>
         runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
       ['POST', new RegExp(`${fl}$`), ([w], c) =>
