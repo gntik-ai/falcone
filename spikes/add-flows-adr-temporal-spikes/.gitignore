@@ -1,0 +1,6 @@
+# EPHEMERAL SPIKE — transient runtime state and regenerable build artifacts (not evidence).
+# node_modules/ is already covered by the repo-root .gitignore.
+spike-a/.run-state/
+**/*.tsbuildinfo
+# Defensive: never commit the multi-MB workflow bundle (size is recorded in sandbox-check.json).
+spike-a/evidence/workflow-bundle.js
