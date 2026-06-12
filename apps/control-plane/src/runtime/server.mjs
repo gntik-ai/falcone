@@ -363,7 +363,13 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       ['POST', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'start_execution', identity: c.identity, flowId: f, version: c.body.version, input: c.body.input }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'list_executions', identity: c.identity, flowId: f, status: c.url.searchParams.get('status') ?? undefined }, 200)],
+        runFlows(flowExecutor, {
+          operation: 'list_executions', identity: c.identity, flowId: f,
+          status: c.url.searchParams.get('status') ?? undefined,
+          // A client-supplied visibility query/filter is captured but NEVER trusted: the executor
+          // strips any tenantId/workspaceId clause and AND-joins its own tenant boundary (D2).
+          query: c.url.searchParams.get('query') ?? c.url.searchParams.get('filter') ?? undefined,
+        }, 200)],
       ['GET', new RegExp(`${fl}/([^/]+)/executions/([^/]+)$`), ([w, f, e], c) =>
         runFlows(flowExecutor, { operation: 'get_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/cancellations$`), ([w, f, e], c) =>
@@ -573,6 +579,9 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // Flow validation failures carry a node-scoped error array (FLW-E codes + nodeId) — surface
       // it on the 422 envelope so the console can highlight the offending canvas nodes.
       if (Array.isArray(err.errors) && statusCode < 500) envelope.errors = err.errors;
+      // Quota breaches (429 QUOTA_EXCEEDED) carry the breached dimension so the caller can show
+      // which limit was hit (spec: body indicates the breached dimension).
+      if (err.dimension && statusCode < 500) envelope.dimension = err.dimension;
       return sendJson(res, statusCode, envelope);
     }
   });
