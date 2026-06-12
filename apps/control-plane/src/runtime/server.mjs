@@ -71,6 +71,18 @@ function readJsonBody(req) {
   });
 }
 
+// Read the RAW request body (string). Webhook trigger ingestion needs the exact bytes the sender
+// signed over — JSON.parse + re-stringify would change the byte sequence and break HMAC. The parsed
+// JSON (best-effort) is forwarded as the flow input.
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; if (raw.length > 4e6) req.destroy(); });
+    req.on('end', () => resolve(raw));
+    req.on('error', reject);
+  });
+}
+
 function identityFromHeaders(headers, pathWorkspaceId) {
   return {
     tenantId: headers['x-tenant-id'],
@@ -192,7 +204,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -202,6 +214,16 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   const fn = '^/v1/functions/workspaces/([^/]+)/actions';
   const rt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/changes';
   const pgrt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)/changes';
+  // Flows: registered ONLY when a flowExecutor is injected (TEMPORAL_ADDRESS set). When absent,
+  // these tuples are omitted and a flows path falls through to 404 / upstream proxy unchanged.
+  const fl = '^/v1/flows/workspaces/([^/]+)/flows';
+  // Task-type catalog (palette source for the console flow designer): a sibling of the
+  // /flows collection under the same workspace prefix. Static first-party descriptors.
+  const flt = '^/v1/flows/workspaces/([^/]+)/task-types';
+  // Inbound webhook trigger ingestion (change: add-flows-triggers). HMAC-authenticated, NOT OIDC:
+  // the per-trigger secret is the credential. The gateway still injects the workspace's tenant
+  // context (x-tenant-id/x-workspace-id) so the secret lookup is tenant-scoped.
+  const fwh = '^/v1/flows/workspaces/([^/]+)/triggers/webhooks/([^/]+)';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -331,7 +353,149 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // Postgres table change capture (trigger + LISTEN/NOTIFY):
     ['GET', new RegExp(`${pgrt}$`), ([w, db, s, t], c) =>
       runRealtimeSse(pgRealtimeExecutor, { workspaceId: w, databaseName: db, schemaName: s, tableName: t }, c), { sse: true }],
+
+    // ---- Flows (Temporal-backed authoring + execution) — only when flowExecutor is wired ----
+    // Definition management (control class). Identity (tenant/workspace) comes ONLY from
+    // resolveIdentity; the workspaceId path segment is the public-surface address, never the
+    // tenant authority.
+    ...(flowExecutor ? [
+      // Task-type catalog — the designer palette source (driven by the activity registry).
+      ['GET', new RegExp(`${flt}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'list_task_types', identity: c.identity }, 200)],
+      ['GET', new RegExp(`${fl}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
+      ['POST', new RegExp(`${fl}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body }, 201)],
+      ['GET', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
+      ['PATCH', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body }, 200)],
+      ['DELETE', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/validate$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'validate', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f }, 201)],
+      ['GET', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
+      ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), ([w, f, v], c) =>
+        runFlows(flowExecutor, { operation: 'get_version', identity: c.identity, flowId: f, version: Number(v) }, 200)],
+
+      // Execution lifecycle (data-control class).
+      ['POST', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'start_execution', identity: c.identity, flowId: f, version: c.body.version, input: c.body.input }, 201)],
+      ['GET', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
+        runFlows(flowExecutor, {
+          operation: 'list_executions', identity: c.identity, flowId: f,
+          status: c.url.searchParams.get('status') ?? undefined,
+          // A client-supplied visibility query/filter is captured but NEVER trusted: the executor
+          // strips any tenantId/workspaceId clause and AND-joins its own tenant boundary (D2).
+          query: c.url.searchParams.get('query') ?? c.url.searchParams.get('filter') ?? undefined,
+        }, 200)],
+      ['GET', new RegExp(`${fl}/([^/]+)/executions/([^/]+)$`), ([w, f, e], c) =>
+        runFlows(flowExecutor, { operation: 'get_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/cancellations$`), ([w, f, e], c) =>
+        runFlows(flowExecutor, { operation: 'cancel_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 202)],
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/retries$`), ([w, f, e], c) =>
+        runFlows(flowExecutor, { operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), ([w, f, e, s], c) =>
+        runFlows(flowExecutor, { operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
+
+      // ---- Inbound webhook trigger ingestion (HMAC-authenticated) ----
+      // The handler verifies the per-trigger HMAC over the RAW body BEFORE any Temporal call; an
+      // invalid/missing signature is 401 (no run started). A valid signature starts the bound flow
+      // (202); a replayed delivery id is an idempotent 202 (no second run). { webhook:true } makes
+      // the dispatcher read the raw body + signature/delivery headers instead of the JSON path.
+      ['POST', new RegExp(`${fwh}$`), ([w, t], c) =>
+        runFlows(flowExecutor, {
+          operation: 'webhook_trigger', identity: c.identity, triggerId: decodeURIComponent(t),
+          rawBody: c.rawBody, signatureHeader: c.signatureHeader, deliveryId: c.deliveryId, payload: c.payload,
+        }, 202), { webhook: true }],
+    ] : []),
+
+    // ---- Flow execution monitoring (SSE stream) — only when a flowMonitoringExecutor is wired ----
+    // Follows a single Temporal execution's history and streams node-status / log-line frames to
+    // the console run view. { sse: true } activates ?apikey= query auth (EventSource can't set
+    // headers) and the streaming response path. Tenant isolation is enforced fail-closed IN the
+    // executor (workflow-id prefix check) BEFORE any history is fetched — see runFlowMonitoringSse.
+    // The path mirrors the addressing under /v1/flows/workspaces/{ws}/executions/{executionId}.
+    ...(flowMonitoringExecutor ? [
+      ['GET', /^\/v1\/flows\/workspaces\/([^/]+)\/executions\/([^/]+)\/events$/, ([w, e], c) =>
+        runFlowMonitoringSse(flowMonitoringExecutor, { workspaceId: w, executionId: decodeURIComponent(e) }, c), { sse: true }],
+    ] : []),
   ];
+}
+
+// Stream a single Temporal execution's history to the client as Server-Sent Events. Like
+// runRealtimeSse it owns the response (no sendJson) and cleans up on client disconnect; it adds
+// an `id:` line per frame (Last-Event-ID resume) and a terminal `event: stream-end` frame. The
+// fail-closed tenant check lives in the executor's subscribe() and throws BEFORE any history is
+// touched: a 403 on a foreign workflow id is propagated as a hard HTTP 403 (no stream opened).
+async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
+  if (!flowMonitoringExecutor) throw Object.assign(new Error('Flow monitoring is not enabled'), { statusCode: 501, code: 'FLOW_MONITORING_DISABLED' });
+  const { req, res, identity } = c;
+  const lastEventId = req.headers['last-event-id'];
+  const controller = new AbortController();
+  let started = false;
+  let sub;
+  let ping;
+  const stop = () => { if (ping) clearInterval(ping); controller.abort(); void sub?.close?.(); };
+  req.on('close', stop);
+
+  const ensureStarted = () => {
+    if (started) return;
+    started = true;
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+      'x-accel-buffering': 'no', // ask proxies (nginx/APISIX) not to buffer the stream
+    });
+    res.write('retry: 3000\n\n');
+    ping = setInterval(() => res.write(': ping\n\n'), 25000);
+  };
+
+  try {
+    sub = await flowMonitoringExecutor.subscribe({
+      ...target,
+      identity,
+      lastEventId,
+      signal: controller.signal,
+      onEvent: (event) => {
+        // The tenant check passed (subscribe did not throw) → safe to open the stream.
+        ensureStarted();
+        const idLine = event.id != null ? `id: ${event.id}\n` : '';
+        res.write(`event: ${event.type}\n${idLine}data: ${JSON.stringify(event)}\n\n`);
+        if (event.type === 'stream-end') { stop(); res.end(); }
+      },
+      onError: () => {
+        ensureStarted();
+        res.write('event: error\ndata: {"code":"FLOW_MONITORING_STREAM_ERROR"}\n\n');
+      },
+    });
+    if (controller.signal.aborted) void sub.close?.();
+  } catch (err) {
+    // A pre-stream rejection (403 foreign workflow id / 401 identity) must surface as an HTTP
+    // status, NOT a 200 stream — the stream was never opened (ensureStarted not called).
+    if (!started && !res.headersSent) {
+      const statusCode = err.statusCode ?? 500;
+      const payload = JSON.stringify({ code: err.code ?? 'FLOW_MONITORING_ERROR', message: statusCode >= 500 ? 'Internal server error' : err.message });
+      res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) });
+      res.end(payload);
+    } else {
+      res.write(`event: error\ndata: ${JSON.stringify({ code: err.code ?? 'FLOW_MONITORING_ERROR' })}\n\n`);
+      stop();
+      res.end();
+    }
+  }
+}
+
+// Dispatch a flows operation through the flow executor. A FLOW_VALIDATION_FAILED error carries
+// a node-scoped `errors` array which is surfaced on the 422 envelope (see the error handler).
+async function runFlows(flowExecutor, params, successStatus) {
+  if (!flowExecutor) throw Object.assign(new Error('Flows are not enabled'), { statusCode: 501, code: 'FLOWS_DISABLED' });
+  const result = await flowExecutor.executeFlows(params);
+  return { status: successStatus, body: result };
 }
 
 // Stream a tenant-scoped Mongo change stream to the client as Server-Sent Events. The handler
@@ -471,12 +635,12 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor);
 
   return http.createServer(async (req, res) => {
     try {
@@ -509,6 +673,24 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         await handler(groups, { url, identity, registry, req, res });
         return;
       }
+      // Webhook trigger ingestion needs the RAW body (HMAC is computed over the exact bytes the
+      // sender signed) plus the signature + delivery-id headers; the parsed JSON is a best-effort
+      // flow input. The signature is the credential, so this path bypasses the OIDC identity gate
+      // (the gateway still injects the workspace's tenant context for the secret lookup).
+      if (opts?.webhook) {
+        const rawBody = await readRawBody(req);
+        let payload;
+        try { payload = rawBody ? JSON.parse(rawBody) : {}; } catch { payload = { raw: rawBody }; }
+        const ctx = {
+          url, identity, registry,
+          rawBody,
+          payload,
+          signatureHeader: req.headers['x-platform-webhook-signature'],
+          deliveryId: req.headers['x-platform-webhook-id'],
+        };
+        const { status, body: out } = await handler(groups, ctx);
+        return sendJson(res, status, out);
+      }
       const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
 
       const { status, body: out } = await handler(groups, { url, identity, body, registry });
@@ -516,10 +698,17 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
     } catch (err) {
       const statusCode = err.statusCode ?? 500;
       if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
-      return sendJson(res, statusCode, {
+      const envelope = {
         code: err.code ?? 'CONTROL_PLANE_ERROR',
         message: statusCode >= 500 ? 'Internal server error' : err.message,
-      });
+      };
+      // Flow validation failures carry a node-scoped error array (FLW-E codes + nodeId) — surface
+      // it on the 422 envelope so the console can highlight the offending canvas nodes.
+      if (Array.isArray(err.errors) && statusCode < 500) envelope.errors = err.errors;
+      // Quota breaches (429 QUOTA_EXCEEDED) carry the breached dimension so the caller can show
+      // which limit was hit (spec: body indicates the breached dimension).
+      if (err.dimension && statusCode < 500) envelope.dimension = err.dimension;
+      return sendJson(res, statusCode, envelope);
     }
   });
 }

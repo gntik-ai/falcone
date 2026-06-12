@@ -1,0 +1,47 @@
+{
+  "apiVersion": "v1.0",
+  "name": "branch-with-retrying-tasks",
+  "description": "Branch node with two condition arms; each arm leads to a task that carries a retryPolicy.",
+  "inputs": {
+    "amount": {
+      "type": "number",
+      "required": true
+    }
+  },
+  "nodes": [
+    {
+      "id": "decide",
+      "type": "branch",
+      "arms": [
+        {
+          "when": "amount > 1000",
+          "next": "high-value-task"
+        },
+        {
+          "when": "amount <= 1000",
+          "next": "standard-task"
+        }
+      ]
+    },
+    {
+      "id": "high-value-task",
+      "type": "task",
+      "taskType": "manual-review",
+      "retryPolicy": {
+        "maxAttempts": 5,
+        "backoffCoefficient": 2.0,
+        "initialInterval": "PT2S",
+        "nonRetryableErrors": ["ValidationError"]
+      }
+    },
+    {
+      "id": "standard-task",
+      "type": "task",
+      "taskType": "auto-approve",
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "backoffCoefficient": 1.5
+      }
+    }
+  ]
+}
