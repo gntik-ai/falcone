@@ -1,0 +1,281 @@
+# E2E values for the Flows capability suite (GitHub issue #367 / epic #355).
+#
+# Applied with: helm upgrade --install --skip-schema-validation -f tests/e2e/values-flows-e2e.yaml
+# Target cluster: kind test-cluster-b (kubeconfig ./kubeconfig-test-cluster-b.yaml)
+# Namespace: ephemeral (managed by stack.sh up / down)
+#
+# Decision on gateway gap (#374 deviation): /v1/flows/* APISIX route wiring is DEFERRED.
+# The Playwright specs use page.route() to intercept /v1/* calls from the web console
+# and proxy them directly to the control-plane service (port 8080). This avoids touching
+# the chart and is transparent to the UI. The console itself is served by the
+# in-falcone-web-console nginx container (port 3000). Both are port-forwarded by stack.sh.
+#
+# Chart validation notes:
+#   - bootstrap.enabled=false: the validate.yaml requires apisix.enabled=true for bootstrap.
+#     We skip bootstrap for the e2e namespace; the test runner provisions identities via API headers.
+#   - publicSurface.bindings: explicit serviceName values silence the validate.yaml binding check
+#     for disabled components.
+#   - APISIX: disabled (we proxy directly to control-plane). The binding check is satisfied by
+#     serviceName overrides below.
+#   - Temporal images: pulled from docker.io (public). The first pull requires internet access.
+
+global:
+  namespace: falcone-e2e
+  environment: e2e
+  imagePullSecrets: []   # local registry images don't need a pull secret
+  # Disable chart-managed namespace creation: stack.sh creates the ephemeral namespace
+  # before helm install, so the chart must not try to own/create it.
+  createNamespace: false
+
+# No ingress/LB in ephemeral E2E namespace: we port-forward instead.
+# exposureKind must be Ingress or LoadBalancer (validate.yaml enforces this).
+# We use Ingress with a placeholder class — no real ingress controller is needed
+# since all traffic goes through kubectl port-forward.
+platform:
+  network:
+    exposureKind: Ingress
+  # Null out the nginx annotation: having both ingressClassName and
+  # kubernetes.io/ingress.class is rejected by the Kubernetes validation webhook.
+  routeAnnotations:
+    kubernetes.io/ingress.class: null
+
+environmentProfile:
+  id: dev
+  diagnostics:
+    logLevel: debug
+    debugEndpoints: true
+    passthroughHeaders: true
+  demoData:
+    enabled: false
+  limitsProfile: relaxed
+
+# ---- Core services needed by the flows loop ----
+
+controlPlane:
+  enabled: true
+  replicas: 1
+  image:
+    repository: localhost:30500/in-falcone-control-plane
+    tag: "0.7.0-flows-e2e-v2"
+    pullPolicy: Always
+  # node:alpine image uses username 'node' (non-numeric). Kubernetes can't verify
+  # non-root via string name. Provide the numeric uid (1000) to satisfy runAsNonRoot.
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: DEPLOYMENT_PROFILE
+      value: e2e
+    # Temporal address: the release-prefixed frontend service within the same namespace.
+    - name: TEMPORAL_ADDRESS
+      value: falcone-temporal-frontend:7233
+    - name: TEMPORAL_NAMESPACE
+      value: falcone-flows
+    - name: TEMPORAL_TASK_QUEUE
+      value: flows-main
+    # Postgres DSN (the temporal databases share the platform PostgreSQL).
+    - name: PGHOST
+      value: falcone-postgresql
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      value: falcone
+    - name: PGPASSWORD
+      value: falcone
+    - name: PGDATABASE
+      value: in_falcone
+  # NetworkPolicy label contract: the Temporal frontend NetworkPolicy (temporal/networkpolicy.yaml)
+  # only admits ingress from pods carrying app.kubernetes.io/component=flows-api.
+  # The chart's default podLabels is {} — must be set explicitly in e2e values.
+  podLabels:
+    app.kubernetes.io/component: flows-api
+
+workflowWorker:
+  enabled: true
+  replicas: 1
+  image:
+    repository: localhost:30500/in-falcone-workflow-worker
+    tag: "0.1.0-flows-e2e"
+    pullPolicy: Always
+  # Same node:alpine image fix as controlPlane above.
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+  env:
+    - name: TEMPORAL_ADDRESS
+      value: falcone-temporal-frontend:7233
+    - name: TEMPORAL_NAMESPACE
+      value: falcone-flows
+    - name: TEMPORAL_TASK_QUEUE
+      value: flows-main
+    - name: WORKER_HEALTH_PORT
+      value: "8080"
+
+temporal:
+  enabled: true
+  persistence:
+    host: falcone-postgresql
+    port: 5432
+    # Use the same 'falcone' user that the Bitnami PostgreSQL pod creates from the
+    # in-falcone-postgresql secret (POSTGRESQL_USERNAME=falcone).  The 'temporal'
+    # default user does not exist in the ephemeral E2E postgres, so the schema job
+    # would fail with auth errors.  stack.sh creates the secret before helm install.
+    user: falcone
+    password: falcone
+    database: temporal
+    visibilityDatabase: temporal_visibility
+    # Reduce to 4 shards for e2e (single-replica history pod). The default 512 shards
+    # causes the Temporal worker service's SDK client to time out during startup under
+    # CPU-constrained kind nodes. The shard count is baked into the schema; dropping
+    # and recreating the temporal databases is required when changing this value.
+    numHistoryShards: 4
+  bootstrap:
+    namespace: falcone-flows
+    retentionDays: 1
+  ui:
+    enabled: false   # not needed for e2e
+  # Increase CPU for Temporal worker service: it runs an embedded SDK client that
+  # initializes synchronously in the fx start hook. Under CPU pressure the Go runtime
+  # can starve the gRPC health check loop, causing the SDK client to time out.
+  worker:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 256Mi
+      limits:
+        cpu: 2000m
+        memory: 512Mi
+  # Increase CPU for history: it owns the shard scan at startup.
+  history:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 1Gi
+
+postgresql:
+  enabled: true
+  image:
+    # bitnami purged public tags; use bitnamilegacy mirror (same as deploy/kind/values-kind.yaml)
+    repository: docker.io/bitnamilegacy/postgresql
+    tag: "17.2.0"
+    pullPolicy: IfNotPresent
+
+# Web console: serves the SPA on port 3000. Port-forwarded by stack.sh.
+webConsole:
+  enabled: true
+  replicas: 1
+  image:
+    repository: localhost:30500/in-falcone-web-console
+    tag: "e2e-flows-v3"
+    pullPolicy: IfNotPresent
+
+# Keycloak: needed for console auth (/v1/auth/* login flows).
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.1.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 768Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# APISIX gateway: disabled for e2e (flows specs proxy directly to control-plane).
+apisix:
+  enabled: false
+
+# Not needed for the flows scenarios.
+mongodb:
+  enabled: false
+
+# Kafka: needed for the platform-event trigger scenario (scenario 3).
+kafka:
+  enabled: true
+  # Single-broker KRaft (same as deploy/kind/values-kind.yaml). >1 replica requires a
+  # proper quorum configuration that is not worth setting up in ephemeral e2e.
+  replicas: 1
+  image:
+    # bitnami purged public tags; use bitnamilegacy mirror (same as deploy/kind/values-kind.yaml)
+    repository: docker.io/bitnamilegacy/kafka
+    tag: "3.9.0"
+    pullPolicy: IfNotPresent
+
+openwhisk:
+  enabled: false
+storage:
+  enabled: false
+observability:
+  enabled: false
+eso:
+  enabled: false
+vault:
+  enabled: false
+controlPlaneExecutor:
+  enabled: false
+
+# Bootstrap is disabled: the validate.yaml requires apisix.enabled=true for bootstrap.
+# The e2e test runner uses gateway-bypass identity headers (x-tenant-id, etc.) directly
+# against the control-plane — no Keycloak session is needed for the API-level specs.
+# Console login is tested with E2E_CONSOLE_USER / E2E_CONSOLE_PASSWORD against Keycloak.
+bootstrap:
+  enabled: false
+
+# Public surface: provide explicit serviceName so the validate.yaml binding checks pass
+# even though APISIX is disabled.
+publicSurface:
+  bindings:
+    api:
+      component: apisix
+      serviceName: "falcone-control-plane"
+      servicePort: http
+      path: /v1
+    identity:
+      component: keycloak
+      serviceName: "falcone-keycloak"
+      servicePort: http
+      path: /auth
+    realtime:
+      component: apisix
+      serviceName: "falcone-control-plane"
+      servicePort: http
+      path: /realtime
+    console:
+      component: webConsole
+      serviceName: ""
+      servicePort: http
+      path: /
+  tls:
+    # Disable cert management: no ingress controller or cert-manager in e2e namespace.
+    mode: external
+  ingress:
+    # Placeholder class: no real controller needed; traffic goes through port-forward.
+    className: "e2e-placeholder"
+  hostnames:
+    api: localhost
+    console: localhost
+    identity: localhost
+    realtime: localhost
+
+gatewayPolicy:
+  passthrough:
+    mode: enabled
+  oidc:
+    issuerUrl: http://falcone-keycloak:8080/realms/in-falcone-platform
+    discoveryUrl: http://falcone-keycloak:8080/realms/in-falcone-platform/.well-known/openid-configuration
