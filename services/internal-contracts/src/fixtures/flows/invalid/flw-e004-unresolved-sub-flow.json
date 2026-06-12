@@ -1,0 +1,13 @@
+{
+  "apiVersion": "v1.0",
+  "name": "unresolved-sub-flow",
+  "description": "Sub-flow reference that a resolver will report as missing -> FLW-E004 (only when a resolver is supplied).",
+  "nodes": [
+    {
+      "id": "call-child",
+      "type": "sub-flow",
+      "flowId": "does-not-exist",
+      "flowVersion": "v9.9"
+    }
+  ]
+}

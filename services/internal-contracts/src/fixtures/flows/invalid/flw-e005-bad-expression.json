@@ -1,0 +1,31 @@
+{
+  "apiVersion": "v1.0",
+  "name": "unparseable-expression",
+  "description": "Branch arm carries a syntactically invalid CEL expression -> FLW-E005.",
+  "nodes": [
+    {
+      "id": "decide",
+      "type": "branch",
+      "arms": [
+        {
+          "when": "amount > > 100",
+          "next": "task-a"
+        },
+        {
+          "when": "amount <= 100",
+          "next": "task-b"
+        }
+      ]
+    },
+    {
+      "id": "task-a",
+      "type": "task",
+      "taskType": "handle-high"
+    },
+    {
+      "id": "task-b",
+      "type": "task",
+      "taskType": "handle-low"
+    }
+  ]
+}

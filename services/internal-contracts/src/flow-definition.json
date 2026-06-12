@@ -1,0 +1,300 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "flow-definition",
+  "title": "Falcone Flow Definition DSL",
+  "description": "Versioned JSON Schema for the user-authored flow DSL. This document is the contract boundary shared by the console flow editors, the control-plane validate endpoint, and the Temporal interpreter worker. JSON Schema enforces structural rules only; semantic rules (unique IDs, acyclic graph, resolvable references, parseable CEL expressions, known task types) carry stable FLW-E error codes and are enforced by the companion semantic validator (flow-definition-validator.mjs).",
+  "type": "object",
+  "required": ["apiVersion", "name", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "description": "Closed enum of supported DSL versions. Consumers detect incompatible documents at load time. Adding a backward-compatible version is an additive enum extension; removing a version is an explicit breaking change governed by the evolution policy.",
+      "type": "string",
+      "enum": ["v1.0"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "inputs": {
+      "$ref": "#/definitions/inputs"
+    },
+    "triggers": {
+      "$ref": "#/definitions/triggers"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/node" }
+    },
+    "canvasMetadata": {
+      "$ref": "#/definitions/canvasMetadata"
+    }
+  },
+  "definitions": {
+    "inputs": {
+      "description": "Typed input parameter descriptors keyed by parameter name.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/inputDescriptor" }
+    },
+    "inputDescriptor": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "object", "array"]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {}
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/trigger" }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["cron", "webhook", "platform-event"]
+        },
+        "schedule": {
+          "description": "POSIX cron expression (cron trigger only). Validity is enforced semantically by FLW-E007.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Webhook path suffix (webhook trigger only).",
+          "type": "string"
+        },
+        "eventType": {
+          "description": "Platform event type to subscribe to (platform-event trigger only).",
+          "type": "string"
+        }
+      }
+    },
+    "canvasMetadata": {
+      "description": "Free-form editor position/layout data. Round-trips verbatim and is semantically ignored for execution.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "retryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "backoffCoefficient": {
+          "type": "number",
+          "minimum": 1
+        },
+        "initialInterval": {
+          "description": "ISO 8601 duration for the first retry interval.",
+          "type": "string"
+        },
+        "maximumInterval": {
+          "description": "ISO 8601 duration cap for the retry interval.",
+          "type": "string"
+        },
+        "nonRetryableErrors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "timeouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "startToClose": { "type": "string" },
+            "scheduleToClose": { "type": "string" },
+            "heartbeat": { "type": "string" }
+          }
+        }
+      }
+    },
+    "branchArm": {
+      "type": "object",
+      "required": ["when", "next"],
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "description": "CEL boolean expression. Parseability is enforced semantically by FLW-E005.",
+          "type": "string",
+          "minLength": 1
+        },
+        "next": {
+          "description": "Target node id for this arm.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "nodeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": {
+          "type": "string",
+          "enum": ["sequence", "parallel", "task", "branch", "wait", "approval", "sub-flow"]
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/definitions/sequenceNode" },
+        { "$ref": "#/definitions/parallelNode" },
+        { "$ref": "#/definitions/taskNode" },
+        { "$ref": "#/definitions/branchNode" },
+        { "$ref": "#/definitions/waitNode" },
+        { "$ref": "#/definitions/approvalNode" },
+        { "$ref": "#/definitions/subFlowNode" }
+      ]
+    },
+    "sequenceNode": {
+      "type": "object",
+      "required": ["id", "type", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "sequence" },
+        "name": { "type": "string" },
+        "steps": {
+          "description": "Ordered node ids executed sequentially.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/nodeId" }
+        },
+        "next": { "$ref": "#/definitions/nodeId" }
+      }
+    },
+    "parallelNode": {
+      "type": "object",
+      "required": ["id", "type", "branches"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "parallel" },
+        "name": { "type": "string" },
+        "branches": {
+          "description": "Two or more node ids executed concurrently.",
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/nodeId" }
+        },
+        "next": { "$ref": "#/definitions/nodeId" }
+      }
+    },
+    "taskNode": {
+      "type": "object",
+      "required": ["id", "type", "taskType"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "task" },
+        "name": { "type": "string" },
+        "taskType": {
+          "description": "Catalog task identifier. Membership in the task-type catalog is enforced semantically by FLW-E006.",
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "type": "object"
+        },
+        "retryPolicy": { "$ref": "#/definitions/retryPolicy" },
+        "next": { "$ref": "#/definitions/nodeId" }
+      }
+    },
+    "branchNode": {
+      "type": "object",
+      "required": ["id", "type", "arms"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "branch" },
+        "name": { "type": "string" },
+        "arms": {
+          "description": "Condition arms, evaluated in order. A branch needs at least two arms, or one arm plus a default (enforced semantically by FLW-E009).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/branchArm" }
+        },
+        "default": {
+          "description": "Fallthrough target node id when no arm matches.",
+          "$ref": "#/definitions/nodeId"
+        }
+      }
+    },
+    "waitNode": {
+      "type": "object",
+      "required": ["id", "type", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "wait" },
+        "name": { "type": "string" },
+        "duration": {
+          "description": "ISO 8601 duration string. Validity is enforced semantically by FLW-E008.",
+          "type": "string",
+          "minLength": 1
+        },
+        "next": { "$ref": "#/definitions/nodeId" }
+      }
+    },
+    "approvalNode": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "approval" },
+        "name": { "type": "string" },
+        "approvers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "timeout": {
+          "description": "ISO 8601 duration before the approval signal times out.",
+          "type": "string"
+        },
+        "next": { "$ref": "#/definitions/nodeId" }
+      }
+    },
+    "subFlowNode": {
+      "type": "object",
+      "required": ["id", "type", "flowId", "flowVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" },
+        "type": { "const": "sub-flow" },
+        "name": { "type": "string" },
+        "flowId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flowVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "type": "object"
+        },
+        "next": { "$ref": "#/definitions/nodeId" }
+      }
+    }
+  }
+}

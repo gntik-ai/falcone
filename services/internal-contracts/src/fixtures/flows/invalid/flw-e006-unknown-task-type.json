@@ -1,0 +1,12 @@
+{
+  "apiVersion": "v1.0",
+  "name": "unknown-task-type",
+  "description": "taskType not present in the supplied catalog -> FLW-E006 (only when a catalog is supplied).",
+  "nodes": [
+    {
+      "id": "step-1",
+      "type": "task",
+      "taskType": "not-in-catalog"
+    }
+  ]
+}
