@@ -1,0 +1,270 @@
+{
+  "timestamp": "2026-06-12T09:32:41.830Z",
+  "address": "127.0.0.1:7233",
+  "run": "48f9d9",
+  "namespacePerTenant": [
+    {
+      "model": "namespace-per-tenant",
+      "n": 1,
+      "workerProcesses": 1,
+      "pollersTotal": 4,
+      "pollersPerTenant": 4,
+      "grpcConnectionsTotal": 4,
+      "grpcConnectionsPerTenant": 4,
+      "perWorker": [
+        {
+          "namespace": "tenant-48f9d9-0",
+          "pid": 3360871,
+          "grpcConnections": 4,
+          "pollers": 4
+        }
+      ]
+    },
+    {
+      "model": "namespace-per-tenant",
+      "n": 5,
+      "workerProcesses": 5,
+      "pollersTotal": 20,
+      "pollersPerTenant": 4,
+      "grpcConnectionsTotal": 60,
+      "grpcConnectionsPerTenant": 12,
+      "perWorker": [
+        {
+          "namespace": "tenant-48f9d9-0",
+          "pid": 3361322,
+          "grpcConnections": 12,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-1",
+          "pid": 3361514,
+          "grpcConnections": 12,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-2",
+          "pid": 3361568,
+          "grpcConnections": 12,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-3",
+          "pid": 3361672,
+          "grpcConnections": 12,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-4",
+          "pid": 3361825,
+          "grpcConnections": 12,
+          "pollers": 4
+        }
+      ]
+    },
+    {
+      "model": "namespace-per-tenant",
+      "n": 20,
+      "workerProcesses": 20,
+      "pollersTotal": 80,
+      "pollersPerTenant": 4,
+      "grpcConnectionsTotal": 840,
+      "grpcConnectionsPerTenant": 42,
+      "perWorker": [
+        {
+          "namespace": "tenant-48f9d9-0",
+          "pid": 3362267,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-1",
+          "pid": 3362346,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-2",
+          "pid": 3362530,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-3",
+          "pid": 3362619,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-4",
+          "pid": 3362778,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-5",
+          "pid": 3362866,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-6",
+          "pid": 3362951,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-7",
+          "pid": 3363103,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-8",
+          "pid": 3363174,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-9",
+          "pid": 3363327,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-10",
+          "pid": 3363410,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-11",
+          "pid": 3363464,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-12",
+          "pid": 3363622,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-13",
+          "pid": 3363693,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-14",
+          "pid": 3363756,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-15",
+          "pid": 3363926,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-16",
+          "pid": 3363980,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-17",
+          "pid": 3364127,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-18",
+          "pid": 3364230,
+          "grpcConnections": 42,
+          "pollers": 4
+        },
+        {
+          "namespace": "tenant-48f9d9-19",
+          "pid": 3364262,
+          "grpcConnections": 42,
+          "pollers": 4
+        }
+      ]
+    }
+  ],
+  "sharedNamespace": [
+    {
+      "model": "shared-namespace",
+      "n": 1,
+      "workerProcesses": 1,
+      "pollersTotal": 4,
+      "pollersPerTenant": 0,
+      "grpcConnectionsTotal": 4,
+      "grpcConnectionsPerTenant": 0,
+      "visibility": {
+        "probedTenants": 1,
+        "isolated": null,
+        "details": [
+          {
+            "note": "N<2: cross-tenant probe requires >=2 tenants; skipped at this N"
+          }
+        ]
+      }
+    },
+    {
+      "model": "shared-namespace",
+      "n": 5,
+      "workerProcesses": 1,
+      "pollersTotal": 4,
+      "pollersPerTenant": 0,
+      "grpcConnectionsTotal": 4,
+      "grpcConnectionsPerTenant": 0,
+      "visibility": {
+        "probedTenants": 2,
+        "isolated": true,
+        "details": [
+          {
+            "query": "tenantId = 'stenant-48f9d9-0'",
+            "returnedCount": 2,
+            "leaked": false,
+            "ok": true
+          },
+          {
+            "query": "tenantId = 'stenant-48f9d9-1'",
+            "returnedCount": 1,
+            "leaked": false,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "model": "shared-namespace",
+      "n": 20,
+      "workerProcesses": 1,
+      "pollersTotal": 4,
+      "pollersPerTenant": 0,
+      "grpcConnectionsTotal": 4,
+      "grpcConnectionsPerTenant": 0,
+      "visibility": {
+        "probedTenants": 2,
+        "isolated": true,
+        "details": [
+          {
+            "query": "tenantId = 'stenant-48f9d9-0'",
+            "returnedCount": 3,
+            "leaked": false,
+            "ok": true
+          },
+          {
+            "query": "tenantId = 'stenant-48f9d9-1'",
+            "returnedCount": 2,
+            "leaked": false,
+            "ok": true
+          }
+        ]
+      }
+    }
+  ]
+}
