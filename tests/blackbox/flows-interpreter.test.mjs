@@ -10,7 +10,7 @@
  *   - the workflow / interpreter source module shape (exported DslInterpreterWorkflow,
  *     node-ID naming convention helper, deterministic-only code)
  *   - the activity-interface contract (input envelope shape downstream #360 plugs into)
- *   - the Dockerfile (node:22-alpine, USER node, build-from-root)
+ *   - the Dockerfile (node:22-slim base — @temporalio/core-bridge ships a glibc native binary that cannot load on Alpine/musl — USER node, build-from-root)
  *   - the umbrella helm chart renders the worker Deployment (flows-worker label, non-root,
  *     probes) when workflowWorker.enabled=true, and renders nothing by default
  *
@@ -24,7 +24,7 @@
  *   bbx-flows-interp-004  node-ID activity naming convention is exposed + documented
  *   bbx-flows-interp-005  workflow code uses no non-deterministic host API (Date.now/Math.random/fetch)
  *   bbx-flows-interp-006  activity-interface contract envelope shape is exported + documented
- *   bbx-flows-interp-007  Dockerfile: node:22-alpine base, USER node, build from repo root
+ *   bbx-flows-interp-007  Dockerfile: node:22-slim base (glibc for core-bridge), USER node, build from repo root
  *   bbx-flows-interp-008  helm: workflowWorker disabled by default → no worker Deployment
  *   bbx-flows-interp-009  helm: workflowWorker.enabled=true → worker Deployment w/ flows-worker label
  *   bbx-flows-interp-010  helm: worker pod spec is non-root with liveness+readiness probes
@@ -185,11 +185,11 @@ test('bbx-flows-interp-006: activity-interface contract envelope is exported and
 // ---------------------------------------------------------------------------
 // bbx-flows-interp-007: Dockerfile properties
 // ---------------------------------------------------------------------------
-test('bbx-flows-interp-007: Dockerfile uses node:22-alpine, USER node, builds from repo root', () => {
+test('bbx-flows-interp-007: Dockerfile uses node:22-slim, USER node, builds from repo root', () => {
   const df = resolve(SVC, 'Dockerfile');
   assert.ok(existsSync(df), 'services/workflow-worker/Dockerfile must exist');
   const src = read(df);
-  assert.match(src, /FROM\s+node:22-alpine/, 'Dockerfile must base on node:22-alpine');
+  assert.match(src, /FROM\s+node:22-slim/, 'Dockerfile must base on node:22-slim (glibc required by @temporalio/core-bridge native binary; Alpine/musl cannot load it)');
   assert.match(src, /USER\s+node/, 'Dockerfile must run as USER node (non-root)');
   // Build from repo root: copies services/workflow-worker paths (not bare src/).
   assert.match(src, /services\/workflow-worker/, 'Dockerfile must copy from the repo-root services/workflow-worker path');
