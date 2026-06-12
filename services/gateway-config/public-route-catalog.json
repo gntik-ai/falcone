@@ -143,6 +143,16 @@
     "privilege_domain": "structural_admin"
   },
   {
+    "method": "POST",
+    "path": "/v1/collections/{name}/embedding-mapping",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/collections/{name}/embedding-mapping",
+    "privilege_domain": "structural_admin"
+  },
+  {
     "method": "PUT",
     "path": "/v1/workspaces/{id}/embedding-provider",
     "privilege_domain": "structural_admin"

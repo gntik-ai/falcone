@@ -14,7 +14,7 @@ import { createRealtimeExecutor } from './realtime-executor.mjs';
 import { createPostgresRealtimeExecutor } from './postgres-realtime-executor.mjs';
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
-import { createEmbeddingProviderStore, createEmbeddingExecutor } from './embedding-executor.mjs';
+import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 
 const { Pool } = pg;
@@ -69,6 +69,11 @@ const embeddingExecutor = createEmbeddingExecutor({
   },
 });
 
+// Per-collection embedding mapping store (write-time auto-embedding). Postgres-backed on the
+// SAME metadata pool as the API-key + provider stores, so mapping configuration survives a
+// restart and is shared across all control-plane replicas. keyPool.end() in shutdown() covers it.
+const mappingStore = createEmbeddingMappingStore({ pool: keyPool });
+
 // Mongo executor (enabled when a MONGO_URI/MONGO_HOST is configured).
 const mUri = mongoUri();
 const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: () => mUri }) : undefined;
@@ -97,12 +102,12 @@ const jwtVerifier = createJwtVerifier({
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
-// Initialise both metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema()])
+// Initialise all metadata schemas (they share keyPool) before listening.
+Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema()])
   .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
   .finally(() => {
     server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
