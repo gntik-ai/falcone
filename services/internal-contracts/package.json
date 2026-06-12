@@ -7,5 +7,8 @@
     "lint": "node -e \"console.log('internal-contracts lint placeholder')\"",
     "test": "node -e \"console.log('internal-contracts test placeholder')\"",
     "typecheck": "node -e \"console.log('internal-contracts typecheck placeholder')\""
+  },
+  "dependencies": {
+    "cel-js": "0.5.0"
   }
 }
