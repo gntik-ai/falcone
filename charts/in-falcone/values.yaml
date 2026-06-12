@@ -2597,6 +2597,104 @@ webConsole:
         idleTimeout: 30m
         refreshTokenMaxAge: 7d
         rememberMeMaxLifetime: 30d
+
+# Temporal DSL interpreter worker (change: add-flows-dsl-interpreter-worker / #359).
+# Hosts the generic DslInterpreterWorkflow + harness activities; polls the Temporal
+# task queue and makes ONLY outbound gRPC calls to the Temporal frontend (no inbound
+# business traffic — the HTTP port serves probes only). Disabled by default; rollback is
+# re-setting workflowWorker.enabled: false.
+#
+# LABEL CONTRACT: the pod MUST carry app.kubernetes.io/component: flows-worker so the
+# Temporal frontend NetworkPolicy (templates/temporal/networkpolicy.yaml) admits it on
+# port 7233. That label is injected here via podLabels.
+workflowWorker:
+  enabled: false
+  wrapper:
+    componentId: workflow-worker
+    workload:
+      kind: Deployment
+  image:
+    repository: ghcr.io/gntik-ai/in-falcone-workflow-worker
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  replicas: 2
+  serviceAccount:
+    create: true
+    name: ""
+    automountToken: false
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    portName: http
+    annotations: {}
+  ports:
+    - name: http
+      containerPort: 8080
+  # NetworkPolicy label contract — admits this pod to the Temporal frontend on 7233.
+  podLabels:
+    app.kubernetes.io/component: flows-worker
+  # Connection env is environment-specific (release-prefixed Temporal frontend DNS);
+  # set it in the overlay, e.g.:
+  #   env:
+  #     - { name: TEMPORAL_ADDRESS, value: <release>-temporal-frontend:7233 }
+  #     - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
+  #     - { name: TEMPORAL_TASK_QUEUE, value: flows-main }
+  env:
+    - name: TEMPORAL_NAMESPACE
+      value: falcone-flows
+    - name: TEMPORAL_TASK_QUEUE
+      value: flows-main
+    - name: WORKER_HEALTH_PORT
+      value: "8080"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Stateless worker: no inbound traffic, no durable local state (all state lives in
+  # Temporal history). Persistence stays disabled; declared in full so the umbrella
+  # values.schema.json (#/definitions/component) validates this stanza strictly.
+  persistence:
+    enabled: false
+    existingClaim: ""
+    size: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: /var/lib/workflow-worker
+    annotations: {}
+  # Probes hit the worker's HTTP health server (src/worker.ts): /readyz flips to 200
+  # once the Temporal worker is polling; /livez is always 200 while the process is up.
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  livenessProbe:
+    httpGet:
+      path: /livez
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 15
+  # Graceful shutdown: SIGTERM drains in-flight activity polls before exit (worker.ts).
+  terminationGracePeriodSeconds: 30
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
 gatewayPolicy:
   version: 2026-03-24
   oidc:

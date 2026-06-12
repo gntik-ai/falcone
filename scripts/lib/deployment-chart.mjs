@@ -21,7 +21,8 @@ export const REQUIRED_COMPONENT_ALIASES = [
   'observability',
   'controlPlane',
   'controlPlaneExecutor',
-  'webConsole'
+  'webConsole',
+  'workflowWorker'
 ];
 export const REQUIRED_VALUE_LAYERS = ['common', 'environment', 'customer', 'platform', 'airgap', 'localOverride'];
 export const RECOMMENDED_DEPLOYMENT_PROFILES = ['all-in-one', 'standard', 'ha'];

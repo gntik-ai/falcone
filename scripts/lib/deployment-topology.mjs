@@ -44,7 +44,8 @@ const REQUIRED_COMPONENT_ALIASES = [
   'observability',
   'controlPlane',
   'controlPlaneExecutor',
-  'webConsole'
+  'webConsole',
+  'workflowWorker'
 ];
 const REQUIRED_DEPLOYMENT_PROFILES = ['all-in-one', 'standard', 'ha'];
 const SUPPORTED_TLS_MODES = ['clusterManaged', 'external'];

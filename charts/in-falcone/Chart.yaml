@@ -60,6 +60,11 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: webConsole.enabled
+  - name: component-wrapper
+    alias: workflowWorker
+    version: 0.2.0
+    repository: file://./charts/component-wrapper
+    condition: workflowWorker.enabled
   - name: eso
     version: 0.1.0
     repository: file://./charts/eso
