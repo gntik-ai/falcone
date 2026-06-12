@@ -32,7 +32,7 @@ data:
       level: info
 
     persistence:
-      numHistoryShards: 512
+      numHistoryShards: {{ $t.persistence.numHistoryShards | default 512 }}
       defaultStore: default
       visibilityStore: visibility
       datastores:
