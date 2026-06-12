@@ -42,6 +42,10 @@ export function buildFlowAuditEvent({
   flowId,
   flowVersion = null,
   executionId = null,
+  // The trigger that initiated an execution start: cron | webhook | platform_event | manual.
+  // Included on flow.execution_started so the monitoring sibling (#366) can attribute autonomous
+  // runs. Null for non-execution events. Additive + backward-compatible (change add-flows-triggers).
+  triggerType = null,
   occurredAt = new Date().toISOString(),
   correlationId = null,
 } = {}) {
@@ -62,6 +66,7 @@ export function buildFlowAuditEvent({
     flowId,
     flowVersion: flowVersion != null ? String(flowVersion) : null,
     executionId,
+    triggerType: triggerType != null ? String(triggerType) : null,
     correlationId,
     occurredAt,
   };
