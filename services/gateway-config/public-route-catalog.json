@@ -197,5 +197,80 @@
     "method": "GET",
     "path": "/v1/events/subscribe",
     "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/validate",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions/{version}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/cancellations",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/retries",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/signals/{signalName}",
+    "privilege_domain": "data_access"
   }
 ]

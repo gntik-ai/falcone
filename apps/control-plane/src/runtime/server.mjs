@@ -192,7 +192,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -202,6 +202,9 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   const fn = '^/v1/functions/workspaces/([^/]+)/actions';
   const rt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/changes';
   const pgrt = '^/v1/realtime/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)/changes';
+  // Flows: registered ONLY when a flowExecutor is injected (TEMPORAL_ADDRESS set). When absent,
+  // these tuples are omitted and a flows path falls through to 404 / upstream proxy unchanged.
+  const fl = '^/v1/flows/workspaces/([^/]+)/flows';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -331,7 +334,54 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // Postgres table change capture (trigger + LISTEN/NOTIFY):
     ['GET', new RegExp(`${pgrt}$`), ([w, db, s, t], c) =>
       runRealtimeSse(pgRealtimeExecutor, { workspaceId: w, databaseName: db, schemaName: s, tableName: t }, c), { sse: true }],
+
+    // ---- Flows (Temporal-backed authoring + execution) — only when flowExecutor is wired ----
+    // Definition management (control class). Identity (tenant/workspace) comes ONLY from
+    // resolveIdentity; the workspaceId path segment is the public-surface address, never the
+    // tenant authority.
+    ...(flowExecutor ? [
+      ['GET', new RegExp(`${fl}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
+      ['POST', new RegExp(`${fl}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body }, 201)],
+      ['GET', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
+      ['PATCH', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body }, 200)],
+      ['DELETE', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/validate$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'validate', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f }, 201)],
+      ['GET', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
+      ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), ([w, f, v], c) =>
+        runFlows(flowExecutor, { operation: 'get_version', identity: c.identity, flowId: f, version: Number(v) }, 200)],
+
+      // Execution lifecycle (data-control class).
+      ['POST', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'start_execution', identity: c.identity, flowId: f, version: c.body.version, input: c.body.input }, 201)],
+      ['GET', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'list_executions', identity: c.identity, flowId: f, status: c.url.searchParams.get('status') ?? undefined }, 200)],
+      ['GET', new RegExp(`${fl}/([^/]+)/executions/([^/]+)$`), ([w, f, e], c) =>
+        runFlows(flowExecutor, { operation: 'get_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/cancellations$`), ([w, f, e], c) =>
+        runFlows(flowExecutor, { operation: 'cancel_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 202)],
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/retries$`), ([w, f, e], c) =>
+        runFlows(flowExecutor, { operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), ([w, f, e, s], c) =>
+        runFlows(flowExecutor, { operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
+    ] : []),
   ];
+}
+
+// Dispatch a flows operation through the flow executor. A FLOW_VALIDATION_FAILED error carries
+// a node-scoped `errors` array which is surfaced on the 422 envelope (see the error handler).
+async function runFlows(flowExecutor, params, successStatus) {
+  if (!flowExecutor) throw Object.assign(new Error('Flows are not enabled'), { statusCode: 501, code: 'FLOWS_DISABLED' });
+  const result = await flowExecutor.executeFlows(params);
+  return { status: successStatus, body: result };
 }
 
 // Stream a tenant-scoped Mongo change stream to the client as Server-Sent Events. The handler
@@ -471,12 +521,12 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor);
 
   return http.createServer(async (req, res) => {
     try {
@@ -516,10 +566,14 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
     } catch (err) {
       const statusCode = err.statusCode ?? 500;
       if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
-      return sendJson(res, statusCode, {
+      const envelope = {
         code: err.code ?? 'CONTROL_PLANE_ERROR',
         message: statusCode >= 500 ? 'Internal server error' : err.message,
-      });
+      };
+      // Flow validation failures carry a node-scoped error array (FLW-E codes + nodeId) — surface
+      // it on the 422 envelope so the console can highlight the offending canvas nodes.
+      if (Array.isArray(err.errors) && statusCode < 500) envelope.errors = err.errors;
+      return sendJson(res, statusCode, envelope);
     }
   });
 }
