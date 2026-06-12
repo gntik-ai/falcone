@@ -1,0 +1,133 @@
+{{- if .Values.temporal.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- /*
+  Temporal server config (rendered by the server's native Go-template env substitution
+  at pod start — values come from the pod env, so the same ConfigMap serves every role).
+  PostgreSQL persistence (default store) + PostgreSQL SQL advanced visibility — NO
+  Elasticsearch (ADR-11). The dynamic-config file enables the SQL visibility store and
+  the five custom search attributes used by the flows engine.
+*/ -}}
+{{- /*
+  IMPORTANT: the plain temporalio/server image does NOT template the config with env
+  vars at load time (that is an auto-setup/dockerize-only feature). All connection values
+  are therefore rendered directly from Helm values here. The broadcast address is left to
+  the image entrypoint, which derives TEMPORAL_BROADCAST_ADDRESS from the pod IP when
+  BIND_ON_IP=0.0.0.0 — so it is intentionally NOT set in this config.
+  The password is the only value that may come from a Secret; when persistence.existingSecret
+  is set, it is injected into the pod env and referenced here via the os-style ${...} that
+  the SQL driver expands. With the default inline password it is rendered literally.
+*/ -}}
+{{- $p := $t.persistence -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "in-falcone.temporal.fullname" $root }}-config
+  labels:
+    {{- include "in-falcone.temporal.labels" (dict "root" $root) | nindent 4 }}
+data:
+  docker.yaml: |
+    log:
+      stdout: true
+      level: info
+
+    persistence:
+      numHistoryShards: 512
+      defaultStore: default
+      visibilityStore: visibility
+      datastores:
+        default:
+          sql:
+            pluginName: {{ $p.driver | quote }}
+            databaseName: {{ $p.database | quote }}
+            connectAddr: "{{ $p.host }}:{{ $p.port }}"
+            connectProtocol: "tcp"
+            user: {{ $p.user | quote }}
+            password: {{ $p.password | quote }}
+            maxConns: 20
+            maxIdleConns: 20
+            maxConnLifetime: "1h"
+        visibility:
+          sql:
+            pluginName: {{ $p.driver | quote }}
+            databaseName: {{ $p.visibilityDatabase | quote }}
+            connectAddr: "{{ $p.host }}:{{ $p.port }}"
+            connectProtocol: "tcp"
+            user: {{ $p.user | quote }}
+            password: {{ $p.password | quote }}
+            maxConns: 10
+            maxIdleConns: 10
+            maxConnLifetime: "1h"
+
+    global:
+      membership:
+        maxJoinDuration: 30s
+        # __BROADCAST_ADDRESS__ is substituted with the pod IP by the container start
+        # wrapper (the plain server image does not template config from env vars).
+        broadcastAddress: "__BROADCAST_ADDRESS__"
+      pprof:
+        port: 0
+      metrics:
+        prometheus:
+          framework: "tally"
+          listenAddress: "0.0.0.0:9090"
+
+    services:
+      # bindOnIP is the concrete IPv4 pod IP (__BIND_IP__, substituted at start). A
+      # 0.0.0.0 bind makes Temporal's Go gRPC server listen on the IPv6 wildcard [::],
+      # which on this cluster's CNI is NOT reachable by IPv4 clients (the kube Service +
+      # other pods are IPv4). Binding the IPv4 pod IP yields a v4 listener reachable via
+      # the ClusterIP Service. The membership broadcast address is the same pod IP.
+      frontend:
+        rpc:
+          grpcPort: {{ $t.frontend.grpcPort }}
+          membershipPort: {{ $t.frontend.membershipPort }}
+          bindOnIP: "__BIND_IP__"
+      history:
+        rpc:
+          grpcPort: {{ $t.history.grpcPort }}
+          membershipPort: {{ $t.history.membershipPort }}
+          bindOnIP: "__BIND_IP__"
+      matching:
+        rpc:
+          grpcPort: {{ $t.matching.grpcPort }}
+          membershipPort: {{ $t.matching.membershipPort }}
+          bindOnIP: "__BIND_IP__"
+      worker:
+        rpc:
+          grpcPort: {{ $t.worker.grpcPort }}
+          membershipPort: {{ $t.worker.membershipPort }}
+          bindOnIP: "__BIND_IP__"
+
+    clusterMetadata:
+      enableGlobalNamespace: false
+      failoverVersionIncrement: 10
+      masterClusterName: "active"
+      currentClusterName: "active"
+      clusterInformation:
+        active:
+          enabled: true
+          initialFailoverVersion: 1
+          rpcName: "frontend"
+          rpcAddress: "{{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "frontend") }}:{{ $t.frontend.grpcPort }}"
+
+    dcRedirectionPolicy:
+      policy: "noop"
+
+    services.frontend.service.publicClient.hostPort: "{{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "frontend") }}:{{ $t.frontend.grpcPort }}"
+
+    dynamicConfigClient:
+      filepath: "/tmp/temporal/dynamicconfig/docker.yaml"
+      pollInterval: "60s"
+
+  dynamic_config.yaml: |
+    # Enable SQL advanced visibility (custom search attributes) on PostgreSQL — no ES.
+    system.enableActivityEagerExecution:
+      - value: false
+    system.forceSearchAttributesCacheRefreshOnRead:
+      - value: true
+        constraints: {}
+    limit.maxIDLength:
+      - value: 255
+        constraints: {}
+{{- end }}

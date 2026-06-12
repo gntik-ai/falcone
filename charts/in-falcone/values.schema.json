@@ -1679,6 +1679,10 @@
         }
       },
       "additionalProperties": true
+    },
+    "temporal": {
+      "type": "object",
+      "additionalProperties": true
     }
   },
   "definitions": {

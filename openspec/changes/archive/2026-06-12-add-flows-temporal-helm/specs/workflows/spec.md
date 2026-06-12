@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Temporal dependency integrated behind condition flag
-The system SHALL include Temporal as a `component-wrapper`-aliased dependency in `charts/in-falcone/Chart.yaml` with `condition: temporal.enabled`, enabling the entire Temporal server deployment to be toggled independently of all other components, consistent with the alias+condition pattern used by `apisix`, `keycloak`, `postgresql`, `kafka`, `mongodb`, `storage`, `observability`, `controlPlane`, and `controlPlaneExecutor`.
+### Requirement: Temporal integrated behind condition flag
+The system SHALL render the entire Temporal server deployment behind a single `temporal.enabled` flag in `charts/in-falcone/values.yaml` (default `false`), so that Temporal can be toggled independently of all other components. Temporal is rendered by first-class umbrella templates under `charts/in-falcone/templates/temporal/**` rather than a `component-wrapper` alias, because the shared `component-wrapper` sub-chart renders only one Deployment + one Service per alias and cannot express Temporal's four role Deployments, Web UI, two lifecycle Jobs, five Services, and NetworkPolicy; image references still flow through the shared `component-wrapper.normalizeRepository` helper so `global.imageRegistry` (Harbor) rewriting continues to apply.
 
 #### Scenario: Temporal disabled by default
 - **WHEN** `charts/in-falcone` is installed or upgraded with `temporal.enabled` absent or set to `false`
