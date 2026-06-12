@@ -1,0 +1,22 @@
+{
+  "apiVersion": "v1.0",
+  "name": "branch-too-few-arms",
+  "description": "Branch node has a single arm and no default -> FLW-E009.",
+  "nodes": [
+    {
+      "id": "decide",
+      "type": "branch",
+      "arms": [
+        {
+          "when": "amount > 100",
+          "next": "task-a"
+        }
+      ]
+    },
+    {
+      "id": "task-a",
+      "type": "task",
+      "taskType": "handle-high"
+    }
+  ]
+}

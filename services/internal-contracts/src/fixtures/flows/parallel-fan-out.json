@@ -1,0 +1,33 @@
+{
+  "apiVersion": "v1.0",
+  "name": "parallel-fan-out",
+  "description": "Parallel block with three concurrent task branches merging to a final task node.",
+  "nodes": [
+    {
+      "id": "fan-out",
+      "type": "parallel",
+      "branches": ["enrich-email", "enrich-phone", "enrich-address"],
+      "next": "merge"
+    },
+    {
+      "id": "enrich-email",
+      "type": "task",
+      "taskType": "enrich-email"
+    },
+    {
+      "id": "enrich-phone",
+      "type": "task",
+      "taskType": "enrich-phone"
+    },
+    {
+      "id": "enrich-address",
+      "type": "task",
+      "taskType": "enrich-address"
+    },
+    {
+      "id": "merge",
+      "type": "task",
+      "taskType": "merge-profile"
+    }
+  ]
+}

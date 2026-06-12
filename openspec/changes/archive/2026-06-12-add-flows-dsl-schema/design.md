@@ -117,6 +117,40 @@ migrations or deployed-service changes are needed.
 ## Open Questions
 
 - **Expression engine syntax**: `FLW-E005` requires expressions to be parseable.
-  Issue #356 (expression engine ADR) determines the concrete parser. Until #356 closes,
-  expression fields in the schema are typed as `string` and `FLW-E005` enforcement is
-  deferred to the interpreter worker. The schema itself has no dependency on #356.
+  Issue #356 (expression engine ADR) — now resolved as **ADR-11** — selects **CEL**
+  (`cel-js`, validated in Spike A) as the expression engine, with JSONata recorded as
+  the validated fallback. Expression fields in the schema remain typed as `string`
+  (no schema dependency on the engine); semantic parseability (`FLW-E005`) is enforced
+  by the shared validator through an injectable engine boundary that defaults to CEL.
+
+## Deviations during implementation
+
+The original Non-Goals deferred the JavaScript semantic validator to a sibling change
+and treated the schema as the sole artifact. Implementation honoured the broader change
+contract (validator as a shared, importable deliverable with the FLW-E codes) and so
+this change additionally ships:
+
+1. **Shared semantic validator** `flow-definition-validator.mjs` in
+   `services/internal-contracts/src/`, exported as `validateFlowDefinition` and
+   `FLOW_VALIDATION_ERROR_CODES`. It is placed in the contract package precisely because
+   both blocked consumers (control-plane validate endpoint, console editors) need the
+   identical rule set and codes; duplicating the rules per consumer was the failure mode
+   this change exists to prevent. The Temporal-activity *mapping implementation* remains a
+   non-goal — only the rule checks live here.
+2. **CEL engine binding via `cel-js@0.5.0`** as a dependency of
+   `@in-falcone/internal-contracts`, used by the default expression engine for `FLW-E005`.
+   Per ADR-11 / Spike A; the engine is injectable so the validated JSONata fallback (or a
+   stub) can replace it without touching rule logic. The JSON Schema itself takes no
+   dependency on cel-js.
+3. **Machine-readable mapping sidecar** `flow-definition-mapping.json` (exported as
+   `flowDefinitionMapping`) carrying the normative FLW-E table, the DSL→Temporal mapping,
+   the retryPolicy→Temporal field mapping, and the apiVersion evolution policy — co-located
+   with the schema in the contract package (not docs-site), so downstream packages consume
+   the bindings as data rather than re-deriving them from prose.
+4. **AJV v8** is the installed validator (`ajv@8.17.1`), not v6 as Decision 1 assumed.
+   Draft-07 schemas compile unchanged on AJV v8 with `{ strict: false, allErrors: true }`
+   (the repo's established contract-test idiom), so the Draft-07 decision still holds; only
+   the stated library version is corrected.
+
+The schema artifact, fixtures, error-code table, mapping table, and evolution policy match
+the spec delta exactly; `openspec validate add-flows-dsl-schema --strict` remains green.
