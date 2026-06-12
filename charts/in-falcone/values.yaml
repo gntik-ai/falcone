@@ -747,6 +747,9 @@ bootstrap:
             serviceAccountClientPattern: "{workspaceSlug}-svc-{serviceAccountSlug}"
             consoleUsersRealm: in-falcone-platform
             endUsersRealmBoundary: tenant_realm
+        # Dedicated-DB tenants (pvc_01pgdedicated below) may enable the `vector`
+        # extension; provision their Postgres instances with the pgvector-capable
+        # image recorded in `postgresql.dedicatedTenantImage` (see above).
         - deploymentProfileId: dpf_01regulateddedicated
           slug: regulated-dedicated
           displayName: Regulated dedicated profile
@@ -1695,15 +1698,23 @@ postgresql:
     workload:
       kind: StatefulSet
   image:
-    # NOTE (add-vector-search): the default bitnami/postgresql image does NOT bundle the
-    # pgvector extension. Dedicated-DB tenants (database_per_tenant) that enable the
-    # `vector` extension for KNN similarity search MUST run on a pgvector-capable image —
-    # e.g. repository: pgvector/pgvector with tag: pg17 (or a Bitnami-compatible image with
-    # pgvector built in). The provisioning pre-flight check rejects `CREATE EXTENSION vector`
-    # when the resolved image does not advertise pgvector support. Do not change the default
-    # here; configure a pgvector image per dedicated-DB tenant Postgres instance instead.
     repository: docker.io/bitnami/postgresql
     tag: 17.2.0
+    pullPolicy: IfNotPresent
+  # dedicatedTenantImage: recommended image for operator-provisioned dedicated-DB
+  # tenant Postgres instances (database_per_tenant — e.g. the dpf_01regulateddedicated
+  # deployment profile / profileClass "dedicated", capability pvc_01pgdedicated).
+  # Such tenants may enable the `vector` extension for KNN similarity search, which the
+  # default bitnami/postgresql image above does NOT bundle; the provisioning pre-flight
+  # (postgres-applier.mjs) rejects `CREATE EXTENSION vector` on an image that lacks the
+  # pgvector control files. This key is an OPERATOR CONTRACT — a named, greppable record
+  # of the recommended image — NOT a value the chart templates apply automatically.
+  # Dedicated-DB instances are operator-provisioned (not per-tenant StatefulSets rendered
+  # by this chart); set this image in your own provisioning tooling. The shared-instance
+  # default `postgresql.image` (bitnami/postgresql) is unaffected.
+  dedicatedTenantImage:
+    repository: pgvector/pgvector
+    tag: pg17
     pullPolicy: IfNotPresent
   replicas: 1
   serviceAccount:
