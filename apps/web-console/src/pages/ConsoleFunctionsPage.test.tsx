@@ -15,8 +15,21 @@ vi.mock('@/lib/console-session', () => ({
   requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args)
 }))
 
-function createContext(overrides: Partial<{ activeTenantId: string | null; activeWorkspaceId: string | null }> = {}) {
-  return { activeTenantId: 'ten_alpha', activeWorkspaceId: 'wrk_alpha', ...overrides }
+function createContext(
+  overrides: Partial<{
+    activeTenantId: string | null
+    activeWorkspaceId: string | null
+    capabilities: Record<string, boolean>
+    capabilitiesLoading: boolean
+  }> = {}
+) {
+  return {
+    activeTenantId: 'ten_alpha',
+    activeWorkspaceId: 'wrk_alpha',
+    capabilities: { functions_public: true },
+    capabilitiesLoading: false,
+    ...overrides
+  }
 }
 
 function inventory(overrides: Record<string, unknown> = {}) {

@@ -184,7 +184,7 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    expect(await screen.findByRole('link', { name: /postgresql/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /^postgresql/i })).toBeInTheDocument()
   })
 
   it('apunta el ítem PostgreSQL a /console/postgres', async () => {
@@ -193,7 +193,7 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    expect(await screen.findByRole('link', { name: /postgresql/i })).toHaveAttribute('href', '/console/postgres')
+    expect(await screen.findByRole('link', { name: /^postgresql/i })).toHaveAttribute('href', '/console/postgres')
   })
 
   it('renderiza el ítem Kafka en el sidebar', async () => {

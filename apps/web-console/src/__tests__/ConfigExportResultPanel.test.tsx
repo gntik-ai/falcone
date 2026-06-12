@@ -42,16 +42,18 @@ describe('ConfigExportResultPanel', () => {
     const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
     const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockReturnValue(undefined)
     const clickSpy = vi.fn()
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+    const realCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'a') {
         return { href: '', download: '', click: clickSpy, set onclick(_: unknown) {} } as unknown as HTMLAnchorElement
       }
-      return document.createElement(tag)
+      return realCreateElement(tag)
     })
 
     render(<ConfigExportResultPanel artifact={ARTIFACT} isLoading={false} />)
     fireEvent.click(screen.getByTestId('download-json-btn'))
     expect(clickSpy).toHaveBeenCalled()
+    createElementSpy.mockRestore()
     createSpy.mockRestore()
     revokeSpy.mockRestore()
   })

@@ -13,7 +13,11 @@ vi.mock('@/lib/console-session', () => ({
 }))
 
 vi.mock('@/lib/console-context', () => ({
-  useConsoleContext: () => ({ activeWorkspaceId: 'ws-fallback' })
+  useConsoleContext: () => ({
+    activeWorkspaceId: 'ws-fallback',
+    capabilities: { realtime: true },
+    capabilitiesLoading: false
+  })
 }))
 
 vi.mock('@/components/console/snippets/RealtimeSnippetsPanel', () => ({
