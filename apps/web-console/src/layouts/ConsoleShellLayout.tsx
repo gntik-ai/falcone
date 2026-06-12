@@ -120,6 +120,12 @@ const consoleNavigationItems = [
     description: 'Editor de filas (CRUD) y claves API anon/service sobre el ejecutor de datos.'
   },
   {
+    label: 'Data: Vector Search',
+    to: '/console/postgres/vector-search',
+    icon: Database,
+    description: 'KNN similarity search, vector index management, and embedding provider config.'
+  },
+  {
     label: 'Data: Mongo',
     to: '/console/mongo/data',
     icon: Database,
