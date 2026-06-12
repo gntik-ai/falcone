@@ -71,11 +71,11 @@ export function ConsoleDocsPage() {
         }}
         onUpdate={async (noteId, content) => {
           const updated = await updateDocNote(workspaceId, noteId, content, token)
-          setNotesOverride((notesOverride ?? data.customNotes).map((note) => note.noteId === noteId ? updated : note))
+          setNotesOverride((notesOverride ?? data.customNotes).map((note: WorkspaceDocNote) => note.noteId === noteId ? updated : note))
         }}
         onDelete={async (noteId) => {
           await deleteDocNote(workspaceId, noteId, token)
-          setNotesOverride((notesOverride ?? data.customNotes).filter((note) => note.noteId !== noteId))
+          setNotesOverride((notesOverride ?? data.customNotes).filter((note: WorkspaceDocNote) => note.noteId !== noteId))
         }}
       />
     </div>

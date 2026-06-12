@@ -135,6 +135,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Web console typecheck
+        run: pnpm --filter @in-falcone/web-console typecheck
+
+      - name: Web console build
+        run: pnpm --filter @in-falcone/web-console build
+
       - name: Web console unit tests (vitest)
         run: pnpm --filter @in-falcone/web-console test
 
