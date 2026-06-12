@@ -180,11 +180,12 @@ unreachable, starts are denied rather than allowed unbounded.
 
 ### glibc / Alpine native-binary trap
 
-The worker image is `node:22-alpine` (musl). The Temporal TypeScript SDK ships a **native Rust
-core** (`@temporalio/core-bridge`); a worker that crash-loops at startup with a missing-shared-
-object / symbol error is almost always a libc mismatch — the native binary was built for / loaded
-against the wrong libc. Keep the worker image's base consistent with the SDK's published musl
-binary, and rebuild the image (don't copy `node_modules` across glibc↔musl bases). The package is
+The worker image is `node:22-slim` (Debian, glibc) — **deliberately not Alpine**. The Temporal
+TypeScript SDK ships a **native Rust core** (`@temporalio/core-bridge`) as a glibc binary; on
+Alpine/musl the worker crash-loops at startup with a missing-shared-object / symbol error. This
+was hit in the real kind deployment and is why `services/workflow-worker/Dockerfile` pins
+`node:22-slim` while the rest of the platform uses `node:22-alpine`. If you change the base image,
+keep it glibc and rebuild (don't copy `node_modules` across glibc↔musl bases). The package is
 also **TypeScript→CommonJS** (not ESM) by a hard SDK constraint — the Temporal workflow bundler
 requires CJS output; do not flip it to `"type":"module"`.
 
@@ -193,11 +194,12 @@ requires CJS output; do not flip it to `"type":"module"`.
 > [!WARNING]
 > `numHistoryShards` is **baked into the persistence schema at setup and can never change** for an
 > existing Temporal database — changing it requires dropping and recreating the `temporal` /
-> `temporal_visibility` databases. In this chart the value is currently **hardcoded to `512`** in
-> `templates/temporal/config.yaml` (it is **not** exposed as a Helm value). On small / CPU-
-> constrained clusters (kind), 512 shards can make the history pod time out at startup; reducing it
-> requires editing the rendered `…-temporal-config` ConfigMap (or the template) to a smaller value
-> (e.g. `4`) **and** recreating the Temporal databases. Pick the production value once, up front.
+> `temporal_visibility` databases. In this chart it is exposed as the Helm value
+> `temporal.persistence.numHistoryShards` (default `512`, rendered into
+> `templates/temporal/config.yaml`).
+> On small / CPU-constrained clusters (kind), 512 shards can make the history pod time out at
+> startup — the E2E values (`tests/e2e/values-flows-e2e.yaml`) use `4`. Pick the production value
+> once, up front: set it at first install and never change it for that database.
 
 ## Backup & restore of the Temporal database
 
