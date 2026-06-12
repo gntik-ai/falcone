@@ -192,7 +192,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -223,14 +223,16 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         filters: filtersFromQuery(c.url.searchParams),
         page: pageFromQuery(c.url.searchParams),
         countMode: c.url.searchParams.get('countMode') ?? undefined }, 200)],
+    // Insert/bulk-insert/update thread embeddingExecutor + mappingStore so the write-path
+    // auto-embed hook fires when a per-collection mapping is configured (no-op otherwise).
     ['POST', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
-      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.values ?? c.body }, 201)],
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.values ?? c.body, embeddingExecutor, mappingStore }, 201)],
     ['POST', new RegExp(`${data}/rows/bulk/insert$`), ([w, db, s, t], c) =>
-      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'bulk_insert', rows: c.body.rows ?? c.body.items }, 201)],
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'bulk_insert', rows: c.body.rows ?? c.body.items, embeddingExecutor, mappingStore }, 201)],
     ['GET', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'get', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
     ['PATCH', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
-      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'update', primaryKey: primaryKeyFromQuery(c.url.searchParams), changes: c.body.changes ?? c.body }, 200)],
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'update', primaryKey: primaryKeyFromQuery(c.url.searchParams), changes: c.body.changes ?? c.body, embeddingExecutor, mappingStore }, 200)],
     ['DELETE', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'delete', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
 
@@ -310,6 +312,17 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runEmbeddingProvider(embeddingExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
     ['DELETE', new RegExp(`${emb}$`), ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+
+    // ---- Per-collection embedding mapping (table-scoped): set / get / remove (structural
+    // admin). The verified identity's tenantId is injected so the Postgres-backed store keys
+    // the record by (tenant_id, workspace_id, schema, table, target_column) — never trusting a
+    // tenantId in the request body.
+    ['PUT', new RegExp(`${data}/embedding-mapping$`), ([w, db, s, t], c) =>
+      runEmbeddingMapping(mappingStore, 'set', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, config: c.body }, 200)],
+    ['GET', new RegExp(`${data}/embedding-mapping$`), ([w, db, s, t], c) =>
+      runEmbeddingMapping(mappingStore, 'get', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
+    ['DELETE', new RegExp(`${data}/embedding-mapping$`), ([w, db, s, t], c) =>
+      runEmbeddingMapping(mappingStore, 'remove', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
 
     // ---- Realtime: subscribe to tenant-scoped changes (SSE stream) ----
     // Mongo collection change stream:
@@ -411,12 +424,59 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+function requireMappingStore(mappingStore) {
+  if (!mappingStore) throw Object.assign(new Error('Embedding mapping is not enabled'), { statusCode: 501, code: 'MAPPING_STORE_DISABLED' });
+  return mappingStore;
+}
+
+// Resolve the target column for a single-mapping GET/DELETE when none is supplied: a table
+// usually has exactly one vector column, so the unqualified resource addresses that mapping.
+async function resolveSingleTargetColumn(store, { workspaceId, tenantId, schemaName, tableName, targetColumn }) {
+  if (targetColumn) return targetColumn;
+  const mappings = await store.getMappings(workspaceId, { tenantId, schemaName, tableName });
+  return mappings.length > 0 ? mappings[0].targetColumn : undefined;
+}
+
+async function runEmbeddingMapping(mappingStore, action, params, successStatus) {
+  const store = requireMappingStore(mappingStore);
+  // The tenantId comes from the verified identity (never the body); the store keys the record
+  // by (tenant_id, workspace_id, schema, table, target_column).
+  if (action === 'set') {
+    const cfg = params.config ?? {};
+    const result = await store.deployMapping(params.workspaceId, {
+      tenantId: params.tenantId,
+      schemaName: params.schemaName,
+      tableName: params.tableName,
+      sourceColumn: cfg.sourceColumn,
+      targetColumn: cfg.targetColumn,
+    });
+    return { status: successStatus, body: result };
+  }
+  const targetColumn = await resolveSingleTargetColumn(store, params);
+  if (action === 'get') {
+    const got = targetColumn
+      ? await store.getMapping(params.workspaceId, {
+          tenantId: params.tenantId, schemaName: params.schemaName, tableName: params.tableName, targetColumn,
+        })
+      : null;
+    if (!got) throw Object.assign(new Error('Embedding mapping not found'), { statusCode: 404, code: 'MAPPING_NOT_FOUND' });
+    return { status: successStatus, body: got };
+  }
+  // remove
+  const result = targetColumn
+    ? await store.removeMapping(params.workspaceId, {
+        tenantId: params.tenantId, schemaName: params.schemaName, tableName: params.tableName, targetColumn,
+      })
+    : { removed: false };
+  return { status: successStatus, body: result };
+}
+
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore);
 
   return http.createServer(async (req, res) => {
     try {
