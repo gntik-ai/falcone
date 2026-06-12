@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
+import type { JsonValue } from '@/lib/http'
 
 interface PageInfo {
   after?: string | null
@@ -312,14 +313,16 @@ function CreateUserPanel({
     setBusy(true)
     setError(null)
     try {
+      const body: { [key: string]: JsonValue } = {
+        username: username.trim(),
+        password: password.trim()
+      }
+      const trimmedEmail = email.trim()
+      if (trimmedEmail) body.email = trimmedEmail
+      if (role) body.roles = [role]
       await requestConsoleSessionJson(`/v1/tenants/${encodeURIComponent(tenantId)}/users`, {
         method: 'POST',
-        body: {
-          username: username.trim(),
-          email: email.trim() || undefined,
-          password: password.trim(),
-          roles: role ? [role] : undefined
-        }
+        body
       })
       setUsername('')
       setEmail('')

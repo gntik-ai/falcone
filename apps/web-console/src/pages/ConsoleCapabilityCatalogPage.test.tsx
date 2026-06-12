@@ -34,7 +34,7 @@ describe('ConsoleCapabilityCatalogPage', () => {
   });
 
   it('renders loading state', () => {
-    const fetcher = vi.fn(() => new Promise(() => {}));
+    const fetcher = vi.fn(() => new Promise<never>(() => {}));
     render(<ConsoleCapabilityCatalogPage workspaceId="ws-123" fetcher={fetcher} />);
     expect(screen.getByTestId('catalog-loading')).toBeInTheDocument();
   });
