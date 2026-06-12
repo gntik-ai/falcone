@@ -30,6 +30,7 @@ import { ConsoleStoragePage } from '@/pages/ConsoleStoragePage'
 import { ConsoleMongoPage } from '@/pages/ConsoleMongoPage'
 import { ConsolePostgresPage } from '@/pages/ConsolePostgresPage'
 import { ConsolePostgresDataPage } from '@/pages/ConsolePostgresDataPage'
+import { ConsoleVectorSearchPage } from '@/pages/ConsoleVectorSearchPage'
 import { ConsoleMongoDataPage } from '@/pages/ConsoleMongoDataPage'
 import { ConsoleEventsDataPage } from '@/pages/ConsoleEventsDataPage'
 import { ConsoleFunctionsDataPage } from '@/pages/ConsoleFunctionsDataPage'
@@ -172,6 +173,10 @@ export const appRoutes = [
           {
             path: 'postgres/data',
             element: <ConsolePostgresDataPage />
+          },
+          {
+            path: 'postgres/vector-search',
+            element: <ConsoleVectorSearchPage />
           },
           {
             path: 'mongo',
