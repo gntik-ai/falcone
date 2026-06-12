@@ -39,7 +39,12 @@ describe('PostgresDataEditor', () => {
   it('loads and renders rows for the table', async () => {
     render(<PostgresDataEditor {...props} />)
     expect(await screen.findByText('alpha')).toBeInTheDocument()
-    expect(mocked.listRows).toHaveBeenCalledWith('ws1', 'appdb', 'app1', 'items', { countMode: 'exact' })
+    expect(mocked.listRows).toHaveBeenCalledWith('ws1', 'appdb', 'app1', 'items', {
+      countMode: 'exact',
+      pageSize: 25,
+      after: undefined,
+      filters: []
+    })
   })
 
   it('inserts a row from the JSON editor', async () => {
@@ -55,7 +60,7 @@ describe('PostgresDataEditor', () => {
     await screen.findByText('alpha')
     fireEvent.change(screen.getByLabelText('New row (JSON)'), { target: { value: 'not json' } })
     fireEvent.click(screen.getByText('Insert'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('not valid JSON')
+    expect(await screen.findByRole('alert')).toHaveTextContent('New row: Not valid JSON')
     expect(mocked.insertRow).not.toHaveBeenCalled()
   })
 
@@ -73,8 +78,8 @@ describe('PostgresDataEditor', () => {
     await waitFor(() => expect(mocked.issueApiKey).toHaveBeenCalledWith('ws1', 'anon'))
     const status = await screen.findByRole('status')
     expect(status).toHaveTextContent('flc_anon_secret123')
-    // the snippet embeds the key + the workspace-scoped rows URL
-    expect(status).toHaveTextContent("Authorization: 'ApiKey flc_anon_secret123'")
+    // the snippet embeds the key via the apikey header + the workspace-scoped rows URL
+    expect(status).toHaveTextContent("apikey: 'flc_anon_secret123'")
     expect(status).toHaveTextContent('/v1/postgres/workspaces/ws1/data/appdb/schemas/app1/tables/items/rows')
   })
 })
