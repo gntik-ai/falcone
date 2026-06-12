@@ -28,7 +28,10 @@ echo "==> running control-plane executor + HTTP tests (Postgres)"
 # vector-search-knn-rls needs the pgvector extension (provided by the pgvector/pgvector
 # image); it self-skips if the extension is unavailable.
 # embedding-provider-persistence needs only PLAIN Postgres (no pgvector) and must NOT skip.
+# postgres-extension-preflight proves the provisioning applier's pg_available_extensions
+# pre-flight (change add-pgvector-provisioning-preflight): vector available -> created;
+# postgis absent -> config error, no CREATE EXTENSION.
 node --test "$HERE"/postgres-data-executor.test.mjs "$HERE"/postgres-ddl-executor.test.mjs \
   "$HERE"/control-plane-http.test.mjs "$HERE"/app-api-keys-rls.test.mjs \
   "$HERE"/postgres-realtime-executor.test.mjs "$HERE"/vector-search-knn-rls.test.mjs \
-  "$HERE"/embedding-provider-persistence.test.mjs
+  "$HERE"/embedding-provider-persistence.test.mjs "$HERE"/postgres-extension-preflight.test.mjs
