@@ -279,6 +279,11 @@
     "privilege_domain": "data_access"
   },
   {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/executions/{executionId}/events",
+    "privilege_domain": "data_access"
+  },
+  {
     "method": "POST",
     "path": "/v1/flows/workspaces/{workspaceId}/triggers/webhooks/{triggerId}",
     "privilege_domain": "data_access"
