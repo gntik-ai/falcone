@@ -28,13 +28,16 @@ for i in $(seq 1 60); do
   mo=$(docker compose ps mongodb --format '{{.Health}}' 2>/dev/null || true)
   mi=$(docker compose ps minio --format '{{.Health}}' 2>/dev/null || true)
   va=$(docker compose ps vault --format '{{.Health}}' 2>/dev/null || true)
+  tm=$(docker compose ps temporal --format '{{.Health}}' 2>/dev/null || true)
   [ "$pg" = "healthy" ] && [ "$kc" = "healthy" ] && [ "$rp" = "healthy" ] \
-    && [ "$mo" = "healthy" ] && [ "$mi" = "healthy" ] && [ "$va" = "healthy" ] && break
+    && [ "$mo" = "healthy" ] && [ "$mi" = "healthy" ] && [ "$va" = "healthy" ] \
+    && [ "$tm" = "healthy" ] && break
   sleep 5
 done
 [ "${pg:-}" = "healthy" ] && [ "${kc:-}" = "healthy" ] && [ "${rp:-}" = "healthy" ] \
   && [ "${mo:-}" = "healthy" ] && [ "${mi:-}" = "healthy" ] && [ "${va:-}" = "healthy" ] \
-  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp mongodb=$mo minio=$mi vault=$va)" >&2; exit 1; }
+  && [ "${tm:-}" = "healthy" ] \
+  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp mongodb=$mo minio=$mi vault=$va temporal=$tm)" >&2; exit 1; }
 
 echo "==> provisioning Keycloak admin service account (falcone-admin)"
 docker compose exec -T keycloak "$KC" config credentials \
