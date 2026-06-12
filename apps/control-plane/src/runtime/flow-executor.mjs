@@ -109,6 +109,32 @@ export function sanitizeClientQuery(clientQuery) {
   return residue;
 }
 
+// Normalise a raw Temporal execution status to the title-case visibility form used by
+// workflow.list() and the public API. The SDK's handle.describe() returns the protobuf ENUM
+// name (e.g. 'COMPLETED', 'RUNNING') while workflow.list() returns the shorter visibility form
+// (e.g. 'Completed', 'Running'). We normalise everything to the title-case form so the web
+// console's isTerminalExecution() set and the listExecutions status values stay consistent.
+const TEMPORAL_STATUS_TITLE_CASE = {
+  completed: 'Completed',
+  failed: 'Failed',
+  canceled: 'Canceled',
+  cancelled: 'Cancelled',
+  terminated: 'Terminated',
+  timedout: 'TimedOut',
+  timed_out: 'TimedOut',
+  continuedasnew: 'ContinuedAsNew',
+  continued_as_new: 'ContinuedAsNew',
+  running: 'Running',
+};
+function normaliseTemporalStatus(rawStatus) {
+  if (rawStatus == null) return null;
+  const key = String(rawStatus)
+    .replace(/^WORKFLOW_EXECUTION_STATUS_/i, '')
+    .replace(/[\s_-]/g, '')
+    .toLowerCase();
+  return TEMPORAL_STATUS_TITLE_CASE[key] ?? rawStatus;
+}
+
 // Verify an externally-supplied executionId (== workflowId) belongs to the caller. On any
 // mismatch we DO NOT reveal whether the run exists for another tenant. `notFoundCode` controls
 // whether a foreign/owned-mismatch surfaces as 404 (read paths: get/detail) or 403 (mutating
@@ -774,7 +800,7 @@ export function createFlowExecutor({
     return {
       executionId,
       workflowId: executionId,
-      status: described.status?.name ?? described.status ?? null,
+      status: normaliseTemporalStatus(described.status?.name ?? described.status),
       version: described.searchAttributes?.flowVersion?.[0] ?? null,
       startedAt: described.startTime ?? null,
       closedAt: described.closeTime ?? null,
