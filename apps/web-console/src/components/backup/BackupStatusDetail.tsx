@@ -46,7 +46,7 @@ export function BackupStatusDetail({ component, onClose }: BackupStatusDetailPro
         </div>
       )}
 
-      {phase === 'pending_confirmation' && precheckResponse && (
+      {(phase === 'pending_confirmation' || phase === 'confirming') && precheckResponse && (
         <RestoreConfirmationDialog
           precheckResponse={precheckResponse}
           onConfirm={async (opts) => void confirm(opts)}

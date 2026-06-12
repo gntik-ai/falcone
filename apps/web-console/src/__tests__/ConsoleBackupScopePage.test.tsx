@@ -7,7 +7,7 @@ afterEach(cleanup)
 
 describe('ConsoleBackupScopePage', () => {
   it('shows loading state initially', () => {
-    const fetcher = vi.fn(() => new Promise(() => {})) // never resolves
+    const fetcher = vi.fn(() => new Promise<never>(() => {})) // never resolves
     render(<ConsoleBackupScopePage role="superadmin" adminFetcher={fetcher} />)
     expect(screen.getByTestId('matrix-loading')).toBeInTheDocument()
   })
