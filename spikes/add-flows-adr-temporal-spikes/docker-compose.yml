@@ -1,0 +1,54 @@
+# EPHEMERAL SPIKE — not production code.
+# Local Temporal dev stack for add-flows-adr-temporal-spikes (Spike A + Spike B).
+# PostgreSQL-backed persistence AND visibility (auto-setup default = SQL visibility on
+# PostgreSQL) so Spike B can prove SQL visibility sufficiency without Elasticsearch.
+#
+# Always run with the dedicated project name so teardown is unambiguous:
+#   docker compose -p flows-spike up -d
+#   docker compose -p flows-spike down -v   # ALWAYS, even on failure
+#
+# Host port mapping is deliberately non-default to avoid clashes with tests/env:
+#   Temporal frontend gRPC : localhost:7233 -> 7233
+#   Postgres               : NOT published (internal only; Spike B talks to Temporal,
+#                            not to Postgres directly)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    # Not published on the host — only the temporal service needs it.
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # auto-setup defaults: PostgreSQL persistence + SQL (PostgreSQL) visibility.
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres
+      # Explicitly DO NOT enable Elasticsearch — SQL visibility on Postgres is the proof.
+      ENABLE_ES: "false"
+      # Skip schema setup wait races by letting auto-setup create everything.
+      SKIP_DEFAULT_NAMESPACE_CREATION: "false"
+      DEFAULT_NAMESPACE: default
+      DEFAULT_NAMESPACE_RETENTION: "1d"
+    ports:
+      - "127.0.0.1:7233:7233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 40

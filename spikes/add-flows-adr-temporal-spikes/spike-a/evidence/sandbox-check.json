@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-06-12T09:36:59.472Z",
+  "address": "127.0.0.1:7233",
+  "namespace": "default",
+  "sdkVersion": "see package.json",
+  "probes": {
+    "cel-js": {
+      "survivedSandbox": true,
+      "evaluatedTo": true,
+      "expected": true
+    },
+    "jsonata": {
+      "survivedSandbox": true,
+      "evaluatedTo": true,
+      "expected": true
+    }
+  },
+  "bundle": {
+    "note": "bundle measured then discarded (regenerable build artifact)",
+    "bytes": 4606385
+  }
+}

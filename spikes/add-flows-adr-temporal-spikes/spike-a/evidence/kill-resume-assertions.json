@@ -1,0 +1,33 @@
+{
+  "workflowId": "spike-a-kill-resume-8482e75a",
+  "assertions": {
+    "completed": true,
+    "branchTaken": true,
+    "taskRan": true,
+    "expectedFinalState": true,
+    "retryAttempts": 3,
+    "retryHonoured": true,
+    "activityStartedEventsInHistory": 2,
+    "definitionInHistoryInput": true,
+    "workflowTaskStartedCount": 3,
+    "resumedAcrossWorkerTasks": true
+  },
+  "finalState": {
+    "amount": 250,
+    "n_slow": {
+      "sleptMs": 9000
+    },
+    "n_task": {
+      "charged": true,
+      "attempts": 3
+    }
+  },
+  "trace": [
+    "n_start",
+    "n_branch",
+    "branch:amount > 100=>true",
+    "n_slow",
+    "n_task",
+    "n_end"
+  ]
+}
