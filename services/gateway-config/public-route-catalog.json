@@ -277,5 +277,10 @@
     "method": "POST",
     "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/signals/{signalName}",
     "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/triggers/webhooks/{triggerId}",
+    "privilege_domain": "data_access"
   }
 ]
