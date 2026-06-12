@@ -1,0 +1,55 @@
+{
+  "$id": "flow-definition-mapping",
+  "title": "Flow DSL normative bindings: error codes, Temporal mapping, and evolution policy",
+  "description": "Machine-readable companion to flow-definition.json. Carries the three normative tables from the workflows spec (add-flows-dsl-schema) so downstream packages (interpreter worker, control-plane API, console editors) consume the identical bindings without re-deriving them from prose. Co-located with the schema in the contract package, NOT in docs-site.",
+  "schemaId": "flow-definition",
+  "errorCodes": [
+    { "code": "FLW-E001", "rule": "Node IDs MUST be unique within the flow document", "kind": "graph", "seam": null },
+    { "code": "FLW-E002", "rule": "The node graph MUST be acyclic (no cycle reachable via next, branches, steps, or arm edges)", "kind": "graph", "seam": null },
+    { "code": "FLW-E003", "rule": "Every node ID referenced in an edge MUST exist in the nodes array", "kind": "graph", "seam": null },
+    { "code": "FLW-E004", "rule": "Every sub-flow node's flowId + flowVersion reference MUST be resolvable at validation time when a resolver is provided", "kind": "reference", "seam": "resolveSubFlow" },
+    { "code": "FLW-E005", "rule": "Expression strings MUST be parseable by the configured expression engine", "kind": "expression", "seam": "expressionEngine" },
+    { "code": "FLW-E006", "rule": "Every taskType value MUST exist in the task-type catalog provided to the validator", "kind": "catalog", "seam": "taskTypeCatalog" },
+    { "code": "FLW-E007", "rule": "A cron trigger schedule field MUST be a valid POSIX cron expression (5 or 6 fields)", "kind": "trigger", "seam": null },
+    { "code": "FLW-E008", "rule": "A wait node's duration field MUST be a valid ISO 8601 duration string", "kind": "node", "seam": null },
+    { "code": "FLW-E009", "rule": "A branch node MUST have at least two condition arms or one condition arm plus a default arm", "kind": "node", "seam": null }
+  ],
+  "expressionEngine": {
+    "language": "CEL",
+    "implementation": "cel-js",
+    "version": "0.5.0",
+    "adr": "ADR-11",
+    "fallback": "jsonata",
+    "rationale": "Spike A bundled and ran cel-js and jsonata inside the Temporal V8 workflow sandbox; both survived. CEL chosen for semantic fit (side-effect-free typed boolean conditions). JSONata recorded as the validated fallback."
+  },
+  "temporalMapping": [
+    { "dsl": "sequence", "temporal": "sequential activity invocations" },
+    { "dsl": "parallel", "temporal": "parallel activity futures (Promise.all equivalent)" },
+    { "dsl": "task+retryPolicy", "temporal": "Temporal activity with per-activity RetryPolicy" },
+    { "dsl": "wait", "temporal": "Temporal durable timer (sleep)" },
+    { "dsl": "approval", "temporal": "Temporal signal (waitForSignal)" },
+    { "dsl": "sub-flow", "temporal": "Temporal child workflow (executeChild)" },
+    { "dsl": "trigger.cron", "temporal": "Temporal Schedule" },
+    { "dsl": "trigger.webhook|platform-event", "temporal": "StartWorkflowExecution / SignalWithStart via the flow API" }
+  ],
+  "retryPolicyMapping": {
+    "maxAttempts": "RetryPolicy.maximumAttempts",
+    "backoffCoefficient": "RetryPolicy.backoffCoefficient",
+    "initialInterval": "RetryPolicy.initialInterval",
+    "maximumInterval": "RetryPolicy.maximumInterval",
+    "nonRetryableErrors": "RetryPolicy.nonRetryableErrorTypes",
+    "timeouts.startToClose": "ActivityOptions.startToCloseTimeout",
+    "timeouts.scheduleToClose": "ActivityOptions.scheduleToCloseTimeout",
+    "timeouts.heartbeat": "ActivityOptions.heartbeatTimeout"
+  },
+  "evolutionPolicy": {
+    "versionField": "apiVersion",
+    "currentVersions": ["v1.0"],
+    "rules": [
+      "Backward-compatible additions (new optional fields, new optional node types) bump the apiVersion minor segment (e.g. v1.0 -> v1.1); the prior enum value remains valid.",
+      "Breaking changes (removal of a node type, rename of a required field, tightening of an enum) require a new major apiVersion value (e.g. v1.1 -> v2.0).",
+      "A prior apiVersion value is removed from the enum only after the deprecation window defined in the governance catalog has elapsed.",
+      "Stored flow definitions MUST be parseable against the schema version identified by their own apiVersion field; the system never silently coerces an old apiVersion to a newer one."
+    ]
+  }
+}

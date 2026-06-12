@@ -1,0 +1,18 @@
+{
+  "apiVersion": "v1.0",
+  "name": "bad-wait-duration",
+  "description": "Wait node duration is not an ISO 8601 duration -> FLW-E008.",
+  "nodes": [
+    {
+      "id": "pause",
+      "type": "wait",
+      "duration": "30 seconds",
+      "next": "go"
+    },
+    {
+      "id": "go",
+      "type": "task",
+      "taskType": "run"
+    }
+  ]
+}

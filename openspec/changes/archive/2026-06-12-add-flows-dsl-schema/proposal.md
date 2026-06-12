@@ -43,11 +43,19 @@ closes that blocking gap for GitHub issue #358, epic #355.
 
 ## Impact
 
-- **services/internal-contracts/src/**: new `flow-definition.json` + fixtures directory +
-  index.mjs export.
-- **tests/contracts/**: new `flow-definition.contract.test.mjs`.
+- **services/internal-contracts/src/**: new `flow-definition.json` schema,
+  `flow-definition-validator.mjs` (shared semantic validator with the FLW-E codes),
+  `flow-definition-mapping.json` (machine-readable error-code / DSL→Temporal / evolution
+  bindings), `fixtures/flows/` (five valid + nine invalid fixtures), and the matching
+  `index.mjs` exports (`flowDefinitionSchema`, `flowDefinitionMapping`,
+  `validateFlowDefinition`, `FLOW_VALIDATION_ERROR_CODES`, schema/mapping URL constants).
+- **services/internal-contracts/package.json**: new `cel-js@0.5.0` dependency (CEL
+  expression engine per ADR-11) backing the default `FLW-E005` engine boundary.
+- **tests/**: new `tests/contracts/flow-definition.contract.test.mjs`,
+  `tests/unit/flow-definition-validator.test.mjs`, and
+  `tests/blackbox/flows-dsl-schema.test.mjs` (`bbx-flows-dsl-001`…`017`).
 - **Consumers** (blocked siblings): `add-flows-dsl-interpreter-worker` (#359),
   `add-flows-control-plane-api` (#360), `add-console-flow-designer` (#363),
-  `add-console-flow-yaml-editor` (#364) — all import the schema from
-  `@falcone/internal-contracts`.
-- No runtime service changes; purely a contract/schema artifact.
+  `add-console-flow-yaml-editor` (#364) — all import the schema, validator, and bindings
+  from `@in-falcone/internal-contracts`.
+- No runtime service changes; purely a contract/schema/validator artifact.
