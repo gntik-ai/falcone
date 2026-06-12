@@ -133,6 +133,61 @@ services:
       interval: 5s
       timeout: 4s
       retries: 40
+
+  # ---- Temporal (workflow engine) --------------------------------------------
+  # Real Temporal dev-server for the workflow-worker real-stack tests
+  # (change add-flows-dsl-interpreter-worker / #359): durable worker-kill resume,
+  # version pinning, node-ID-from-history, and SDK replay all need a real Temporal
+  # server with durable history — an in-memory mock cannot replicate replay.
+  #
+  # temporalio/auto-setup = the lightest officially-supported single-container dev
+  # setup. It needs a SQL backend; temporal-postgres is dedicated to it (kept apart
+  # from the app `postgres`/pgvector service so neither pollutes the other). Both use
+  # tmpfs — ephemeral, clean every run, consistent with the postgres/mongo pattern.
+  # SQL visibility on Postgres (ENABLE_ES=false), per the Temporal Helm decision (#357).
+  temporal-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    # Internal only — only the temporal service connects to it.
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data  # ephemeral
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      # auto-setup defaults: PostgreSQL persistence + SQL (PostgreSQL) visibility.
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+      # SQL visibility on Postgres — no Elasticsearch (matches the prod Helm decision).
+      ENABLE_ES: "false"
+      SKIP_DEFAULT_NAMESPACE_CREATION: "false"
+      DEFAULT_NAMESPACE: default
+      DEFAULT_NAMESPACE_RETENTION: "1d"
+    # Frontend gRPC on the host (non-default-clash-safe, matches the spike).
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
   # ---- HTTP request-chain slice ----------------------------------------------
   # action-runner: TEST-ONLY HTTP shim that adapts plain HTTP -> the OpenWhisk-
   # style product actions (params in / {statusCode,body} out) and injects a real
