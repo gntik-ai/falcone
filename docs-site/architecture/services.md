@@ -143,6 +143,14 @@ Per-tenant serverless functions: deploy (`POST /v1/functions`, `structural_admin
 
 ---
 
+## Flows / Workflow Engine (Temporal)
+
+**Chart aliases:** `temporal`, `workflowWorker` (both off by default) · **Code:** `services/workflow-worker/`, `apps/control-plane/src/runtime/flow-*.mjs` · **DSL:** `services/internal-contracts/src/flow-definition.json`
+
+A durable workflow engine. Tenants author **flows** as a YAML DSL; the control plane stores immutable versions and starts each execution as a **Temporal** workflow, run by a single generic interpreter (`DslInterpreterWorkflow`) that maps DSL nodes (`sequence`/`parallel`/`task`/`branch`/`wait`/`approval`/`sub-flow`) to Temporal primitives. Temporal is **internal-only** (no public route; operator-only Web UI) and uses a **shared namespace** (`falcone-flows`) with server-stamped `tenantId`/`workspaceId`/`flowId`/`flowVersion`/`triggerType` search attributes for isolation, plus PostgreSQL SQL visibility (no Elasticsearch). Every workflow id is `{tenantId}:{workspaceId}:{flowId}:{runUuid}`, generated server-side and prefix-checked on every command. See [Flows Architecture](/architecture/flows), the [Flows Runbook](/architecture/flows-runbook), the tenant [Flows guide](/guide/flows), and [ADR-11](/architecture/adrs#adr-11-temporal-for-the-durable-workflow-flows-engine).
+
+---
+
 ## Identity (Keycloak)
 
 **Chart alias:** `keycloak`
