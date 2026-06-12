@@ -65,6 +65,41 @@ async function columnVectorDimension(client, schemaName, tableName, columnName) 
   return typmod && typmod > 0 ? Number(typmod) : undefined;
 }
 
+// Format an embedding vector as the `[a,b,c]` literal string pgvector accepts. The generic
+// insert/update binder does NOT add a ::vector cast, but Postgres applies the assignment cast
+// from text to the target vector(N) column on INSERT/UPDATE, so a plain literal coerces
+// correctly (proven by the auto-embedding-write real-stack round-trip). Mirrors the KNN read
+// path's vectorLiteral at postgresql-data-api.mjs lines ~1870-1872.
+function vectorLiteral(vector) {
+  return `[${vector.map((entry) => Number(entry)).join(',')}]`;
+}
+
+// Apply the write-time auto-embed hook to a single payload object (insert values, one
+// bulk_insert row, or update changes). Returns a (possibly new) payload with the target vector
+// column populated from the source text column, or the original payload unchanged when:
+//   - no mapping is configured for the (tenantId, workspaceId, schema, table),
+//   - the source column is absent/empty in the payload, OR
+//   - the target column is already explicitly provided (explicit value precedence).
+// Throws (422) before any SQL is built when the provider is missing or the embedding dimension
+// does not match the column — so a failure is atomic (no partial write).
+async function applyAutoEmbed(payload, mappings, { client, schemaName, tableName, workspaceId, tenantId, embeddingExecutor }) {
+  if (!payload || mappings.length === 0) return payload;
+  let out = payload;
+  for (const mapping of mappings) {
+    const { sourceColumn, targetColumn } = mapping;
+    // Explicit target value (any non-undefined, including a caller-supplied vector) wins.
+    if (out[targetColumn] !== undefined && out[targetColumn] !== null) continue;
+    const sourceText = out[sourceColumn];
+    if (sourceText === undefined || sourceText === null || String(sourceText).length === 0) continue;
+    const expectedDimension = await columnVectorDimension(client, schemaName, tableName, targetColumn);
+    const vector = await embeddingExecutor.embedForWorkspace(workspaceId, sourceText, { expectedDimension, tenantId });
+    // Copy-on-first-write so the caller's params object is never mutated.
+    if (out === payload) out = { ...payload };
+    out[targetColumn] = vectorLiteral(vector);
+  }
+  return out;
+}
+
 // Assemble the adapter request. Access metadata (grants/policies) is synthesised for
 // the caller's role; the database itself remains the source of truth for grants and
 // RLS — this layer's job is to drive the plan builder and stamp tenant scoping.
@@ -179,6 +214,40 @@ export async function executePostgresData(registry, params) {
       const vectorColumnName = params.vectorColumn ?? table.vectorColumns?.[0];
       const expectedDimension = vectorColumnName ? await columnVectorDimension(client, params.schemaName, params.tableName, vectorColumnName) : undefined;
       knnParams.queryVector = await params.embeddingExecutor.embedForWorkspace(workspaceId, params.queryText, { expectedDimension, tenantId });
+    }
+
+    // Write-time auto-embedding (mirrors the KNN read hook above onto the write path):
+    // for insert/bulk_insert/update, look up the table's embedding mapping(s) and, when the
+    // source text column is present and the target vector column is not explicitly provided,
+    // generate the embedding in-platform BEFORE the plan is built. Active only when BOTH a
+    // mappingStore and an embeddingExecutor are wired — existing callers are unaffected.
+    if (
+      params.mappingStore && params.embeddingExecutor &&
+      ['insert', 'bulk_insert', 'update'].includes(params.operation)
+    ) {
+      const mappings = await params.mappingStore.getMappings(workspaceId, {
+        tenantId, schemaName: params.schemaName, tableName: params.tableName,
+      });
+      if (mappings.length > 0) {
+        const ctxEmbed = {
+          client, schemaName: params.schemaName, tableName: params.tableName,
+          workspaceId, tenantId, embeddingExecutor: params.embeddingExecutor,
+        };
+        if (params.operation === 'insert') {
+          knnParams.values = await applyAutoEmbed(params.values, mappings, ctxEmbed);
+        } else if (params.operation === 'bulk_insert') {
+          // Sequential per-row; if any embedding rejects, the error propagates before any SQL.
+          const rows = [];
+          for (const row of params.rows ?? []) {
+            rows.push(await applyAutoEmbed(row, mappings, ctxEmbed));
+          }
+          knnParams.rows = rows;
+        } else {
+          // update: re-embed only when the source column is in the change set (and the target
+          // is not). applyAutoEmbed already enforces both conditions.
+          knnParams.changes = await applyAutoEmbed(params.changes, mappings, ctxEmbed);
+        }
+      }
     }
 
     let plan;
