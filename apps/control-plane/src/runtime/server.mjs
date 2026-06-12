@@ -204,7 +204,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -412,7 +412,82 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
           rawBody: c.rawBody, signatureHeader: c.signatureHeader, deliveryId: c.deliveryId, payload: c.payload,
         }, 202), { webhook: true }],
     ] : []),
+
+    // ---- Flow execution monitoring (SSE stream) — only when a flowMonitoringExecutor is wired ----
+    // Follows a single Temporal execution's history and streams node-status / log-line frames to
+    // the console run view. { sse: true } activates ?apikey= query auth (EventSource can't set
+    // headers) and the streaming response path. Tenant isolation is enforced fail-closed IN the
+    // executor (workflow-id prefix check) BEFORE any history is fetched — see runFlowMonitoringSse.
+    // The path mirrors the addressing under /v1/flows/workspaces/{ws}/executions/{executionId}.
+    ...(flowMonitoringExecutor ? [
+      ['GET', /^\/v1\/flows\/workspaces\/([^/]+)\/executions\/([^/]+)\/events$/, ([w, e], c) =>
+        runFlowMonitoringSse(flowMonitoringExecutor, { workspaceId: w, executionId: decodeURIComponent(e) }, c), { sse: true }],
+    ] : []),
   ];
+}
+
+// Stream a single Temporal execution's history to the client as Server-Sent Events. Like
+// runRealtimeSse it owns the response (no sendJson) and cleans up on client disconnect; it adds
+// an `id:` line per frame (Last-Event-ID resume) and a terminal `event: stream-end` frame. The
+// fail-closed tenant check lives in the executor's subscribe() and throws BEFORE any history is
+// touched: a 403 on a foreign workflow id is propagated as a hard HTTP 403 (no stream opened).
+async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
+  if (!flowMonitoringExecutor) throw Object.assign(new Error('Flow monitoring is not enabled'), { statusCode: 501, code: 'FLOW_MONITORING_DISABLED' });
+  const { req, res, identity } = c;
+  const lastEventId = req.headers['last-event-id'];
+  const controller = new AbortController();
+  let started = false;
+  let sub;
+  let ping;
+  const stop = () => { if (ping) clearInterval(ping); controller.abort(); void sub?.close?.(); };
+  req.on('close', stop);
+
+  const ensureStarted = () => {
+    if (started) return;
+    started = true;
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+      'x-accel-buffering': 'no', // ask proxies (nginx/APISIX) not to buffer the stream
+    });
+    res.write('retry: 3000\n\n');
+    ping = setInterval(() => res.write(': ping\n\n'), 25000);
+  };
+
+  try {
+    sub = await flowMonitoringExecutor.subscribe({
+      ...target,
+      identity,
+      lastEventId,
+      signal: controller.signal,
+      onEvent: (event) => {
+        // The tenant check passed (subscribe did not throw) → safe to open the stream.
+        ensureStarted();
+        const idLine = event.id != null ? `id: ${event.id}\n` : '';
+        res.write(`event: ${event.type}\n${idLine}data: ${JSON.stringify(event)}\n\n`);
+        if (event.type === 'stream-end') { stop(); res.end(); }
+      },
+      onError: () => {
+        ensureStarted();
+        res.write('event: error\ndata: {"code":"FLOW_MONITORING_STREAM_ERROR"}\n\n');
+      },
+    });
+    if (controller.signal.aborted) void sub.close?.();
+  } catch (err) {
+    // A pre-stream rejection (403 foreign workflow id / 401 identity) must surface as an HTTP
+    // status, NOT a 200 stream — the stream was never opened (ensureStarted not called).
+    if (!started && !res.headersSent) {
+      const statusCode = err.statusCode ?? 500;
+      const payload = JSON.stringify({ code: err.code ?? 'FLOW_MONITORING_ERROR', message: statusCode >= 500 ? 'Internal server error' : err.message });
+      res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) });
+      res.end(payload);
+    } else {
+      res.write(`event: error\ndata: ${JSON.stringify({ code: err.code ?? 'FLOW_MONITORING_ERROR' })}\n\n`);
+      stop();
+      res.end();
+    }
+  }
 }
 
 // Dispatch a flows operation through the flow executor. A FLOW_VALIDATION_FAILED error carries
@@ -560,12 +635,12 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor);
 
   return http.createServer(async (req, res) => {
     try {
