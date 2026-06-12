@@ -23,6 +23,7 @@ import { teardown as mongoTeardown } from '../appliers/mongo-applier.mjs';
 import { teardown as kafkaTeardown } from '../appliers/kafka-applier.mjs';
 import { teardown as storageTeardown } from '../appliers/storage-applier.mjs';
 import { teardown as functionsTeardown } from '../appliers/functions-applier.mjs';
+import { teardown as workflowsTeardown } from '../appliers/workflows-applier.mjs';
 
 /**
  * Ordered teardown plan. Each entry maps the saga domain to its applier and the
@@ -35,6 +36,8 @@ const TEARDOWN_PLAN = [
   { domain: 'kafka', dataKey: 'kafka', teardownKey: 'kafkaTeardown' },
   { domain: 'storage', dataKey: 'storage', teardownKey: 'storageTeardown' },
   { domain: 'functions', dataKey: 'functions', teardownKey: 'functionsTeardown' },
+  // Workflows (flows / Temporal) — change: add-flows-tenancy-isolation-limits (design D7).
+  { domain: 'workflows', dataKey: 'workflows', teardownKey: 'workflowsTeardown' },
 ];
 
 export function resolveDependencies(params = {}) {
@@ -53,6 +56,7 @@ export function resolveDependencies(params = {}) {
     kafkaTeardown: params.kafkaTeardown ?? kafkaTeardown,
     storageTeardown: params.storageTeardown ?? storageTeardown,
     functionsTeardown: params.functionsTeardown ?? functionsTeardown,
+    workflowsTeardown: params.workflowsTeardown ?? workflowsTeardown,
     // Side effects after a full-success purge.
     hardDeleteServiceRows: params.hardDeleteServiceRows ?? (async () => {}),
     transitionTenantState: params.transitionTenantState ?? (async () => {}),
