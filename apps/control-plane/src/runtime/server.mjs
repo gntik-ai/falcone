@@ -71,6 +71,18 @@ function readJsonBody(req) {
   });
 }
 
+// Read the RAW request body (string). Webhook trigger ingestion needs the exact bytes the sender
+// signed over — JSON.parse + re-stringify would change the byte sequence and break HMAC. The parsed
+// JSON (best-effort) is forwarded as the flow input.
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; if (raw.length > 4e6) req.destroy(); });
+    req.on('end', () => resolve(raw));
+    req.on('error', reject);
+  });
+}
+
 function identityFromHeaders(headers, pathWorkspaceId) {
   return {
     tenantId: headers['x-tenant-id'],
@@ -208,6 +220,10 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   // Task-type catalog (palette source for the console flow designer): a sibling of the
   // /flows collection under the same workspace prefix. Static first-party descriptors.
   const flt = '^/v1/flows/workspaces/([^/]+)/task-types';
+  // Inbound webhook trigger ingestion (change: add-flows-triggers). HMAC-authenticated, NOT OIDC:
+  // the per-trigger secret is the credential. The gateway still injects the workspace's tenant
+  // context (x-tenant-id/x-workspace-id) so the secret lookup is tenant-scoped.
+  const fwh = '^/v1/flows/workspaces/([^/]+)/triggers/webhooks/([^/]+)';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -384,6 +400,17 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         runFlows(flowExecutor, { operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
       ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), ([w, f, e, s], c) =>
         runFlows(flowExecutor, { operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
+
+      // ---- Inbound webhook trigger ingestion (HMAC-authenticated) ----
+      // The handler verifies the per-trigger HMAC over the RAW body BEFORE any Temporal call; an
+      // invalid/missing signature is 401 (no run started). A valid signature starts the bound flow
+      // (202); a replayed delivery id is an idempotent 202 (no second run). { webhook:true } makes
+      // the dispatcher read the raw body + signature/delivery headers instead of the JSON path.
+      ['POST', new RegExp(`${fwh}$`), ([w, t], c) =>
+        runFlows(flowExecutor, {
+          operation: 'webhook_trigger', identity: c.identity, triggerId: decodeURIComponent(t),
+          rawBody: c.rawBody, signatureHeader: c.signatureHeader, deliveryId: c.deliveryId, payload: c.payload,
+        }, 202), { webhook: true }],
     ] : []),
   ];
 }
@@ -570,6 +597,24 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       if (opts?.sse) {
         await handler(groups, { url, identity, registry, req, res });
         return;
+      }
+      // Webhook trigger ingestion needs the RAW body (HMAC is computed over the exact bytes the
+      // sender signed) plus the signature + delivery-id headers; the parsed JSON is a best-effort
+      // flow input. The signature is the credential, so this path bypasses the OIDC identity gate
+      // (the gateway still injects the workspace's tenant context for the secret lookup).
+      if (opts?.webhook) {
+        const rawBody = await readRawBody(req);
+        let payload;
+        try { payload = rawBody ? JSON.parse(rawBody) : {}; } catch { payload = { raw: rawBody }; }
+        const ctx = {
+          url, identity, registry,
+          rawBody,
+          payload,
+          signatureHeader: req.headers['x-platform-webhook-signature'],
+          deliveryId: req.headers['x-platform-webhook-id'],
+        };
+        const { status, body: out } = await handler(groups, ctx);
+        return sendJson(res, status, out);
       }
       const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
 
