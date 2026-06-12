@@ -355,7 +355,8 @@
       "observability",
       "controlPlane",
       "controlPlaneExecutor",
-      "webConsole"
+      "webConsole",
+      "workflowWorker"
     ],
     "deployment_profiles": [
       "all-in-one",
