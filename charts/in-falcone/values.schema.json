@@ -585,7 +585,19 @@
       "$ref": "#/definitions/component"
     },
     "postgresql": {
-      "$ref": "#/definitions/component"
+      "allOf": [
+        {
+          "$ref": "#/definitions/component"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "dedicatedTenantImage": {
+              "$ref": "#/definitions/image"
+            }
+          }
+        }
+      ]
     },
     "mongodb": {
       "$ref": "#/definitions/component"

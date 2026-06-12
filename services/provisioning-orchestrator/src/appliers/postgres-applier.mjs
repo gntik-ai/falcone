@@ -91,6 +91,53 @@ function _isSafeColumnDefault(value) {
   return false;
 }
 
+/**
+ * Pre-flight: does the target Postgres instance ship this extension's control
+ * file? `pg_available_extensions` lists exactly the extensions whose control
+ * files are present on disk for the running image, so an absent row means the
+ * image cannot install the extension and `CREATE EXTENSION` would fail with a
+ * cryptic `could not open extension control file` at runtime.
+ *
+ * Pure with respect to the DB (read-only catalog scan) and decoupled from the
+ * reconcile flow so it can be unit-tested with a mock `query`. Errors from the
+ * underlying query propagate unchanged (the caller's try/catch turns them into
+ * an error result) — they are NOT swallowed into a false negative.
+ *
+ * @param {string} name extension name to probe
+ * @param {(sql: string, params: unknown[]) => Promise<unknown[]>} query injected query fn
+ * @returns {Promise<boolean>} true if the extension is available on the instance
+ */
+export async function _checkExtensionAvailable(name, query) {
+  const rows = await query('SELECT 1 FROM pg_available_extensions WHERE name = $1', [name]);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/**
+ * Build the actionable configuration-error message for an extension that the
+ * target instance image cannot install. For `vector` (case-insensitive) the
+ * message names the pgvector-capable image remedy; other extensions get the
+ * generic guidance. No raw Postgres error or stack trace is included.
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+function _unavailableExtensionMessage(name) {
+  if (String(name).toLowerCase() === 'vector') {
+    return (
+      `Extension 'vector' is not available on the target Postgres instance ` +
+      `(absent from pg_available_extensions). The default bitnami/postgresql image ` +
+      `does not bundle pgvector. Provision this dedicated-DB tenant instance with a ` +
+      `pgvector-capable image (e.g. pgvector/pgvector:pgNN) before enabling the ` +
+      `'vector' extension.`
+    );
+  }
+  return (
+    `Extension '${name}' is not available on the target Postgres instance ` +
+    `(absent from pg_available_extensions). Provision the instance with an image ` +
+    `that ships the '${name}' extension control file before enabling it.`
+  );
+}
+
 /** Fixed set of SQL privilege keywords (case-insensitive trimmed match). */
 const _ALLOWED_PRIVILEGES = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']);
 
@@ -315,7 +362,27 @@ async function _processResource(resourceType, item, { dryRun, query, schema, log
     }
     case 'extensions': {
       const rows = await query('SELECT extname, extversion FROM pg_extension WHERE extname = $1', [name]);
-      if (rows.length > 0) existing = { name, version: rows[0].extversion };
+      if (rows.length > 0) {
+        existing = { name, version: rows[0].extversion };
+      } else {
+        // Not installed yet — pre-flight the instance capability BEFORE any
+        // CREATE EXTENSION. Runs regardless of dryRun so a dry-run pass surfaces
+        // the configuration error instead of a false "would_create". If the
+        // extension is already installed (existing !== null) the image clearly
+        // ships it, so the pre-flight is skipped.
+        const available = await _checkExtensionAvailable(name, query);
+        if (!available) {
+          return {
+            resource_type: resourceType,
+            resource_name: name,
+            resource_id: null,
+            action: 'error',
+            message: _unavailableExtensionMessage(name),
+            warnings,
+            diff: null,
+          };
+        }
+      }
       break;
     }
     case 'grants': {
