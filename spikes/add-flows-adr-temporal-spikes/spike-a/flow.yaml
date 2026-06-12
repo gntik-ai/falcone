@@ -1,0 +1,28 @@
+# EPHEMERAL SPIKE — not production code.
+# 3-node flow (start -> branch -> retry-task -> end) parsed OUTSIDE the workflow and
+# passed as workflow input. Branch condition is evaluated by the chosen expression engine.
+id: spike-a-branch-retry
+version: 1
+start: n_start
+nodes:
+  - id: n_start
+    type: start
+    next: n_branch
+
+  - id: n_branch
+    type: branch
+    # Evaluated against the workflow input { amount: number }.
+    # CEL and JSONata both express this; the chosen engine evaluates it inside the sandbox.
+    condition: "amount > 100"
+    onTrue: n_task
+    onFalse: n_end
+
+  - id: n_task
+    type: task
+    activity: flakyCharge
+    retry:
+      maximumAttempts: 3
+    next: n_end
+
+  - id: n_end
+    type: end

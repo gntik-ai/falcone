@@ -1,0 +1,8 @@
+{
+  "timestamp": "2026-06-12T09:30:38.619Z",
+  "workflowId": "spike-a-kill-resume-8482e75a",
+  "replay": {
+    "deterministic": true,
+    "nonDeterminismError": null
+  }
+}
