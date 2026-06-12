@@ -200,6 +200,11 @@
   },
   {
     "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/task-types",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
     "path": "/v1/flows/workspaces/{workspaceId}/flows",
     "privilege_domain": "structural_admin"
   },
