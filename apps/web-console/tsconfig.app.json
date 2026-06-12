@@ -19,5 +19,5 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/actions"]
+  "exclude": ["src/actions/*.mjs"]
 }
