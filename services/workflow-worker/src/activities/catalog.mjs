@@ -9,6 +9,7 @@ import { registerActivity, resolveActivity, taskTypeNames, listTaskTypes, hasTas
 import { TASK_TYPE_NAMES } from './catalog-names.mjs';
 import { toNonRetryable } from './errors.mjs';
 import { assertPayloadSize } from './limits.mjs';
+import { assertExecutionToken } from './execution-token.mjs';
 
 import { dbQuery, dbQueryInputSchema, dbQueryOutputSchema } from './db-query.mjs';
 import { storagePut, storagePutInputSchema, storagePutOutputSchema } from './storage-put.mjs';
@@ -74,12 +75,24 @@ export async function dispatchTask(input, deps = {}) {
   const entry = _registry().get(input.taskType);
   if (!entry) {
     // Unregistered taskType → interpreter echo seam (graph-walk fixtures). Production
-    // definitions cannot reach here with an unknown type: FLW-E006 rejects them first.
+    // definitions cannot reach here with an unknown type: FLW-E006 rejects them first. No
+    // tenant data store is touched, so the per-execution token is not validated here.
     return {
       nodeId: input.nodeId,
       taskType: input.taskType,
       output: { executed: true, taskType: input.taskType, params: input.params ?? {} },
     };
+  }
+  // Per-execution credential gate (change: add-flows-tenancy-isolation-limits). A REGISTERED
+  // (first-party) activity touches a tenant data store, so before it runs the short-lived token
+  // the control-plane minted at execution start MUST validate against the execution's tenant +
+  // workspace. A missing / expired / cross-tenant token fails the activity NON-RETRYABLY and no
+  // tenant data is accessed. The token is carried in the tenant envelope's `executionToken`
+  // (mirrored into the Temporal memo). When no token is configured AT ALL (legacy interpreter
+  // harness with token enforcement off) the gate is a no-op — production always stamps one.
+  const token = input.tenant?.executionToken;
+  if (token !== undefined && token !== null) {
+    assertExecutionToken(token, input.tenant.tenantId, input.tenant.workspaceId);
   }
   const output = await entry.activity(
     { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential },

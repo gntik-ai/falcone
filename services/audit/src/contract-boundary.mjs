@@ -41,3 +41,40 @@ export const capabilityEnforcementDeniedEvent = {
     occurredAt: { type: 'string', description: 'ISO 8601 UTC timestamp' }
   }
 };
+
+/**
+ * Flow lifecycle event — flows category (change: add-flows-tenancy-isolation-limits).
+ *
+ * Emitted by the control-plane flow executor for each of the eight flow lifecycle actions:
+ * definition created/updated/published(version)/deleted, execution started/cancelled/retry, and
+ * signal sent. Carries the tenant context so the audit pipeline scopes, retains, and queries flow
+ * activity exactly as it does every other tenant-scoped event. The authoritative envelope builder
+ * is services/audit/src/flow-lifecycle-events.mjs::buildFlowAuditEvent.
+ */
+export const flowLifecycleEvent = {
+  eventType: 'flow_lifecycle_event',
+  category: 'flows',
+  fields: {
+    eventType: {
+      type: 'string',
+      enum: [
+        'flow.definition_created',
+        'flow.definition_updated',
+        'flow.version_published',
+        'flow.definition_deleted',
+        'flow.execution_started',
+        'flow.execution_cancelled',
+        'flow.execution_retry',
+        'flow.signal_sent'
+      ]
+    },
+    tenantId: { type: 'string', description: 'UUID of the tenant' },
+    workspaceId: { type: 'string', description: 'UUID of the workspace' },
+    actorId: { type: 'string', description: 'sub from JWT or client_id (or apikey:<type>)' },
+    flowId: { type: 'string', description: 'The flow definition id' },
+    flowVersion: { type: 'string', nullable: true, description: 'Pinned/published version where applicable' },
+    executionId: { type: 'string', nullable: true, description: 'Workflow execution id for execution/signal events' },
+    correlationId: { type: 'string', nullable: true, description: 'End-to-end correlation ID' },
+    occurredAt: { type: 'string', description: 'ISO 8601 UTC timestamp' }
+  }
+};

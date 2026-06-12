@@ -35,3 +35,9 @@ export { emailSend, emailSendInputSchema, emailSendOutputSchema } from './email-
 export { assertPayloadSize, MAX_INPUT_BYTES, MAX_OUTPUT_BYTES, serializedByteLength } from './limits.mjs';
 export { toNonRetryable, toRetryable, classifyExecutorError, isTransientNetworkError } from './errors.mjs';
 export { resolveSsrfSafe } from './ssrf.mjs';
+export {
+  assertExecutionToken,
+  EXECUTION_TOKEN_EXPIRED,
+  EXECUTION_TOKEN_TENANT_MISMATCH,
+  EXECUTION_TOKEN_INVALID,
+} from './execution-token.mjs';
