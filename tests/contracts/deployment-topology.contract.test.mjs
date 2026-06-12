@@ -37,7 +37,8 @@ test('deployment topology contract exposes the required descriptors and promotio
     'observability',
     'controlPlane',
     'controlPlaneExecutor',
-    'webConsole'
+    'webConsole',
+    'workflowWorker'
   ]);
   assert.deepEqual(topology.packaging_guidance.deployment_profiles, ['all-in-one', 'standard', 'ha']);
   assert.equal(topology.packaging_guidance.profile_values_path, 'charts/in-falcone/values/profiles/{profile}.yaml');

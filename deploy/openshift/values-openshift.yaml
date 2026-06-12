@@ -143,6 +143,28 @@ observability:
     fsGroup: null
     fsGroupChangePolicy: null
 
+# Temporal (flows engine) — INTERNAL-ONLY, disabled by default. Enable for the flows
+# capability. Temporal server pods are STATELESS (durable state lives in PostgreSQL), so
+# the chart defaults already leave fsGroup unset — but we null it explicitly here to
+# mirror the per-component SCC pattern and stay safe if defaults change. Restricted-v2
+# injects uid + fsGroup from the namespace's assigned range; do NOT pin them. The
+# temporal-sql-tool / admin-tools images must be mirrored into Harbor (rewritten by
+# global.imageRegistry). No Route/Ingress is rendered for Temporal — operator UI access
+# is via `kubectl port-forward` only.
+temporal:
+  # enabled: true        # uncomment to deploy Temporal in this install
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+    # restricted-v2 injects uid/gid/fsGroup from the namespace's assigned range — do NOT
+    # pin them (the chart default pins runAsUser/runAsGroup 1000 for plain Kubernetes /
+    # kind verification; null them here so the SCC takes over).
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null
+    fsGroupChangePolicy: null
+
 # Exposure: OpenShift Routes. The Route templates render only when
 # platform.network.exposureKind == "Route" (default is "Ingress").
 platform:

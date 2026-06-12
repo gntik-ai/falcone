@@ -1,0 +1,18 @@
+{
+  "apiVersion": "v1.0",
+  "name": "bad-cron-schedule",
+  "description": "Cron trigger schedule has too few fields -> FLW-E007.",
+  "triggers": [
+    {
+      "kind": "cron",
+      "schedule": "0 9"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "step-1",
+      "type": "task",
+      "taskType": "run"
+    }
+  ]
+}

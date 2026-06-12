@@ -15,7 +15,16 @@ import { createPostgresRealtimeExecutor } from './postgres-realtime-executor.mjs
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
+import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
+import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
+import { createFlowTriggerRegistry, createTriggerStore } from './flow-trigger-registry.mjs';
+import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
+// Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
+// Feeds the flows validate/publish endpoints' FLW-E006 check so a flow definition that
+// references an unknown taskType is rejected (422 FLOW_VALIDATION_FAILED). The full activity
+// registry (with @temporalio/activity) lives in the worker; only the names cross here.
+import { TASK_TYPE_NAMES } from '../../../../services/workflow-worker/src/activities/catalog-names.mjs';
 
 const { Pool } = pg;
 const PORT = Number(process.env.PORT ?? 8080);
@@ -97,17 +106,139 @@ const jwtVerifier = createJwtVerifier({
   audience: process.env.KEYCLOAK_AUDIENCE,
 });
 
+// Flow executor (Temporal-backed flows API). Enabled ONLY when TEMPORAL_ADDRESS is configured;
+// it is the SOLE holder of the Temporal client (lazy-connect). Definitions/versions persist on
+// the SAME metadata pool as the API-key + embedding stores (design.md OQ1). When unset, no flows
+// routes are registered and a flows path falls through to 404 / upstream proxy unchanged.
+// Flow quota gate (change: add-flows-tenancy-isolation-limits). Wired only when a quota
+// evaluator endpoint is configured (FLOW_QUOTA_ENFORCE_URL); the evaluator calls the
+// provisioning-orchestrator quota-enforce action over HTTP and maps a hard-limit decision to a
+// 429. When unset the flows API is unmetered (dev/test) — a breach never silently allows in prod
+// because production always sets the URL.
+const flowQuotaGate = process.env.FLOW_QUOTA_ENFORCE_URL
+  ? createFlowQuotaGate({
+      evaluate: async ({ dimensionKey, tenantId, workspaceId, currentUsage }) => {
+        const res = await fetch(process.env.FLOW_QUOTA_ENFORCE_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dimensionKey, tenantId, workspaceId, currentUsage }),
+        });
+        if (!res.ok) throw Object.assign(new Error(`quota evaluator ${res.status}`), { status: res.status });
+        return res.json();
+      },
+    })
+  : undefined;
+
+// Flow audit sink (change: add-flows-tenancy-isolation-limits). Best-effort: emits each flow
+// lifecycle event to the audit Kafka topic via the events executor when configured; otherwise a
+// no-op (definitions/executions still work; production wires Kafka). NEVER fails a flow request.
+const flowAuditTopic = process.env.FLOW_AUDIT_TOPIC ?? 'falcone.audit.flow-lifecycle';
+const flowAuditSink = eventsExecutor
+  ? async (event) => {
+      try {
+        await eventsExecutor.executeEvents({
+          operation: 'publish', topic: flowAuditTopic,
+          identity: { tenantId: event.tenantId, workspaceId: event.workspaceId },
+          payload: { messages: [{ key: event.tenantId, value: event }] },
+        });
+      } catch (err) { console.error('[control-plane] flow audit publish failed:', err?.message ?? err); }
+    }
+  : undefined;
+
+const flowExecutor = process.env.TEMPORAL_ADDRESS
+  ? createFlowExecutor({
+      store: createFlowStore({ pool: keyPool }),
+      temporalAddress: process.env.TEMPORAL_ADDRESS,
+      temporalNamespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows',
+      temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
+      // Enforce FLW-E006: validate/publish reject any taskType not in the catalog.
+      taskTypeCatalog: TASK_TYPE_NAMES,
+      quotaGate: flowQuotaGate,
+      auditSink: flowAuditSink,
+    })
+  : undefined;
+
+// Flow trigger registry (change: add-flows-triggers). Enabled WITH the flow executor: it holds the
+// Temporal ScheduleClient (lazy-connect over the same address) and a Kafka consumer for
+// platform-event triggers (enabled only when KAFKA_BROKERS is set). It calls back into the
+// executor's startTriggeredExecution for platform-event-initiated starts. The trigger registration
+// store persists on the SAME metadata pool as the flow definition store.
+if (flowExecutor) {
+  let scheduleClientP = null;
+  const flowTriggerRegistry = createFlowTriggerRegistry({
+    store: createTriggerStore({ pool: keyPool }),
+    temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
+    secretMasterKey: process.env.FLOW_TRIGGER_SECRET_KEY,
+    // Lazy Temporal client (its `.schedule` is the ScheduleClient). Shares the connection lifetime
+    // with the executor's gateway in production; here a dedicated lazy connect keeps the boundary.
+    getTemporalClient: async () => {
+      if (!scheduleClientP) {
+        scheduleClientP = (async () => {
+          const { Connection, Client } = await import('@temporalio/client');
+          const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS });
+          return new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows' });
+        })();
+      }
+      return scheduleClientP;
+    },
+    // Platform-event consumer: a single KafkaJS consumer group subscribing to the union of
+    // registered tenant-scoped physical topics. Enabled only when a broker is configured.
+    kafkaConsumerFactory: process.env.KAFKA_BROKERS
+      ? async () => {
+          const { Kafka, logLevel } = await import('kafkajs');
+          const kafka = new Kafka({ clientId: 'flows-trigger-consumer', brokers: process.env.KAFKA_BROKERS.split(',').map((b) => b.trim()).filter(Boolean), logLevel: logLevel.NOTHING });
+          const consumer = kafka.consumer({ groupId: process.env.FLOW_TRIGGER_CONSUMER_GROUP ?? 'flows-trigger-consumer' });
+          await consumer.connect();
+          return {
+            subscribe: ({ topics }) => Promise.all(topics.map((topic) => consumer.subscribe({ topic, fromBeginning: false }))),
+            run: ({ eachMessage }) => consumer.run({ eachMessage }),
+            stop: () => consumer.stop().catch(() => {}),
+            disconnect: () => consumer.disconnect().catch(() => {}),
+          };
+        }
+      : undefined,
+    startTriggeredExecution: (args) => flowExecutor.startTriggeredExecution(args),
+  });
+  flowExecutor.setTriggerRegistry(flowTriggerRegistry);
+}
+
+// Flow-monitoring executor (change: add-console-flow-monitoring / #366). The execution
+// observability SSE stream: follows a single Temporal execution's history and emits node-status
+// / log-line frames to the console run view. Wired WITH the flow executor (it needs a Temporal
+// client) and gated on the same TEMPORAL_ADDRESS guard; FLOWS_ENABLED=false force-disables it so
+// an operator can keep the flows API while suppressing the streaming endpoint (which then falls
+// through to the 501 guard). The history provider lazily connects its own Temporal client over the
+// same address — mirroring the trigger registry's lazy-connect boundary.
+let monitoringClientP = null;
+const flowMonitoringExecutor = flowExecutor && process.env.FLOWS_ENABLED !== 'false'
+  ? createFlowMonitoringExecutor({
+      workflowHistoryProvider: createTemporalHistoryProvider({
+        getClient: async () => {
+          if (!monitoringClientP) {
+            monitoringClientP = (async () => {
+              const { Connection, Client } = await import('@temporalio/client');
+              const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS });
+              return new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows' });
+            })();
+          }
+          return monitoringClientP;
+        },
+      }),
+      pollIntervalMs: Number(process.env.FLOW_MONITORING_POLL_MS ?? 1000),
+    })
+  : undefined;
+
 // When the executor fronts the data-family wildcard (gateway route-split), it serves the
 // data-plane + DDL slice itself and proxies every other path under those prefixes
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
 // Initialise all metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema()])
+Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve()])
   .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
   .finally(() => {
     server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
@@ -123,6 +254,7 @@ async function shutdown(signal) {
   await realtimeExecutor?.close().catch(() => {});
   await pgRealtimeExecutor?.close().catch(() => {});
   await eventsExecutor?.close().catch(() => {});
+  await flowExecutor?.close().catch(() => {});
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
