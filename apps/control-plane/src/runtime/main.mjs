@@ -16,6 +16,7 @@ import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
+import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 // Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
 // Feeds the flows validate/publish endpoints' FLW-E006 check so a flow definition that
@@ -107,6 +108,41 @@ const jwtVerifier = createJwtVerifier({
 // it is the SOLE holder of the Temporal client (lazy-connect). Definitions/versions persist on
 // the SAME metadata pool as the API-key + embedding stores (design.md OQ1). When unset, no flows
 // routes are registered and a flows path falls through to 404 / upstream proxy unchanged.
+// Flow quota gate (change: add-flows-tenancy-isolation-limits). Wired only when a quota
+// evaluator endpoint is configured (FLOW_QUOTA_ENFORCE_URL); the evaluator calls the
+// provisioning-orchestrator quota-enforce action over HTTP and maps a hard-limit decision to a
+// 429. When unset the flows API is unmetered (dev/test) — a breach never silently allows in prod
+// because production always sets the URL.
+const flowQuotaGate = process.env.FLOW_QUOTA_ENFORCE_URL
+  ? createFlowQuotaGate({
+      evaluate: async ({ dimensionKey, tenantId, workspaceId, currentUsage }) => {
+        const res = await fetch(process.env.FLOW_QUOTA_ENFORCE_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dimensionKey, tenantId, workspaceId, currentUsage }),
+        });
+        if (!res.ok) throw Object.assign(new Error(`quota evaluator ${res.status}`), { status: res.status });
+        return res.json();
+      },
+    })
+  : undefined;
+
+// Flow audit sink (change: add-flows-tenancy-isolation-limits). Best-effort: emits each flow
+// lifecycle event to the audit Kafka topic via the events executor when configured; otherwise a
+// no-op (definitions/executions still work; production wires Kafka). NEVER fails a flow request.
+const flowAuditTopic = process.env.FLOW_AUDIT_TOPIC ?? 'falcone.audit.flow-lifecycle';
+const flowAuditSink = eventsExecutor
+  ? async (event) => {
+      try {
+        await eventsExecutor.executeEvents({
+          operation: 'publish', topic: flowAuditTopic,
+          identity: { tenantId: event.tenantId, workspaceId: event.workspaceId },
+          payload: { messages: [{ key: event.tenantId, value: event }] },
+        });
+      } catch (err) { console.error('[control-plane] flow audit publish failed:', err?.message ?? err); }
+    }
+  : undefined;
+
 const flowExecutor = process.env.TEMPORAL_ADDRESS
   ? createFlowExecutor({
       store: createFlowStore({ pool: keyPool }),
@@ -115,6 +151,8 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
       temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
       // Enforce FLW-E006: validate/publish reject any taskType not in the catalog.
       taskTypeCatalog: TASK_TYPE_NAMES,
+      quotaGate: flowQuotaGate,
+      auditSink: flowAuditSink,
     })
   : undefined;
 
