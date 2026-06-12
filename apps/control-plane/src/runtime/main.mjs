@@ -16,6 +16,7 @@ import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
+import { createFlowTriggerRegistry, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 // Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
@@ -155,6 +156,50 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
       auditSink: flowAuditSink,
     })
   : undefined;
+
+// Flow trigger registry (change: add-flows-triggers). Enabled WITH the flow executor: it holds the
+// Temporal ScheduleClient (lazy-connect over the same address) and a Kafka consumer for
+// platform-event triggers (enabled only when KAFKA_BROKERS is set). It calls back into the
+// executor's startTriggeredExecution for platform-event-initiated starts. The trigger registration
+// store persists on the SAME metadata pool as the flow definition store.
+if (flowExecutor) {
+  let scheduleClientP = null;
+  const flowTriggerRegistry = createFlowTriggerRegistry({
+    store: createTriggerStore({ pool: keyPool }),
+    temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
+    secretMasterKey: process.env.FLOW_TRIGGER_SECRET_KEY,
+    // Lazy Temporal client (its `.schedule` is the ScheduleClient). Shares the connection lifetime
+    // with the executor's gateway in production; here a dedicated lazy connect keeps the boundary.
+    getTemporalClient: async () => {
+      if (!scheduleClientP) {
+        scheduleClientP = (async () => {
+          const { Connection, Client } = await import('@temporalio/client');
+          const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS });
+          return new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows' });
+        })();
+      }
+      return scheduleClientP;
+    },
+    // Platform-event consumer: a single KafkaJS consumer group subscribing to the union of
+    // registered tenant-scoped physical topics. Enabled only when a broker is configured.
+    kafkaConsumerFactory: process.env.KAFKA_BROKERS
+      ? async () => {
+          const { Kafka, logLevel } = await import('kafkajs');
+          const kafka = new Kafka({ clientId: 'flows-trigger-consumer', brokers: process.env.KAFKA_BROKERS.split(',').map((b) => b.trim()).filter(Boolean), logLevel: logLevel.NOTHING });
+          const consumer = kafka.consumer({ groupId: process.env.FLOW_TRIGGER_CONSUMER_GROUP ?? 'flows-trigger-consumer' });
+          await consumer.connect();
+          return {
+            subscribe: ({ topics }) => Promise.all(topics.map((topic) => consumer.subscribe({ topic, fromBeginning: false }))),
+            run: ({ eachMessage }) => consumer.run({ eachMessage }),
+            stop: () => consumer.stop().catch(() => {}),
+            disconnect: () => consumer.disconnect().catch(() => {}),
+          };
+        }
+      : undefined,
+    startTriggeredExecution: (args) => flowExecutor.startTriggeredExecution(args),
+  });
+  flowExecutor.setTriggerRegistry(flowTriggerRegistry);
+}
 
 // When the executor fronts the data-family wildcard (gateway route-split), it serves the
 // data-plane + DDL slice itself and proxies every other path under those prefixes
