@@ -17,6 +17,11 @@ import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
+// Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
+// Feeds the flows validate/publish endpoints' FLW-E006 check so a flow definition that
+// references an unknown taskType is rejected (422 FLOW_VALIDATION_FAILED). The full activity
+// registry (with @temporalio/activity) lives in the worker; only the names cross here.
+import { TASK_TYPE_NAMES } from '../../../../services/workflow-worker/src/activities/catalog-names.mjs';
 
 const { Pool } = pg;
 const PORT = Number(process.env.PORT ?? 8080);
@@ -108,6 +113,8 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
       temporalAddress: process.env.TEMPORAL_ADDRESS,
       temporalNamespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows',
       temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
+      // Enforce FLW-E006: validate/publish reject any taskType not in the catalog.
+      taskTypeCatalog: TASK_TYPE_NAMES,
     })
   : undefined;
 

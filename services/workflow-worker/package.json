@@ -9,7 +9,7 @@
   },
   "main": "dist/worker.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-activity-catalog.mjs",
     "start": "node dist/worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
