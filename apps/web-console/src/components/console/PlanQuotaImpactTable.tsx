@@ -21,7 +21,7 @@ export function PlanQuotaImpactTable({ items, title = 'Quota impact' }: { items:
             <tr key={item.dimensionKey} className="border-t border-border">
               <td>{item.displayLabel ?? item.dimensionKey}</td>
               <td>{'previousEffectiveValueKind' in item ? renderValue(item.previousEffectiveValueKind, item.previousEffectiveValue) : '—'}</td>
-              <td>{renderValue(item.newEffectiveValueKind ?? item.effectiveValueKind, item.newEffectiveValue ?? item.effectiveValue)}</td>
+              <td>{'newEffectiveValueKind' in item ? renderValue(item.newEffectiveValueKind, item.newEffectiveValue) : renderValue(item.effectiveValueKind, item.effectiveValue)}</td>
               <td><span aria-label={`comparison ${'comparison' in item ? item.comparison : 'current'}`}>{'comparison' in item ? item.comparison : 'current'}</span></td>
               <td>{item.observedUsage ?? '—'}</td>
               <td><span aria-label={`usage status ${item.usageStatus}`}>{item.usageStatus}</span></td>
