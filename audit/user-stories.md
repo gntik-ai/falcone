@@ -1612,3 +1612,246 @@ Code: `services/gateway-config/routes/capability-gated-routes.yaml:15-44`
 | us-audit-03 | Export audit events | cap-audit | Tenant admin | fn-audit-03 |
 | us-gw-01 | Idempotent mutation replay | cap-gateway | Any client | uc-gw-01 |
 | us-gw-02 | Capability gate blocks route | cap-gateway | Workspace developer | uc-gw-02 |
+| us-flows-01 | Design & publish a flow | cap-workflows | Workspace developer | fn-flows-01/02/03 |
+| us-flows-02 | Manual run & live observe | cap-workflows | Workspace developer | fn-flows-04/05 |
+| us-flows-03 | Webhook / cron / event triggers | cap-workflows | Workspace developer | fn-flows-06/07/08 |
+| us-flows-04 | Failure & retry | cap-workflows | Workspace developer | fn-flows-09/10 |
+| us-flows-05 | Human approval gate | cap-workflows | Workspace admin | fn-flows-11 |
+| us-flows-06 | Worker-kill resilience | cap-workflows | Platform operator | fn-flows-12 |
+| us-flows-07 | Version pinning | cap-workflows | Workspace developer | fn-flows-13 |
+| us-flows-08 | Cross-tenant isolation probes | cap-workflows | Security officer | fn-flows-14/15 |
+
+---
+
+## cap-workflows — Flows (Temporal-backed visual workflow engine)
+
+> Added: 2026-06-12. Source branch: feat/add-flows-triggers (epic #355).
+> Code anchors: `apps/control-plane/src/runtime/flow-executor.mjs`, `services/workflow-worker/src/workflows/DslInterpreterWorkflow.ts`, `apps/web-console/src/pages/ConsoleFlowDesignerPage.tsx`, `apps/web-console/src/pages/ConsoleFlowRunPage.tsx`.
+
+---
+
+### us-flows-01
+
+**As a** workspace developer, **I want** to build a multi-node flow on the canvas designer, switch to the YAML editor for fine-grained edits, and publish version 1 **so that** the flow is available for execution and I can track its definition history.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Flow definitions live in Postgres under RLS (`tenant_id = identity.tenantId`).
+
+**Acceptance criteria:**
+
+- GIVEN an authenticated workspace developer navigates to `/console/flows`
+  WHEN they enter a flow name and click "New flow"
+  THEN the designer page opens with a fresh draft; the task-type palette loads from `/v1/flows/workspaces/{ws}/task-types`.
+
+- GIVEN three nodes are placed on the canvas (fetch-record → transform-record → persist-record)
+  WHEN "Save draft" is clicked
+  THEN the API persists the draft (`PATCH /v1/flows/{ws}/flows/{flowId}`); the "Saved" indicator appears.
+
+- GIVEN the user switches to YAML view
+  WHEN the YAML editor renders
+  THEN the canonical YAML serialisation of the canvas model is displayed without loss.
+
+- GIVEN the user edits a node description in YAML and switches back to canvas
+  WHEN the canvas re-syncs from YAML
+  THEN the edited node is reflected on the canvas.
+
+- GIVEN the definition is valid (no FLW-E* errors)
+  WHEN the user clicks "Publish"
+  THEN `POST /v1/flows/{ws}/flows/{flowId}/versions` returns `{ version: 1 }`; the "v1 published" badge appears.
+
+**Linked:** fn-flows-01, fn-flows-02, fn-flows-03 / `apps/control-plane/src/runtime/flow-executor.mjs::createFlowExecutor`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-design-publish.spec.ts`
+
+---
+
+### us-flows-02
+
+**As a** workspace developer, **I want** to manually start a published flow from the console and watch per-node status badges turn green live **so that** I can confirm the run completed correctly and inspect each node's output.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Execution state lives in Temporal (in `falcone-flows` namespace) scoped by workflow-id prefix `{tenantId}:{workspaceId}:`.
+
+**Acceptance criteria:**
+
+- GIVEN a published flow
+  WHEN the developer clicks "Run" in the console
+  THEN `POST .../executions` is called; a new `executionId` is returned; the run page navigates to `/console/flows/{flowId}/runs/{executionId}`.
+
+- GIVEN the run is in progress and the user supplies the anon key
+  WHEN the SSE stream connects (`GET .../executions/{id}/events?apikey=...`)
+  THEN `node-status` events arrive in real time; the canvas badges update to `started` then `completed` for each node.
+
+- GIVEN the run reaches `Completed`
+  WHEN the SSE stream closes with a `stream-end` event
+  THEN the run page transitions to "Final state from history" and the Cancel button is disabled.
+
+**Linked:** fn-flows-04, fn-flows-05 / `apps/control-plane/src/runtime/flow-monitoring-executor.mjs`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-run-observe.spec.ts`
+
+---
+
+### us-flows-03
+
+**As a** workspace developer, **I want** flows to start automatically from webhooks, cron schedules, and platform events **so that** I can wire integrations without manual intervention.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Trigger registration happens at publish time (`flow-trigger-registry.mjs`); cron = Temporal Schedule; webhook = HMAC-signed HTTP ingestion; platform event = Kafka consumer offset.
+
+**Acceptance criteria:**
+
+- GIVEN a flow with a webhook trigger and a registered HMAC secret
+  WHEN a correctly signed `POST /v1/flows/workspaces/{ws}/triggers/webhooks/{triggerId}` is received
+  THEN a new execution is started (`201 executionId`).
+
+- GIVEN a flow with a webhook trigger
+  WHEN an incorrectly signed POST arrives
+  THEN the server returns `401 UNAUTHORIZED` and no execution is started.
+
+- GIVEN a flow with a `* * * * *` cron trigger
+  WHEN it is published
+  THEN a Temporal Schedule is registered; within 90 s the first execution fires and reaches Completed.
+
+- GIVEN a flow with a `platform-event` trigger bound to `document.created`
+  WHEN published
+  THEN the Kafka consumer for `document.created` is registered (platform event → execution pipeline active).
+
+**Linked:** fn-flows-06, fn-flows-07, fn-flows-08 / `apps/control-plane/src/runtime/flow-trigger-registry.mjs`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-triggers.spec.ts`
+
+---
+
+### us-flows-04
+
+**As a** workspace developer, **I want** a flow with a failing task to show retries and then enter a terminal failure state, and to be able to trigger a retry from the console that starts a new successful run **so that** transient failures do not permanently block my workflow.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Retry policy is per-node in the DSL; Temporal's RetryPolicy is mapped from the DSL at schedule time (`DslInterpreterWorkflow`).
+
+**Acceptance criteria:**
+
+- GIVEN a flow with a task whose `retryPolicy.maxAttempts=2`
+  WHEN the task fails on every attempt
+  THEN the execution transitions to `Failed` after exhausting retries.
+
+- GIVEN a failed execution
+  WHEN the developer clicks "Retry"
+  THEN `POST .../retries` starts a new execution with the same version and input; the new `executionId` differs from the original.
+
+- GIVEN a running execution
+  WHEN the developer clicks "Cancel"
+  THEN `POST .../cancellations` is called; the execution reaches a terminal state.
+
+**Linked:** fn-flows-09, fn-flows-10 / `apps/web-console/src/components/flows/RunActionToolbar.tsx`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-failure-retry.spec.ts`
+
+---
+
+### us-flows-05
+
+**As a** workspace admin, **I want** a flow to pause at a human-approval node so that I can review the run in the console and resume it by approving or reject it **so that** high-value operations require explicit human sign-off before proceeding.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Approval is a Temporal signal (`flowApproval`); the approval node blocks the workflow coroutine until the signal arrives or the timeout elapses.
+
+**Acceptance criteria:**
+
+- GIVEN a flow with an `approval` node (id: `review`, approvers: `role:workspace_admin`)
+  WHEN the execution reaches the approval node
+  THEN the node status transitions to `waiting-approval`; the execution status is `Running`.
+
+- GIVEN the approval node is in `waiting-approval`
+  WHEN the user opens the run page
+  THEN the Approve and Reject buttons are visible in the toolbar.
+
+- GIVEN the Approve button is clicked (with confirmation)
+  WHEN `POST .../signals/review` is sent with `{ approved: true }`
+  THEN the execution resumes and reaches `Completed`.
+
+- GIVEN the Reject button is clicked
+  WHEN `POST .../signals/review` is sent with `{ approved: false }`
+  THEN the execution terminates (Failed or Canceled per the workflow implementation).
+
+**Linked:** fn-flows-11 / `apps/control-plane/src/runtime/flow-executor.mjs::APPROVAL_SIGNAL`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-human-approval.spec.ts`
+
+---
+
+### us-flows-06
+
+**As a** platform operator, **I want** a long-running flow to survive a worker pod kill so that when Kubernetes restarts the pod the execution resumes from where it left off with no duplicated or lost node effects **so that** the workflow engine is resilient to normal infrastructure disruptions.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Temporal persists workflow history in PostgreSQL; the DslInterpreterWorkflow is deterministically replayable.
+
+**Acceptance criteria:**
+
+- GIVEN a running flow whose first activity takes 15 s
+  WHEN `kubectl delete pod --force` is issued against the worker pod while the activity is in-flight
+  THEN Kubernetes creates a replacement worker pod.
+
+- GIVEN the replacement worker pod is Ready
+  WHEN Temporal reassigns the in-flight activity
+  THEN the execution resumes without restarting completed nodes.
+
+- GIVEN the execution finishes
+  WHEN the execution detail is inspected
+  THEN the `final-step` node appears exactly once with status `completed` (exactly-once node-effect semantics).
+
+**Linked:** fn-flows-12 / `services/workflow-worker/src/workflows/DslInterpreterWorkflow.ts::WorkflowSideEffectGuard`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-worker-kill.spec.ts`
+
+---
+
+### us-flows-07
+
+**As a** workspace developer, **I want** an in-flight v1 run to complete with v1 behavior even after I publish v2, and subsequent trigger-started runs to use v2 **so that** live runs are never broken by schema changes.
+
+**Tenant context:** `ten_A` / `wrk_A1`. Version is stamped into the `flowVersion` Temporal search attribute at execution start; the workflow reads the pinned version from its start args.
+
+**Acceptance criteria:**
+
+- GIVEN a published v1 flow with an in-flight execution (pinned to `version: 1`)
+  WHEN v2 is published (`POST .../versions` returns `{ version: 2 }`)
+  THEN the v1 execution completes with v1 definition behavior (unaffected by v2).
+
+- GIVEN v2 is published
+  WHEN a new execution is started without an explicit version
+  THEN the execution uses v2 definition; its `version` metadata reflects `2`.
+
+**Linked:** fn-flows-13 / `apps/control-plane/src/runtime/flow-executor.mjs::startExecution`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-version-pinning.spec.ts`
+
+---
+
+### us-flows-08
+
+**As a** platform security officer, **I want** tenant B to be unable to see tenant A's flows, executions, or live streams anywhere in the UI or API **so that** tenant data is strictly isolated and there is no information disclosure across tenant boundaries.
+
+**Tenant context:** Cross-tenant probe. Tenant A = `ten_A` / `wrk_A1`; Tenant B = `ten_B` / `wrk_B1`.
+
+**Acceptance criteria:**
+
+- GIVEN tenant A has a published flow and a completed execution
+  WHEN tenant B calls `GET /v1/flows/workspaces/wrk_B1/flows/{flowId_A}` (with tenant B's identity headers)
+  THEN the server returns 404 (RLS hides the row) or 403.
+
+- GIVEN tenant A's execution has a known `executionId`
+  WHEN tenant B calls `GET .../executions/{executionId_A}` (with tenant B's identity)
+  THEN the server returns 404 (workflowId prefix mismatch → EXECUTION_NOT_FOUND).
+
+- GIVEN tenant B attempts `POST .../executions/{executionId_A}/cancellations` (mutating verb)
+  WHEN the executor evaluates `assertOwnedWorkflowId`
+  THEN the response is 403 CROSS_TENANT_FORBIDDEN.
+
+- GIVEN tenant B attempts to send a signal to tenant A's execution
+  THEN the response is 403 CROSS_TENANT_FORBIDDEN.
+
+- GIVEN tenant B opens the console Flows page
+  WHEN the API lists `wrk_B1` flows
+  THEN no tenant A flows appear (RLS enforced at the database query level).
+
+**Linked:** fn-flows-14, fn-flows-15 / `apps/control-plane/src/runtime/flow-executor.mjs::assertOwnedWorkflowId`
+
+**E2E spec:** `tests/e2e/specs/flows/flows-cross-tenant.spec.ts`
+
