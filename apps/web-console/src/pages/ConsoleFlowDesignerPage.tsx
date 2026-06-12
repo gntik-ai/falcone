@@ -31,6 +31,7 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { CapabilityGate } from '@/components/console/CapabilityGate'
+import { FlowYamlEditor, type FlowEditorValidity } from '@/components/flows/FlowYamlEditor'
 import { FLOW_PALETTE_DRAG_MIME, FlowPalette } from '@/components/flows/FlowPalette'
 import { FlowProblemsPanel } from '@/components/flows/FlowProblemsPanel'
 import { evaluateConnection } from '@/components/flows/connectionRules'
@@ -49,6 +50,8 @@ import {
   groupErrorsByNode,
   validateFlowSemantics
 } from '@/components/flows/semanticValidation'
+import { parseYamlToFlow, serializeFlowToYaml } from '@/lib/flows/yaml-serialiser'
+import type { ViewMode } from '@/lib/flows/view-sync'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
@@ -109,6 +112,16 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null)
 
+  // YAML view state. The canvas and YAML are two views of one canonical document; YAML edits
+  // are flushed back into the canvas node/edge model on a valid switch (see flushYamlToCanvas).
+  const [viewMode, setViewMode] = useState<ViewMode>('canvas')
+  const [yamlText, setYamlText] = useState<string>('')
+  const [yamlValidity, setYamlValidity] = useState<FlowEditorValidity>({
+    parseable: true,
+    valid: true,
+    markers: []
+  })
+
   const baseDefinition: FlowDefinition = useMemo(
     () => record?.definition ?? emptyDefinition(record?.name ?? flowId),
     [record, flowId]
@@ -149,13 +162,55 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     [baseDefinition, nodes, edges]
   )
 
+  // Seed / refresh the YAML buffer from the canvas whenever the editor is not the active
+  // editing surface, so opening the YAML view always reflects the current canvas (canonical,
+  // comment-free serialisation).
+  useEffect(() => {
+    if (viewMode === 'canvas') {
+      setYamlText(serializeFlowToYaml(currentDefinition))
+    }
+  }, [viewMode, currentDefinition])
+
+  const taskTypeIds = useMemo(
+    () => (taskTypes.length > 0 ? taskTypes.map((descriptor) => descriptor.id) : undefined),
+    [taskTypes]
+  )
+
+  // Flush a (valid) YAML buffer back into the canvas node/edge model. Returns false when the
+  // YAML is syntactically invalid so the caller can block a view switch and warn.
+  const flushYamlToCanvas = useCallback((): boolean => {
+    try {
+      const definition = parseYamlToFlow(yamlText)
+      setNodes(definitionToNodes(definition) as DesignerNode[])
+      setEdges(definitionToEdges(definition) as Edge[])
+      setDirty(true)
+      return true
+    } catch {
+      return false
+    }
+  }, [yamlText])
+
+  // Switch view. Leaving the YAML editor for a canvas-bearing mode requires syntactically
+  // valid YAML; otherwise the switch is blocked and the YAML view stays put with markers.
+  const switchView = useCallback(
+    (mode: ViewMode) => {
+      const leavingYaml = viewMode === 'yaml' || viewMode === 'side-by-side'
+      const enteringCanvas = mode === 'canvas' || mode === 'side-by-side'
+      if (leavingYaml && enteringCanvas) {
+        if (!flushYamlToCanvas()) return // invalid YAML — block the switch
+      }
+      setViewMode(mode)
+    },
+    [viewMode, flushYamlToCanvas]
+  )
+
   // Client-side semantic validation (FLW-E001…FLW-E009) on every graph change.
   const semanticErrors = useMemo(
     () =>
       validateFlowSemantics(currentDefinition, {
-        taskTypeCatalog: taskTypes.length > 0 ? taskTypes.map((descriptor) => descriptor.id) : undefined
+        taskTypeCatalog: taskTypeIds
       }),
-    [currentDefinition, taskTypes]
+    [currentDefinition, taskTypeIds]
   )
 
   const allProblems = useMemo(
@@ -318,11 +373,31 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     return error instanceof Error ? error.message : 'Request failed'
   }, [])
 
+  // When the YAML editor is the active surface the YAML buffer is the source of truth; resolve
+  // the definition to persist from it (falling back to the canvas projection on the canvas view).
+  const resolveDefinitionToSave = useCallback((): FlowDefinition | null => {
+    if (viewMode === 'yaml' || viewMode === 'side-by-side') {
+      try {
+        return parseYamlToFlow(yamlText)
+      } catch {
+        return null // invalid YAML — caller must NOT persist
+      }
+    }
+    return currentDefinition
+  }, [viewMode, yamlText, currentDefinition])
+
   const saveDraft = useCallback(async (): Promise<boolean> => {
+    // Graceful-degradation guard: never PATCH /flows/:id while the YAML editor holds an
+    // invalid document. The stored draft keeps its last-valid value.
+    const definitionToSave = resolveDefinitionToSave()
+    if (definitionToSave === null) {
+      setLoadError('The YAML document is invalid — fix the highlighted errors before saving.')
+      return false
+    }
     setSaving(true)
     setLoadError(null)
     try {
-      const saved = await updateFlowDraft(workspaceId, flowId, { definition: currentDefinition })
+      const saved = await updateFlowDraft(workspaceId, flowId, { definition: definitionToSave })
       setRecord(saved)
       setServerErrors([])
       setDirty(false)
@@ -334,7 +409,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     } finally {
       setSaving(false)
     }
-  }, [workspaceId, flowId, currentDefinition, applyServerRejection])
+  }, [workspaceId, flowId, resolveDefinitionToSave, applyServerRejection])
 
   const revert = useCallback(async () => {
     await load()
@@ -358,7 +433,51 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     }
   }, [workspaceId, flowId, saveDraft, applyServerRejection])
 
-  const blockingErrors = semanticErrors.length + serverErrors.length
+  // When editing YAML, the FLW-E semantic markers come from the editor's own validation; fold
+  // them (and any syntax error) into the publish/save gate.
+  const yamlBlocking =
+    viewMode !== 'canvas' && (!yamlValidity.parseable || yamlValidity.markers.length > 0)
+  const blockingErrors =
+    semanticErrors.length + serverErrors.length + (yamlBlocking ? yamlValidity.markers.length + 1 : 0)
+
+  const renderCanvasSurface = (
+    <main ref={canvasRef} className="min-w-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
+      <ReactFlow
+        nodes={decoratedNodes}
+        edges={edges}
+        nodeTypes={flowNodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        isValidConnection={isValidConnection}
+        fitView
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background gap={16} />
+        <Controls />
+      </ReactFlow>
+    </main>
+  )
+
+  const renderYamlSurface = (
+    <div className="min-w-0 flex-1 border-l border-border" data-testid="designer-yaml-pane">
+      {viewMode !== 'canvas' && !yamlValidity.parseable ? (
+        <p
+          className="bg-amber-100 px-3 py-1 text-xs text-amber-800"
+          role="status"
+          data-testid="designer-yaml-degraded-banner"
+        >
+          The YAML is invalid — the canvas keeps the last valid version and the draft will not be saved until you fix it.
+        </p>
+      ) : null}
+      <FlowYamlEditor
+        value={yamlText}
+        onChange={setYamlText}
+        taskTypeCatalog={taskTypeIds}
+        onValidityChange={setYamlValidity}
+      />
+    </div>
+  )
 
   if (loadError && record === null) {
     return (
@@ -399,6 +518,22 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          <div className="mr-2 flex items-center gap-1" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
+            {(['canvas', 'yaml', 'side-by-side'] as const).map((mode) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={viewMode === mode ? 'default' : 'ghost'}
+                role="tab"
+                aria-selected={viewMode === mode}
+                data-testid={`view-mode-${mode}`}
+                data-active={String(viewMode === mode)}
+                onClick={() => switchView(mode)}
+              >
+                {mode === 'canvas' ? 'Canvas' : mode === 'yaml' ? 'YAML' : 'Side by side'}
+              </Button>
+            ))}
+          </div>
           <Button size="sm" variant="ghost" onClick={() => void revert()} disabled={saving || publishing}>
             Revert
           </Button>
@@ -432,23 +567,11 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
           </div>
           <FlowPalette workspaceId={workspaceId} onCatalogLoaded={setTaskTypes} />
         </aside>
-        <main ref={canvasRef} className="min-w-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
-          <ReactFlow
-            nodes={decoratedNodes}
-            edges={edges}
-            nodeTypes={flowNodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            isValidConnection={isValidConnection}
-            fitView
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background gap={16} />
-            <Controls />
-          </ReactFlow>
-        </main>
-        {selectedNode ? (
+        {/* View switcher: canvas, YAML, or both side by side. YAML is the canonical document;
+            an invalid YAML edit keeps the canvas on its last-valid graph (degradation banner). */}
+        {(viewMode === 'canvas' || viewMode === 'side-by-side') && renderCanvasSurface}
+        {(viewMode === 'yaml' || viewMode === 'side-by-side') && renderYamlSurface}
+        {selectedNode && viewMode !== 'yaml' ? (
           <aside className="w-72 shrink-0 overflow-y-auto border-l border-border">
             <NodePropertyPanel
               key={selectedNode.id}
