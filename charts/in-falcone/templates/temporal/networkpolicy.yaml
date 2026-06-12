@@ -1,0 +1,51 @@
+{{- if and .Values.temporal.enabled .Values.temporal.networkPolicy.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- /*
+  NetworkPolicy restricting inbound access to the Temporal frontend gRPC port (7233).
+  Only pods carrying an allowed `app.kubernetes.io/component` label — OR Temporal's own
+  internal components — may connect.
+
+  LABEL CONTRACT (Decision 5, design.md) — sibling changes MUST set these pod labels:
+    - add-flows-control-plane-api  (#365): app.kubernetes.io/component: flows-api
+    - add-flows-dsl-interpreter-worker (#359): app.kubernetes.io/component: flows-worker
+  If those changes ship different labels, flows traffic to Temporal will be silently
+  blocked. Keep this list in sync with values.temporal.networkPolicy.allowedComponents.
+
+  Temporal's OWN internals also need the frontend gRPC port: the worker role embeds an
+  SDK client and the bootstrap Job registers the namespace + custom search attributes —
+  both connect to 7233. They are admitted via the `in-falcone.io/component: temporal`
+  label that every Temporal pod (incl. the Jobs) carries, so the deployment is functional
+  out of the box without depending on the (external) flows-api/flows-worker labels.
+
+  The policy selects the Temporal frontend pods only (port 7233 lives there) and denies
+  all other inbound traffic to them (default-deny once a NetworkPolicy selects a pod).
+  The inter-role membership/gossip ports (6933-6939) are NOT restricted by this policy.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "in-falcone.temporal.fullname" $root }}-frontend
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "frontend") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "in-falcone.temporal.roleSelectorLabels" (dict "root" $root "role" "frontend") | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- range $t.networkPolicy.allowedComponents }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: {{ . }}
+        {{- end }}
+        # Temporal's own pods (worker SDK client + bootstrap Job) — internal access.
+        - podSelector:
+            matchLabels:
+              in-falcone.io/component: temporal
+      ports:
+        - protocol: TCP
+          port: {{ $t.frontend.grpcPort }}
+{{- end }}
