@@ -15,7 +15,9 @@
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit"
   },
   "dependencies": {
+    "@in-falcone/internal-contracts": "workspace:*",
     "@radix-ui/react-slot": "^1.1.0",
+    "@xyflow/react": "^12.8.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.400.0",

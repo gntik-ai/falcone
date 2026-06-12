@@ -62,6 +62,18 @@ const ConsoleSecretRotationPage = lazy(async () => {
   return { default: module.ConsoleSecretRotationPage }
 })
 
+// Flows section is code-split so the @xyflow/react canvas chunk stays out of the
+// initial shell bundle (change: add-console-flow-designer).
+const ConsoleFlowsPage = lazy(async () => {
+  const module = await import('@/pages/ConsoleFlowsPage')
+  return { default: module.ConsoleFlowsPage }
+})
+
+const ConsoleFlowDesignerPage = lazy(async () => {
+  const module = await import('@/pages/ConsoleFlowDesignerPage')
+  return { default: module.ConsoleFlowDesignerPage }
+})
+
 
 function RequireSuperadminRoute({ children }: { children: JSX.Element }) {
   const session = readConsoleShellSession()
@@ -200,6 +212,14 @@ export const appRoutes = [
           {
             path: 'realtime/changes',
             element: <ConsoleRealtimeChangesPage />
+          },
+          {
+            path: 'flows',
+            element: <ConsoleFlowsPage />
+          },
+          {
+            path: 'flows/:flowId',
+            element: <ConsoleFlowDesignerPage />
           },
           {
             path: 'storage',
