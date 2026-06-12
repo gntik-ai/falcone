@@ -1,0 +1,57 @@
+{{- if and .Values.temporal.enabled .Values.temporal.ui.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- $ui := $t.ui -}}
+{{- /*
+  Temporal Web UI. INTERNAL-ONLY (ADR-11): deployed for operator access via
+  `kubectl port-forward` exclusively. NO Ingress / Route / APISIX route is rendered
+  for it anywhere; the Service (services.yaml) is ClusterIP-only.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "web") }}
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "web") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "in-falcone.temporal.roleSelectorLabels" (dict "root" $root "role" "web") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "web") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      {{- include "in-falcone.temporal.imagePullSecrets" $root | nindent 6 }}
+      {{- with $t.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: temporal-web
+          image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $ui.image) | quote }}
+          imagePullPolicy: {{ $ui.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ $ui.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "{{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "frontend") }}:{{ $t.frontend.grpcPort }}"
+            - name: TEMPORAL_UI_PORT
+              value: {{ $ui.service.targetPort | quote }}
+            # Internal-only: the UI is reachable solely via kubectl port-forward.
+            - name: TEMPORAL_CSRF_COOKIE_INSECURE
+              value: "true"
+          {{- with $ui.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

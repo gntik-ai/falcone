@@ -1,0 +1,23 @@
+{
+  "apiVersion": "v1.0",
+  "name": "duplicate-ids",
+  "description": "Two nodes share the id step-1 -> FLW-E001.",
+  "nodes": [
+    {
+      "id": "step-1",
+      "type": "task",
+      "taskType": "first",
+      "next": "step-2"
+    },
+    {
+      "id": "step-2",
+      "type": "task",
+      "taskType": "second"
+    },
+    {
+      "id": "step-1",
+      "type": "task",
+      "taskType": "shadow"
+    }
+  ]
+}

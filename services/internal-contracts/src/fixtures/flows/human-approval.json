@@ -1,0 +1,25 @@
+{
+  "apiVersion": "v1.0",
+  "name": "human-approval-then-publish",
+  "description": "Sequence containing one approval node followed by one task node.",
+  "triggers": [
+    {
+      "kind": "platform-event",
+      "eventType": "document.submitted"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "review",
+      "type": "approval",
+      "approvers": ["role:workspace_admin"],
+      "timeout": "P2D",
+      "next": "publish"
+    },
+    {
+      "id": "publish",
+      "type": "task",
+      "taskType": "publish-document"
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{{- if .Values.temporal.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- $p := $t.persistence -}}
+{{- /*
+  Schema setup/upgrade Job. Runs temporal-sql-tool (bundled in the admin-tools image)
+  as a Helm pre-install,pre-upgrade hook so the persistence + visibility schemas are
+  ready BEFORE the Temporal server pods become available. SQL visibility on PostgreSQL,
+  no Elasticsearch. hook-delete-policy keeps the namespace clean between upgrades.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "in-falcone.temporal.fullname" $root }}-schema
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "schema") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ $t.jobs.backoffLimit }}
+  activeDeadlineSeconds: {{ $t.jobs.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $t.jobs.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "schema") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      {{- include "in-falcone.temporal.imagePullSecrets" $root | nindent 6 }}
+      {{- with $t.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: temporal-sql-tool
+          image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $t.schemaTool.image) | quote }}
+          imagePullPolicy: {{ $t.schemaTool.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              # NOTE: the admin-tools image is alpine-based and ships /bin/sh ONLY (no
+              # bash). Keep this script POSIX-sh compatible (no arrays, no PIPESTATUS).
+              SQL="temporal-sql-tool --ep ${SQL_HOST} --port ${SQL_PORT} --user ${SQL_USER} --password ${SQL_PASSWORD} --plugin ${SQL_PLUGIN}"
+
+              # Wait for PostgreSQL to accept connections before touching schemas.
+              # temporal-sql-tool has no `ping`; `create-database` against the default
+              # `postgres` DB doubles as a connectivity probe (idempotent + exit 0 when
+              # PG is reachable, whether or not the database already exists).
+              i=0
+              while [ "$i" -lt 60 ]; do
+                if ${SQL} --database postgres create-database >/dev/null 2>&1; then
+                  echo "postgres ${SQL_HOST}:${SQL_PORT} reachable"; break
+                fi
+                i=$((i + 1))
+                echo "waiting for postgres ${SQL_HOST}:${SQL_PORT} (${i}/60)"; sleep 5
+              done
+
+              # Primary persistence database + schema.
+              ${SQL} --database "${SQL_DATABASE}" create-database || true
+              ${SQL} --database "${SQL_DATABASE}" setup-schema -v 0.0
+              ${SQL} --database "${SQL_DATABASE}" update-schema \
+                -d /etc/temporal/schema/postgresql/v12/temporal/versioned
+
+              # SQL visibility database + schema (no Elasticsearch).
+              ${SQL} --database "${SQL_VISIBILITY_DATABASE}" create-database || true
+              ${SQL} --database "${SQL_VISIBILITY_DATABASE}" setup-schema -v 0.0
+              ${SQL} --database "${SQL_VISIBILITY_DATABASE}" update-schema \
+                -d /etc/temporal/schema/postgresql/v12/visibility/versioned
+          env:
+            - name: SQL_PLUGIN
+              value: {{ $p.driver | quote }}
+            - name: SQL_HOST
+              value: {{ $p.host | quote }}
+            - name: SQL_PORT
+              value: {{ $p.port | quote }}
+            - name: SQL_USER
+              value: {{ $p.user | quote }}
+            - name: SQL_PASSWORD
+              {{- if $p.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $p.existingSecret | quote }}
+                  key: {{ $p.passwordSecretKey | quote }}
+              {{- else }}
+              value: {{ $p.password | quote }}
+              {{- end }}
+            - name: SQL_DATABASE
+              value: {{ $p.database | quote }}
+            - name: SQL_VISIBILITY_DATABASE
+              value: {{ $p.visibilityDatabase | quote }}
+          {{- with $t.jobs.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

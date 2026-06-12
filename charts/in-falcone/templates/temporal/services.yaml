@@ -1,0 +1,57 @@
+{{- if .Values.temporal.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- /*
+  ClusterIP-only Services for every Temporal role + the Web UI. NO LoadBalancer or
+  NodePort type is ever set, and no nodePort is pinned — Temporal is internal-only
+  (ADR-11). External exposure is the responsibility of NOTHING in this chart: there is
+  deliberately no Ingress / Route / APISIX route for any Temporal endpoint.
+*/ -}}
+{{- $services := list
+  (dict "role" "frontend" "port" $t.frontend.grpcPort "portName" "grpc" "membership" $t.frontend.membershipPort)
+  (dict "role" "history"  "port" $t.history.grpcPort  "portName" "grpc" "membership" $t.history.membershipPort)
+  (dict "role" "matching" "port" $t.matching.grpcPort "portName" "grpc" "membership" $t.matching.membershipPort)
+  (dict "role" "worker"   "port" $t.worker.grpcPort   "portName" "grpc" "membership" $t.worker.membershipPort)
+-}}
+{{- range $s := $services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "in-falcone.temporal.roleName" (dict "root" $root "role" $s.role) }}
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" $s.role) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "in-falcone.temporal.roleSelectorLabels" (dict "root" $root "role" $s.role) | nindent 4 }}
+  ports:
+    - name: {{ $s.portName }}
+      port: {{ $s.port }}
+      targetPort: {{ $s.port }}
+      protocol: TCP
+    - name: membership
+      port: {{ $s.membership }}
+      targetPort: {{ $s.membership }}
+      protocol: TCP
+{{- end }}
+{{- if $t.ui.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "in-falcone.temporal.roleName" (dict "root" $root "role" "web") }}
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "web") | nindent 4 }}
+spec:
+  # ClusterIP-only: operator access is via `kubectl port-forward svc/<release>-temporal-web 8080:8080`.
+  type: ClusterIP
+  selector:
+    {{- include "in-falcone.temporal.roleSelectorLabels" (dict "root" $root "role" "web") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $t.ui.service.port }}
+      targetPort: {{ $t.ui.service.targetPort }}
+      protocol: TCP
+{{- end }}
+{{- end }}
