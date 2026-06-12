@@ -29,9 +29,14 @@
 import { zeroCounts } from '../reprovision/types.mjs';
 
 const POSTGRES_TARGETS = [
-  // Order: versions + schedules before definitions (FK-safe), then the definition head.
+  // Order: versions + schedules + trigger artifacts before definitions (FK-safe), then the
+  // definition head. The trigger-artifact tables (flow_trigger_secrets / flow_trigger_registrations,
+  // change add-flows-triggers) are purged here so no per-trigger HMAC secret or event subscription
+  // outlives the tenant; Temporal Schedules themselves are removed by removeTriggerArtifacts below.
   { resourceType: 'flow_versions', table: 'flow_versions' },
   { resourceType: 'flow_schedules', table: 'flow_schedules' },
+  { resourceType: 'flow_trigger_secrets', table: 'flow_trigger_secrets' },
+  { resourceType: 'flow_trigger_registrations', table: 'flow_trigger_registrations' },
   { resourceType: 'flow_definitions', table: 'flow_definitions' },
 ];
 
