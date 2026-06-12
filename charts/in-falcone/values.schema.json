@@ -617,6 +617,9 @@
     "controlPlane": {
       "$ref": "#/definitions/component"
     },
+    "workflowWorker": {
+      "$ref": "#/definitions/component"
+    },
     "webConsole": {
       "$ref": "#/definitions/component",
       "properties": {
