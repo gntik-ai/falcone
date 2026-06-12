@@ -15,6 +15,7 @@ import { createPostgresRealtimeExecutor } from './postgres-realtime-executor.mjs
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
+import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 
 const { Pool } = pg;
@@ -97,17 +98,30 @@ const jwtVerifier = createJwtVerifier({
   audience: process.env.KEYCLOAK_AUDIENCE,
 });
 
+// Flow executor (Temporal-backed flows API). Enabled ONLY when TEMPORAL_ADDRESS is configured;
+// it is the SOLE holder of the Temporal client (lazy-connect). Definitions/versions persist on
+// the SAME metadata pool as the API-key + embedding stores (design.md OQ1). When unset, no flows
+// routes are registered and a flows path falls through to 404 / upstream proxy unchanged.
+const flowExecutor = process.env.TEMPORAL_ADDRESS
+  ? createFlowExecutor({
+      store: createFlowStore({ pool: keyPool }),
+      temporalAddress: process.env.TEMPORAL_ADDRESS,
+      temporalNamespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows',
+      temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
+    })
+  : undefined;
+
 // When the executor fronts the data-family wildcard (gateway route-split), it serves the
 // data-plane + DDL slice itself and proxies every other path under those prefixes
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 
 // Initialise all metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema()])
+Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve()])
   .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
   .finally(() => {
     server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
@@ -123,6 +137,7 @@ async function shutdown(signal) {
   await realtimeExecutor?.close().catch(() => {});
   await pgRealtimeExecutor?.close().catch(() => {});
   await eventsExecutor?.close().catch(() => {});
+  await flowExecutor?.close().catch(() => {});
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
