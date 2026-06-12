@@ -1,0 +1,114 @@
+{{- if .Values.temporal.enabled }}
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- $b := $t.bootstrap -}}
+{{- $frontendAddr := printf "%s:%v" (include "in-falcone.temporal.roleName" (dict "root" $root "role" "frontend")) $t.frontend.grpcPort -}}
+{{- /*
+  Bootstrap Job (ADR-11). Runs the admin-tools `temporal` CLI as a Helm
+  post-install,post-upgrade hook AFTER the server is ready. It:
+    1. Waits for the frontend gRPC port (7233) to be reachable.
+    2. Registers the default Temporal namespace ({{ $b.namespace }}).
+    3. Registers the five custom search attributes (all Keyword): tenantId,
+       workspaceId, flowId, flowVersion, triggerType.
+  hook-delete-policy keeps the namespace clean between upgrades.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "in-falcone.temporal.fullname" $root }}-bootstrap
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "bootstrap") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ $t.jobs.backoffLimit }}
+  activeDeadlineSeconds: {{ $t.jobs.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $t.jobs.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "bootstrap") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      {{- include "in-falcone.temporal.imagePullSecrets" $root | nindent 6 }}
+      {{- with $t.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: temporal-bootstrap
+          image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $t.adminTools.image) | quote }}
+          imagePullPolicy: {{ $t.adminTools.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              # NOTE: the admin-tools image ships /bin/sh ONLY (no bash). POSIX-sh only.
+              # IMPORTANT: chart-specific env var names are used (FLOW_*) so they do NOT
+              # collide with the temporal CLI's auto-read TEMPORAL_ADDRESS/TEMPORAL_NAMESPACE
+              # env. If TEMPORAL_NAMESPACE were set to the not-yet-created flows namespace,
+              # the CLI would target it implicitly and the health probe would hang.
+              # 1. Wait for the Temporal frontend gRPC port to be reachable (probe the
+              #    always-present temporal-system namespace, never the flows namespace).
+              i=0
+              while [ "$i" -lt 60 ]; do
+                if temporal operator cluster health \
+                    --address "${FLOW_FRONTEND_ADDR}" --namespace temporal-system >/dev/null 2>&1; then
+                  echo "temporal frontend is healthy"; break
+                fi
+                i=$((i + 1))
+                echo "waiting for temporal frontend ${FLOW_FRONTEND_ADDR} (${i}/60)"; sleep 5
+              done
+
+              # 2. Register the default namespace (idempotent — ignore AlreadyExists).
+              temporal operator namespace describe \
+                --address "${FLOW_FRONTEND_ADDR}" --namespace "${FLOW_NAMESPACE}" >/dev/null 2>&1 || \
+              temporal operator namespace create \
+                --address "${FLOW_FRONTEND_ADDR}" --namespace "${FLOW_NAMESPACE}" \
+                --retention "${FLOW_RETENTION}"
+
+              # 3. Register the five custom search attributes (all Keyword). Idempotent +
+              #    retried: a freshly-created namespace can briefly reject SA registration
+              #    while the cluster settles, so each attribute is retried until the SA is
+              #    present (or 30 attempts), instead of a fire-and-forget that could leave
+              #    an attribute unregistered.
+              register_sa() {
+                _name="$1"; _type="$2"; _r=0
+                while [ "$_r" -lt 30 ]; do
+                  temporal operator search-attribute create \
+                    --address "${FLOW_FRONTEND_ADDR}" --namespace "${FLOW_NAMESPACE}" \
+                    --name "$_name" --type "$_type" >/dev/null 2>&1 || true
+                  if temporal operator search-attribute list \
+                      --address "${FLOW_FRONTEND_ADDR}" --namespace "${FLOW_NAMESPACE}" 2>/dev/null \
+                      | grep -qE "(^|[[:space:]])${_name}([[:space:]])"; then
+                    echo "search attribute ${_name} registered"; return 0
+                  fi
+                  _r=$((_r + 1)); echo "retrying search attribute ${_name} (${_r}/30)"; sleep 3
+                done
+                echo "failed to register search attribute ${_name}" >&2; return 1
+              }
+              {{- range $b.searchAttributes }}
+              register_sa {{ .name | quote }} {{ .type | quote }}
+              {{- end }}
+
+              echo "temporal bootstrap complete"
+          env:
+            - name: FLOW_FRONTEND_ADDR
+              value: {{ $frontendAddr | quote }}
+            - name: FLOW_NAMESPACE
+              value: {{ $b.namespace | quote }}
+            - name: FLOW_RETENTION
+              value: "{{ $b.retentionDays }}d"
+          {{- with $t.jobs.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

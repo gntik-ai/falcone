@@ -3437,3 +3437,196 @@ eso:
 
 vault:
   enabled: false
+
+# ---------------------------------------------------------------------------
+# Temporal — durable workflow (flows) engine. INTERNAL-ONLY platform component.
+# ADR-11: shared namespace + custom search attributes for tenancy; PostgreSQL SQL
+# visibility (NO Elasticsearch); Web UI operator-only (kubectl port-forward, never
+# tenant-exposed). Disabled by default — opt-in for the flows capability.
+#
+# NOTE ON RENDERING (deviation from the original design.md component-wrapper sketch):
+# Temporal is a four-role server (frontend/history/matching/worker) plus a Web UI,
+# two lifecycle Jobs, multiple Services and a NetworkPolicy. The shared
+# `component-wrapper` sub-chart renders exactly one Deployment + one Service per
+# release alias and therefore cannot express four role Deployments. Temporal is
+# instead rendered by first-class umbrella templates under
+# templates/temporal/** (the same approach used by the platform bootstrap Job),
+# all gated by `temporal.enabled`. Image references still flow through the shared
+# `component-wrapper.normalizeRepository` helper so `global.imageRegistry` (Harbor)
+# rewriting and the airgap path keep working.
+temporal:
+  enabled: false
+
+  # Server image — pinned to a Temporal release that supports PostgreSQL SQL
+  # advanced visibility + custom search attributes (ADR-11). Routed through the
+  # global.imageRegistry rewrite helper for Harbor/airgap installs.
+  image:
+    repository: docker.io/temporalio/server
+    tag: "1.31.1"
+    pullPolicy: IfNotPresent
+
+  # temporal-sql-tool image used by the pre-install/pre-upgrade schema Job.
+  schemaTool:
+    image:
+      repository: docker.io/temporalio/admin-tools
+      tag: "1.31.1"
+      pullPolicy: IfNotPresent
+
+  # admin-tools image used by the post-install/post-upgrade bootstrap Job
+  # (registers the default namespace + custom search attributes via the temporal CLI).
+  adminTools:
+    image:
+      repository: docker.io/temporalio/admin-tools
+      tag: "1.31.1"
+      pullPolicy: IfNotPresent
+
+  # Web UI image — deployed but NEVER exposed externally (operator port-forward only).
+  ui:
+    enabled: true
+    image:
+      repository: docker.io/temporalio/ui
+      tag: "2.51.0"
+      pullPolicy: IfNotPresent
+    service:
+      port: 8080
+      targetPort: 8080
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  # PostgreSQL persistence + SQL visibility (ADR-11: no Elasticsearch). Defaults
+  # target the platform PostgreSQL service; the Temporal databases are kept SEPARATE
+  # from the platform `in_falcone` database to avoid schema/migration coupling.
+  persistence:
+    driver: postgres12
+    host: in-falcone-postgresql
+    port: 5432
+    user: temporal
+    # Plaintext default for dev/sandbox; production should set existingSecret +
+    # passwordSecretKey to source the password from a Secret instead.
+    password: temporal
+    existingSecret: ""
+    passwordSecretKey: ""
+    # Dedicated databases (NOT schemas inside in_falcone) for primary + visibility.
+    database: temporal
+    visibilityDatabase: temporal_visibility
+    tls:
+      enabled: false
+
+  # Cluster bootstrap inputs (ADR-11 shared-namespace tenancy model).
+  bootstrap:
+    namespace: falcone-flows
+    retentionDays: 7
+    # All five custom search attributes are Keyword (ADR-11). Order is significant
+    # only for readability; the bootstrap Job registers each one.
+    searchAttributes:
+      - name: tenantId
+        type: Keyword
+      - name: workspaceId
+        type: Keyword
+      - name: flowId
+        type: Keyword
+      - name: flowVersion
+        type: Keyword
+      - name: triggerType
+        type: Keyword
+
+  # NetworkPolicy label contract (Decision 5 in design.md). Inbound to the frontend
+  # gRPC port is permitted ONLY from pods carrying these component labels. The
+  # sibling changes add-flows-control-plane-api (#365) and
+  # add-flows-dsl-interpreter-worker (#359) MUST set these labels on their pods.
+  networkPolicy:
+    enabled: true
+    allowedComponents:
+      - flows-api
+      - flows-worker
+
+  # Job knobs shared by the schema + bootstrap Jobs.
+  jobs:
+    backoffLimit: 3
+    activeDeadlineSeconds: 600
+    ttlSecondsAfterFinished: 300
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  # Pod-level security context. fsGroup is intentionally UNSET here (Temporal pods are
+  # stateless — persistence lives in PostgreSQL) so OpenShift's restricted-v2 SCC can
+  # inject the namespace-assigned GID. runAsNonRoot + seccompProfile are asserted.
+  # runAsUser/runAsGroup are pinned to the Temporal image's baked-in UID/GID (1000) so a
+  # restricted PodSecurity admission (and kind's runAsNonRoot verification) can confirm
+  # the container is non-root — the image declares a NON-numeric user (`temporal`), which
+  # kubelet cannot verify against runAsNonRoot alone. The OpenShift overlay NULLS
+  # runAsUser/runAsGroup/fsGroup so restricted-v2 injects values from the namespace range.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Container-level security context applied to every Temporal container.
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
+  # Frontend gRPC port (7233) is the only port the NetworkPolicy admits inbound.
+  frontend:
+    grpcPort: 7233
+    membershipPort: 6933
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  history:
+    grpcPort: 7234
+    membershipPort: 6934
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  matching:
+    grpcPort: 7235
+    membershipPort: 6935
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  worker:
+    grpcPort: 7239
+    membershipPort: 6939
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
