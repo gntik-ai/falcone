@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { ApiError } from '@/lib/http'
+import type { ApiError, JsonValue } from '@/lib/http'
 
 interface IamUser {
   id: string
@@ -116,7 +116,7 @@ export function ConsoleIamAccessPage() {
     void loadUserDetail(realm, selectedUserId)
   }, [realm, selectedUserId, loadUserDetail])
 
-  async function mutate(path: string, method: 'POST' | 'DELETE' | 'PUT', body?: Record<string, unknown>) {
+  async function mutate(path: string, method: 'POST' | 'DELETE' | 'PUT', body?: JsonValue) {
     if (!realm || !selectedUserId) return
     setBusy(true)
     setError(null)

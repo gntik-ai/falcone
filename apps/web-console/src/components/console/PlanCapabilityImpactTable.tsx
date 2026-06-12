@@ -13,7 +13,7 @@ export function PlanCapabilityImpactTable({ items, title = 'Capability impact' }
             <tr key={item.capabilityKey} className="border-t border-border">
               <td>{item.displayLabel ?? item.capabilityKey}</td>
               <td>{'previousState' in item ? String(item.previousState ?? '—') : '—'}</td>
-              <td>{'newState' in item ? String(item.newState ?? '—') : String(item.enabled)}</td>
+              <td>{'comparison' in item ? String(item.newState ?? '—') : String(item.enabled)}</td>
               <td><span aria-label={`capability state ${'comparison' in item ? item.comparison : item.enabled ? 'enabled' : 'disabled'}`}>{'comparison' in item ? item.comparison : item.enabled ? 'enabled' : 'disabled'}</span></td>
             </tr>
           ))}
