@@ -74,6 +74,18 @@ const ConsoleFlowDesignerPage = lazy(async () => {
   return { default: module.ConsoleFlowDesignerPage }
 })
 
+// Flow run-view + run-history (change: add-console-flow-monitoring). Code-split with the rest of
+// the flows section so the canvas chunk stays out of the initial shell bundle.
+const ConsoleFlowRunPage = lazy(async () => {
+  const module = await import('@/pages/ConsoleFlowRunPage')
+  return { default: module.ConsoleFlowRunPage }
+})
+
+const ConsoleFlowHistoryPage = lazy(async () => {
+  const module = await import('@/pages/ConsoleFlowHistoryPage')
+  return { default: module.ConsoleFlowHistoryPage }
+})
+
 
 function RequireSuperadminRoute({ children }: { children: JSX.Element }) {
   const session = readConsoleShellSession()
@@ -220,6 +232,14 @@ export const appRoutes = [
           {
             path: 'flows/:flowId',
             element: <ConsoleFlowDesignerPage />
+          },
+          {
+            path: 'flows/:flowId/runs',
+            element: <ConsoleFlowHistoryPage />
+          },
+          {
+            path: 'flows/:flowId/runs/:executionId',
+            element: <ConsoleFlowRunPage />
           },
           {
             path: 'storage',
