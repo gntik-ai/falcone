@@ -1,0 +1,13 @@
+{
+  "apiVersion": "v1.0",
+  "name": "dangling-reference",
+  "description": "Node points at ghost-node which does not exist -> FLW-E003.",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "task",
+      "taskType": "first",
+      "next": "ghost-node"
+    }
+  ]
+}

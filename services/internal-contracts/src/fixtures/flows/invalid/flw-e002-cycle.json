@@ -1,0 +1,19 @@
+{
+  "apiVersion": "v1.0",
+  "name": "two-node-cycle",
+  "description": "Node a -> b -> a forms a cycle -> FLW-E002.",
+  "nodes": [
+    {
+      "id": "a",
+      "type": "task",
+      "taskType": "first",
+      "next": "b"
+    },
+    {
+      "id": "b",
+      "type": "task",
+      "taskType": "second",
+      "next": "a"
+    }
+  ]
+}
