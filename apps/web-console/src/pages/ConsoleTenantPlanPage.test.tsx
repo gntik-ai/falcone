@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { ConsoleTenantPlanPage } from './ConsoleTenantPlanPage'
 
-vi.mock('@/services/planManagementApi', () => ({ getTenantCurrentPlan: vi.fn().mockResolvedValue({ assignment: { planId: 'p1' }, plan: { displayName: 'Starter', status: 'active' } }), getTenantPlanHistory: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }), listPlans: vi.fn().mockResolvedValue({ items: [{ id: 'p1', displayName: 'Starter', status: 'active' }], total: 1, page: 1, pageSize: 20 }), assignPlan: vi.fn() }))
+vi.mock('@/services/planManagementApi', () => ({ getTenantCurrentPlan: vi.fn().mockResolvedValue({ assignment: { planId: 'p1' }, plan: { displayName: 'Starter', status: 'active' } }), getEffectiveEntitlements: vi.fn().mockResolvedValue({ tenantId: 'ten_1', planId: 'p1', planDisplayName: 'Starter', quotaDimensions: [], capabilities: [] }), getPlanChangeHistory: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }), listPlans: vi.fn().mockResolvedValue({ items: [{ id: 'p1', displayName: 'Starter', status: 'active' }], total: 1, page: 1, pageSize: 20 }), assignPlan: vi.fn() }))
 
 describe('ConsoleTenantPlanPage', () => {
   it('renders current assignment and change action', async () => {

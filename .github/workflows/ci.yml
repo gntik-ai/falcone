@@ -115,6 +115,29 @@ jobs:
           path: services/internal-contracts/src/domain-model.json
           if-no-files-found: error
 
+  web-console:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Web console unit tests (vitest)
+        run: pnpm --filter @in-falcone/web-console test
+
   security:
     runs-on: ubuntu-latest
     steps:
