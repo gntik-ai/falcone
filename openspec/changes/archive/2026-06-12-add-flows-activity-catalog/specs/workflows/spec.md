@@ -1,15 +1,16 @@
 ## ADDED Requirements
 
 ### Requirement: Task-type registry
-The system SHALL maintain a task-type registry that maps each task type name (string, e.g. `db.query`) to its Temporal activity implementation, its JSON Schema for the input envelope, and its JSON Schema for the output envelope. The registry SHALL be the single authoritative source consumed by DSL validation and the console palette; an unknown task type name SHALL be rejected at validation time with error code `UNKNOWN_TASK_TYPE`.
+The system SHALL maintain a task-type registry that maps each task type name (string, e.g. `db.query`) to its Temporal activity implementation, its JSON Schema for the input envelope, and its JSON Schema for the output envelope. The registry SHALL be the single authoritative source consumed by DSL validation and the console palette. The registry's `resolveActivity` lookup SHALL reject an unknown task type name with error code `UNKNOWN_TASK_TYPE`. DSL validation (the control-plane validate/publish endpoint, fed the registry's task-type names as its `taskTypeCatalog`) SHALL reject a workflow definition that references an unknown task type at validation time with HTTP 422 and validation error code `FLW-E006`, persisting no workflow.
 
 #### Scenario: Known task type accepted
 - **WHEN** a workflow definition references task type `db.query`
-- **THEN** the registry resolves it to the corresponding activity and its schemas without error
+- **THEN** the registry resolves it to the corresponding activity and its schemas without error, and DSL validation passes
 
 #### Scenario: Unknown task type rejected
 - **WHEN** a workflow definition references a task type name not present in the registry (e.g. `db.unknown`)
-- **THEN** DSL validation returns HTTP 422 with error code `UNKNOWN_TASK_TYPE` and no workflow is persisted
+- **THEN** DSL validation returns HTTP 422 with validation error code `FLW-E006` (inside `FLOW_VALIDATION_FAILED`) and no workflow is persisted
+- **AND** the registry's `resolveActivity` lookup for that name throws a non-retryable failure with error code `UNKNOWN_TASK_TYPE`
 
 ### Requirement: Tenant-scoped activity credentials
 The system SHALL ensure that every first-party task-type activity executes API calls under a short-lived tenant-scoped `flc_service_…` API key (key type `service`, db role `falcone_service`) minted for the execution run. The system SHALL NOT use static platform credentials or the platform superuser role when invoking any first-party activity. The minted key SHALL be destroyed or expired after the execution run concludes.
