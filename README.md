@@ -69,7 +69,7 @@ hand-rolled backends.
 
 ### How it fits together
 
-```
+```text
                         ┌──────────────────────────────────────────┐
    Bearer JWT  ──▶  API Gateway (APISIX)   /v1   idempotency, CORS, │
                     resolve tenant ▸ inject identity, correlation-id │
@@ -206,14 +206,14 @@ docker compose -f tests/env/docker-compose.yml ps
 
 | Service | URL / endpoint | Credentials |
 | --- | --- | --- |
-| API gateway (APISIX) | http://localhost:9080 | Bearer JWT from Keycloak |
-| Keycloak (IdP) | http://localhost:8081 | `admin` / `admin` |
+| API gateway (APISIX) | <http://localhost:9080> | Bearer JWT from Keycloak |
+| Keycloak (IdP) | <http://localhost:8081> | `admin` / `admin` |
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
 | MongoDB (rs0) | `localhost:57017` | — |
 | Redpanda (Kafka) | `localhost:19092` | — |
-| MinIO (S3 API) | http://localhost:59000 | `minioadmin` / `minioadmin` |
-| MinIO console | http://localhost:59001 | `minioadmin` / `minioadmin` |
-| Vault (dev) | http://localhost:58200 | token `root` |
+| MinIO (S3 API) | <http://localhost:59000> | `minioadmin` / `minioadmin` |
+| MinIO console | <http://localhost:59001> | `minioadmin` / `minioadmin` |
+| Vault (dev) | <http://localhost:58200> | token `root` |
 
 ### 4. Exercise it
 
@@ -241,7 +241,7 @@ cd tests/env
 
 ## Repository layout
 
-```
+```text
 apps/            control-plane (REST API surface) · web-console (React UI)
 services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
                  scheduling-engine, provisioning-orchestrator, backup-status,
