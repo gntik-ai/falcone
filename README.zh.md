@@ -67,20 +67,23 @@ Falcone 的存在就是为了一次性解决这个问题。它是一个 **多租
                         └───────────────┬──────────────────────────┘
                                         ▼
                         ┌──────────────────────────────────────────┐
-                        │ control-plane  — 249+ 个 REST 端点         │
+                        │ control-plane  — 250+ 个 REST 端点         │
                         │ tenants · workspaces · auth/IAM · pg ·    │
                         │ mongo · storage · events · functions ·    │
-                        │ metrics · plans · quotas · backup         │
+                        │ metrics · plans · quotas · backup ·       │
+                        │ flows (/v1/flows) · MCP (/v1/mcp) [Prev.] │
                         └───────────────┬──────────────────────────┘
             ┌───────────────────────────┼─────────────────────────────┐
             ▼                           ▼                             ▼
    provisioning-orchestrator   realtime-gateway / webhook-engine   cdc-bridges
    （Saga、appliers）          scheduling-engine / backup-status   (pg & mongo → Kafka)
+                               workflow-worker（Flows 解释器）
             │                           │                             │
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
    │ PostgreSQL（RLS + 按租户 schema）· MongoDB · Kafka · S3/MinIO ·          │
-   │ Vault（密钥）· Keycloak（按租户 realm 的 IAM）                            │
+   │ Vault（密钥）· Keycloak（按租户 realm 的 IAM + 面向 MCP 的 OAuth 2.1）·   │
+   │ Temporal（Flows 引擎）· Knative（functions + 按租户 MCP 运行时）          │
    └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -237,13 +240,15 @@ cd tests/env
 ## 仓库结构
 
 ```text
-apps/            control-plane（REST API 面）· web-console（React UI）
+apps/            control-plane（REST API 面）· web-console（React UI）·
+                 cli（falcone CLI：mcp init/dev/deploy）· mcp-server-sdk（按租户隔离的 MCP 工具 SDK）
 services/        gateway-config、realtime-gateway、webhook-engine、cdc-bridges、
                  scheduling-engine、provisioning-orchestrator、backup-status、
-                 audit、adapters、internal-contracts ……
-charts/ helm/    Kubernetes / Helm 部署
+                 workflow-worker（Flows DSL 解释器）、audit、adapters、
+                 internal-contracts ……
+charts/ helm/    Kubernetes / Helm 部署（含 temporal、workflowWorker、mcp 组件）
 deploy/          APISIX 路由、kind/OpenShift 引导
-tests/           blackbox（契约）· e2e（Playwright）· env（Compose 栈）
+tests/           blackbox（契约）· e2e（Playwright，含 mcp 规格）· env（Compose 栈）
 openspec/        规格驱动的变更工作流
 ```
 
