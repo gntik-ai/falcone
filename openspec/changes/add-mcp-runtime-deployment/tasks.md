@@ -6,12 +6,12 @@
 - [ ] 1.4 `values-openshift` overlay: non-root, restricted SCC, numeric UID
 - [x] 1.5 `helm template`/lint renders cleanly with `mcp.enabled=true`; `pnpm validate:deployment-chart` + topology validators pass
 
-## 2. Provisioning MCP domain
+## 2. Provisioning MCP domain (teardown cascade)
 
-- [ ] 2.1 Add `mcp-applier.mjs` in `services/provisioning-orchestrator/src/appliers/` mirroring `functions-applier.mjs` (namespace = `tenantId`, idempotent apply, symmetric teardown, rollback)
-- [ ] 2.2 Add `mcp-collector.mjs` to export the tenant's MCP footprint state
-- [ ] 2.3 Register the MCP domain in the saga collector/applier registry
-- [ ] 2.4 Unit tests for applier idempotency + teardown + rollback
+- [x] 2.1 Add `mcp-applier.mjs` (`teardown`) mirroring `workflows-applier.mjs` — delete the tenant's MCP-server ksvcs + MCP metadata rows; dependency-injected, idempotent, dryRun, `42P01`→skipped
+- [x] 2.2 No reprovision collector needed — MCP is teardown-only, like the workflows domain (servers are created via the MCP API, not reprovisioned config)
+- [x] 2.3 Wire the MCP teardown into `tenant-purge-sweep.mjs` (`TEARDOWN_PLAN` entry + `resolveDependencies`)
+- [x] 2.4 Unit tests (`mcp-applier.test.mjs`): delete, idempotent, dryRun, table-absent skip, error→partial-failure, sweep wiring
 
 ## 3. Verify on cluster
 

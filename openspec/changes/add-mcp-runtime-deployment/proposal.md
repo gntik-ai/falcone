@@ -8,7 +8,7 @@ ADR-12 decided to host each tenant's MCP server as a **Knative ksvc in the tenan
   - **RBAC** granting the control-plane service account `serving.knative.dev` create/get/list/delete on `services` (ksvc) scoped to tenant namespaces, plus the minimal core access to manage the per-server `Service`/secret.
   - **NetworkPolicy** templates that make MCP-server pods **internal-only**: ingress only from the platform gateway (Kourier/APISIX), controlled egress; mirrors `charts/in-falcone/templates/temporal/networkpolicy.yaml`.
   - `values` toggles and a `values-openshift` overlay (non-root, restricted SCC, numeric UID).
-- Add an **MCP domain to the provisioning saga**: an `mcp-applier` (+ collector) in `services/provisioning-orchestrator` that stands up / tears down a tenant's MCP runtime footprint (namespace labels, RBAC, NetworkPolicy) per tenant, **mirroring `functions-applier.mjs`** (namespace = `tenantId`), idempotent with rollback on failure.
+- Add an **MCP domain to the tenant purge sweep**: an `mcp-applier` in `services/provisioning-orchestrator` whose `teardown` removes a tenant's MCP runtime footprint (its hosted MCP-server ksvcs + MCP metadata rows), **mirroring `workflows-applier.mjs`** — wired into `tenant-purge-sweep.mjs`'s `TEARDOWN_PLAN` with the same partial-failure semantics (any error → purge does not finalize). Idempotent; a missing metadata table (`42P01`) is treated as "already gone", not an error. (Provision-time footprint is the static chart RBAC/NetworkPolicy above; individual servers are created later via the MCP API in #391/#392/#394 — there is no separate provision-time apply step, consistent with the workflows domain.)
 
 ## Capabilities
 
