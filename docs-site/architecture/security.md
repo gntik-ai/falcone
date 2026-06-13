@@ -54,6 +54,13 @@ Subscriptions match the verified tenant **inside** the Mongo change-stream pipel
 
 Object keys, event topics, caches and logs are tenant-keyed, so isolation holds across the whole surface — not just SQL/document reads.
 
+### Flows & MCP *(Preview)*
+
+The AI-native capabilities ([Flows](/architecture/flows), [MCP](/architecture/mcp)) carry the same tenant boundary:
+
+- **Flows** — every Temporal workflow id is `{tenantId}:{workspaceId}:{flowId}:{runUuid}`, generated **server-side** and **prefix-checked on every command** (start/signal/cancel/query); the shared namespace is isolated by server-stamped search attributes, so a cross-tenant id query is denied. Activity credentials are tenant-scoped, and the `http.request` activity is SSRF-guarded and strips platform credentials.
+- **MCP** — access is per-tenant **OAuth 2.1** with **per-tool scopes** (Keycloak as the Authorization Server; read tools need a base scope, mutating tools their explicit scope). The management API and audit are keyed by the credential-derived `tenantId`, so a cross-tenant read/call/audit resolves to `404`; per-tenant quotas + rate limits (per server and per OAuth client) bound noisy neighbours; hosted MCP-server pods are **internal-only** (NetworkPolicy), reachable only via the gateway.
+
 ## Rate limiting & noisy-neighbour
 
 APISIX `limit-count` uses `key_type: var_combination` with `$http_apikey`, giving **each API key its own bucket** (a plain `var` key would rate-limit globally across keys). Choose `policy: local` (node-local, ≈ N× the limit with N gateway replicas) or `policy: redis` (globally exact). Per-tenant quotas (from the plan's `quota_policy`) provide the higher-level resource limits.

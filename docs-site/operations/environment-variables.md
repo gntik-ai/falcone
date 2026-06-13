@@ -44,6 +44,32 @@ For change streams / realtime the URI must point at a **replica set** (e.g. `?re
 | `KAFKA_BROKERS` | — | Comma-separated brokers; events executor is enabled only when set |
 | `FN_BACKEND` | — | Set to `off` to disable the functions executor |
 
+## Flows (Temporal) *(Preview)*
+
+The Flows API is registered **only when `TEMPORAL_ADDRESS` is set** (the executor is the sole Temporal client).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TEMPORAL_ADDRESS` | — | Temporal frontend `host:port`; **enables Flows** when set |
+| `TEMPORAL_NAMESPACE` | `falcone-flows` | Shared Temporal namespace |
+| `TEMPORAL_TASK_QUEUE` | `flows-main` | Worker task queue |
+| `FLOW_QUOTA_ENFORCE_URL` | — | Quota-evaluator endpoint; when set, hard-limit breaches → `429` |
+| `FLOW_AUDIT_TOPIC` | `falcone.audit.flow-lifecycle` | Kafka topic for flow lifecycle audit (best-effort) |
+| `FLOW_TRIGGER_SECRET_KEY` | — | Master key for per-trigger webhook signing secrets |
+| `FLOWS_ENABLED` | — | Set to `false` to keep the Flows API but suppress the monitoring SSE endpoint |
+
+## MCP server hosting *(Preview)*
+
+The MCP management API (`/v1/mcp`) is registered **only when `MCP_ENABLED=true`**.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MCP_ENABLED` | — | Set to `true` to serve the MCP management API |
+| `MCP_SELF_BASE_URL` | `http://127.0.0.1:$PORT` | Base URL the engine self-calls to mediate tool calls |
+| `MCP_GATEWAY_BASE_URL` | (self URL) | Public base URL used to compute a server's endpoint |
+| `MCP_RUNTIME_IMAGE` | — | Platform MCP runtime image (digest-pinned for the registry) |
+| `MCP_RUNTIME_IMAGE_DIGEST` | — | `sha256:` digest of the runtime image |
+
 ## Identity (JWT verification)
 
 | Variable | Purpose |
