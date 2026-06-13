@@ -183,6 +183,15 @@ jobs:
     # RLS, data/DDL/realtime executors — against a REAL database. These prove the
     # tenant-isolation guarantees that in-memory unit tests cannot.
     runs-on: ubuntu-latest
+    # The tests/env compose stack uses a FIXED compose project name (falcone-testenv) and a
+    # FIXED host port (55432). On a shared Docker host (self-hosted runners), two concurrent
+    # real-stack runs collide ("address already in use" / container-name conflict, issue #413).
+    # Serialize repo-wide so only one run touches the shared host at a time. GLOBAL group (not
+    # per-branch): the Docker host is the shared resource. cancel-in-progress:false => queue, so
+    # the running integration finishes and tears down cleanly rather than being killed mid-run.
+    concurrency:
+      group: real-stack-shared-host
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -200,6 +209,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Defensive: clear any leftover stack from a hard-killed prior run (the trap-based
+      # teardown can be skipped if a job is force-cancelled). Serialization (above) prevents
+      # concurrent collisions; this handles residue. Safe no-op when nothing is running.
+      - name: Pre-clean any leftover tests/env stack
+        run: docker compose -f tests/env/docker-compose.yml down -v --remove-orphans || true
 
       - name: Executor real-stack tests (Postgres + pgvector)
         run: bash tests/env/executor/run.sh
