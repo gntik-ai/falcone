@@ -114,11 +114,12 @@ für eine KI-native Welt. (Die Auflösung ist bewusst locker gehalten; entscheid
 nicht das Akronym.) Konkret bedeutet „für KI gebaut", dass das Backend eines Mandanten so gestaltet
 ist, dass es **nativ von Agenten konsumierbar** ist, nicht nur von Anwendungscode:
 
-- **MCP-Server-Hosting** *(in Entwicklung)* — Mandanten werden ihr Backend (Daten, Speicher,
-  Funktionen) als [Model-Context-Protocol](https://modelcontextprotocol.io)-Server bereitstellen
-  können, sodass jeder MCP-fähige Agent es unter der Isolation, Authentifizierung und den
-  Kontingenten dieses Mandanten entdecken und aufrufen kann.
-- **Agentische Workflows** — die Temporal-basierte **Flows**-Engine erlaubt es Mandanten,
+- **MCP-Server-Hosting** *(Preview)* — ein Mandant stellt sein Backend (Daten, Speicher, Funktionen)
+  als [Model-Context-Protocol](https://modelcontextprotocol.io)-Server bereit, sodass jeder
+  MCP-fähige Agent es unter der Isolation, Authentifizierung und den Kontingenten dieses Mandanten
+  entdecken und aufrufen kann. Die Management-API wird live unter `/v1/mcp` bereitgestellt; Instant
+  MCP und der offizielle Server funktionieren durchgängig.
+- **Agentische Workflows** *(Preview)* — die Temporal-basierte **Flows**-Engine erlaubt es Mandanten,
   langlebige, mehrstufige Workflows aus einem JSON-Schema-DSL zu definieren, mit einem hauseigenen
   Aktivitätskatalog, dessen Credentials pro Mandant eingegrenzt sind — das verlässliche Fundament,
   das ein Agent braucht, um über Services hinweg zu handeln.
@@ -132,14 +133,29 @@ Mandant und Workspace eingegrenzt, durch die Plan-Fähigkeiten gesteuert und aud
 
 Falcone ist pre-1.0 und entwickelt sich schnell; dies ist die kurzfristige Richtung, keine Zusage.
 
-- **MCP-Server-Hosting** — *in aktiver Entwicklung.* Mandanten sollen
-  [Model-Context-Protocol](https://modelcontextprotocol.io)-Server bereitstellen und hosten können,
-  damit ihre Backends für KI-Agenten erreichbar sind — unter Isolation, Authentifizierung und
-  Kontingenten pro Mandant.
-- **Flows — langlebige Workflow-Engine (Temporal)** — *in Arbeit* ([Epic #355](https://github.com/gntik-ai/falcone/issues/355)).
-  Vom Mandanten definierte Workflows über ein JSON-Schema-DSL und einen Interpreter-Worker, ein
-  hauseigener Aktivitätskatalog mit pro Mandant eingegrenzten Credentials, Trigger (Temporal
-  Schedules, Webhooks, Plattform-Events) und ein visueller Designer in der Web-Konsole.
+**Verfügbar (Preview).** Beide AI-nativen Vorzeigefunktionen sind gelandet und dokumentiert; sie
+bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
+
+- **MCP-Server-Hosting** — die Management-API wird live unter `/v1/mcp` bereitgestellt; **Instant
+  MCP** und der **offizielle Server** funktionieren durchgängig (erstellen → kuratieren →
+  veröffentlichen → aufrufen → beobachten), mit Isolation pro Mandant, OAuth, Kontingenten,
+  Registry/Versionierung und Audit. Der Serverzustand ist derzeit In-Memory (Einzelreplik).
+  ([Epic #386](https://github.com/gntik-ai/falcone/issues/386))
+- **Flows — langlebige Workflow-Engine (Temporal)** — vom Mandanten definierte Workflows über ein
+  JSON-Schema-DSL und einen Interpreter-Worker, ein hauseigener Aktivitätskatalog mit pro Mandant
+  eingegrenzten Credentials, Trigger und ein visueller Designer.
+  ([Epic #355](https://github.com/gntik-ai/falcone/issues/355))
+
+**In Arbeit / geplant.**
+
+- **Nächste MCP-Schritte** — eine dauerhafte (Postgres-basierte) Server-Registry mit mehreren
+  Replikas; Custom-Hosting (eigenes Image) auf dem Live-Erstellungspfad; das Verdrahten von
+  Workflows-as-MCP-Tools; und eine direkte MCP-Protokoll-Verbindung pro Server (heute vermittelt die
+  Control-Plane die Tool-Aufrufe).
+- **Alternativen für Objektspeicher / Dokument-DB** — *geplant, in Evaluierung, noch nicht
+  implementiert.* Die Plattform nutzt **MinIO** (Objektspeicher) und **MongoDB** (Dokument-API);
+  source-available / leichtere Alternativen (z. B. SeaweedFS; FerretDB über ein
+  DocumentDB-kompatibles Backend) werden evaluiert und sind auf der Deployment-Ebene austauschbar.
 - **Auf dem Weg zu einem ersten stabilen Release** — *geplant.* Sicherheitsaudit,
   Stabilitätszusicherungen für APIs/Schemata und Migrationswerkzeuge (siehe den Hinweis oben).
 
@@ -162,7 +178,8 @@ Falcone ist pre-1.0 und entwickelt sich schnell; dies ist die kurzfristige Richt
 | **Funktionen** | Serverless-Funktionen mit Versionen, Aktivierungen, Aufrufen, Rollback und Cron- / Kafka- / Storage-Triggern. |
 | **Webhooks** | Signierte Webhook-Zustellung mit Retries und SSRF-Schutz (private, Loopback-, Link-Local- und ULA-Bereiche blockiert, zum Zustellzeitpunkt erneut geprüft). |
 | **Scheduling** | Cron-Jobs mit Nebenläufigkeits- und Job-Anzahl-Kontingenten pro Workspace und vollständigem Ausführungs-Audit. |
-| **Flows (Workflow-Engine)** | Vom Mandanten definierte langlebige Workflows auf einer Temporal-basierten Engine: ein JSON-Schema-DSL und ein Interpreter-Worker, ein hauseigener Aktivitätskatalog mit pro Mandant eingegrenzten Credentials, Trigger (Schedules, Webhooks, Plattform-Events) und ein visueller Designer in der Konsole. *In aktiver Entwicklung ([Epic #355](https://github.com/gntik-ai/falcone/issues/355)).* |
+| **Flows (Workflow-Engine)** | Vom Mandanten definierte langlebige Workflows auf einer Temporal-basierten Engine: ein JSON-Schema-DSL und ein Interpreter-Worker, ein hauseigener Aktivitätskatalog mit pro Mandant eingegrenzten Credentials, Trigger (Schedules, Webhooks, Plattform-Events) und ein visueller Designer in der Konsole. *Preview ([Epic #355](https://github.com/gntik-ai/falcone/issues/355)).* |
+| **MCP-Server-Hosting** | Hosting von Model-Context-Protocol-Servern des Mandanten, damit KI-Agenten das Backend als Tools aufrufen. Management-API live unter `/v1/mcp`: Instant MCP (aus einer Ressource generierte Tools), der offizielle read-first-Server, verpflichtende Kuratierung, Registry/Versionierung mit Rug-Pull-Prüfung, OAuth 2.1, Kontingente/Rate-Limits pro Mandant und Audit. *Preview — Instant MCP + offizieller Server live (In-Memory-Zustand); Custom-Image-Hosting und Workflows-as-Tools sind experimentell ([Epic #386](https://github.com/gntik-ai/falcone/issues/386)).* |
 | **Pläne & Kontingente** | Kommerzielle Pläne werden auf Capability-Keys, Kontingent-Standardwerte und ein Deployment-Profil abgebildet. Kontingente erzwingen Modi hard-block / soft-grace / soft-exhausted pro Mandant und Workspace. |
 | **Backup & Wiederherstellung** | Snapshot-Auflistung, Wiederherstellungs-Orchestrierung und Point-in-Time-Recovery-Simulation (PITR) über S3- / Postgres- / Mongo-Adapter. |
 | **Observability & Audit** | Audit-Pipeline pro Mandant (Akteur, Scope-Envelope, Ressource, Aktion, Ergebnis), an Kafka gestreamt und persistiert, mit Metrik-Familien, Health-Checks, Dashboards und Schwellenwert-Alerts. |

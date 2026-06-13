@@ -7,9 +7,16 @@ platform's durable execution engine, not in a process. You author a flow as a sm
 DSL** (or visually on a canvas), publish an immutable **version**, and run it manually or from a
 **trigger** (schedule, webhook, or platform event).
 
-This page is the developer/tenant guide. For how it works internally see
+This page is the developer/tenant guide. For the complete DSL spec with a valid YAML example of
+every node type, task type and trigger see the
+[Workflow DSL Reference](/architecture/workflow-dsl-reference); for how it works internally see
 [Flows Architecture](/architecture/flows); for deploy/operate see the
 [Flows Runbook](/architecture/flows-runbook).
+
+::: tip Status — Preview
+Flows is functionally complete and runs end-to-end on the Temporal-backed engine, but is **Preview**
+under the platform's [not-production-ready](/) posture and requires Temporal to be deployed.
+:::
 
 ## Where flows live
 
