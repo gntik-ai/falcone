@@ -1,0 +1,31 @@
+# Throwaway Temporal dev server for the add-mcp-workflows-as-tools (#395) live spike.
+# EPHEMERAL — applied into ns mcp-temporal-spike, deleted with the namespace afterwards.
+# Not part of the chart: production rides the chart's Temporal (ADR-11).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-dev
+  labels: { app: temporal-dev }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: temporal-dev } }
+  template:
+    metadata:
+      labels: { app: temporal-dev }
+    spec:
+      containers:
+        - name: temporal
+          image: temporalio/temporal:latest   # Temporal CLI 1.7.2 (Server 1.31.1)
+          command: ["temporal", "server", "start-dev", "--ip", "0.0.0.0", "--namespace", "default"]
+          ports:
+            - { name: grpc, containerPort: 7233 }
+            - { name: ui, containerPort: 8233 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-dev
+spec:
+  selector: { app: temporal-dev }
+  ports:
+    - { name: grpc, port: 7233, targetPort: 7233 }
