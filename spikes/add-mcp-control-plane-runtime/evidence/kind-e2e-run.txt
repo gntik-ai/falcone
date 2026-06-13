@@ -1,0 +1,23 @@
+# Full MCP E2E suite — REAL run against the kind cluster (test-cluster-b).
+# Runtime: ephemeral Deployment mcp-cp-executor (ns mcp-e2e), image
+#   localhost:30500/in-falcone-control-plane-executor:0.9.6-mcp, MCP_ENABLED=true,
+#   port-forwarded to 127.0.0.1:18080.
+# Command: E2E_CP_BASE_URL=http://127.0.0.1:18080 npx playwright test specs/mcp specs/issues/add-mcp-e2e.spec.ts
+
+
+Running 12 tests using 2 workers
+
+  ✓   1 [other] › specs/mcp/mcp-cross-tenant.spec.ts:48:3 › mcp: cross-tenant isolation › mcp-e2e-xt-01: B cannot get A's server detail (7ms)
+  ✓   2 [other] › specs/issues/add-mcp-e2e.spec.ts:28:3 › issue add-mcp-e2e: MCP runtime smoke › mcp-e2e-smoke: create → get → delete a server (72ms)
+  ✓   3 [other] › specs/mcp/mcp-cross-tenant.spec.ts:53:3 › mcp: cross-tenant isolation › mcp-e2e-xt-02: A's server does not appear in B's server list (12ms)
+  ✓   4 [other] › specs/mcp/mcp-cross-tenant.spec.ts:59:3 › mcp: cross-tenant isolation › mcp-e2e-xt-03: B cannot call a tool on A's server (7ms)
+  ✓   5 [other] › specs/mcp/mcp-full-loop.spec.ts:43:3 › mcp: full loop (create → curate → deploy → connect → call → observe) › mcp-e2e-fl-01: create a server with a draft tool set (13ms)
+  ✓   6 [other] › specs/mcp/mcp-cross-tenant.spec.ts:64:3 › mcp: cross-tenant isolation › mcp-e2e-xt-04: B cannot read A's server audit (logs/credentials) (6ms)
+  ✓   7 [other] › specs/mcp/mcp-full-loop.spec.ts:50:3 › mcp: full loop (create → curate → deploy → connect → call → observe) › mcp-e2e-fl-02: curate and publish the tool set (12ms)
+  ✓   9 [other] › specs/mcp/mcp-full-loop.spec.ts:56:3 › mcp: full loop (create → curate → deploy → connect → call → observe) › mcp-e2e-fl-03: the published server exposes an endpoint and curated tools (7ms)
+  ✓   8 [other] › specs/mcp/mcp-version-pinning.spec.ts:40:3 › mcp: version pinning / rug-pull review › mcp-e2e-vp-01: a tool-description change is held for review (not served) (50ms)
+  ✓  10 [other] › specs/mcp/mcp-full-loop.spec.ts:63:3 › mcp: full loop (create → curate → deploy → connect → call → observe) › mcp-e2e-fl-04: call a tool through the OAuth-backed path and get a structured result (56ms)
+  ✓  12 [other] › specs/mcp/mcp-full-loop.spec.ts:74:3 › mcp: full loop (create → curate → deploy → connect → call → observe) › mcp-e2e-fl-05: the tool call is observable in the tenant audit (5ms)
+  ✓  11 [other] › specs/mcp/mcp-version-pinning.spec.ts:57:3 › mcp: version pinning / rug-pull review › mcp-e2e-vp-02: after approval, the new version serves (9ms)
+
+  12 passed (1.3s)
