@@ -134,7 +134,8 @@
     "logical_databases",
     "topics",
     "collections_tables",
-    "error_count"
+    "error_count",
+    "mcp_tool_invocations"
   ],
   "evaluation_defaults": {
     "default_policy_mode": "enforced",

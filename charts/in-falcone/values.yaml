@@ -3745,6 +3745,15 @@ mcp:
     gatewayNamespaces:
       - knative-serving
       - kourier-system
+  # Per-tenant quota + rate-limit DEFAULTS (the resolved plan overrides these; see
+  # apps/control-plane/src/mcp-quota.mjs and the mcp_tool_invocations quota dimension).
+  # mode: enforced | unbounded (mirrors observability-quota-policies policy modes).
+  quotas:
+    mode: enforced
+    maxServersPerTenant: 10
+    maxToolsPerServer: 50
+    toolCallsPerMinutePerServer: 600
+    toolCallsPerMinutePerOAuthClient: 300
   # OpenShift-safe defaults for hosted MCP-server pods (overlays may tighten further).
   securityContext:
     runAsNonRoot: true
