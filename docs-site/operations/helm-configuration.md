@@ -51,6 +51,20 @@ config:
       existingSecret: my-external-postgres   # supply username/password/database
 ```
 
+The **AI-native capabilities are off by default** and are enabled by their own component toggles
+(set the matching runtime env from [Environment Variables](/operations/environment-variables)):
+
+```yaml
+temporal:        { enabled: true }   # Flows engine — also set TEMPORAL_ADDRESS on the executor
+workflowWorker:  { enabled: true }   # the DSL interpreter worker
+mcp:             { enabled: true }   # MCP server hosting (RBAC + internal-only NetworkPolicy);
+                                     # set MCP_ENABLED=true on the executor to serve /v1/mcp
+```
+
+Object storage is the `storage` component (**MinIO**, S3-compatible) and the document API is the
+`mongodb` component; the SeaweedFS / FerretDB+DocumentDB alternatives on the [Roadmap](/guide/roadmap)
+are not yet implemented in the chart.
+
 ## Exposure & TLS
 
 ```yaml

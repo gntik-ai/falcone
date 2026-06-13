@@ -52,9 +52,9 @@ features:
     linkText: Installation
   - icon: 🤖
     title: Built for AI — a BaAIS
-    details: A backend designed to be natively consumable by AI agents — MCP server hosting (in development) and the Temporal-based Flows workflow engine — all under the same per-tenant isolation, auth and quotas.
-    link: /guide/what-is-falcone#built-for-ai-a-baais
-    linkText: The vision
+    details: A backend designed to be natively consumable by AI agents — MCP server hosting (Preview, served live under /v1/mcp) and the Temporal-based Flows workflow engine (Preview) — all under the same per-tenant isolation, auth and quotas.
+    link: /guide/mcp
+    linkText: MCP &amp; Flows
 ---
 
 ::: danger Not production-ready

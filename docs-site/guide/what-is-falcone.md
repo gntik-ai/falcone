@@ -43,10 +43,12 @@ AI-native world. (The expansion is deliberately loose; what matters is the direc
 acronym.) Concretely, it means a tenant's backend is designed to be **natively consumable by
 agents**, not only by application code:
 
-- **MCP server hosting** *(in development)* — expose a tenant's backend (data, storage,
-  functions) as a [Model Context Protocol](https://modelcontextprotocol.io) server, so any
-  MCP-capable agent can discover and call it under that tenant's own isolation, auth and quotas.
-- **Agentic workflows** — the Temporal-based [Flows](/guide/flows) engine runs durable,
+- **MCP server hosting** *(Preview)* — expose a tenant's backend (data, storage, functions) as a
+  [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP-capable agent can
+  discover and call it under that tenant's own isolation, auth and quotas. The management API is
+  served live under `/v1/mcp`; Instant MCP and the official server work end-to-end. See the
+  [MCP guide](/guide/mcp).
+- **Agentic workflows** *(Preview)* — the Temporal-based [Flows](/guide/flows) engine runs durable,
   multi-step workflows with a first-party activity catalog whose credentials are tenant-scoped —
   the reliable substrate an agent needs to act across services.
 
