@@ -3728,3 +3728,28 @@ temporal:
       limits:
         cpu: 500m
         memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# MCP server hosting (ADR-12). Reuses Knative (each MCP server = a ksvc), so this
+# component installs NO new runtime — it only grants the control-plane the RBAC to
+# manage per-tenant MCP-server ksvcs + internal-only NetworkPolicies, and ships the
+# NetworkPolicy template for hosted MCP-server pods. Default OFF until the inbound
+# gateway (#389) and isolation/quotas (#399) land. The per-tenant footprint is
+# applied by the provisioning saga at tenant-creation time.
+# ---------------------------------------------------------------------------
+mcp:
+  enabled: false
+  networkPolicy:
+    enabled: true
+    # Namespaces allowed to reach MCP-server pods (the Knative ingress/activator path).
+    gatewayNamespaces:
+      - knative-serving
+      - kourier-system
+  # OpenShift-safe defaults for hosted MCP-server pods (overlays may tighten further).
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop: ["ALL"]

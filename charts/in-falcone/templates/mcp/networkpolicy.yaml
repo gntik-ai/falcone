@@ -1,0 +1,49 @@
+{{- if and .Values.mcp.enabled .Values.mcp.networkPolicy.enabled }}
+{{- /*
+  Internal-only NetworkPolicy for hosted MCP-server pods (label
+  `in-falcone.io/component: mcp-server`). Inbound is allowed ONLY from the Knative
+  ingress / activator path (the platform gateway namespaces) — MCP-server pods are
+  never directly reachable. Egress is constrained to DNS + the platform namespace
+  (the executor mediates access to real backends). Mirrors the temporal NetworkPolicy.
+
+  ENFORCEMENT CAVEAT (ADR-12): NetworkPolicy is honored only under a policy-enforcing
+  CNI (Calico/Cilium). kind's default kindnet does NOT enforce it, so cross-namespace
+  isolation cannot be proven on kindnet — production/CI must run a policy CNI (#399).
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-mcp-server-internal-only
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      in-falcone.io/component: mcp-server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        {{- range .Values.mcp.networkPolicy.gatewayNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+  egress:
+    # DNS resolution.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Platform data-plane services live in the platform namespace; the executor
+    # mediates real backends, so MCP-server egress is limited to it.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.namespace }}
+{{- end }}
