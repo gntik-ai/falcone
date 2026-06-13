@@ -72,7 +72,7 @@ lugar de una flota de backends hechos a mano.
 
 ### Cómo encaja todo
 
-```
+```text
                         ┌──────────────────────────────────────────┐
    Bearer JWT  ──▶  API Gateway (APISIX)   /v1   idempotencia, CORS, │
                     resuelve tenant ▸ inyecta identidad, correlation │
@@ -211,14 +211,14 @@ docker compose -f tests/env/docker-compose.yml ps
 
 | Servicio | URL / endpoint | Credenciales |
 | --- | --- | --- |
-| API gateway (APISIX) | http://localhost:9080 | Bearer JWT de Keycloak |
-| Keycloak (IdP) | http://localhost:8081 | `admin` / `admin` |
+| API gateway (APISIX) | <http://localhost:9080> | Bearer JWT de Keycloak |
+| Keycloak (IdP) | <http://localhost:8081> | `admin` / `admin` |
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
 | MongoDB (rs0) | `localhost:57017` | — |
 | Redpanda (Kafka) | `localhost:19092` | — |
-| MinIO (API S3) | http://localhost:59000 | `minioadmin` / `minioadmin` |
-| Consola MinIO | http://localhost:59001 | `minioadmin` / `minioadmin` |
-| Vault (dev) | http://localhost:58200 | token `root` |
+| MinIO (API S3) | <http://localhost:59000> | `minioadmin` / `minioadmin` |
+| Consola MinIO | <http://localhost:59001> | `minioadmin` / `minioadmin` |
+| Vault (dev) | <http://localhost:58200> | token `root` |
 
 ### 4. Pruébalo
 
@@ -246,7 +246,7 @@ cd tests/env
 
 ## Estructura del repositorio
 
-```
+```text
 apps/            control-plane (superficie API REST) · web-console (UI React)
 services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
                  scheduling-engine, provisioning-orchestrator, backup-status,

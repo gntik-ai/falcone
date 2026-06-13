@@ -37,7 +37,7 @@ to the DSL node id** (optionally suffixed `#<loopCounter>` for an iterated node)
 `activityIdForNode` in `src/shared/naming.ts`. Because `activityId` is surfaced verbatim
 on the `ActivityTaskScheduled` history event:
 
-```
+```text
 history event ActivityTaskScheduled.activityId === DSL node.id   (or node.id#<n>)
 ```
 
@@ -93,7 +93,7 @@ SDK `WorkflowReplayer` is run over recorded fixture histories to catch regressio
 
 ## Build
 
-```
+```text
 pnpm --filter @in-falcone/workflow-worker build   # tsc → dist/ (CommonJS)
 node dist/worker.js                                # run the worker
 ```
