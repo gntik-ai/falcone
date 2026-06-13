@@ -76,20 +76,23 @@ hand-rolled backends.
                         └───────────────┬──────────────────────────┘
                                         ▼
                         ┌──────────────────────────────────────────┐
-                        │ control-plane  — 249+ REST endpoints      │
+                        │ control-plane  — 250+ REST endpoints      │
                         │ tenants · workspaces · auth/IAM · pg ·    │
                         │ mongo · storage · events · functions ·    │
-                        │ metrics · plans · quotas · backup         │
+                        │ metrics · plans · quotas · backup ·       │
+                        │ flows (/v1/flows) · MCP (/v1/mcp) [Prev.] │
                         └───────────────┬──────────────────────────┘
             ┌───────────────────────────┼─────────────────────────────┐
             ▼                           ▼                             ▼
    provisioning-orchestrator   realtime-gateway / webhook-engine   cdc-bridges
    (sagas, appliers)           scheduling-engine / backup-status   (pg & mongo → Kafka)
+                               workflow-worker (Flows interpreter)
             │                           │                             │
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
    │ PostgreSQL (RLS + schema-per-tenant) · MongoDB · Kafka · S3/MinIO ·      │
-   │ Vault (secrets) · Keycloak (realm-per-tenant IAM)                        │
+   │ Vault (secrets) · Keycloak (realm-per-tenant IAM + MCP OAuth 2.1) ·      │
+   │ Temporal (Flows engine) · Knative (functions + per-tenant MCP runtime)   │
    └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -257,13 +260,15 @@ cd tests/env
 ## Repository layout
 
 ```text
-apps/            control-plane (REST API surface) · web-console (React UI)
+apps/            control-plane (REST API surface) · web-console (React UI) ·
+                 cli (falcone CLI: mcp init/dev/deploy) · mcp-server-sdk (tenant-scoped MCP tool SDK)
 services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
                  scheduling-engine, provisioning-orchestrator, backup-status,
-                 audit, adapters, internal-contracts, …
-charts/ helm/    Kubernetes / Helm deployment
+                 workflow-worker (Flows DSL interpreter), audit, adapters,
+                 internal-contracts, …
+charts/ helm/    Kubernetes / Helm deployment (incl. temporal, workflowWorker, mcp components)
 deploy/          APISIX routes, kind/OpenShift bootstrap
-tests/           blackbox (contract) · e2e (Playwright) · env (Compose stack)
+tests/           blackbox (contract) · e2e (Playwright, incl. mcp specs) · env (Compose stack)
 openspec/        spec-driven change workflow
 ```
 
