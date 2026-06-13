@@ -1,0 +1,16 @@
+{
+  "name": "@in-falcone/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Falcone CLI — bootstrap harness with the mcp command group (init / dev / deploy).",
+  "bin": {
+    "falcone": "bin/falcone.mjs"
+  },
+  "scripts": {
+    "start": "node bin/falcone.mjs",
+    "test": "node --test src/**/*.test.mjs",
+    "lint": "node -e \"console.log('cli lint placeholder')\"",
+    "typecheck": "node -e \"console.log('cli typecheck placeholder')\""
+  }
+}
