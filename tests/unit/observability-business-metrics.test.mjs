@@ -31,13 +31,15 @@ test('summarizeObservabilityBusinessMetrics returns the complete business-metric
   assert.equal(summary.metricTypes.some((t) => t.id === 'usage'), true);
   assert.equal(summary.metricTypes.some((t) => t.id === 'saturation'), true);
 
-  assert.equal(summary.businessDomains.length, 9);
+  assert.equal(summary.businessDomains.length, 10);
   assert.equal(summary.businessDomains.some((d) => d.id === 'tenant_lifecycle'), true);
   assert.equal(summary.businessDomains.some((d) => d.id === 'quota_posture'), true);
+  assert.equal(summary.businessDomains.some((d) => d.id === 'mcp_tool_usage'), true);
 
-  assert.equal(summary.metricFamilies.length, 9);
+  assert.equal(summary.metricFamilies.length, 10);
   assert.equal(summary.metricFamilies.some((f) => f.id === 'api_requests_total'), true);
   assert.equal(summary.metricFamilies.some((f) => f.id === 'quota_utilization_ratio'), true);
+  assert.equal(summary.metricFamilies.some((f) => f.id === 'mcp_tool_invocations_total'), true);
 
   assert.equal(summary.requiredLabels.includes('metric_scope'), true);
   assert.equal(summary.cardinalityControls.forbidden_labels.includes('user_id'), true);

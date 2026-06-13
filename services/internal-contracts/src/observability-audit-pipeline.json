@@ -142,6 +142,22 @@
       ],
       "emission_freshness_threshold_seconds": 120,
       "scope_attribution": "both"
+    },
+    {
+      "id": "mcp",
+      "display_name": "Model Context Protocol servers",
+      "required_event_categories": [
+        "resource_creation",
+        "resource_deletion",
+        "configuration_change",
+        "access_control_modification"
+      ],
+      "optional_event_categories": [
+        "tool_invocation_failure",
+        "oauth_client_consent_change"
+      ],
+      "emission_freshness_threshold_seconds": 180,
+      "scope_attribution": "both"
     }
   ],
   "pipeline_topology": {

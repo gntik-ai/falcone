@@ -18,7 +18,8 @@ const REQUIRED_DOMAIN_IDS = [
   'data_service_usage',
   'storage_usage',
   'realtime_event_activity',
-  'quota_posture'
+  'quota_posture',
+  'mcp_tool_usage'
 ];
 const REQUIRED_METRIC_TYPE_IDS = ['adoption', 'usage', 'saturation'];
 const REQUIRED_METRIC_FAMILY_IDS = [
@@ -30,7 +31,8 @@ const REQUIRED_METRIC_FAMILY_IDS = [
   'data_service_operations_total',
   'storage_logical_volume_bytes',
   'realtime_connections_active',
-  'quota_utilization_ratio'
+  'quota_utilization_ratio',
+  'mcp_tool_invocations_total'
 ];
 const REQUIRED_SCOPES = ['platform', 'tenant', 'workspace'];
 const REQUIRED_BASE_LABELS = ['environment', 'subsystem', 'metric_scope', 'collection_mode'];
