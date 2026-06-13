@@ -1,0 +1,17 @@
+# Live verification on test-cluster-b Keycloak (in-falcone-keycloak), throwaway realm mcp-oauth-spike
+# Proves: Keycloak issues an OAuth 2.1 token carrying a PER-TOOL scope to a registered MCP client.
+
+STEP admin-token: OK
+STEP create-realm: 201
+STEP create-client-scope (per-tool 'mcp:tool:echo'): 201
+STEP create-client (confidential, service-account, https redirect): 201
+STEP assign per-tool scope as default: 204
+STEP client_credentials token: OK
+RESULT token.scope = "mcp:tool:echo profile email"
+RESULT per-tool scope present = true
+CLEANUP delete-realm: done  (no residue left on the cluster)
+
+Conclusion: per-tool scopes model cleanly as Keycloak client scopes; a registered client
+obtains a token carrying the per-tool scope. "Extend Keycloak as the MCP OAuth 2.1 AS" (ADR-12)
+is validated live. DCR endpoint + authorization_code/client_credentials/refresh_token grants were
+confirmed earlier (#387 evidence).
