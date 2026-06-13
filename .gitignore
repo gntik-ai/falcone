@@ -36,3 +36,6 @@ deploy/kind/.uiout/
 
 # kind web-console build output (served by static-server.mjs)
 deploy/kind/web-console/dist/
+
+# Generated third-party license report (SBOM) — produced by `pnpm sbom:licenses*` / CI, not committed
+sbom/
