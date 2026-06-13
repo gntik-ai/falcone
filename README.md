@@ -110,11 +110,12 @@ AI-native world. (The expansion is intentionally loose; what matters is the dire
 acronym.) Concretely, "built for AI" means a tenant's backend is designed to be **natively
 consumable by agents**, not only by application code:
 
-- **MCP server hosting** *(in development)* — tenants will expose their backend (data, storage,
-  functions) as a [Model Context Protocol](https://modelcontextprotocol.io) server, so any
-  MCP-capable agent can discover and call it under that tenant's own isolation, auth and quotas.
-- **Agentic workflows** — the Temporal-based **Flows** engine lets tenants define durable,
-  multi-step workflows from a JSON-Schema DSL, with a first-party activity catalog whose
+- **MCP server hosting** *(Preview)* — a tenant exposes its backend (data, storage, functions) as a
+  [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP-capable agent can
+  discover and call it under that tenant's own isolation, auth and quotas. The management API is
+  served live under `/v1/mcp`; Instant MCP and the official server work end-to-end.
+- **Agentic workflows** *(Preview)* — the Temporal-based **Flows** engine lets tenants define
+  durable, multi-step workflows from a JSON-Schema DSL, with a first-party activity catalog whose
   credentials are tenant-scoped — the reliable substrate an agent needs to act across services.
 
 Everything an agent touches stays inside the same contract as the rest of the platform: scoped by
@@ -126,15 +127,28 @@ tenant and workspace, gated by plan capabilities, and audited.
 
 Falcone is pre-1.0 and moving quickly; this is near-term direction, not a commitment.
 
-- **MCP server hosting** — *in active development.* Let tenants expose and host
-  [Model Context Protocol](https://modelcontextprotocol.io) servers so their backends are
-  reachable by AI agents, under per-tenant isolation, authentication and quotas.
-- **Flows — durable workflow engine (Temporal)** — *in progress* ([epic #355](https://github.com/gntik-ai/falcone/issues/355)).
-  Tenant-defined workflows via a JSON-Schema DSL and interpreter worker, a first-party activity
-  catalog with tenant-scoped credentials, triggers (Temporal Schedules, webhooks, platform
-  events) and a visual designer in the web console.
-- **Toward a first stable release** — *planned.* Security review, API/schema stability
-  guarantees, and migration tooling (see the notice at the top).
+**Shipped (Preview).** Both flagship AI-native capabilities have landed and are documented; they
+remain Preview under the not-production-ready posture above:
+
+- **MCP server hosting** — the management API is served live under `/v1/mcp`; **Instant MCP** and
+  the **official server** work end-to-end (create → curate → publish → call → observe), with
+  per-tenant isolation, OAuth, quotas, registry/versioning and audit. Server state is in-memory
+  (single-replica) today. ([epic #386](https://github.com/gntik-ai/falcone/issues/386))
+- **Flows — durable workflow engine (Temporal)** — tenant-defined workflows via a JSON-Schema DSL
+  and interpreter worker, a first-party activity catalog with tenant-scoped credentials, triggers
+  and a visual designer. ([epic #355](https://github.com/gntik-ai/falcone/issues/355))
+
+**In progress / planned.**
+
+- **MCP next increments** — a durable (Postgres-backed) multi-replica server registry; custom
+  (bring-your-own-image) hosting on the live create path; wiring workflows-as-MCP-tools; and a
+  direct per-server MCP-protocol connection (the control-plane mediates tool calls today).
+- **Object storage / document DB alternatives** — *planned, under evaluation, not yet implemented.*
+  The platform ships **MinIO** (object storage) and **MongoDB** (document API); source-available /
+  lighter alternatives (e.g. SeaweedFS; FerretDB over a DocumentDB-compatible backend) are being
+  evaluated and are swappable at the deployment layer.
+- **Toward a first stable release** — *planned.* Security review, API/schema stability guarantees,
+  and migration tooling (see the notice at the top).
 
 ---
 
@@ -155,7 +169,8 @@ Falcone is pre-1.0 and moving quickly; this is near-term direction, not a commit
 | **Functions** | Serverless functions with versions, activations, invocations, rollback and cron / Kafka / storage triggers. |
 | **Webhooks** | Signed, retried webhook delivery with SSRF guarding (private, loopback, link-local and ULA ranges blocked, re-checked at delivery time). |
 | **Scheduling** | Cron jobs with per-workspace concurrency and job-count quotas and full execution audit. |
-| **Flows (workflow engine)** | Tenant-defined durable workflows on a Temporal-based engine: a JSON-Schema DSL and interpreter worker, a first-party activity catalog with tenant-scoped credentials, triggers (schedules, webhooks, platform events) and a visual designer in the console. *In active development ([epic #355](https://github.com/gntik-ai/falcone/issues/355)).* |
+| **Flows (workflow engine)** | Tenant-defined durable workflows on a Temporal-based engine: a JSON-Schema DSL and interpreter worker, a first-party activity catalog with tenant-scoped credentials, triggers (schedules, webhooks, platform events) and a visual designer in the console. *Preview ([epic #355](https://github.com/gntik-ai/falcone/issues/355)).* |
+| **MCP server hosting** | Host tenant Model Context Protocol servers so AI agents can call the backend as tools. Management API served live under `/v1/mcp`: Instant MCP (tools generated from a resource), the official read-first server, mandatory curation, registry/versioning with rug-pull review, OAuth 2.1, per-tenant quotas/rate-limits and audit. *Preview — Instant MCP + official server live (in-memory state); custom-image hosting and workflows-as-tools are experimental ([epic #386](https://github.com/gntik-ai/falcone/issues/386)).* |
 | **Plans & quotas** | Commercial plans map to capability keys, quota defaults and a deployment profile. Quotas enforce hard-block / soft-grace / soft-exhausted modes per tenant and workspace. |
 | **Backup & restore** | Snapshot listing, restore orchestration and point-in-time-recovery simulation over S3 / Postgres / Mongo adapters. |
 | **Observability & audit** | Per-tenant audit pipeline (actor, scope envelope, resource, action, result) streamed to Kafka and persisted, with metrics families, health checks, dashboards and threshold alerts. |
