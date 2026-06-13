@@ -23,6 +23,7 @@ export default defineConfig({
       { text: 'Architecture', link: '/architecture/overview' },
       { text: 'API Reference', link: '/api/control-plane' },
       { text: 'Operations', link: '/operations/helm-configuration' },
+      { text: 'Roadmap', link: '/guide/roadmap' },
     ],
 
     sidebar: {
@@ -35,6 +36,13 @@ export default defineConfig({
             { text: 'Quickstart', link: '/guide/quickstart' },
             { text: 'Usage Examples', link: '/guide/examples' },
             { text: 'Flows (Workflows)', link: '/guide/flows' },
+          ],
+        },
+        {
+          text: 'Project',
+          items: [
+            { text: 'Roadmap', link: '/guide/roadmap' },
+            { text: 'Third-party Licenses', link: '/guide/third-party-licenses' },
           ],
         },
       ],
