@@ -64,6 +64,42 @@ The tenant/workspace are resolved **from the credential**, in precedence order (
 | POST | `/v1/events/publish` | [Events](/api/realtime) |
 | GET | `/v1/events/subscribe` | [Realtime](/api/realtime) (SSE) |
 
+## Flows routes *(Preview)*
+
+Served by the control-plane runtime when Flows is enabled (`TEMPORAL_ADDRESS`). Workspace-scoped;
+authoring is `structural_admin`, running/observing is `data_access`. See the
+[Flows guide](/guide/flows) and the [Workflow DSL Reference](/architecture/workflow-dsl-reference).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET/POST | `/v1/flows/workspaces/{ws}/flows` | List / create flows |
+| GET/PATCH/DELETE | `…/flows/{flowId}` | Get / update / delete a flow |
+| POST | `…/flows/{flowId}/validate` | Validate a draft (FLW-E checks) |
+| GET/POST | `…/flows/{flowId}/versions` | List / publish immutable versions |
+| GET/POST | `…/flows/{flowId}/executions` | List / start runs |
+| GET | `…/executions/{executionId}` | Run status |
+| POST | `…/executions/{executionId}/cancellations` · `…/retries` · `…/signals/{name}` | Cancel / retry / signal |
+| GET | `…/executions/{executionId}/events` | Run event stream (SSE) |
+
+## MCP management routes *(Preview)*
+
+Served by the control-plane runtime when MCP hosting is enabled (`MCP_ENABLED`). Workspace-scoped;
+the tenant is credential-derived, so a cross-tenant read/call/audit returns `404`. See the
+[MCP guide](/guide/mcp) and [MCP Architecture](/architecture/mcp).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET/POST | `/v1/mcp/workspaces/{ws}/servers` | List / create a server (`source: instant` \| `official`) |
+| GET/DELETE | `…/servers/{serverId}` | Get (endpoint, version, tools) / delete |
+| POST | `…/servers/{serverId}/curations` | Curate the tool set |
+| POST | `…/servers/{serverId}/versions` | Publish a version |
+| POST | `…/servers/{serverId}/versions/{version}/approval` | Approve a held (rug-pull-reviewed) version |
+| POST | `…/servers/{serverId}/tool-calls` | Invoke a tool (control-plane-mediated) |
+| GET | `…/servers/{serverId}/audit` | Tenant-scoped audit trail |
+
+> Flows and MCP routes are served directly by the control-plane runtime; gateway public-surface
+> registration in the route catalog is part of the ongoing work.
+
 ## Errors
 
 Errors are JSON with a stable `code` and a `message`:
