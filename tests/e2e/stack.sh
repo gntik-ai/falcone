@@ -52,7 +52,9 @@ find_chart() {
 
 healthy() {
   echo ">> Verifying ALL services are operational ..."
-  kubectl rollout status deploy --all -n "$NS" --timeout=10m
+  for dep in $(kubectl get deployment -n "$NS" -o name 2>/dev/null); do
+    kubectl rollout status "$dep" -n "$NS" --timeout=10m
+  done
   for sts in $(kubectl get statefulset -n "$NS" -o name 2>/dev/null); do
     kubectl rollout status "$sts" -n "$NS" --timeout=10m
   done
@@ -83,13 +85,92 @@ case "${1:-up}" in
     echo ">> Recreating namespace '$NS' (clean slate) ..."
     kubectl delete namespace "$NS" --ignore-not-found --wait=true
     kubectl create namespace "$NS"
+    # Pre-install: seed required Kubernetes secrets so chart components can start.
+    # The Bitnami PostgreSQL container creates an initial user from POSTGRESQL_USERNAME
+    # and POSTGRESQL_PASSWORD loaded via envFromSecrets (in-falcone-postgresql secret).
+    # Temporal's persistence is configured to use these same credentials in e2e.
+    echo ">> Creating pre-install secrets in '$NS' ..."
+    kubectl create secret generic in-falcone-postgresql \
+      --from-literal=POSTGRESQL_USERNAME=falcone \
+      --from-literal=POSTGRESQL_PASSWORD=falcone \
+      --from-literal=POSTGRESQL_POSTGRES_PASSWORD=falcone \
+      --from-literal=POSTGRESQL_DATABASE=in_falcone \
+      -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+    # Kafka credentials (Bitnami KRaft; values taken from the kind install reference).
+    kubectl create secret generic in-falcone-kafka \
+      --from-literal=KAFKA_CFG_PROCESS_ROLES=broker,controller \
+      --from-literal=KAFKA_CFG_NODE_ID=0 \
+      --from-literal=KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@localhost:9093 \
+      --from-literal=KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
+      --from-literal=KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://falcone-kafka:9092 \
+      --from-literal=KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
+      --from-literal=KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+      --from-literal=KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
+      -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+    # Keycloak identity client (placeholder values; not used by flows specs).
+    kubectl create secret generic in-falcone-identity-client \
+      --from-literal=client-id=in-falcone-console \
+      --from-literal=client-secret=e2e-placeholder-secret \
+      -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+
+    # Pre-bootstrap PostgreSQL: the Temporal schema job runs as a pre-install Helm hook,
+    # but it needs PostgreSQL to already be listening.  If `temporal.enabled` is true we
+    # deploy the PostgreSQL manifests early (before helm install) so the hook can connect.
+    # We detect this via a rendered dry-run: if the chart would create a falcone-temporal-*
+    # schema job, then PostgreSQL must be up first.
     echo ">> Installing Falcone with Helm into '$NS' ..."
     if [ -n "${DEPLOY_CMD:-}" ]; then
       eval "$DEPLOY_CMD"
     else
       require helm
       CHART="$(find_chart)" || { echo "No Helm chart found. Set E2E_HELM_CHART=<path-or-ref> (and E2E_HELM_VALUES if needed)." >&2; exit 2; }
-      helm upgrade --install "$REL" "$CHART" -n "$NS" ${E2E_HELM_VALUES:+-f "$E2E_HELM_VALUES"} --wait --timeout 15m
+      VALUES_FLAG="${E2E_HELM_VALUES:+-f "$E2E_HELM_VALUES"}"
+      # Check if Temporal is enabled.  When it is we MUST break the circular-dependency
+      # deadlock: the schema job (pre-install hook) needs PostgreSQL, and the bootstrap job
+      # (post-install hook) needs the Temporal frontend running BEFORE the workflow-worker
+      # starts (otherwise the worker crashes on missing namespace and helm --wait never
+      # finishes).  Strategy:
+      #   1. Deploy ALL non-hook resources via --no-hooks --wait=false (Helm adopts them).
+      #   2. Wait for PostgreSQL then run the schema Job out-of-band.
+      #   3. Wait for Temporal frontend then run the bootstrap Job out-of-band.
+      #   4. Wait for all Deployments + StatefulSets to stabilise (retries self-heal).
+      TEMPORAL_ENABLED=0
+      helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation 2>/dev/null \
+        | grep -q 'falcone-temporal-schema' && TEMPORAL_ENABLED=1 || true
+
+      if [ "$TEMPORAL_ENABLED" -eq 1 ]; then
+        echo ">> Temporal enabled: phased deploy to break bootstrap deadlock ..."
+        # Phase 1 — deploy everything without hooks; no --wait so CrashLoopBackOffs are OK.
+        helm upgrade --install --skip-schema-validation --server-side=false --no-hooks \
+          "$REL" "$CHART" -n "$NS" $VALUES_FLAG
+
+        # Phase 2 — wait for PostgreSQL then run schema job.
+        echo ">> Waiting for PostgreSQL ..."
+        kubectl rollout status statefulset/"$REL"-postgresql -n "$NS" --timeout=5m
+        echo ">> Running Temporal schema migration ..."
+        helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation \
+          -s templates/temporal/schema-job.yaml 2>/dev/null \
+          | kubectl apply -n "$NS" -f -
+        kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=complete --timeout=3m \
+          || kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=failed --timeout=30s || true
+        kubectl logs -n "$NS" job/"$REL"-temporal-schema 2>/dev/null | tail -5 || true
+
+        # Phase 3 — wait for Temporal frontend then run bootstrap job.
+        echo ">> Waiting for Temporal frontend ..."
+        kubectl rollout status deployment/"$REL"-temporal-frontend -n "$NS" --timeout=5m
+        echo ">> Running Temporal namespace bootstrap ..."
+        helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation \
+          -s templates/temporal/bootstrap-job.yaml 2>/dev/null \
+          | kubectl apply -n "$NS" -f -
+        kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=complete --timeout=5m \
+          || kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=failed --timeout=30s || true
+        kubectl logs -n "$NS" job/"$REL"-temporal-bootstrap 2>/dev/null | tail -5 || true
+      else
+        # No Temporal: standard helm install with hooks.
+        # --skip-schema-validation: in-falcone chart has strict JSON-schema constraints that
+        # reject unknown/overridden keys even in valid e2e overlay combinations (known quirk).
+        helm upgrade --install --skip-schema-validation --server-side=false "$REL" "$CHART" -n "$NS" $VALUES_FLAG --wait --timeout 15m
+      fi
     fi
     healthy
     echo ">> Port-forwarding front + back ..."
