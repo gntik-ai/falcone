@@ -204,7 +204,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -224,6 +224,10 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   // the per-trigger secret is the credential. The gateway still injects the workspace's tenant
   // context (x-tenant-id/x-workspace-id) so the secret lookup is tenant-scoped.
   const fwh = '^/v1/flows/workspaces/([^/]+)/triggers/webhooks/([^/]+)';
+  // MCP server hosting management API — registered ONLY when an mcpEngine is injected (MCP_ENABLED).
+  // The MCP runtime/engine is internal-only; all tenant access goes through these control-plane
+  // routes, which derive the tenant from the verified identity exactly like every other route.
+  const mcp = '^/v1/mcp/workspaces/([^/]+)/servers';
   return [
     ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
@@ -423,6 +427,31 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       ['GET', /^\/v1\/flows\/workspaces\/([^/]+)\/executions\/([^/]+)\/events$/, ([w, e], c) =>
         runFlowMonitoringSse(flowMonitoringExecutor, { workspaceId: w, executionId: decodeURIComponent(e) }, c), { sse: true }],
     ] : []),
+
+    // ---- MCP server hosting management (create → curate → publish → approve → call → observe) ----
+    // Registered only when an mcpEngine is injected (MCP_ENABLED). Tenant/workspace come from the
+    // verified identity (resolveIdentity), never from tool arguments; the engine keys all state by
+    // identity.tenantId so a cross-tenant read/call/audit resolves to 404 / empty.
+    ...(mcpEngine ? [
+      ['GET', new RegExp(`${mcp}$`), ([w], c) =>
+        runMcp(mcpEngine, { operation: 'list_servers', identity: c.identity, workspaceId: c.identity.workspaceId }, 200)],
+      ['POST', new RegExp(`${mcp}$`), ([w], c) =>
+        runMcp(mcpEngine, { operation: 'create_server', identity: c.identity, workspaceId: c.identity.workspaceId, body: c.body }, 201)],
+      ['GET', new RegExp(`${mcp}/([^/]+)$`), ([w, s], c) =>
+        runMcp(mcpEngine, { operation: 'get_server', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s }, 200)],
+      ['DELETE', new RegExp(`${mcp}/([^/]+)$`), ([w, s], c) =>
+        runMcp(mcpEngine, { operation: 'delete_server', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s }, 200)],
+      ['POST', new RegExp(`${mcp}/([^/]+)/curations$`), ([w, s], c) =>
+        runMcp(mcpEngine, { operation: 'curate_server', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, body: c.body }, 200)],
+      ['POST', new RegExp(`${mcp}/([^/]+)/versions$`), ([w, s], c) =>
+        runMcp(mcpEngine, { operation: 'publish_version', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, version: c.body.version, body: c.body }, 201)],
+      ['POST', new RegExp(`${mcp}/([^/]+)/versions/([^/]+)/approval$`), ([w, s, v], c) =>
+        runMcp(mcpEngine, { operation: 'approve_version', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, version: decodeURIComponent(v) }, 200)],
+      ['POST', new RegExp(`${mcp}/([^/]+)/tool-calls$`), ([w, s], c) =>
+        runMcp(mcpEngine, { operation: 'call_tool', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, body: c.body }, 200)],
+      ['GET', new RegExp(`${mcp}/([^/]+)/audit$`), ([w, s], c) =>
+        runMcp(mcpEngine, { operation: 'list_audit', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s }, 200)],
+    ] : []),
   ];
 }
 
@@ -495,6 +524,15 @@ async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
 async function runFlows(flowExecutor, params, successStatus) {
   if (!flowExecutor) throw Object.assign(new Error('Flows are not enabled'), { statusCode: 501, code: 'FLOWS_DISABLED' });
   const result = await flowExecutor.executeFlows(params);
+  return { status: successStatus, body: result };
+}
+
+// Dispatch an MCP management operation through the engine. Quota/rate-limit breaches throw with
+// { statusCode, code, dimension } — surfaced by the central error handler (which already echoes
+// err.dimension on the 429 envelope). Cross-tenant reads surface as 404 (MCP_SERVER_NOT_FOUND).
+async function runMcp(mcpEngine, params, successStatus) {
+  if (!mcpEngine) throw Object.assign(new Error('MCP hosting is not enabled'), { statusCode: 501, code: 'MCP_DISABLED' });
+  const result = await mcpEngine.executeMcp(params);
   return { status: successStatus, body: result };
 }
 
@@ -635,12 +673,12 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine);
 
   return http.createServer(async (req, res) => {
     try {
