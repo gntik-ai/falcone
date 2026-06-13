@@ -21,7 +21,9 @@ charts/in-falcone/
 └── charts/component-wrapper/  # shared wrapper subchart
 ```
 
-Component aliases (each toggleable): `apisix`, `keycloak`, `postgresql`, `mongodb`, `kafka`, `openwhisk`, `storage`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`.
+Component aliases (each toggleable): `apisix`, `keycloak`, `postgresql`, `mongodb`, `kafka`, `openwhisk`, `storage`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`, `workflowWorker` + `temporal` (the [Flows](/architecture/flows) engine, **off by default**), `mcp` ([MCP server hosting](/architecture/mcp), **off by default**), plus `eso` + `vault` for secret management.
+
+> **Data & storage layer.** Object storage is **MinIO** (`storage`, S3-compatible) and the document API is **MongoDB** (`mongodb`). Source-available / lighter alternatives (SeaweedFS for object storage; FerretDB over a DocumentDB-compatible backend) are *planned / under evaluation* — not implemented in the chart — and are swappable at the deployment layer. See the [Roadmap](/guide/roadmap).
 
 ## Values layering
 
@@ -79,7 +81,7 @@ On install/upgrade a **hook job** (`<release>-bootstrap`) reconciles the gateway
 
 ## Runtime footprint (example)
 
-A representative deployed namespace runs: the APISIX gateway, the control plane + executor, the web console, Keycloak, PostgreSQL, MongoDB (as a replica set for change streams), Kafka, MinIO, and observability — plus the bootstrap job. Components you point at an external managed service can be disabled (`<component>.enabled: false`).
+A representative deployed namespace runs: the APISIX gateway, the control plane + executor, the web console, Keycloak, PostgreSQL, MongoDB (as a replica set for change streams), Kafka, MinIO, and observability — plus the bootstrap job. When the AI-native capabilities are enabled it also runs **Temporal + the workflow-worker** (Flows) and the **MCP runtime** (per-tenant Knative ksvcs); both are off by default. Components you point at an external managed service can be disabled (`<component>.enabled: false`).
 
 > [!TIP]
 > The repository's `deploy/kind/` directory contains a hand-built real runtime used for live validation on a kind cluster (gateway, durable saga control plane, data plane). It is a faithful but development-oriented topology; production installs use the umbrella chart with the profiles above.

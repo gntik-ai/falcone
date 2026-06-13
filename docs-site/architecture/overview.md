@@ -22,6 +22,7 @@ In Falcone is a **multi-tenant BaaS** assembled from a small set of cooperating 
                     │  tenants/workspaces│   │  resolveIdentity()           │
                     │  schemas/functions │   │  build*Plan() → run on driver│
                     │  api-keys/quotas   │   └───┬─────┬─────┬─────┬─────┬───┘
+                    │  /v1/flows /v1/mcp │       │     │     │     │     │
                     └─────────┬──────────┘       │     │     │     │     │
                               │              Postgres Mongo Kafka MinIO Funcs
                               ▼                  │     │     │     │     │
@@ -75,8 +76,33 @@ In Falcone uses a **shared-database, tenant-scoped** model with defense in depth
 
 See [Security & Auth](/architecture/security) for the full model.
 
+## AI-native layer (Flows & MCP) — *Preview*
+
+Two capabilities make a tenant's backend consumable by AI agents, both served by the control plane
+and both off by default:
+
+```
+   Control Plane
+   ├─ /v1/flows/workspaces/{ws}/…  ──▶  Temporal  ◀──poll──  workflow-worker
+   │  (durable workflow definitions,                          (DslInterpreterWorkflow +
+   │   versions, executions)                                   first-party activity catalog)
+   └─ /v1/mcp/workspaces/{ws}/servers/…  ──▶  mcp-engine  ──▶  Knative ksvc (per-tenant MCP server)
+      (create · curate · publish · call · audit)              served over Streamable HTTP, OAuth 2.1
+```
+
+- **Flows** — a durable [workflow engine](/guide/flows) on Temporal (chart components `temporal` +
+  `workflowWorker`, enabled by `TEMPORAL_ADDRESS`). Tenants author a YAML
+  [DSL](/architecture/workflow-dsl-reference); the control plane stores immutable versions and runs
+  each execution as a Temporal workflow. Isolation is by server-generated workflow ids
+  (`{tenantId}:{workspaceId}:{flowId}:{runUuid}`) prefix-checked on every command.
+- **MCP server hosting** — the control-plane runtime serves the [MCP](/guide/mcp) management API
+  (`mcp-engine`, enabled by `MCP_ENABLED`). Instant MCP and the official server are live (Preview);
+  custom (BYO-image) hosting and workflows-as-tools are Experimental; per-tenant OAuth 2.1 + per-tool
+  scopes via Keycloak; MCP-server pods are internal-only.
+
 ## Where to go next
 
-- [Services & Components](/architecture/services) — a subsection per component (gateway, control plane, executor, adapters, console, realtime, data backends, identity, secrets, observability).
+- [Services & Components](/architecture/services) — a subsection per component (gateway, control plane, executor, adapters, console, realtime, data backends, **Flows**, **MCP hosting**, identity, secrets, observability).
+- [Flows](/architecture/flows) · [Workflow DSL Reference](/architecture/workflow-dsl-reference) · [MCP Server Hosting](/architecture/mcp) — the AI-native capabilities.
 - [Domain Model](/architecture/domain-model) — tenants, workspaces, members, plans, quotas.
 - [Deployment Topology](/architecture/deployment) — how it all maps to a cluster.
