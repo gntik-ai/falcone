@@ -6,7 +6,7 @@
 
 ## 2. Control-plane management surface
 
-- [ ] 2.1 Routes to register/list/revoke MCP OAuth clients and assign per-tool scopes, built on `external-application-iam.mjs` + the `keycloak-admin.mjs` adapter (client/scope/credential primitives)
+- [x] 2.1 Routes to register/list/revoke MCP OAuth clients and assign per-tool scopes, built on `external-application-iam.mjs` + the `keycloak-admin.mjs` adapter (client/scope/credential primitives)
 - [ ] 2.2 Consent capture/record reusing the `wf-con-001-user-approval` approval-flow pattern
 - [ ] 2.3 Token lifecycle (issue/refresh/revoke) via the existing credential rotation/revoke primitives; never expose raw Keycloak admin to tenants
 
@@ -18,5 +18,5 @@
 
 ## 4. Finalize
 
-- [ ] 4.1 `openspec validate add-mcp-oauth-authorization-server --strict`
+- [x] 4.1 `openspec validate add-mcp-oauth-authorization-server --strict`
 - [ ] 4.2 Confirm no raw Keycloak admin/DCR endpoint is reachable by tenants; HTTPS-only redirect URIs enforced
