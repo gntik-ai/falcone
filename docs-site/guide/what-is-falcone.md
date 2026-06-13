@@ -1,5 +1,12 @@
 # What is In Falcone?
 
+::: danger Not production-ready
+In Falcone is in early, active development — APIs, schemas and behavior may change without
+notice, there are no stability/security/support guarantees, and it has not had a security audit.
+Use it for evaluation and development only, never for production workloads or sensitive data. See
+the [Roadmap](/guide/roadmap).
+:::
+
 **In Falcone** (codename *Falcone*) is a **multi-tenant Backend-as-a-Service (BaaS)**. It gives application teams the building blocks they would otherwise assemble by hand — databases, object storage, an event bus, serverless functions, authentication and realtime subscriptions — behind a **single API gateway**, with **tenant isolation enforced at every layer**.
 
 A single platform instance hosts many **tenants**. Each tenant owns one or more **workspaces** (the unit a project's data lives in), and every read and write is scoped to the calling tenant. The cardinal rule of the platform is that **no tenant can ever observe or mutate another tenant's data** — this is enforced in the database (PostgreSQL Row-Level Security), in the data adapters (injected tenant predicates), and in the realtime pipeline (tenant-scoped change matching).
@@ -24,6 +31,28 @@ These map to the platform's public HTTP surface, split into two privilege domain
 - **`data_access`** — the day-to-day data plane: documents, queries, objects, function invocation, analytics, event publish/subscribe.
 
 See the [API Reference](/api/control-plane) for the full route catalog.
+
+## Built for AI: a BaAIS
+
+In Falcone starts from the same foundation as any backend platform — multi-tenant data, auth,
+storage, events and functions behind one API — and points it at how software is increasingly
+built and operated: **by, and for, AI agents.**
+
+We call this category a **BaAIS** — a *Backend-as-an-AI-Service*, a play on "BaaS" for an
+AI-native world. (The expansion is deliberately loose; what matters is the direction, not the
+acronym.) Concretely, it means a tenant's backend is designed to be **natively consumable by
+agents**, not only by application code:
+
+- **MCP server hosting** *(in development)* — expose a tenant's backend (data, storage,
+  functions) as a [Model Context Protocol](https://modelcontextprotocol.io) server, so any
+  MCP-capable agent can discover and call it under that tenant's own isolation, auth and quotas.
+- **Agentic workflows** — the Temporal-based [Flows](/guide/flows) engine runs durable,
+  multi-step workflows with a first-party activity catalog whose credentials are tenant-scoped —
+  the reliable substrate an agent needs to act across services.
+
+Everything an agent touches stays inside the same tenant-isolation contract as the rest of the
+platform: scoped by tenant and workspace, gated by plan capabilities, and audited. See the
+[Roadmap](/guide/roadmap) for what's in flight.
 
 ## A guided tour of a real deployment
 

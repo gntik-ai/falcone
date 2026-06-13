@@ -7,6 +7,12 @@
 
   <p>Bases de données, stockage, authentification, événements, temps réel et fonctions serverless — isolés par tenant, gouvernés par des plans et des quotas, derrière une seule API.</p>
 
+  <p>
+    <img alt="Statut : développement précoce" src="https://img.shields.io/badge/status-early%20development-orange" />
+    <img alt="Pas prêt pour la production" src="https://img.shields.io/badge/production-not%20ready-critical" />
+    <img alt="Licence : MIT" src="https://img.shields.io/badge/license-MIT-blue" />
+  </p>
+
   <sub>
 
   [English](./README.md) ·
@@ -18,6 +24,16 @@
 
   </sub>
 </div>
+
+---
+
+> [!WARNING]
+> **Falcone n'est pas prêt pour la production.** Le projet est en développement précoce et actif.
+> Les API publiques, les schémas de données et le comportement à l'exécution peuvent changer à tout
+> moment, sans préavis ni chemin de migration. À ce stade, il n'existe **aucune garantie de
+> stabilité, de sécurité ou de support**, et le projet n'a pas fait l'objet d'un audit de sécurité.
+> **N'exécutez pas Falcone pour des charges de production et ne lui confiez pas de données
+> sensibles.** Utilisez-le uniquement pour l'évaluation, l'expérimentation et le développement.
 
 ---
 
@@ -87,6 +103,48 @@ une passerelle APISIX.
 
 ---
 
+## Conçu pour l'IA : un BaAIS
+
+Falcone part de là où part toute plateforme backend — données, authentification, stockage,
+événements et fonctions multitenant derrière une seule API — et l'oriente vers la façon dont les
+logiciels sont de plus en plus construits et exploités : **par, et pour, des agents d'IA.**
+
+Nous appelons cette catégorie un **BaAIS** — un *Backend-as-an-AI-Service*, un jeu de mots sur
+« BaaS » pour un monde nativement orienté IA. (L'expansion est volontairement souple ; ce qui
+compte, c'est la direction, pas l'acronyme.) Concrètement, « conçu pour l'IA » signifie que le
+backend d'un tenant est pensé pour être **nativement consommable par des agents**, et pas seulement
+par du code applicatif :
+
+- **Hébergement de serveurs MCP** *(en développement)* — les tenants pourront exposer leur backend
+  (données, stockage, fonctions) sous forme de serveur [Model Context Protocol](https://modelcontextprotocol.io),
+  afin que tout agent compatible MCP puisse le découvrir et l'appeler sous l'isolation,
+  l'authentification et les quotas propres à ce tenant.
+- **Workflows agentiques** — le moteur **Flows**, basé sur Temporal, permet aux tenants de définir
+  des workflows durables et multi-étapes à partir d'un DSL en JSON Schema, avec un catalogue
+  d'activités natif dont les identifiants sont délimités par tenant — le socle fiable dont un agent
+  a besoin pour agir entre les services.
+
+Tout ce qu'un agent touche reste à l'intérieur du même contrat que le reste de la plateforme :
+délimité par tenant et workspace, filtré par les capacités du plan, et audité.
+
+---
+
+## Feuille de route
+
+Falcone est en pré-1.0 et évolue vite ; ceci est la direction à court terme, pas un engagement.
+
+- **Hébergement de serveurs MCP** — *en développement actif.* Permettre aux tenants d'exposer et
+  d'héberger des serveurs [Model Context Protocol](https://modelcontextprotocol.io) afin que leurs
+  backends soient accessibles aux agents d'IA, sous isolation, authentification et quotas par tenant.
+- **Flows — moteur de workflows durables (Temporal)** — *en cours* ([épopée #355](https://github.com/gntik-ai/falcone/issues/355)).
+  Workflows définis par le tenant via un DSL en JSON Schema et un worker interpréteur, un catalogue
+  d'activités natif avec des identifiants délimités par tenant, des déclencheurs (Temporal
+  Schedules, webhooks, événements de plateforme) et un concepteur visuel dans la console web.
+- **Vers une première version stable** — *planifié.* Audit de sécurité, garanties de stabilité des
+  API/schémas et outils de migration (voir l'avertissement en haut).
+
+---
+
 ## Capacités
 
 | Domaine | Ce que cela offre à un tenant |
@@ -104,6 +162,7 @@ une passerelle APISIX.
 | **Fonctions** | Fonctions serverless avec versions, activations, invocations, rollback et déclencheurs cron / Kafka / stockage. |
 | **Webhooks** | Livraison de webhooks signée et avec retries, avec protection SSRF (plages privées, loopback, link-local et ULA bloquées, revérifiées au moment de la livraison). |
 | **Planification** | Tâches cron avec quotas de concurrence et de nombre de tâches par workspace et audit complet de l'exécution. |
+| **Flows (moteur de workflows)** | Workflows durables définis par le tenant sur un moteur basé sur Temporal : un DSL en JSON Schema et un worker interpréteur, un catalogue d'activités natif avec des identifiants délimités par tenant, des déclencheurs (schedules, webhooks, événements de plateforme) et un concepteur visuel dans la console. *En développement actif ([épopée #355](https://github.com/gntik-ai/falcone/issues/355)).* |
 | **Plans & quotas** | Les plans commerciaux correspondent à des clés de capacité, des valeurs de quota par défaut et un profil de déploiement. Les quotas appliquent des modes hard-block / soft-grace / soft-exhausted par tenant et workspace. |
 | **Sauvegarde & restauration** | Listing des snapshots, orchestration de la restauration et simulation de récupération à un point dans le temps (PITR) sur les adaptateurs S3 / Postgres / Mongo. |
 | **Observabilité & audit** | Pipeline d'audit par tenant (acteur, enveloppe de portée, ressource, action, résultat) diffusé vers Kafka et persisté, avec familles de métriques, health checks, tableaux de bord et alertes de seuil. |
@@ -200,6 +259,76 @@ deploy/          Routes APISIX, bootstrap kind/OpenShift
 tests/           blackbox (contrat) · e2e (Playwright) · env (stack Compose)
 openspec/        Flux de changements piloté par les spécifications
 ```
+
+---
+
+## Logiciels tiers et licences
+
+Falcone lui-même est sous **licence MIT** (voir [LICENSE](./LICENSE)). Il s'appuie sur les logiciels
+tiers ci-dessous. Les composants marqués ⚠ sont **copyleft ou à source disponible** (pas open source
+au sens de l'OSI) — voir la note de compatibilité qui suit.
+
+### Plateforme et infrastructure (déployés comme services / images)
+
+| Composant | Rôle dans Falcone | Licence (SPDX) | Lien |
+| --- | --- | --- | --- |
+| PostgreSQL 16 (+ pgvector) | Datastore principal du tenant ; isolation RLS + schéma par tenant ; pgvector pour la recherche vectorielle | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
+| MongoDB Server 7 | API de données documentaires par tenant/workspace | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
+| Redpanda 24.2 | Bus d'événements compatible Kafka / streaming CDC | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
+| MinIO | Stockage d'objets compatible S3 | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| HashiCorp Vault 1.18 | Gestion des secrets | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
+| Keycloak 26 | IAM avec realm par tenant / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
+| Apache APISIX 3.9 | API gateway (surface publique `/v1`) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
+| Temporal (serveur 1.25 + SDK TypeScript 1.18) | Moteur de workflows durables derrière Flows | `MIT` | [temporal](https://github.com/temporalio/temporal) · [sdk-typescript](https://github.com/temporalio/sdk-typescript) |
+| Knative Serving + Kourier | Runtime de fonctions serverless | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
+| Apache OpenWhisk | Moteur de fonctions hérité / optionnel | `Apache-2.0` | [openwhisk](https://github.com/apache/openwhisk) |
+| Kubernetes + Helm | Déploiement et orchestration | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
+| Node.js 22 | Runtime des services | `MIT` | [nodejs](https://github.com/nodejs/node) |
+| nginx | Service statique de l'image de la console web | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
+
+### Principaux frameworks et bibliothèques applicatifs (npm)
+
+| Composant | Rôle dans Falcone | Licence (SPDX) | Lien |
+| --- | --- | --- | --- |
+| React 18 | UI de la console web | `MIT` | [react](https://github.com/facebook/react) |
+| Vite | Build et serveur de dev de la console | `MIT` | [vite](https://github.com/vitejs/vite) |
+| TypeScript | Code typé (console, workflow worker) | `Apache-2.0` | [TypeScript](https://github.com/microsoft/TypeScript) |
+| Tailwind CSS | Styles de la console | `MIT` | [tailwindcss](https://github.com/tailwindlabs/tailwindcss) |
+| React Flow (`@xyflow/react`) | Canevas du concepteur visuel de Flows | `MIT` | [xyflow](https://github.com/xyflow/xyflow) |
+| Monaco Editor (+ `monaco-yaml`) | Édition de code / YAML dans la console | `MIT` | [monaco-editor](https://github.com/microsoft/monaco-editor) |
+| node-postgres (`pg`) | Client PostgreSQL | `MIT` | [node-postgres](https://github.com/brianc/node-postgres) |
+| MongoDB Node Driver (`mongodb`) | Client MongoDB | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
+| KafkaJS | Client Kafka / Redpanda | `MIT` | [kafkajs](https://github.com/tulios/kafkajs) |
+| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | Client S3 / MinIO | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
+| jose + jwks-rsa | Validation JWT / JWKS | `MIT` | [jose](https://github.com/panva/jose) · [node-jwks-rsa](https://github.com/auth0/node-jwks-rsa) |
+| ws | Passerelle temps réel WebSocket | `MIT` | [ws](https://github.com/websockets/ws) |
+| Ajv | Validation JSON Schema | `MIT` | [ajv](https://github.com/ajv-validator/ajv) |
+| cel-js | Évaluation d'expressions de capacité / politique | `MIT` | [cel-js](https://www.npmjs.com/package/cel-js) |
+| Playwright | Tests E2E sur stack réelle | `Apache-2.0` | [playwright](https://github.com/microsoft/playwright) |
+
+> [!IMPORTANT]
+> **Compatibilité des licences — revue nécessaire.** Le code propre de Falcone est sous **MIT**, ce
+> qui est compatible avec l'utilisation de tous les composants permissifs ci-dessus (MIT,
+> Apache-2.0, ISC, BSD, PostgreSQL). Les composants ⚠ ne sont **pas** open source au sens de l'OSI
+> et méritent une revue :
+> - **MongoDB (`SSPL-1.0`)**, **MinIO (`AGPL-3.0`)**, **Redpanda (`BSL-1.1` + `RCL`)** et
+>   **Vault (`BUSL-1.1`)** sont copyleft ou à source disponible.
+> - Les exécuter comme **services d'appui séparés avec lesquels Falcone communique par le réseau**
+>   n'impose pas, en soi, leur licence au code MIT de Falcone (pas de liaison / d'œuvre dérivée).
+>   **Mais** leurs clauses « offre en tant que service » / « service concurrent » sont directement
+>   pertinentes pour un BaaS multitenant qui **réexpose** leurs fonctionnalités aux tenants — une API
+>   de données Mongo, une API Kafka/événements, une API de stockage S3. En particulier, **l'article
+>   13 de la SSPL et l'article 13 de l'AGPL visent l'offre des fonctionnalités du logiciel en tant
+>   que service**, et les concessions BSL de Redpanda/Vault excluent les offres gérées concurrentes.
+>   Examinez ces termes avant toute offre hébergée ou commerciale. Les quatre sont remplaçables au
+>   niveau du déploiement si leurs termes ne conviennent pas à votre usage.
+
+**Non exhaustif.** Ce tableau liste les composants tiers **principaux**, pas l'arbre complet des
+dépendances transitives (les utilitaires mineurs — `undici`, `clsx`, `lucide-react`, `uuid`,
+`cron-parser`, `js-yaml`, etc. — sont omis). Pour une vue complète, générez un SBOM / rapport de
+licences — p. ex. `license-checker` ou `pnpm licenses list` pour les workspaces npm — et, si des
+composants Python ou Go sont ajoutés plus tard, `pip-licenses` et `go-licenses` respectivement.
+Examinez la sortie avant toute distribution.
 
 ---
 
