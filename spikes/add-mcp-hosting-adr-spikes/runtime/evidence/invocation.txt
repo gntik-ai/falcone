@@ -1,0 +1,9 @@
+# Runtime spike — MCP server hosted as a Knative ksvc in per-tenant namespace mcp-spike-a
+# Invoked over the Knative HTTP path (http://mcp-spike-fixture.mcp-spike-a.svc.cluster.local)
+
+INIT  -> protocolVersion 2025-11-25; serverInfo.tenant = tenant-a
+LIST  -> tools: echo (read-only), tenant_info (per-tenant context)
+CALL  -> tools/call tenant_info => "tenant=tenant-a"  (per-tenant env injection proven)
+
+Conclusion: an MCP-shaped server runs as a Knative ksvc (min-scale 0) in a per-tenant
+namespace and serves MCP JSON-RPC over Streamable HTTP. Runtime decision (reuse Knative) viable.
