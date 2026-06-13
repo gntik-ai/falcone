@@ -38,6 +38,7 @@ import { ConsoleKafkaPage } from '@/pages/ConsoleKafkaPage'
 import { ConsoleOperationsPage } from '@/pages/ConsoleOperationsPage'
 import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
 import { ConsoleFunctionsPage } from '@/pages/ConsoleFunctionsPage'
+import { ConsoleMcpServerDetailPage } from '@/pages/ConsoleMcpServerDetailPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { WelcomePage } from '@/pages/WelcomePage'
@@ -264,6 +265,10 @@ export const appRoutes = [
           {
             path: 'operations/:operationId',
             element: <ConsoleOperationDetailPage />
+          },
+          {
+            path: 'mcp/servers/:mcpServerId',
+            element: <ConsoleMcpServerDetailPage />
           },
           {
             path: 'workspaces/:workspaceId/realtime',
