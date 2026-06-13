@@ -201,6 +201,20 @@
       "source_ref": "identity_events_total",
       "source_domain": "identity_activity",
       "description": "Bounded error-count projection for workload and control-plane failures during the observation window, represented through normalized observability inputs rather than raw error payloads."
+    },
+    {
+      "id": "mcp_tool_invocations",
+      "display_name": "MCP tool invocations",
+      "unit": "invocation",
+      "aggregation_kind": "counter_delta",
+      "supported_scopes": [
+        "tenant",
+        "workspace"
+      ],
+      "source_mode": "business_metric_family",
+      "source_ref": "mcp_tool_invocations_total",
+      "source_domain": "mcp_tool_usage",
+      "description": "MCP tool invocations attributed to the target scope during the observation window, for per-tenant noisy-neighbor quota posture."
     }
   ],
   "snapshot_contract": {
