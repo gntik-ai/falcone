@@ -16,7 +16,8 @@ const REQUIRED_SUBSYSTEM_IDS = [
   'openwhisk',
   'storage',
   'quota_metering',
-  'tenant_control_plane'
+  'tenant_control_plane',
+  'mcp'
 ];
 const REQUIRED_HEALTH_SIGNAL_IDS = ['audit_emission_freshness', 'audit_transport_health', 'audit_storage_health'];
 const REQUIRED_LABELS = ['environment', 'subsystem', 'metric_scope', 'collection_mode'];
