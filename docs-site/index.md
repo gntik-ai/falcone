@@ -50,7 +50,20 @@ features:
     details: A single umbrella Helm chart with layered values for Kubernetes (Ingress), OpenShift (Routes, restricted-v2) and air-gapped private registries — plus a docker-compose stack for local development.
     link: /guide/installation
     linkText: Installation
+  - icon: 🤖
+    title: Built for AI — a BaAIS
+    details: A backend designed to be natively consumable by AI agents — MCP server hosting (in development) and the Temporal-based Flows workflow engine — all under the same per-tenant isolation, auth and quotas.
+    link: /guide/what-is-falcone#built-for-ai-a-baais
+    linkText: The vision
 ---
+
+::: danger Not production-ready
+**In Falcone is in early, active development.** Public APIs, data schemas and runtime behavior
+may change at any time, without notice or a migration path; there are no stability, security or
+support guarantees; and the project has not undergone a security audit. **Do not use it for
+production workloads or sensitive data** — evaluation, experimentation and development only. See
+the [Roadmap](/guide/roadmap).
+:::
 
 ## A first look
 
