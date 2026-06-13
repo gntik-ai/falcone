@@ -23,7 +23,7 @@ test('observability audit pipeline contract is exposed through shared readers', 
 
   assert.equal(contract.version, '2026-03-28');
   assert.equal(OBSERVABILITY_AUDIT_PIPELINE_VERSION, '2026-03-28');
-  assert.equal(subsystems.length, 8);
+  assert.equal(subsystems.length, 9);
   assert.equal(topology.transport_backbone, 'kafka');
   assert.equal(healthSignals.length, 3);
   assert.equal(Array.isArray(tenantIsolation.required_fields), true);
@@ -57,7 +57,8 @@ test('shared readers return the expected subsystem, topology, health-signal, and
     'openwhisk',
     'storage',
     'quota_metering',
-    'tenant_control_plane'
+    'tenant_control_plane',
+    'mcp'
   ]);
   assert.deepEqual(topology.topology_path, ['subsystem_emitter', 'kafka_audit_transport', 'durable_audit_store']);
   assert.deepEqual(signalIds, ['audit_emission_freshness', 'audit_transport_health', 'audit_storage_health']);

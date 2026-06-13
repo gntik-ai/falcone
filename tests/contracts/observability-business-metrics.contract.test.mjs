@@ -27,9 +27,9 @@ test('observability business metrics contract is exposed through shared readers'
 
   assert.equal(contract.version, '2026-03-28');
   assert.equal(OBSERVABILITY_BUSINESS_METRICS_VERSION, '2026-03-28');
-  assert.equal(domains.length, 9);
+  assert.equal(domains.length, 10);
   assert.equal(metricTypes.length, 3);
-  assert.equal(families.length, 9);
+  assert.equal(families.length, 10);
 
   assert.equal(Array.isArray(controls.requiredLabels), true);
   assert.equal(Array.isArray(controls.boundedDimensionCatalog), true);
