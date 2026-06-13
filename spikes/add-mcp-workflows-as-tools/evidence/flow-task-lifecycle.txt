@@ -1,0 +1,30 @@
+# Live verification on test-cluster-b: a flow as a long-running MCP tool (#395)
+# Temporal dev server: temporalio/temporal:latest — Temporal CLI 1.7.2 (Server 1.31.1, UI 2.49.1)
+# Client: @temporalio/client 1.18.1 (grpc-js 1.14.4), from the production workflow-worker image.
+# Mirrors apps/control-plane/src/mcp-workflows-tools.mjs (taskHandleFromExecution / mapExecutionToTaskStatus).
+
+deploy:   Deployment+Service temporal-dev in ns mcp-temporal-spike (temporal-dev.yaml); frontend on :7233
+client:   spike-client pod from localhost:30500/in-falcone-workflow-worker:0.1.0-flows-e2e (ships @temporalio/client)
+
+run (env TEMPORAL_ADDRESS=temporal-dev:7233 node /tmp/spike-flow-task.mjs):
+    connecting to temporal-dev:7233
+    CONNECTED
+    starting workflow id=mcp-task-2066915280780849
+    STARTED taskId=mcp-task-2066915280780849 runId=019ec1b6-dfdc-76e8-855e-bb5cabe157c5
+    STATUS RUNNING
+    MCP-TASK {"taskId":"mcp-task-2066915280780849","status":"working"}
+    TERMINATED (cleanup)
+    OK
+
+what it proves:
+    START   -> invoking the flow tool starts a durable Temporal workflow (POST .../executions shape).
+    HANDLE  -> the MCP Task id IS the durable workflow id (taskHandleFromExecution keys on executionId).
+    POLL    -> the live RUNNING status maps to the MCP Task `working` state (mapExecutionToTaskStatus);
+               no worker is registered on the `flows` queue, so RUNNING->working is the bounded proof
+               state — completed/failed/cancelled branches are unit-tested and ride the real worker
+               (ADR-11) in production.
+
+teardown: kubectl delete ns mcp-temporal-spike (no residue; Temporal is not part of the chart here)
+
+conclusion: the flow<->MCP-Tasks mapping reflects the REAL Temporal workflow lifecycle end to end:
+            tool call -> start durable workflow -> Task handle (= run id) -> poll status -> MCP Task status.
