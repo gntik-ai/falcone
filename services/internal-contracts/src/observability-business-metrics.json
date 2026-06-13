@@ -129,6 +129,16 @@
         "superadmin",
         "metering"
       ]
+    },
+    {
+      "id": "mcp_tool_usage",
+      "display_name": "MCP tool usage",
+      "description": "Model Context Protocol tool-invocation volume per tenant, workspace, server, tool, and OAuth client.",
+      "primary_consumers": [
+        "tenant_owner",
+        "sre",
+        "metering"
+      ]
     }
   ],
   "required_labels": [
@@ -149,7 +159,8 @@
         "data_service_usage",
         "storage_usage",
         "realtime_event_activity",
-        "quota_posture"
+        "quota_posture",
+        "mcp_tool_usage"
       ]
     },
     {
@@ -187,7 +198,8 @@
         "storage",
         "realtime",
         "events",
-        "quotas"
+        "quotas",
+        "mcp"
       ]
     },
     {
@@ -564,6 +576,40 @@
         "quota",
         "tenant_warning_summary",
         "alerting_input"
+      ]
+    },
+    {
+      "id": "mcp_tool_invocations_total",
+      "name": "in_falcone_mcp_tool_invocations_total",
+      "domain": "mcp_tool_usage",
+      "metric_type": "usage",
+      "description": "MCP tool-invocation volume per tenant and workspace, dimensioned by server, tool, OAuth client, and status class; tool latency rides the normalized in_falcone_component_operation_duration_seconds family with the same bounded dimensions.",
+      "kind": "counter",
+      "producer": "mcp",
+      "supported_scopes": [
+        "platform",
+        "tenant",
+        "workspace"
+      ],
+      "required_labels": [
+        "environment",
+        "subsystem",
+        "metric_scope",
+        "collection_mode",
+        "domain",
+        "metric_type",
+        "feature_area",
+        "operation_family"
+      ],
+      "allowed_optional_labels": [
+        "tenant_id",
+        "workspace_id"
+      ],
+      "safe_attribution_policy": "workspace_safe_when_oauth_client_context_is_attributable_to_a_known_tenant_workspace",
+      "downstream_uses": [
+        "quota",
+        "metering",
+        "tenant_usage_summary"
       ]
     }
   ]
