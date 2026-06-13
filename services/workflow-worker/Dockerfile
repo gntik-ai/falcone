@@ -6,7 +6,9 @@
 #
 # Two stages: (1) compile TypeScript → dist/ (CommonJS) with dev deps, then (2) a slim
 # runtime image with only production deps and the compiled dist/, running as USER node.
-FROM node:22-alpine AS build
+# @temporalio/core-bridge ships a glibc native binary; Alpine (musl) cannot load it.
+# Use node:22-slim (Debian Bookworm slim) which provides glibc. Both stages must match.
+FROM node:22-slim AS build
 WORKDIR /app/services/workflow-worker
 
 # Install ALL deps (incl. typescript) for the tsc compile.
@@ -16,10 +18,11 @@ RUN npm install --no-package-lock
 # Compile.
 COPY services/workflow-worker/tsconfig.json ./tsconfig.json
 COPY services/workflow-worker/src ./src
+COPY services/workflow-worker/scripts ./scripts
 RUN npm run build
 
 # ---- runtime ----
-FROM node:22-alpine AS runtime
+FROM node:22-slim AS runtime
 WORKDIR /app/services/workflow-worker
 
 # Production deps only.
@@ -28,6 +31,12 @@ RUN npm install --omit=dev --no-package-lock
 
 # Compiled output.
 COPY --from=build /app/services/workflow-worker/dist ./dist
+
+# The ssrf.mjs activity imports isBlockedIp from services/webhook-engine/src/webhook-subscription.mjs
+# via a relative path (../../../webhook-engine/src/...). The entire webhook-engine/src/ must live at
+# the same path relative to the dist/ directory as it does in the repo workspace, because
+# webhook-subscription.mjs itself imports from event-catalogue.mjs in the same directory.
+COPY services/webhook-engine/src /app/services/webhook-engine/src
 
 ENV NODE_ENV=production \
     TEMPORAL_ADDRESS=temporal-frontend:7233 \
