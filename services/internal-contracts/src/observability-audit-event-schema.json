@@ -98,7 +98,8 @@
       "openwhisk",
       "storage",
       "quota_metering",
-      "tenant_control_plane"
+      "tenant_control_plane",
+      "mcp"
     ],
     "resource_id_policy": "resource_id is required unless the audited action targets a policy-only or platform-only configuration object without a stable resource identifier"
   },

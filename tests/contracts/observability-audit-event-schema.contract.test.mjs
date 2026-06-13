@@ -51,7 +51,7 @@ test('shared readers return the expected required field, actor, scope, resource,
   ]);
   assert.deepEqual(actor.required_fields, ['actor_id', 'actor_type']);
   assert.deepEqual(scope.scope_modes, ['tenant', 'tenant_workspace', 'platform']);
-  assert.equal(resource.supported_subsystem_ids.length, 8);
+  assert.equal(resource.supported_subsystem_ids.length, 9);
   assert.equal(action.categories.includes('privilege_escalation'), true);
   assert.equal(result.outcomes.includes('partial'), true);
   assert.equal(origin.origin_surfaces.includes('console_backend'), true);
