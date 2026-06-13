@@ -36,6 +36,7 @@ export default defineConfig({
             { text: 'Quickstart', link: '/guide/quickstart' },
             { text: 'Usage Examples', link: '/guide/examples' },
             { text: 'Flows (Workflows)', link: '/guide/flows' },
+            { text: 'MCP Server Hosting', link: '/guide/mcp' },
           ],
         },
         {
@@ -57,6 +58,8 @@ export default defineConfig({
             { text: 'Deployment Topology', link: '/architecture/deployment' },
             { text: 'Flows (Workflow Engine)', link: '/architecture/flows' },
             { text: 'Flows Runbook', link: '/architecture/flows-runbook' },
+            { text: 'MCP Server Hosting', link: '/architecture/mcp' },
+            { text: 'MCP Runbook', link: '/architecture/mcp-runbook' },
           ],
         },
         {
