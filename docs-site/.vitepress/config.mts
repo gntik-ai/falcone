@@ -34,6 +34,7 @@ export default defineConfig({
             { text: 'Installation', link: '/guide/installation' },
             { text: 'Quickstart', link: '/guide/quickstart' },
             { text: 'Usage Examples', link: '/guide/examples' },
+            { text: 'Flows (Workflows)', link: '/guide/flows' },
           ],
         },
       ],
@@ -46,6 +47,8 @@ export default defineConfig({
             { text: 'Domain Model', link: '/architecture/domain-model' },
             { text: 'Security & Auth', link: '/architecture/security' },
             { text: 'Deployment Topology', link: '/architecture/deployment' },
+            { text: 'Flows (Workflow Engine)', link: '/architecture/flows' },
+            { text: 'Flows Runbook', link: '/architecture/flows-runbook' },
           ],
         },
         {
