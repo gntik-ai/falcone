@@ -113,3 +113,28 @@ export function buildMcpClientRegistration({ clientId, redirectUris = [], server
     violations: [],
   };
 }
+
+/**
+ * Build the ordered IAM-admin request plan to provision an MCP OAuth client in the tenant's realm:
+ * create each per-tool client scope, then register the client with those scopes as defaults.
+ * Returns IAM-admin REQUEST descriptors ({ resourceKind, action, payload }) — the caller feeds each
+ * to `keycloak-admin.buildIamAdminAdapterCall({ ...req, tenantId, ... })`, keeping this module free
+ * of cross-package imports and consistent with the executor-over-adapter-plans pattern (ADR-4).
+ *
+ * @param {Object} input  same shape as buildMcpClientRegistration + { tenantId }
+ * @returns {{ tenantId:string, iamRequests: Array<{resourceKind:string,action:string,payload:Object}>, violations: Array }}
+ */
+export function buildMcpOAuthProvisioningPlan({ tenantId, serverId, clientId, redirectUris = [], tools = [], planLimits = {} } = {}) {
+  const reg = buildMcpClientRegistration({ clientId, redirectUris, serverId, tools, planLimits });
+  if (reg.violations.length > 0) {
+    return { tenantId, iamRequests: [], violations: reg.violations };
+  }
+  const toolScopes = deriveToolScopes(serverId, tools);
+  const iamRequests = [
+    // 1..N: per-tool client scopes (FK-safe: scopes before the client that references them).
+    ...toolScopes.map((scope) => ({ resourceKind: 'scope', action: 'create', payload: scope })),
+    // N+1: the curated client with the scopes attached as defaults.
+    { resourceKind: 'client', action: 'create', payload: reg.request },
+  ];
+  return { tenantId, iamRequests, violations: [] };
+}
