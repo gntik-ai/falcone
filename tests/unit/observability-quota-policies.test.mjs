@@ -168,7 +168,7 @@ test('buildTenantQuotaPosture derives overall status and keeps all dimensions vi
   });
 
   assert.equal(posture.queryScope, 'tenant');
-  assert.equal(posture.dimensions.length, 9);
+  assert.equal(posture.dimensions.length, 10);
   assert.equal(posture.overallStatus, 'hard_limit_reached');
   assert.deepEqual(posture.hardLimitBreaches, ['api_requests']);
   assert.deepEqual(posture.softLimitBreaches, ['storage_volume_bytes']);
