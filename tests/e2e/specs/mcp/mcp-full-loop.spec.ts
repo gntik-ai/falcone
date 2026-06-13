@@ -61,9 +61,14 @@ test.describe('mcp: full loop (create → curate → deploy → connect → call
   })
 
   test('mcp-e2e-fl-04: call a tool through the OAuth-backed path and get a structured result', async () => {
-    const result = await client.callTool(WS, serverId, { name: 'list', arguments: {} })
+    // Invoke a real curated tool from the published manifest; the control-plane mediates the call
+    // (scope-enforced, tenant-scoped) and returns a structured MCP result envelope.
+    const detail = await client.getServer(WS, serverId)
+    const toolName = detail.body.tools[0].name
+    const result = await client.callTool(WS, serverId, { name: toolName, arguments: { workspaceId: WS } })
     expect([200, 202]).toContain(result.status)
     expect(result.body).toBeTruthy()
+    expect(Array.isArray(result.body.content)).toBe(true)
   })
 
   test('mcp-e2e-fl-05: the tool call is observable in the tenant audit', async () => {
