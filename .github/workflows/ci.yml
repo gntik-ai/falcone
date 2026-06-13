@@ -164,6 +164,19 @@ jobs:
       - name: Image supply-chain policy validation
         run: pnpm security:images
 
+      - name: Third-party license report (SBOM)
+        run: |
+          mkdir -p sbom
+          pnpm --silent sbom:licenses | tee sbom/third-party-licenses.txt
+          pnpm --silent sbom:licenses:json > sbom/third-party-licenses.json
+
+      - name: Upload third-party license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: third-party-license-report
+          path: sbom/
+          if-no-files-found: error
+
   real-stack:
     # Boots the tests/env Postgres (pgvector image) and runs the control-plane
     # executor real-stack slice — incl. the vector-search cross-tenant KNN probe,
