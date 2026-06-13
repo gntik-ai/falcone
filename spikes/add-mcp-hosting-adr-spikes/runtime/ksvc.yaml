@@ -1,0 +1,28 @@
+# EPHEMERAL SPIKE — MCP server fixture as a Knative ksvc in a per-tenant namespace.
+# Mirrors the working fn-runtime ksvc pattern (dev.local image skips tag resolution; min-scale 0).
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: mcp-spike-fixture
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app.kubernetes.io/part-of: mcp-hosting-spike
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+        autoscaling.knative.dev/max-scale: "3"
+        autoscaling.knative.dev/scale-to-zero-pod-retention-period: "0s"
+    spec:
+      containers:
+        - image: localhost:30500/mcp-spike-fixture:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: TENANT_ID
+              value: TENANT_PLACEHOLDER
+          readinessProbe:
+            httpGet:
+              path: /healthz

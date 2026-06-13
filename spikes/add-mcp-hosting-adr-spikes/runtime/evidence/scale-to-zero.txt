@@ -1,0 +1,10 @@
+# Scale-to-zero + cold-start evidence (2026-06-13T13:10:17Z)
+deployment: deployment.apps/mcp-spike-fixture-00001-deployment
+start replicas: 1
+t+10s replicas=1
+t+20s replicas=1
+t+30s replicas=0
+=> SCALED TO ZERO at ~30s
+--- cold-start: re-invoke after scale-to-zero ---
+cold-start 1164ms {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"tenant=tenant-a"}]}}
+replicas after cold-start: 1
