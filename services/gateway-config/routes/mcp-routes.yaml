@@ -1,0 +1,49 @@
+# MCP server hosting — inbound gateway routes (change: add-mcp-gateway-ingress, #389; ADR-12).
+#
+# Tenants' hosted MCP servers are reached ONLY through this APISIX route over Streamable HTTP;
+# the runtime (Knative ksvcs, #388) is internal-only and never exposed directly. The route
+# validates the tenant's OAuth 2.1 access token (keycloak-openid-connect, #390) and enforces the
+# MCP invoke scope + per-tenant rate floor (scope-enforcement.lua); finer per-tool scope is
+# enforced by scope-enforcement (path-derived) and, defense-in-depth, by the server SDK (#401).
+# The upstream is the internal MCP router, which dispatches by {workspaceId}/{serverId} to the
+# correct tenant-namespaced ksvc (per-server endpoints are created at deploy time, #388).
+#
+# Pattern mirrors services/gateway-config/routes/backup-admin-routes.yaml. Streamable HTTP needs a
+# long read timeout and unbuffered responses so server-streamed (SSE) messages flow.
+routes:
+  - name: mcp-server-streamable-http
+    uri: /v1/mcp/workspaces/*/servers/*
+    methods:
+      - GET      # open the server-streamed (SSE) channel
+      - POST     # send a JSON-RPC message
+      - DELETE   # end the session
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+        required_scopes:
+          - mcp:invoke
+      scope-enforcement:
+        required_scopes:
+          - mcp:invoke
+        workspace_scoped: true
+        static_requests_per_minute: 120
+        rate_limit_metric_key: tenant.api_requests_per_minute.max
+      limit-req:
+        rate: 60
+        burst: 120
+        key: consumer_name
+      proxy-buffering:
+        enabled: false
+      response-rewrite:
+        headers:
+          set:
+            Cache-Control: "no-store"
+    upstream:
+      type: roundrobin
+      # Streamable HTTP / SSE: long read so a streamed response is not cut.
+      timeout:
+        connect: 5
+        send: 600
+        read: 600
+      nodes:
+        mcp-server-router: 1

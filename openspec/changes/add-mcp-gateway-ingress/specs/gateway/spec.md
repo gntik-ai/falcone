@@ -1,12 +1,12 @@
 ## ADDED Requirements
 
-### Requirement: Gateway exposes an MCP inbound route family
-The gateway SHALL define an MCP route family that terminates Streamable HTTP, applies OAuth 2.1 token validation and per-tool scope enforcement (reusing the platform scope-enforcement plugin), and proxies to tenant MCP-server workloads — declared consistently across the gateway-policy framework (APISIX routes, public API routing families with qos profiles, and the public route catalog).
+### Requirement: Gateway exposes an MCP inbound route
+The gateway SHALL define an MCP inbound route (an APISIX route declaration, consistent with how other non-control-plane surfaces are declared — e.g. `routes/backup-admin-routes.yaml`) that terminates Streamable HTTP, applies OAuth 2.1 token validation and scope enforcement (reusing the platform `keycloak-openid-connect` + `scope-enforcement` plugins), and proxies to tenant MCP-server workloads — without disrupting the existing gateway-policy family contracts.
 
-#### Scenario: MCP family is declared consistently
+#### Scenario: MCP route does not break gateway-policy contracts
 - **WHEN** the gateway policy contracts are validated
-- **THEN** the MCP route family is present in the APISIX route declarations, the public API routing families, and the public route catalog, with no consistency violations
+- **THEN** the MCP inbound route is present and the existing gateway-policy family/route consistency checks still pass with no violations
 
-#### Scenario: MCP family uses OAuth + scope enforcement
+#### Scenario: MCP route uses OAuth + scope enforcement and SSE-friendly upstream
 - **WHEN** the MCP route handles a request
-- **THEN** it applies OAuth 2.1 validation and per-tool scope enforcement before proxying upstream
+- **THEN** it validates the OAuth 2.1 token and enforces the MCP scope before proxying, over a Streamable-HTTP-friendly upstream (long read timeout, response buffering disabled)
