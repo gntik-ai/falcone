@@ -1,7 +1,29 @@
 // Unit tests for the MCP OAuth helpers (change add-mcp-oauth-authorization-server, #390).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toolScopeName, deriveToolScopes, isHttpsRedirectUri, buildMcpClientRegistration } from './mcp-oauth.mjs';
+import { toolScopeName, deriveToolScopes, isHttpsRedirectUri, buildMcpClientRegistration, buildMcpOAuthProvisioningPlan } from './mcp-oauth.mjs';
+
+test('buildMcpOAuthProvisioningPlan: N scope-creates then 1 client-create, tenant-scoped', () => {
+  const plan = buildMcpOAuthProvisioningPlan({
+    tenantId: 'ten_A', serverId: 'srv', clientId: 'c1',
+    redirectUris: ['https://app/cb'], tools: [{ name: 'echo' }, { name: 'query' }],
+  });
+  assert.equal(plan.tenantId, 'ten_A');
+  assert.deepEqual(plan.violations, []);
+  assert.equal(plan.iamRequests.length, 3); // 2 scopes + 1 client
+  assert.deepEqual(plan.iamRequests.map((r) => `${r.resourceKind}:${r.action}`), ['scope:create', 'scope:create', 'client:create']);
+  assert.equal(plan.iamRequests[0].payload.name, 'mcp:srv:echo');
+  assert.deepEqual(plan.iamRequests[2].payload.defaultClientScopes, ['mcp:srv:echo', 'mcp:srv:query']);
+});
+
+test('buildMcpOAuthProvisioningPlan: violations short-circuit (no IAM requests)', () => {
+  const plan = buildMcpOAuthProvisioningPlan({
+    tenantId: 'ten_A', serverId: 'srv', clientId: 'c1',
+    redirectUris: ['http://insecure/cb'], tools: [{ name: 'echo' }],
+  });
+  assert.equal(plan.iamRequests.length, 0);
+  assert.ok(plan.violations.some((v) => v.code === 'invalid_redirect_uri'));
+});
 
 test('toolScopeName: mcp:<server>:<tool>, sanitized', () => {
   assert.equal(toolScopeName('srv-1', 'echo'), 'mcp:srv-1:echo');
