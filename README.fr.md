@@ -115,11 +115,12 @@ compte, c'est la direction, pas l'acronyme.) Concrètement, « conçu pour l'IA 
 backend d'un tenant est pensé pour être **nativement consommable par des agents**, et pas seulement
 par du code applicatif :
 
-- **Hébergement de serveurs MCP** *(en développement)* — les tenants pourront exposer leur backend
-  (données, stockage, fonctions) sous forme de serveur [Model Context Protocol](https://modelcontextprotocol.io),
-  afin que tout agent compatible MCP puisse le découvrir et l'appeler sous l'isolation,
-  l'authentification et les quotas propres à ce tenant.
-- **Workflows agentiques** — le moteur **Flows**, basé sur Temporal, permet aux tenants de définir
+- **Hébergement de serveurs MCP** *(Preview)* — un tenant expose son backend (données, stockage,
+  fonctions) sous forme de serveur [Model Context Protocol](https://modelcontextprotocol.io), afin
+  que tout agent compatible MCP puisse le découvrir et l'appeler sous l'isolation, l'authentification
+  et les quotas propres à ce tenant. L'API de gestion est servie en direct sous `/v1/mcp` ; Instant
+  MCP et le serveur officiel fonctionnent de bout en bout.
+- **Workflows agentiques** *(Preview)* — le moteur **Flows**, basé sur Temporal, permet aux tenants de définir
   des workflows durables et multi-étapes à partir d'un DSL en JSON Schema, avec un catalogue
   d'activités natif dont les identifiants sont délimités par tenant — le socle fiable dont un agent
   a besoin pour agir entre les services.
@@ -133,13 +134,29 @@ délimité par tenant et workspace, filtré par les capacités du plan, et audit
 
 Falcone est en pré-1.0 et évolue vite ; ceci est la direction à court terme, pas un engagement.
 
-- **Hébergement de serveurs MCP** — *en développement actif.* Permettre aux tenants d'exposer et
-  d'héberger des serveurs [Model Context Protocol](https://modelcontextprotocol.io) afin que leurs
-  backends soient accessibles aux agents d'IA, sous isolation, authentification et quotas par tenant.
-- **Flows — moteur de workflows durables (Temporal)** — *en cours* ([épopée #355](https://github.com/gntik-ai/falcone/issues/355)).
-  Workflows définis par le tenant via un DSL en JSON Schema et un worker interpréteur, un catalogue
-  d'activités natif avec des identifiants délimités par tenant, des déclencheurs (Temporal
-  Schedules, webhooks, événements de plateforme) et un concepteur visuel dans la console web.
+**Disponible (Preview).** Les deux capacités phares pour l'IA ont atterri et sont documentées ;
+elles restent en Preview sous l'avertissement « non prêt pour la production » ci-dessus :
+
+- **Hébergement de serveurs MCP** — l'API de gestion est servie en direct sous `/v1/mcp` ; **Instant
+  MCP** et le **serveur officiel** fonctionnent de bout en bout (créer → curer → publier → appeler →
+  observer), avec isolation par tenant, OAuth, quotas, registre/versionnage et audit. L'état du
+  serveur est en mémoire (réplique unique) pour l'instant.
+  ([épopée #386](https://github.com/gntik-ai/falcone/issues/386))
+- **Flows — moteur de workflows durables (Temporal)** — workflows définis par le tenant via un DSL
+  en JSON Schema et un worker interpréteur, un catalogue d'activités natif avec des identifiants
+  délimités par tenant, des déclencheurs et un concepteur visuel.
+  ([épopée #355](https://github.com/gntik-ai/falcone/issues/355))
+
+**En cours / planifié.**
+
+- **Prochains incréments MCP** — un registre de serveurs durable (sur Postgres) et multi-réplique ;
+  l'hébergement personnalisé (image propre) sur le chemin de création en direct ; le câblage des
+  workflows-as-MCP-tools ; et une connexion MCP directe par serveur (aujourd'hui le control-plane
+  relaie les appels d'outils).
+- **Alternatives de stockage d'objets / base documentaire** — *planifié, en évaluation, pas encore
+  implémenté.* La plateforme utilise **MinIO** (stockage d'objets) et **MongoDB** (API documentaire) ;
+  des alternatives source-available / plus légères (p. ex. SeaweedFS ; FerretDB sur un backend
+  compatible DocumentDB) sont à l'évaluation et interchangeables au niveau du déploiement.
 - **Vers une première version stable** — *planifié.* Audit de sécurité, garanties de stabilité des
   API/schémas et outils de migration (voir l'avertissement en haut).
 
@@ -162,7 +179,8 @@ Falcone est en pré-1.0 et évolue vite ; ceci est la direction à court terme, 
 | **Fonctions** | Fonctions serverless avec versions, activations, invocations, rollback et déclencheurs cron / Kafka / stockage. |
 | **Webhooks** | Livraison de webhooks signée et avec retries, avec protection SSRF (plages privées, loopback, link-local et ULA bloquées, revérifiées au moment de la livraison). |
 | **Planification** | Tâches cron avec quotas de concurrence et de nombre de tâches par workspace et audit complet de l'exécution. |
-| **Flows (moteur de workflows)** | Workflows durables définis par le tenant sur un moteur basé sur Temporal : un DSL en JSON Schema et un worker interpréteur, un catalogue d'activités natif avec des identifiants délimités par tenant, des déclencheurs (schedules, webhooks, événements de plateforme) et un concepteur visuel dans la console. *En développement actif ([épopée #355](https://github.com/gntik-ai/falcone/issues/355)).* |
+| **Flows (moteur de workflows)** | Workflows durables définis par le tenant sur un moteur basé sur Temporal : un DSL en JSON Schema et un worker interpréteur, un catalogue d'activités natif avec des identifiants délimités par tenant, des déclencheurs (schedules, webhooks, événements de plateforme) et un concepteur visuel dans la console. *Preview ([épopée #355](https://github.com/gntik-ai/falcone/issues/355)).* |
+| **Hébergement de serveurs MCP** | Héberger les serveurs Model Context Protocol du tenant pour que les agents d'IA appellent le backend comme des outils. API de gestion servie en direct sous `/v1/mcp` : Instant MCP (outils générés depuis une ressource), le serveur officiel read-first, curation obligatoire, registre/versionnage avec revue anti « rug-pull », OAuth 2.1, quotas/limites de débit par tenant et audit. *Preview — Instant MCP + serveur officiel en direct (état en mémoire) ; l'hébergement d'image personnalisée et les workflows-as-tools sont expérimentaux ([épopée #386](https://github.com/gntik-ai/falcone/issues/386)).* |
 | **Plans & quotas** | Les plans commerciaux correspondent à des clés de capacité, des valeurs de quota par défaut et un profil de déploiement. Les quotas appliquent des modes hard-block / soft-grace / soft-exhausted par tenant et workspace. |
 | **Sauvegarde & restauration** | Listing des snapshots, orchestration de la restauration et simulation de récupération à un point dans le temps (PITR) sur les adaptateurs S3 / Postgres / Mongo. |
 | **Observabilité & audit** | Pipeline d'audit par tenant (acteur, enveloppe de portée, ressource, action, résultat) diffusé vers Kafka et persisté, avec familles de métriques, health checks, tableaux de bord et alertes de seuil. |

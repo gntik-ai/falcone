@@ -57,6 +57,7 @@ export default defineConfig({
             { text: 'Security & Auth', link: '/architecture/security' },
             { text: 'Deployment Topology', link: '/architecture/deployment' },
             { text: 'Flows (Workflow Engine)', link: '/architecture/flows' },
+            { text: 'Workflow DSL Reference', link: '/architecture/workflow-dsl-reference' },
             { text: 'Flows Runbook', link: '/architecture/flows-runbook' },
             { text: 'MCP Server Hosting', link: '/architecture/mcp' },
             { text: 'MCP Runbook', link: '/architecture/mcp-runbook' },
