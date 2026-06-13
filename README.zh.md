@@ -60,7 +60,7 @@ Falcone 的存在就是为了一次性解决这个问题。它是一个 **多租
 
 ### 整体架构如何组合
 
-```
+```text
                         ┌──────────────────────────────────────────┐
    Bearer JWT  ──▶  API 网关 (APISIX)   /v1   幂等、CORS、           │
                     解析租户 ▸ 注入身份、关联 ID (correlation-id)     │
@@ -190,14 +190,14 @@ docker compose -f tests/env/docker-compose.yml ps
 
 | 服务 | URL / 端点 | 凭据 |
 | --- | --- | --- |
-| API 网关（APISIX） | http://localhost:9080 | 来自 Keycloak 的 Bearer JWT |
-| Keycloak（IdP） | http://localhost:8081 | `admin` / `admin` |
+| API 网关（APISIX） | <http://localhost:9080> | 来自 Keycloak 的 Bearer JWT |
+| Keycloak（IdP） | <http://localhost:8081> | `admin` / `admin` |
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
 | MongoDB（rs0） | `localhost:57017` | — |
 | Redpanda（Kafka） | `localhost:19092` | — |
-| MinIO（S3 API） | http://localhost:59000 | `minioadmin` / `minioadmin` |
-| MinIO 控制台 | http://localhost:59001 | `minioadmin` / `minioadmin` |
-| Vault（dev） | http://localhost:58200 | 令牌 `root` |
+| MinIO（S3 API） | <http://localhost:59000> | `minioadmin` / `minioadmin` |
+| MinIO 控制台 | <http://localhost:59001> | `minioadmin` / `minioadmin` |
+| Vault（dev） | <http://localhost:58200> | 令牌 `root` |
 
 ### 4. 上手验证
 
@@ -224,7 +224,7 @@ cd tests/env
 
 ## 仓库结构
 
-```
+```text
 apps/            control-plane（REST API 面）· web-console（React UI）
 services/        gateway-config、realtime-gateway、webhook-engine、cdc-bridges、
                  scheduling-engine、provisioning-orchestrator、backup-status、

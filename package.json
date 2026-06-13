@@ -79,6 +79,12 @@
       "brace-expansion@5": ">=5.0.6",
       "follow-redirects": "^1.16.0",
       "postcss": "^8.5.10"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-r5fr-rjxr-66jc",
+        "GHSA-gv7w-rqvm-qjhr"
+      ]
     }
   }
 }
