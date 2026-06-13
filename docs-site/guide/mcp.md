@@ -10,24 +10,73 @@ This page is the tenant/developer guide. For how it works internally see
 [MCP Runbook](/architecture/mcp-runbook); for the decision record see
 [ADR-12](/architecture/adrs#adr-12-mcp-server-hosting-runtime-gateway-oauth-and-isolation).
 
-::: warning Status — active development
-MCP hosting is built as a complete set of curation, registry, OAuth, quota, observability and SDK
-components (epic #386) with a real-stack E2E suite. The control-plane HTTP routes that serve the
-management API live are the remaining integration step — see the
-[Roadmap](/guide/roadmap) and the [MCP Architecture](/architecture/mcp#status-and-maturity) status
-note. The shapes below are the intended, code-grounded product surface.
+::: warning Status — Preview
+The MCP management API is **served live** by the control-plane runtime under `/v1/mcp` (epic #386;
+wired in by the runtime integration). **Instant MCP** and the **official server** work end-to-end
+(create → curate → publish → call → observe). Server state is currently **in-memory and
+single-replica** (a durable, multi-replica registry is on the [Roadmap](/guide/roadmap)). **Custom
+(bring-your-own-image) hosting** and **workflows-as-MCP-tools** exist as built, tested modules but
+are **not yet wired into the live create path** — see their notes below. This is **Preview** under
+the platform's [not-production-ready](/) posture.
 :::
 
 ## Three ways to get a server
 
-| Source | What it is | Built on |
-| --- | --- | --- |
-| **Instant MCP** | Generate tools from an existing resource (a Postgres schema, a function, a bucket, an events topic) | `mcp-instant-generator` |
-| **Custom (bring-your-own)** | Host your own container image as an MCP server | `mcp-custom-hosting` |
-| **Official** | Falcone's curated, read-first platform tools | `mcp-official-catalog` / `mcp-official-server` |
+| Source | What it is | Status | Built on |
+| --- | --- | --- | --- |
+| **Instant MCP** | Generate tools from an existing resource (a Postgres schema, a function, a bucket, an events topic) | **Preview** (live) | `mcp-instant-generator` |
+| **Official** | Falcone's curated, read-first platform tools | **Preview** (live) | `mcp-official-catalog` / `mcp-official-server` |
+| **Custom (bring-your-own)** | Host your own container image as an MCP server | **Experimental** — the deploy-spec builder + supply-chain checks exist and were spike-proven, but a per-server image is not yet deployed by the live create path | `mcp-custom-hosting` |
 
 Every source produces a **draft** tool set that must pass **curation** before it can serve traffic
 — Instant MCP never publishes a raw dump.
+
+## The management API
+
+The control-plane serves the MCP management API under
+`/v1/mcp/workspaces/{workspaceId}/servers`. As with every route, the tenant/workspace come from
+your verified credential — never from request arguments — so a cross-tenant read/call/audit resolves
+to `404`.
+
+| Action | Method & path |
+| --- | --- |
+| List / create a server | `GET` / `POST .../servers` |
+| Get / delete a server | `GET` / `DELETE .../servers/{serverId}` |
+| Curate the tool set | `POST .../servers/{serverId}/curations` |
+| Publish a version | `POST .../servers/{serverId}/versions` |
+| Approve a held version | `POST .../servers/{serverId}/versions/{version}/approval` |
+| Call a tool (mediated) | `POST .../servers/{serverId}/tool-calls` |
+| Read the audit trail | `GET .../servers/{serverId}/audit` |
+
+End-to-end with Instant MCP (generates `query_<table>` / `insert_<table>` tools from a schema):
+
+```bash
+# create → curate → publish → inspect → call → observe
+SID=$(curl -sX POST $API/v1/mcp/workspaces/$WS/servers -H "$H" \
+  -d '{"name":"Acme","source":"instant"}' | jq -r .serverId)
+curl -sX POST $API/v1/mcp/workspaces/$WS/servers/$SID/curations -H "$H" -d '{"decisions":{}}'
+curl -sX POST $API/v1/mcp/workspaces/$WS/servers/$SID/versions   -H "$H" -d '{"version":"v1"}'
+curl -s     $API/v1/mcp/workspaces/$WS/servers/$SID              -H "$H"   # → { endpoint, version, tools[] }
+curl -sX POST $API/v1/mcp/workspaces/$WS/servers/$SID/tool-calls -H "$H" \
+  -d '{"name":"query_items","arguments":{"workspaceId":"'$WS'"}}'          # → { content: [...] }
+curl -s     $API/v1/mcp/workspaces/$WS/servers/$SID/audit        -H "$H"   # → tenant-scoped events
+```
+
+An Instant-generated tool definition (the shape curation operates on):
+
+```json
+{
+  "name": "query_items",
+  "description": "Query rows from the \"items\" table with optional filters and pagination. Read-only; runs under the tenant's row-level security.",
+  "mutates": false,
+  "suggestedScope": null,
+  "method": "GET",
+  "path": "/v1/postgres/workspaces/{workspaceId}/data/default/schemas/public/tables/items"
+}
+```
+
+Mutating tools (e.g. `insert_items`) carry a `suggestedScope` like
+`mcp:<serverId>:write:table:items` that curation must assign before the server can publish.
 
 ## Mandatory curation
 
@@ -107,11 +156,14 @@ falcone mcp deploy --image <ref>         # deploy to the runtime and print the e
 The CLI authenticates with your Falcone credential; the tenant is fixed by that credential and a
 `--tenant` that disagrees is refused — you can never target another tenant.
 
-## Flows as tools
+## Flows as tools *(Experimental)*
 
-A published **Flow** (durable Temporal workflow) can be exposed as a **long-running MCP tool**:
+A published **Flow** (durable Temporal workflow) can be mapped to a **long-running MCP tool**:
 invoking it starts a flow execution and returns an MCP **Task** the agent polls to completion
-(running → completed/failed/cancelled), reusing the flows executions API.
+(running → completed/failed/cancelled), reusing the flows executions API. The mapping
+(`mcp-workflows-tools`) is built and unit-tested, but is **not yet wired into the live create
+path** — it is not reachable through the management API today. Tracked on the
+[Roadmap](/guide/roadmap).
 
 ## Versioning & the "rug-pull" guard
 

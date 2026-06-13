@@ -96,12 +96,28 @@ extension**: invoking it starts a durable execution and returns a Task handle ke
 `executionId`; the execution status maps to the MCP Task status. Live-verified against a real
 Temporal dev server.
 
+## Runtime wiring
+
+The control-plane runtime **serves the MCP management API** under
+`/v1/mcp/workspaces/{workspaceId}/servers/…` (`apps/control-plane/src/runtime/server.mjs`), gated on
+an injected `mcpEngine` exactly like the flows executor. `runtime/mcp-engine.mjs` is the integration
+seam: it **composes** the pure modules — `mcp-instant-generator` / `mcp-official-catalog` →
+`mcp-curation` → `mcp-registry` → `mcp-quota` → `mcp-observability` → `mcp-official-server` — and
+dispatches `executeMcp({operation, identity, …})`. Identity (tenant/workspace) comes from the
+gateway-injected headers via `resolveIdentity`; every operation is keyed by `identity.tenantId`, so a
+cross-tenant read/call/audit resolves to `404`; quota/rate-limit breaches surface as `429` with the
+breached `dimension`. The full MCP E2E suite (`tests/e2e/specs/mcp/`) passes against the runtime.
+
 ## Status and maturity
 
-The MCP capability is built as **pure control-plane modules + internal contracts + the chart
-component + de-risking spikes + a real-stack E2E suite** (epic #386). The control-plane runtime
-(`apps/control-plane/src/runtime/server.mjs`) does **not yet serve `/v1/mcp/...` management routes** —
-the modules above are pure logic and contracts, not yet wired into the live HTTP server. Wiring them
-in is the remaining integration that turns the [E2E suite](/architecture/mcp-runbook#e2e-suite)
-green; until then the management API is exercised by unit tests and the spikes. This is tracked on
+| Layer | Status |
+| --- | --- |
+| Instant MCP + official server (create → curate → publish → call → audit) | **Preview** — live via `/v1/mcp` |
+| Registry / versioning / rug-pull review, per-tenant quotas + rate limits, observability/audit | **Preview** — composed into the engine |
+| Server state | **In-memory, single-replica** — a Postgres-backed registry on the metadata pool is the next increment (mirrors how flows began) |
+| Custom (BYO-image) hosting | **Experimental** — `mcp-custom-hosting` builds the ksvc deploy-spec + supply-chain checks (spike-proven), but the engine does not deploy a per-server ksvc on the live create path |
+| Workflows-as-MCP-tools | **Experimental** — `mcp-workflows-tools` mapping is built/tested but not wired into the engine |
+| Tool-call connectivity | The control-plane **mediates** tool calls today; a per-server ksvc + direct MCP-protocol connection is a follow-up |
+
+All of the above sits under the platform's not-production-ready posture. Follow-ups are tracked on
 the [Roadmap](/guide/roadmap).
