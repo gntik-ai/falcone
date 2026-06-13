@@ -151,6 +151,16 @@ A durable workflow engine. Tenants author **flows** as a YAML DSL; the control p
 
 ---
 
+## MCP Server Hosting (Preview)
+
+**Chart alias:** `mcp` (off by default) · **Code:** `apps/control-plane/src/runtime/mcp-engine.mjs`, `apps/control-plane/src/mcp-*.mjs` · **API:** `/v1/mcp/workspaces/{ws}/servers/…`
+
+Hosts tenant **Model Context Protocol** servers so AI agents can call the backend as **tools**. The control-plane runtime serves the management API (create → curate → publish → call → audit) when `MCP_ENABLED=true`; `mcp-engine` composes the MCP modules — the **instant generator** (tools from a Postgres schema / function / bucket / topic), the **official catalog** (curated read-first platform tools), mandatory **curation**, the **registry** (digest-pinned versions + rug-pull review), per-tenant **quotas/rate-limits**, and **observability/audit** (the `mcp` audit subsystem). Remote transport is **Streamable HTTP**; access is per-tenant **OAuth 2.1** with per-tool scopes via Keycloak (the MCP-aware Authorization Server). Hosted MCP-server pods are **internal-only** (NetworkPolicy), reachable only via the gateway, and scale to zero on Knative.
+
+Status: **Instant MCP** and the **official server** are live (Preview); **custom (bring-your-own-image) hosting** and **workflows-as-MCP-tools** are **Experimental** (built but not on the live create path); server state is **in-memory (single-replica)**. See [MCP Architecture](/architecture/mcp), the [MCP Runbook](/architecture/mcp-runbook), the tenant [MCP guide](/guide/mcp), and [ADR-12](/architecture/adrs#adr-12-mcp-server-hosting-runtime-gateway-oauth-and-isolation).
+
+---
+
 ## Identity (Keycloak)
 
 **Chart alias:** `keycloak`

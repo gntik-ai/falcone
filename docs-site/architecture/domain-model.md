@@ -21,6 +21,8 @@ The platform's core entities and their relationships are defined in `services/in
 
 The model also defines audit records for governed **function** lifecycle actions (deployment, admin actions, rollback evidence, quota enforcement) — the platform keeps a query-safe audit trail for sensitive operations.
 
+The AI-native capabilities *(Preview)* carry their own workspace-scoped resource models alongside this core domain: **Flows** define flow definitions, immutable versions and executions (schema `flow-definition.json`; see the [Workflow DSL Reference](/architecture/workflow-dsl-reference)), and **MCP server hosting** defines per-tenant MCP servers with digest-pinned versions and curated tool sets (see [MCP Architecture](/architecture/mcp)). Both are tenant/workspace-scoped and audited like every other resource.
+
 ## Relationships
 
 ```
