@@ -34,7 +34,7 @@ test('observability usage consumption contract is exposed through shared readers
   assert.equal(OBSERVABILITY_USAGE_CONSUMPTION_VERSION, '2026-03-28');
   assert.equal(listUsageConsumptionScopes().length, 2);
   assert.equal(listUsageFreshnessStates().length, 3);
-  assert.equal(listUsageMeteredDimensions().length, 9);
+  assert.equal(listUsageMeteredDimensions().length, 10);
   assert.equal(tenantScope.route_operation_id, 'getTenantUsageSnapshot');
   assert.equal(workspaceScope.required_permission, 'workspace.usage.read');
   assert.equal(apiRequests.source_ref, 'api_requests_total');
