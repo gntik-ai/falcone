@@ -25,6 +25,7 @@ shared_expectations:
     - storage
     - quota_metering
     - tenant_control_plane
+    - mcp
   required_masking_categories:
     - credential_material
     - provider_locator
