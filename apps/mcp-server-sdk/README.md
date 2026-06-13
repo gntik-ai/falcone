@@ -4,6 +4,10 @@ Tenant-scoped Falcone clients for MCP tools, over the official MCP SDKs. Write a
 reads/writes the tenant's data in a few lines — automatically scoped to the caller's tenant
 (RLS-bound) with no way to escape that scope.
 
+> **Status: Preview.** Part of [MCP server hosting](../../docs-site/guide/mcp.md) (Preview), under
+> the platform's not-production-ready posture. The TypeScript module is the unit-tested reference;
+> the Python module mirrors its contract.
+
 ## TypeScript / JavaScript (unit-tested reference)
 
 ```js
