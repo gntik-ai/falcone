@@ -29,8 +29,9 @@ test('summarizeObservabilityUsageConsumption exposes the full bounded catalog', 
   assert.equal(summary.freshnessStates.some((state) => state.id === 'fresh'), true);
   assert.equal(summary.freshnessStates.some((state) => state.id === 'degraded'), true);
   assert.equal(summary.freshnessStates.some((state) => state.id === 'unavailable'), true);
-  assert.equal(summary.meteredDimensions.length, 9);
+  assert.equal(summary.meteredDimensions.length, 10);
   assert.equal(summary.meteredDimensions.some((dimension) => dimension.id === 'api_requests'), true);
+  assert.equal(summary.meteredDimensions.some((dimension) => dimension.id === 'mcp_tool_invocations'), true);
   assert.equal(summary.meteredDimensions.some((dimension) => dimension.id === 'logical_databases'), true);
   assert.equal(summary.refreshPolicy.default_cadence_seconds, 300);
 });
@@ -58,7 +59,7 @@ test('buildTenantUsageSnapshot emits every tenant dimension and propagates degra
   assert.equal(snapshot.queryScope, 'tenant');
   assert.equal(snapshot.tenantId, 'ten_abc');
   assert.equal(snapshot.workspaceId, null);
-  assert.equal(snapshot.dimensions.length, 9);
+  assert.equal(snapshot.dimensions.length, 10);
   assert.equal(snapshot.dimensions.find((dimension) => dimension.dimensionId === 'api_requests').value, 120);
   assert.equal(snapshot.dimensions.find((dimension) => dimension.dimensionId === 'logical_databases').value, 3);
   assert.equal(snapshot.dimensions.find((dimension) => dimension.dimensionId === 'collections_tables').value, 0);
