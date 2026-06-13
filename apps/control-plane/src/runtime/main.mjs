@@ -20,6 +20,7 @@ import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './f
 import { createFlowTriggerRegistry, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
+import { createMcpEngine } from './mcp-engine.mjs';
 // Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
 // Feeds the flows validate/publish endpoints' FLW-E006 check so a flow definition that
 // references an unknown taskType is rejected (422 FLOW_VALIDATION_FAILED). The full activity
@@ -228,12 +229,25 @@ const flowMonitoringExecutor = flowExecutor && process.env.FLOWS_ENABLED !== 'fa
     })
   : undefined;
 
+// MCP server hosting management engine (change: add-mcp-control-plane-runtime). Enabled ONLY when
+// MCP_ENABLED=true; it composes the pure MCP control-plane modules with an in-memory per-tenant
+// store (the cp-executor runs single-replica) and self-calls this runtime to mediate tool calls.
+// When unset, no /v1/mcp routes are registered and an MCP path falls through to 404 / upstream proxy.
+const mcpEngine = process.env.MCP_ENABLED === 'true'
+  ? createMcpEngine({
+      selfBaseUrl: process.env.MCP_SELF_BASE_URL ?? `http://127.0.0.1:${PORT}`,
+      gatewayBaseUrl: process.env.MCP_GATEWAY_BASE_URL,
+      runtimeImage: process.env.MCP_RUNTIME_IMAGE,
+      runtimeImageDigest: process.env.MCP_RUNTIME_IMAGE_DIGEST,
+    })
+  : undefined;
+
 // When the executor fronts the data-family wildcard (gateway route-split), it serves the
 // data-plane + DDL slice itself and proxies every other path under those prefixes
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
 });
 

@@ -38,8 +38,14 @@ test.describe('mcp: version pinning / rug-pull review', () => {
   })
 
   test('mcp-e2e-vp-01: a tool-description change is held for review (not served)', async () => {
-    // publish a v2 that changes a tool description/scope -> requiresReview
-    const pub = await client.publishVersion(WS, serverId, { version: 'v2', toolDescriptionChange: true })
+    // A real curation decision that changes a tool's description -> the new version differs from the
+    // active one -> the registry marks it requiresReview and it is NOT served until approved.
+    const before = await client.getServer(WS, serverId)
+    const toolName = before.body.tools[0].name
+    const pub = await client.publishVersion(WS, serverId, {
+      version: 'v2',
+      curation: { decisions: { [toolName]: { description: 'CHANGED description for the v2 rug-pull review test' } } },
+    })
     expect([200, 201]).toContain(pub.status)
     expect(pub.body.requiresReview ?? pub.body.status === 'requires_review').toBeTruthy()
 
