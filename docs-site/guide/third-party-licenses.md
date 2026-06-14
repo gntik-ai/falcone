@@ -17,7 +17,8 @@ Deployed as separate services / container images that In Falcone talks to over t
 | PostgreSQL 16 (+ pgvector) | Primary tenant datastore; RLS + schema-per-tenant isolation; pgvector for vector search | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
 | MongoDB Server 7 | Per-tenant/workspace document data API | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
 | Redpanda 24.2 | Kafka-compatible event bus / CDC streaming | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
-| MinIO | S3-compatible object storage | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| SeaweedFS 4.33 | S3-compatible object storage (go-forward, [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
+| MinIO | S3-compatible object storage (legacy — retained during cutover) | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
 | HashiCorp Vault 1.18 | Secrets management | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
 | Keycloak 26 | Realm-per-tenant IAM / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API gateway (public `/v1` surface) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
@@ -41,7 +42,7 @@ Deployed as separate services / container images that In Falcone talks to over t
 | node-postgres (`pg`) | PostgreSQL client | `MIT` | [node-postgres](https://github.com/brianc/node-postgres) |
 | MongoDB Node Driver (`mongodb`) | MongoDB client | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
 | KafkaJS | Kafka / Redpanda client | `MIT` | [kafkajs](https://github.com/tulios/kafkajs) |
-| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | S3 / MinIO client | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
+| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | S3 object-store client (SeaweedFS) | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
 | jose + jwks-rsa | JWT / JWKS validation | `MIT` | [jose](https://github.com/panva/jose) · [node-jwks-rsa](https://github.com/auth0/node-jwks-rsa) |
 | ws | WebSocket realtime gateway | `MIT` | [ws](https://github.com/websockets/ws) |
 | Ajv | JSON Schema validation | `MIT` | [ajv](https://github.com/ajv-validator/ajv) |
@@ -65,6 +66,11 @@ source and deserve review:
   software's functionality as a service**, and the Redpanda / Vault BSL grants exclude competing
   managed offerings. Review these terms before any hosted or commercial offering. All four are
   swappable at the deployment layer if their terms don't fit your use.
+- **Object store: MinIO → SeaweedFS (Apache-2.0).** Per
+  [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), **SeaweedFS** is
+  the adopted go-forward object store, chosen specifically to retire the MinIO **AGPL §13**
+  "offer-as-a-service" exposure for a BaaS that re-exposes S3 to tenants. MinIO is retained only
+  during the cutover window.
 
 This is engineering guidance, not legal advice — have counsel review before distribution.
 :::

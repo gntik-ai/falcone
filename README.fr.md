@@ -94,7 +94,7 @@ observable — au lieu d'une flotte de backends artisanaux.
             │                           │                             │
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
-   │ PostgreSQL (RLS + schéma par tenant) · MongoDB · Kafka · S3/MinIO ·      │
+   │ PostgreSQL (RLS + schéma par tenant) · MongoDB · Kafka · SeaweedFS ·     │
    │ Vault (secrets) · Keycloak (IAM realm par tenant + OAuth 2.1 pour MCP) · │
    │ Temporal (moteur Flows) · Knative (functions + runtime MCP par tenant)   │
    └────────────────────────────────────────────────────────────────────────┘
@@ -156,10 +156,13 @@ elles restent en Preview sous l'avertissement « non prêt pour la production »
   l'hébergement personnalisé (image propre) sur le chemin de création en direct ; le câblage des
   workflows-as-MCP-tools ; et une connexion MCP directe par serveur (aujourd'hui le control-plane
   relaie les appels d'outils).
-- **Alternatives de stockage d'objets / base documentaire** — *planifié, en évaluation, pas encore
-  implémenté.* La plateforme utilise **MinIO** (stockage d'objets) et **MongoDB** (API documentaire) ;
-  des alternatives source-available / plus légères (p. ex. SeaweedFS ; FerretDB sur un backend
-  compatible DocumentDB) sont à l'évaluation et interchangeables au niveau du déploiement.
+- **Stockage d'objets — migration MinIO → SeaweedFS.** **SeaweedFS** (Apache-2.0) est le stockage
+  d'objets adopté pour l'avenir ([ADR-13](docs-site/architecture/adrs.md)) ; il est déployé par le
+  chart umbrella et MinIO n'est conservé que pendant la fenêtre de bascule. Voir le
+  [runbook de stockage SeaweedFS](docs-site/architecture/seaweedfs.md).
+- **Alternative de base documentaire** — *planifié, en évaluation.* La plateforme utilise **MongoDB**
+  (API documentaire) ; une alternative source-available (FerretDB sur un backend compatible
+  DocumentDB) est à l'évaluation et interchangeable au niveau du déploiement.
 - **Vers une première version stable** — *planifié.* Audit de sécurité, garanties de stabilité des
   API/schémas et outils de migration (voir l'avertissement en haut).
 
@@ -196,7 +199,7 @@ elles restent en Preview sous l'avertissement « non prêt pour la production »
 
 Le dépôt fournit une stack Compose qui démarre les **vrais services d'appui** avec
 lesquels Falcone communique — PostgreSQL, Keycloak, Redpanda (Kafka), MongoDB
-(replica set à un nœud), MinIO (S3) et Vault — plus une passerelle APISIX et un
+(replica set à un nœud), SeaweedFS (S3) et Vault — plus une passerelle APISIX et un
 action runner. C'est le moyen le plus rapide d'obtenir un environnement
 fonctionnel sur votre machine.
 
@@ -217,7 +220,7 @@ pnpm install
 ### 2. Démarrer la stack avec Docker Compose
 
 Le script utilitaire configure pour vous les health checks, les migrations, le
-replica set Mongo, le bucket MinIO et le dispositif d'audit Vault :
+replica set Mongo, le bucket SeaweedFS et le dispositif d'audit Vault :
 
 ```bash
 cd tests/env
@@ -240,8 +243,7 @@ docker compose -f tests/env/docker-compose.yml ps
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
 | MongoDB (rs0) | `localhost:57017` | — |
 | Redpanda (Kafka) | `localhost:19092` | — |
-| MinIO (API S3) | <http://localhost:59000> | `minioadmin` / `minioadmin` |
-| Console MinIO | <http://localhost:59001> | `minioadmin` / `minioadmin` |
+| SeaweedFS (API S3) | <http://localhost:58333> | Clé d'accès / clé secrète S3 (path-style) |
 | Vault (dev) | <http://localhost:58200> | token `root` |
 
 ### 4. Mettez-la à l'épreuve
@@ -298,7 +300,8 @@ au sens de l'OSI) — voir la note de compatibilité qui suit.
 | PostgreSQL 16 (+ pgvector) | Datastore principal du tenant ; isolation RLS + schéma par tenant ; pgvector pour la recherche vectorielle | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
 | MongoDB Server 7 | API de données documentaires par tenant/workspace | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
 | Redpanda 24.2 | Bus d'événements compatible Kafka / streaming CDC | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
-| MinIO | Stockage d'objets compatible S3 | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| SeaweedFS 4.33 | Stockage d'objets compatible S3 (cible, [ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
+| MinIO | Stockage d'objets compatible S3 (hérité — conservé pendant la bascule) | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
 | HashiCorp Vault 1.18 | Gestion des secrets | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
 | Keycloak 26 | IAM avec realm par tenant / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API gateway (surface publique `/v1`) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
@@ -322,7 +325,7 @@ au sens de l'OSI) — voir la note de compatibilité qui suit.
 | node-postgres (`pg`) | Client PostgreSQL | `MIT` | [node-postgres](https://github.com/brianc/node-postgres) |
 | MongoDB Node Driver (`mongodb`) | Client MongoDB | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
 | KafkaJS | Client Kafka / Redpanda | `MIT` | [kafkajs](https://github.com/tulios/kafkajs) |
-| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | Client S3 / MinIO | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
+| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | Client de stockage d'objets S3 (SeaweedFS) | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
 | jose + jwks-rsa | Validation JWT / JWKS | `MIT` | [jose](https://github.com/panva/jose) · [node-jwks-rsa](https://github.com/auth0/node-jwks-rsa) |
 | ws | Passerelle temps réel WebSocket | `MIT` | [ws](https://github.com/websockets/ws) |
 | Ajv | Validation JSON Schema | `MIT` | [ajv](https://github.com/ajv-validator/ajv) |
@@ -345,6 +348,11 @@ au sens de l'OSI) — voir la note de compatibilité qui suit.
 >   que service**, et les concessions BSL de Redpanda/Vault excluent les offres gérées concurrentes.
 >   Examinez ces termes avant toute offre hébergée ou commerciale. Les quatre sont remplaçables au
 >   niveau du déploiement si leurs termes ne conviennent pas à votre usage.
+> - **Stockage d'objets : MinIO → SeaweedFS (Apache-2.0).** Conformément à
+>   [ADR-13](docs-site/architecture/adrs.md), **SeaweedFS** est le stockage d'objets adopté pour
+>   l'avenir, choisi spécifiquement pour retirer l'exposition de l'**article 13 de l'AGPL** « offre en
+>   tant que service » de MinIO pour un BaaS qui réexpose S3 aux tenants. MinIO n'est conservé que
+>   pendant la fenêtre de bascule.
 
 **Non exhaustif.** Ce tableau liste les composants tiers **principaux**, pas l'arbre complet des
 dépendances transitives (les utilitaires mineurs — `undici`, `clsx`, `lucide-react`, `uuid`,

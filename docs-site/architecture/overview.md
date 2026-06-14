@@ -24,7 +24,7 @@ In Falcone is a **multi-tenant BaaS** assembled from a small set of cooperating 
                     │  api-keys/quotas   │   └───┬─────┬─────┬─────┬─────┬───┘
                     │  /v1/flows /v1/mcp │       │     │     │     │     │
                     └─────────┬──────────┘       │     │     │     │     │
-                              │              Postgres Mongo Kafka MinIO Funcs
+                              │              Postgres Mongo Kafka SeaweedFS Funcs
                               ▼                  │     │     │     │     │
                     ┌────────────────────┐      ▼     ▼     ▼     ▼     ▼
                     │  Platform metadata │   (per-workspace data backends, tenant-scoped)

@@ -8,7 +8,7 @@ EDGE          CONTROL & DATA PLANE        DATA BACKENDS           PLATFORM
 APISIX  ─────▶ Control Plane              PostgreSQL              Keycloak (identity)
 gateway        Executor                   MongoDB                 Vault + ESO (secrets)
                Adapters                   Kafka / Redpanda        Prometheus (observability)
-Web Console    Realtime Engine            MinIO (storage)         Bootstrap & Provisioning
+Web Console    Realtime Engine            SeaweedFS (storage)     Bootstrap & Provisioning
                Functions runtime
 ```
 
@@ -119,11 +119,11 @@ The document data engine, also the source for Mongo realtime. Isolation is enfor
 
 ---
 
-## Object Storage (MinIO)
+## Object Storage (SeaweedFS)
 
-**Chart alias:** `storage`
+**Chart alias:** `seaweedfs` (replaces the legacy MinIO `storage` component — [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs))
 
-S3-compatible object storage exposed as `…/objects/{bucket}/{key}` (`data_access`). Object paths are tenant-scoped so one tenant's keys never resolve into another's namespace.
+S3-compatible object storage (SeaweedFS, Apache-2.0) exposed as `…/objects/{bucket}/{key}` (`data_access`). Object paths are tenant-scoped so one tenant's keys never resolve into another's namespace. For topology, the filer-on-PostgreSQL metadata store, the per-tenant identity model and day-2 operations see the [SeaweedFS Storage Runbook](/architecture/seaweedfs).
 
 ---
 
