@@ -66,19 +66,20 @@
 
 ## 10. Real-stack proof in tests/env
 
-> BLOCKED on OQ2 only: the §5/§6 runtime wiring is done (`storage-identity-runtime.mjs`), but the real
-> admin transport endpoint/protocol is still unresolved (the live SeaweedFS 4.33 per-tenant onboarding
-> path is `weed shell s3.configure -apply`, not the documented HTTP POST the default transport assumes).
-> Once a real admin transport is pinned, point the IAM client's env vars at it and mirror
-> `tests/env/seaweedfs/run.sh` (pinned image + self-skip without docker) to exercise the full
-> provision→rotate→cleanup→revoke lifecycle + cross-tenant `AccessDenied` against a live gateway.
+> **RESOLVED (OQ2).** The real SeaweedFS 4.33 admin path is `weed shell s3.configure -apply` (verified
+> against the pinned image: per-bucket-scoped action strings, credential append for grace overlap,
+> `-delete` removal). Implemented as `createWeedShellTransport({ exec })` in the IAM client (exec wraps
+> `weed shell` over `kubectl exec`/`docker exec`; static identities protected). Real-stack slice
+> `tests/env/seaweedfs/seaweedfs-tenant-identities.test.mjs` + kind runner
+> `tests/env/seaweedfs/run-tenant-identities.sh` (ephemeral namespace, port-forward, always torn down;
+> self-skips without a cluster). **Ran green on the kind test cluster** (1 pass, ~7s).
 
-- [ ] 10.1 Add a `tests/env/` real-stack test slice that spins up the SeaweedFS `tests/env` container and exercises the full provision → rotate → revoke lifecycle against a live SeaweedFS instance — BLOCKED (see note above)
-- [ ] 10.2 Add the cross-tenant isolation probe (Tenant A key vs Tenant B bucket) to the real-stack slice; assert `AccessDenied` from the live SeaweedFS endpoint — BLOCKED (see note above)
-- [ ] 10.3 Verify no plaintext secrets appear in Postgres or logs after provision/rotation/revocation — BLOCKED (see note above)
+- [x] 10.1 Real-stack slice exercises the full provision → rotate (grace) → cleanup → revoke lifecycle against a LIVE SeaweedFS (kind, ephemeral ns) — `tests/env/seaweedfs/run-tenant-identities.sh`
+- [x] 10.2 Cross-tenant isolation probe in the slice: Tenant A's key gets `AccessDenied` (403) on Tenant B's bucket from the live gateway (and the rotated key stays cross-tenant denied)
+- [x] 10.3 No plaintext secret in the persisted credential record (masked key + `secretVersion` only); the secret is delivered once via the envelope — asserted in the slice
 
 ## 11. Validation
 
 - [x] 11.1 Run `openspec validate add-seaweedfs-tenant-identities --strict` and fix until clean — valid
 - [x] 11.2 Run `bash tests/blackbox/run.sh` — all new tests green, no regressions (549 pass / 0 fail; also `tests/adapters` 131, `tests/contracts` 232, `tests/unit` 656 green)
-- [ ] 11.3 Run the real-stack `tests/env/` slice — all steps pass against live SeaweedFS
+- [x] 11.3 Run the real-stack `tests/env/` slice — passes against live SeaweedFS on the kind test cluster (`bash tests/env/seaweedfs/run-tenant-identities.sh` → 1 pass; namespace torn down)

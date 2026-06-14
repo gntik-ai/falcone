@@ -257,6 +257,88 @@ export function createHttpTransport({ env = process.env, fetchImpl = fetch, now 
   };
 }
 
+// ── weed-shell transport (real SeaweedFS admin path — resolves Design OQ2) ────
+// SeaweedFS 4.33 has no signed HTTP identity API; live per-tenant onboarding is
+// `weed shell s3.configure -apply` (spike evidence 10, verified against the
+// pinned image). This transport drives that real mechanism through an injected
+// `exec(weedShellCommand) -> Promise<stdout>` (the caller wires `echo '<cmd>' |
+// weed shell` over `docker exec` or `kubectl exec`). Static (bootstrap) identities
+// are never rewritten/deleted.
+
+function parseWeedShellConfig(stdout) {
+  const start = stdout.indexOf('{');
+  const end = stdout.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) return { identities: [] };
+  return JSON.parse(stdout.slice(start, end + 1));
+}
+
+// Reverse buildSeaweedFSIdentity's expansion: ["Read:b","Write:b"] -> {actions:[Read,Write], buckets:[b]}.
+function unscopeActions(scopedActions = []) {
+  const actions = [];
+  const buckets = [];
+  for (const entry of scopedActions) {
+    const idx = entry.indexOf(':');
+    const action = idx === -1 ? entry : entry.slice(0, idx);
+    const bucket = idx === -1 ? null : entry.slice(idx + 1);
+    if (!actions.includes(action)) actions.push(action);
+    if (bucket && !buckets.includes(bucket)) buckets.push(bucket);
+  }
+  return { actions, buckets };
+}
+
+function sameIdentity(a, b) {
+  const keys = (id) => (id.credentials ?? []).map((c) => c.accessKey).sort().join(',');
+  const acts = (id) => [...(id.actions ?? [])].sort().join(',');
+  return keys(a) === keys(b) && acts(a) === acts(b);
+}
+
+export function createWeedShellTransport({ exec } = {}) {
+  if (typeof exec !== 'function') {
+    throw iamError(SEAWEEDFS_IAM_ERROR_CODES.IAM_CONFIG_MISSING, 'createWeedShellTransport requires an exec(command) function.');
+  }
+
+  async function readRaw() {
+    const out = await exec('s3.configure');
+    return parseWeedShellConfig(out).identities ?? [];
+  }
+
+  return {
+    async readIdentities() {
+      return (await readRaw()).map((id) => ({
+        name: id.name,
+        credentials: (id.credentials ?? []).map((c) => ({ accessKey: c.accessKey, secretKey: c.secretKey })),
+        actions: [...(id.actions ?? [])]
+      }));
+    },
+    async writeIdentities(desired) {
+      const raw = await readRaw();
+      const staticNames = new Set(raw.filter((id) => id.isStatic).map((id) => id.name));
+      const currentByName = new Map(raw.map((id) => [id.name, { credentials: (id.credentials ?? []).map((c) => ({ accessKey: c.accessKey })), actions: id.actions ?? [] }]));
+      const desiredNames = new Set(desired.map((id) => id.name));
+
+      // Delete identities no longer desired (never a static/bootstrap identity).
+      for (const id of raw) {
+        if (!desiredNames.has(id.name) && !staticNames.has(id.name)) {
+          await exec(`s3.configure -user ${id.name} -delete -apply`);
+        }
+      }
+
+      // Upsert each desired identity (skip static admin; skip unchanged).
+      for (const id of desired) {
+        if (staticNames.has(id.name)) continue;
+        const current = currentByName.get(id.name);
+        if (current && sameIdentity(current, id)) continue;
+        if (current) await exec(`s3.configure -user ${id.name} -delete -apply`);
+        const { actions, buckets } = unscopeActions(id.actions);
+        for (const cred of id.credentials) {
+          await exec(`s3.configure -user ${id.name} -access_key ${cred.accessKey} -secret_key ${cred.secretKey} -buckets ${buckets.join(',')} -actions ${actions.join(',')} -apply`);
+        }
+      }
+    }
+    // No reload(): `s3.configure -apply` reloads the running gateway live.
+  };
+}
+
 function resolveTransport(opts = {}) {
   return opts.transport ?? createHttpTransport({ env: opts.env, fetchImpl: opts.fetchImpl, now: opts.now });
 }
