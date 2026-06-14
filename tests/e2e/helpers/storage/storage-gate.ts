@@ -29,9 +29,10 @@ export async function probeStorageApi(
   request: APIRequestContext,
   baseUrl: string,
   identity: TenantIdentity,
+  bearerToken?: string | null,
 ): Promise<StorageGateResult> {
   try {
-    const client = createStorageApiClient(request, baseUrl, identity)
+    const client = createStorageApiClient(request, baseUrl, identity, bearerToken)
     const res = await client.listBuckets()
     if (res.status === 200) {
       return { available: true, reason: '' }

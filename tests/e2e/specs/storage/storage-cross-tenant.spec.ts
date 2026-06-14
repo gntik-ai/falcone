@@ -31,6 +31,7 @@ import type { APIRequestContext } from '@playwright/test'
 import { TENANT_A, TENANT_B, controlPlaneBaseUrl, bucketName } from '../../helpers/storage/tenant-fixtures'
 import { createStorageApiClient, StorageApiClient } from '../../helpers/storage/storage-api-client'
 import { probeStorageApi, STORAGE_GATE_REASON } from '../../helpers/storage/storage-gate'
+import { mintTenantToken, perTenantS3Enabled, PER_TENANT_S3_SKIP_REASON } from '../../helpers/storage/storage-auth'
 
 test.describe('storage: cross-tenant isolation', () => {
   test.describe.configure({ mode: 'serial' })
@@ -47,11 +48,13 @@ test.describe('storage: cross-tenant isolation', () => {
     ctxA = await playwright.request.newContext({ baseURL: cpBase })
     ctxB = await playwright.request.newContext({ baseURL: cpBase })
 
-    const gate = await probeStorageApi(ctxA, cpBase, TENANT_A)
+    const tokenA = await mintTenantToken(ctxA, TENANT_A)
+    const tokenB = await mintTenantToken(ctxB, TENANT_B)
+    const gate = await probeStorageApi(ctxA, cpBase, TENANT_A, tokenA)
     test.skip(!gate.available, gate.reason || STORAGE_GATE_REASON)
 
-    clientA = createStorageApiClient(ctxA, cpBase, TENANT_A)
-    clientB = createStorageApiClient(ctxB, cpBase, TENANT_B)
+    clientA = createStorageApiClient(ctxA, cpBase, TENANT_A, tokenA)
+    clientB = createStorageApiClient(ctxB, cpBase, TENANT_B, tokenB)
 
     // Tenant A provisions a bucket that B should not be able to see or access.
     const provision = await clientA.provisionBucket(TENANT_A.workspaceId, BUCKET_A)
@@ -69,6 +72,7 @@ test.describe('storage: cross-tenant isolation', () => {
   })
 
   test('sto-e2e-xt-01: Tenant A\'s bucket does not appear in Tenant B\'s list', async () => {
+    test.skip(!perTenantS3Enabled(), PER_TENANT_S3_SKIP_REASON)
     test.skip(!bucketIdA, 'Tenant A bucket provisioning failed in beforeAll')
     const list = await clientB.listBuckets()
     expect(list.status).toBe(200)
@@ -79,6 +83,7 @@ test.describe('storage: cross-tenant isolation', () => {
   })
 
   test('sto-e2e-xt-02: Tenant B is denied access to Tenant A\'s bucket objects', async () => {
+    test.skip(!perTenantS3Enabled(), PER_TENANT_S3_SKIP_REASON)
     test.skip(!bucketIdA, 'Tenant A bucket provisioning failed in beforeAll')
     const res = await clientB.listObjects(bucketIdA!)
     // The control-plane either denies (403), returns not-found (404),
@@ -87,6 +92,7 @@ test.describe('storage: cross-tenant isolation', () => {
   })
 
   test('sto-e2e-xt-03: Tenant B is denied object metadata for Tenant A\'s bucket', async () => {
+    test.skip(!perTenantS3Enabled(), PER_TENANT_S3_SKIP_REASON)
     test.skip(!bucketIdA, 'Tenant A bucket provisioning failed in beforeAll')
     const res = await clientB.getObjectMetadata(bucketIdA!, 'any-object-key')
     // 404 is acceptable if the key does not exist (no upload happened for cross-tenant key),

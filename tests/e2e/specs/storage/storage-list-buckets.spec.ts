@@ -20,6 +20,7 @@ import type { APIRequestContext } from '@playwright/test'
 import { TENANT_A, controlPlaneBaseUrl } from '../../helpers/storage/tenant-fixtures'
 import { createStorageApiClient, StorageApiClient } from '../../helpers/storage/storage-api-client'
 import { probeStorageApi, STORAGE_GATE_REASON } from '../../helpers/storage/storage-gate'
+import { mintTenantToken } from '../../helpers/storage/storage-auth'
 
 test.describe('storage: list buckets', () => {
   test.describe.configure({ mode: 'serial' })
@@ -30,9 +31,10 @@ test.describe('storage: list buckets', () => {
 
   test.beforeAll(async ({ playwright }) => {
     ctx = await playwright.request.newContext({ baseURL: cpBase })
-    const gate = await probeStorageApi(ctx, cpBase, TENANT_A)
+    const token = await mintTenantToken(ctx, TENANT_A)
+    const gate = await probeStorageApi(ctx, cpBase, TENANT_A, token)
     test.skip(!gate.available, gate.reason || STORAGE_GATE_REASON)
-    client = createStorageApiClient(ctx, cpBase, TENANT_A)
+    client = createStorageApiClient(ctx, cpBase, TENANT_A, token)
   })
 
   test.afterAll(async () => {
