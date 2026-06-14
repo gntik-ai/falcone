@@ -32,10 +32,12 @@ These have landed and are documented; they remain **Preview** under the not-prod
 
 ## Infrastructure — under evaluation — *planned*
 
-- **Object storage / document DB alternatives.** The platform ships **MinIO** (object storage) and
-  **MongoDB** (document API) today. Evaluating source-available / lighter alternatives (e.g.
-  SeaweedFS for object storage; FerretDB over a DocumentDB-compatible backend) is **planned** — no
-  implementation exists in the repo yet, and the backends are swappable at the deployment layer.
+- **Document DB alternative.** The platform ships **MongoDB** (document API) today; a
+  source-available alternative (FerretDB over a DocumentDB-compatible backend) is **under
+  evaluation** and swappable at the deployment layer. (Object storage has migrated to
+  **SeaweedFS** (Apache-2.0) — see
+  [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs) and the
+  [SeaweedFS Storage Runbook](/architecture/seaweedfs).)
 
 ## Toward a first stable release — *planned*
 

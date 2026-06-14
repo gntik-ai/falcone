@@ -90,7 +90,7 @@ hand-rolled backends.
             │                           │                             │
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
-   │ PostgreSQL (RLS + schema-per-tenant) · MongoDB · Kafka · S3/MinIO ·      │
+   │ PostgreSQL (RLS + schema-per-tenant) · MongoDB · Kafka · SeaweedFS ·     │
    │ Vault (secrets) · Keycloak (realm-per-tenant IAM + MCP OAuth 2.1) ·      │
    │ Temporal (Flows engine) · Knative (functions + per-tenant MCP runtime)   │
    └────────────────────────────────────────────────────────────────────────┘
@@ -146,10 +146,13 @@ remain Preview under the not-production-ready posture above:
 - **MCP next increments** — a durable (Postgres-backed) multi-replica server registry; custom
   (bring-your-own-image) hosting on the live create path; wiring workflows-as-MCP-tools; and a
   direct per-server MCP-protocol connection (the control-plane mediates tool calls today).
-- **Object storage / document DB alternatives** — *planned, under evaluation, not yet implemented.*
-  The platform ships **MinIO** (object storage) and **MongoDB** (document API); source-available /
-  lighter alternatives (e.g. SeaweedFS; FerretDB over a DocumentDB-compatible backend) are being
-  evaluated and are swappable at the deployment layer.
+- **Object storage — migrating MinIO → SeaweedFS.** **SeaweedFS** (Apache-2.0) is the adopted
+  go-forward object store ([ADR-13](docs-site/architecture/adrs.md)); it is deployed by the
+  umbrella chart and MinIO is retained only during the cutover window. See the
+  [SeaweedFS Storage Runbook](docs-site/architecture/seaweedfs.md).
+- **Document DB alternative** — *planned, under evaluation.* The platform ships **MongoDB**
+  (document API); a source-available alternative (FerretDB over a DocumentDB-compatible backend)
+  is being evaluated and is swappable at the deployment layer.
 - **Toward a first stable release** — *planned.* Security review, API/schema stability guarantees,
   and migration tooling (see the notice at the top).
 
@@ -186,7 +189,7 @@ remain Preview under the not-production-ready posture above:
 
 The repository ships a Compose stack that brings up the **real backing services**
 Falcone talks to — PostgreSQL, Keycloak, Redpanda (Kafka), MongoDB (single-node
-replica set), MinIO (S3) and Vault — plus an APISIX gateway and an action runner.
+replica set), SeaweedFS (S3) and Vault — plus an APISIX gateway and an action runner.
 This is the fastest way to get a working environment on your machine.
 
 ### Prerequisites
@@ -206,7 +209,7 @@ pnpm install
 ### 2. Bring up the stack with Docker Compose
 
 The helper script wires up health checks, migrations, the Mongo replica set, the
-MinIO bucket and the Vault audit device for you:
+SeaweedFS bucket and the Vault audit device for you:
 
 ```bash
 cd tests/env
@@ -229,8 +232,7 @@ docker compose -f tests/env/docker-compose.yml ps
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
 | MongoDB (rs0) | `localhost:57017` | — |
 | Redpanda (Kafka) | `localhost:19092` | — |
-| MinIO (S3 API) | <http://localhost:59000> | `minioadmin` / `minioadmin` |
-| MinIO console | <http://localhost:59001> | `minioadmin` / `minioadmin` |
+| SeaweedFS (S3 API) | <http://localhost:58333> | S3 access/secret key (path-style) |
 | Vault (dev) | <http://localhost:58200> | token `root` |
 
 ### 4. Exercise it
@@ -287,7 +289,8 @@ see the compatibility note that follows.
 | PostgreSQL 16 (+ pgvector) | Primary tenant datastore; RLS + schema-per-tenant isolation; pgvector for vector search | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
 | MongoDB Server 7 | Per-tenant/workspace document data API | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
 | Redpanda 24.2 | Kafka-compatible event bus / CDC streaming | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
-| MinIO | S3-compatible object storage | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| SeaweedFS 4.33 | S3-compatible object storage (go-forward, [ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
+| MinIO | S3-compatible object storage (legacy — retained during cutover) | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
 | HashiCorp Vault 1.18 | Secrets management | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
 | Keycloak 26 | Realm-per-tenant IAM / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API gateway (public `/v1` surface) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
@@ -311,7 +314,7 @@ see the compatibility note that follows.
 | node-postgres (`pg`) | PostgreSQL client | `MIT` | [node-postgres](https://github.com/brianc/node-postgres) |
 | MongoDB Node Driver (`mongodb`) | MongoDB client | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
 | KafkaJS | Kafka / Redpanda client | `MIT` | [kafkajs](https://github.com/tulios/kafkajs) |
-| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | S3 / MinIO client | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
+| AWS SDK for JS v3 (`@aws-sdk/client-s3`) | S3 object-store client (SeaweedFS) | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
 | jose + jwks-rsa | JWT / JWKS validation | `MIT` | [jose](https://github.com/panva/jose) · [node-jwks-rsa](https://github.com/auth0/node-jwks-rsa) |
 | ws | WebSocket realtime gateway | `MIT` | [ws](https://github.com/websockets/ws) |
 | Ajv | JSON Schema validation | `MIT` | [ajv](https://github.com/ajv-validator/ajv) |
@@ -332,6 +335,10 @@ see the compatibility note that follows.
 >   functionality as a service**, and the Redpanda/Vault BSL grants exclude competing managed
 >   offerings. Review these terms before any hosted or commercial offering. All four are swappable
 >   at the deployment layer if their terms don't fit your use.
+> - **Object store: MinIO → SeaweedFS (Apache-2.0).** Per
+>   [ADR-13](docs-site/architecture/adrs.md), **SeaweedFS** is the adopted go-forward object store,
+>   chosen specifically to retire the MinIO **AGPL §13** "offer-as-a-service" exposure for a BaaS
+>   that re-exposes S3 to tenants. MinIO is retained only during the cutover window.
 
 **Not exhaustive.** This table lists the **principal** third-party components, not the full
 transitive dependency tree (minor utilities — `undici`, `clsx`, `lucide-react`, `uuid`,

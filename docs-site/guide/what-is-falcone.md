@@ -17,7 +17,7 @@ A single platform instance hosts many **tenants**. Each tenant owns one or more 
 | --- | --- | --- |
 | **Relational data API** | REST CRUD + query + DDL over SQL tables, with keyset pagination and filtering | PostgreSQL |
 | **Document data API** | REST CRUD + query over collections, with cursor pagination | MongoDB |
-| **Object storage** | S3-compatible buckets and objects | MinIO |
+| **Object storage** | S3-compatible buckets and objects | SeaweedFS |
 | **Events** | Publish/subscribe to a tenant-scoped event stream | Kafka / Redpanda |
 | **Serverless functions** | Deploy and invoke per-tenant functions | Knative / OpenWhisk runtime |
 | **Realtime** | Subscribe to live data changes over Server-Sent Events | Mongo change streams + Postgres CDC |
@@ -58,7 +58,7 @@ platform: scoped by tenant and workspace, gated by plan capabilities, and audite
 
 ## A guided tour of a real deployment
 
-The following screenshots are taken from a live cluster running the full stack (gateway, control plane, executor, console, Keycloak, PostgreSQL, MongoDB, Kafka, MinIO).
+The following screenshots are taken from a live cluster running the full stack (gateway, control plane, executor, console, Keycloak, PostgreSQL, MongoDB, Kafka, SeaweedFS).
 
 ### Sign in
 
@@ -144,6 +144,6 @@ Plans define entitlements; quotas enforce per-tenant limits; observability surfa
 
 ## How it fits together (in one paragraph)
 
-A request enters through the **APISIX gateway**, which classifies it by credential (an `apikey` header for anon/service keys, or a Bearer JWT) and routes it to the right backend. Structural-admin calls reach the **control plane**; data-plane calls reach the **executor**, which runs adapter-built query plans against the real **PostgreSQL** / **MongoDB** / **Kafka** / **MinIO** backends. The executor resolves identity (API key is authoritative, then verified JWT, then gateway-injected headers) and **stamps and filters by the tenant** on every operation. Realtime rides the same identity model over SSE. The whole thing is packaged as one **umbrella Helm chart** you can target at Kubernetes, OpenShift or an air-gapped registry.
+A request enters through the **APISIX gateway**, which classifies it by credential (an `apikey` header for anon/service keys, or a Bearer JWT) and routes it to the right backend. Structural-admin calls reach the **control plane**; data-plane calls reach the **executor**, which runs adapter-built query plans against the real **PostgreSQL** / **MongoDB** / **Kafka** / **SeaweedFS** backends. The executor resolves identity (API key is authoritative, then verified JWT, then gateway-injected headers) and **stamps and filters by the tenant** on every operation. Realtime rides the same identity model over SSE. The whole thing is packaged as one **umbrella Helm chart** you can target at Kubernetes, OpenShift or an air-gapped registry.
 
 Continue to the [Architecture overview](/architecture/overview) for the detailed design, or jump to the [Quickstart](/guide/quickstart) to build a TODO app.
