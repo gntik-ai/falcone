@@ -5,6 +5,14 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 FILTER="${1:-}"
 
+# SeaweedFS migration validation (change add-seaweedfs-migration-validation).
+# Off by default so the suite is unchanged for the standard (MinIO) path; CI sets
+# SEAWEEDFS_VALIDATION=1 + S3_ENDPOINT->SeaweedFS to gate the migration validation.
+if [ "${SEAWEEDFS_VALIDATION:-}" = "1" ]; then
+  echo "==> SEAWEEDFS_VALIDATION=1: running SeaweedFS migration validation" >&2
+  bash "$(dirname "$0")/../env/validation/run-validation.sh" || exit 1
+fi
+
 if [ -f go.mod ]; then
   exec go test ./tests/blackbox/... ${FILTER:+-run "$FILTER"}
 elif [ -f package.json ]; then
