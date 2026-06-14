@@ -61,6 +61,7 @@ export default defineConfig({
             { text: 'Flows Runbook', link: '/architecture/flows-runbook' },
             { text: 'MCP Server Hosting', link: '/architecture/mcp' },
             { text: 'MCP Runbook', link: '/architecture/mcp-runbook' },
+            { text: 'SeaweedFS Storage Runbook', link: '/architecture/seaweedfs' },
           ],
         },
         {
