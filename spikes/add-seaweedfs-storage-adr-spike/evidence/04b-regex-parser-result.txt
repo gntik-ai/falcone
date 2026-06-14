@@ -1,0 +1,27 @@
+### Task 4.1 — ListBuckets raw XML
+HTTP 200
+<?xml version="1.0" encoding="UTF-8"?>
+<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Owner><ID>falcone-spike-admin</ID><DisplayName>falcone-spike-admin</DisplayName></Owner><Buckets><Bucket><Name>tenant-a-bucket</Name><CreationDate>2026-06-14T00:20:26Z</CreationDate></Bucket><Bucket><Name>tenant-a-lock-bucket</Name><CreationDate>2026-06-14T00:20:26Z</CreationDate></Bucket></Buckets></ListAllMyBucketsResult>
+regex parse -> [{'name': 'tenant-a-bucket', 'creationDate': '2026-06-14T00:20:26Z'}, {'name': 'tenant-a-lock-bucket', 'creationDate': '2026-06-14T00:20:26Z'}]
+LISTBUCKETS regex parser: MATCH
+
+### Task 4.2 — ListObjectsV2 raw XML (non-empty bucket)
+HTTP 200
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>tenant-a-bucket</Name><Prefix></Prefix><MaxKeys>50</MaxKeys><IsTruncated>false</IsTruncated><Contents><Key>byTenantA.txt</Key><ETag>&#34;0ed1ec84951e84b4e5145543715359b5&#34;</ETag><Size>18</Size><StorageClass>STANDARD</StorageClass><LastModified>2026-06-14T00:20:26Z</LastModified></Contents><Contents><Key>probe/hello.txt</Key><ETag>&#34;087bb523457fbdbf9df5ac0246d67bd7&#34;</ETag><Size>27</Size><StorageClass>STANDARD</StorageClass><LastModified>2026-06-14T00:20:26Z</LastModified></Contents><Contents><Key>ver/obj.txt</Key><ETag>&#34;a5525ca6ccec944c3e9db3753f269c01&#34;</ETag><Size>7</Size><StorageClass>STANDARD</StorageClass><LastModified>2026-06-14T00:20:26Z</LastModified></Contents><KeyCount>3</KeyCount></ListBucketResult>
+regex parse -> objects=[{'key': 'byTenantA.txt', 'size': 18, 'etag': '0ed1ec84951e84b4e5145543715359b5', 'lastModified': '2026-06-14T00:20:26Z', 'storageClass': 'STANDARD'}, {'key': 'probe/hello.txt', 'size': 27, 'etag': '087bb523457fbdbf9df5ac0246d67bd7', 'lastModified': '2026-06-14T00:20:26Z', 'storageClass': 'STANDARD'}, {'key': 'ver/obj.txt', 'size': 7, 'etag': 'a5525ca6ccec944c3e9db3753f269c01', 'lastModified': '2026-06-14T00:20:26Z', 'storageClass': 'STANDARD'}]
+             truncated=False nextToken=None
+LISTOBJECTSV2 regex parser: MATCH
+
+### Tag-presence audit (regex parser dependencies)
+  <Bucket                > ListBuckets=Y ListObjectsV2=-
+  <Name                  > ListBuckets=Y ListObjectsV2=Y
+  <CreationDate          > ListBuckets=Y ListObjectsV2=-
+  <Contents              > ListBuckets=- ListObjectsV2=Y
+  <Key                   > ListBuckets=- ListObjectsV2=Y
+  <Size                  > ListBuckets=- ListObjectsV2=Y
+  <ETag                  > ListBuckets=- ListObjectsV2=Y
+  <LastModified          > ListBuckets=- ListObjectsV2=Y
+  <StorageClass          > ListBuckets=- ListObjectsV2=Y
+  <IsTruncated           > ListBuckets=- ListObjectsV2=Y
+  <NextContinuationToken > ListBuckets=- ListObjectsV2=-

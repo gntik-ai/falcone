@@ -1,0 +1,4 @@
+seaweedfs-1  | I0614 00:18:50.671869 s3.go:290 S3 read filer buckets dir: /buckets
+seaweedfs-1  | E0614 00:18:50.683709 s3api_server.go:338 Failed to load IAM configuration: no signing key found for STS service; please provide 'signingKey' in IAM config, configure 'jwt.filer_signing.key' in security.toml, or ensure SSE-S3 is initialized
+seaweedfs-1  | I0614 00:18:50.695316 s3.go:499 Start Seaweed S3 API Server 30GB 4.33 55010be19 at http port 8333
+seaweedfs-1  | I0614 00:18:50.696073 s3.go:541 Start Iceberg REST Catalog Server at http://seaweedfs:8181

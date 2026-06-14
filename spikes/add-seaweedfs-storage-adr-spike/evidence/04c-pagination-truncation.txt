@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>tenant-a-bucket</Name><Prefix></Prefix><MaxKeys>1</MaxKeys><IsTruncated>true</IsTruncated><Contents><Key>byTenantA.txt</Key><ETag>&#34;0ed1ec84951e84b4e5145543715359b5&#34;</ETag><Size>18</Size><StorageClass>STANDARD</StorageClass><LastModified>2026-06-14T00:20:26Z</LastModified></Contents><NextContinuationToken>byTenantA.txt.versions</NextContinuationToken><KeyCount>1</KeyCount></ListBucketResult>
+IsTruncated: true
+NextContinuationToken present: True -> byTenantA.txt.versions
