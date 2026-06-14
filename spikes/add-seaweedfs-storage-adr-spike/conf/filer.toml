@@ -1,0 +1,33 @@
+# SeaweedFS filer metadata store -> PostgreSQL (postgres2 = one table per bucket,
+# the variant that isolates each S3 bucket into its own table; relevant to a
+# multitenant BaaS where a bucket maps to a tenant/workspace boundary).
+# Validates Decision D2 of the ADR spike: reuse Falcone's existing Postgres tier
+# instead of introducing a new stateful dependency.
+
+[leveldb2]
+enabled = false
+
+[postgres2]
+enabled = true
+# REQUIRED: postgres2 ships no usable default createTable template at v4.33 — leaving it
+# unset makes the filer emit a malformed `fmt.Sprintf` string and crash on boot
+# (init table filemeta: ERROR: syntax error at or near "%!"). The "%s" is substituted
+# with each per-bucket table name. Captured in evidence/01-postgres2-default-createtable-failure.txt.
+createTable = """
+CREATE TABLE IF NOT EXISTS "%s" (
+  dirhash   BIGINT,
+  name      VARCHAR(65535),
+  directory VARCHAR(65535),
+  meta      bytea,
+  PRIMARY KEY (dirhash, name)
+);
+"""
+hostname = "postgres"
+port = 5432
+username = "seaweed"
+password = "seaweedpw"
+database = "seaweedfs"
+schema = "public"
+sslmode = "disable"
+connection_max_idle = 5
+connection_max_open = 30

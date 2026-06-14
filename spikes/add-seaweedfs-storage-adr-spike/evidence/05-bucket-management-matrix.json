@@ -1,0 +1,68 @@
+[
+  {
+    "op": "createBucket",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "bucket=tenant-a-bucket"
+  },
+  {
+    "op": "putObject+getObject",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "roundtrip_integrity=True"
+  },
+  {
+    "op": "putBucketPolicy",
+    "http": 400,
+    "class": "PARTIAL",
+    "detail": "accepts Principal:\"*\" string form; rejects AWS-canonical Principal:{AWS:[...]} with 400 MalformedPolicy 'invalid resource' -> SHIM"
+  },
+  {
+    "op": "getBucketPolicy",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "round-trips for SeaweedFS-accepted policies (verified after PUT with Principal:\"*\")"
+  },
+  {
+    "op": "putBucketVersioning",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "readback_status=Enabled"
+  },
+  {
+    "op": "putBucketLifecycleConfiguration",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "readback_rules=1"
+  },
+  {
+    "op": "putBucketCors",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "readback_rules=1"
+  },
+  {
+    "op": "objectVersioning",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "vid1=6747356368ddb2b2511c790b95d4c7bc vid2=67473563686380b3032c10532f61faa0 get(vid1)=b'v1-body'"
+  },
+  {
+    "op": "objectLock/WORM",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "ObjectLockEnabled=Enabled"
+  },
+  {
+    "op": "tenantA scoped identity (signs own bucket)",
+    "http": 200,
+    "class": "SUPPORTED",
+    "detail": "static identities file"
+  },
+  {
+    "op": "tenantA cross-bucket write (expect DENY)",
+    "http": 403,
+    "class": "SUPPORTED",
+    "detail": "correctly denied (AccessDenied)"
+  }
+]

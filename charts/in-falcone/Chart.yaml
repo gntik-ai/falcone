@@ -73,3 +73,13 @@ dependencies:
     version: 0.1.0
     repository: file://./charts/vault
     condition: vault.enabled
+  # SeaweedFS HA object-storage tier (master/volume/filer/S3 gateway). First
+  # remote sub-chart dependency in this umbrella; gated by seaweedfs.enabled
+  # (default false) so it coexists with the bundled MinIO storage component
+  # (storage.enabled) during the MinIO -> SeaweedFS cutover. Version pinned to
+  # the chart that ships SeaweedFS appVersion 4.33 (validated by the
+  # add-seaweedfs-storage-adr-spike #431 evidence). See add-seaweedfs-deployment.
+  - name: seaweedfs
+    version: 4.33.0
+    repository: https://seaweedfs.github.io/seaweedfs/helm
+    condition: seaweedfs.enabled

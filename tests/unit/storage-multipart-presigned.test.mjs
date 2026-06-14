@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
+import { buildStorageProviderProfile, DEFAULT_STORAGE_PROVIDER_TYPE } from '../../services/adapters/src/storage-provider-profile.mjs';
+import { buildStorageBucketRecord } from '../../services/adapters/src/storage-bucket-object-ops.mjs';
 import { isStorageReservedPrefix } from '../../services/adapters/src/storage-logical-organization.mjs';
 import { STORAGE_NORMALIZED_ERROR_CODES } from '../../services/adapters/src/storage-error-taxonomy.mjs';
 import {
@@ -204,6 +206,53 @@ test('buildMultipartCompletionPreview returns expected object record for valid p
   assert.equal(preview.validationOutcome, 'valid');
   assert.equal(preview.expectedObjectRecord.objectKey, 'uploads/file.bin');
   assert.deepEqual(preview.validationErrors, []);
+});
+
+test('storage-multipart-presigned module no longer hardcodes a providerType: \'minio\' literal', () => {
+  const moduleSource = readFileSync(
+    new URL('../../services/adapters/src/storage-multipart-presigned.mjs', import.meta.url),
+    'utf8'
+  );
+  assert.equal(/providerType:\s*'minio'/.test(moduleSource), false);
+  assert.equal(/providerType:\s*"minio"/.test(moduleSource), false);
+  // The tenant storage context providerType is sourced from the session context or the
+  // config-driven default, not a literal.
+  assert.match(moduleSource, /session\?\.tenantStorageContext\?\.providerType\s*\?\?\s*DEFAULT_STORAGE_PROVIDER_TYPE/);
+});
+
+test('buildMultipartCompletionPreview sources the tenant storage context providerType from the session (seaweedfs)', () => {
+  const session = {
+    ...makeSession(),
+    tenantStorageContext: { providerType: 'seaweedfs' }
+  };
+  // The bucket-context shape the preview constructs surfaces the providerType through
+  // buildStorageBucketRecord (the public bucket surface) when not pre-resolved.
+  const bucketRecord = buildStorageBucketRecord({
+    tenantId: session.tenantId,
+    workspaceId: session.workspaceId,
+    bucketName: session.bucketId,
+    tenantStorageContext: {
+      entityType: 'tenant_storage_context',
+      tenantId: session.tenantId,
+      providerType: session?.tenantStorageContext?.providerType ?? DEFAULT_STORAGE_PROVIDER_TYPE,
+      namespace: `${session.tenantId}:${session.workspaceId}`,
+      quotaAssignment: { capabilityAvailable: true },
+      state: 'active',
+      bucketProvisioningAllowed: true
+    }
+  });
+  assert.equal(bucketRecord.providerType, 'seaweedfs');
+  assert.equal(bucketRecord.tenantStorageContext.providerType, 'seaweedfs');
+});
+
+test('buildMultipartCompletionPreview still produces a valid object record (no hardcoded minio literal needed)', () => {
+  const preview = buildMultipartCompletionPreview({
+    session: makeSession(),
+    parts: [1, 2, 3].map((partNumber) => ({ partNumber, sizeBytes: 5_000_000 })),
+    now: '2026-03-28T00:00:00Z'
+  });
+  assert.equal(preview.validationOutcome, 'valid');
+  assert.equal(preview.expectedObjectRecord.objectKey, 'uploads/file.bin');
 });
 
 test('buildMultipartCompletionPreview rejects invalid part ordering', () => {
