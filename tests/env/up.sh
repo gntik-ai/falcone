@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bring up the Falcone test environment (Postgres + Keycloak + Redpanda + MongoDB
-# + MinIO + Vault), wait for health, provision the Keycloak admin service account,
-# apply known service migrations, initiate the Mongo replica set, create the MinIO
+# + SeaweedFS + Vault), wait for health, provision the Keycloak admin service account,
+# apply known service migrations, initiate the Mongo replica set, create the SeaweedFS
 # bucket, and enable the Vault file audit device.
 # Idempotent: safe to re-run.
 set -euo pipefail
@@ -26,18 +26,18 @@ for i in $(seq 1 60); do
   kc=$(docker compose ps keycloak --format '{{.Health}}' 2>/dev/null || true)
   rp=$(docker compose ps redpanda --format '{{.Health}}' 2>/dev/null || true)
   mo=$(docker compose ps mongodb --format '{{.Health}}' 2>/dev/null || true)
-  mi=$(docker compose ps minio --format '{{.Health}}' 2>/dev/null || true)
+  sw=$(docker compose ps seaweedfs --format '{{.Health}}' 2>/dev/null || true)
   va=$(docker compose ps vault --format '{{.Health}}' 2>/dev/null || true)
   tm=$(docker compose ps temporal --format '{{.Health}}' 2>/dev/null || true)
   [ "$pg" = "healthy" ] && [ "$kc" = "healthy" ] && [ "$rp" = "healthy" ] \
-    && [ "$mo" = "healthy" ] && [ "$mi" = "healthy" ] && [ "$va" = "healthy" ] \
+    && [ "$mo" = "healthy" ] && [ "$sw" = "healthy" ] && [ "$va" = "healthy" ] \
     && [ "$tm" = "healthy" ] && break
   sleep 5
 done
 [ "${pg:-}" = "healthy" ] && [ "${kc:-}" = "healthy" ] && [ "${rp:-}" = "healthy" ] \
-  && [ "${mo:-}" = "healthy" ] && [ "${mi:-}" = "healthy" ] && [ "${va:-}" = "healthy" ] \
+  && [ "${mo:-}" = "healthy" ] && [ "${sw:-}" = "healthy" ] && [ "${va:-}" = "healthy" ] \
   && [ "${tm:-}" = "healthy" ] \
-  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp mongodb=$mo minio=$mi vault=$va temporal=$tm)" >&2; exit 1; }
+  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp mongodb=$mo seaweedfs=$sw vault=$va temporal=$tm)" >&2; exit 1; }
 
 echo "==> provisioning Keycloak admin service account (falcone-admin)"
 docker compose exec -T keycloak "$KC" config credentials \
@@ -71,12 +71,14 @@ done
 [ "${state:-}" = "1" ] && echo "   replica set rs0 is PRIMARY" \
   || { echo "   mongodb did not reach PRIMARY (myState=$state)" >&2; exit 1; }
 
-echo "==> creating MinIO bucket (falcone-test)"
-# Run mc inside the minio container (it ships the mc client).
-docker compose exec -T minio sh -c \
-  "mc alias set local http://localhost:9000 minioadmin minioadmin >/dev/null 2>&1 && mc mb --ignore-existing local/falcone-test >/dev/null" \
+echo "==> creating SeaweedFS bucket (falcone-test)"
+# Create the bucket via `weed shell` inside the all-in-one container. Check-then-create
+# keeps it idempotent regardless of s3.bucket.create's re-create behavior.
+docker compose exec -T seaweedfs sh -c \
+  'echo "s3.bucket.list" | weed shell -master localhost:9333 2>/dev/null | grep -qw falcone-test \
+     || echo "s3.bucket.create -name falcone-test" | weed shell -master localhost:9333 >/dev/null 2>&1' \
   && echo "   bucket falcone-test ready" \
-  || { echo "   failed to create MinIO bucket" >&2; exit 1; }
+  || { echo "   failed to create SeaweedFS bucket" >&2; exit 1; }
 
 echo "==> enabling Vault file audit device"
 # Idempotent: enabling an already-enabled device returns an error we ignore.
@@ -179,7 +181,7 @@ INSERT INTO backup_status_snapshots
 VALUES
   ('$E2E_TENANT_ID', 'postgres', 'pg-tenant-a-1', 'tenant-a-primary-db', 'dedicated',
    FALSE, 'success', NOW(), NOW(), 'tenant A dedicated database'),
-  ('$E2E_TENANT_B_ID', 'object-store', 'minio-shared-1', 'shared-platform-objectstore', 'shared',
+  ('$E2E_TENANT_B_ID', 'object-store', 'seaweedfs-shared-1', 'shared-platform-objectstore', 'shared',
    TRUE, 'success', NOW(), NOW(), 'platform-shared object store owned by tenant B')
 ON CONFLICT (tenant_id, component_type, instance_id) DO NOTHING;
 SQL
@@ -292,8 +294,7 @@ echo "  Keycloak admin console : http://localhost:8081  (admin/admin)"
 echo "  Postgres               : postgres://falcone:falcone@localhost:55432/falcone_test"
 echo "  Redpanda (Kafka)       : localhost:19092"
 echo "  MongoDB (rs0)          : mongodb://localhost:57017/?replicaSet=rs0&directConnection=true"
-echo "  MinIO S3 API           : http://localhost:59000  (minioadmin/minioadmin), bucket falcone-test"
-echo "  MinIO console          : http://localhost:59001"
+echo "  SeaweedFS S3 API       : http://localhost:58333  (falconedev/falconedevsecret, path-style), bucket falcone-test"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
 echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/plans/change-history, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/workspace-sub-quotas, /v1/backups/status)"
