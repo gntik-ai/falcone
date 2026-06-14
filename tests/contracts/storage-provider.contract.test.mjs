@@ -64,6 +64,21 @@ import {
   buildVerificationRun
 } from '../../services/adapters/src/storage-provider-verification.mjs';
 
+test('seaweedfs is a supported storage provider with a baseline-eligible capability profile', () => {
+  assert.equal(supportedStorageProviderTypes.includes('seaweedfs'), true);
+
+  const profile = getStorageProviderProfile({ providerType: 'seaweedfs' });
+  assert.equal(profile.providerType, 'seaweedfs');
+  assert.equal(profile.backendFamily, 's3-compatible');
+  assert.equal(profile.capabilityBaseline.eligible, true);
+
+  const entries = Object.fromEntries(profile.capabilityDetails.map((entry) => [entry.capabilityId, entry]));
+  assert.equal(entries['object.versioning'].state, 'partially_satisfied');
+  assert.equal(entries['bucket.lifecycle'].state, 'unsatisfied');
+  assert.equal(entries['object.lock'].state, 'unsatisfied');
+  assert.equal(entries['bucket.event_notifications'].state, 'unsatisfied');
+});
+
 test('storage OpenAPI contract exposes additive provider, bucket, and object routes and schemas', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
   const providerRoute = document.paths['/v1/platform/storage/provider']?.get;

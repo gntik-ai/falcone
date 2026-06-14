@@ -1,0 +1,153 @@
+{{- if and .Values.seaweedfs.enabled .Values.seaweedfsTls.bootstrap.enabled }}
+{{- /*
+  SeaweedFS inter-component TLS bootstrap (add-seaweedfs-deployment, task 8.2 / OQ-3).
+
+  SAFE DEFAULT for clusters WITHOUT cert-manager: a Helm pre-install/pre-upgrade
+  hook Job that generates a self-signed CA + leaf certs with openssl and writes
+  them into the Secrets the SeaweedFS sub-chart consumes when
+  certificates.externalCertificates.enabled=true:
+    <release>-seaweedfs-{ca,master,volume,filer,client}-cert
+  Each leaf Secret carries tls.crt/tls.key/ca.crt; the ca Secret carries the CA.
+
+  cert-manager DETECTION IS A DEPLOY-TIME CONCERN (cannot be probed from
+  `helm template`). Where cert-manager IS available, disable this hook
+  (seaweedfsTls.bootstrap.enabled=false) and leave
+  certificates.externalCertificates.enabled=false so the sub-chart's Issuer path
+  provisions the certs instead.
+
+  Runs as a hook (BEFORE the sub-chart pods) so the cert Secrets exist when the
+  master/volume/filer/s3 pods mount them.
+*/ -}}
+{{- $b := .Values.seaweedfsTls.bootstrap -}}
+{{- $prefix := printf "%s-seaweedfs" .Release.Name -}}
+{{- $ns := .Values.global.namespace -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-tls
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch", "update"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-tls
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-tls
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+    namespace: {{ $ns }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-tls
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.labels" . | nindent 8 }}
+        app.kubernetes.io/component: seaweedfs-tls
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Release.Name }}-seaweedfs-tls-bootstrap
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tls-bootstrap
+          image: {{ .Values.seaweedfsTls.bootstrap.image.repository }}:{{ .Values.seaweedfsTls.bootstrap.image.tag }}
+          imagePullPolicy: {{ .Values.seaweedfsTls.bootstrap.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: NS
+              value: {{ $ns | quote }}
+            - name: PREFIX
+              value: {{ $prefix | quote }}
+            - name: CN
+              value: {{ $b.commonName | quote }}
+            - name: DAYS
+              value: {{ $b.days | quote }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              command -v openssl >/dev/null || { echo "openssl required in the bootstrap image"; exit 1; }
+              # Skip if the CA Secret already exists (idempotent re-install).
+              if kubectl -n "$NS" get secret "${PREFIX}-ca-cert" >/dev/null 2>&1; then
+                echo "CA secret already present; skipping TLS bootstrap"; exit 0
+              fi
+              D=$(mktemp -d)
+              # Self-signed CA.
+              openssl req -x509 -nodes -newkey rsa:2048 -days "$DAYS" \
+                -keyout "$D/ca.key" -out "$D/ca.crt" -subj "/CN=$CN"
+              make_leaf() {
+                comp="$1"
+                openssl req -nodes -newkey rsa:2048 \
+                  -keyout "$D/$comp.key" -out "$D/$comp.csr" \
+                  -subj "/CN=${PREFIX}-$comp"
+                openssl x509 -req -in "$D/$comp.csr" -CA "$D/ca.crt" -CAkey "$D/ca.key" \
+                  -CAcreateserial -days "$DAYS" -out "$D/$comp.crt"
+                kubectl -n "$NS" create secret generic "${PREFIX}-${comp}-cert" \
+                  --from-file=tls.crt="$D/$comp.crt" \
+                  --from-file=tls.key="$D/$comp.key" \
+                  --from-file=ca.crt="$D/ca.crt" \
+                  --dry-run=client -o yaml | kubectl apply -f -
+              }
+              kubectl -n "$NS" create secret generic "${PREFIX}-ca-cert" \
+                --from-file=tls.crt="$D/ca.crt" \
+                --from-file=tls.key="$D/ca.key" \
+                --from-file=ca.crt="$D/ca.crt" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              for c in master volume filer client; do make_leaf "$c"; done
+              echo "SeaweedFS inter-component TLS secrets created under ${PREFIX}-*-cert"
+{{- end }}

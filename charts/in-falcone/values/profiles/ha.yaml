@@ -83,3 +83,27 @@ kafka:
 storage:
   persistence:
     size: 1Ti
+# SeaweedFS HA overrides (add-seaweedfs-deployment, D2/D3). master -> 3-node Raft
+# quorum, volume -> 3 servers at 1Ti each, S3 -> 2 replicas, replication 011 (one
+# cross-rack copy). filer stays at 1 replica (stateless w.r.t. object data;
+# metadata in PostgreSQL) with its 20Gi PVC unchanged. Applies only when
+# seaweedfs.enabled=true; harmless otherwise.
+seaweedfs:
+  master:
+    replicas: 3
+    # 011 = 1 copy + 1 cross-rack copy (tolerates a volume-server failure).
+    defaultReplication: "011"
+  volume:
+    replicas: 3
+    dataDirs:
+      - name: data1
+        type: "persistentVolumeClaim"
+        size: "1Ti"
+        storageClass: ""
+        maxVolumes: 0
+  filer:
+    # Stateless filer; HA scale of the filer process is deferred. PVC unchanged.
+    replicas: 1
+    defaultReplicaPlacement: "011"
+  s3:
+    replicas: 2

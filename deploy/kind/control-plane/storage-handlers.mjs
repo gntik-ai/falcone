@@ -9,11 +9,18 @@
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
 
-const ENDPOINT = (process.env.MINIO_ENDPOINT || 'http://falcone-storage:9000').replace(/\/+$/, '');
-const ACCESS = process.env.MINIO_ACCESS_KEY || '';
-const SECRET = process.env.MINIO_SECRET_KEY || '';
-const REGION = process.env.MINIO_REGION || 'us-east-1';
+// Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
+// or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
+// fallbacks; a single startup deprecation notice fires when they are used.
+const ENDPOINT = (process.env.STORAGE_S3_ENDPOINT || process.env.MINIO_ENDPOINT || 'http://falcone-storage:9000').replace(/\/+$/, '');
+const ACCESS = process.env.STORAGE_S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY || '';
+const SECRET = process.env.STORAGE_S3_SECRET_KEY || process.env.MINIO_SECRET_KEY || '';
+const REGION = process.env.STORAGE_S3_REGION || process.env.MINIO_REGION || 'us-east-1';
 const EMPTY_SHA = crypto.createHash('sha256').update('').digest('hex');
+
+if (!process.env.STORAGE_S3_ENDPOINT && process.env.MINIO_ENDPOINT) {
+  console.warn('[storage] MINIO_ENDPOINT is deprecated; set STORAGE_S3_ENDPOINT (and STORAGE_S3_ACCESS_KEY / STORAGE_S3_SECRET_KEY) instead. Falling back to MINIO_* for now.');
+}
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
@@ -72,13 +79,29 @@ async function s3(method, path, { query = {}, headers = {}, body } = {}) {
   return { status: res.status, headers: res.headers, text };
 }
 
-// minimal XML helpers for the (simple, known) S3 list responses
+// minimal XML helpers for the (simple, known) S3 list responses.
+// Entity-aware + CDATA-tolerant: SeaweedFS (and other gateways) may encode characters
+// in bucket names / object keys (`&amp; &lt; &gt; &quot; &#34;`) or wrap text in
+// <![CDATA[...]]>. We decode the common entity set and strip CDATA wrappers before
+// returning tag content, while staying byte-compatible with the real SeaweedFS 4.33
+// envelopes captured in the adr-spike (`&#34;`-quoted ETags, NextContinuationToken).
+const stripCdata = (s) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+const decodeXmlEntities = (s) => s
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#34;/g, '"')
+  .replace(/&#x22;/gi, '"')
+  .replace(/&apos;/g, '\'')
+  .replace(/&#39;/g, '\'')
+  .replace(/&amp;/g, '&'); // ampersand last so we don't double-decode
+const decodeTagContent = (s) => (s == null ? null : decodeXmlEntities(stripCdata(s)));
 const allTags = (xml, tag) => {
   const out = []; const re = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'); let m;
-  while ((m = re.exec(xml))) out.push(m[1]);
+  while ((m = re.exec(xml))) out.push(decodeTagContent(m[1]));
   return out;
 };
-const oneTag = (xml, tag) => { const m = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`)); return m ? m[1] : null; };
+const oneTag = (xml, tag) => { const m = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`)); return m ? decodeTagContent(m[1]) : null; };
 
 export async function listBuckets() {
   const { text } = await s3('GET', '/');

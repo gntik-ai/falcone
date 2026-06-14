@@ -1,0 +1,58 @@
+{{- if .Values.seaweedfs.enabled }}
+{{- /*
+  SeaweedFS filer DB-init ConfigMap (add-seaweedfs-deployment, task 3.x).
+
+  The upstream SeaweedFS filer StatefulSet always references a
+  `db-schema-config-volume` backed by a ConfigMap named
+  `<release>-seaweedfs-db-init-config` (overridable via filer.dbInitConfigName).
+  The upstream chart does NOT create that ConfigMap, so without this template the
+  filer Pod cannot be scheduled (missing ConfigMap volume source). We point
+  seaweedfs.filer.dbInitConfigName at THIS ConfigMap.
+
+  It carries the working `filer.toml` for the postgres2 backend. The createTable
+  template is the spike-validated DDL (add-seaweedfs-storage-adr-spike #431,
+  evidence/01 + conf/filer.toml): the postgres2 default at 4.33 crashes the filer
+  at boot (`init table filemeta: ERROR: syntax error at or near "%!"`). The
+  authoritative runtime config is delivered to the filer via the
+  WEED_POSTGRES2_* env vars in values.yaml (which also set CREATETABLE); this
+  filer.toml mirrors it for operator visibility / the file-config code path.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.seaweedfs.filer.dbInitConfigName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-filer
+data:
+  filer.toml: |-
+    # SeaweedFS filer metadata store -> PostgreSQL (postgres2: one table per
+    # bucket). Dedicated database `seaweedfs_filer` (NOT Falcone's app DB) so the
+    # filer's runtime CREATE/DROP TABLE never collides with managed migrations.
+    [leveldb2]
+    enabled = false
+
+    [postgres2]
+    enabled = true
+    # REQUIRED: postgres2 ships no usable createTable default at 4.33 — leaving it
+    # unset makes the filer emit a malformed fmt.Sprintf string and crash on boot
+    # (init table filemeta: ERROR: syntax error at or near "%!"). The "%s" is
+    # substituted with each per-bucket table name.
+    createTable = """
+    CREATE TABLE IF NOT EXISTS "%s" (
+      dirhash   BIGINT,
+      name      VARCHAR(65535),
+      directory VARCHAR(65535),
+      meta      bytea,
+      PRIMARY KEY (dirhash, name)
+    );
+    """
+    hostname = "{{ .Release.Name }}-postgresql"
+    port = 5432
+    database = "seaweedfs_filer"
+    schema = "public"
+    sslmode = "disable"
+    connection_max_idle = 5
+    connection_max_open = 30
+{{- end }}

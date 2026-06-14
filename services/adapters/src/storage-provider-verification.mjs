@@ -81,6 +81,7 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
       minio: 'NoSuchKey',
       'ceph-rgw': 'NoSuchKey',
       garage: 'NoSuchKey',
+      seaweedfs: 'NoSuchKey',
       default: 'NoSuchKey'
     })
   }),
@@ -92,6 +93,7 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
       minio: 'NoSuchBucket',
       'ceph-rgw': 'NoSuchBucket',
       garage: 'NoSuchBucket',
+      seaweedfs: 'NoSuchBucket',
       default: 'NoSuchBucket'
     })
   }),
@@ -103,6 +105,7 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
       minio: 'BucketAlreadyExists',
       'ceph-rgw': 'BucketAlreadyExists',
       garage: 'BucketAlreadyExists',
+      seaweedfs: 'BucketAlreadyExists',
       default: 'BucketAlreadyExists'
     })
   }),
@@ -114,6 +117,7 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
       minio: 'AccessDenied',
       'ceph-rgw': 'AccessDenied',
       garage: 'AccessDenied',
+      seaweedfs: 'AccessDenied',
       default: 'AccessDenied'
     })
   }),
@@ -125,10 +129,20 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
       minio: 'InvalidBucketName',
       'ceph-rgw': 'InvalidBucketName',
       garage: 'InvalidBucketName',
+      seaweedfs: 'InvalidBucketName',
       default: 'InvalidBucketName'
     })
   })
 });
+
+export function getErrorScenarioProviderCodeMap(errorCode) {
+  const definition = ERROR_SCENARIO_DEFINITIONS[errorCode];
+  return definition ? { ...definition.providerCodeByType } : null;
+}
+
+export function listErrorScenarioCodes() {
+  return Object.keys(ERROR_SCENARIO_DEFINITIONS);
+}
 
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) {
