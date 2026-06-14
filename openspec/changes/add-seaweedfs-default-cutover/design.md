@@ -28,9 +28,11 @@ Set `storage.enabled: false` and `seaweedfs.enabled: true` in `charts/in-falcone
 
 `charts/in-falcone/values/profiles/ha.yaml` already overrides `seaweedfs` (3 master / 3 volume, replication `011`). Ensure the HA profile also disables MinIO so the HA object store is unambiguously SeaweedFS.
 
-### D3 — `tests/env` SeaweedFS stack on `:58333`
+### D3 — `tests/env` SeaweedFS as an all-in-one server on `:58333` (embedded filer)
 
-Replace the `minio` Compose service with SeaweedFS components. The S3 gateway maps container `:8333` → host `:58333` (the port `validation/run-validation.sh` already documents), deliberately **not** reusing MinIO's `:59000` so a side-by-side bring-up during development never collides. Filer metadata uses the existing Compose Postgres (dedicated `seaweedfs_filer` database with the explicit `createTable` DDL proven necessary at 4.33).
+Replace the `minio` Compose service with a single all-in-one SeaweedFS `server` (master + volume + filer + S3 gateway), pinned to the spike-validated 4.33 digest (the same image `tests/env/seaweedfs/run.sh` uses). The S3 gateway maps container `:8333` → host `:58333` (the port `validation/run-validation.sh` already documents), deliberately **not** reusing MinIO's `:59000` so a side-by-side bring-up during development never collides.
+
+The shared dev compose uses SeaweedFS's **embedded filer store** (ephemeral `/data` on tmpfs), **not** filer-on-PostgreSQL. Rationale: the shared test stack must be robust and dependency-light (every real-stack suite depends on it); the S3 contract the suites exercise is identical regardless of the filer backend, and filer-on-PostgreSQL is already validated by the Helm chart and the `tests/env/seaweedfs` slice. Adding a Postgres dependency + DB-ordering to the shared compose would add fragility for no additional S3-surface coverage. The static dev S3 identity lives in `tests/env/seaweedfs/conf/s3-identities.json` and is mirrored by the `S3_*` exports in `env.sh`.
 
 ### D4 — Provider-agnostic env is the seam
 
