@@ -1,0 +1,29 @@
+name: ferretdb-spike
+services:
+  postgres:
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+    container_name: ferretdb-spike-engine
+    environment:
+      - POSTGRES_USER=falcone
+      - POSTGRES_PASSWORD=spikepass
+      - POSTGRES_DB=postgres
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U falcone -d postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:2.7.0
+    container_name: ferretdb-spike-gateway
+    restart: on-failure
+    environment:
+      - FERRETDB_POSTGRESQL_URL=postgres://falcone:spikepass@postgres:5432/postgres
+    ports:
+      - "27017:27017"
+    depends_on:
+      postgres:
+        condition: service_healthy
