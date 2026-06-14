@@ -81,6 +81,9 @@ kafka:
   persistence:
     size: 250Gi
 storage:
+  # MinIO stays OFF in HA too (inherits the base cutover default); the 1Ti size below
+  # only applies if MinIO is re-enabled for rollback (tools/migration/ROLLBACK.md).
+  enabled: false
   persistence:
     size: 1Ti
 # SeaweedFS HA overrides (add-seaweedfs-deployment, D2/D3). master -> 3-node Raft
