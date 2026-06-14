@@ -1,3 +1,15 @@
+/**
+ * @module storage-logical-organization
+ *
+ * LEGACY tenant-to-bucket strategy: prefix-per-tenant. This module derives
+ * object-KEY prefixes (`tenants/<id>/workspaces/<id>/...`) for in-bucket logical
+ * organization; it does NOT — and must not — create buckets. The canonical
+ * tenant-to-bucket mapping for the SeaweedFS migration is bucket-per-workspace
+ * backed by the `workspace_buckets` table (see add-seaweedfs-bucket-lifecycle-
+ * migration, decision D1). No NEW call site may use this strategy to allocate a
+ * bucket. Retained (not deleted) because it is still the keyspace-organization
+ * helper for object operations within a workspace's bucket.
+ */
 import { posix as posixPath } from 'node:path';
 
 import { buildTenantStorageContextRecord } from './storage-tenant-context.mjs';

@@ -202,9 +202,16 @@ async function storageProvisionBucket(ctx) {
   const workspaceId = ctx.params.workspaceId;
   const ws = await store.getWorkspace(ctx.pool, workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
-  // DNS-safe bucket name (lowercase, [a-z0-9-], 3..63)
+  // DNS-safe bucket name (lowercase, [a-z0-9-], 3..63). This is the canonical rule
+  // codified in services/provisioning-orchestrator/src/utils/bucket-name-validator.mjs;
+  // it is duplicated inline here because this kind-runtime image bundles only
+  // deploy/kind/control-plane and cannot import the services package.
   const raw = (ctx.body?.name ?? `ws-${ws.slug ?? ws.id.slice(0, 8)}-assets`).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
   const bucket = raw.length >= 3 ? raw : `ws-${ws.id.slice(0, 8)}`;
+  // Reject before any backend call if the derived name still violates the contract.
+  if (!/^[a-z0-9-]{3,63}$/.test(bucket)) {
+    return err(400, 'STORAGE_INVALID_BUCKET_NAME', `derived bucket name '${bucket}' is not DNS-safe ([a-z0-9-], 3..63)`);
+  }
   try {
     await createBucket(bucket);
     const rec = await store.insertBucket(ctx.pool, { workspaceId: ws.id, tenantId: ws.tenant_id, bucketName: bucket, region: REGION });
