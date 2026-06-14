@@ -1,0 +1,1 @@
+seaweedfs-1  | F0614 00:17:51.769031 configuration.go:26 failed to initialize store for postgres2: init table filemeta: ERROR: syntax error at or near "%!" (SQLSTATE 42601)

@@ -1,0 +1,4 @@
+FINDING: putBucketPolicy is PARTIAL — Principal must be the string "*";
+  AWS-canonical Principal:{"AWS":[...]} -> 400 MalformedPolicy 'Policy has invalid resource'.
+getBucketPolicy round-trip OK, http= 200
+  stored Principal= *
