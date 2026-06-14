@@ -1,0 +1,76 @@
+{{- if .Values.seaweedfs.enabled }}
+{{- /*
+  SeaweedFS S3 gateway credentials (add-seaweedfs-deployment, design D7).
+
+  Two chart-created Secrets, sharing ONE generated access/secret-key pair:
+
+    1. {{ .Values.seaweedfsS3Creds.secretName }}
+       Human/consumer-facing keys `s3AccessKey` / `s3SecretKey`. This is the
+       Secret storage consumers reference (resolving the legacy MinIO
+       key-name inconsistency where the chart declared access-key/secret-key but
+       consumers expected MINIO_ROOT_USER/PASSWORD). Wire it to the
+       provider-neutral STORAGE_S3_ACCESS_KEY / STORAGE_S3_SECRET_KEY env names
+       (#434) at cutover time.
+
+    2. {{ .Values.seaweedfsS3Creds.configSecretName }}
+       The SeaweedFS identities JSON (key `seaweedfs_s3_config`) that the S3
+       gateway loads via `-s3.config` (wired through
+       seaweedfs.s3.existingConfigSecret). Built from the SAME generated values
+       so the gateway authenticates with the chart-created credentials.
+
+  STABLE ACROSS RE-INSTALLS: the values are generated once with randAlphaNum and
+  then re-read on every subsequent render via `lookup`, so upgrades/re-installs
+  do NOT rotate the credentials. The Secrets also carry
+  helm.sh/resource-policy: keep so an accidental uninstall does not drop them.
+*/ -}}
+{{- $ns := .Values.global.namespace -}}
+{{- $credsName := .Values.seaweedfsS3Creds.secretName -}}
+{{- $configName := .Values.seaweedfsS3Creds.configSecretName -}}
+{{- $identityName := .Values.seaweedfsS3Creds.identityName -}}
+{{- /* Regeneration guard: reuse existing values when the Secret already exists. */ -}}
+{{- $existing := lookup "v1" "Secret" $ns $credsName -}}
+{{- $accessKey := "" -}}
+{{- $secretKey := "" -}}
+{{- if and $existing $existing.data -}}
+  {{- $accessKey = index $existing.data "s3AccessKey" | b64dec -}}
+  {{- $secretKey = index $existing.data "s3SecretKey" | b64dec -}}
+{{- end -}}
+{{- if not $accessKey -}}
+  {{- $accessKey = randAlphaNum 20 -}}
+{{- end -}}
+{{- if not $secretKey -}}
+  {{- $secretKey = randAlphaNum 40 -}}
+{{- end -}}
+{{- $identities := dict "identities" (list (dict
+      "name" $identityName
+      "credentials" (list (dict "accessKey" $accessKey "secretKey" $secretKey))
+      "actions" (list "Admin" "Read" "Write" "List" "Tagging"))) -}}
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ $credsName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-s3
+  annotations:
+    "helm.sh/resource-policy": keep
+stringData:
+  s3AccessKey: {{ $accessKey | quote }}
+  s3SecretKey: {{ $secretKey | quote }}
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ $configName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-s3
+  annotations:
+    "helm.sh/resource-policy": keep
+stringData:
+  seaweedfs_s3_config: {{ toJson $identities | quote }}
+{{- end }}

@@ -30,7 +30,7 @@ export const STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES = Object.freeze({
 
 export const STORAGE_PROVIDER_CAPABILITY_MANIFEST_VERSION = 'v2';
 export const STORAGE_PROVIDER_CAPABILITY_BASELINE_VERSION = 'v1';
-export const DEFAULT_STORAGE_PROVIDER_TYPE = 'minio';
+export const DEFAULT_STORAGE_PROVIDER_TYPE = process.env.STORAGE_DEFAULT_PROVIDER_TYPE || 'minio';
 
 const REQUIRED_BASELINE_CAPABILITIES = Object.freeze([
   'bucket.create',
@@ -391,6 +391,78 @@ const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
       buildStorageProviderLimitation({
         code: 'BUCKET_EVENT_NOTIFICATIONS_NOT_ASSUMED',
         summary: 'Bucket event notifications are not assumed in the common abstraction profile for Garage.',
+        affectsCapabilities: ['bucket.event_notifications']
+      })
+    ]
+  }),
+  seaweedfs: buildProviderDefinition({
+    providerType: 'seaweedfs',
+    displayName: 'SeaweedFS',
+    backendFamily: 's3-compatible',
+    selectionKeys: ['seaweedfs'],
+    configuredVia: 'storage.config.inline.providerType',
+    defaultRegion: 'us-east-1',
+    capabilityEntries: {
+      'bucket.create': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Creates workspace buckets.' },
+      'bucket.delete': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Deletes eligible buckets.' },
+      'bucket.list': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Lists scoped buckets.' },
+      'object.put': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Stores objects.', constraints: STANDARD_OBJECT_CONSTRAINTS },
+      'object.get': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Downloads object content.' },
+      'object.delete': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Deletes scoped objects.' },
+      'object.list': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Lists bucket objects.' },
+      'object.metadata.get': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Fetches HEAD-style object metadata.' },
+      'object.content_type.preserve': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Preserves content type metadata on write and read.' },
+      'object.integrity.etag_or_checksum': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Returns an ETag or checksum on upload responses.' },
+      'object.list.pagination.deterministic': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Provides deterministic object listing pagination.', constraints: STANDARD_PAGINATION_CONSTRAINTS },
+      'object.conditional.if_match': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports If-Match conditional requests.', constraints: STANDARD_CONDITIONAL_CONSTRAINTS },
+      'object.conditional.if_none_match': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports If-None-Match conditional requests.', constraints: STANDARD_IF_NONE_MATCH_CONSTRAINTS },
+      'bucket.presigned_urls': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports presigned URL flows for future storage increments.' },
+      'object.multipart_upload': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports multipart upload flows.', constraints: [buildCapabilityConstraint({ key: 'maxParts', operator: '<=', value: 10000 })] },
+      'object.versioning': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.PARTIALLY_SATISFIED,
+        summary: 'Requires an explicit per-bucket versioning flag; not assumed by default in the common abstraction profile for SeaweedFS.',
+        constraints: [buildCapabilityConstraint({ key: 'versioningMode', value: 'bucket_flag_required' })]
+      },
+      'bucket.policy': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED,
+        summary: 'Supports declarative bucket policy exposure through the common platform surface; the SeaweedFS S3 gateway requires the wildcard or identity-name principal form (a normalization shim flattens AWS-canonical principals per adr-spike G1).',
+        constraints: [
+          ...STANDARD_BUCKET_POLICY_CONSTRAINTS,
+          buildCapabilityConstraint({ key: 'principalForm', value: 'wildcard_or_identity_name' })
+        ]
+      },
+      'bucket.lifecycle': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
+        summary: 'Accepted by the SeaweedFS S3 gateway per adr-spike, but not assumed or governed in the common abstraction profile for SeaweedFS.'
+      },
+      'object.lock': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
+        summary: 'Accepted by the SeaweedFS S3 gateway per adr-spike, but not assumed or governed in the common abstraction profile for SeaweedFS.'
+      },
+      'bucket.event_notifications': {
+        state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.UNSATISFIED,
+        summary: 'Storage event notifications are not assumed or governed in the common abstraction profile for SeaweedFS.'
+      }
+    },
+    limitations: [
+      buildStorageProviderLimitation({
+        code: 'OBJECT_VERSIONING_BUCKET_FLAG_REQUIRED',
+        summary: 'Object versioning requires an explicit per-bucket versioning flag on SeaweedFS.',
+        affectsCapabilities: ['object.versioning']
+      }),
+      buildStorageProviderLimitation({
+        code: 'BUCKET_LIFECYCLE_NOT_ASSUMED',
+        summary: 'Bucket lifecycle rules are not assumed in the common abstraction profile for SeaweedFS.',
+        affectsCapabilities: ['bucket.lifecycle']
+      }),
+      buildStorageProviderLimitation({
+        code: 'OBJECT_LOCK_NOT_ASSUMED',
+        summary: 'Object lock and immutability controls are not assumed in the common abstraction profile for SeaweedFS.',
+        affectsCapabilities: ['object.lock']
+      }),
+      buildStorageProviderLimitation({
+        code: 'BUCKET_EVENT_NOTIFICATIONS_NOT_ASSUMED',
+        summary: 'Bucket event notifications are not assumed in the common abstraction profile for SeaweedFS.',
         affectsCapabilities: ['bucket.event_notifications']
       })
     ]
