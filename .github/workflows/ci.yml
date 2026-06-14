@@ -56,6 +56,22 @@ jobs:
       - name: Resilience scaffolding
         run: pnpm test:resilience
 
+      # SeaweedFS migration validation (change add-seaweedfs-migration-validation).
+      # Gated OFF by default (repo variable SEAWEEDFS_VALIDATION != '1') so normal CI
+      # is unaffected; enable only when a SeaweedFS-backed env + Postgres are reachable
+      # (operator supplies S3_ENDPOINT / creds / DATABASE_URL as repo vars/secrets).
+      # Runs the parity checker + per-tenant storage smoke via the blackbox entrypoint.
+      - name: SeaweedFS migration validation (gated)
+        if: ${{ vars.SEAWEEDFS_VALIDATION == '1' }}
+        env:
+          SEAWEEDFS_VALIDATION: '1'
+          S3_ENDPOINT: ${{ vars.SEAWEEDFS_S3_ENDPOINT }}
+          S3_ACCESS_KEY: ${{ secrets.SEAWEEDFS_S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.SEAWEEDFS_S3_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.SEAWEEDFS_VALIDATION_DATABASE_URL }}
+          MIGRATION_MANIFEST: ${{ vars.SEAWEEDFS_MIGRATION_MANIFEST }}
+        run: bash tests/blackbox/run.sh
+
       - name: Plan Enforcement Coherence Tests
         run: node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs
         env:
