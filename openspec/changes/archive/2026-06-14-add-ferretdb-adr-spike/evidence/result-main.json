@@ -1,0 +1,325 @@
+{
+  "versionPair": {
+    "ferretdb": "2.7.0",
+    "documentdb": "17-0.107.0-ferretdb-2.7.0"
+  },
+  "aggregation": {
+    "$match": {
+      "status": "SUPPORTED",
+      "rowCount": 2,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ref": "r1"
+      }
+    },
+    "$project": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "_id": 1,
+        "category": "x",
+        "qty": 2
+      }
+    },
+    "$sort": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ref": "r1"
+      }
+    },
+    "$limit": {
+      "status": "SUPPORTED",
+      "rowCount": 2,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ref": "r1"
+      }
+    },
+    "$skip": {
+      "status": "SUPPORTED",
+      "rowCount": 2,
+      "sample": {
+        "_id": 2,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 3,
+        "price": 1.25,
+        "tags": [
+          "b",
+          "c"
+        ],
+        "ref": "r2"
+      }
+    },
+    "$group": {
+      "status": "SUPPORTED",
+      "rowCount": 2,
+      "sample": {
+        "_id": "x",
+        "total": 5
+      }
+    },
+    "$unwind": {
+      "status": "SUPPORTED",
+      "rowCount": 5,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": "a",
+        "ref": "r1"
+      }
+    },
+    "$lookup": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ref": "r1",
+        "joined": [
+          {
+            "_id": "6a2f1b1951376813f0eb6573",
+            "key": "r1",
+            "label": "L1"
+          }
+        ]
+      }
+    },
+    "$count": {
+      "status": "SUPPORTED",
+      "rowCount": 1,
+      "sample": {
+        "n": 3
+      }
+    },
+    "$facet": {
+      "status": "SUPPORTED",
+      "rowCount": 1,
+      "sample": {
+        "byCount": [
+          {
+            "c": 3
+          }
+        ],
+        "totals": [
+          {
+            "_id": null,
+            "s": 10
+          }
+        ],
+        "firstOne": [
+          {
+            "_id": 1,
+            "tenantId": "tA",
+            "category": "x",
+            "qty": 2,
+            "price": 9.5,
+            "tags": [
+              "a",
+              "b"
+            ],
+            "ref": "r1"
+          }
+        ],
+        "cats": [
+          {
+            "_id": "x"
+          },
+          {
+            "_id": "y"
+          }
+        ]
+      }
+    },
+    "$addFields": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ref": "r1",
+        "computed": 3
+      }
+    },
+    "$set": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ref": "r1",
+        "flag": true
+      }
+    },
+    "$unset": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "_id": 1,
+        "tenantId": "tA",
+        "category": "x",
+        "qty": 2,
+        "price": 9.5,
+        "ref": "r1"
+      }
+    },
+    "$replaceRoot": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "wrapped": "x",
+        "q": 2
+      }
+    },
+    "$replaceWith": {
+      "status": "SUPPORTED",
+      "rowCount": 3,
+      "sample": {
+        "only": "x",
+        "q": 2
+      }
+    }
+  },
+  "blocked": {
+    "$out": {
+      "status": "SUPPORTED",
+      "note": "executed without error (unexpected)"
+    },
+    "$merge": {
+      "status": "SUPPORTED",
+      "note": "executed without error (unexpected)"
+    },
+    "$geoNear": {
+      "status": "UNSUPPORTED",
+      "codeName": "IndexNotFound",
+      "code": 27,
+      "message": "$geoNear requires a 2d or 2dsphere index, but none were found"
+    }
+  },
+  "mixedNumeric": {
+    "status": "SUPPORTED",
+    "sum": 11,
+    "avg": 2.75,
+    "expected": {
+      "sum": 11,
+      "avg": 2.75
+    }
+  },
+  "indexes": {
+    "single": {
+      "status": "SUPPORTED",
+      "name": "a_1"
+    },
+    "compound": {
+      "status": "SUPPORTED",
+      "name": "a_1_b_-1"
+    },
+    "unique": {
+      "status": "SUPPORTED",
+      "name": "u_1",
+      "collisionEnforced": true,
+      "collisionError": {
+        "codeName": null,
+        "code": 11000,
+        "message": "Duplicate key violation on the requested collection: Index 'u_1'"
+      }
+    },
+    "sparse": {
+      "status": "SUPPORTED",
+      "name": "s_1",
+      "missingFieldDocsCoexist": true,
+      "error": null
+    },
+    "text": {
+      "status": "SUPPORTED",
+      "note": "created (unexpected)"
+    },
+    "geo": {
+      "status": "SUPPORTED",
+      "note": "created (unexpected)"
+    }
+  },
+  "transactions": {
+    "commit": {
+      "status": "UNSUPPORTED",
+      "codeName": "CommandNotFound",
+      "code": 59,
+      "message": "no such command: 'commitTransaction'"
+    },
+    "abort": {
+      "status": "SUPPORTED"
+    }
+  },
+  "changeStreams": {
+    "preImageCollMod": {
+      "status": "UNSUPPORTED",
+      "codeName": "UnknownBsonField",
+      "code": 40415,
+      "message": "BSON field 'collMod.changeStreamPreAndPostImages' is an unknown field."
+    },
+    "realtimeWatch": {
+      "status": "UNSUPPORTED",
+      "phase": "iterate",
+      "codeName": "CommandNotSupported",
+      "code": 115,
+      "message": "Stage $changeStream is not supported yet in native pipeline"
+    },
+    "cdcWatch": {
+      "status": "UNSUPPORTED",
+      "phase": "iterate",
+      "codeName": "CommandNotSupported",
+      "code": 115,
+      "message": "Stage $changeStream is not supported yet in native pipeline"
+    }
+  }
+}

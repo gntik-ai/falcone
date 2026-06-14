@@ -1,0 +1,7 @@
+{
+  "status": "SUPPORTED",
+  "indexName": "expireAt_1",
+  "expiredDocPurged": true,
+  "purgeElapsedSeconds": 45,
+  "nonExpiringDocRetained": true
+}

@@ -1,0 +1,49 @@
+{
+  "$out": {
+    "ferretdbAccepts": true,
+    "materializedDocs": 2,
+    "functional": true
+  },
+  "$merge": {
+    "ferretdbAccepts": true,
+    "materializedDocs": 2,
+    "functional": true
+  },
+  "textIndex": {
+    "createAccepted": true,
+    "createError": null,
+    "indexEntries": [
+      "_id_",
+      "body_text"
+    ],
+    "textSearchQuery": {
+      "ok": true,
+      "hits": 1
+    }
+  },
+  "geoIndex": {
+    "createAccepted": true,
+    "createError": null,
+    "indexEntries": [
+      "_id_",
+      "loc_2dsphere"
+    ],
+    "geoNearQuery": {
+      "ok": true,
+      "rows": 2
+    }
+  },
+  "txCommit": {
+    "result": "REJECTED",
+    "error": {
+      "codeName": "CommandNotFound",
+      "code": 59,
+      "message": "no such command: 'commitTransaction'"
+    },
+    "docPersisted": true
+  },
+  "txAbort": {
+    "result": "ACCEPTED",
+    "docPersisted": true
+  }
+}

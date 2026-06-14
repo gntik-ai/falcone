@@ -1,0 +1,28 @@
+{
+  "namespaceIsolation": {
+    "tenantADocs": 1,
+    "crossDbLookup": {
+      "accepted": false,
+      "codeName": "Location40321",
+      "code": 40321,
+      "message": "lookup argument 'from' must be a string, is type object"
+    }
+  },
+  "createScopedUser": {
+    "ok": 1
+  },
+  "createAnyUser": {
+    "ok": 1
+  },
+  "scopedUserAccess": {
+    "connected": true,
+    "ownDbRead": {
+      "ok": true,
+      "count": 1
+    },
+    "crossTenantRead": {
+      "ok": true,
+      "count": 1
+    }
+  }
+}
