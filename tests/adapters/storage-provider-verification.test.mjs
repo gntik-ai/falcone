@@ -15,7 +15,9 @@ import {
 } from '../../services/adapters/src/provider-catalog.mjs';
 import {
   buildCapabilityBaselineVerificationResult,
-  buildErrorTaxonomyConsistencyResult
+  buildErrorTaxonomyConsistencyResult,
+  getErrorScenarioProviderCodeMap,
+  listErrorScenarioCodes
 } from '../../services/adapters/src/storage-provider-verification.mjs';
 
 test('MinIO baseline verification is eligible', () => {
@@ -54,6 +56,40 @@ test('negative baseline fixtures surface missing required capabilities', () => {
 
   assert.equal(result.eligible, false);
   assert.deepEqual(result.missingCapabilities, ['object.list.pagination.deterministic']);
+});
+
+test('every providerCodeByType map includes an explicit seaweedfs key matching the S3 standard code', () => {
+  const expectedSeaweedfsCodes = {
+    OBJECT_NOT_FOUND: 'NoSuchKey',
+    BUCKET_NOT_FOUND: 'NoSuchBucket',
+    BUCKET_ALREADY_EXISTS: 'BucketAlreadyExists',
+    STORAGE_ACCESS_DENIED: 'AccessDenied',
+    STORAGE_INVALID_REQUEST: 'InvalidBucketName'
+  };
+
+  for (const errorCode of listErrorScenarioCodes()) {
+    const map = getErrorScenarioProviderCodeMap(errorCode);
+    assert.equal(Object.prototype.hasOwnProperty.call(map, 'seaweedfs'), true, `missing seaweedfs key for ${errorCode}`);
+    assert.equal(map.seaweedfs, expectedSeaweedfsCodes[errorCode], `unexpected seaweedfs code for ${errorCode}`);
+  }
+});
+
+test('error taxonomy consistency remains true for MinIO, Garage, and SeaweedFS across required codes', () => {
+  for (const errorCode of [
+    'OBJECT_NOT_FOUND',
+    'BUCKET_NOT_FOUND',
+    'BUCKET_ALREADY_EXISTS',
+    'STORAGE_ACCESS_DENIED',
+    'STORAGE_INVALID_REQUEST'
+  ]) {
+    const result = buildErrorTaxonomyConsistencyResult({
+      errorCode,
+      providers: ['minio', 'garage', 'seaweedfs']
+    });
+
+    assert.equal(result.consistent, true);
+    assert.equal(result.providerResults.length, 3);
+  }
 });
 
 test('error taxonomy consistency remains true for MinIO vs Garage across required codes', () => {

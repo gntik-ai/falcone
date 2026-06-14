@@ -165,7 +165,24 @@ controlPlane:
         secretKeyRef:
           name: in-falcone-keycloak-admin
           key: password
-    # Object storage: MinIO S3 API + root credentials (no plaintext).
+    # Object storage: provider-neutral S3 endpoint + credentials (no plaintext).
+    # STORAGE_S3_* are authoritative; the live runtime falls back to the legacy
+    # MINIO_* names (kept below) only when STORAGE_S3_ENDPOINT is unset. Point
+    # STORAGE_S3_ENDPOINT at a SeaweedFS S3 gateway (port 8333, path-style) when
+    # add-seaweedfs-deployment lands; today it mirrors the MinIO endpoint.
+    - name: STORAGE_S3_ENDPOINT
+      value: http://falcone-storage:9000
+    - name: STORAGE_S3_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_USER
+    - name: STORAGE_S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_PASSWORD
+    # Legacy MINIO_* names retained as backward-compatible fallbacks.
     - name: MINIO_ENDPOINT
       value: http://falcone-storage:9000
     - name: MINIO_ACCESS_KEY

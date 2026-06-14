@@ -2135,6 +2135,343 @@ storage:
       capabilities:
         drop:
           - ALL
+# ---------------------------------------------------------------------------
+# SeaweedFS — HA object-storage tier (add-seaweedfs-deployment, #432).
+#
+# Sub-chart `seaweedfs` (upstream chart 4.33.0 / appVersion 4.33), pinned in
+# Chart.yaml and gated by `seaweedfs.enabled`. DEFAULT OFF: SeaweedFS and the
+# bundled MinIO `storage` component co-exist during the MinIO -> SeaweedFS
+# cutover (CUTOVER TOGGLE — flip this per environment; rollback = set it back to
+# false, MinIO is untouched). When false the sub-chart renders nothing (no pods,
+# PVCs, or Services).
+#
+# Topology (dev/base): 1 master, 1 volume server (100Gi PVC), 1 filer (20Gi PVC,
+# metadata in PostgreSQL), 1 S3 gateway on port 8333, replication 001. The HA
+# profile (values/profiles/ha.yaml) raises master->3 (Raft quorum), volume->3
+# (1Ti each), S3->2, replication->011.
+#
+# All keys below are nested under `seaweedfs:` so they are passed to the upstream
+# sub-chart verbatim (Helm subchart value-passing). Field paths were mapped from
+# `helm show values seaweedfs/seaweedfs --version 4.33.0`.
+# ---------------------------------------------------------------------------
+seaweedfs:
+  enabled: false
+
+  global:
+    # Inherit the umbrella registry/pull-secret conventions. The OpenShift
+    # overlay rewrites the image registry to Harbor + injects the pull secret.
+    imageRegistry: ""
+    imagePullSecrets: ""
+    seaweedfs:
+      # Pin the SeaweedFS image to the spike-validated 4.33 build. The sub-chart
+      # appVersion is 4.33, so the default tag already matches; the digest pin
+      # from the spike (chrislusf/seaweedfs@sha256:f0b3589...) is applied in the
+      # OpenShift/airgap overlay where reproducibility matters.
+      image:
+        repository: ""
+        name: chrislusf/seaweedfs
+      # Replication is driven per-component via master.defaultReplication /
+      # filer.defaultReplicaPlacement (see below) so the dev (001) and HA (011)
+      # notations are explicit per profile. enableReplication stays false so the
+      # per-component values win.
+      enableReplication: false
+      replicationPlacement: "001"
+      # Inter-component TLS (master<->volume<->filer<->s3). Default OFF in the
+      # dev/base profile because the kind test cluster has no cert-manager; the
+      # TLS bootstrap (self-signed CA hook + enableSecurity) is layered on in the
+      # OpenShift overlay and the values/profiles/ha.yaml hardening. See task 8.
+      enableSecurity: false
+
+  # --- master (Raft quorum for volume assignment) -------------------------
+  master:
+    enabled: true
+    replicas: 1
+    port: 9333
+    grpcPort: 19333
+    # SeaweedFS replication notation <cross-DC><cross-rack><same-rack>.
+    # dev/base: 001 = single copy, no cross-rack redundancy. HA profile -> 011.
+    defaultReplication: "001"
+    # Durable master metadata on a PVC (upstream default is hostPath, which is
+    # not durable across reschedules). Falls back to global.defaultStorageClass
+    # when storageClass is empty.
+    data:
+      type: "persistentVolumeClaim"
+      size: "8Gi"
+      storageClass: ""
+    logs:
+      type: "emptyDir"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  # --- volume servers (data shards) ---------------------------------------
+  volume:
+    enabled: true
+    replicas: 1
+    port: 8080
+    grpcPort: 18080
+    # dev/base: a single 100Gi PVC per volume server (matches the MinIO 100Gi
+    # envelope). HA profile raises size to 1Ti and replicas to 3.
+    dataDirs:
+      - name: data1
+        type: "persistentVolumeClaim"
+        size: "100Gi"
+        storageClass: ""
+        maxVolumes: 0
+    logs:
+      type: "emptyDir"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+  # --- filer (POSIX namespace + metadata; metadata store = PostgreSQL) -----
+  filer:
+    enabled: true
+    replicas: 1
+    port: 8888
+    grpcPort: 18888
+    defaultReplicaPlacement: "001"
+    # 20Gi PVC for the filer's local working data in all profiles (metadata
+    # itself lives in PostgreSQL — see extraEnvironmentVars below).
+    enablePVC: true
+    data:
+      type: "persistentVolumeClaim"
+      size: "20Gi"
+      storageClass: ""
+    logs:
+      type: "emptyDir"
+    # The upstream filer StatefulSet mounts a `db-schema-config-volume` from a
+    # ConfigMap; point it at the chart-managed ConfigMap that carries the working
+    # postgres2 filer.toml (templates/seaweedfs-db-init-configmap.yaml).
+    dbInitConfigName: in-falcone-seaweedfs-db-init
+    # Init-container: wait for PostgreSQL, then create the dedicated
+    # `seaweedfs_filer` database idempotently. PostgreSQL has NO
+    # `CREATE DATABASE IF NOT EXISTS`, so use the SELECT-from-pg_database guard.
+    # Rendered via tpl so {{ .Release.Name }} resolves to the in-cluster
+    # PostgreSQL service name. Superuser creds come from the postgresql Secret.
+    initContainers: |-
+      - name: wait-and-create-filer-db
+        image: docker.io/bitnami/postgresql:16
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop: ["ALL"]
+        env:
+          - name: PGHOST
+            value: "{{ .Release.Name }}-postgresql"
+          - name: PGPORT
+            value: "5432"
+          - name: PGUSER
+            valueFrom:
+              secretKeyRef:
+                name: in-falcone-postgresql
+                key: POSTGRESQL_USERNAME
+                optional: true
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: in-falcone-postgresql
+                key: POSTGRESQL_PASSWORD
+          - name: PGDATABASE
+            value: "postgres"
+        command:
+          - /bin/sh
+          - -ec
+          - |
+            : "${PGUSER:=postgres}"
+            export PGUSER
+            until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do
+              echo "waiting for postgres at $PGHOST:$PGPORT"; sleep 2;
+            done
+            # PostgreSQL has no CREATE DATABASE IF NOT EXISTS — guard on pg_database.
+            psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres -tc \
+              "SELECT 1 FROM pg_database WHERE datname='seaweedfs_filer'" \
+              | grep -q 1 \
+              || psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres -c \
+                "CREATE DATABASE seaweedfs_filer"
+            echo "seaweedfs_filer database is present"
+    # Filer metadata store = PostgreSQL `postgres2` backend (one table per
+    # bucket — isolates each S3 bucket/tenant into its own table). The
+    # add-seaweedfs-storage-adr-spike (#431) empirically proved postgres2 ships
+    # NO usable createTable default at 4.33: the filer crashes at boot with
+    # `init table filemeta: ERROR: syntax error at or near "%!"`. WEED_POSTGRES2_CREATETABLE
+    # below supplies the working template (evidence/01 + conf/filer.toml). The
+    # `%s` is substituted with each per-bucket table name at runtime. The filer
+    # uses a DEDICATED database (seaweedfs_filer), NOT Falcone's app DB, so its
+    # runtime DDL never collides with managed migrations (spike finding).
+    extraEnvironmentVars:
+      WEED_LEVELDB2_ENABLED: "false"
+      WEED_MYSQL_ENABLED: "false"
+      WEED_POSTGRES2_ENABLED: "true"
+      WEED_POSTGRES2_HOSTNAME: "{{ .Release.Name }}-postgresql"
+      WEED_POSTGRES2_PORT: "5432"
+      WEED_POSTGRES2_DATABASE: "seaweedfs_filer"
+      WEED_POSTGRES2_SCHEMA: "public"
+      WEED_POSTGRES2_SSLMODE: "disable"
+      WEED_POSTGRES2_CONNECTION_MAX_IDLE: "5"
+      WEED_POSTGRES2_CONNECTION_MAX_OPEN: "30"
+      WEED_POSTGRES2_CREATETABLE: |-
+        CREATE TABLE IF NOT EXISTS "%s" (
+          dirhash   BIGINT,
+          name      VARCHAR(65535),
+          directory VARCHAR(65535),
+          meta      bytea,
+          PRIMARY KEY (dirhash, name)
+        );
+    # Filer DB credentials (postgres2 username/password) injected from the
+    # in-cluster PostgreSQL Secret. OQ-2 (dedicated least-privilege filer role)
+    # is deferred to add-seaweedfs-tenant-identities (#433); for now reuse the
+    # provisioned app credentials, which hold runtime CREATE/DROP TABLE.
+    secretExtraEnvironmentVars:
+      WEED_POSTGRES2_USERNAME:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_USERNAME
+          optional: true
+      WEED_POSTGRES2_PASSWORD:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    # The filer does NOT run the S3 gateway; a dedicated `s3` Deployment does.
+    s3:
+      enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  # --- S3 gateway (S3-protocol front door, port 8333) ---------------------
+  s3:
+    enabled: true
+    replicas: 1
+    port: 8333
+    # ClusterIP only — never NodePort/LoadBalancer. Ingress/Route stay disabled
+    # (upstream defaults) so the gateway is internal-only (no tenant-facing path).
+    service:
+      type: ClusterIP
+    # Path-style, in-cluster only. Auth is ON: the gateway authenticates S3
+    # requests against an identities JSON. We supply that JSON via a
+    # chart-managed Secret (templates/seaweedfs-s3-creds.yaml) so the credentials
+    # are a single source of truth shared with `in-falcone-seaweedfs-s3-creds`.
+    enableAuth: true
+    existingConfigSecret: in-falcone-seaweedfs-s3-config
+    # No bucket-subdomain routing (path-style only); leave domainName empty.
+    domainName: ""
+    # Iceberg REST catalog (port 8181) is a new surface Falcone does not use —
+    # leave it disabled/unexposed (spike note).
+    icebergPort: null
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # --- components Falcone does not deploy ---------------------------------
+  sftp:
+    enabled: false
+  admin:
+    enabled: false
+  worker:
+    enabled: false
+  cosi:
+    enabled: false
+  allInOne:
+    enabled: false
+
+  # --- internal-only networking (add-seaweedfs-deployment, D9) ------------
+  # Rendered by templates/seaweedfs-networkpolicy.yaml only when
+  # seaweedfs.enabled AND seaweedfs.networkPolicy.enabled. Allows app -> S3:8333
+  # from the listed Falcone app component labels, permits intra-SeaweedFS traffic
+  # on master/volume/filer ports, and denies all other ingress to SeaweedFS pods.
+  # NOTE: NetworkPolicy is honored only under a policy-enforcing CNI
+  # (Calico/Cilium/OVN-Kubernetes). kind's default kindnet does NOT enforce it,
+  # so the manifest renders but has no effect on kind.
+  networkPolicy:
+    enabled: true
+    # Falcone app pods (by app.kubernetes.io/name = componentId) allowed to reach
+    # the S3 gateway on 8333.
+    allowedAppComponents:
+      - controlPlane
+      - controlPlaneExecutor
+      - workflowWorker
+    # PostgreSQL component name (filer egress target for the metadata store).
+    postgresComponent: postgresql
+
+# ---------------------------------------------------------------------------
+# SeaweedFS inter-component TLS bootstrap (add-seaweedfs-deployment, task 8 / OQ-3).
+#
+# The upstream sub-chart can run with mutual TLS between master/volume/filer/s3
+# (seaweedfs.global.seaweedfs.enableSecurity=true). It normally provisions the
+# certs with cert-manager (Issuer/Certificate CRDs). cert-manager availability is
+# a DEPLOY-TIME concern that cannot be probed from `helm template`, so the SAFE
+# DEFAULT shipped here is a Helm pre-install hook Job that generates a self-signed
+# CA + leaf certs into the Secrets the sub-chart expects
+# (<release>-seaweedfs-{ca,master,volume,filer,client}-cert) using openssl, and we
+# set certificates.externalCertificates.enabled=true so the sub-chart consumes
+# them instead of cert-manager. Toggle `tlsBootstrap.enabled` off where
+# cert-manager is present and let the sub-chart's Issuer path run instead.
+#
+# Default OFF in the base/dev profile (kind has neither cert-manager nor a need
+# for inter-pod TLS in a single-node dev cluster); enable it (and enableSecurity)
+# in hardened profiles / the OpenShift overlay.
+# ---------------------------------------------------------------------------
+seaweedfsTls:
+  bootstrap:
+    enabled: false
+    # Image used by the pre-install hook to run openssl + kubectl.
+    image:
+      repository: docker.io/bitnami/kubectl
+      tag: "1.32.2"
+      pullPolicy: IfNotPresent
+    # CA subject common name and cert validity (days).
+    commonName: "Falcone SeaweedFS CA"
+    days: 3650
+
+# ---------------------------------------------------------------------------
+# SeaweedFS S3 credential Secret (add-seaweedfs-deployment, D7).
+#
+# A chart-created Secret `in-falcone-seaweedfs-s3-creds` (keys `s3AccessKey` /
+# `s3SecretKey`) is generated on first install (randAlphaNum) and is the SINGLE
+# source of truth for the S3 gateway credentials — see
+# templates/seaweedfs-s3-creds.yaml. A lookup-based regeneration guard keeps the
+# values STABLE across re-installs/upgrades (no rotation). The same values are
+# rendered into the SeaweedFS identities JSON Secret
+# (`in-falcone-seaweedfs-s3-config`, key `seaweedfs_s3_config`) consumed by the
+# gateway (seaweedfs.s3.existingConfigSecret above).
+#
+# CONSUMER WIRING (#434): the live runtime reads provider-neutral
+# STORAGE_S3_ENDPOINT / STORAGE_S3_ACCESS_KEY / STORAGE_S3_SECRET_KEY (with
+# MINIO_* fallback) — see deploy/kind/values-kind.yaml + values-openshift.yaml.
+# To point consumers at SeaweedFS, wire:
+#   STORAGE_S3_ENDPOINT   -> http://<release>-seaweedfs-s3:8333  (path-style)
+#   STORAGE_S3_ACCESS_KEY -> secret in-falcone-seaweedfs-s3-creds key s3AccessKey
+#   STORAGE_S3_SECRET_KEY -> secret in-falcone-seaweedfs-s3-creds key s3SecretKey
+# (left to the cutover step / data-migration change; #434's values are untouched.)
+# ---------------------------------------------------------------------------
+seaweedfsS3Creds:
+  # Secret holding the human-facing credential keys (s3AccessKey/s3SecretKey).
+  secretName: in-falcone-seaweedfs-s3-creds
+  # Secret holding the SeaweedFS identities JSON (key: seaweedfs_s3_config) that
+  # the gateway loads via -s3.config; derived from the same generated values.
+  configSecretName: in-falcone-seaweedfs-s3-config
+  # Identity name advertised inside the SeaweedFS identities JSON.
+  identityName: falcone-s3-admin
+
 observability:
   enabled: true
   wrapper:

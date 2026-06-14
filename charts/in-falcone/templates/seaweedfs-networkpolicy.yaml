@@ -1,0 +1,90 @@
+{{- if and .Values.seaweedfs.enabled .Values.seaweedfs.networkPolicy.enabled }}
+{{- /*
+  Internal-only NetworkPolicy for the SeaweedFS object-storage tier
+  (add-seaweedfs-deployment, design D9).
+
+  SeaweedFS sub-chart pods carry `app.kubernetes.io/name: seaweedfs` with a
+  per-role `app.kubernetes.io/component` (master | volume | filer | s3).
+
+  Ingress posture (default-deny once a pod is selected):
+    - S3 gateway (8333): only from the Falcone app pods listed in
+      seaweedfs.networkPolicy.allowedAppComponents, plus other SeaweedFS pods.
+    - master (9333/19333), volume (8080/18080), filer (8888/18888): only from
+      within the SeaweedFS pod set (intra-cluster control/data traffic).
+    - everything else: denied.
+
+  Egress: DNS + the platform namespace (reaches in-cluster PostgreSQL for the
+  filer metadata store and intra-SeaweedFS traffic), denied otherwise.
+
+  ENFORCEMENT CAVEAT: honored only under a policy-enforcing CNI
+  (Calico/Cilium/OVN-Kubernetes). kind's kindnet does NOT enforce NetworkPolicy,
+  so on kind this manifest renders but has no effect (cross-pod isolation cannot
+  be proven there — that is OpenShift/CI's job).
+*/ -}}
+{{- $np := .Values.seaweedfs.networkPolicy -}}
+{{- $swSelector := dict "matchLabels" (dict "app.kubernetes.io/name" "seaweedfs") -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-internal-only
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # S3 gateway (8333) — from allowed Falcone app pods + intra-SeaweedFS.
+    - from:
+        {{- range $np.allowedAppComponents }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+        {{- end }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+      ports:
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.s3.port }}
+    # Intra-SeaweedFS control/data plane: master, volume, filer ports — only from
+    # other SeaweedFS pods.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+      ports:
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.master.port }}        # 9333
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.master.grpcPort }}    # 19333
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.volume.port }}        # 8080
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.volume.grpcPort }}    # 18080
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.filer.port }}         # 8888
+        - protocol: TCP
+          port: {{ .Values.seaweedfs.filer.grpcPort }}     # 18888
+  egress:
+    # DNS resolution.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Platform namespace: intra-SeaweedFS traffic + the filer's PostgreSQL
+    # metadata store both live here.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.namespace }}
+        - podSelector: {}
+{{- end }}

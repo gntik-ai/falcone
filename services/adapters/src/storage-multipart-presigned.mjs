@@ -1,5 +1,6 @@
 import { buildStorageObjectRecord } from './storage-bucket-object-ops.mjs';
 import { isStorageReservedPrefix } from './storage-logical-organization.mjs';
+import { DEFAULT_STORAGE_PROVIDER_TYPE } from './storage-provider-profile.mjs';
 import {
   STORAGE_ERROR_RETRYABILITY,
   STORAGE_NORMALIZED_ERROR_CODES,
@@ -440,7 +441,7 @@ export function buildMultipartCompletionPreview({ session, parts = [], now = DEF
         tenantStorageContext: {
           entityType: 'tenant_storage_context',
           tenantId: session.tenantId,
-          providerType: 'minio',
+          providerType: session?.tenantStorageContext?.providerType ?? DEFAULT_STORAGE_PROVIDER_TYPE,
           namespace: `${session.tenantId}:${session.workspaceId}`,
           quotaAssignment: { capabilityAvailable: true },
           state: 'active',

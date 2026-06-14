@@ -88,6 +88,12 @@ controlPlane:
     - { name: KEYCLOAK_BASE_URL, value: "http://falcone-keycloak:8080" }
     - { name: KEYCLOAK_ADMIN_USERNAME, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: username } } }
     - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: password } } }
+    # Provider-neutral S3 endpoint (STORAGE_S3_* authoritative; point at a SeaweedFS
+    # S3 gateway on port 8333 / path-style once add-seaweedfs-deployment lands).
+    - { name: STORAGE_S3_ENDPOINT, value: "http://falcone-storage:9000" }
+    - { name: STORAGE_S3_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_USER } } }
+    - { name: STORAGE_S3_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_PASSWORD } } }
+    # Legacy MINIO_* names retained as backward-compatible fallbacks.
     - { name: MINIO_ENDPOINT, value: "http://falcone-storage:9000" }
     - { name: MINIO_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_USER } } }
     - { name: MINIO_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_PASSWORD } } }
@@ -142,6 +148,118 @@ observability:
   podSecurityContext:
     fsGroup: null
     fsGroupChangePolicy: null
+
+# SeaweedFS (HA object-storage tier, add-seaweedfs-deployment #432) — OpenShift
+# restricted-v2 SCC + Harbor/airgap overlay. Disabled by default here; flip
+# seaweedfs.enabled: true to deploy. The base values carry NO SCC/fsGroup fields
+# (those live only in THIS overlay) so plain-Kubernetes/kind installs are
+# unaffected.
+#
+# SCC: restricted-v2 injects uid + fsGroup from the namespace's assigned range,
+# so we must NOT pin fsGroup. The upstream sub-chart only emits a
+# podSecurityContext when podSecurityContext.enabled is true (it then omits the
+# `enabled` key), so we set enabled: true and assert ONLY runAsNonRoot +
+# seccompProfile (NO fsGroup key -> absent -> SCC-injected). Same pattern as the
+# null-fsGroup data-plane components above (storage/postgresql/...).
+#
+# Harbor + airgap: global.imageRegistry rewrites the SeaweedFS image registry to
+# Harbor and global.seaweedfs.image.repository rewrites the namespace part; the
+# pull secret is taken from global.imagePullSecrets. The image is pinned to the
+# spike-validated 4.33 digest for reproducibility.
+seaweedfs:
+  global:
+    # Rewrite chrislusf/seaweedfs -> harbor.example.com/falcone/<...>/seaweedfs.
+    imageRegistry: "harbor.example.com/falcone"
+    # The sub-chart accepts a string or {name} list; use the Harbor robot secret.
+    imagePullSecrets: harbor-pull
+    seaweedfs:
+      image:
+        # Mirror chrislusf/seaweedfs into Harbor under this namespace path.
+        repository: "chrislusf"
+        name: "chrislusf/seaweedfs"
+      # Reproducible pin: SeaweedFS 4.33 (digest from spike evidence/00-version-pin.txt:
+      # chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495).
+      # Mirror that exact digest into Harbor before install.
+      # Inter-component mutual TLS (master<->volume<->filer<->s3). Certs come from
+      # the self-signed-CA bootstrap hook (seaweedfsTls.bootstrap, below) unless
+      # cert-manager is present — set certificates.externalCertificates.enabled
+      # accordingly. (task 8.1)
+      enableSecurity: true
+  certificates:
+    externalCertificates:
+      # Consume the bootstrap-hook-provided cert Secrets instead of cert-manager.
+      # Flip to false where cert-manager is installed so the sub-chart's Issuer
+      # path provisions the certs.
+      enabled: true
+  master:
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+  volume:
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+  filer:
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+  s3:
+    # Disable plaintext on the S3 gateway: expose the HTTPS port (8334) backed by
+    # the in-cluster cert; consumers use https://<release>-seaweedfs-s3:8334. (task 8.3)
+    httpsPort: 8334
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+
+# SeaweedFS TLS bootstrap (self-signed CA hook). Enabled here as the safe default
+# for clusters without cert-manager; the hook image must be mirrored to Harbor
+# (rewrite it explicitly — the hook bypasses the component-wrapper image helper).
+seaweedfsTls:
+  bootstrap:
+    enabled: true
+    image:
+      repository: "harbor.example.com/falcone/bitnami/kubectl"
+      tag: "1.32.2"
 
 # Temporal (flows engine) — INTERNAL-ONLY, disabled by default. Enable for the flows
 # capability. Temporal server pods are STATELESS (durable state lives in PostgreSQL), so
