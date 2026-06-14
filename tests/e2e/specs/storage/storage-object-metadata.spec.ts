@@ -26,6 +26,7 @@ import * as crypto from 'crypto'
 import { TENANT_A, controlPlaneBaseUrl, bucketName } from '../../helpers/storage/tenant-fixtures'
 import { createStorageApiClient, StorageApiClient } from '../../helpers/storage/storage-api-client'
 import { probeStorageApi, STORAGE_GATE_REASON } from '../../helpers/storage/storage-gate'
+import { mintTenantToken } from '../../helpers/storage/storage-auth'
 
 // SeaweedFS S3 gateway — reachable from the test host only when port-forwarded.
 // Set E2E_S3_ENDPOINT + E2E_S3_ACCESS_KEY + E2E_S3_SECRET_KEY when running on kind.
@@ -138,9 +139,10 @@ test.describe('storage: object metadata', () => {
 
   test.beforeAll(async ({ playwright }) => {
     ctx = await playwright.request.newContext({ baseURL: cpBase })
-    const gate = await probeStorageApi(ctx, cpBase, TENANT_A)
+    const token = await mintTenantToken(ctx, TENANT_A)
+    const gate = await probeStorageApi(ctx, cpBase, TENANT_A, token)
     test.skip(!gate.available, gate.reason || STORAGE_GATE_REASON)
-    client = createStorageApiClient(ctx, cpBase, TENANT_A)
+    client = createStorageApiClient(ctx, cpBase, TENANT_A, token)
 
     // Provision bucket.
     const provision = await client.provisionBucket(TENANT_A.workspaceId, BUCKET)

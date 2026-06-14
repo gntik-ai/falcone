@@ -38,8 +38,9 @@ export interface StorageApiResponse<T = JsonBody> {
   body: T
 }
 
-function identityHeaders(identity: TenantIdentity): Record<string, string> {
-  return {
+function identityHeaders(identity: TenantIdentity, bearerToken?: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    // Identity headers (honoured by a gateway-bypass / e2e-profile control-plane).
     'x-tenant-id': identity.tenantId,
     'x-workspace-id': identity.workspaceId,
     'x-auth-subject': identity.actorId ?? 'e2e-storage-actor',
@@ -47,6 +48,10 @@ function identityHeaders(identity: TenantIdentity): Record<string, string> {
     'content-type': 'application/json',
     accept: 'application/json',
   }
+  // Bearer JWT is authoritative on the standard control-plane build: it derives the
+  // tenant/workspace identity from the token's claims and ignores the x-* headers.
+  if (bearerToken) headers.authorization = `Bearer ${bearerToken}`
+  return headers
 }
 
 async function callApi<T = JsonBody>(
@@ -54,10 +59,11 @@ async function callApi<T = JsonBody>(
   method: 'get' | 'post' | 'delete',
   url: string,
   identity: TenantIdentity,
+  bearerToken: string | null | undefined,
   data?: JsonBody,
 ): Promise<StorageApiResponse<T>> {
   const res = await request[method](url, {
-    headers: identityHeaders(identity),
+    headers: identityHeaders(identity, bearerToken),
     ...(data !== undefined ? { data } : {}),
   })
   let body: T
@@ -73,25 +79,27 @@ export function createStorageApiClient(
   request: APIRequestContext,
   baseUrl: string,
   identity: TenantIdentity,
+  bearerToken?: string | null,
 ) {
   const enc = encodeURIComponent
+  const t = bearerToken
 
   return {
     /** GET /v1/storage/buckets — list all buckets for the authenticated tenant */
     listBuckets: () =>
-      callApi(request, 'get', `${baseUrl}/v1/storage/buckets`, identity),
+      callApi(request, 'get', `${baseUrl}/v1/storage/buckets`, identity, t),
 
     /** POST /v1/storage/workspaces/{workspaceId}/buckets — provision a new bucket */
     provisionBucket: (workspaceId: string, name: string) =>
-      callApi(request, 'post', `${baseUrl}/v1/storage/workspaces/${enc(workspaceId)}/buckets`, identity, { name }),
+      callApi(request, 'post', `${baseUrl}/v1/storage/workspaces/${enc(workspaceId)}/buckets`, identity, t, { name }),
 
     /** GET /v1/storage/workspaces/{workspaceId}/usage — per-workspace usage metrics */
     getWorkspaceUsage: (workspaceId: string) =>
-      callApi(request, 'get', `${baseUrl}/v1/storage/workspaces/${enc(workspaceId)}/usage`, identity),
+      callApi(request, 'get', `${baseUrl}/v1/storage/workspaces/${enc(workspaceId)}/usage`, identity, t),
 
     /** GET /v1/storage/buckets/{bucketId}/objects — list objects in a bucket */
     listObjects: (bucketId: string) =>
-      callApi(request, 'get', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects`, identity),
+      callApi(request, 'get', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects`, identity, t),
 
     /** GET /v1/storage/buckets/{bucketId}/objects/{objectKey}/metadata — object HEAD metadata */
     getObjectMetadata: (bucketId: string, objectKey: string) =>
@@ -100,6 +108,7 @@ export function createStorageApiClient(
         'get',
         `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects/${enc(objectKey)}/metadata`,
         identity,
+        t,
       ),
   }
 }
