@@ -9,6 +9,9 @@ import {
   STORAGE_PROVIDER_ERROR_CODES,
   buildStorageProviderProfile
 } from './storage-provider-profile.mjs';
+import { STORAGE_POLICY_ACTIONS, toSeaweedFSActions } from './storage-access-policy.mjs';
+import { buildStorageProgrammaticCredentialSecretEnvelope } from './storage-programmatic-credentials.mjs';
+import { writeIdentity, reloadIdentities } from './seaweedfs-iam-client.mjs';
 
 const STORAGE_CAPABILITY_KEY = 'data.storage.bucket';
 const STORAGE_BYTES_METRIC_KEY = 'tenant.storage.bytes.max';
@@ -460,10 +463,143 @@ export function previewWorkspaceStorageBootstrap({
   };
 }
 
-// ── T02 provisional workflow helpers (guarded stubs) ─────────────────────────
+// ── Workspace storage boundary provisioning (real SeaweedFS identity) ────────
+// change add-seaweedfs-tenant-identities. Replaces the former NOT_YET_IMPLEMENTED
+// stub with a real per-workspace SeaweedFS identity write. The function is
+// collaborator-injectable (single input object, matching the wf-con-003 call
+// site `{ request, jobRef, workspaceRecord, client }`) so it is unit-testable
+// without live infrastructure and so a real deployment supplies the DB-bound
+// bucket lookup / persistence / credential idempotency probe.
 
-export async function provisionWorkspaceStorageBoundary() {
-  const error = new Error('NOT_YET_IMPLEMENTED: provisionWorkspaceStorageBoundary');
-  error.code = 'NOT_YET_IMPLEMENTED';
-  throw error;
+export const STORAGE_BOUNDARY_ERROR_CODES = Object.freeze({
+  BUCKET_NOT_FOUND: 'STORAGE_BOUNDARY_BUCKET_NOT_FOUND',
+  WORKSPACE_REQUIRED: 'STORAGE_BOUNDARY_WORKSPACE_REQUIRED'
+});
+
+// Default policy grant for a freshly provisioned workspace key: read/write/list,
+// no admin (mirrors the built-in `member` role in storage-access-policy).
+const DEFAULT_BOUNDARY_POLICY_DECISIONS = Object.freeze({ read: true, write: true, list: true, admin: false });
+const DEFAULT_BOUNDARY_SCOPE_ACTIONS = Object.freeze([
+  STORAGE_POLICY_ACTIONS.OBJECT_GET,
+  STORAGE_POLICY_ACTIONS.OBJECT_PUT,
+  STORAGE_POLICY_ACTIONS.OBJECT_LIST,
+  STORAGE_POLICY_ACTIONS.OBJECT_HEAD
+]);
+
+/**
+ * Derive the per-workspace SeaweedFS identity name (Design D1). Mirrors the
+ * reconciler's `workspaceIdentity` (provisioning-orchestrator) so the bucket
+ * isolation policy principal and the IAM identity name are the same string.
+ */
+export function deriveWorkspaceStorageIdentityName(workspaceId) {
+  if (!workspaceId) {
+    throw new Error('workspaceId is required to derive a workspace storage identity name.');
+  }
+  return `falcone-ws-${workspaceId}`;
+}
+
+function resolveBoundaryIdentifiers(input) {
+  const tenantId = input.tenantId
+    ?? input.workspaceRecord?.tenantId
+    ?? input.request?.callerContext?.tenantId
+    ?? null;
+  const workspaceId = input.workspaceId
+    ?? input.workspaceRecord?.workspaceId
+    ?? input.request?.callerContext?.workspaceId
+    ?? null;
+  return { tenantId, workspaceId };
+}
+
+export async function provisionWorkspaceStorageBoundary(input = {}) {
+  const { tenantId, workspaceId } = resolveBoundaryIdentifiers(input);
+
+  if (!workspaceId) {
+    const error = new Error('workspaceId is required to provision a workspace storage boundary.');
+    error.code = STORAGE_BOUNDARY_ERROR_CODES.WORKSPACE_REQUIRED;
+    throw error;
+  }
+
+  const now = input.now ?? '2026-03-27T00:00:00Z';
+  const iamClient = input.iamClient ?? { writeIdentity, reloadIdentities };
+  const iamOptions = input.iamOptions ?? {};
+  const identityName = deriveWorkspaceStorageIdentityName(workspaceId);
+
+  // Idempotency guard (tasks.md 4.2): a workspace that already has an active
+  // credential record returns it without creating a second SeaweedFS identity
+  // and without delivering a fresh one-time secret.
+  const existing = typeof input.findActiveCredential === 'function'
+    ? await input.findActiveCredential({ tenantId, workspaceId })
+    : null;
+  if (existing) {
+    return {
+      boundaryId: `wsb_${workspaceId}`,
+      workspaceId,
+      tenantId,
+      identityName,
+      bucketName: existing.scopes?.[0]?.bucketName ?? input.bucketName ?? null,
+      credential: existing,
+      secretEnvelope: null,
+      reused: true
+    };
+  }
+
+  // Resolve the workspace's bucket; fail-closed if absent (tasks.md 4.3, Design
+  // D3) — an unscoped/wildcard identity would breach cross-tenant isolation.
+  const bucketName = typeof input.resolveBucketName === 'function'
+    ? await input.resolveBucketName({ tenantId, workspaceId })
+    : (input.bucketName ?? input.workspaceRecord?.bucketName ?? null);
+
+  if (!bucketName) {
+    const error = new Error(`No workspace_buckets mapping for workspace ${workspaceId}; refusing to write an unscoped SeaweedFS identity.`);
+    error.code = STORAGE_BOUNDARY_ERROR_CODES.BUCKET_NOT_FOUND;
+    throw error;
+  }
+
+  const actions = toSeaweedFSActions(input.policyDecisions ?? DEFAULT_BOUNDARY_POLICY_DECISIONS);
+
+  // Build the credential + one-time secret (deterministic builder; the plaintext
+  // secret lives only in the returned envelope and is never persisted).
+  const envelope = buildStorageProgrammaticCredentialSecretEnvelope({
+    tenantId,
+    workspaceId,
+    displayName: input.displayName ?? `workspace-storage-${workspaceId}`,
+    principal: { principalType: 'service_account', principalId: identityName },
+    scopes: [{
+      workspaceId,
+      bucketName,
+      allowedActions: input.scopeActions ?? [...DEFAULT_BOUNDARY_SCOPE_ACTIONS]
+    }],
+    secretVersion: 1,
+    now,
+    actorId: input.actorId ?? null,
+    actorType: input.actorType ?? null,
+    correlationId: input.correlationId ?? input.request?.callerContext?.correlationId ?? null
+  });
+
+  // Write the real per-tenant SeaweedFS identity scoped to its own bucket. The
+  // IAM client reloads the gateway internally (tasks.md 4.1d) and fail-closes on
+  // an empty/wildcard bucket scope before any backend call.
+  await iamClient.writeIdentity({
+    name: identityName,
+    accessKey: envelope.accessKeyId,
+    secretKey: envelope.secretAccessKey,
+    actions,
+    buckets: [bucketName]
+  }, iamOptions);
+
+  // Persist masked key + secretVersion (tasks.md 4.1e); plaintext is never stored.
+  if (typeof input.persistCredential === 'function') {
+    await input.persistCredential(envelope.credential);
+  }
+
+  return {
+    boundaryId: `wsb_${workspaceId}`,
+    workspaceId,
+    tenantId,
+    identityName,
+    bucketName,
+    credential: envelope.credential, // accessKeyIdMasked + secretVersion: 1
+    secretEnvelope: envelope,        // one-time secret delivery
+    reused: false
+  };
 }
