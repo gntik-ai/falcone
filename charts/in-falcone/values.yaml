@@ -2057,7 +2057,10 @@ openwhisk:
 # non-prod rollback test being green (tools/migration/ROLLBACK.md, sections 4-5).
 # ---------------------------------------------------------------------------
 storage:
-  enabled: true
+  # Object store cut over to SeaweedFS (ADR-13). MinIO is OFF by default and kept only as
+  # an explicit rollback toggle — set `storage.enabled: true` to re-deploy MinIO during the
+  # retention window (tools/migration/ROLLBACK.md). PVCs are retained on disable.
+  enabled: false
   wrapper:
     componentId: storage
     workload:
@@ -2171,7 +2174,8 @@ storage:
 # `helm show values seaweedfs/seaweedfs --version 4.33.0`.
 # ---------------------------------------------------------------------------
 seaweedfs:
-  enabled: false
+  # Default-active object store after the MinIO -> SeaweedFS cutover (ADR-13).
+  enabled: true
 
   global:
     # Inherit the umbrella registry/pull-secret conventions. The OpenShift

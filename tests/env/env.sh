@@ -24,14 +24,16 @@ export KAFKA_BROKERS="localhost:19092"
 export MONGO_URI="mongodb://localhost:57017/?replicaSet=rs0&directConnection=true"
 export MONGO_TEST_URI="$MONGO_URI"
 
-# MinIO (S3-compatible object storage). Both env-var spellings are exported so the
-# openapi-sdk-service (S3_ACCESS_KEY/S3_SECRET_KEY) and the provisioning-orchestrator
-# (S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) collectors both resolve.
-export S3_ENDPOINT="http://localhost:59000"
-export S3_ACCESS_KEY_ID="minioadmin"
-export S3_ACCESS_KEY="minioadmin"
-export S3_SECRET_ACCESS_KEY="minioadmin"
-export S3_SECRET_KEY="minioadmin"
+# SeaweedFS (S3-compatible object storage; replaces MinIO — ADR-13). Path-style on
+# :58333. Both env-var spellings are exported so the openapi-sdk-service
+# (S3_ACCESS_KEY/S3_SECRET_KEY) and the provisioning-orchestrator
+# (S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) collectors both resolve. Credentials match
+# tests/env/seaweedfs/conf/s3-identities.json.
+export S3_ENDPOINT="http://localhost:58333"
+export S3_ACCESS_KEY_ID="falconedev"
+export S3_ACCESS_KEY="falconedev"
+export S3_SECRET_ACCESS_KEY="falconedevsecret"
+export S3_SECRET_KEY="falconedevsecret"
 export S3_SDK_BUCKET="falcone-test"
 
 # Vault (dev mode). The file audit device writes to a host-mounted path that
