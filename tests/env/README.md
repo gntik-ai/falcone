@@ -12,7 +12,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 | Keycloak | `http://localhost:8081` (admin `admin`/`admin`) | internal IdP; tenants map 1:1 to realms; also hosts the slice realm `falcone-e2e` |
 | Redpanda | `localhost:19092` (`KAFKA_BROKERS`) | Kafka API broker (events, audit, CDC change streams); auto-creates topics |
 | MongoDB  | `mongodb://localhost:57017/?replicaSet=rs0&directConnection=true` (`MONGO_URI` / `MONGO_TEST_URI`) | document store; single-node replica set `rs0` (**required** for CDC change streams); ephemeral (tmpfs); `rs.initiate()` + wait-for-PRIMARY on `up` |
-| MinIO    | `http://localhost:59000` S3 API / `http://localhost:59001` console (`minioadmin`/`minioadmin`) | S3-compatible object storage (`S3_ENDPOINT`); ephemeral (tmpfs); bucket `falcone-test` (`S3_SDK_BUCKET`) created on `up` |
+| SeaweedFS | `http://localhost:58333` S3 API (path-style; `falconedev`/`falconedevsecret`) | S3-compatible object storage (`S3_ENDPOINT`), replaces MinIO (ADR-13); ephemeral (tmpfs); bucket `falcone-test` (`S3_SDK_BUCKET`) created on `up` |
 | Vault    | `http://localhost:58200` (token `root`) (`VAULT_ADDR`/`VAULT_TOKEN`) | dev mode (auto-unsealed); file audit device → host-mounted log at `tests/env/vault/audit/vault-audit.log` (`VAULT_AUDIT_LOG_PATH`), tailed by `secret-audit-handler` |
 
 ### What each new service is for
@@ -22,10 +22,11 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
   by `mongo-cdc-bridge` (`src/index.mjs`, reads `MONGO_TEST_URI`/`MONGO_URI`).
   MongoDB change streams require a replica set, so the node runs as single-node
   `rs0` and `up.sh` initiates it and waits until it is PRIMARY.
-- **MinIO** — S3-compatible object storage for workspace SDK artifacts
-  (`openapi-sdk-service`, reads `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` /
-  `S3_SDK_BUCKET`) and storage-config export (`provisioning-orchestrator`
-  `collectors/s3-collector.mjs`). `up.sh` creates the `falcone-test` bucket.
+- **SeaweedFS** — S3-compatible object storage (replaces MinIO — ADR-13) for workspace
+  SDK artifacts (`openapi-sdk-service`, reads `S3_ENDPOINT` / `S3_ACCESS_KEY` /
+  `S3_SECRET_KEY` / `S3_SDK_BUCKET`) and storage-config export (`provisioning-orchestrator`
+  `collectors/s3-collector.mjs`). All-in-one `server` (master+volume+filer+S3) on the
+  spike-validated 4.33 image; `up.sh` creates the `falcone-test` bucket via `weed shell`.
 - **Vault** — secret store. Its only test-relevant job is emitting a **file**
   audit log to a host-mounted path that `secret-audit-handler` (`src/index.mjs`,
   reads `VAULT_AUDIT_LOG_PATH`) tails and republishes. `up.sh` enables the file
@@ -36,8 +37,8 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 - **MongoDB**: `rs.initiate({_id:'rs0', members:[{host:'mongodb:27017'}]})` if the
   set is not already configured, then waits until `rs.status().myState == 1`
   (PRIMARY).
-- **MinIO**: `mc alias set local … && mc mb --ignore-existing local/falcone-test`
-  (run with the in-container `mc` client).
+- **SeaweedFS**: `s3.bucket.create -name falcone-test` via the in-container `weed shell`
+  (check-then-create, idempotent).
 - **Vault**: `vault audit enable file file_path=/vault/audit/vault-audit.log`
   ("already enabled" is ignored), then a `vault kv get` / `vault token lookup` to
   guarantee the host-visible audit log file is non-empty.
@@ -399,9 +400,9 @@ unmanaged-attribute → array-claim mapping is finicky.
 - **More backing services**: add them to `docker-compose.yml`, expose host ports
   with a healthcheck consistent with the existing services (so `up.sh`'s health
   loop works), wire any bootstrap into `up.sh`, and export their endpoints in
-  `env.sh`. (Postgres, Keycloak, Redpanda, MongoDB, MinIO and Vault are already
+  `env.sh`. (Postgres, Keycloak, Redpanda, MongoDB, SeaweedFS and Vault are already
   provided.)
-- **More backing services** (Vault, MinIO, MongoDB): add them to
+- **More backing services** (Vault, SeaweedFS, MongoDB): add them to
   `docker-compose.yml`, expose host ports, and export their endpoints in `env.sh`.
 - **More slice routes**: add a `{ name, methods, pathRegex, module, exportName, invoke, deps? }`
   entry to `action-runner/routes.mjs` (the shim imports the module from the

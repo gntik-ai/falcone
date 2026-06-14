@@ -8,14 +8,14 @@
 #   - redpanda : Kafka API broker (events, audit, CDC change streams).
 #   - mongodb  : document store. Run as a single-node replica set (rs0) because
 #                Falcone's CDC change streams require a replica set.
-#   - minio    : S3-compatible object storage (workspace SDK artifacts, storage
-#                config export). Bucket `falcone-test` created on `up`.
+#   - seaweedfs: S3-compatible object storage (workspace SDK artifacts, storage
+#                config export); all-in-one server on :58333. Bucket `falcone-test` created on `up`.
 #   - vault    : secret store (dev mode). Emits a FILE audit log to a host-mounted
 #                path that secret-audit-handler tails (VAULT_AUDIT_LOG_PATH).
 #
 # Lifecycle is driven by tests/env/up.sh (waits for health, provisions the admin
 # service account, applies migrations, initiates the Mongo replica set, creates
-# the MinIO bucket, enables the Vault file audit device) and tests/env/down.sh.
+# the SeaweedFS bucket, enables the Vault file audit device) and tests/env/down.sh.
 #
 # OUT OF SCOPE here (these stay on the Kubernetes/Helm path): OpenWhisk/functions
 # (too heavy for compose), the Falcone app + APISIX gateway containers (no
@@ -92,18 +92,24 @@ services:
     tmpfs:
       - /data/db  # ephemeral: clean DB every run (matches the postgres pattern)
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+  seaweedfs:
+    # All-in-one SeaweedFS (master + volume + filer + S3 gateway) — the dev/test
+    # object store that replaces MinIO (ADR-13). Pinned to the spike-validated 4.33
+    # digest (also used by tests/env/seaweedfs/run.sh and the Helm chart). The shared
+    # compose uses the embedded filer store on tmpfs for robustness; filer-on-PostgreSQL
+    # is exercised by the Helm chart and the tests/env/seaweedfs slice, not duplicated here.
+    image: chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495
+    command: >
+      server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -filer -s3
+      -s3.port=8333 -s3.config=/etc/seaweedfs/s3-identities.json
+      -master.volumeSizeLimitMB=128 -volume.max=20
+    volumes:
+      - ./seaweedfs/conf/s3-identities.json:/etc/seaweedfs/s3-identities.json:ro
     ports:
-      - "59000:9000"  # S3 API
-      - "59001:9001"  # web console
+      - "58333:8333"  # S3 API (path-style)
     healthcheck:
-      # The minio image ships curl; probe the live health endpoint.
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      # busybox wget (shipped in the image) probes the S3 gateway status endpoint.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8333/status || exit 1"]
       interval: 5s
       timeout: 4s
       retries: 40

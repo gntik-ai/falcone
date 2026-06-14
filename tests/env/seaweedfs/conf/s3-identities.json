@@ -1,0 +1,12 @@
+{
+  "_comment": "tests/env dev S3 identity for the SeaweedFS object store (replaces MinIO). Throwaway dev credentials, not real secrets; must match the S3_* values in tests/env/env.sh.",
+  "identities": [
+    {
+      "name": "falcone-testenv-admin",
+      "credentials": [
+        { "accessKey": "falconedev", "secretKey": "falconedevsecret" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}
