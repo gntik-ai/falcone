@@ -1,0 +1,48 @@
+# SeaweedFS S3-compatibility + filer-on-PostgreSQL spike stack (OpenSpec: add-seaweedfs-storage-adr-spike).
+# Pinned by digest so the compatibility matrix is reproducible against an exact image.
+#   chrislusf/seaweedfs:latest @ 2026-06-14 self-reports `version 30GB 4.33 55010be19 linux amd64`.
+# Only the S3 gateway (8333) is published to the host; the volume server (8080) stays internal
+# because host :8080 is already taken. Master/filer are driven via `docker exec ... weed shell`.
+name: seaweedfs-adr-spike
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seaweed
+      POSTGRES_PASSWORD: seaweedpw
+      POSTGRES_DB: seaweedfs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seaweed -d seaweedfs"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [spike]
+
+  seaweedfs:
+    image: chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # All-in-one: master + volume + filer (postgres2 metadata) + S3 gateway.
+    # `-s3.config` makes the gateway load the static identities file (task 7.1 baseline).
+    command: >
+      server
+      -dir=/data
+      -ip=seaweedfs
+      -master.volumeSizeLimitMB=128
+      -volume.max=20
+      -filer
+      -s3
+      -s3.port=8333
+      -s3.config=/conf/s3-identities.json
+    volumes:
+      - ./conf/filer.toml:/etc/seaweedfs/filer.toml:ro
+      - ./conf/s3-identities.json:/conf/s3-identities.json:ro
+    ports:
+      - "127.0.0.1:8333:8333"   # S3 gateway (only host-exposed port)
+    networks: [spike]
+
+networks:
+  spike:
+    driver: bridge

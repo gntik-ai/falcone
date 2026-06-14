@@ -1,0 +1,24 @@
+{
+  "_comment": "SPIKE-ONLY throwaway credentials. Not real secrets. The tenant-a entry mirrors the field shape Falcone derives in services/adapters/src/storage-programmatic-credentials.mjs (accessKey=AKST..., secretKey=sk_...), scoped to a single bucket to prove per-tenant isolation.",
+  "identities": [
+    {
+      "name": "falcone-spike-admin",
+      "credentials": [
+        { "accessKey": "falconespikeadmin", "secretKey": "falcone-spike-admin-secret-0000" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "tenant-a",
+      "credentials": [
+        { "accessKey": "AKSTSPIKETENANTA0001", "secretKey": "sk_spike_tenant_a_secret_00000000" }
+      ],
+      "actions": [
+        "Read:tenant-a-bucket",
+        "Write:tenant-a-bucket",
+        "List:tenant-a-bucket",
+        "Tagging:tenant-a-bucket"
+      ]
+    }
+  ]
+}
