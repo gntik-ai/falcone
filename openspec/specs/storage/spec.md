@@ -10,6 +10,8 @@ the maximum age (in days) for storage programmatic credentials and an optional
 warn-before-expiry window, so that tenants can enforce a credential lifetime without
 manual intervention.
 
+This requirement is unchanged in behavior; it is re-stated here to record that it applies equally when the active storage provider is `seaweedfs`.
+
 #### Scenario: Tenant configures a storage credential rotation policy
 
 - **WHEN** a tenant admin sets `maxStorageCredentialAgeDays: 90` and
@@ -206,4 +208,303 @@ mechanism before implementation begins.
 - **THEN** the credential fields written (accessKey, secretKey, actions, buckets)
   map directly to the parameters the storage-applier already constructs, or a
   gap is recorded with a shim recommendation
+
+### Requirement: SeaweedFS is a supported storage provider
+
+The system SHALL include `seaweedfs` in `SUPPORTED_STORAGE_PROVIDER_TYPES` with `backendFamily: 's3-compatible'`, a baseline-eligible capability profile (all required capabilities satisfied), and a capability map that marks `object.versioning` as `partially_satisfied`, and `bucket.lifecycle`, `object.lock`, and `bucket.event_notifications` as `unsatisfied`, so that operator deployments can select SeaweedFS without receiving an `UNKNOWN_PROVIDER_TYPE` error.
+
+#### Scenario: resolveStorageProviderConfig accepts seaweedfs
+
+- **WHEN** `resolveStorageProviderConfig('seaweedfs')` is called
+- **THEN** it returns a provider definition with `providerType: 'seaweedfs'`, `backendFamily: 's3-compatible'`, and `capabilityBaseline.eligible: true`
+
+#### Scenario: seaweedfs appears in supported provider list
+
+- **WHEN** `listSupportedStorageProviders()` is called
+- **THEN** the returned array includes `'seaweedfs'`
+
+#### Scenario: resolveStorageProviderConfig rejects unknown type after seaweedfs addition
+
+- **WHEN** `resolveStorageProviderConfig('unknown-xyz')` is called
+- **THEN** it returns an error with code `UNKNOWN_PROVIDER_TYPE` and `seaweedfs` is not affected
+
+### Requirement: SeaweedFS capability profile reflects adr-spike compatibility matrix
+
+The system SHALL expose a capability manifest for `seaweedfs` in which all required baseline capabilities (`bucket.create`, `bucket.delete`, `bucket.list`, `object.put`, `object.get`, `object.delete`, `object.list`, `object.metadata.get`, `object.content_type.preserve`, `object.integrity.etag_or_checksum`, `object.list.pagination.deterministic`, `object.conditional.if_match`, `object.conditional.if_none_match`) are `satisfied`; `object.versioning` is `partially_satisfied`; and `bucket.lifecycle`, `object.lock`, `bucket.event_notifications` are `unsatisfied`, so that the platform introspection surface accurately represents SeaweedFS capabilities to operators and tenants.
+
+#### Scenario: Provider introspection reports seaweedfs baseline eligible
+
+- **WHEN** `GET /v1/platform/storage/provider` is called and the active provider is `seaweedfs`
+- **THEN** the response includes `capabilityBaseline.eligible: true` and all required capability entries have state `satisfied`
+
+#### Scenario: Provider introspection reports versioning as partial for seaweedfs
+
+- **WHEN** `GET /v1/platform/storage/provider` is called and the active provider is `seaweedfs`
+- **THEN** the capability entry for `object.versioning` has `state: 'partially_satisfied'`
+
+#### Scenario: Provider introspection reports lifecycle, lock, and event-notifications unsatisfied for seaweedfs
+
+- **WHEN** `GET /v1/platform/storage/provider` is called and the active provider is `seaweedfs`
+- **THEN** the capability entries for `bucket.lifecycle`, `object.lock`, and `bucket.event_notifications` each have `state: 'unsatisfied'`
+
+### Requirement: SeaweedFS has providerCodeByType entries for all normalized error scenarios
+
+The system SHALL include `seaweedfs` in every `providerCodeByType` map in the storage verification module so that normalized error translation (`OBJECT_NOT_FOUND`, `BUCKET_NOT_FOUND`, `BUCKET_ALREADY_EXISTS`, `STORAGE_ACCESS_DENIED`, `STORAGE_INVALID_REQUEST`) works correctly when the active provider is SeaweedFS.
+
+#### Scenario: Error normalization maps seaweedfs NoSuchKey to OBJECT_NOT_FOUND
+
+- **WHEN** the storage adapter receives an S3 error code `NoSuchKey` from a SeaweedFS backend
+- **THEN** the normalized error code is `OBJECT_NOT_FOUND` with HTTP status 404
+
+#### Scenario: Error normalization maps seaweedfs BucketAlreadyExists to BUCKET_ALREADY_EXISTS
+
+- **WHEN** the storage adapter receives an S3 error code `BucketAlreadyExists` from a SeaweedFS backend
+- **THEN** the normalized error code is `BUCKET_ALREADY_EXISTS` with HTTP status 409
+
+### Requirement: Storage client endpoint and port are provider-neutral and config-driven
+
+The system SHALL read the S3 gateway endpoint from provider-neutral environment variables (`STORAGE_S3_ENDPOINT`, `STORAGE_S3_ACCESS_KEY`, `STORAGE_S3_SECRET_KEY`) in the live runtime (`deploy/kind/control-plane/storage-handlers.mjs`), with backward-compatible fallback to legacy `MINIO_*` names, so that switching to SeaweedFS (S3 gateway port 8333) requires only a chart/env change and no source modification.
+
+#### Scenario: Live runtime uses STORAGE_S3_ENDPOINT when set
+
+- **WHEN** the environment has `STORAGE_S3_ENDPOINT=http://falcone-storage:8333` and `MINIO_ENDPOINT` is unset
+- **THEN** the live storage runtime directs all S3 requests to `http://falcone-storage:8333`
+
+#### Scenario: Live runtime falls back to MINIO_ENDPOINT for backward compatibility
+
+- **WHEN** `STORAGE_S3_ENDPOINT` is unset and `MINIO_ENDPOINT=http://falcone-storage:9000` is set
+- **THEN** the live storage runtime directs all S3 requests to `http://falcone-storage:9000`
+
+#### Scenario: Chart wiring points at SeaweedFS port 8333 for new deployments
+
+- **WHEN** the Helm chart is deployed with the SeaweedFS storage profile
+- **THEN** `STORAGE_S3_ENDPOINT` resolves to a SeaweedFS S3 gateway address on port 8333 and path-style addressing is in effect
+
+### Requirement: Default storage provider type is config-driven
+
+The system SHALL derive `DEFAULT_STORAGE_PROVIDER_TYPE` from a `STORAGE_DEFAULT_PROVIDER_TYPE` environment variable when set, falling back to `'minio'` only when the variable is absent, so that operators can designate `seaweedfs` as the default provider without modifying source code.
+
+#### Scenario: Default provider follows STORAGE_DEFAULT_PROVIDER_TYPE env var
+
+- **WHEN** the runtime is started with `STORAGE_DEFAULT_PROVIDER_TYPE=seaweedfs`
+- **THEN** provider resolution that does not specify an explicit type selects `seaweedfs`
+
+#### Scenario: Default provider falls back to minio when env var is absent
+
+- **WHEN** `STORAGE_DEFAULT_PROVIDER_TYPE` is not set
+- **THEN** `DEFAULT_STORAGE_PROVIDER_TYPE` is `'minio'` and existing behavior is preserved
+
+### Requirement: Hardcoded providerType minio literal is removed from the presigned multipart module
+
+The system SHALL NOT contain a hardcoded `providerType: 'minio'` literal in the tenant storage context fixture inside `services/adapters/src/storage-multipart-presigned.mjs`; the value SHALL be sourced from the active tenant storage context or the config-driven default, so that presigned multipart flows work correctly for SeaweedFS tenants.
+
+#### Scenario: Presigned multipart session reflects the actual provider type
+
+- **WHEN** a multipart presigned upload session is constructed for a tenant whose storage context has `providerType: 'seaweedfs'`
+- **THEN** the session record carries `providerType: 'seaweedfs'` and not `'minio'`
+
+### Requirement: List XML parsing is tolerant of SeaweedFS S3 envelope variations
+
+The system SHALL parse S3 ListBuckets and ListObjectsV2 XML responses using a method that tolerates SeaweedFS envelope differences (CDATA sections, entity-encoded characters, variant tag ordering) without returning incomplete or malformed bucket/object lists, so that live storage operations against SeaweedFS are functionally correct.
+
+#### Scenario: listBuckets returns correct names from a SeaweedFS ListAllMyBuckets envelope
+
+- **WHEN** the SeaweedFS S3 gateway returns a `ListAllMyBucketsResult` XML response with bucket names containing hyphens or underscores
+- **THEN** `listBuckets()` returns a complete array with the correct name for every bucket in the response
+
+#### Scenario: listObjects returns correct entries from a SeaweedFS ListObjectsV2 envelope
+
+- **WHEN** the SeaweedFS S3 gateway returns a `ListBucketResult` XML response for a bucket containing objects with keys that include slashes and unicode characters
+- **THEN** `listObjects()` returns all objects with correct keys, sizes, ETags, and `lastModified` values
+
+### Requirement: Tenant-facing storage API contract is unchanged
+
+The system SHALL preserve all existing `/v1/storage/*` route shapes, request schemas, and response schemas after the SeaweedFS provider is registered, so that tenants and SDK consumers experience no breaking change.
+
+#### Scenario: Storage contract tests pass with seaweedfs as active provider
+
+- **WHEN** `bash tests/blackbox/run.sh` is executed against a runtime configured with `STORAGE_DEFAULT_PROVIDER_TYPE=seaweedfs`
+- **THEN** all storage contract assertions in `tests/contracts/storage-provider.contract.test.mjs` pass with no schema violations
+
+#### Scenario: openapi-sdk-service presigned GET works against SeaweedFS endpoint
+
+- **WHEN** the `openapi-sdk-service` uploads an SDK artefact and generates a presigned GET URL while `S3_ENDPOINT` points to a SeaweedFS S3 gateway with `forcePathStyle: true`
+- **THEN** the presigned URL resolves successfully and returns the uploaded content with the correct content type
+
+### Requirement: SeaweedFS platform component deployable via chart toggle
+
+The system SHALL deploy SeaweedFS (master, volume, filer, S3 gateway) as a
+sub-chart of the umbrella Helm chart, controlled by a `seaweedfs.enabled` boolean
+value, so that SeaweedFS and MinIO can run side-by-side during cutover without
+either being removed from the chart.
+
+#### Scenario: SeaweedFS enabled alongside MinIO
+
+- **WHEN** the umbrella chart is installed with `seaweedfs.enabled=true` and
+  `storage.enabled=true`
+- **THEN** both the MinIO StatefulSet and all SeaweedFS components (master,
+  volume server, filer, S3 gateway) reach the Ready state in the same namespace
+
+#### Scenario: SeaweedFS disabled by default
+
+- **WHEN** the umbrella chart is installed without overriding `seaweedfs.enabled`
+- **THEN** no SeaweedFS pods, PVCs, or Services are created and the MinIO
+  StatefulSet continues to serve as the sole storage backend
+
+### Requirement: SeaweedFS master Raft quorum per topology profile
+
+The system SHALL deploy SeaweedFS master nodes in an odd-count Raft quorum —
+1 replica in the dev (base) profile and 3 replicas in the HA profile — so that the
+volume-assignment layer is highly available under the HA profile and single-node
+in development without configuration changes to application workloads.
+
+#### Scenario: Dev profile deploys a single master
+
+- **WHEN** the umbrella chart is installed using the base (dev) values with
+  `seaweedfs.enabled=true`
+- **THEN** exactly 1 SeaweedFS master Pod is Running and the master service
+  resolves at its ClusterIP
+
+#### Scenario: HA profile deploys a three-master Raft quorum
+
+- **WHEN** the umbrella chart is installed using the HA profile values
+  (`profiles/ha.yaml`) with `seaweedfs.enabled=true`
+- **THEN** exactly 3 SeaweedFS master Pods are Running, they form a Raft quorum,
+  and the cluster reports a single elected leader
+
+### Requirement: SeaweedFS volume servers with profile-driven replication
+
+The system SHALL deploy SeaweedFS volume servers with a replication notation of
+`001` in the dev profile (single copy, no cross-rack redundancy) and `011` in the
+HA profile (one additional cross-rack copy), so that data durability guarantees
+match the declared topology without over-provisioning in development.
+
+#### Scenario: Dev volume server uses replication 001
+
+- **WHEN** the umbrella chart is installed with the base profile and
+  `seaweedfs.enabled=true`
+- **THEN** the SeaweedFS master reports replication setting `001` and a single
+  volume server is Ready
+
+#### Scenario: HA volume servers use replication 011
+
+- **WHEN** the umbrella chart is installed with the HA profile and
+  `seaweedfs.enabled=true`
+- **THEN** 3 volume server Pods are Running, the SeaweedFS master reports
+  replication setting `011`, and a new volume assigned to a collection reports
+  copies on at least 2 distinct rack groups
+
+### Requirement: SeaweedFS filer metadata stored in PostgreSQL
+
+The system SHALL configure the SeaweedFS filer to use the in-cluster PostgreSQL
+instance as its metadata backend, with filer tables created in a dedicated
+`seaweedfs_filer` database before the filer Pod starts, so that filer metadata
+is durable, survives pod restarts, and is backed up alongside other tenant data.
+
+#### Scenario: Filer database schema exists before filer starts
+
+- **WHEN** the SeaweedFS filer Pod initialises
+- **THEN** the `seaweedfs_filer` database exists in PostgreSQL, the filer-required
+  tables are present, and the filer process reports successful metadata-store
+  connection in its startup logs
+
+#### Scenario: Filer survives pod restart with metadata intact
+
+- **WHEN** the SeaweedFS filer Pod is deleted and rescheduled
+- **THEN** a new filer Pod reconnects to the existing `seaweedfs_filer` PostgreSQL
+  database and previously written file entries are readable without data loss
+
+#### Scenario: Filer namespace operations are isolated per tenant context
+
+- **WHEN** a write operation is performed in the SeaweedFS filer namespace under
+  Tenant A's directory path
+- **THEN** a read under Tenant B's directory path does not return Tenant A's
+  entries and the PostgreSQL rows carry a tenant-scoped key prefix
+
+### Requirement: SeaweedFS S3 gateway reachable in-cluster only on port 8333
+
+The system SHALL expose the SeaweedFS S3 gateway exclusively as a ClusterIP
+Service on port 8333, with no Ingress, Route, NodePort, or LoadBalancer service
+type, so that no tenant-facing network path reaches SeaweedFS directly from
+outside the cluster.
+
+#### Scenario: S3 gateway accepts requests from within the cluster
+
+- **WHEN** a pod inside the cluster sends an S3 API request (e.g., `ListBuckets`)
+  to the SeaweedFS S3 gateway ClusterIP on port 8333
+- **THEN** the gateway returns a valid S3 response and the HTTP status is 200
+
+#### Scenario: S3 gateway has no external exposure
+
+- **WHEN** the umbrella chart is installed with `seaweedfs.enabled=true`
+- **THEN** no Service of type NodePort or LoadBalancer, no Ingress resource, and
+  no OpenShift Route exists for the SeaweedFS S3 gateway
+
+### Requirement: SeaweedFS PVC sizing follows the storage envelope per profile
+
+The system SHALL provision PersistentVolumeClaims for SeaweedFS volume servers
+at 100 Gi per server in the dev profile and 1 Ti per server in the HA profile,
+and a filer PVC of 20 Gi in all profiles, falling back to
+`global.defaultStorageClass` when no explicit `storageClass` is specified, so that
+storage sizing is consistent with the per-profile envelope already applied to other
+components.
+
+#### Scenario: Dev profile PVCs match the 100 Gi envelope
+
+- **WHEN** the umbrella chart is installed with the base profile and
+  `seaweedfs.enabled=true`
+- **THEN** the SeaweedFS volume server PVC has `storage: 100Gi` and the filer PVC
+  has `storage: 20Gi`
+
+#### Scenario: HA profile PVCs match the 1 Ti envelope
+
+- **WHEN** the umbrella chart is installed with the HA profile and
+  `seaweedfs.enabled=true`
+- **THEN** each SeaweedFS volume server PVC has `storage: 1Ti` and the filer PVC
+  has `storage: 20Gi`
+
+### Requirement: SeaweedFS S3 gateway credentials in a chart-created Secret
+
+The system SHALL create a Kubernetes Secret containing the SeaweedFS S3 gateway
+access key and secret key (keys: `s3AccessKey`, `s3SecretKey`) as part of the
+Helm chart release, so that storage consumers reference a consistently named and
+chart-managed Secret rather than a pre-provisioned Secret with inconsistent key
+names.
+
+#### Scenario: Chart creates the S3 credential Secret on install
+
+- **WHEN** the umbrella chart is installed with `seaweedfs.enabled=true`
+- **THEN** a Secret named `in-falcone-seaweedfs-s3-creds` exists in the namespace,
+  contains the keys `s3AccessKey` and `s3SecretKey`, and the S3 gateway uses those
+  values to authenticate requests
+
+#### Scenario: S3 credential Secret key names are consistent with chart documentation
+
+- **WHEN** a consumer mounts or reads the `in-falcone-seaweedfs-s3-creds` Secret
+- **THEN** the keys `s3AccessKey` and `s3SecretKey` are present and non-empty,
+  and no alternate key names (`MINIO_ROOT_USER`, `access-key`, etc.) are used for
+  the same purpose
+
+### Requirement: SeaweedFS components comply with OpenShift restricted-v2 SCC
+
+The system SHALL configure all SeaweedFS component Pods (master, volume, filer,
+S3 gateway) in the OpenShift overlay with `podSecurityContext.fsGroup: null`,
+`runAsNonRoot: true`, and `seccompProfile.type: RuntimeDefault`, so that the
+restricted-v2 Security Context Constraint injects the uid and fsGroup from the
+namespace annotation without requiring a custom SCC assignment.
+
+#### Scenario: SeaweedFS Pods pass restricted-v2 SCC admission on OpenShift
+
+- **WHEN** the umbrella chart is installed in an OpenShift namespace governed by
+  the restricted-v2 SCC with `seaweedfs.enabled=true` and the OpenShift overlay
+  (`values-openshift.yaml`) applied
+- **THEN** all SeaweedFS Pods are admitted without SCC violation events and reach
+  the Running state without privilege-escalation warnings
+
+#### Scenario: SeaweedFS Pods do not request fsGroup in the OpenShift overlay
+
+- **WHEN** the OpenShift overlay is applied
+- **THEN** no SeaweedFS component PodSpec contains a non-null `fsGroup` field
+  and the injected uid/gid from the restricted-v2 SCC is sufficient for the
+  process to start and write to its PVC mount
 
