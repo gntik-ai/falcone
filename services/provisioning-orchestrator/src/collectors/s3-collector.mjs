@@ -71,6 +71,12 @@ export async function collect(tenantId, options = {}) {
 
     const listXml = await listRes.text();
     const allBuckets = parseBucketNames(listXml);
+    // LEGACY `<tenantId>-` name-prefix strategy. Used here only to FILTER an
+    // existing bucket listing for export; it never creates buckets. The canonical
+    // tenant-to-bucket mapping is bucket-per-workspace via `workspace_buckets`
+    // (add-seaweedfs-bucket-lifecycle-migration, decision D1). No new code path may
+    // allocate a bucket from this prefix; reconciliation discovers such legacy
+    // buckets and backfills `workspace_buckets` rows instead.
     const tenantPrefix = `${tenantId}-`;
     const tenantBuckets = allBuckets.filter(b => b.startsWith(tenantPrefix));
 
