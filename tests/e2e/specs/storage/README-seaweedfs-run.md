@@ -6,7 +6,7 @@ control-plane, the specs authenticate with real Keycloak-minted JWTs.
 
 ## Green result (test-cluster-b, 2026-06-14)
 
-```
+```text
 ✓ sto-e2e-001  list buckets
 ✓ sto-e2e-002a provision bucket (201)
 ✓ sto-e2e-002b provisioned bucket appears in list
