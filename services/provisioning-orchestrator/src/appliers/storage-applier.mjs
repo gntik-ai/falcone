@@ -6,6 +6,7 @@
 import { compareResources, resolveAction, buildDiff } from '../reprovision/diff.mjs';
 import { REDACTED_MARKER, zeroCounts } from '../reprovision/types.mjs';
 import { assertRegionSupported } from './region-guard.mjs';
+import { assertValidBucketName } from '../utils/bucket-name-validator.mjs';
 
 /**
  * @param {string} tenantId
@@ -178,6 +179,9 @@ export async function teardown(tenantId, domainData = {}, options = {}) {
 
 async function _processBucket(bucket, { dryRun, s3Api, log }) {
   const name = bucket.name ?? 'unknown';
+  // Reject a non-DNS-safe bucket name BEFORE any backend call (head/create). The
+  // caller loop turns the thrown InvalidBucketNameError into an `error` result.
+  assertValidBucketName(name);
   const warnings = [];
   const cleanedBucket = _stripRedacted(bucket, warnings, name);
 
