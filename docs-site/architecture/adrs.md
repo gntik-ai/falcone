@@ -117,6 +117,8 @@ The significant architectural decisions visible in the codebase, captured as sho
 
 ## ADR-13 — Migrate object store from MinIO to SeaweedFS
 
+**Runbook.** Operational architecture, topology, filer-on-PostgreSQL, per-tenant identity model, replication, PVC sizing, TLS/networking, day-2 ops, observability and licensing: [SeaweedFS Storage Runbook](/architecture/seaweedfs).
+
 **Decision.** Replace the bundled **MinIO** object store with **SeaweedFS (Apache-2.0)** as the S3-compatible backend for the storage capability. Pin the migration to SeaweedFS **`4.33`** (`chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`). Back the filer with **PostgreSQL** (`[postgres2]`, one table per bucket) in a **dedicated database**, reusing Falcone's existing Postgres tier rather than adding a new stateful dependency. Serve S3 on the confirmed port **8333** with **path-style** addressing. Bootstrap S3 identities from a static config file and onboard tenants **live via `s3.configure`** (no gateway restart). **Reject** MinIO CE (licence + console regression), RustFS (alpha), and Ceph/Rook (operational weight).
 
 **Why.**
