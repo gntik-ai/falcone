@@ -2171,11 +2171,11 @@ seaweedfs:
         repository: ""
         name: chrislusf/seaweedfs
       # Replication is driven per-component via master.defaultReplication /
-      # filer.defaultReplicaPlacement (see below) so the dev (001) and HA (011)
+      # filer.defaultReplicaPlacement (see below) so the dev (000) and HA (011)
       # notations are explicit per profile. enableReplication stays false so the
       # per-component values win.
       enableReplication: false
-      replicationPlacement: "001"
+      replicationPlacement: "000"
       # Inter-component TLS (master<->volume<->filer<->s3). Default OFF in the
       # dev/base profile because the kind test cluster has no cert-manager; the
       # TLS bootstrap (self-signed CA hook + enableSecurity) is layered on in the
@@ -2189,8 +2189,11 @@ seaweedfs:
     port: 9333
     grpcPort: 19333
     # SeaweedFS replication notation <cross-DC><cross-rack><same-rack>.
-    # dev/base: 001 = single copy, no cross-rack redundancy. HA profile -> 011.
-    defaultReplication: "001"
+    # dev/base: 000 = single copy on the lone volume server. (001 means ONE extra
+    # same-rack replica, which needs a 2nd volume server; on the 1-server dev
+    # topology it makes every object PUT fail with a 500 InternalError.)
+    # HA profile (3 volume servers) -> 011.
+    defaultReplication: "000"
     # Durable master metadata on a PVC (upstream default is hostPath, which is
     # not durable across reschedules). Falls back to global.defaultStorageClass
     # when storageClass is empty.
@@ -2238,7 +2241,8 @@ seaweedfs:
     replicas: 1
     port: 8888
     grpcPort: 18888
-    defaultReplicaPlacement: "001"
+    # dev/base: 000 (single copy on the lone volume server); see master.defaultReplication.
+    defaultReplicaPlacement: "000"
     # 20Gi PVC for the filer's local working data in all profiles (metadata
     # itself lives in PostgreSQL — see extraEnvironmentVars below).
     enablePVC: true
@@ -2259,7 +2263,11 @@ seaweedfs:
     # PostgreSQL service name. Superuser creds come from the postgresql Secret.
     initContainers: |-
       - name: wait-and-create-filer-db
-        image: docker.io/bitnami/postgresql:16
+        # NOTE: docker.io/bitnami/postgresql:16 was removed in the bitnami -> bitnamilegacy
+        # image purge (NotFound on pull). Use the same non-root (UID 1001) bitnamilegacy
+        # postgres client image the umbrella already runs for postgresql, so pg_isready/psql
+        # are present and `runAsNonRoot: true` is satisfied.
+        image: docker.io/bitnamilegacy/postgresql:17.2.0
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -2405,10 +2413,14 @@ seaweedfs:
     enabled: true
     # Falcone app pods (by app.kubernetes.io/name = componentId) allowed to reach
     # the S3 gateway on 8333.
+    # These must match the rendered `app.kubernetes.io/name` pod labels, which the
+    # component-wrapper sets to the KEBAB-case componentId (e.g. `control-plane`),
+    # NOT the camelCase values key. Mismatched (camelCase) entries silently drop all
+    # app -> SeaweedFS:8333 traffic, since kindnet enforces this NetworkPolicy.
     allowedAppComponents:
-      - controlPlane
-      - controlPlaneExecutor
-      - workflowWorker
+      - control-plane
+      - control-plane-executor
+      - workflow-worker
     # PostgreSQL component name (filer egress target for the metadata store).
     postgresComponent: postgresql
 
