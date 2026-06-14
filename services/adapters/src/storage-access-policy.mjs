@@ -611,6 +611,37 @@ export function buildStoragePolicyDecisionAuditEvent({ decision, actor = null, o
   }));
 }
 
+// ── SeaweedFS identity action mapping (Design D5) ────────────────────────────
+// Translation table from the in-process policy-decision booleans to the SeaweedFS
+// S3 identity `actions` vocabulary. Used by seaweedfs-iam-client.mjs when writing
+// a per-tenant identity so the backend-enforced scope mirrors the in-process
+// access-policy engine. Order is canonical (Read, Write, List, Admin) so the
+// serialized identity is deterministic.
+export const SEAWEEDFS_ACTION_BY_PERMISSION = buildFrozenRecord({
+  read: 'Read',
+  write: 'Write',
+  list: 'List',
+  admin: 'Admin'
+});
+
+const SEAWEEDFS_ACTION_ORDER = Object.freeze(['read', 'write', 'list', 'admin']);
+
+/**
+ * Map a `{read, write, list, admin}` policy-decision object to the SeaweedFS
+ * identity `actions` subset. Only permissions explicitly set to `true` are
+ * included; an object with no granted permissions returns `[]` (which the IAM
+ * client treats as a fail-closed INVALID_IDENTITY_SCOPE — an actionless identity
+ * is never written).
+ *
+ * @param {{read?: boolean, write?: boolean, list?: boolean, admin?: boolean}} [policyDecisions]
+ * @returns {string[]} ordered subset of ['Read','Write','List','Admin']
+ */
+export function toSeaweedFSActions(policyDecisions = {}) {
+  return SEAWEEDFS_ACTION_ORDER
+    .filter((permission) => policyDecisions?.[permission] === true)
+    .map((permission) => SEAWEEDFS_ACTION_BY_PERMISSION[permission]);
+}
+
 export function buildStoragePolicyMutationAuditEvent({ operation, actor = {}, previousPolicy = null, nextPolicy = null, tenantId = null, workspaceId = null, bucketId = null, occurredAt = DEFAULT_NOW, correlationId = null } = {}) {
   return buildFrozenRecord(sanitizeStringsDeep({
     eventType: 'storage.policy.mutation',
