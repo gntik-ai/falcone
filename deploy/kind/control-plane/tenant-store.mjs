@@ -64,6 +64,12 @@ export async function ensureSchema(pool) {
       created_by TEXT
     )`);
   // ---- data plane: object-store buckets mapped to a workspace -------------
+  // CANONICAL tenant-to-bucket mapping (bucket-per-workspace). This table is the
+  // single source of truth for storage reconciliation (add-seaweedfs-bucket-
+  // lifecycle-migration). Coverage note: `bucket_name` is globally UNIQUE but
+  // `workspace_id` is NOT unique here, so a workspace may map to 0..N buckets and a
+  // bucket created out-of-band on the backend may have no row — the migration
+  // reconciler's discover-and-merge step backfills those missing rows.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workspace_buckets (
       id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,

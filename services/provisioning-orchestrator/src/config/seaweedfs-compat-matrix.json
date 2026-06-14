@@ -1,0 +1,16 @@
+{
+  "source": "spikes/add-seaweedfs-storage-adr-spike/compatibility-matrix.md (OpenSpec add-seaweedfs-storage-adr-spike, GitHub #431)",
+  "configTypes": ["lifecycle", "policy", "cors", "versioning"],
+  "defaultVersion": "4.33",
+  "versions": {
+    "4.33": {
+      "lifecycle": "SUPPORTED",
+      "policy": "PARTIAL",
+      "cors": "SUPPORTED",
+      "versioning": "SUPPORTED"
+    }
+  },
+  "partialNotes": {
+    "policy": "Gap G1: SeaweedFS 4.33 rejects the canonical Principal forms {\"AWS\":[\"*\"]} / {\"AWS\":\"*\"} with 400 MalformedPolicy but accepts the string form \"*\". The gate flattens Principal.AWS to \"*\" before putBucketPolicy."
+  }
+}
