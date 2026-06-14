@@ -2040,6 +2040,22 @@ openwhisk:
       capabilities:
         drop:
           - ALL
+# ---------------------------------------------------------------------------
+# MinIO `storage` component (legacy object-storage tier).
+#
+# MIGRATION / ROLLBACK NOTE (add-seaweedfs-rollback-plan, #438):
+# During the MinIO -> SeaweedFS cutover this StatefulSet is the SIDE-BY-SIDE
+# fallback. Keep `enabled: true` and DO NOT reclaim its PVC for the full rollback
+# retention window (N days, default 7 — see tools/migration/ROLLBACK.md). After
+# cutover the app is re-pointed to SeaweedFS (STORAGE_S3_ENDPOINT -> ...seaweedfs-s3:8333),
+# so MinIO receives NO new writes and is effectively READ-ONLY — it exists only
+# as the rollback target (re-point STORAGE_S3_ENDPOINT back to
+# http://<release>-storage:9000). Persistence below uses `existingClaim: ""` with
+# no delete-on-upgrade / delete-on-uninstall annotation, so a `helm upgrade`/
+# `uninstall` does NOT delete the PVC (StatefulSet volumeClaimTemplate retention).
+# Deleting this component or its PVC is the POINT-OF-NO-RETURN and is GATED on the
+# non-prod rollback test being green (tools/migration/ROLLBACK.md, sections 4-5).
+# ---------------------------------------------------------------------------
 storage:
   enabled: true
   wrapper:
