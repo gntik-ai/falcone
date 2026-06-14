@@ -61,9 +61,11 @@ mcp:             { enabled: true }   # MCP server hosting (RBAC + internal-only 
                                      # set MCP_ENABLED=true on the executor to serve /v1/mcp
 ```
 
-Object storage is the `storage` component (**MinIO**, S3-compatible) and the document API is the
-`mongodb` component; the SeaweedFS / FerretDB+DocumentDB alternatives on the [Roadmap](/guide/roadmap)
-are not yet implemented in the chart.
+Object storage is the `seaweedfs` component (**SeaweedFS**, S3-compatible, Apache-2.0;
+[ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), replacing the
+legacy MinIO `storage` component) and the document API is the `mongodb` component; the
+FerretDB + DocumentDB document-DB alternative on the [Roadmap](/guide/roadmap) is not yet
+implemented in the chart.
 
 ## Exposure & TLS
 

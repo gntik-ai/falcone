@@ -65,7 +65,7 @@ It starts:
 | `mongodb` | `mongo:7` (`--replSet rs0`) | Document backend + change streams |
 | `keycloak` | `quay.io/keycloak/keycloak:26.0` | Identity (OIDC), realm auto-imported |
 | `redpanda` | `redpandadata/redpanda:v24.2.7` | Kafka-compatible event bus |
-| `minio` | `minio/minio:latest` | S3-compatible object storage |
+| `seaweedfs` | `chrislusf/seaweedfs:4.33` | S3-compatible object storage |
 | `vault` | `hashicorp/vault:1.18` (dev) | Secret backend |
 | `apisix` | `apache/apisix:3.9.1-debian` | API gateway |
 
@@ -192,7 +192,7 @@ keycloak:  { image: { repository: registry.airgap.in-falcone.local/keycloak/keyc
 postgresql:{ image: { repository: registry.airgap.in-falcone.local/bitnami/postgresql } }
 mongodb:   { image: { repository: registry.airgap.in-falcone.local/bitnami/mongodb } }
 kafka:     { image: { repository: registry.airgap.in-falcone.local/bitnami/kafka } }
-storage:   { image: { repository: registry.airgap.in-falcone.local/minio/minio } }
+seaweedfs: { image: { repository: registry.airgap.in-falcone.local/chrislusf/seaweedfs } }
 controlPlane: { image: { repository: registry.airgap.in-falcone.local/example/in-falcone-control-plane } }
 webConsole:   { image: { repository: registry.airgap.in-falcone.local/example/in-falcone-web-console } }
 ```

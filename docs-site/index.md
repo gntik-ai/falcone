@@ -42,7 +42,7 @@ features:
     linkText: Realtime
   - icon: 📦
     title: Storage, events & functions
-    details: S3-compatible object storage (MinIO), an event bus (Kafka/Redpanda) and serverless functions round out the BaaS surface.
+    details: S3-compatible object storage (SeaweedFS), an event bus (Kafka/Redpanda) and serverless functions round out the BaaS surface.
     link: /architecture/services
     linkText: Components
   - icon: 🚀
