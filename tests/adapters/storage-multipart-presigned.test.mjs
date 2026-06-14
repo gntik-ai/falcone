@@ -22,7 +22,8 @@ import {
   evaluateStorageMultipartStaleness,
   buildStorageStaleSessionCleanupRecord,
   validateStorageMultipartObjectKey,
-  validateStoragePresignedTtl
+  validateStoragePresignedTtl,
+  getStorageBucketRecord
 } from '../../services/adapters/src/provider-catalog.mjs';
 import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
 
@@ -119,6 +120,44 @@ test('validateStoragePartList enforces maxParts boundary', () => {
 
   assert.equal(validateStoragePartList({ parts: validParts, maxParts: 10000, minPartSizeBytes: 5_242_880 }).valid, true);
   assert.equal(validateStoragePartList({ parts: invalidParts, maxParts: 10000, minPartSizeBytes: 5_242_880 }).valid, false);
+});
+
+test('a seaweedfs tenant storage context surfaces providerType seaweedfs on the bucket record (catalog surface)', () => {
+  const bucket = getStorageBucketRecord({
+    tenantId: 'ten_01',
+    workspaceId: 'wrk_01',
+    bucketName: 'bucket-01',
+    tenantStorageContext: {
+      entityType: 'tenant_storage_context',
+      tenantId: 'ten_01',
+      providerType: 'seaweedfs',
+      providerDisplayName: 'SeaweedFS',
+      namespace: 'tenants/ten_01',
+      state: 'active',
+      bucketProvisioningAllowed: true,
+      quotaAssignment: { capabilityAvailable: true }
+    }
+  });
+  assert.equal(bucket.providerType, 'seaweedfs');
+  assert.equal(bucket.tenantStorageContext.providerType, 'seaweedfs');
+});
+
+test('completion preview still produces a valid object record through the catalog surface', () => {
+  const session = buildStorageMultipartSession({
+    tenantId: 'ten_01',
+    workspaceId: 'wrk_01',
+    bucketId: 'bucket-01',
+    objectKey: 'uploads/file.bin',
+    ttlSeconds: 3600,
+    now: '2026-03-28T00:00:00Z'
+  });
+  const preview = buildStorageMultipartCompletionPreview({
+    session,
+    parts: [1, 2, 3].map((partNumber) => ({ partNumber, sizeBytes: 5_000_000 })),
+    now: '2026-03-28T00:00:00Z'
+  });
+  assert.equal(preview.validationOutcome, 'valid');
+  assert.equal(preview.expectedObjectRecord.objectKey, 'uploads/file.bin');
 });
 
 test('all additive multipart-presigned provider catalog exports are defined', () => {

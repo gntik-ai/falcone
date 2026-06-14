@@ -1,0 +1,7 @@
+### Task 3.1 path-style addressing (forcePathStyle:true)
+  region=auto     pathstyle_url=True presigned-GET-> HTTP 200 body=b'falcone-seaweedfs-roundtrip'
+  region=us-east-1 pathstyle_url=True presigned-GET-> HTTP 200 body=b'falcone-seaweedfs-roundtrip'
+
+### Task 3.1 explicit unsigned path-style structure check
+  presigned URL: http://127.0.0.1:8333/tenant-a-bucket/probe/hello.txt
+  query has X-Amz-Signature: True | X-Amz-Credential region scope: auto

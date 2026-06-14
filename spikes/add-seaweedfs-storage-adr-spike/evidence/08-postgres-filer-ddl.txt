@@ -1,0 +1,46 @@
+=== tables created by SeaweedFS postgres2 filer ===
+                List of relations
+ Schema |         Name         | Type  |  Owner  
+--------+----------------------+-------+---------
+ public | filemeta             | table | seaweed
+ public | tenant-a-bucket      | table | seaweed
+ public | tenant-a-lock-bucket | table | seaweed
+(3 rows)
+
+=== extensions present ===
+                 List of installed extensions
+  Name   | Version |   Schema   |         Description          
+---------+---------+------------+------------------------------
+ plpgsql | 1.0     | pg_catalog | PL/pgSQL procedural language
+(1 row)
+
+=== DDL of the per-bucket table (tenant-a-bucket) ===
+                    Table "public.tenant-a-bucket"
+  Column   |           Type           | Collation | Nullable | Default 
+-----------+--------------------------+-----------+----------+---------
+ dirhash   | bigint                   |           | not null | 
+ name      | character varying(65535) |           | not null | 
+ directory | character varying(65535) |           |          | 
+ meta      | bytea                    |           |          | 
+Indexes:
+    "tenant-a-bucket_pkey" PRIMARY KEY, btree (dirhash, name)
+
+=== DDL of the root filemeta table ===
+                        Table "public.filemeta"
+  Column   |           Type           | Collation | Nullable | Default 
+-----------+--------------------------+-----------+----------+---------
+ dirhash   | bigint                   |           | not null | 
+ name      | character varying(65535) |           | not null | 
+ directory | character varying(65535) |           |          | 
+ meta      | bytea                    |           |          | 
+Indexes:
+    "filemeta_pkey" PRIMARY KEY, btree (dirhash, name)
+
+=== row counts (metadata entries) ===
+        table         | approx_rows 
+----------------------+-------------
+ filemeta             |           9
+ tenant-a-bucket      |           8
+ tenant-a-lock-bucket |           0
+(3 rows)
+

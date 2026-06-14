@@ -1,0 +1,11 @@
+put todelete.txt ok; objects before delete: ['todelete.txt']
+after delete_object, KeyCount: 0
+delete_bucket ok
+head_bucket after delete -> 404 (gone, expected)
+             List of relations
+ Schema |      Name       | Type  |  Owner  
+--------+-----------------+-------+---------
+ public | filemeta        | table | seaweed
+ public | tenant-a-bucket | table | seaweed
+(2 rows)
+

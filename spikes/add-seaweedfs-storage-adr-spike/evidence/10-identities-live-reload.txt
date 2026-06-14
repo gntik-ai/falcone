@@ -1,0 +1,4 @@
+admin created tenant-b-bucket
+attempt 0: tenant-b signed request ACCEPTED, roundtrip=True
+LIVE-RELOAD RESULT: SUPPORTED — new tenant usable with NO gateway restart
+ISOLATION: AccessDenied (tenant-b denied on tenant-a-bucket, expected)
