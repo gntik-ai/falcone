@@ -33,6 +33,10 @@ const AGGREGATION_ALLOWED_STAGES = new Set([
   '$replaceRoot',
   '$replaceWith'
 ]);
+// Intentional adapter POLICY, NOT an engine limitation. ADR-14 confirmed FerretDB 2.7.0 /
+// postgres-documentdb accept $out/$merge/$geoNear (and all adapter-allowed stages); these are
+// blocked by design. The $facet≤4 and $lookup≤1 caps are likewise adapter policy. No
+// FERRETDB_UNSUPPORTED_OPERATOR shim exists — none is needed (add-ferretdb-data-access-cutover #459).
 const AGGREGATION_BLOCKED_STAGES = new Set(['$out', '$merge', '$geoNear']);
 const CHANGE_STREAM_ALLOWED_STAGES = new Set(['$match', '$project', '$addFields', '$set', '$unset', '$replaceRoot', '$replaceWith']);
 const TRANSACTION_ACTIONS = new Set(['insert', 'update', 'replace', 'delete']);
@@ -104,6 +108,11 @@ export const MONGO_DATA_DEFAULT_TRANSFER_LIMITS = Object.freeze({
   exportConsistency: 'snapshot',
   ordered: true
 });
+// readConcern:'snapshot' / writeConcern:'majority' apply ONLY to MongoDB-7-style backends
+// that support multi-document transactions. On a FerretDB backend (supportsTransactions=false)
+// the `transaction` op is rejected at the API boundary (501 TRANSACTION_NOT_SUPPORTED) before a
+// plan is ever built, so these concerns are never dispatched to FerretDB — FerretDB silently
+// ignores them, so carrying them forward would be a false guarantee (add-ferretdb-data-access-cutover #459).
 export const MONGO_DATA_DEFAULT_TRANSACTION_LIMITS = Object.freeze({
   maxOperations: 25,
   maxPayloadBytes: 262144,
@@ -2498,6 +2507,20 @@ export function buildMongoDataApiPlan({
   }
 
   if (operation === 'transaction') {
+    // FerretDB cutover (add-ferretdb-data-access-cutover, #459): reject a multi-document
+    // transaction at the API boundary BEFORE any individual op is dispatched. FerretDB 2.7.0
+    // reports supportsTransactions=false; its commitTransaction is CommandNotFound(59), ops
+    // dispatched before commit ALREADY persist non-atomically, and abortTransaction is a
+    // silent no-op (no rollback) — so a commit-time/lazy guard would leave partial writes
+    // committed. This boundary-first 501 is distinct from the generic 409 capability error
+    // (which covers unknown/unsupported cluster topology) so it doesn't disturb those paths.
+    if (normalizeTopologyProfile(topology).supportsTransactions === false) {
+      throw new MongoDataApiError({
+        code: 'TRANSACTION_NOT_SUPPORTED',
+        status: 501,
+        message: 'Multi-document transactions are not supported by the configured backend.'
+      });
+    }
     assertCapabilityCompatibility(compatibility);
     assertMongoPlanPolicyEnabled(normalizedPlanPolicy.transaction.enabled, 'transaction', normalizedPlanPolicy.planId);
     const transaction = normalizeMongoTransactionPayload({

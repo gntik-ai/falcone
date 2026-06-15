@@ -67,33 +67,6 @@ substitute for adapter-layer injection.
 - **WHEN** tenant A sends a delete with the `_id` of a document owned by tenant B
 - **THEN** `deleted` is 0 and the document remains intact
 
-### Requirement: Adapter aggregation stage allowlist and blocked-stage policy are unchanged
-
-The system SHALL preserve the existing adapter aggregation stage allowlist
-(`$match`, `$project`, `$sort`, `$limit`, `$skip`, `$group`, `$unwind`, `$lookup` ≤1,
-`$count`, `$facet` ≤4, `$addFields`, `$set`, `$unset`, `$replaceRoot`, `$replaceWith`)
-and the existing `AGGREGATION_BLOCKED_STAGES` (`$out`, `$merge`, `$geoNear`) in
-`services/adapters/src/mongodb-data-api.mjs` after the FerretDB cutover. The blocked
-stages are rejected as **intentional adapter policy** — they are engine-functional on
-FerretDB but blocked by the allowlist by design. The `$facet≤4` and `$lookup≤1` caps are
-likewise adapter policy, not engine constraints. No new `FERRETDB_UNSUPPORTED_OPERATOR`
-error code is introduced.
-
-#### Scenario: Already-blocked stages ($out, $merge, $geoNear) continue to be rejected
-
-- **WHEN** a caller submits an aggregate request containing `$out`, `$merge`, or `$geoNear`
-- **THEN** the response status is 422 or 400 and no database command is dispatched,
-  identical to pre-FerretDB behavior (adapter policy, not engine limitation)
-
-#### Scenario: Pipeline with all adapter-allowed stages executes normally on FerretDB
-
-- **WHEN** a caller submits an aggregate request whose pipeline uses only stages from
-  the adapter allowlist (`$match`, `$project`, `$sort`, `$limit`, `$skip`, `$group`,
-  `$unwind`, `$count`, `$addFields`, `$set`, `$unset`, `$replaceRoot`, `$replaceWith`,
-  `$lookup` with at most 1 stage, `$facet` with at most 4 sub-stages)
-- **THEN** the plan is built and executed against FerretDB and the response contains the
-  aggregation result with status 200
-
 ### Requirement: Driver errors are returned as sanitized HTTP responses
 
 The system SHALL catch all `mongodb` driver errors raised by the FerretDB gateway, log the
@@ -122,6 +95,33 @@ instance fail fast rather than silently.
 - **THEN** the response status is 501 with `code: "MONGO_DISABLED"`
 
 ## ADDED Requirements
+
+### Requirement: Adapter aggregation stage allowlist and blocked-stage policy are unchanged
+
+The system SHALL preserve the existing adapter aggregation stage allowlist
+(`$match`, `$project`, `$sort`, `$limit`, `$skip`, `$group`, `$unwind`, `$lookup` ≤1,
+`$count`, `$facet` ≤4, `$addFields`, `$set`, `$unset`, `$replaceRoot`, `$replaceWith`)
+and the existing `AGGREGATION_BLOCKED_STAGES` (`$out`, `$merge`, `$geoNear`) in
+`services/adapters/src/mongodb-data-api.mjs` after the FerretDB cutover. The blocked
+stages are rejected as **intentional adapter policy** — they are engine-functional on
+FerretDB but blocked by the allowlist by design. The `$facet≤4` and `$lookup≤1` caps are
+likewise adapter policy, not engine constraints. No new `FERRETDB_UNSUPPORTED_OPERATOR`
+error code is introduced.
+
+#### Scenario: Already-blocked stages ($out, $merge, $geoNear) continue to be rejected
+
+- **WHEN** a caller submits an aggregate request containing `$out`, `$merge`, or `$geoNear`
+- **THEN** the response status is 422 or 400 and no database command is dispatched,
+  identical to pre-FerretDB behavior (adapter policy, not engine limitation)
+
+#### Scenario: Pipeline with all adapter-allowed stages executes normally on FerretDB
+
+- **WHEN** a caller submits an aggregate request whose pipeline uses only stages from
+  the adapter allowlist (`$match`, `$project`, `$sort`, `$limit`, `$skip`, `$group`,
+  `$unwind`, `$count`, `$addFields`, `$set`, `$unset`, `$replaceRoot`, `$replaceWith`,
+  `$lookup` with at most 1 stage, `$facet` with at most 4 sub-stages)
+- **THEN** the plan is built and executed against FerretDB and the response contains the
+  aggregation result with status 200
 
 ### Requirement: Multi-document transaction ops are rejected at the API boundary before any op runs
 

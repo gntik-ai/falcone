@@ -7,7 +7,9 @@ import assert from 'node:assert/strict'
 import { MongoClient } from 'mongodb'
 import { createMongoExecutor } from '../../../apps/control-plane/src/runtime/mongo-data-executor.mjs'
 
-const URI = process.env.MONGO_URI ?? 'mongodb://localhost:57017/?replicaSet=rs0&directConnection=true'
+// FerretDB cutover (#459): default to the FerretDB gateway URI (no replica set). run-mongo.sh
+// sets MONGO_URI + MONGO_BACKEND=ferretdb and brings up the FerretDB+DocumentDB stack.
+const URI = process.env.MONGO_URI ?? 'mongodb://falcone:falcone@localhost:57017/'
 const DB = 'cp_mongo_probe'
 const COLL = 'notes'
 const TEN_A = 'ten_m_a'
@@ -25,7 +27,9 @@ before(async () => {
   admin = new MongoClient(URI)
   await admin.connect()
   await admin.db(DB).dropDatabase().catch(() => {})
-  exec = createMongoExecutor({ resolveUri: () => URI })
+  // FerretDB backend profile: supportsTransactions=false so the data-API rejects transaction
+  // ops at the boundary (501). Mirrors main.mjs when MONGO_BACKEND=ferretdb (#459).
+  exec = createMongoExecutor({ resolveUri: () => URI, topology: { supportsTransactions: false } })
 })
 
 after(async () => {
@@ -131,4 +135,28 @@ test('missing tenant identity → 401', async () => {
     () => exec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: {}, operation: 'list' }),
     (e) => e.statusCode === 401
   )
+})
+
+// FerretDB cutover (#459): a multi-document transaction op MUST be rejected at the API
+// boundary with 501 TRANSACTION_NOT_SUPPORTED before ANY individual op is dispatched —
+// FerretDB has no transactions (ops persist non-atomically, abort is a no-op).
+test('transaction op is rejected at the boundary (501) and dispatches no individual ops', async () => {
+  const txnDocId = 'txn_should_not_persist'
+  await assert.rejects(
+    exec.executeMongoData({
+      ...base({ tenantId: TEN_A, workspaceId: WS_A }),
+      operation: 'transaction',
+      payload: {
+        operations: [{ kind: 'insert', collectionName: COLL, document: { _id: txnDocId, body: 'nope' } }]
+      }
+    }),
+    (err) => {
+      assert.equal(err.statusCode, 501)
+      assert.equal(err.code, 'TRANSACTION_NOT_SUPPORTED')
+      return true
+    }
+  )
+  // No op within the transaction was dispatched: the doc must not exist.
+  const leaked = await admin.db(DB).collection(COLL).findOne({ _id: txnDocId })
+  assert.equal(leaked, null, 'no transaction op persisted to the backend')
 })

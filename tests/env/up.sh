@@ -25,19 +25,22 @@ for i in $(seq 1 60); do
   pg=$(docker compose ps postgres --format '{{.Health}}' 2>/dev/null || true)
   kc=$(docker compose ps keycloak --format '{{.Health}}' 2>/dev/null || true)
   rp=$(docker compose ps redpanda --format '{{.Health}}' 2>/dev/null || true)
-  mo=$(docker compose ps mongodb --format '{{.Health}}' 2>/dev/null || true)
+  # Document store: gate on the DocumentDB ENGINE healthcheck (the FerretDB gateway image is
+  # distroless and has no container healthcheck; it depends_on documentdb: service_healthy and
+  # readiness is gated by the driver's connection retry).
+  dd=$(docker compose ps documentdb --format '{{.Health}}' 2>/dev/null || true)
   sw=$(docker compose ps seaweedfs --format '{{.Health}}' 2>/dev/null || true)
   va=$(docker compose ps vault --format '{{.Health}}' 2>/dev/null || true)
   tm=$(docker compose ps temporal --format '{{.Health}}' 2>/dev/null || true)
   [ "$pg" = "healthy" ] && [ "$kc" = "healthy" ] && [ "$rp" = "healthy" ] \
-    && [ "$mo" = "healthy" ] && [ "$sw" = "healthy" ] && [ "$va" = "healthy" ] \
+    && [ "$dd" = "healthy" ] && [ "$sw" = "healthy" ] && [ "$va" = "healthy" ] \
     && [ "$tm" = "healthy" ] && break
   sleep 5
 done
 [ "${pg:-}" = "healthy" ] && [ "${kc:-}" = "healthy" ] && [ "${rp:-}" = "healthy" ] \
-  && [ "${mo:-}" = "healthy" ] && [ "${sw:-}" = "healthy" ] && [ "${va:-}" = "healthy" ] \
+  && [ "${dd:-}" = "healthy" ] && [ "${sw:-}" = "healthy" ] && [ "${va:-}" = "healthy" ] \
   && [ "${tm:-}" = "healthy" ] \
-  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp mongodb=$mo seaweedfs=$sw vault=$va temporal=$tm)" >&2; exit 1; }
+  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp documentdb=$dd seaweedfs=$sw vault=$va temporal=$tm)" >&2; exit 1; }
 
 echo "==> provisioning Keycloak admin service account (falcone-admin)"
 docker compose exec -T keycloak "$KC" config credentials \
@@ -57,19 +60,12 @@ for f in "$ROOT"/services/backup-status/src/db/migrations/*.sql; do
     && echo "   applied $(basename "$f")" || echo "   skipped $(basename "$f") (already applied?)"
 done
 
-echo "==> initiating MongoDB replica set (rs0)"
-# Idempotent: rs.initiate() only runs if the set is not already configured.
-docker compose exec -T mongodb mongosh --quiet --eval \
-  "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongodb:27017'}]}) }" >/dev/null
-# Wait until the node is PRIMARY (change streams need a writable primary).
-for i in $(seq 1 30); do
-  state=$(docker compose exec -T mongodb mongosh --quiet --eval \
-    "try { rs.status().myState } catch (e) { -1 }" 2>/dev/null | tr -d '[:space:]')
-  [ "$state" = "1" ] && break
-  sleep 2
-done
-[ "${state:-}" = "1" ] && echo "   replica set rs0 is PRIMARY" \
-  || { echo "   mongodb did not reach PRIMARY (myState=$state)" >&2; exit 1; }
+# FerretDB needs NO replica-set initiation (it is a stateless gateway over PostgreSQL/
+# DocumentDB, not a mongod). The document store is ready once the ferretdb healthcheck
+# passes (gated above) and the documentdb engine is healthy (ferretdb depends_on it).
+# NOTE: FerretDB does not support change streams — realtime/CDC tests/env paths are deferred
+# to add-ferretdb-realtime-cdc-remediation (#460). (add-ferretdb-data-access-cutover #459)
+echo "==> document store: FerretDB gateway ready (no replica-set init required)"
 
 echo "==> creating SeaweedFS bucket (falcone-test)"
 # Create the bucket via `weed shell` inside the all-in-one container. Check-then-create
@@ -293,7 +289,7 @@ echo "Test environment is UP."
 echo "  Keycloak admin console : http://localhost:8081  (admin/admin)"
 echo "  Postgres               : postgres://falcone:falcone@localhost:55432/falcone_test"
 echo "  Redpanda (Kafka)       : localhost:19092"
-echo "  MongoDB (rs0)          : mongodb://localhost:57017/?replicaSet=rs0&directConnection=true"
+echo "  FerretDB (document API): mongodb://falcone:falcone@localhost:57017/   (MONGO_BACKEND=ferretdb)"
 echo "  SeaweedFS S3 API       : http://localhost:58333  (falconedev/falconedevsecret, path-style), bucket falcone-test"
 echo "  Vault (dev)            : http://localhost:58200  (token root)"
 echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
