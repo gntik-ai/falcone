@@ -1,0 +1,61 @@
+{{- if and .Values.ferretdb.enabled .Values.ferretdb.networkPolicy.enabled }}
+{{- /*
+  Internal-only NetworkPolicy for the FerretDB gateway (add-ferretdb-gateway, task 3.2).
+
+  The FerretDB gateway is rendered by the component-wrapper, so its pods carry
+  `app.kubernetes.io/name: ferretdb`. Posture (default-deny once a pod is selected):
+    - Ingress to 27017 (MongoDB wire protocol): only from the Falcone app components in
+      ferretdb.networkPolicy.allowedAppComponents (control-plane / executor / CDC bridge)
+      plus other ferretdb pods. Everything else (incl. any tenant-facing path) denied.
+    - Egress: DNS + the platform namespace (reaches the in-cluster documentdb engine).
+
+  ENFORCEMENT CAVEAT: honored only under a policy-enforcing CNI
+  (Calico/Cilium/OVN-Kubernetes). kind's kindnet does NOT enforce NetworkPolicy, so on
+  kind this manifest renders but has no effect (isolation is OpenShift/CI's job).
+*/ -}}
+{{- $np := .Values.ferretdb.networkPolicy -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-ferretdb-internal-only
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ferretdb
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ferretdb
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # MongoDB wire protocol (27017) — only from allowed Falcone app pods + intra-ferretdb.
+    - from:
+        {{- range $np.allowedAppComponents }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+        {{- end }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ferretdb
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ferretdb.service.port }}
+  egress:
+    # DNS resolution.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Platform namespace: the documentdb engine (backend Postgres) lives here.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.namespace }}
+        - podSelector: {}
+{{- end }}
