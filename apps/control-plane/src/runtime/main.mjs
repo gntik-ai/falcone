@@ -86,7 +86,28 @@ const mappingStore = createEmbeddingMappingStore({ pool: keyPool });
 
 // Mongo executor (enabled when a MONGO_URI/MONGO_HOST is configured).
 const mUri = mongoUri();
-const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: () => mUri }) : undefined;
+
+// Per-tenant DocumentDB credential resolution (FerretDB migration #458). When a per-tenant
+// FerretDB credential has been provisioned (documentdb-identity-applier) and ESO/Vault has
+// mounted it as env `FERRETDB_TENANT_URI__<sanitizedTenantId>`, the executor authenticates
+// with that least-privilege credential (per-tenant audit trail). Otherwise it falls back to
+// the shared MONGO_URI for pre-migration / back-fill-window tenants.
+//
+// IMPORTANT: tenant ISOLATION is enforced by the adapter's tenantId scoping
+// (services/adapters/src/mongodb-data-api.mjs applyTenantScopeToFilter/injectTenantIntoDocument),
+// NOT by this credential — ADR-14 disproved per-database role scoping at FerretDB v2.7.0,
+// so the per-tenant credential is least-privilege auth/audit only, never the isolation boundary.
+function resolveMongoUriForTenant(workspaceId, identity = {}) {
+  const tenantId = identity?.tenantId;
+  if (tenantId) {
+    const envName = `FERRETDB_TENANT_URI__${String(tenantId).replace(/[^A-Za-z0-9]+/g, '_')}`;
+    const perTenantUri = process.env[envName];
+    if (perTenantUri) return perTenantUri;
+  }
+  return mUri; // shared fallback (pre-migration / back-fill window)
+}
+
+const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: resolveMongoUriForTenant }) : undefined;
 
 // Realtime executor (Mongo change streams; needs a replica set). Enabled with Mongo.
 const realtimeExecutor = mUri ? createRealtimeExecutor({ resolveUri: () => mUri }) : undefined;
