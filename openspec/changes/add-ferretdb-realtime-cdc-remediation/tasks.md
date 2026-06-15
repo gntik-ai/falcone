@@ -6,8 +6,20 @@
 > `CollectionCatalog` (relation→namespace), `pg-logical-replication`+`bson` deps, `wal_level=logical`
 > in tests/env, and a real-stack proof `tests/env/executor/wal-replication.test.mjs` (run-wal.sh) that
 > asserts insert/update/delete decode with tenantId, update pre/post images, delete pre-image, and
-> consumer-side tenant isolation. Next pass: consumer wiring (§5/§6/§7), chart provisioning (§2.4),
-> blackbox + e2e cross-tenant probes (§1/§8/§9).
+> consumer-side tenant isolation.
+>
+> **Increment 2 (CDC bridge):** `ChangeStreamWatcher` rewritten onto `WalReplicationClient` (synth
+> raw-change-doc → `MongoChangeEventMapper`, delta-mode `updateDescription` from WAL pre/post images,
+> manual-ack after Kafka publish + persist so the slot never advances past an unpublished change),
+> `ResumeTokenStore` adapted to the LSN cursor (§7), `ChangeStreamManager`/`index.mjs` rewired (one slot
+> per capture config over a shared publication; the DocumentDB engine is a separate connection from the
+> bridge metadata DB; idempotent in-app provisioning of publication + RI-FULL sweep + per-config slot).
+> Proven by `tests/env/executor/cdc-wal.test.mjs` (run-cdc-wal.sh): full path FerretDB write → WAL →
+> watcher → **real Kafka (redpanda)**, asserting the tenant's CloudEvents land on its topic and a second
+> tenant's writes on the same slot are never published (cross-tenant CDC probe, §8.2). Unit cover:
+> `ChangeStreamWatcher.test.mjs` (filter/synth/delta-diff/ack-after-publish/error-halt) — 30 bridge unit
+> tests green. Next pass: realtime executor wiring (§5), chart-level provisioning + secret (§2),
+> blackbox + e2e suites (§1/§8.1/§9), opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
@@ -98,14 +110,14 @@
 
 ## 6. CDC Bridge — Replace collection.watch() with WAL consumer
 
-- [ ] 6.1 In `services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs`, replace the `_run` loop:
+- [x] 6.1 In `services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs`, replace the `_run` loop:
   - Remove `collection.watch()` (line 42), `resumeAfter` / `startAtOperationTime` options, and
     the for-await loop over the MongoDB stream (lines 38–56)
   - Instantiate `WalReplicationClient` with the start LSN obtained from
     `ResumeTokenStore.get(captureConfig.id)`
   - Consume records from the WAL client; apply consumer-side tenantId filter:
     discard if `record.tenantId !== captureConfig.tenant_id`
-- [ ] 6.2 For each passing WAL record, synthesise the raw-change-doc shape expected by
+- [x] 6.2 For each passing WAL record, synthesise the raw-change-doc shape expected by
   `MongoChangeEventMapper`:
   - `operationType`: `record.operationType` (`insert`, `replace`, or `delete`; `update` when
     `updateDescription` can be synthesised from OLD/NEW diff for `capture_mode: 'delta'`)
@@ -115,20 +127,20 @@
   - `wallTime`: current timestamp (replication protocol does not guarantee wall time; use
     `new Date()` at decode time)
   - `clusterTime`: LSN as a synthetic value or null (acceptable for CloudEvents `time` field fallback)
-- [ ] 6.3 Pass the synthetic raw-change-doc to `MongoChangeEventMapper.map(rawChangeDoc,
+- [x] 6.3 Pass the synthetic raw-change-doc to `MongoChangeEventMapper.map(rawChangeDoc,
   captureConfig)` — no modifications to `MongoChangeEventMapper` or `buildMongoChangeEvent`
-- [ ] 6.4 After successful `kafkaPublisher.publish`, call `ResumeTokenStore.upsert(captureConfig.id,
+- [x] 6.4 After successful `kafkaPublisher.publish`, call `ResumeTokenStore.upsert(captureConfig.id,
   record.lsn)` to persist the confirmed LSN
-- [ ] 6.5 Preserve the oversized-message guard (lines 48–53): if
+- [x] 6.5 Preserve the oversized-message guard (lines 48–53): if
   `Buffer.byteLength(JSON.stringify(envelope)) > maxBytes`, emit the truncated envelope and audit
 
 ## 7. ResumeTokenStore — Adapt to LSN cursor
 
-- [ ] 7.1 In `services/mongo-cdc-bridge/src/ResumeTokenStore.mjs`, adapt `upsert` to accept an
+- [x] 7.1 In `services/mongo-cdc-bridge/src/ResumeTokenStore.mjs`, adapt `upsert` to accept an
   LSN string (e.g. `"0/1A2B3C4D"`) instead of a MongoDB resume token BSON object; the stored
   value in `mongo_capture_resume_tokens.resume_token` (JSONB column) becomes `{"lsn":"0/1A2B3C4D"}`
-- [ ] 7.2 Adapt `get` to return the LSN string from the stored JSONB: `rows[0]?.resume_token?.lsn ?? null`
-- [ ] 7.3 Preserve the existing `delete(captureId)` method and Postgres table/column names
+- [x] 7.2 Adapt `get` to return the LSN string from the stored JSONB: `rows[0]?.resume_token?.lsn ?? null`
+- [x] 7.3 Preserve the existing `delete(captureId)` method and Postgres table/column names
   unchanged — no schema migration needed (JSONB value shape changes; column structure is stable)
 
 ## 8. Tenant Isolation Verification
