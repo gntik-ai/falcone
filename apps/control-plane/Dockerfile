@@ -24,6 +24,11 @@ RUN npm install --omit=dev --no-package-lock
 COPY apps/control-plane/src /app/apps/control-plane/src
 COPY services/adapters/src /app/services/adapters/src
 COPY services/internal-contracts/src /app/services/internal-contracts/src
+# Realtime executor (add-ferretdb-realtime-cdc-remediation #460) imports the shared logical-
+# replication modules (WalReplicationClient/CollectionCatalog/provisionLogicalReplication) from the
+# CDC bridge. Node resolves their deps (pg-logical-replication, bson — declared in this image's
+# package.json) from /app/node_modules via the upward walk.
+COPY services/mongo-cdc-bridge/src /app/services/mongo-cdc-bridge/src
 COPY services/workflow-worker/src/activities/catalog-names.mjs /app/services/workflow-worker/src/activities/catalog-names.mjs
 COPY services/audit/src /app/services/audit/src
 COPY services/webhook-engine/src /app/services/webhook-engine/src
