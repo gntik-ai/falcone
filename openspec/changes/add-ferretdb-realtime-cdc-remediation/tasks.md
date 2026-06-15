@@ -55,10 +55,24 @@
 > `REALTIME_DOCUMENTDB_URL` wired into the control-plane via the replication Secret in
 > `deploy/kind/values-kind.yaml` (`optional:true`; render-verified into `falcone-control-plane`).
 >
-> **Remaining:** the REPLICATION Secret instance (operator-provided `realtime-url`/`cdc-url`/`password`
-> keys) + a CDC-bridge Deployment/values component (the bridge image now exists; no chart component
-> yet); a FerretDB-data-source realtime e2e spec + full-stack ephemeral deploy (the existing realtime
-> e2e is PG/LISTEN-NOTIFY based); blackbox `cdc-*` (§1/§9); opsx verify/archive.
+> **Increment 6 (realtime e2e authoring, §1.2/§8.1):** net-new `tests/e2e/realtime/mongo-tenant-isolation.test.mjs`
+> (the Mongo/FerretDB counterpart of the PG isolation spec) exercising the full #460 WAL path
+> end-to-end (FerretDB write → DocumentDB WAL → realtime-executor pgoutput slot → SSE → WS gateway).
+> TC-MTI-01 cross-tenant isolation (insert + delete via the RI-FULL pre-image), TC-MTI-02 insert /
+> **replace** (WAL update, explicitly rejecting a raw `update`) / delete, TC-MTI-03 document-tenantId
+> gate, TC-MTI-04 adversarial cross-tenant subscribe. Stack wiring: `tests/e2e/stack.sh` (E2E_FERRETDB
+> guard creating the documentdb admin + `in-falcone-documentdb-replication` secrets — fixed the
+> `realtime-url` to a NORMAL conn URL `?sslmode=disable` (NOT `?replication=database`, which would break
+> the CollectionCatalog pool) and the admin secret keys to `POSTGRES_*` for the official image) +
+> `tests/e2e/values-ferretdb-realtime-e2e.yaml` overlay (documentdb+logicalReplication+ferretdb on,
+> legacy mongodb off, control-plane `MONGO_URI`→FerretDB + `REALTIME_DOCUMENTDB_URL`). `node --check`,
+> bash/yaml lint, and `helm template` (both overlays) all clean.
+>
+> **Remaining (the live run + net-new deployment surface):** build/push the control-plane image with
+> the branch changes; a full-stack ephemeral deploy to RUN `mongo-tenant-isolation.test.mjs` on kind
+> (control-plane + ferretdb + documentdb + keycloak, all Ready) — the spec + wiring exist but a live
+> green run is pending; a CDC-bridge Deployment/values component (bridge image exists; no chart
+> component yet) + its REPLICATION secret + `cdc-url`; blackbox `cdc-*` (§1.1/§9); opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
@@ -66,9 +80,13 @@
   `tests/blackbox/cdc-ferretdb-stack.test.mjs`) that verifies CDC capture publishes at least one
   insert event to Kafka when running against the FerretDB/DocumentDB stack; confirm it fails on
   the unmodified engine
-- [ ] 1.2 Add a failing assertion to `tests/e2e/realtime/tenant-isolation.test.mjs` that verifies
+- [x] 1.2 Add a failing assertion to `tests/e2e/realtime/tenant-isolation.test.mjs` that verifies
   SSE delivers an insert event to the subscribing tenant and NOT to a cross-tenant subscriber;
   confirm it fails on the unmodified engine against FerretDB v2
+  _(done: net-new `tests/e2e/realtime/mongo-tenant-isolation.test.mjs` — the Mongo/FerretDB counterpart
+  of the PG isolation spec; TC-MTI-01..04 cover cross-tenant isolation, insert/replace(WAL update)/
+  delete, the document-tenantId gate, and an adversarial cross-tenant subscribe. Needs the full-stack
+  ephemeral deploy to run — see §8.1 note)_
 - [ ] 1.3 Run `bash tests/blackbox/run.sh` and confirm both new assertions fail (baseline)
 
 ## 2. Publication, Slot, and REPLICA IDENTITY Provisioning
@@ -184,7 +202,7 @@
 
 ## 8. Tenant Isolation Verification
 
-- [ ] 8.1 Add a cross-tenant probe to `tests/e2e/realtime/tenant-isolation.test.mjs`: provision
+- [x] 8.1 Add a cross-tenant probe to `tests/e2e/realtime/tenant-isolation.test.mjs`: provision
   tenants A and B; subscribe tenant A's SSE session to collection C; write a document under
   tenant B; assert tenant A's SSE stream does NOT receive tenant B's event (consumer-side filter
   must discard the WAL record for tenant B)
