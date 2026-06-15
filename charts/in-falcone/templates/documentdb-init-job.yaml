@@ -15,6 +15,14 @@
   enforceable from here.
 */ -}}
 {{- $svc := include "in-falcone.componentServiceNameByAlias" (dict "root" . "component" "documentdb") -}}
+{{- if .Values.documentdb.logicalReplication.enabled -}}
+  {{- if not (regexMatch "^[a-z_][a-z0-9_]*$" .Values.documentdb.logicalReplication.role.name) -}}
+    {{- fail (printf "documentdb.logicalReplication.role.name %q is not a safe SQL identifier" .Values.documentdb.logicalReplication.role.name) -}}
+  {{- end -}}
+  {{- if not (regexMatch "^[a-z_][a-z0-9_]*$" .Values.documentdb.logicalReplication.publicationName) -}}
+    {{- fail (printf "documentdb.logicalReplication.publicationName %q is not a safe SQL identifier" .Values.documentdb.logicalReplication.publicationName) -}}
+  {{- end -}}
+{{- end -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -83,6 +91,12 @@ spec:
               echo "Creating extension (idempotent) ..."
               psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS documentdb CASCADE"
               echo "documentdb extension ensured in database ${PGDATABASE}."
+              {{- if .Values.documentdb.logicalReplication.enabled }}
+              echo "Provisioning logical replication (role, publication, REPLICA IDENTITY FULL, event trigger) ..."
+              psql -v ON_ERROR_STOP=1 -v role="${REPL_ROLE}" -v pw="${REPL_PASSWORD}" -v pub="${REPL_PUB}" \
+                -f /sql/provision-logical-replication.sql
+              echo "Logical replication provisioned (role ${REPL_ROLE}, publication ${REPL_PUB})."
+              {{- end }}
           env:
             - name: PGHOST
               value: {{ $svc | quote }}
@@ -99,6 +113,17 @@ spec:
               value: "postgres"
             - name: HOME
               value: /tmp
+            {{- if .Values.documentdb.logicalReplication.enabled }}
+            - name: REPL_ROLE
+              value: {{ .Values.documentdb.logicalReplication.role.name | quote }}
+            - name: REPL_PUB
+              value: {{ .Values.documentdb.logicalReplication.publicationName | quote }}
+            - name: REPL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.documentdb.logicalReplication.role.passwordSecretName | quote }}
+                  key: {{ .Values.documentdb.logicalReplication.role.passwordSecretKey | quote }}
+            {{- end }}
           envFrom:
             {{- range .Values.documentdb.envFromSecrets }}
             - secretRef:
@@ -115,7 +140,21 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.documentdb.logicalReplication.enabled }}
+            - name: provision-sql
+              mountPath: /sql/provision-logical-replication.sql
+              subPath: provision-logical-replication.sql
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.documentdb.logicalReplication.enabled }}
+        - name: provision-sql
+          configMap:
+            name: {{ .Values.documentdb.confConfigMapName }}
+            items:
+              - key: provision-logical-replication.sql
+                path: provision-logical-replication.sql
+        {{- end }}
 {{- end }}
