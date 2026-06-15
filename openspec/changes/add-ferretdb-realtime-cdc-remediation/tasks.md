@@ -44,10 +44,21 @@
 > consumer streams + resolves the catalog AS the non-superuser `falcone_cdc_repl` role. `helm lint` +
 > `helm template` clean.
 >
-> **Remaining (next pass):** consumer env wiring + the REPLICATION Secret in the runtime manifests
-> (`deploy/kind/control-plane` realtime `REALTIME_DOCUMENTDB_URL`; a CDC-bridge Deployment with
-> `MONGO_CDC_DOCUMENTDB_URL` — none exists yet); packaging (control-plane image must bundle
-> services/mongo-cdc-bridge); blackbox `cdc-*` (§1/§9) + e2e realtime (§8.1) on kind; opsx verify/archive.
+> **Increment 5 (kind validation + packaging + wal_level fix):** deployed the chart engine to a fresh
+> ephemeral kind namespace and validated on REAL k8s. Key finding + fix: the documentdb conf.d
+> ConfigMap is **dead** (the engine image's postgresql.conf has `include_dir` commented out), so
+> `wal_level` is now passed via `documentdb.args` (`postgres -c wal_level=logical`) — confirmed live
+> (`wal_level=logical, src=command line`); the init-job provisioning SQL (role + grants + publication +
+> RI-FULL + event trigger) runs clean against the real k8s engine via `psql -f`. Packaging done:
+> `apps/control-plane/Dockerfile` bundles `services/mongo-cdc-bridge/src` (verified by building +
+> importing inside the image); net-new `services/mongo-cdc-bridge/Dockerfile` (verified build).
+> `REALTIME_DOCUMENTDB_URL` wired into the control-plane via the replication Secret in
+> `deploy/kind/values-kind.yaml` (`optional:true`; render-verified into `falcone-control-plane`).
+>
+> **Remaining:** the REPLICATION Secret instance (operator-provided `realtime-url`/`cdc-url`/`password`
+> keys) + a CDC-bridge Deployment/values component (the bridge image now exists; no chart component
+> yet); a FerretDB-data-source realtime e2e spec + full-stack ephemeral deploy (the existing realtime
+> e2e is PG/LISTEN-NOTIFY based); blackbox `cdc-*` (§1/§9); opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
