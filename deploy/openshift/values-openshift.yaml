@@ -150,6 +150,17 @@ documentdb:
       fsGroup: null
     securityContext:
       runAsUser: null
+# FerretDB gateway (add-ferretdb-gateway). Stateless Deployment, no PVC — null the
+# inherited fsGroup so restricted-v2 injects it; runAsNonRoot + seccompProfile
+# RuntimeDefault come from global.podSecurity. The FerretDB image is non-root by
+# default, so no runAsUser override is needed. The main-container image is registry-
+# rewritten to Harbor automatically (global.imageRegistry); the engine-gate
+# initContainer image is NOT auto-rewritten — mirror it alongside the engine image.
+ferretdb:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
 kafka:
   volumePermissions: { enabled: false }
   podSecurityContext:
