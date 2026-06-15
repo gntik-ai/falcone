@@ -18,8 +18,23 @@
 > watcher → **real Kafka (redpanda)**, asserting the tenant's CloudEvents land on its topic and a second
 > tenant's writes on the same slot are never published (cross-tenant CDC probe, §8.2). Unit cover:
 > `ChangeStreamWatcher.test.mjs` (filter/synth/delta-diff/ack-after-publish/error-halt) — 30 bridge unit
-> tests green. Next pass: realtime executor wiring (§5), chart-level provisioning + secret (§2),
-> blackbox + e2e suites (§1/§8.1/§9), opsx verify/archive.
+> tests green.
+>
+> **Increment 3 (realtime executor):** `realtime-executor.mjs` rewritten onto a per-process shared
+> `WalReplicationClient` (off `collection.watch()`); per-session subscriber fan-out with consumer-side
+> (tenantId, database, collection) filter; a WAL UPDATE surfaces as `'replace'` (full-document
+> semantics); fresh live-only slot at startup, dropped on close (no history replay / WAL pinning).
+> Shared provisioning helper `provisionLogicalReplication.mjs` (publication + RI-FULL sweep + slot
+> lifecycle) used by both the manager and the executor. `main.mjs` rewired to a REPLICATION-privileged
+> engine connection (`REALTIME_DOCUMENTDB_URL`, per-replica slot name); `pg-logical-replication`+`bson`
+> added to control-plane. Proven by `tests/env/executor/realtime-executor.test.mjs` (run-realtime.sh):
+> tenant A sees its insert/update(as replace)/delete, never tenant B's, delete carries the pre-image
+> (tenant-scoped). All real-stack slices green (WAL 2, CDC 1, realtime 2) + 30 bridge unit tests.
+>
+> **Remaining (next pass):** chart-level provisioning + REPLICATION secret on the engine StatefulSet
+> (§2; in-app idempotent provisioning exists but the chart must own wal_level=logical + RI-FULL on
+> NEW documents_N tables via event trigger); blackbox `cdc-*` (§1/§9) + e2e realtime (§8.1) suites;
+> packaging (control-plane image must bundle services/mongo-cdc-bridge); opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
@@ -89,11 +104,11 @@
 
 ## 5. Realtime Engine — Replace collection.watch() with WAL consumer
 
-- [ ] 5.1 In `apps/control-plane/src/runtime/realtime-executor.mjs`, remove:
+- [x] 5.1 In `apps/control-plane/src/runtime/realtime-executor.mjs`, remove:
   - The `collection.watch()` call (line 66)
   - The `db.command({ collMod: params.collectionName, changeStreamPreAndPostImages: { enabled: true } })` call (line 54)
   - The `MongoClient` dependency for the streaming path (the data-access client remains for non-streaming calls)
-- [ ] 5.2 Wire `WalReplicationClient` into `realtime-executor.subscribe`:
+- [x] 5.2 Wire `WalReplicationClient` into `realtime-executor.subscribe`:
   - The client starts consuming WAL records from `falcone_cdc_slot`
   - For each record, apply the consumer-side tenantId filter:
     discard if `record.tenantId !== params.identity.tenantId`; also filter on
@@ -102,7 +117,7 @@
     `{ type: record.operationType, documentId: record.documentId, document: record.fullDocument ?? record.fullDocumentBeforeChange }`
     (matching lines 79–84 of the current implementation)
   - Call `params.onChange(mappedEvent)` for each passing record
-- [ ] 5.3 On SSE session teardown (`params.signal` abort or explicit close):
+- [x] 5.3 On SSE session teardown (`params.signal` abort or explicit close):
   - Stop consuming records from the shared WAL client for this session
   - Release the per-session cursor (in-memory LSN position)
   - No UNLISTEN or outbox queries — the WAL client is shared; only the per-session subscription
