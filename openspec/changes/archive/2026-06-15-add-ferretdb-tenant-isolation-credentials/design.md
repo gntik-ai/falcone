@@ -88,6 +88,38 @@ This change depends on: `add-ferretdb-adr-spike` (ADR-14 merged), `add-ferretdb-
 - **Migration gap for pre-existing tenants** — Tenants onboarded before this change have no per-tenant DocumentDB credential. A back-fill step creates credentials for them; until back-filled, they continue on the shared `MONGO_URI`. Mitigation: back-fill script iterates all active tenants.
 - **Credential rotation downtime** — `updateUser` takes effect immediately; active in-flight connections authenticated with the old password may be dropped. Mitigation: rotate during low-traffic windows; document in the runbook.
 
+## Implementation & Live-Run Findings (kind, 2026-06-15)
+
+Deployed documentdb + ferretdb to the kind `falcone` release and ran the REAL applier
+against the live engine through the gateway. Findings (some correct the proposal/ADR-14):
+
+- **D2 correction — createUser yields a SUPERUSER, not a non-superuser role.** ADR-14 (and
+  this design) assumed wire-protocol `createUser` provisions a non-superuser/non-BYPASSRLS
+  Postgres login role. LIVE: `\du` shows the role is a **Superuser** (verified). A superuser
+  implicitly bypasses RLS, so the credential is NOT least-privilege as-created. **Fix:** the
+  applier now demotes via `ALTER ROLE … NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOREPLICATION` over an injected Postgres connection (`opts.pgQuery`), fail-closed. FerretDB
+  exposes no `ALTER ROLE`, so this requires a pg connection in addition to the wire client.
+  LIVE-CONFIRMED post-fix: `rolsuper=false, rolbypassrls=false, rolcanlogin=true`. The spec's
+  non-superuser requirement is now satisfied BY the applier (not by the raw engine).
+- **Target database is `postgres`, not `in_falcone`.** `CREATE EXTENSION documentdb` only
+  succeeds in the DB named by `cron.database_name='postgres'` (pg_documentdb cascades
+  pg_cron). The gateway DSN + engine-gate target `postgres`. ⚠️ The merged
+  `add-ferretdb-documentdb-engine` (#468) init-Job targets `in_falcone` → it FAILS on a real
+  cluster; a follow-up fix to that change is required.
+- **GUCs confirmed (resolves D4):** `documentdb.enableUserCrud=on`, `documentdb.maxUserLimit=100`.
+- **FerretDB image needs a numeric `runAsUser`** (declares a non-numeric `ferretdb` user;
+  kubelet `runAsNonRoot` check fails otherwise) — corrects the gateway change's D5.
+- **Validated live:** provision → idempotent re-provision → rotate → revoke → revoke-missing
+  through the real gateway; `hello` maxWireVersion 21; engine-gate initContainer + readiness
+  probe both work. The per-tenant **resolver** (`main.mjs`) was proven to execute in the real
+  executor runtime (it resolved the per-tenant URI and the driver attempted the connection).
+- **Not completed:** the data-api document round-trip through the executor is blocked by an
+  in-cluster ClusterIP routing issue to the ferretdb Service (port-forward to a pod works —
+  maxWireVersion 21; ClusterIP times out; endpoints are healthy). This is an environmental /
+  FerretDB-deployment concern (owned by `add-ferretdb-data-access-cutover`), not a defect in
+  this change's code.
+
 ## Open Questions
 
 - OQ1: Should the back-fill step force-rotate existing tenant credentials, or leave them on the shared credential until the next onboarding event? (Default: no-force-rotate; `--force-rotate` flag available in the back-fill script.)
