@@ -1872,6 +1872,156 @@ mongodb:
       capabilities:
         drop:
           - ALL
+# DocumentDB engine (FerretDB document-store backend). Dedicated Postgres 17.6
+# StatefulSet rendered by the component-wrapper sub-chart (alias `documentdb` in
+# Chart.yaml). OFF by default — coexists with the mongodb backend during the
+# MongoDB -> DocumentDB cutover (add-ferretdb-* epic). The image is a
+# MongoDB-wire-compatible Postgres extension stack; it requires the SERVER-START GUC
+# `shared_preload_libraries='pg_cron,pg_documentdb_core,pg_documentdb'`, which the
+# bitnami/postgresql relational tier cannot provide — hence a dedicated instance
+# (ADR-14 / add-ferretdb-adr-spike #455). Tenants never reach this engine directly;
+# the FerretDB gateway (add-ferretdb-gateway) is the only in-cluster consumer.
+documentdb:
+  enabled: false
+  wrapper:
+    componentId: documentdb
+    workload:
+      kind: StatefulSet
+  # Pinned by tag AND digest (digest wins in component-wrapper.renderImage) so the
+  # GUC surface is reproducible (ADR-14). PostgreSQL 17.6; bundled extensions:
+  # documentdb 0.107-0, documentdb_core 0.107-0, pg_cron 1.6, postgis 3.6.0,
+  # rum 1.3, vector 0.8.1, tsm_system_rows.
+  image:
+    repository: ghcr.io/ferretdb/postgres-documentdb
+    tag: 17-0.107.0-ferretdb-2.7.0
+    digest: sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
+    pullPolicy: IfNotPresent
+  replicas: 1
+  serviceAccount:
+    create: true
+    name: ""
+    automountToken: false
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432
+    portName: tcp-documentdb
+    annotations: {}
+  ports:
+    - name: tcp-documentdb
+      containerPort: 5432
+      protocol: TCP
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  env:
+    - name: POSTGRES_DB
+      value: in_falcone
+    # Keep PGDATA in a sub-directory of the mounted PVC so the official postgres
+    # entrypoint does not trip over a non-empty volume root (e.g. lost+found).
+    - name: PGDATA
+      value: /var/lib/postgresql/data/pgdata
+  # POSTGRES_USER / POSTGRES_PASSWORD admin credentials are provided out-of-band
+  # via the `in-falcone-documentdb` Secret (mirrors in-falcone-postgresql /
+  # in-falcone-mongodb). Per-tenant roles are a separate change
+  # (add-ferretdb-tenant-isolation-credentials).
+  envFromSecrets:
+    - in-falcone-documentdb
+  envFromConfigMaps: []
+  persistence:
+    enabled: true
+    existingClaim: ""
+    size: 20Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: /var/lib/postgresql/data
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    fsGroup: 1001
+    fsGroupChangePolicy: OnRootMismatch
+    # Unlike the bitnami siblings (image USER 1001, already non-root), this is the
+    # OFFICIAL postgres image (USER root + gosu drop), so runAsNonRoot:true alone
+    # would be rejected on vanilla k8s. Pin the postgres uid (999) here; the
+    # OpenShift overlay nulls it so the SCC injects a namespace-range uid instead.
+    runAsUser: 999
+    runAsNonRoot: true
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+    runAsNonRoot: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # SERVER-START GUCs are delivered as a conf.d include FILE (not the wrapper's
+  # config.inline, which renders an env-var ConfigMap). The ConfigMap is
+  # templates/documentdb-configmap.yaml; its name MUST equal confConfigMapName.
+  confConfigMapName: in-falcone-documentdb-conf
+  extraVolumes:
+    - name: documentdb-conf
+      configMap:
+        name: in-falcone-documentdb-conf
+        items:
+          - key: custom.conf
+            path: custom.conf
+  extraVolumeMounts:
+    - name: documentdb-conf
+      mountPath: /etc/postgresql/conf.d/custom.conf
+      subPath: custom.conf
+      readOnly: true
+  config:
+    inline: {}
+  initContainers: []
+  volumePermissions:
+    enabled: false
+    image:
+      repository: docker.io/library/busybox
+      tag: 1.36.1
+      pullPolicy: IfNotPresent
+    command: []
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+  # Post-install/post-upgrade hook Job that creates the `documentdb` extension in
+  # the target DB once the engine is ready (templates/documentdb-init-job.yaml).
+  initJob:
+    enabled: true
+    backoffLimit: 5
+    activeDeadlineSeconds: 600
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      fsGroup: 1001
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 999
+      capabilities:
+        drop:
+          - ALL
 kafka:
   enabled: true
   wrapper:

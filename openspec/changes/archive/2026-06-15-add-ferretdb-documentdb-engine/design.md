@@ -112,10 +112,16 @@ at startup; no additional `documentdb.*` GUCs are required.
 
 ### D3: Extension creation via Helm init Job
 
-**Decision:** a Helm pre-install/pre-upgrade hook Job runs
+**Decision:** a Helm **post-install/post-upgrade** hook Job runs
 `SELECT 1 FROM pg_available_extensions WHERE name = 'documentdb'` (consistent with
 `postgres-applier.mjs:111`) and, if present, `CREATE EXTENSION IF NOT EXISTS documentdb`
 in the target database. The Job waits for `pg_isready` before executing.
+
+> CORRECTION (code reconciliation): the hook is **post**-install/post-upgrade, not
+> pre-install. A pre-install hook completes before the release's normal resources (the
+> engine StatefulSet) are applied, so `pg_isready` against the engine could never
+> succeed. The engine must exist first; the post-install Job then waits for it to become
+> ready and creates the extension. See "Implementation Reconciliation" below.
 
 **Rationale:** mirrors the existing extension validation guard in
 `services/provisioning-orchestrator/src/appliers/postgres-applier.mjs`; keeps the chart
@@ -157,8 +163,11 @@ an init-sql mount) so real-stack tests can connect without a K8s cluster.
 ### D7: HA topology
 
 **Decision:** the StatefulSet defaults to 1 replica (dev). The HA profile overrides to
-2 replicas with pod anti-affinity (`requiredDuringSchedulingIgnoredDuringExecution`,
-hostname topology key) to ensure no two replicas land on the same node. Primary
+2 replicas with pod anti-affinity (`preferredDuringSchedulingIgnoredDuringExecution`,
+hostname topology key) to spread replicas across nodes. (CORRECTION vs. the original
+`required…` wording: every component in `values/profiles/ha.yaml` uses `preferred` —
+`required` would leave the second replica `Pending` on a single-node cluster. See
+"Implementation Reconciliation".) Primary
 selection is handled by a sidecar (e.g. Patroni) or deferred to a streaming-replication
 Helm sub-chart; the base change delivers the StatefulSet + PVC foundation.
 
@@ -206,3 +215,42 @@ on timing.
 - OQ-2: Should the HA replica use Patroni for primary selection, or streaming
   replication only? **Deferred**; base change delivers single-replica StatefulSet +
   PVC. HA primary-selection is a follow-up change.
+
+## Implementation Reconciliation (code-verified)
+
+The proposal/tasks were drafted against an assumed "hand-write
+`templates/documentdb-statefulset.yaml` / `documentdb-service.yaml` with
+`volumeClaimTemplates`" layout. The actual `charts/in-falcone` architecture differs;
+the implementation follows the code, and the deltas below were applied:
+
+- **Wrapper subchart, not bespoke templates.** Every datastore (`postgresql`,
+  `mongodb`, `kafka`, …) is a `component-wrapper` subchart alias declared in
+  `Chart.yaml` plus a values stanza; the wrapper renders the StatefulSet, ClusterIP
+  Service, PVC and ServiceAccount, and handles global image-registry rewrite,
+  imagePullSecrets and pod-security merge. DocumentDB is wired the same way (new
+  `documentdb` alias + `documentdb:` stanza). Only the `custom.conf` ConfigMap and the
+  extension init Job are hand-written umbrella templates (precedent: `seaweedfs-*`).
+- **Standalone PVC, not `volumeClaimTemplates`.** The wrapper references a separate PVC
+  (`<release>-documentdb-data`); there is no `volumeClaimTemplates` path in this chart.
+- **GUC file via `extraVolumes`, not `config.inline`.** The wrapper's `config.inline`
+  renders a flat env-var ConfigMap consumed by `envFrom` — it cannot deliver a
+  `postgresql.conf`/`conf.d` file. The `custom.conf` ConfigMap is mounted via
+  `documentdb.extraVolumes`/`extraVolumeMounts` at the conf.d override directory.
+- **Post-install hook** for the init Job (see D3 correction).
+- **HA anti-affinity `preferred`** + size `200Gi` to match the `mongodb` document-store
+  sibling (see D7 correction).
+- **Official-image `runAsUser: 999`.** The bitnami siblings ship a non-root image USER
+  (1001), so `runAsNonRoot: true` alone admits them. The DocumentDB image is the
+  *official* postgres image (USER root + gosu drop), which `runAsNonRoot: true` would
+  reject on vanilla k8s. The base values pin `runAsUser: 999` (postgres uid) for the
+  StatefulSet and the init Job; the OpenShift overlay nulls it so restricted-v2 injects
+  a namespace-range uid (D4 intent preserved). PGDATA is a subdir so initdb's 0700 dir
+  perms satisfy postgres even with the fsGroup-setgid PVC mount.
+- **tests/env host port `55433`** to follow the existing `5xxxx` publish convention
+  (postgres `55432`, mongodb `57017`).
+- **Live checks deferred.** Image pull / entrypoint conf.d honouring (task 1.2),
+  `docker compose up` + `\dx` (6.2), and kind deploy (8.3) require a container runtime
+  absent from this audit workspace; they are deferred to the downstream E2E/kind change.
+  Render-level verification (helm lint + helm template + openspec validate) is complete.
+- **No schema edit needed.** The root `values.schema.json` is `additionalProperties:
+  true` at top level, so a new `documentdb` key validates without a schema change.

@@ -89,7 +89,14 @@
 - [ ] 7.3 Ensure the chart enforces startup order: the FerretDB gateway Deployment
       must have an init-container or depend on a Job/readiness gate from
       `add-ferretdb-documentdb-engine` that confirms the `documentdb_api` schema
-      exists before the gateway container starts
+      exists before the gateway container starts.
+      ENGINE-SIDE CONTRACT (delivered by `add-ferretdb-documentdb-engine`, task 3.1):
+      the engine exposes ClusterIP Service `<release>-documentdb:5432` and a
+      post-install/post-upgrade hook Job `<release>-documentdb-init` that runs
+      `CREATE EXTENSION documentdb` (loading `documentdb_api`). The gateway
+      init-container should `pg_isready` against the Service AND
+      `SELECT 1 FROM information_schema.schemata WHERE schema_name = 'documentdb_api'`
+      before the main container starts.
 - [ ] 7.4 Verify that `helm lint charts/in-falcone/` passes with
       `ferretdb.enabled=true` and with the default (`ferretdb.enabled=false`); fix
       any lint errors
