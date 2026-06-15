@@ -1997,6 +1997,24 @@ documentdb:
       capabilities:
         drop:
           - ALL
+  # Logical replication provisioning for realtime SSE + CDC (add-ferretdb-realtime-cdc-
+  # remediation #460). FerretDB v2 has no change streams, so the realtime executor and the Kafka
+  # CDC bridge consume a pgoutput logical replication slot on this engine. When enabled, the init
+  # Job creates a REPLICATION-privileged role (distinct from falcone_app and the per-tenant roles),
+  # the schema-scoped publication, REPLICA IDENTITY FULL on existing documents_* tables, and an
+  # event trigger that keeps RI FULL applied to tables created later (new collections). The
+  # consumers (realtime executor / CDC bridge) connect with this role via REALTIME_DOCUMENTDB_URL /
+  # MONGO_CDC_DOCUMENTDB_URL; the password is provided out-of-band in the named Secret (mirrors the
+  # admin-creds pattern). wal_level=logical is set in templates/documentdb-configmap.yaml.
+  logicalReplication:
+    enabled: true
+    publicationName: falcone_cdc_pub
+    role:
+      name: falcone_cdc_repl
+      # Secret + key holding the replication role password. MUST exist before install (like the
+      # admin in-falcone-documentdb Secret); the same value backs the consumers' connection URLs.
+      passwordSecretName: in-falcone-documentdb-replication
+      passwordSecretKey: password
   # Post-install/post-upgrade hook Job that creates the `documentdb` extension in
   # the target DB once the engine is ready (templates/documentdb-init-job.yaml).
   initJob:
