@@ -92,6 +92,36 @@ services:
     tmpfs:
       - /data/db  # ephemeral: clean DB every run (matches the postgres pattern)
 
+  documentdb:
+    # DocumentDB engine (FerretDB document-store backend) — MongoDB-wire-compatible
+    # Postgres 17 extension stack. Lets real-stack tests target the engine without a
+    # Kubernetes cluster (add-ferretdb-documentdb-engine). Pinned by tag + digest to
+    # match the Helm chart (charts/in-falcone/values.yaml documentdb.image). Published
+    # on 55433 (the shared postgres is 55432) per the 5xxxx host-port convention.
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
+    environment:
+      POSTGRES_USER: falcone
+      POSTGRES_PASSWORD: falcone
+      POSTGRES_DB: falcone_test
+      # Keep PGDATA in a subdir of the (tmpfs) data dir, like the chart.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "55433:5432"
+    volumes:
+      # SERVER-START GUCs as an explicit conf.d include (the engine image also preloads
+      # the libraries via its bundled config). NOT delivered via POSTGRES_EXTRA_ARGS.
+      - ./documentdb/conf/custom.conf:/etc/postgresql/conf.d/custom.conf:ro
+      # Creates the `documentdb` extension on first boot (entrypoint runs initdb.d
+      # against POSTGRES_DB once PGDATA is empty — always, since the data dir is tmpfs).
+      - ./documentdb/init/10-create-documentdb-extension.sql:/docker-entrypoint-initdb.d/10-create-documentdb-extension.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U falcone -d falcone_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data  # ephemeral: clean DB every run
+
   seaweedfs:
     # All-in-one SeaweedFS (master + volume + filer + S3 gateway) — the dev/test
     # object store that replaces MinIO (ADR-13). Pinned to the spike-validated 4.33

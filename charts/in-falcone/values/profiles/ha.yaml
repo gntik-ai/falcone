@@ -110,3 +110,25 @@ seaweedfs:
     defaultReplicaPlacement: "011"
   s3:
     replicas: 2
+# DocumentDB engine HA (add-ferretdb-documentdb-engine). Applies only when
+# documentdb.enabled=true; harmless otherwise. 2 replicas spread across nodes
+# (preferred anti-affinity, like every other component here — `required` would leave
+# the second replica Pending on a single-node cluster). 200Gi PVC matches the mongodb
+# document-store sibling above. Primary selection (Patroni / streaming replication) is
+# a follow-up change; this only delivers the StatefulSet + PVC HA foundation.
+documentdb:
+  replicas: 2
+  persistence:
+    size: 200Gi
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - documentdb
+            topologyKey: kubernetes.io/hostname
