@@ -38,6 +38,7 @@ const REQUIRED_COMPONENT_ALIASES = [
   'keycloak',
   'postgresql',
   'mongodb',
+  'documentdb',
   'kafka',
   'openwhisk',
   'storage',
