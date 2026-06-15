@@ -198,3 +198,38 @@ Security bypass when RLS is later applied to the DocumentDB tables.
   non-root UID; verify with `docker inspect`. If a root UID is declared, add a
   `securityContext.runAsUser` override in the OpenShift overlay. Mitigation: static
   analysis of the rendered PodSpec before merge.
+
+## Implementation Reconciliation (code-verified)
+
+The proposal/tasks assumed hand-written `templates/ferretdb-deployment.yaml` /
+`ferretdb-service.yaml`. The umbrella chart does not work that way — every component is a
+`component-wrapper` sub-chart alias. The implementation follows the code (same pattern as
+the merged `add-ferretdb-documentdb-engine`):
+
+- **Wrapper alias, not bespoke templates.** New `ferretdb` alias in `Chart.yaml`
+  (`condition: ferretdb.enabled`) + a `ferretdb:` values stanza. The wrapper renders the
+  Deployment (`workload.kind: Deployment`), ClusterIP Service, and ServiceAccount, and
+  applies global image-registry rewrite + imagePullSecrets + pod-security merge. The
+  wrapper key is **`replicas`** (the tasks' `replicaCount` does not exist here).
+- **Engine-gate via `initContainers` values, not a separate template.** The
+  `wait-for-documentdb` initContainer (`pg_isready` + `documentdb_api` schema check, using
+  the version-coupled engine image) is delivered through `ferretdb.initContainers`. This
+  is the authoritative engine-first gate (D3); the readiness probe is secondary.
+- **NetworkPolicy is the only hand-written umbrella template**
+  (`templates/ferretdb-networkpolicy.yaml`), gated `ferretdb.enabled &&
+  ferretdb.networkPolicy.enabled` (seaweedfs precedent).
+- **Component-alias contract sync (4 places).** Registering the alias required updating
+  `scripts/lib/deployment-chart.mjs` + `scripts/lib/deployment-topology.mjs`
+  (REQUIRED_COMPONENT_ALIASES), `services/internal-contracts/src/deployment-topology.json`
+  (`packaging_guidance.component_aliases`), and
+  `tests/contracts/deployment-topology.contract.test.mjs` — order-sensitive
+  (`ferretdb` after `documentdb`), or CI `quality` fails.
+- **Backend DSN Secret.** `FERRETDB_POSTGRESQL_URL` is sourced from the externally
+  provisioned `in-falcone-ferretdb` Secret (key `postgresql-url`), carrying the
+  `sslmode=require` bootstrap DSN — the engine change references an external admin Secret
+  rather than provisioning one, so the gateway uses the same external-Secret pattern.
+- **FERRETDB_DEBUG_ADDR=:8088** is set so the debug/health server binds all interfaces
+  (default 127.0.0.1 would make the kubelet HTTP probe fail).
+- **Live checks deferred** (tasks 1.2/8.3/8.4): no container runtime in the audit
+  workspace. Render-level verification (helm lint/template base+OpenShift, the chart
+  validators, unit/contract suites, `openspec validate --strict`) is complete.
