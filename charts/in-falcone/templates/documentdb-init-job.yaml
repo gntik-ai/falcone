@@ -1,0 +1,115 @@
+{{- if and .Values.documentdb.enabled .Values.documentdb.initJob.enabled }}
+{{- /*
+  DocumentDB extension init Job (add-ferretdb-documentdb-engine, task 3.1).
+
+  POST-install/POST-upgrade hook: a pre-install hook would run before the release's
+  DocumentDB StatefulSet exists, so pg_isready could never succeed. As a post hook this
+  runs after the engine is created, waits for it to accept connections, then creates the
+  `documentdb` extension (which loads the `documentdb_api` schema the FerretDB gateway
+  needs). The availability check mirrors the guard in
+  services/provisioning-orchestrator/src/appliers/postgres-applier.mjs:111 and fails
+  closed if the extension is absent (e.g. wrong image).
+
+  Cross-change ordering: the gateway (add-ferretdb-gateway) MUST gate its own startup on
+  this Job via an init-container / readiness probe — cross-chart hook ordering is not
+  enforceable from here.
+*/ -}}
+{{- $svc := include "in-falcone.componentServiceNameByAlias" (dict "root" . "component" "documentdb") -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-documentdb-init
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    in-falcone.io/component: documentdb
+    in-falcone.io/documentdb-phase: extension-init
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.documentdb.initJob.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.documentdb.initJob.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.labels" . | nindent 8 }}
+        in-falcone.io/component: documentdb
+        in-falcone.io/documentdb-phase: extension-init
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      {{- /* normalize imagePullSecrets({name} maps) + privateRegistry.pullSecretNames(strings) */ -}}
+      {{- $imagePullSecrets := list -}}
+      {{- range (default (list) .Values.global.imagePullSecrets) -}}
+        {{- $imagePullSecrets = append $imagePullSecrets (.name | default .) -}}
+      {{- end -}}
+      {{- range (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+        {{- $imagePullSecrets = append $imagePullSecrets . -}}
+      {{- end -}}
+      {{- $imagePullSecrets = $imagePullSecrets | uniq -}}
+      {{- if gt (len $imagePullSecrets) 0 }}
+      imagePullSecrets:
+        {{- range $imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.documentdb.initJob.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: documentdb-init
+          image: {{ include "component-wrapper.renderImage" (dict "Values" .Values "image" .Values.documentdb.image "name" "documentdb-init") | quote }}
+          imagePullPolicy: {{ .Values.documentdb.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              export PGHOST="${PGHOST}" PGPORT="${PGPORT}"
+              export PGUSER="${POSTGRES_USER:-postgres}"
+              export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+              export PGDATABASE="${PGDATABASE:-postgres}"
+              echo "Waiting for DocumentDB engine at ${PGHOST}:${PGPORT} ..."
+              until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}"; do
+                echo "  not ready yet; retrying in 2s"; sleep 2
+              done
+              echo "Engine ready. Checking documentdb is in pg_available_extensions ..."
+              avail="$(psql -tAc "SELECT 1 FROM pg_available_extensions WHERE name = 'documentdb'")"
+              if [ "${avail}" != "1" ]; then
+                echo "ERROR: 'documentdb' absent from pg_available_extensions (wrong image?). Failing closed." >&2
+                exit 1
+              fi
+              echo "Creating extension (idempotent) ..."
+              psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS documentdb CASCADE"
+              echo "documentdb extension ensured in database ${PGDATABASE}."
+          env:
+            - name: PGHOST
+              value: {{ $svc | quote }}
+            - name: PGPORT
+              value: {{ .Values.documentdb.service.port | quote }}
+            # Target DB matches documentdb.env POSTGRES_DB on the StatefulSet.
+            - name: PGDATABASE
+              value: "in_falcone"
+            - name: HOME
+              value: /tmp
+          envFrom:
+            {{- range .Values.documentdb.envFromSecrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          {{- with .Values.documentdb.initJob.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.documentdb.initJob.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

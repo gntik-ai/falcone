@@ -133,6 +133,23 @@ mongodb:
   podSecurityContext:
     fsGroup: null
     fsGroupChangePolicy: null
+# DocumentDB engine (add-ferretdb-documentdb-engine). Same SCC treatment as the other
+# stateful datastores: null the per-component fsGroup so restricted-v2 injects it from
+# the namespace range. runAsNonRoot + seccompProfile RuntimeDefault come from
+# global.podSecurity. The extension init Job also pins runAsUser/fsGroup in the base
+# values (for vanilla k8s); null them here so the SCC governs the Job too.
+documentdb:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+    runAsUser: null                 # base pins 999 (official postgres uid); SCC injects here
+  initJob:
+    podSecurityContext:
+      runAsUser: null
+      fsGroup: null
+    securityContext:
+      runAsUser: null
 kafka:
   volumePermissions: { enabled: false }
   podSecurityContext:
