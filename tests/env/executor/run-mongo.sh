@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Real-Mongo runner for the Mongo data executor proof (change add-mongo-data-execute).
-# Brings up the tests/env MongoDB (single-node replica set rs0 — initiated like up.sh),
-# waits for PRIMARY, then runs the suite.
+# Real-stack runner for the Mongo data executor proof. After the MongoDB -> FerretDB cutover
+# (add-ferretdb-data-access-cutover #459) this brings up the FerretDB gateway + its DocumentDB
+# engine (engine-first via depends_on healthcheck) instead of mongo:7, then runs the suite
+# against FerretDB with MONGO_BACKEND=ferretdb (so the data-API rejects `transaction` ops 501).
 #
 #   bash tests/env/executor/run-mongo.sh
+#
+# NOTE: FerretDB has no change streams — realtime-executor tests are deferred to
+# add-ferretdb-realtime-cdc-remediation (#460) and are NOT run here.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,24 +15,15 @@ ENV_DIR="$(cd "$HERE/.." && pwd)"
 COMPOSE="docker compose -f $ENV_DIR/docker-compose.yml"
 
 if [ -z "${MONGO_URI:-}" ]; then
-  echo "==> starting tests/env MongoDB"
-  $COMPOSE up -d mongodb
-  echo "==> waiting for health"
-  for _ in $(seq 1 40); do
-    [ "$($COMPOSE ps --format '{{.Health}}' mongodb 2>/dev/null || true)" = "healthy" ] && break
-    sleep 2
-  done
-  echo "==> initiating replica set rs0 (idempotent) + waiting for PRIMARY"
-  $COMPOSE exec -T mongodb mongosh --quiet --eval \
-    "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongodb:27017'}]}) }" >/dev/null
-  for _ in $(seq 1 30); do
-    state=$($COMPOSE exec -T mongodb mongosh --quiet --eval "try { rs.status().myState } catch (e) { -1 }" 2>/dev/null | tr -d '[:space:]')
-    [ "$state" = "1" ] && break
-    sleep 2
-  done
-  [ "${state:-}" = "1" ] || { echo "mongodb did not reach PRIMARY (myState=${state:-})" >&2; exit 1; }
-  export MONGO_URI="mongodb://localhost:57017/?replicaSet=rs0&directConnection=true"
+  echo "==> starting tests/env FerretDB gateway + DocumentDB engine (engine-first)"
+  # ferretdb depends_on documentdb: service_healthy, so this waits for the engine first.
+  $COMPOSE up -d --wait documentdb ferretdb
+  echo "==> FerretDB gateway healthy on :57017"
+  export MONGO_URI="mongodb://falcone:falcone@localhost:57017/"
 fi
 
-echo "==> running Mongo data + realtime executor tests"
-node --test "$HERE/mongo-data-executor.test.mjs" "$HERE/realtime-executor.test.mjs"
+# FerretDB backend: the data-API rejects multi-document transaction ops at the boundary.
+export MONGO_BACKEND="${MONGO_BACKEND:-ferretdb}"
+
+echo "==> running Mongo data executor tests against FerretDB"
+node --test "$HERE/mongo-data-executor.test.mjs"

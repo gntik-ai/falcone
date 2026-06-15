@@ -63,7 +63,12 @@ export function createMongoExecutor(options = {}) {
         sort: params.sort,
         page: params.page ?? {},
         payload: params.payload ?? {},
-        effectiveRoleName: identity.roleName
+        effectiveRoleName: identity.roleName,
+        // Backend capability profile (FerretDB cutover, #459). When the backend is FerretDB
+        // this carries supportsTransactions=false, so the plan builder rejects a transaction
+        // op at the API boundary (501 TRANSACTION_NOT_SUPPORTED) before any op is dispatched.
+        // Defaults to {} (MongoDB 7 / unknown) — only transaction/change_stream ops consult it.
+        topology: options.topology ?? {}
       })
     } catch (caught) {
       // adapter validation error (MongoDataApiError has .status/.code)
