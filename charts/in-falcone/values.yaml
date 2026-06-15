@@ -2077,9 +2077,11 @@ ferretdb:
       memory: 512Mi
   env:
     # Backend DSN sourced from a Secret (never hardcoded). The Secret carries the full
-    # postgres://USER:PASS@in-falcone-documentdb:5432/in_falcone?sslmode=require URL
-    # using the documentdb bootstrap/superuser role (so FerretDB can manage the schema).
-    # Provisioned out-of-band (ESO/Vault/bootstrap), like in-falcone-postgresql/-mongodb.
+    # postgres://USER:PASS@in-falcone-documentdb:5432/postgres?sslmode=require URL using the
+    # documentdb bootstrap/superuser role (so FerretDB can manage the schema). The database
+    # is `postgres` — that is where the documentdb extension + documentdb_api schema live
+    # (pg_cron is bound to cron.database_name='postgres'). Provisioned out-of-band
+    # (ESO/Vault/bootstrap), like in-falcone-postgresql/-mongodb.
     - name: FERRETDB_POSTGRESQL_URL
       valueFrom:
         secretKeyRef:
@@ -2114,6 +2116,12 @@ ferretdb:
       drop:
         - ALL
     runAsNonRoot: true
+    # The FerretDB image declares a NON-NUMERIC user (`ferretdb`); kubelet cannot verify
+    # runAsNonRoot without a numeric uid (CreateContainerConfigError), so pin it. FerretDB
+    # v2 runs as uid 1000 and is a stateless proxy (no uid-specific local writes). The
+    # OpenShift overlay nulls this so the SCC injects a namespace-range uid. (Surfaced by
+    # the kind live run — corrects design D5's "no runAsUser needed" assumption.)
+    runAsUser: 1000
   # Liveness/readiness gate traffic on the FerretDB debug health endpoint. The exact
   # path/port (8088 /debug/healthz) is confirmed by live verification (task 1.2,
   # deferred — no container runtime here); override here if the live check differs.
@@ -2165,8 +2173,14 @@ ferretdb:
           value: in-falcone-documentdb
         - name: PGPORT
           value: "5432"
+        # The documentdb extension + documentdb_api schema live in the `postgres`
+        # database: pg_documentdb cascades pg_cron, and pg_cron is bound to
+        # cron.database_name='postgres' (engine custom.conf), so CREATE EXTENSION only
+        # succeeds in `postgres`. FerretDB connects to `postgres`; per-tenant Mongo
+        # "databases" are logical namespaces inside it. (Surfaced by the kind live run;
+        # the add-ferretdb-documentdb-engine init-Job must likewise target `postgres`.)
         - name: PGDATABASE
-          value: in_falcone
+          value: postgres
         - name: HOME
           value: /tmp
       envFrom:

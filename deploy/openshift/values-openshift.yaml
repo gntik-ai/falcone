@@ -161,6 +161,8 @@ ferretdb:
   podSecurityContext:
     fsGroup: null
     fsGroupChangePolicy: null
+  securityContext:
+    runAsUser: null                 # base pins 1000 (FerretDB image uid); SCC injects here
 kafka:
   volumePermissions: { enabled: false }
   podSecurityContext:

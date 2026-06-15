@@ -27,8 +27,13 @@ export function createMongoExecutor(options = {}) {
     return client
   }
 
-  async function resolve(workspaceId) {
-    const uri = await options.resolveUri(workspaceId)
+  // resolveUri receives the workspaceId AND the request identity ({ tenantId, workspaceId,
+  // roleName }) so a per-tenant DocumentDB credential can be resolved (FerretDB migration
+  // #458). Existing single-URI resolvers ignore the second arg, so this is backward
+  // compatible. Tenant isolation is STILL enforced by the adapter's tenantId scoping —
+  // the per-tenant credential is least-privilege auth/audit, NOT the isolation boundary.
+  async function resolve(workspaceId, identity) {
+    const uri = await options.resolveUri(workspaceId, identity)
     if (!uri) {
       throw clientError(`No MongoDB is provisioned for workspace ${workspaceId}`, 503, 'WORKSPACE_DB_UNRESOLVED')
     }
@@ -65,7 +70,7 @@ export function createMongoExecutor(options = {}) {
       throw clientError(caught.message, caught.status ?? 400, caught.code ?? 'PLAN_REJECTED')
     }
 
-    const uri = await resolve(workspaceId)
+    const uri = await resolve(workspaceId, identity)
     const collection = (await clientFor(uri)).db(params.databaseName).collection(params.collectionName)
     const op = plan.operation
 
