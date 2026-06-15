@@ -77,20 +77,34 @@ services:
       timeout: 5s
       retries: 40
 
-  mongodb:
-    image: mongo:7
-    # Single-node replica set: Falcone CDC change streams require a replica set.
-    # Replica-set initiation (rs.initiate) is performed by up.sh after health.
-    command: ["--replSet", "rs0", "--bind_ip_all"]
+  # FerretDB gateway — the MongoDB-wire document store, replacing mongo:7 in the
+  # MongoDB -> FerretDB cutover (add-ferretdb-data-access-cutover #459). It translates the
+  # wire protocol to SQL against the `documentdb` engine below. Same external port (57017)
+  # as the replaced mongo:7, so MONGO_URI consumers are unchanged. Engine-first startup:
+  # depends_on the documentdb healthcheck so the gateway never connects before the backend
+  # (and its documentdb extension) is ready.
+  # NOTE: change streams / CDC are NOT supported by FerretDB — realtime tests/env paths are
+  # deferred to add-ferretdb-realtime-cdc-remediation (#460). Set MONGO_BACKEND=ferretdb so
+  # the data-API rejects `transaction` ops at the boundary (501).
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:2.7.0@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985
+    environment:
+      # Backend DSN -> the documentdb engine's `postgres` database (where the documentdb
+      # extension + documentdb_api schema live; the engine has no TLS in tests/env).
+      FERRETDB_POSTGRESQL_URL: postgres://falcone:falcone@documentdb:5432/postgres?sslmode=disable
+      FERRETDB_LISTEN_ADDR: ":27017"
+      FERRETDB_DEBUG_ADDR: ":8088"
     ports:
       - "57017:27017"
-    healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 40
-    tmpfs:
-      - /data/db  # ephemeral: clean DB every run (matches the postgres pattern)
+    depends_on:
+      documentdb:
+        condition: service_healthy
+    # No container healthcheck: the FerretDB v2.7.0 image is DISTROLESS (no shell, no wget),
+    # so a docker-compose CMD healthcheck cannot run. Engine-first ordering is gated by the
+    # documentdb healthcheck above (depends_on: service_healthy); gateway readiness is gated
+    # by the MongoDB driver's serverSelection retry in the consumers (run-mongo.sh / tests).
+    # On Kubernetes the gateway uses a kubelet httpGet probe on /debug/readyz (kubelet-side,
+    # no in-container tool needed) — see charts/in-falcone/values.yaml ferretdb.readinessProbe.
 
   documentdb:
     # DocumentDB engine (FerretDB document-store backend) — MongoDB-wire-compatible
@@ -99,23 +113,35 @@ services:
     # match the Helm chart (charts/in-falcone/values.yaml documentdb.image). Published
     # on 55433 (the shared postgres is 55432) per the 5xxxx host-port convention.
     image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
+    # SERVER-START GUCs via the postgres command line so they are active on the FIRST-INIT
+    # temp server too — the official postgres entrypoint passes these `-c` args to the temp
+    # server that runs docker-entrypoint-initdb.d. A conf.d include file does NOT work here:
+    # the temp init server does not read /etc/postgresql/conf.d, so `CREATE EXTENSION documentdb`
+    # (which needs pg_documentdb_core preloaded) fails during init. (The Helm chart instead
+    # creates the extension via a POST-startup init Job, where the image's bundled preload is
+    # already active.) add-ferretdb-data-access-cutover #459 (surfaced on the first live compose run).
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron,pg_documentdb_core,pg_documentdb
+      - -c
+      - cron.database_name=postgres
     environment:
       POSTGRES_USER: falcone
       POSTGRES_PASSWORD: falcone
-      POSTGRES_DB: falcone_test
+      # POSTGRES_DB MUST be `postgres`: the engine image ships its own
+      # /docker-entrypoint-initdb.d/20-install.sql that runs `CREATE EXTENSION documentdb`
+      # against POSTGRES_DB, and the extension only installs in `postgres` (pg_cron is bound
+      # to cron.database_name='postgres'). FerretDB also connects to `postgres`. So the image's
+      # bundled init creates the extension for us — no custom init SQL is needed here
+      # (add-ferretdb-data-access-cutover #459, surfaced on the first live compose run).
+      POSTGRES_DB: postgres
       # Keep PGDATA in a subdir of the (tmpfs) data dir, like the chart.
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "55433:5432"
-    volumes:
-      # SERVER-START GUCs as an explicit conf.d include (the engine image also preloads
-      # the libraries via its bundled config). NOT delivered via POSTGRES_EXTRA_ARGS.
-      - ./documentdb/conf/custom.conf:/etc/postgresql/conf.d/custom.conf:ro
-      # Creates the `documentdb` extension on first boot (entrypoint runs initdb.d
-      # against POSTGRES_DB once PGDATA is empty — always, since the data dir is tmpfs).
-      - ./documentdb/init/10-create-documentdb-extension.sql:/docker-entrypoint-initdb.d/10-create-documentdb-extension.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U falcone -d falcone_test"]
+      test: ["CMD-SHELL", "pg_isready -U falcone -d postgres"]
       interval: 3s
       timeout: 3s
       retries: 20
