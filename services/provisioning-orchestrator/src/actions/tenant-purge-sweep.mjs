@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { evaluateTenantLifecycleMutation } from '../../../internal-contracts/src/index.mjs';
 import { teardown as iamTeardown } from '../appliers/iam-applier.mjs';
 import { teardown as postgresTeardown } from '../appliers/postgres-applier.mjs';
+import { teardown as documentdbIdentityTeardown } from '../appliers/documentdb-identity-applier.mjs';
 import { teardown as mongoTeardown } from '../appliers/mongo-applier.mjs';
 import { teardown as kafkaTeardown } from '../appliers/kafka-applier.mjs';
 import { teardown as storageTeardown } from '../appliers/storage-applier.mjs';
@@ -33,6 +34,9 @@ import { teardown as mcpTeardown } from '../appliers/mcp-applier.mjs';
 const TEARDOWN_PLAN = [
   { domain: 'iam', dataKey: 'iam', teardownKey: 'iamTeardown' },
   { domain: 'postgres_metadata', dataKey: 'postgres_metadata', teardownKey: 'postgresTeardown' },
+  // DocumentDB per-tenant credential revocation (dropUser) — FerretDB migration #458.
+  // Idempotent: a no-op for tenants with no per-tenant credential (pre-migration).
+  { domain: 'documentdb_identity', dataKey: 'documentdb_identity', teardownKey: 'documentdbIdentityTeardown' },
   { domain: 'mongo_metadata', dataKey: 'mongo_metadata', teardownKey: 'mongoTeardown' },
   { domain: 'kafka', dataKey: 'kafka', teardownKey: 'kafkaTeardown' },
   { domain: 'storage', dataKey: 'storage', teardownKey: 'storageTeardown' },
@@ -55,6 +59,7 @@ export function resolveDependencies(params = {}) {
     // Applier teardowns (injectable for tests).
     iamTeardown: params.iamTeardown ?? iamTeardown,
     postgresTeardown: params.postgresTeardown ?? postgresTeardown,
+    documentdbIdentityTeardown: params.documentdbIdentityTeardown ?? documentdbIdentityTeardown,
     mongoTeardown: params.mongoTeardown ?? mongoTeardown,
     kafkaTeardown: params.kafkaTeardown ?? kafkaTeardown,
     storageTeardown: params.storageTeardown ?? storageTeardown,
