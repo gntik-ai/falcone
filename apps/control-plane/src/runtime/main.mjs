@@ -116,8 +116,20 @@ function resolveMongoUriForTenant(workspaceId, identity = {}) {
 const mongoTopology = process.env.MONGO_BACKEND === 'ferretdb' ? { supportsTransactions: false } : {};
 const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: resolveMongoUriForTenant, topology: mongoTopology }) : undefined;
 
-// Realtime executor (Mongo change streams; needs a replica set). Enabled with Mongo.
-const realtimeExecutor = mUri ? createRealtimeExecutor({ resolveUri: () => mUri }) : undefined;
+// Realtime executor (FerretDB cutover #460): FerretDB v2 has no change streams, so SSE consumes a
+// pgoutput logical replication slot on the DocumentDB engine. The engine is a SEPARATE Postgres from
+// the data-plane DSN above; REALTIME_DOCUMENTDB_URL is a REPLICATION-privileged connection to it
+// (distinct from falcone_app). The slot is per-process — each replica gets a distinct name.
+const realtimeDocumentDbUrl = process.env.REALTIME_DOCUMENTDB_URL ?? process.env.DOCUMENTDB_REPLICATION_URL;
+const realtimeSlotName = process.env.REALTIME_SLOT_NAME
+  ?? `falcone_rt_${String(process.env.HOSTNAME ?? 'local').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
+const realtimeExecutor = realtimeDocumentDbUrl
+  ? createRealtimeExecutor({
+      engineConnectionConfig: { connectionString: realtimeDocumentDbUrl },
+      publicationName: process.env.REALTIME_PUBLICATION ?? 'falcone_cdc_pub',
+      slotName: realtimeSlotName,
+    })
+  : undefined;
 
 // Events executor (enabled when KAFKA_BROKERS is configured).
 const eventsExecutor = process.env.KAFKA_BROKERS ? createEventsExecutor({ brokers: process.env.KAFKA_BROKERS }) : undefined;
