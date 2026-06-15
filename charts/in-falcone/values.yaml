@@ -2122,18 +2122,20 @@ ferretdb:
     # OpenShift overlay nulls this so the SCC injects a namespace-range uid. (Surfaced by
     # the kind live run — corrects design D5's "no runAsUser needed" assumption.)
     runAsUser: 1000
-  # Liveness/readiness gate traffic on the FerretDB debug health endpoint. The exact
-  # path/port (8088 /debug/healthz) is confirmed by live verification (task 1.2,
-  # deferred — no container runtime here); override here if the live check differs.
+  # FerretDB v2.7.0 debug endpoints (live-verified, add-ferretdb-data-access-cutover #459):
+  # /debug/livez (liveness) and /debug/readyz (readiness — 200 only once the DocumentDB
+  # backend connection is established). NOT /debug/healthz (that path only 200s via the
+  # /debug/ prefix index, so it would NOT gate readiness on backend connectivity). The
+  # debug server binds all interfaces via FERRETDB_DEBUG_ADDR=:8088.
   livenessProbe:
     httpGet:
-      path: /debug/healthz
+      path: /debug/livez
       port: 8088
     initialDelaySeconds: 15
     periodSeconds: 10
   readinessProbe:
     httpGet:
-      path: /debug/healthz
+      path: /debug/readyz
       port: 8088
     initialDelaySeconds: 5
     periodSeconds: 5

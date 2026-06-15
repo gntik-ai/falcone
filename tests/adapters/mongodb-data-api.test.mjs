@@ -432,3 +432,60 @@ test('mongodb data adapter rejects large or conflicting bulk payloads determinis
     (error) => error instanceof MongoDataApiError && ['mongo_data_bulk_payload_too_large', 'mongo_data_conflict'].includes(error.code)
   );
 });
+
+// --- FerretDB cutover (add-ferretdb-data-access-cutover, #459) -------------------------
+// FerretDB 2.7.0 does NOT support multi-document transactions (commitTransaction ->
+// CommandNotFound(59); ops persist non-atomically before commit; abort is a no-op). The
+// backend reports supportsTransactions=false, and the plan builder MUST reject a transaction
+// op at the API boundary (before ANY op is dispatched) with 501 TRANSACTION_NOT_SUPPORTED.
+test('ferretdb cutover: transaction op with supportsTransactions=false -> 501 TRANSACTION_NOT_SUPPORTED at the boundary', () => {
+  assert.throws(
+    () => buildMongoDataApiPlan({
+      operation: 'transaction',
+      workspaceId: 'ws_orders',
+      databaseName: 'tenant_shared',
+      tenantId: 'ten_alpha',
+      topology: { supportsTransactions: false },
+      payload: {
+        operations: [{ kind: 'insert', collectionName: 'orders', document: { _id: 'ord_x', status: 'open' } }]
+      }
+    }),
+    (error) => {
+      assert.ok(error instanceof MongoDataApiError, 'is a MongoDataApiError');
+      assert.equal(error.status, 501);
+      assert.equal(error.code, 'TRANSACTION_NOT_SUPPORTED');
+      return true;
+    }
+  );
+});
+
+test('ferretdb cutover: transaction op still builds on a transactions-supporting backend (no regression)', () => {
+  const plan = buildMongoDataApiPlan({
+    operation: 'transaction',
+    workspaceId: 'ws_orders',
+    databaseName: 'tenant_shared',
+    tenantId: 'ten_alpha',
+    topology: { clusterTopology: 'replica_set', supportsTransactions: true },
+    payload: {
+      operations: [{ kind: 'insert', collectionName: 'orders', document: { _id: 'ord_y', status: 'open' } }]
+    }
+  });
+  assert.ok(plan.transaction, 'transaction plan is built when the backend supports transactions');
+});
+
+test('ferretdb cutover: no FerretDB-dispatched plan carries readConcern:snapshot / writeConcern:majority', () => {
+  // The snapshot/majority concerns only ride transaction ops, which are rejected for FerretDB,
+  // so no plan dispatched to FerretDB carries them. A non-transaction op (list) likewise carries
+  // none. Asserting the invariant directly (JSON scan) keeps it honest across op paths.
+  const listPlan = buildMongoDataApiPlan({
+    operation: 'list',
+    workspaceId: 'ws_orders',
+    databaseName: 'tenant_shared',
+    collectionName: 'orders',
+    tenantId: 'ten_alpha',
+    topology: { supportsTransactions: false }
+  });
+  const json = JSON.stringify(listPlan);
+  assert.ok(!json.includes('"readConcern":"snapshot"'), 'no snapshot readConcern');
+  assert.ok(!json.includes('"writeConcern":"majority"'), 'no majority writeConcern');
+});
