@@ -68,11 +68,26 @@
 > legacy mongodb off, control-plane `MONGO_URI`→FerretDB + `REALTIME_DOCUMENTDB_URL`). `node --check`,
 > bash/yaml lint, and `helm template` (both overlays) all clean.
 >
-> **Remaining (the live run + net-new deployment surface):** build/push the control-plane image with
-> the branch changes; a full-stack ephemeral deploy to RUN `mongo-tenant-isolation.test.mjs` on kind
-> (control-plane + ferretdb + documentdb + keycloak, all Ready) — the spec + wiring exist but a live
-> green run is pending; a CDC-bridge Deployment/values component (bridge image exists; no chart
-> component yet) + its REPLICATION secret + `cdc-url`; blackbox `cdc-*` (§1.1/§9); opsx verify/archive.
+> **Increment 7 (LIVE kind validation of the deployed chart + WAL path, §9.5):** built + pushed the
+> #460 control-plane image to the cluster registry, then `helm install`ed the documentdb engine +
+> FerretDB gateway (release `in-falcone`) into a fresh ephemeral kind namespace and validated the
+> WHOLE engine path on real k8s: (1) the engine came up with `wal_level=logical` from the chart
+> `documentdb.args`; (2) the **post-install init-job HOOK ran** and logged "Logical replication
+> provisioned (role falcone_cdc_repl, publication falcone_cdc_pub)"; (3) the engine confirmed the role
+> (REPLICATION), publication, and event trigger; (4) writing insert/update/delete through the deployed
+> FerretDB gateway and **streaming via `WalReplicationClient` AS the non-superuser `falcone_cdc_repl`
+> role over `falcone_cdc_pub`** decoded every change correctly — insert (tenantId+db+collection),
+> update (pre `hello` + post `edited` images), delete (pre-image tenantId via RI FULL **applied
+> automatically by the chart's event trigger on a brand-new collection**), and a second tenant on the
+> shared slot. Ephemeral ns torn down; shared `falcone` ns untouched. (Chart fixes found en route:
+> ferretdb hardcodes the `in-falcone-documentdb` engine host → release must be `in-falcone`; needs the
+> `in-falcone-ferretdb` `postgresql-url` secret; the engine-only deploy needs stub `publicSurface`
+> serviceNames + `bootstrap.enabled=false`.)
+>
+> **Remaining:** the full control-plane SSE + WS-gateway + Keycloak/IAM e2e (`mongo-tenant-isolation.test.mjs`)
+> — needs the control-plane (image is now in the registry) + the IAM realm/admin-client bootstrap stood
+> up; a CDC-bridge Deployment/values component (bridge image exists; no chart component yet) + its
+> REPLICATION secret + `cdc-url`; blackbox `cdc-*` (§1.1/§9); opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
@@ -221,6 +236,6 @@
   diffing OpenAPI spec and Kafka topic assertions before/after
 - [ ] 9.4 Confirm `ResumeTokenStore` restart-durability: stop and restart the CDC bridge
   mid-stream; assert no duplicate events and no gap in sequence from the Kafka consumer side
-- [ ] 9.5 Confirm `REPLICA IDENTITY FULL` is in effect on all `documentdb_data` tables in the
+- [x] 9.5 Confirm `REPLICA IDENTITY FULL` is in effect on all `documentdb_data` tables in the
   test environment: `SELECT relreplident FROM pg_class WHERE relname LIKE 'documentdb_data%'`
   — must return `'f'` (full) for all rows
