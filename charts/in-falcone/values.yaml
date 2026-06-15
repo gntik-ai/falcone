@@ -2022,6 +2022,197 @@ documentdb:
       capabilities:
         drop:
           - ALL
+# FerretDB gateway — stateless MongoDB-wire-protocol proxy that translates to SQL
+# against the documentdb engine. Rendered by the component-wrapper sub-chart (alias
+# `ferretdb` in Chart.yaml) as a Deployment (no PVC, >=2 replicas, HPA-ready).
+# OFF by default; deploy alongside mongodb during the MongoDB -> FerretDB cutover
+# (add-ferretdb-gateway). Tenants never reach this Service; only the control-plane /
+# CDC bridge consume it via MONGO_URI (repoint deferred to add-ferretdb-data-access-cutover).
+#
+# VERSION COUPLING: the gateway image tag 2.7.0 is paired with the documentdb engine
+# 0.107.0-ferretdb-2.7.0 (MongoDB wire protocol 7.0, maxWireVersion 21, buildInfo
+# 7.0.77). Pinned by tag AND digest so registry drift is caught at pull time. UPGRADE
+# ORDER: upgrade the documentdb engine FIRST, then bump this tag+digest to the matching
+# FerretDB release. STARTUP ORDER: the engine must have `CREATE EXTENSION documentdb`
+# applied (documentdb_api schema present) before the gateway connects — enforced by the
+# engine-gate initContainer below + the readiness probe.
+ferretdb:
+  enabled: false
+  wrapper:
+    componentId: ferretdb
+    workload:
+      kind: Deployment
+  image:
+    repository: ghcr.io/ferretdb/ferretdb
+    tag: 2.7.0
+    digest: sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985
+    pullPolicy: IfNotPresent
+  replicas: 2
+  serviceAccount:
+    create: true
+    name: ""
+    automountToken: false
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 27017
+    targetPort: 27017
+    portName: tcp-mongo
+    annotations: {}
+  ports:
+    - name: tcp-mongo
+      containerPort: 27017
+      protocol: TCP
+    - name: http-debug
+      containerPort: 8088
+      protocol: TCP
+  # HPA-ready: modest requests, headroom in limits. The gateway is CPU-bound on
+  # wire<->SQL translation; no local state.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+  env:
+    # Backend DSN sourced from a Secret (never hardcoded). The Secret carries the full
+    # postgres://USER:PASS@in-falcone-documentdb:5432/in_falcone?sslmode=require URL
+    # using the documentdb bootstrap/superuser role (so FerretDB can manage the schema).
+    # Provisioned out-of-band (ESO/Vault/bootstrap), like in-falcone-postgresql/-mongodb.
+    - name: FERRETDB_POSTGRESQL_URL
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-ferretdb
+          key: postgresql-url
+    # Bind the debug/health server on all interfaces (default is 127.0.0.1, which the
+    # kubelet probe cannot reach) so the liveness/readiness HTTP probes work.
+    - name: FERRETDB_DEBUG_ADDR
+      value: ":8088"
+    - name: FERRETDB_LISTEN_ADDR
+      value: ":27017"
+  envFromSecrets: []
+  envFromConfigMaps: []
+  persistence:
+    enabled: false
+    existingClaim: ""
+    size: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: /var/lib/ferretdb
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  # Stateless gateway: inherits global.podSecurity (runAsNonRoot, seccomp, fsGroup 1001).
+  # fsGroup is harmless here (no volumes); the OpenShift overlay nulls it for SCC.
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+    runAsNonRoot: true
+  # Liveness/readiness gate traffic on the FerretDB debug health endpoint. The exact
+  # path/port (8088 /debug/healthz) is confirmed by live verification (task 1.2,
+  # deferred — no container runtime here); override here if the live check differs.
+  livenessProbe:
+    httpGet:
+      path: /debug/healthz
+      port: 8088
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /debug/healthz
+      port: 8088
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraVolumes: []
+  extraVolumeMounts: []
+  config:
+    inline: {}
+  # Engine-first hard gate (add-ferretdb-gateway task 7.3): block the gateway container
+  # until the documentdb engine accepts connections AND the documentdb_api schema exists
+  # (loaded by the engine's CREATE EXTENSION init Job). Uses the engine image (psql +
+  # version-coupled). AIRGAP NOTE: initContainer images are NOT auto-rewritten by
+  # global.imageRegistry; mirror/override this image alongside the engine image.
+  initContainers:
+    - name: wait-for-documentdb
+      image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
+      imagePullPolicy: IfNotPresent
+      command:
+        - /bin/bash
+        - -ec
+        - |
+          export PGUSER="${POSTGRES_USER:-postgres}" PGPASSWORD="${POSTGRES_PASSWORD:-}"
+          echo "Waiting for documentdb engine ${PGHOST}:${PGPORT} ..."
+          until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}"; do
+            echo "  engine not ready; retry in 2s"; sleep 2
+          done
+          echo "Engine up. Waiting for documentdb_api schema (CREATE EXTENSION done) ..."
+          until [ "$(psql -h "${PGHOST}" -p "${PGPORT}" -d "${PGDATABASE}" -tAc \
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'documentdb_api'")" = "1" ]; do
+            echo "  documentdb_api absent; retry in 2s"; sleep 2
+          done
+          echo "documentdb_api present — gateway may start."
+      env:
+        - name: PGHOST
+          value: in-falcone-documentdb
+        - name: PGPORT
+          value: "5432"
+        - name: PGDATABASE
+          value: in_falcone
+        - name: HOME
+          value: /tmp
+      envFrom:
+        - secretRef:
+            name: in-falcone-documentdb
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 999
+        capabilities:
+          drop:
+            - ALL
+  volumePermissions:
+    enabled: false
+    image:
+      repository: docker.io/library/busybox
+      tag: 1.36.1
+      pullPolicy: IfNotPresent
+    command: []
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+  # In-cluster MongoDB-protocol TLS (gateway -> client) is deferred to a follow-on
+  # mTLS/service-mesh change; the ClusterIP-only boundary makes plaintext acceptable
+  # initially. Backend (gateway -> postgres) TLS is enforced via sslmode=require in the
+  # FERRETDB_POSTGRESQL_URL secret value. (add-ferretdb-gateway task 4.2 / design D6.)
+  tls:
+    enabled: false
+  # Internal-only NetworkPolicy (templates/ferretdb-networkpolicy.yaml), gated by
+  # ferretdb.enabled AND ferretdb.networkPolicy.enabled. Allows ingress to 27017 only
+  # from the listed Falcone app components (control-plane / executor / workflow worker
+  # — the MONGO_URI + CDC consumers); denies all other ingress. Honored only under a
+  # policy-enforcing CNI (kindnet does NOT enforce it). Default ON when enabled.
+  networkPolicy:
+    enabled: true
+    # Must match the rendered app.kubernetes.io/name pod labels (KEBAB-case componentId).
+    allowedAppComponents:
+      - control-plane
+      - control-plane-executor
+      - workflow-worker
 kafka:
   enabled: true
   wrapper:
