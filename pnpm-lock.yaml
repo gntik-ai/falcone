@@ -52,6 +52,9 @@ importers:
       '@temporalio/client':
         specifier: 1.18.1
         version: 1.18.1
+      bson:
+        specifier: ^7.2.0
+        version: 7.2.0
       cel-js:
         specifier: 0.5.0
         version: 0.5.0
@@ -64,6 +67,9 @@ importers:
       pg:
         specifier: 8.14.1
         version: 8.14.1
+      pg-logical-replication:
+        specifier: ^2.5.0
+        version: 2.5.0
       undici:
         specifier: ^6.21.0
         version: 6.24.1
