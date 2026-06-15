@@ -350,6 +350,7 @@
       "postgresql",
       "mongodb",
       "documentdb",
+      "ferretdb",
       "kafka",
       "openwhisk",
       "storage",

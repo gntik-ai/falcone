@@ -39,6 +39,7 @@ const REQUIRED_COMPONENT_ALIASES = [
   'postgresql',
   'mongodb',
   'documentdb',
+  'ferretdb',
   'kafka',
   'openwhisk',
   'storage',
