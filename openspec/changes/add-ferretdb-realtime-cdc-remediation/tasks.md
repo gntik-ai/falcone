@@ -84,10 +84,19 @@
 > `in-falcone-ferretdb` `postgresql-url` secret; the engine-only deploy needs stub `publicSurface`
 > serviceNames + `bootstrap.enabled=false`.)
 >
-> **Remaining:** the full control-plane SSE + WS-gateway + Keycloak/IAM e2e (`mongo-tenant-isolation.test.mjs`)
-> — needs the control-plane (image is now in the registry) + the IAM realm/admin-client bootstrap stood
-> up; a CDC-bridge Deployment/values component (bridge image exists; no chart component yet) + its
-> REPLICATION secret + `cdc-url`; blackbox `cdc-*` (§1.1/§9); opsx verify/archive.
+> **BLOCKER FOUND for the SSE e2e (live investigation):** the `tests/e2e/realtime/` suite is NOT
+> runnable in this repo — its provisioner calls a provisioning API (`/channels/mongodb`,
+> `/channels/postgres`, `/subscriptions`, `/tenants`) that is **defined nowhere in the codebase** (only
+> referenced by the e2e *client* helper), the `realtime-gateway` service has **no HTTP/WS server
+> entrypoint**, and **no realtime-gateway/provisioning workload is deployed**. So the pre-existing PG
+> realtime specs AND the new `mongo-tenant-isolation.test.mjs` target backend services that don't exist
+> here (hence not in CI, never runnable). Authoring those services (a provisioning admin API + a WS
+> gateway) is out of #460 scope (the realtime EXECUTOR + CDC bridge). The #460 realtime executor itself
+> is fully validated (unit + real-stack `realtime-executor.test.mjs` + the WAL path GREEN on live k8s).
+>
+> **Remaining:** a CDC-bridge Deployment/values component (bridge image exists; no chart component yet)
+> + its REPLICATION secret + `cdc-url`; blackbox `cdc-*` (§1.1/§9); the realtime SSE e2e once a
+> provisioning API + WS gateway exist; opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
