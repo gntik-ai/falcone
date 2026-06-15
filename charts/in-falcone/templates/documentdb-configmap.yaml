@@ -1,0 +1,30 @@
+{{- if .Values.documentdb.enabled }}
+{{- /*
+  DocumentDB engine SERVER-START GUC overrides (add-ferretdb-documentdb-engine).
+
+  `shared_preload_libraries` is a context=postmaster GUC: it is read once before the
+  postmaster starts and CANNOT be set at session scope or via POSTGRES_EXTRA_ARGS.
+  This ConfigMap is mounted by the DocumentDB StatefulSet (documentdb.extraVolumes /
+  extraVolumeMounts in values.yaml) as a conf.d include FILE applied before postmaster
+  start, so the setting is explicit, auditable and survives a pod restart.
+
+  The pinned engine image ALSO preloads these libraries via its own bundled config
+  (ADR-14 / add-ferretdb-adr-spike #455); this file is the Helm-managed declaration of
+  the same set. Only these two GUCs are mandatory at startup (ADR-14): no additional
+  `documentdb.*` GUCs are required.
+
+  Name MUST equal documentdb.confConfigMapName (referenced by the StatefulSet volume).
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.documentdb.confConfigMapName }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    in-falcone.io/component: documentdb
+data:
+  custom.conf: |
+    # Managed by Helm — add-ferretdb-documentdb-engine. Do not edit in-cluster.
+    shared_preload_libraries = 'pg_cron,pg_documentdb_core,pg_documentdb'
+    cron.database_name = 'postgres'
+{{- end }}

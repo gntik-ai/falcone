@@ -25,6 +25,14 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: mongodb.enabled
+  # DocumentDB engine (FerretDB document-store backend) — dedicated Postgres 17
+  # StatefulSet rendered by the generic component-wrapper, gated by documentdb.enabled
+  # (default false). See add-ferretdb-documentdb-engine. Replaces the mongodb backend.
+  - name: component-wrapper
+    alias: documentdb
+    version: 0.2.0
+    repository: file://./charts/component-wrapper
+    condition: documentdb.enabled
   - name: component-wrapper
     alias: kafka
     version: 0.2.0
