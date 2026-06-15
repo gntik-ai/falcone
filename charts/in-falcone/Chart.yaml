@@ -33,6 +33,15 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: documentdb.enabled
+  # FerretDB gateway — stateless MongoDB-wire-protocol proxy in front of the
+  # documentdb engine, rendered by the generic component-wrapper (Deployment),
+  # gated by ferretdb.enabled (default false). See add-ferretdb-gateway. DEPENDS ON
+  # documentdb (engine must be initialised before the gateway connects).
+  - name: component-wrapper
+    alias: ferretdb
+    version: 0.2.0
+    repository: file://./charts/component-wrapper
+    condition: ferretdb.enabled
   - name: component-wrapper
     alias: kafka
     version: 0.2.0
