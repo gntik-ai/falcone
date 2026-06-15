@@ -1,3 +1,14 @@
+> **Progress — focused pass (2026-06-15):** the net-new logical-replication foundation is built and
+> proven end-to-end against the live engine (`ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`).
+> Verified premise correction: the `bson` type renders as `BSONHEX<hex>` in pgoutput **TEXT** mode, so
+> **no binary START_REPLICATION is needed** (`pg-logical-replication` default TEXT mode + hex-decode +
+> `bson.deserialize`). Done: `WalBsonDecoder` (§3), `WalReplicationClient` + reconnect (§4),
+> `CollectionCatalog` (relation→namespace), `pg-logical-replication`+`bson` deps, `wal_level=logical`
+> in tests/env, and a real-stack proof `tests/env/executor/wal-replication.test.mjs` (run-wal.sh) that
+> asserts insert/update/delete decode with tenantId, update pre/post images, delete pre-image, and
+> consumer-side tenant isolation. Next pass: consumer wiring (§5/§6/§7), chart provisioning (§2.4),
+> blackbox + e2e cross-tenant probes (§1/§8/§9).
+
 ## 1. Failing Black-Box Tests (test-first gate)
 
 - [ ] 1.1 Add a failing assertion to `tests/blackbox/cdc-stream.test.mjs` (or new
@@ -26,7 +37,9 @@
 
 ## 3. BSON-Row WAL Decoder (WalBsonDecoder)
 
-- [ ] 3.1 Implement `services/mongo-cdc-bridge/src/WalBsonDecoder.mjs` (or equivalent path) that:
+- [x] 3.1 Implement `services/mongo-cdc-bridge/src/WalBsonDecoder.mjs` (or equivalent path) that:
+  _(done: `WalBsonDecoder.mjs` decodes `BSONHEX<hex>` columns; `CollectionCatalog.mjs` resolves
+  `documents_<id>` → `{database,collection}` via `documentdb_api_catalog.collections`)_
   - Accepts a raw `pgoutput` WAL message (relation + tuple data)
   - Understands the `documentdb_data` column layout (identify columns for BSON payload, tenantId,
     documentId via inspection of the live engine at `ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`)
@@ -35,14 +48,18 @@
     into `fullDocumentBeforeChange`
   - Returns `{ operationType: 'insert'|'update'|'replace'|'delete', tenantId, documentId,
     fullDocument, fullDocumentBeforeChange }`
-- [ ] 3.2 Add unit tests for `WalBsonDecoder` against fixture WAL messages captured from the real
+- [x] 3.2 Add unit tests for `WalBsonDecoder` against fixture WAL messages captured from the real
   DocumentDB engine (record format verified against the running image)
-- [ ] 3.3 Verify decoder correctness in `tests/env` against the live DocumentDB engine: insert,
+  _(done: `tests/unit/WalBsonDecoder.test.mjs`, 10 cases, fixtures encoded as the engine renders them)_
+- [x] 3.3 Verify decoder correctness in `tests/env` against the live DocumentDB engine: insert,
   update, delete a document through the wire protocol; assert decoded output matches the original
+  _(done: `tests/env/executor/wal-replication.test.mjs` via `run-wal.sh`, green against the live engine)_
 
 ## 4. WAL Replication Client (WalReplicationClient)
 
-- [ ] 4.1 Implement `WalReplicationClient` (new module, shared by both consumers) that:
+- [x] 4.1 Implement `WalReplicationClient` (new module, shared by both consumers) that:
+  _(done: `services/mongo-cdc-bridge/src/WalReplicationClient.mjs`, EventEmitter 'change'/'error',
+  autoAck for realtime / manual ack for CDC durability, flowControl backpressure)_
   - Opens a Postgres replication connection (using `REPLICATION=database` parameter) using the
     REPLICATION-privileged credentials
   - Issues `START_REPLICATION SLOT falcone_cdc_slot LOGICAL <lsn>` using the pgoutput protocol
@@ -53,8 +70,10 @@
   - Emits an async iterable or event stream of `{ lsn, operationType, tenantId, documentId,
     fullDocument, fullDocumentBeforeChange }` records
   - Accepts a start LSN (from `ResumeTokenStore`) or defaults to `0/0` for a fresh start
-- [ ] 4.2 Handle reconnection with exponential backoff on replication connection loss; preserve
+- [x] 4.2 Handle reconnection with exponential backoff on replication connection loss; preserve
   the last confirmed LSN across reconnects so no records are lost
+  _(done: reconnect loop with capped exponential backoff; the slot's server-side confirmed_flush is
+  the durable cursor — manual-ack consumers only advance it after persisting)_
 
 ## 5. Realtime Engine — Replace collection.watch() with WAL consumer
 

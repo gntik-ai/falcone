@@ -10,8 +10,10 @@
     "test:integration": "node --test tests/integration/**/*.test.mjs"
   },
   "dependencies": {
+    "bson": "^7.2.0",
+    "kafkajs": "^2.2.4",
     "mongodb": "^6.17.0",
     "pg": "^8.11.0",
-    "kafkajs": "^2.2.4"
+    "pg-logical-replication": "^2.5.0"
   }
 }
