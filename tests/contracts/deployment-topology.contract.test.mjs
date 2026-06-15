@@ -31,6 +31,7 @@ test('deployment topology contract exposes the required descriptors and promotio
     'keycloak',
     'postgresql',
     'mongodb',
+    'documentdb',
     'kafka',
     'openwhisk',
     'storage',
