@@ -31,10 +31,23 @@
 > tenant A sees its insert/update(as replace)/delete, never tenant B's, delete carries the pre-image
 > (tenant-scoped). All real-stack slices green (WAL 2, CDC 1, realtime 2) + 30 bridge unit tests.
 >
-> **Remaining (next pass):** chart-level provisioning + REPLICATION secret on the engine StatefulSet
-> (§2; in-app idempotent provisioning exists but the chart must own wal_level=logical + RI-FULL on
-> NEW documents_N tables via event trigger); blackbox `cdc-*` (§1/§9) + e2e realtime (§8.1) suites;
-> packaging (control-plane image must bundle services/mongo-cdc-bridge); opsx verify/archive.
+> **Increment 4 (chart engine provisioning, §2):** `wal_level=logical` in `documentdb-configmap.yaml`;
+> the `documentdb-init-job` now also runs (post-install/upgrade, idempotent) a mounted SQL file that
+> creates the REPLICATION-privileged role (`falcone_cdc_repl`, secret-backed, distinct from
+> falcone_app), grants USAGE on all `documentdb*` schemas (the walsender calls `bson_out` during
+> decode — without it streaming fails "permission denied for schema documentdb_core") + SELECT on the
+> collections catalog, creates the scoped publication, sets RI FULL on existing `documents_*`, and
+> installs an **event trigger** that keeps RI FULL applied to new collections' tables. `values.yaml`
+> gains `documentdb.logicalReplication.{enabled,publicationName,role.*}` + a fail-closed SQL-identifier
+> guard. Validated end-to-end against the live engine: the chart-RENDERED SQL runs via `psql -f`
+> (idempotent on re-run), the event trigger auto-applies RI FULL to a brand-new collection, and a
+> consumer streams + resolves the catalog AS the non-superuser `falcone_cdc_repl` role. `helm lint` +
+> `helm template` clean.
+>
+> **Remaining (next pass):** consumer env wiring + the REPLICATION Secret in the runtime manifests
+> (`deploy/kind/control-plane` realtime `REALTIME_DOCUMENTDB_URL`; a CDC-bridge Deployment with
+> `MONGO_CDC_DOCUMENTDB_URL` — none exists yet); packaging (control-plane image must bundle
+> services/mongo-cdc-bridge); blackbox `cdc-*` (§1/§9) + e2e realtime (§8.1) on kind; opsx verify/archive.
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
@@ -49,16 +62,16 @@
 
 ## 2. Publication, Slot, and REPLICA IDENTITY Provisioning
 
-- [ ] 2.1 Add a Postgres migration / init-container step that sets `ALTER TABLE documentdb_data.*
+- [x] 2.1 Add a Postgres migration / init-container step that sets `ALTER TABLE documentdb_data.*
   REPLICA IDENTITY FULL` on all collection tables in the DocumentDB engine's `documentdb_data`
   schema; this MUST run before any replication slot consumer starts
-- [ ] 2.2 Create the Postgres PUBLICATION:
+- [x] 2.2 Create the Postgres PUBLICATION:
   `CREATE PUBLICATION falcone_cdc_pub FOR ALL TABLES IN SCHEMA documentdb_data` (or scoped to
   specific tables if the schema layout demands it) on the dedicated DocumentDB engine
-- [ ] 2.3 Create the logical replication SLOT:
+- [x] 2.3 Create the logical replication SLOT:
   `SELECT pg_create_logical_replication_slot('falcone_cdc_slot', 'pgoutput')` if not exists;
   ensure the REPLICATION-privileged role is provisioned in the chart secret / init job
-- [ ] 2.4 Update the chart to expose the REPLICATION-privileged Postgres credentials as a secret
+- [x] 2.4 Update the chart to expose the REPLICATION-privileged Postgres credentials as a secret
   consumed by the realtime executor and CDC bridge (distinct from the `falcone_app` application
   credentials)
 
