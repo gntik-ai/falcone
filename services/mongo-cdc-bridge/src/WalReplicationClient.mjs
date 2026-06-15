@@ -22,6 +22,12 @@
 //   'change' → { lsn, operationType, database, collection, collectionId, tenantId, documentId,
 //                fullDocument, fullDocumentBeforeChange }
 //   'error'  → Error (connection / decode failures; the client keeps retrying unless stopped)
+//
+// For consumers that need strict ordering + backpressure (the CDC bridge must publish + persist +
+// acknowledge each change before the next), set the async `onChange` handler instead of (or in
+// addition to) the 'change' event. With flowControl enabled the replication stream is paused until
+// `onChange` resolves, so changes are delivered and acknowledged one at a time, in order. The
+// fire-and-forget 'change' event is suited to the realtime executor's per-session fan-out.
 import { EventEmitter } from 'node:events'
 import { LogicalReplicationService, PgoutputPlugin } from 'pg-logical-replication'
 
@@ -37,7 +43,8 @@ export class WalReplicationClient extends EventEmitter {
     catalog,
     autoAck = true,
     protoVersion = 1,
-    maxReconnectAttempts = Infinity
+    maxReconnectAttempts = Infinity,
+    onChange = null
   }) {
     super()
     if (!connectionConfig) throw new TypeError('WalReplicationClient requires connectionConfig')
@@ -53,6 +60,9 @@ export class WalReplicationClient extends EventEmitter {
     this.autoAck = autoAck
     this.protoVersion = protoVersion
     this.maxReconnectAttempts = maxReconnectAttempts
+    // Optional async handler; awaited by _onData so the stream applies backpressure (in-order,
+    // one-at-a-time delivery). May be set after construction (the CDC watcher does this).
+    this.onChange = onChange
     this.service = null
     this._stopped = false
     this._confirmedLsn = null
@@ -124,7 +134,7 @@ export class WalReplicationClient extends EventEmitter {
     if (!decoded) return
     const collection = await this.catalog.resolve(decoded.collectionId)
     if (!collection) return // collection metadata not found (e.g. dropped) — skip
-    this.emit('change', {
+    const record = {
       lsn,
       operationType: decoded.walOp,
       database: collection.databaseName,
@@ -134,7 +144,11 @@ export class WalReplicationClient extends EventEmitter {
       documentId: decoded.documentId,
       fullDocument: decoded.fullDocument,
       fullDocumentBeforeChange: decoded.fullDocumentBeforeChange
-    })
+    }
+    this.emit('change', record)
+    // Awaited: with flowControl this pauses the stream until the consumer has handled (and, for the
+    // CDC bridge, durably persisted + acknowledged) this change — preserving order and at-least-once.
+    if (this.onChange) await this.onChange(record)
   }
 
   // Durably advance the confirmed LSN (manual-ack consumers call this AFTER persisting a change).
