@@ -205,6 +205,18 @@ controlPlane:
         secretKeyRef:
           name: in-falcone-mongodb
           key: MONGODB_ROOT_PASSWORD
+    # Realtime SSE over Postgres logical replication (add-ferretdb-realtime-cdc-remediation #460):
+    # FerretDB v2 has no change streams, so the realtime executor consumes a pgoutput slot on the
+    # DocumentDB engine. REALTIME_DOCUMENTDB_URL is the full REPLICATION-privileged connection URL
+    # (role falcone_cdc_repl), provided out-of-band in the replication Secret. `optional: true` keeps
+    # the pod starting (and realtime gracefully OFF in main.mjs) until the secret exists. The per-
+    # replica slot name defaults to falcone_rt_<pod-name> via HOSTNAME (no extra env needed).
+    - name: REALTIME_DOCUMENTDB_URL
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb-replication
+          key: realtime-url
+          optional: true
     # Event store: Kafka broker (PLAINTEXT listener, no auth).
     - name: KAFKA_BROKERS
       value: falcone-kafka:9092
