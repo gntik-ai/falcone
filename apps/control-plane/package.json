@@ -12,10 +12,12 @@
   },
   "dependencies": {
     "@temporalio/client": "1.18.1",
+    "bson": "^7.2.0",
     "cel-js": "0.5.0",
     "kafkajs": "2.2.4",
     "mongodb": "6.15.0",
     "pg": "8.14.1",
+    "pg-logical-replication": "^2.5.0",
     "undici": "^6.21.0",
     "yaml": "2.8.3"
   }
