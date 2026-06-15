@@ -88,9 +88,15 @@ spec:
               value: {{ $svc | quote }}
             - name: PGPORT
               value: {{ .Values.documentdb.service.port | quote }}
-            # Target DB matches documentdb.env POSTGRES_DB on the StatefulSet.
+            # The documentdb extension MUST be created in the `postgres` database, NOT
+            # in_falcone: pg_documentdb cascades pg_cron, and pg_cron is bound to
+            # cron.database_name='postgres' (custom.conf), so `CREATE EXTENSION documentdb`
+            # only succeeds in `postgres` ("can only create extension in database postgres").
+            # FerretDB connects to `postgres`; per-tenant Mongo databases are logical
+            # namespaces inside it. (Surfaced by the kind live run — add-ferretdb-tenant-
+            # isolation-credentials #458.)
             - name: PGDATABASE
-              value: "in_falcone"
+              value: "postgres"
             - name: HOME
               value: /tmp
           envFrom:
