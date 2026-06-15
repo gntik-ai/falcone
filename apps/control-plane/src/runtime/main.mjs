@@ -107,7 +107,14 @@ function resolveMongoUriForTenant(workspaceId, identity = {}) {
   return mUri; // shared fallback (pre-migration / back-fill window)
 }
 
-const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: resolveMongoUriForTenant }) : undefined;
+// Backend capability profile (FerretDB cutover, add-ferretdb-data-access-cutover #459).
+// MONGO_BACKEND=ferretdb signals the FerretDB gateway, which does NOT support multi-document
+// transactions — supportsTransactions=false makes the data-API reject `transaction` ops at the
+// boundary (501 TRANSACTION_NOT_SUPPORTED) before any op persists non-atomically. Any other
+// value (or unset) leaves it unconstrained (MongoDB 7 / rollback). Only transaction and
+// change_stream ops consult this; CRUD/aggregate are unaffected.
+const mongoTopology = process.env.MONGO_BACKEND === 'ferretdb' ? { supportsTransactions: false } : {};
+const mongoExecutor = mUri ? createMongoExecutor({ resolveUri: resolveMongoUriForTenant, topology: mongoTopology }) : undefined;
 
 // Realtime executor (Mongo change streams; needs a replica set). Enabled with Mongo.
 const realtimeExecutor = mUri ? createRealtimeExecutor({ resolveUri: () => mUri }) : undefined;
