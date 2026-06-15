@@ -126,6 +126,13 @@ services:
       - shared_preload_libraries=pg_cron,pg_documentdb_core,pg_documentdb
       - -c
       - cron.database_name=postgres
+      # Logical replication is the realtime/CDC mechanism after the FerretDB cutover
+      # (add-ferretdb-realtime-cdc-remediation #460): FerretDB v2 has no change streams, so
+      # realtime SSE + the Kafka CDC bridge consume a pgoutput logical replication slot on the
+      # documentdb_data tables. wal_level MUST be `logical` (default `replica`), else
+      # pg_create_logical_replication_slot fails "logical decoding requires wal_level >= logical".
+      - -c
+      - wal_level=logical
     environment:
       POSTGRES_USER: falcone
       POSTGRES_PASSWORD: falcone
