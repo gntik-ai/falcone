@@ -1897,6 +1897,23 @@ documentdb:
     digest: sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
     pullPolicy: IfNotPresent
   replicas: 1
+  # SERVER-START GUCs on the postgres command line. The engine image does NOT honor the conf.d
+  # ConfigMap (documentdb-configmap.yaml): its postgresql.conf has `include_dir` commented out, so a
+  # mounted conf.d file is silently ignored (confirmed on a live kind engine — the GUC source stayed
+  # `default`). GUCs that must be active at postmaster start are therefore passed here as `postgres
+  # -c` args; the image ENTRYPOINT (docker-entrypoint.sh) runs initdb then forwards these to postgres.
+  # The image also writes shared_preload_libraries/cron.database_name into postgresql.conf, but
+  # declaring them here is explicit and matches the validated tests/env compose. wal_level=logical is
+  # REQUIRED for the realtime SSE + CDC logical replication slots (add-ferretdb-realtime-cdc-
+  # remediation #460); without it pg_create_logical_replication_slot fails.
+  args:
+    - postgres
+    - -c
+    - shared_preload_libraries=pg_cron,pg_documentdb_core,pg_documentdb
+    - -c
+    - cron.database_name=postgres
+    - -c
+    - wal_level=logical
   serviceAccount:
     create: true
     name: ""

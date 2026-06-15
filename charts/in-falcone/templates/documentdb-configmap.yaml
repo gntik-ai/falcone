@@ -28,12 +28,10 @@ data:
     shared_preload_libraries = 'pg_cron,pg_documentdb_core,pg_documentdb'
     cron.database_name = 'postgres'
 {{- if .Values.documentdb.logicalReplication.enabled }}
-    # Logical replication for realtime SSE + CDC (add-ferretdb-realtime-cdc-remediation #460).
-    # FerretDB v2 has no change streams; the realtime executor and the Kafka CDC bridge consume a
-    # pgoutput logical replication slot on this engine. wal_level MUST be `logical` (default
-    # `replica`) — a context=postmaster GUC, so it lives here and is read before postmaster start;
-    # without it pg_create_logical_replication_slot fails "logical decoding requires wal_level >= logical".
-    wal_level = logical
+  # NOTE: wal_level=logical is NOT set here. The engine image does not `include_dir` this conf.d
+  # file, so server GUCs must be passed on the postgres command line instead — see documentdb.args
+  # in values.yaml (add-ferretdb-realtime-cdc-remediation #460; confirmed on a live kind engine:
+  # a conf.d wal_level was silently ignored, GUC source stayed `default`).
   # Logical-replication provisioning SQL, run once by the post-install init Job via `psql -f`
   # (add-ferretdb-realtime-cdc-remediation #460). Idempotent. :role / :pw / :pub are passed by the
   # Job via `psql -v` (client-side, safely quoted); %I/%L quote identifiers/literals server-side.
