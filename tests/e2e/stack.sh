@@ -128,6 +128,44 @@ case "${1:-up}" in
       --from-literal=client-secret=e2e-placeholder-secret \
       -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
+    # ---- DocumentDB / FerretDB secrets (add-ferretdb-realtime-cdc-remediation #460) ----
+    # The documentdb sub-chart (postgres-documentdb engine) requires in-falcone-documentdb
+    # with the admin credentials it uses for CREATE EXTENSION and the superuser password.
+    # The logical-replication init job (logicalReplication.enabled=true in chart values)
+    # creates the falcone_cdc_repl role and reads its password from in-falcone-documentdb-replication.
+    # The control-plane pod reads REALTIME_DOCUMENTDB_URL from the same secret (optional:true,
+    # so the pod starts even if absent; realtime is gracefully disabled until it exists).
+    # These are e2e-only credentials — no production values here.
+    if [ "${E2E_REALTIME_MONGO:-}" = "true" ] || [ "${E2E_FERRETDB:-}" = "true" ]; then
+      # DocumentDB engine admin credentials. The engine is the OFFICIAL postgres image (NOT Bitnami),
+      # which reads POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB; the component-wrapper injects these
+      # via envFromSecrets:[in-falcone-documentdb]. Key names MUST be POSTGRES_* (verified against the
+      # live in-falcone-documentdb secret) — POSTGRESQL_* (Bitnami) would be ignored by this image.
+      echo ">> [FerretDB] Creating DocumentDB + replication secrets in '$NS' ..."
+      kubectl create secret generic in-falcone-documentdb \
+        --from-literal=POSTGRES_USER=falcone \
+        --from-literal=POSTGRES_PASSWORD=falcone \
+        --from-literal=POSTGRES_DB=postgres \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+
+      # Logical replication role credentials + the full REPLICATION-privileged connection URL
+      # that the realtime executor (REALTIME_DOCUMENTDB_URL) and the CDC bridge use.
+      # The URL format mirrors the DocumentDB Service within the namespace:
+      #   postgres://falcone_cdc_repl:<password>@<release>-documentdb:5432/postgres?sslmode=disable
+      # The release name defaults to $REL (falcone) and the service name is <release>-documentdb.
+      # IMPORTANT: this is a NORMAL connection URL — do NOT append ?replication=database. main.mjs
+      # uses it for BOTH the WalReplicationClient (which adds replication mode itself) AND the
+      # CollectionCatalog's normal pool (which runs SELECTs on documentdb_api_catalog.collections); a
+      # replication-mode connection cannot run those queries. sslmode=disable: the engine ships no TLS.
+      DOCDB_REPL_PASSWORD="${E2E_DOCDB_REPL_PASSWORD:-e2e-repl-secret}"
+      DOCDB_SVC="${REL}-documentdb"
+      DOCDB_REPL_URL="postgres://falcone_cdc_repl:${DOCDB_REPL_PASSWORD}@${DOCDB_SVC}:5432/postgres?sslmode=disable"
+      kubectl create secret generic in-falcone-documentdb-replication \
+        --from-literal=password="${DOCDB_REPL_PASSWORD}" \
+        --from-literal=realtime-url="${DOCDB_REPL_URL}" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+    fi
+
     # Pre-bootstrap PostgreSQL: the Temporal schema job runs as a pre-install Helm hook,
     # but it needs PostgreSQL to already be listening.  If `temporal.enabled` is true we
     # deploy the PostgreSQL manifests early (before helm install) so the hook can connect.
