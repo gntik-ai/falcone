@@ -1,3 +1,17 @@
+## Progress — focused start (2026-06-16)
+
+> Core data + index migration scripts built under `tools/migration/ferretdb/` and validated END-TO-END
+> against a live source MongoDB (mongo:7) -> FerretDB target (tests/env): `bulk-copy.sh` (mongodump),
+> `upsert.sh` (mongorestore into `<db>__migstaging` **DATA-ONLY `--noIndexRestore`** + idempotent
+> `replaceOne({_id},doc,{upsert:true})` -> real db -> drop staging; re-run keeps counts stable),
+> `export-indexes.sh` + `recreate-indexes.sh` (9/9 incl. text + 2dsphere PASS). **Live premise
+> corrections:** (1) `mongorestore` recreates the dump's indexes and FerretDB 2.7.0 rejects
+> `textIndexVersion:3` ("only textIndexVersion 2 is supported") -> restore DATA-ONLY; (2) recreate must
+> **strip** `textIndexVersion`/`2dsphereIndexVersion` (and a text index's `{_fts,_ftsx}` key is rebuilt
+> from `weights`) — the proposal's "all index types functional" holds, but the source version metadata
+> must not be passed through. NEXT: preflight.sh, snapshot.sh + compare-snapshots.sh (sha256 integrity),
+> delta-export.sh, migrate.sh entry point, RUNBOOK.md, full dry-run results artifact (T02/T04/T06/T07/T08/T09).
+
 ## T01: Confirm baseline green
 
 - [ ] T01.1 Run `openspec validate add-ferretdb-data-migration-runbook --strict`
@@ -20,15 +34,15 @@
 
 ## T03: Initial bulk copy script (idempotent upserts)
 
-- [ ] T03.1 Create `tools/migration/ferretdb/bulk-copy.sh` that accepts
+- [x] T03.1 Create `tools/migration/ferretdb/bulk-copy.sh` that accepts
   `--source-uri` (MongoDB), `--dest-uri` (FerretDB), `--dbs` (comma-separated
   or `all`), and `--output-dir`; runs `mongodump --uri $SOURCE_URI --out
   $output_dir` covering the specified databases.
-- [ ] T03.2 Create `tools/migration/ferretdb/upsert.sh` that accepts `--dest-uri`
+- [x] T03.2 Create `tools/migration/ferretdb/upsert.sh` that accepts `--dest-uri`
   and `--dump-dir`; for each BSON file in the dump, issues a `replaceOne` with
   `upsert:true` keyed on `_id` for every document via mongosh; logs progress per
   collection; is safe to re-run (idempotent).
-- [ ] T03.3 Do NOT use `mongorestore --drop` or `mongorestore --oplogReplay` —
+- [x] T03.3 Do NOT use `mongorestore --drop` or `mongorestore --oplogReplay` —
   these are non-idempotent or require atomic multi-doc transactions (unsupported
   on FerretDB). Use only `replaceOne + upsert:true` per document.
 - [ ] T03.4 Create `tools/migration/ferretdb/migrate.sh` entry point with
@@ -54,18 +68,18 @@
 
 ## T05: Index migration script (all types, no type-based halting)
 
-- [ ] T05.1 Create `tools/migration/ferretdb/export-indexes.sh` that uses mongosh
+- [x] T05.1 Create `tools/migration/ferretdb/export-indexes.sh` that uses mongosh
   to iterate all collections in the source MongoDB and writes a JSON file
   `{db, collection, indexes: [{name, key, unique, sparse, expireAfterSeconds,
   weights, ...}]}` for every non-`_id` index, including text and 2dsphere entries.
-- [ ] T05.2 Create `tools/migration/ferretdb/recreate-indexes.sh` that reads the
+- [x] T05.2 Create `tools/migration/ferretdb/recreate-indexes.sh` that reads the
   exported JSON and runs `db.collection.createIndex(...)` via mongosh against the
   FerretDB target; skips `_id` indexes only; does NOT halt on text or 2dsphere
   index types (both are functional on FerretDB 2.7.0 with rum/postgis bundled).
-- [ ] T05.3 Log each index creation result as `PASS: index <name> on
+- [x] T05.3 Log each index creation result as `PASS: index <name> on
   <db>.<collection>` or `FAIL: index <name> on <db>.<collection> error=<msg>`;
   exit non-zero if any index fails.
-- [ ] T05.4 Remove any prior logic that halted on text or 2dsphere index types —
+- [x] T05.4 Remove any prior logic that halted on text or 2dsphere index types —
   these are functional on the pinned version pair and must not block migration.
 
 ## T06: Integrity snapshot and comparison
