@@ -13,6 +13,15 @@ if [ "${SEAWEEDFS_VALIDATION:-}" = "1" ]; then
   bash "$(dirname "$0")/../env/validation/run-validation.sh" || exit 1
 fi
 
+# FerretDB migration validation (change add-ferretdb-migration-validation).
+# Off by default so the suite is unchanged for the standard (MongoDB) path; CI sets
+# FERRETDB_VALIDATION=1 + FERRETDB_URI->FerretDB to gate the document-store migration validation
+# (parity checker + per-tenant data-API smoke + risk-area probes).
+if [ "${FERRETDB_VALIDATION:-}" = "1" ]; then
+  echo "==> FERRETDB_VALIDATION=1: running FerretDB migration validation" >&2
+  bash "$(dirname "$0")/../env/validation/run-ferretdb-validation.sh" || exit 1
+fi
+
 if [ -f go.mod ]; then
   exec go test ./tests/blackbox/... ${FILTER:+-run "$FILTER"}
 elif [ -f package.json ]; then
