@@ -4,7 +4,7 @@ In Falcone is a **multi-tenant BaaS** assembled from a small set of cooperating 
 
 1. **One gateway, two privilege domains.** Everything enters through APISIX, which classifies a request by its credential and routes it to either the **control plane** (`structural_admin`) or the **executor** (`data_access`).
 2. **Identity derives the tenant — never the client.** The tenant/workspace come from a verified credential (API key → JWT → gateway-injected headers, in that order). Client-supplied `x-tenant-id` is never trusted. Invalid credentials fail closed.
-3. **Isolation is enforced at the data layer**, not just at the edge. PostgreSQL Row-Level Security with a non-`BYPASSRLS` role, MongoDB adapter-injected predicates, and tenant-scoped realtime matching mean a routing mistake cannot leak data.
+3. **Isolation is enforced at the data layer**, not just at the edge. PostgreSQL Row-Level Security with a non-`BYPASSRLS` role, FerretDB/DocumentDB adapter-injected predicates, and tenant-scoped realtime matching mean a routing mistake cannot leak data.
 
 ## Request lifecycle
 
@@ -24,7 +24,7 @@ In Falcone is a **multi-tenant BaaS** assembled from a small set of cooperating 
                     │  api-keys/quotas   │   └───┬─────┬─────┬─────┬─────┬───┘
                     │  /v1/flows /v1/mcp │       │     │     │     │     │
                     └─────────┬──────────┘       │     │     │     │     │
-                              │              Postgres Mongo Kafka SeaweedFS Funcs
+                              │              Postgres FerretDB Kafka SeaweedFS Funcs
                               ▼                  │     │     │     │     │
                     ┌────────────────────┐      ▼     ▼     ▼     ▼     ▼
                     │  Platform metadata │   (per-workspace data backends, tenant-scoped)
@@ -71,7 +71,7 @@ This precedence is the reason a client cannot spoof a tenant: the only way to se
 In Falcone uses a **shared-database, tenant-scoped** model with defense in depth:
 
 - **PostgreSQL** — RLS policies on tenant-scoped tables, plus a dedicated **non-`BYPASSRLS` application role** (`falcone_app`, with `anon`/`service` variants). The executor runs queries via `SET LOCAL ROLE` so even a buggy query is constrained by RLS. (A superuser would bypass RLS — which is exactly why the app role is not a superuser.)
-- **MongoDB** — the data adapter injects a `tenantId` predicate into every read and stamps it on every write; the realtime change-stream pipeline `$match`es on the verified tenant.
+- **FerretDB + DocumentDB** (document store) — the data adapter injects a `tenantId` predicate into every read and stamps it on every write (the authoritative isolation boundary; per-database role scoping is NOT enforced at the engine — [ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)); the realtime pipeline (Postgres logical replication) filters consumer-side on the verified tenant.
 - **Every layer** — caches, queues, object keys, events and logs are keyed by tenant so isolation holds beyond the database.
 
 See [Security & Auth](/architecture/security) for the full model.

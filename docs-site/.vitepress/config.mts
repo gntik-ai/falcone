@@ -4,6 +4,11 @@ export default defineConfig({
   title: 'In Falcone',
   description: 'Multi-tenant Backend-as-a-Service platform — documentation',
   base: '/falcone/',
+  // Runbook pages cross-link into repo source dirs (tools/migration/…, etc.) that live OUTSIDE
+  // the docs-site root — those links resolve in the GitHub repo view but not in the built site,
+  // so VitePress's dead-link check flags them. Ignore links into those repo dirs (seaweedfs.md and
+  // ferretdb.md both reference the migration runbooks under tools/migration/).
+  ignoreDeadLinks: [/\/tools\//],
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/falcone/favicon.svg' }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/falcone/img/icon-32.png' }],
@@ -62,6 +67,7 @@ export default defineConfig({
             { text: 'MCP Server Hosting', link: '/architecture/mcp' },
             { text: 'MCP Runbook', link: '/architecture/mcp-runbook' },
             { text: 'SeaweedFS Storage Runbook', link: '/architecture/seaweedfs' },
+            { text: 'FerretDB Document-Store Runbook', link: '/architecture/ferretdb' },
           ],
         },
         {

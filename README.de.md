@@ -177,7 +177,7 @@ bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
 | **Authentifizierung & IAM** | OIDC-delegierter Konsolen-Login, Registrierung mit ausstehender Aktivierung, Passwort-Wiederherstellung. Keycloak-Administration (Realm pro Mandant) von Realms, Clients, Rollen, Scopes und Benutzern. JWT-Validierung über gecachtes JWKS mit Introspection-Fallback. |
 | **Service-Accounts & OAuth2-Apps** | OAuth2-Clients und API-Key-Service-Accounts pro Workspace, mit HTTPS-Redirect-URI-Validierung und planbasierten Limits. |
 | **PostgreSQL** | Mandanten-eingegrenzte Daten-API plus Administration/Governance, Change-Data-Capture, Metriken und Audit. Isolation über Row-Level-Security (`app.tenant_id` / `app.workspace_id`) und Schemas pro Mandant. |
-| **MongoDB** | Dokument-API pro Mandant/Workspace, Administration, Change Streams, Metriken und Audit. |
+| **FerretDB + DocumentDB** | Dokument-API pro Mandant/Workspace, Administration, Change Streams, Metriken und Audit. |
 | **Objektspeicher** | S3-kompatible Buckets, Multipart-Uploads, vorsignierte URLs, Zugriffsrichtlinien, Event-Benachrichtigungen und Kapazitätskontingente pro Mandant. |
 | **Events (Kafka)** | Topic-Verwaltung und mandanten-eingegrenzte CDC-Change-Streams (`<Präfix>.<Mandant>.<Workspace>`), plus System-Topics für Audit/Kontingent/Lebenszyklus. |
 | **Echtzeit** | WebSocket-Abonnements (`/v1/websockets`) mit Bearer-JWT-Authentifizierung, Scope-zu-Channel-Durchsetzung und Mandanten-Isolation pro Sitzung. |
@@ -240,7 +240,7 @@ docker compose -f tests/env/docker-compose.yml ps
 | API-Gateway (APISIX) | <http://localhost:9080> | Bearer-JWT von Keycloak |
 | Keycloak (IdP) | <http://localhost:8081> | `admin` / `admin` |
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
-| MongoDB (rs0) | `localhost:57017` | — |
+| FerretDB gateway (MongoDB wire) | `localhost:57017` | `falcone` / `falcone` |
 | Redpanda (Kafka) | `localhost:19092` | — |
 | SeaweedFS (S3-API) | <http://localhost:58333> | S3-Access-Key / Secret-Key (path-style) |
 | Vault (dev) | <http://localhost:58200> | Token `root` |
