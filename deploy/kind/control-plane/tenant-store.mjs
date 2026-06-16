@@ -157,7 +157,13 @@ export async function upsertFnAction(pool, a) {
      a.parameters ? JSON.stringify(a.parameters) : null, a.memoryMb, a.timeoutMs, a.ksvcName, a.createdBy]);
   return rows[0];
 }
-export async function getFnAction(pool, resourceId) {
+export async function getFnAction(pool, resourceId, tenantId = null) {
+  if (tenantId != null) {
+    const { rows } = await pool.query(
+      'SELECT * FROM fn_actions WHERE resource_id=$1 AND tenant_id=$2 LIMIT 1',
+      [resourceId, tenantId]);
+    return rows[0] ?? null;
+  }
   const { rows } = await pool.query('SELECT * FROM fn_actions WHERE resource_id=$1 LIMIT 1', [resourceId]);
   return rows[0] ?? null;
 }

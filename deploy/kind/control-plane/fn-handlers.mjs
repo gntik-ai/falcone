@@ -12,6 +12,14 @@ import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcName, ksvcHost 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 
+// Returns the caller's tenantId to use as a scope predicate on fn_actions queries,
+// or null for superadmin/internal callers (they may operate cross-tenant).
+function callerTenantId(identity) {
+  if (!identity) return null;
+  if (identity.actorType === 'superadmin' || identity.actorType === 'internal') return null;
+  return identity.tenantId ?? null;
+}
+
 function activationOut(r) {
   return {
     activationId: r.activation_id, resourceId: r.resource_id,
@@ -46,7 +54,7 @@ async function fnDeploy(ctx) {
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   const code = b.source?.inlineCode ?? b.source?.code;
   if (!code) return err(400, 'VALIDATION_ERROR', 'source.inlineCode is required');
-  const existing = ctx.params.actionId ? await store.getFnAction(ctx.pool, ctx.params.actionId) : null;
+  const existing = ctx.params.actionId ? await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity)) : null;
   const resourceId = existing?.resource_id ?? ctx.params.actionId ?? `fn_${randomUUID().slice(0, 12)}`;
   const limits = b.execution?.limits ?? {};
   const memoryMb = Number(limits.memoryMb) || 256;
@@ -84,13 +92,13 @@ async function fnListActions(ctx) {
 }
 // GET /v1/functions/actions/{actionId}
 async function fnActionDetail(ctx) {
-  const r = await store.getFnAction(ctx.pool, ctx.params.actionId);
+  const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.actionId} not found`);
   return ok(200, actionOut(r, await store.latestFnActivation(ctx.pool, r.resource_id)));
 }
 // POST /v1/functions/actions/{actionId}/invocations  — REAL execution
 async function fnInvoke(ctx) {
-  const r = await store.getFnAction(ctx.pool, ctx.params.actionId);
+  const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.actionId} not found`);
   const params = ctx.body?.parameters ?? {};
   const startedAt = new Date().toISOString();
@@ -117,6 +125,9 @@ async function fnInvoke(ctx) {
 }
 // GET /v1/functions/actions/{actionId}/activations
 async function fnActivations(ctx) {
+  // Verify the action exists and belongs to the caller's tenant before listing its activations.
+  const action = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
+  if (!action) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.actionId} not found`);
   const rows = await store.listFnActivations(ctx.pool, ctx.params.actionId);
   return ok(200, { items: rows.map(activationOut), page: { total: rows.length } });
 }
@@ -124,29 +135,36 @@ async function fnActivations(ctx) {
 async function fnActivation(ctx) {
   const r = await store.getFnActivation(ctx.pool, ctx.params.activationId);
   if (!r) return err(404, 'ACTIVATION_NOT_FOUND', 'activation not found');
+  // Verify the parent function belongs to the caller's tenant (fail-closed, no existence leak).
+  const action = await store.getFnAction(ctx.pool, r.resource_id, callerTenantId(ctx.identity));
+  if (!action) return err(404, 'ACTIVATION_NOT_FOUND', 'activation not found');
   return ok(200, activationOut(r));
 }
 // GET .../activations/{activationId}/logs
 async function fnActivationLogs(ctx) {
   const r = await store.getFnActivation(ctx.pool, ctx.params.activationId);
   if (!r) return err(404, 'ACTIVATION_NOT_FOUND', 'activation not found');
+  const action = await store.getFnAction(ctx.pool, r.resource_id, callerTenantId(ctx.identity));
+  if (!action) return err(404, 'ACTIVATION_NOT_FOUND', 'activation not found');
   return ok(200, { activationId: r.activation_id, lines: Array.isArray(r.logs) ? r.logs : [], truncated: false });
 }
 // GET .../activations/{activationId}/result
 async function fnActivationResult(ctx) {
   const r = await store.getFnActivation(ctx.pool, ctx.params.activationId);
   if (!r) return err(404, 'ACTIVATION_NOT_FOUND', 'activation not found');
+  const action = await store.getFnAction(ctx.pool, r.resource_id, callerTenantId(ctx.identity));
+  if (!action) return err(404, 'ACTIVATION_NOT_FOUND', 'activation not found');
   return ok(200, { activationId: r.activation_id, status: r.status === 'success' ? 'succeeded' : 'failed', result: r.result ?? {}, contentType: 'application/json' });
 }
 // GET /v1/functions/actions/{actionId}/versions
 async function fnVersions(ctx) {
-  const r = await store.getFnAction(ctx.pool, ctx.params.actionId);
+  const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', 'action not found');
   return ok(200, { items: [{ versionId: `v${r.version}`, resourceId: r.resource_id, versionNumber: r.version, status: 'active', originType: 'deploy', rollbackEligible: false, timestamps: { createdAt: r.created_at, updatedAt: r.updated_at } }], page: { total: 1 } });
 }
 // POST /v1/functions/actions/{actionId}/rollback  (no historical versions kept — accept as no-op)
 async function fnRollback(ctx) {
-  const r = await store.getFnAction(ctx.pool, ctx.params.actionId);
+  const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', 'action not found');
   return ok(202, { requestId: randomUUID(), resourceId: r.resource_id, requestedVersionId: ctx.body?.versionId ?? `v${r.version}`, status: 'accepted', correlationId: randomUUID() });
 }
