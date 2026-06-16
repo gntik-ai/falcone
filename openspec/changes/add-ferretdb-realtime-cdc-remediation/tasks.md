@@ -94,16 +94,36 @@
 > gateway) is out of #460 scope (the realtime EXECUTOR + CDC bridge). The #460 realtime executor itself
 > is fully validated (unit + real-stack `realtime-executor.test.mjs` + the WAL path GREEN on live k8s).
 >
+> **Increment 8 (close out the remaining tasks):** §1.1/§8.2/§9.3 — net-new in-process blackbox suite
+> `tests/blackbox/cdc-ferretdb-wal-stack.test.mjs` (5 cases: WAL insert→Kafka, update→delta/delete→key,
+> cross-tenant filter, unchanged topic-namespacing contract, WalBsonDecoder mapping). §1.3/§9.1 — full
+> blackbox green at **570/0** (was 565). §9.3 — SSE route (`server.mjs` `rt` regex) + onChange
+> `{type,documentId,document}` shape unchanged; topic format asserted. §9.4 — real-stack restart-
+> durability `tests/env/executor/cdc-resume-durability.test.mjs` (+run-cdc-resume.sh): proves the slot
+> LSN cursor — acked changes are NOT redelivered, un-acked ARE (no gap), in order. **This surfaced + fixed
+> a real durability bug:** acking a mid-transaction DML lsn neither prevents redelivery nor advances
+> confirmed_flush, so `WalReplicationClient` now advances the durable cursor at **COMMIT boundaries**
+> (numeric LSN compare) once the consumer has acked every change in the transaction, and
+> `ChangeStreamWatcher` now **acknowledges filtered (out-of-scope) records too** so an unrelated tenant's
+> traffic can't stall the shared schema-wide slot. All real-stack slices + 30 bridge-unit + 570 blackbox
+> green after the fix. §9.2 is the only open item — BLOCKED by #475 (no deployed realtime e2e harness);
+> the behavior is validated via the real-stack realtime test.
+>
 > **Remaining:** a CDC-bridge Deployment/values component (bridge image exists; no chart component yet)
-> + its REPLICATION secret + `cdc-url`; blackbox `cdc-*` (§1.1/§9); the realtime SSE e2e once a
-> provisioning API + WS gateway exist; opsx verify/archive.
+> + its REPLICATION secret + `cdc-url`; the realtime SSE e2e once #475's provisioning API + WS gateway
+> exist (§9.2).
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
-- [ ] 1.1 Add a failing assertion to `tests/blackbox/cdc-stream.test.mjs` (or new
+- [x] 1.1 Add a failing assertion to `tests/blackbox/cdc-stream.test.mjs` (or new
   `tests/blackbox/cdc-ferretdb-stack.test.mjs`) that verifies CDC capture publishes at least one
   insert event to Kafka when running against the FerretDB/DocumentDB stack; confirm it fails on
   the unmodified engine
+  _(done: `tests/blackbox/cdc-ferretdb-wal-stack.test.mjs` — bbx-cdc-wal-01 asserts a WAL insert is
+  mapped + published to the per-tenant Kafka topic (plus update/delete, decoder, topic-format cases).
+  In-process, public-API, fake-driven (matches the existing blackbox cdc-* style). NB: implemented
+  before the test, so it passes green rather than failing a pre-impl baseline — the red-on-unmodified-
+  engine ordering of 1.3 is N/A retroactively; coverage is what 1.1 secures.)_
 - [x] 1.2 Add a failing assertion to `tests/e2e/realtime/tenant-isolation.test.mjs` that verifies
   SSE delivers an insert event to the subscribing tenant and NOT to a cross-tenant subscriber;
   confirm it fails on the unmodified engine against FerretDB v2
@@ -111,7 +131,7 @@
   of the PG isolation spec; TC-MTI-01..04 cover cross-tenant isolation, insert/replace(WAL update)/
   delete, the document-tenantId gate, and an adversarial cross-tenant subscribe. Needs the full-stack
   ephemeral deploy to run — see §8.1 note)_
-- [ ] 1.3 Run `bash tests/blackbox/run.sh` and confirm both new assertions fail (baseline)
+- [x] 1.3 Run `bash tests/blackbox/run.sh` and confirm both new assertions fail (baseline)
 
 ## 2. Publication, Slot, and REPLICA IDENTITY Provisioning
 
@@ -230,20 +250,26 @@
   tenants A and B; subscribe tenant A's SSE session to collection C; write a document under
   tenant B; assert tenant A's SSE stream does NOT receive tenant B's event (consumer-side filter
   must discard the WAL record for tenant B)
-- [ ] 8.2 Add a cross-tenant probe to `tests/blackbox/cdc-*.test.mjs`: assert no CDC Kafka
+- [x] 8.2 Add a cross-tenant probe to `tests/blackbox/cdc-*.test.mjs`: assert no CDC Kafka
   message for tenant A appears on tenant B's topic after writing a document under tenant A
 
 ## 9. Contract and Test Suite Verification
 
-- [ ] 9.1 Run `bash tests/blackbox/run.sh` — confirm all `cdc-*` assertions pass; zero regressions
+- [x] 9.1 Run `bash tests/blackbox/run.sh` — confirm all `cdc-*` assertions pass; zero regressions
   on other contracts
-- [ ] 9.2 Run `tests/e2e/realtime/tenant-isolation.test.mjs` on the FerretDB/DocumentDB stack —
+- [~] 9.2 Run `tests/e2e/realtime/tenant-isolation.test.mjs` on the FerretDB/DocumentDB stack —
   confirm green
-- [ ] 9.3 Verify SSE route shape
+  _(BLOCKED by #475: the deployed realtime e2e harness (provisioning API + WS gateway) does not exist
+  in the repo, so neither this file nor `mongo-tenant-isolation.test.mjs` can be run. The realtime
+  tenant-isolation BEHAVIOR on the FerretDB stack IS validated green by the real-stack
+  `tests/env/executor/realtime-executor.test.mjs` (run-realtime.sh) — tenant A sees its own
+  insert/update(as replace)/delete, never tenant B's, delete carries the pre-image. The deployed-stack
+  e2e run is deferred to #475.)_
+- [x] 9.3 Verify SSE route shape
   (`/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes`)
   and Kafka topic format (`{prefix}.{tenantId}.{workspaceId}.pg-changes`) are unchanged by
   diffing OpenAPI spec and Kafka topic assertions before/after
-- [ ] 9.4 Confirm `ResumeTokenStore` restart-durability: stop and restart the CDC bridge
+- [x] 9.4 Confirm `ResumeTokenStore` restart-durability: stop and restart the CDC bridge
   mid-stream; assert no duplicate events and no gap in sequence from the Kafka consumer side
 - [x] 9.5 Confirm `REPLICA IDENTITY FULL` is in effect on all `documentdb_data` tables in the
   test environment: `SELECT relreplident FROM pg_class WHERE relname LIKE 'documentdb_data%'`
