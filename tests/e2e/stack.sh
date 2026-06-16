@@ -52,6 +52,9 @@ find_chart() {
 
 healthy() {
   echo ">> Verifying ALL services are operational ..."
+  # Iterates EVERY Deployment and StatefulSet in the namespace, so the FerretDB gateway
+  # (Deployment) and DocumentDB engine (StatefulSet) are auto-covered when E2E_FERRETDB=true —
+  # no FerretDB-specific wait logic is needed (add-ferretdb-document-store-e2e #464, task 8.3).
   for dep in $(kubectl get deployment -n "$NS" -o name 2>/dev/null); do
     kubectl rollout status "$dep" -n "$NS" --timeout=10m
   done
@@ -98,6 +101,21 @@ case "${1:-up}" in
         && kind load docker-image chrislusf/seaweedfs:4.33 2>/dev/null || true
       docker pull bitnamilegacy/postgresql:17.2.0 2>/dev/null \
         && kind load docker-image bitnamilegacy/postgresql:17.2.0 2>/dev/null || true
+    fi
+
+    # ---- FerretDB image pre-pull (add-ferretdb-document-store-e2e #464, task 8.1) ----
+    # When E2E_FERRETDB=true, pre-pull the DocumentDB engine + FerretDB gateway images so the kind
+    # nodes do not hit ImagePullBackOff on first deploy. The FerretDB deploy itself is the in-falcone
+    # chart's documentdb + ferretdb sub-charts (enabled by tests/e2e/values-ferretdb-realtime-e2e.yaml
+    # passed via E2E_HELM_VALUES) — NOT a separate Helm release or E2E_DOCUMENT_BACKEND block.
+    # ENGINE-FIRST ordering is enforced by the chart's documentdb readiness dependency; healthy()
+    # then waits on every Deployment and StatefulSet (both FerretDB components included). Best-effort.
+    if [ "${E2E_FERRETDB:-}" = "true" ]; then
+      echo ">> [FerretDB] Pre-pulling DocumentDB engine + gateway images (best-effort, non-fatal) ..."
+      docker pull ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0 2>/dev/null \
+        && kind load docker-image ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0 2>/dev/null || true
+      docker pull ghcr.io/ferretdb/ferretdb:2.7.0 2>/dev/null \
+        && kind load docker-image ghcr.io/ferretdb/ferretdb:2.7.0 2>/dev/null || true
     fi
 
     # Pre-install: seed required Kubernetes secrets so chart components can start.
@@ -278,6 +296,9 @@ EOF
   down)
     command -v kubectl >/dev/null 2>&1 || exit 0
     stop_forwards
+    # Deletes the whole ephemeral namespace — the FerretDB gateway (Deployment) and DocumentDB
+    # engine (StatefulSet + PVC) are namespace-scoped and torn down with it, same as every other
+    # component (add-ferretdb-document-store-e2e #464, task 8.4).
     kubectl delete namespace "$NS" --ignore-not-found --wait=false
     echo ">> Namespace '$NS' deleted (all pods removed). Cluster left intact."
     ;;
