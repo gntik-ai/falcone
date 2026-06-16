@@ -16,11 +16,11 @@ A single platform instance hosts many **tenants**. Each tenant owns one or more 
 | Capability | What it gives you | Backed by |
 | --- | --- | --- |
 | **Relational data API** | REST CRUD + query + DDL over SQL tables, with keyset pagination and filtering | PostgreSQL |
-| **Document data API** | REST CRUD + query over collections, with cursor pagination | MongoDB |
+| **Document data API** | REST CRUD + query over collections, with cursor pagination | FerretDB + DocumentDB (MongoDB-wire-compatible) |
 | **Object storage** | S3-compatible buckets and objects | SeaweedFS |
 | **Events** | Publish/subscribe to a tenant-scoped event stream | Kafka / Redpanda |
-| **Serverless functions** | Deploy and invoke per-tenant functions | Knative / OpenWhisk runtime |
-| **Realtime** | Subscribe to live data changes over Server-Sent Events | Mongo change streams + Postgres CDC |
+| **Serverless functions** | Deploy and invoke per-tenant functions | Knative runtime |
+| **Realtime** | Subscribe to live data changes over Server-Sent Events | Postgres logical replication (document store) + Postgres trigger CDC |
 | **Identity & access** | Users, roles, service accounts, JWTs and API keys per tenant | Keycloak (OIDC) |
 | **Tenant administration** | Provision tenants/workspaces, members, plans, quotas | Control plane |
 | **Observability & quotas** | Per-tenant usage, metrics, audit and hard limits | Prometheus + control plane |
@@ -58,7 +58,7 @@ platform: scoped by tenant and workspace, gated by plan capabilities, and audite
 
 ## A guided tour of a real deployment
 
-The following screenshots are taken from a live cluster running the full stack (gateway, control plane, executor, console, Keycloak, PostgreSQL, MongoDB, Kafka, SeaweedFS).
+The following screenshots are taken from a live cluster running the full stack (gateway, control plane, executor, console, Keycloak, PostgreSQL, FerretDB + DocumentDB, Kafka, SeaweedFS).
 
 ### Sign in
 
@@ -88,9 +88,9 @@ Each tenant manages its own users, roles and machine identities. Service account
 
 ![Service-account credential](/screens/15-sa-credential.png)
 
-### Databases — PostgreSQL & MongoDB
+### Databases — PostgreSQL & the FerretDB document store
 
-The console exposes both data engines. You can browse schemas and tables in PostgreSQL and collections/documents in MongoDB — all scoped to the active tenant.
+The console exposes both data engines. You can browse schemas and tables in PostgreSQL and collections/documents in the FerretDB-backed document store (MongoDB-wire-compatible, over DocumentDB) — all scoped to the active tenant.
 
 ![Database home](/screens/05-database.png)
 
@@ -98,9 +98,9 @@ The console exposes both data engines. You can browse schemas and tables in Post
 
 ![PostgreSQL table browser](/screens/21-postgres-table.png)
 
-![MongoDB databases](/screens/18-mongo.png)
+![Document databases (FerretDB-backed)](/screens/18-mongo.png)
 
-![MongoDB documents](/screens/19-mongo-documents.png)
+![Document explorer (FerretDB-backed)](/screens/19-mongo-documents.png)
 
 ### Object storage
 
@@ -144,6 +144,6 @@ Plans define entitlements; quotas enforce per-tenant limits; observability surfa
 
 ## How it fits together (in one paragraph)
 
-A request enters through the **APISIX gateway**, which classifies it by credential (an `apikey` header for anon/service keys, or a Bearer JWT) and routes it to the right backend. Structural-admin calls reach the **control plane**; data-plane calls reach the **executor**, which runs adapter-built query plans against the real **PostgreSQL** / **MongoDB** / **Kafka** / **SeaweedFS** backends. The executor resolves identity (API key is authoritative, then verified JWT, then gateway-injected headers) and **stamps and filters by the tenant** on every operation. Realtime rides the same identity model over SSE. The whole thing is packaged as one **umbrella Helm chart** you can target at Kubernetes, OpenShift or an air-gapped registry.
+A request enters through the **APISIX gateway**, which classifies it by credential (an `apikey` header for anon/service keys, or a Bearer JWT) and routes it to the right backend. Structural-admin calls reach the **control plane**; data-plane calls reach the **executor**, which runs adapter-built query plans against the real **PostgreSQL** / **FerretDB + DocumentDB** / **Kafka** / **SeaweedFS** backends. The executor resolves identity (API key is authoritative, then verified JWT, then gateway-injected headers) and **stamps and filters by the tenant** on every operation. Realtime rides the same identity model over SSE. The whole thing is packaged as one **umbrella Helm chart** you can target at Kubernetes, OpenShift or an air-gapped registry.
 
 Continue to the [Architecture overview](/architecture/overview) for the detailed design, or jump to the [Quickstart](/guide/quickstart) to build a TODO app.

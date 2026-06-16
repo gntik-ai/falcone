@@ -8,8 +8,6 @@ kafka:
   replicas: 1
   persistence:
     size: 20Gi
-openwhisk:
-  replicas: 1
 controlPlane:
   replicas: 1
 webConsole:
@@ -19,9 +17,6 @@ observability:
 postgresql:
   persistence:
     size: 10Gi
-mongodb:
+documentdb:
   persistence:
     size: 10Gi
-storage:
-  persistence:
-    size: 20Gi

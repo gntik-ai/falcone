@@ -84,10 +84,6 @@ postgresql:
   image:
     repository: docker.io/bitnamilegacy/postgresql
     tag: 17.2.0
-mongodb:
-  image:
-    repository: docker.io/bitnamilegacy/mongodb
-    tag: 8.0.0
 kafka:
   # single-broker KRaft (the in-falcone-kafka secret pins NODE_ID=0 with a
   # localhost quorum; >1 replica would yield independent brokers, not a cluster)
@@ -95,27 +91,6 @@ kafka:
   image:
     repository: docker.io/bitnamilegacy/kafka
     tag: 3.9.0
-openwhisk:
-  # openwhisk/standalone REQUIRES the docker socket (it spawns action containers
-  # via docker) and exits immediately without it; this chart profile also ships
-  # no invokers, so real action execution is out of scope on kind. A clearly
-  # labeled stub keeps the service surface (:3233) present and healthy.
-  image:
-    repository: localhost:30500/falcone-svc-stub
-    tag: "0.1.0"
-  env:
-    - name: OPENWHISK_RUNTIME_ENV
-      value: kubernetes
-    - name: PORT
-      value: "3233"
-    - name: SERVICE_NAME
-      value: openwhisk
-storage:
-  image:
-    repository: docker.io/minio/minio
-    tag: RELEASE.2025-04-22T22-12-26Z
-  securityContext:
-    runAsUser: 1000  # minio image defaults to root; any uid works with fsGroup on /data
 observability:
   image:
     repository: docker.io/prom/prometheus
@@ -166,45 +141,35 @@ controlPlane:
           name: in-falcone-keycloak-admin
           key: password
     # Object storage: provider-neutral S3 endpoint + credentials (no plaintext).
-    # STORAGE_S3_* are authoritative; the live runtime falls back to the legacy
-    # MINIO_* names (kept below) only when STORAGE_S3_ENDPOINT is unset. Point
-    # STORAGE_S3_ENDPOINT at a SeaweedFS S3 gateway (port 8333, path-style) when
-    # add-seaweedfs-deployment lands; today it mirrors the MinIO endpoint.
+    # STORAGE_S3_* are authoritative, pointed at the SeaweedFS S3 gateway (port 8333,
+    # path-style). SeaweedFS replaced MinIO (ADR-13). NOTE: the in-falcone-storage
+    # Secret key names below are a legacy convention retained for the existing secret;
+    # repoint to the SeaweedFS credentials Secret when cutting the kind storage backend over.
     - name: STORAGE_S3_ENDPOINT
-      value: http://falcone-storage:9000
+      value: http://falcone-seaweedfs-s3:8333
     - name: STORAGE_S3_ACCESS_KEY
       valueFrom:
         secretKeyRef:
           name: in-falcone-storage
-          key: MINIO_ROOT_USER
+          key: s3_access_key
     - name: STORAGE_S3_SECRET_KEY
       valueFrom:
         secretKeyRef:
           name: in-falcone-storage
-          key: MINIO_ROOT_PASSWORD
-    # Legacy MINIO_* names retained as backward-compatible fallbacks.
-    - name: MINIO_ENDPOINT
-      value: http://falcone-storage:9000
-    - name: MINIO_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: in-falcone-storage
-          key: MINIO_ROOT_USER
-    - name: MINIO_SECRET_KEY
-      valueFrom:
-        secretKeyRef:
-          name: in-falcone-storage
-          key: MINIO_ROOT_PASSWORD
-    # Document store: MongoDB (bitnami root user + secret password, no plaintext).
+          key: s3_secret_key
+    # Document store: FerretDB gateway over the DocumentDB engine (MongoDB-wire, no plaintext).
+    # The gateway passes the DocumentDB Postgres credentials through to the engine.
     - name: MONGO_HOST
-      value: falcone-mongodb:27017
+      value: falcone-ferretdb:27017
+    - name: MONGO_BACKEND
+      value: ferretdb
     - name: MONGO_USER
-      value: root
+      value: falcone
     - name: MONGO_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: in-falcone-mongodb
-          key: MONGODB_ROOT_PASSWORD
+          name: in-falcone-documentdb
+          key: POSTGRES_PASSWORD
     # Realtime SSE over Postgres logical replication (add-ferretdb-realtime-cdc-remediation #460):
     # FerretDB v2 has no change streams, so the realtime executor consumes a pgoutput slot on the
     # DocumentDB engine. REALTIME_DOCUMENTDB_URL is the full REPLICATION-privileged connection URL

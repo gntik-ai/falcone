@@ -25,8 +25,9 @@ test('DEFAULT_STORAGE_PROVIDER_TYPE resolves to seaweedfs when STORAGE_DEFAULT_P
   assert.equal(resolveDefaultProviderType({ STORAGE_DEFAULT_PROVIDER_TYPE: 'seaweedfs' }), 'seaweedfs');
 });
 
-test('DEFAULT_STORAGE_PROVIDER_TYPE falls back to minio when STORAGE_DEFAULT_PROVIDER_TYPE is unset', () => {
+test('DEFAULT_STORAGE_PROVIDER_TYPE falls back to seaweedfs when STORAGE_DEFAULT_PROVIDER_TYPE is unset', () => {
   // Pass an env object whose STORAGE_DEFAULT_PROVIDER_TYPE is explicitly removed.
+  // SeaweedFS is the go-forward object store (ADR-13); MinIO was removed.
   const env = { ...process.env };
   delete env.STORAGE_DEFAULT_PROVIDER_TYPE;
   const value = execFileSync(process.execPath, ['--input-type=module', '-e', probe], {
@@ -34,5 +35,5 @@ test('DEFAULT_STORAGE_PROVIDER_TYPE falls back to minio when STORAGE_DEFAULT_PRO
     env,
     encoding: 'utf8'
   }).trim();
-  assert.equal(value, 'minio');
+  assert.equal(value, 'seaweedfs');
 });

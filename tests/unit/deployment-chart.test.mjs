@@ -31,7 +31,7 @@ test('deployment chart stays internally consistent with packaging guidance', () 
 
 test('deployment chart validation detects missing dependency aliases and values layers', () => {
   const brokenChart = structuredClone(readRootChart());
-  brokenChart.dependencies = brokenChart.dependencies.filter((entry) => entry.alias !== 'storage');
+  brokenChart.dependencies = brokenChart.dependencies.filter((entry) => entry.alias !== 'ferretdb');
 
   const brokenValues = structuredClone(readRootValues());
   delete brokenValues.deployment.valuesLayers.airgap;
@@ -44,7 +44,7 @@ test('deployment chart validation detects missing dependency aliases and values 
     readDomainModel()
   );
 
-  assert.ok(violations.some((violation) => violation.includes('Missing wrapper dependency alias storage')));
+  assert.ok(violations.some((violation) => violation.includes('Missing wrapper dependency alias ferretdb')));
   assert.ok(violations.some((violation) => violation.includes('deployment.valuesLayers must include airgap')));
 });
 

@@ -1,14 +1,15 @@
-// Console MongoDB (document store) handlers — REAL MongoDB (kind deploy).
+// Console document-store handlers — the FerretDB gateway over the DocumentDB engine (kind
+// deploy), accessed via the MongoDB wire protocol.
 //
-// MongoDB runs as `falcone-mongodb:27017` (bitnami; root user + MONGODB_ROOT_PASSWORD).
-// The web-console Mongo page browses databases, collections, indexes, views and
-// documents. We talk to it with the official `mongodb` driver (added to the image),
-// returning the camelCase shapes the page expects. System databases are hidden.
-// Provisioning (engine=mongodb) creates the database + its initial collections.
+// The FerretDB gateway runs as `falcone-ferretdb:27017` (DocumentDB engine credentials:
+// user `falcone` + POSTGRES_PASSWORD). The web-console document page browses databases,
+// collections, indexes, views and documents. We talk to it with the official `mongodb`
+// driver (FerretDB is MongoDB-wire-compatible), returning the camelCase shapes the page
+// expects. System databases are hidden. Provisioning (engine=mongodb) creates the database.
 import { MongoClient } from 'mongodb';
 
-const HOST = process.env.MONGO_HOST || 'falcone-mongodb:27017';
-const USER = process.env.MONGO_USER || 'root';
+const HOST = process.env.MONGO_HOST || 'falcone-ferretdb:27017';
+const USER = process.env.MONGO_USER || 'falcone';
 const PASS = process.env.MONGO_PASSWORD || '';
 const URI = process.env.MONGO_URI
   || `mongodb://${encodeURIComponent(USER)}:${encodeURIComponent(PASS)}@${HOST}/?authSource=admin`;

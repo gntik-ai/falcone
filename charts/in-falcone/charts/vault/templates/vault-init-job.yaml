@@ -38,18 +38,15 @@ spec:
               for policy in platform tenant functions gateway iam; do
                 vault policy write "$policy" "/config/policies/${policy}.hcl"
               done
-              vault write auth/kubernetes/role/platform-role bound_service_account_names='*' bound_service_account_namespaces='postgresql,mongodb,kafka,s3-compat,openwhisk' policies=platform ttl=24h
-              vault write auth/kubernetes/role/functions-role bound_service_account_names='*' bound_service_account_namespaces='openwhisk' policies=functions ttl=24h
+              vault write auth/kubernetes/role/platform-role bound_service_account_names='*' bound_service_account_namespaces='postgresql,documentdb,kafka,s3-compat' policies=platform ttl=24h
               vault write auth/kubernetes/role/gateway-role bound_service_account_names='*' bound_service_account_namespaces='apisix' policies=gateway ttl=24h
               vault write auth/kubernetes/role/iam-role bound_service_account_names='*' bound_service_account_namespaces='keycloak' policies=iam ttl=24h
               vault write auth/kubernetes/role/eso-role bound_service_account_names='{{ .Values.eso.serviceAccountName | default "eso-vault-auth" }}' bound_service_account_namespaces='eso-system' policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }}
               vault kv put secret/platform/postgresql root-password=dummy-root-password app-password=dummy-app-password
-              vault kv put secret/platform/mongodb root-password=dummy-root-password app-password=dummy-app-password
+              vault kv put secret/platform/documentdb root-password=dummy-root-password app-password=dummy-app-password
               vault kv put secret/platform/kafka admin-password=dummy-admin-password inter-broker-secret=dummy-inter-broker-secret
               vault kv put secret/platform/s3 access-key=dummy-access-key secret-key=dummy-secret-key
-              vault kv put secret/platform/openwhisk db-password=dummy-db-password
               vault kv put secret/platform/encryption master-key=REPLACE_WITH_32_BYTE_KEY
-              vault kv put secret/functions/openwhisk controller-password=dummy-controller-password invoker-password=dummy-invoker-password action-encryption-key=dummy-action-encryption-key
               vault kv put secret/gateway/apisix admin-key=dummy-admin-key dashboard-password=dummy-dashboard-password etcd-password=dummy-etcd-password
               vault kv put secret/iam/keycloak admin-password=dummy-admin-password db-password=dummy-db-password
           volumeMounts:

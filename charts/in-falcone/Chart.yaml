@@ -20,14 +20,9 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: postgresql.enabled
-  - name: component-wrapper
-    alias: mongodb
-    version: 0.2.0
-    repository: file://./charts/component-wrapper
-    condition: mongodb.enabled
   # DocumentDB engine (FerretDB document-store backend) — dedicated Postgres 17
-  # StatefulSet rendered by the generic component-wrapper, gated by documentdb.enabled
-  # (default false). See add-ferretdb-documentdb-engine. Replaces the mongodb backend.
+  # StatefulSet rendered by the generic component-wrapper, gated by documentdb.enabled.
+  # See add-ferretdb-documentdb-engine. The document store; the legacy MongoDB server was removed.
   - name: component-wrapper
     alias: documentdb
     version: 0.2.0
@@ -47,16 +42,6 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: kafka.enabled
-  - name: component-wrapper
-    alias: openwhisk
-    version: 0.2.0
-    repository: file://./charts/component-wrapper
-    condition: openwhisk.enabled
-  - name: component-wrapper
-    alias: storage
-    version: 0.2.0
-    repository: file://./charts/component-wrapper
-    condition: storage.enabled
   - name: component-wrapper
     alias: observability
     version: 0.2.0
@@ -90,12 +75,12 @@ dependencies:
     version: 0.1.0
     repository: file://./charts/vault
     condition: vault.enabled
-  # SeaweedFS HA object-storage tier (master/volume/filer/S3 gateway). First
-  # remote sub-chart dependency in this umbrella; gated by seaweedfs.enabled
-  # (default false) so it coexists with the bundled MinIO storage component
-  # (storage.enabled) during the MinIO -> SeaweedFS cutover. Version pinned to
-  # the chart that ships SeaweedFS appVersion 4.33 (validated by the
-  # add-seaweedfs-storage-adr-spike #431 evidence). See add-seaweedfs-deployment.
+  # SeaweedFS HA object-storage tier (master/volume/filer/S3 gateway) — the
+  # default-active object store (the bundled MinIO storage component was removed
+  # in the MinIO -> SeaweedFS migration, ADR-13). First remote sub-chart dependency
+  # in this umbrella; gated by seaweedfs.enabled. Version pinned to the chart that
+  # ships SeaweedFS appVersion 4.33 (validated by the add-seaweedfs-storage-adr-spike
+  # #431 evidence). See add-seaweedfs-deployment.
   - name: seaweedfs
     version: 4.33.0
     repository: https://seaweedfs.github.io/seaweedfs/helm
