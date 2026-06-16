@@ -6,6 +6,7 @@
 // shape the SPA expects. Handler contract: async (ctx) => { statusCode, body }.
 import { randomUUID } from 'node:crypto';
 import { kcAdmin } from './kc-admin.mjs';
+import * as store from './tenant-store.mjs';
 const KC_BASE = (process.env.KEYCLOAK_BASE_URL || 'http://falcone-keycloak:8080').replace(/\/+$/, '');
 const REALM = process.env.CONSOLE_AUTH_REALM || 'in-falcone-platform';
 const CLIENT = process.env.CONSOLE_AUTH_CLIENT_ID || 'in-falcone-console';
@@ -103,19 +104,37 @@ async function signupPolicy() {
 }
 
 // POST /v1/auth/signups  (PUBLIC) — self-service account creation in the
-// platform realm. Creates an enabled Keycloak user with the supplied password so
-// the account can immediately log in (ConsoleSignupRegistration shape).
+// tenant's own iam_realm (NOT the shared platform realm). Resolves the tenant
+// by body.tenantId, validates that the tenant has a provisioned iam_realm,
+// then creates an enabled Keycloak user with the supplied password and stamps
+// tenant_id/workspace_id attributes so the tenant-context client scope maps
+// them into access-token claims (ConsoleSignupRegistration shape).
 async function signup(ctx) {
-  const { body } = ctx;
+  const { body, pool } = ctx;
+  // Allow test injection via ctx._kcAdmin; fall back to the module-level singleton.
+  const kc = ctx._kcAdmin ?? kcAdmin;
   if (!SELF_SERVICE) return errBody(403, 'SIGNUP_DISABLED', 'Self-service signup is disabled');
   const username = body.username ?? body.primaryEmail;
   if (!username || !body.password) return errBody(400, 'VALIDATION_ERROR', 'username and password are required');
+  if (!body.tenantId) return errBody(400, 'VALIDATION_ERROR', 'tenantId is required');
+
+  // Resolve the tenant and obtain its iam_realm (realm-per-tenant model).
+  const tenant = await store.getTenant(pool, body.tenantId);
+  if (!tenant) return errBody(404, 'TENANT_NOT_FOUND', `tenant ${body.tenantId} not found`);
+  if (!tenant.iam_realm) return errBody(422, 'REALM_NOT_PROVISIONED', `tenant ${body.tenantId} has no iam_realm provisioned`);
+
+  const realm = tenant.iam_realm;
+  const attributes = {};
+  attributes.tenant_id = tenant.id;
+  if (body.workspaceId) attributes.workspace_id = body.workspaceId;
+
   try {
-    const userId = await kcAdmin.createUser(REALM, {
+    const userId = await kc.createUser(realm, {
       username, email: body.primaryEmail ?? null,
       firstName: (body.displayName ?? username).split(' ')[0],
       lastName: (body.displayName ?? '').split(' ').slice(1).join(' ') || 'User',
-      password: body.password, enabled: true, temporary: false
+      password: body.password, enabled: true, temporary: false,
+      attributes
     });
     return ok(201, {
       registrationId: randomUUID(), userId, activationMode: 'self_service', state: 'active',
