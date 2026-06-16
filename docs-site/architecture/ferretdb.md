@@ -6,12 +6,12 @@ over a PostgreSQL + DocumentDB engine**. For the decision record see
 for cutover and rollback procedures see the migration runbooks linked under
 [Day-2 Operations](#day-2-operations).
 
-> **Migration status.** FerretDB + DocumentDB is the **adopted go-forward** document store
-> (ADR-14, epic #454), deployed by the umbrella chart's `documentdb` and `ferretdb` sub-charts.
-> It replaces the bundled **MongoDB**, which is being phased out: MongoDB may run **alongside**
-> the new stack during the cutover window so operators can flip `MONGO_URI` per environment and
-> roll back without data loss (see the [rollback runbook](#day-2-operations)). Treat MongoDB as
-> **legacy / being retired**, not as the target backend.
+> **Migration status.** FerretDB + DocumentDB is the document store (ADR-14, epic #454),
+> deployed by the umbrella chart's `documentdb` and `ferretdb` sub-charts and enabled by default.
+> The migration off the bundled **MongoDB** server is **complete**: that component has been
+> removed from the chart and the cutover/rollback window is closed. The MongoDB driver, wire
+> protocol and Mongo-style data API are unchanged — clients still connect via `MONGO_URI`. The
+> migration runbooks below remain as the historical record of the MongoDB → FerretDB cutover.
 
 ## Overview
 
@@ -191,8 +191,9 @@ full design and implementation are owned by **`add-ferretdb-realtime-cdc-remedia
 ## Day-2 Operations
 
 **Enable / disable.** FerretDB + DocumentDB are chart components toggled by `ferretdb.enabled` /
-`documentdb.enabled`. During cutover MongoDB (`mongodb.enabled`) coexists so operators can flip
-`MONGO_URI` and roll back; see the runbooks below.
+`documentdb.enabled` (both on by default). They are the sole document store; the former `mongodb`
+server component has been removed. The cutover and rollback runbooks below remain as the historical
+migration record.
 
 **Health checks.** `helm upgrade --install` gates on rollout completion; after install:
 

@@ -6,7 +6,7 @@ This page describes **every architecture component** of In Falcone — what it d
 EDGE          CONTROL & DATA PLANE        DATA BACKENDS           PLATFORM
 ─────         ────────────────────        ─────────────           ────────
 APISIX  ─────▶ Control Plane              PostgreSQL              Keycloak (identity)
-gateway        Executor                   MongoDB                 Vault + ESO (secrets)
+gateway        Executor                   FerretDB + DocumentDB   Vault + ESO (secrets)
                Adapters                   Kafka / Redpanda        Prometheus (observability)
 Web Console    Realtime Engine            SeaweedFS (storage)     Bootstrap & Provisioning
                Functions runtime
@@ -49,15 +49,15 @@ The executor is the **data plane**. It is deliberately dependency-light: it take
 | --- | --- | --- |
 | `postgres-data-executor.mjs` | PostgreSQL | row CRUD + bulk + query, under RLS |
 | `postgres-ddl-executor.mjs` | PostgreSQL | schema/table/column/index DDL |
-| `mongo-data-executor.mjs` | MongoDB | document CRUD + query |
+| `mongo-data-executor.mjs` | FerretDB / DocumentDB | document CRUD + query (MongoDB wire protocol) |
 | `events-executor.mjs` | Kafka | publish/subscribe |
 | `functions-executor.mjs` | Functions runtime | invoke |
-| `realtime-executor.mjs` | MongoDB | change-stream subscriptions |
+| `realtime-executor.mjs` | FerretDB / DocumentDB | Postgres logical-replication subscriptions |
 | `postgres-realtime-executor.mjs` | PostgreSQL | trigger + `LISTEN/NOTIFY` CDC |
 
 Supporting modules: `connection-registry.mjs` (resolve a workspace's connection URI), `api-keys.mjs` (verify `flc_…` keys → tenant/workspace/DB role/scopes), `jwt-verify.mjs` (verify Bearer tokens). The executor's `resolveIdentity()` enforces the credential precedence described in the [overview](/architecture/overview#identity-resolution-precedence).
 
-Every executor call carries an `identity` and **stamps/filters by `tenantId`** — for PostgreSQL via the RLS-bound role, for MongoDB via an injected predicate.
+Every executor call carries an `identity` and **stamps/filters by `tenantId`** — for PostgreSQL via the RLS-bound role, for the FerretDB/DocumentDB document store via an injected predicate (the MongoDB wire protocol has no RLS / `SET ROLE`, so the adapter predicate is the guard).
 
 ---
 
@@ -90,7 +90,7 @@ The console talks to the same public API as any other client, so anything it doe
 
 Realtime delivers live data changes over **Server-Sent Events** (no WebSocket dependency). Two sources:
 
-- **MongoDB change streams.** `collection.watch()` with a pipeline that `$match`es the verified tenant. insert/update/replace are scoped on `fullDocument.tenantId`; **deletes** are scoped on `fullDocumentBeforeChange.tenantId`, which requires collection **pre-images** (`changeStreamPreAndPostImages`, MongoDB 6.0+, enabled best-effort on subscribe). Change streams require a **replica set**.
+- **Document-store CDC (Postgres logical replication).** FerretDB v2 over DocumentDB has no MongoDB change streams, so document realtime is sourced from a Postgres **`pgoutput`** logical-replication slot on the DocumentDB engine's `documentdb_data` tables. `REPLICA IDENTITY FULL` carries delete pre-images, and the verified tenant is enforced by **consumer-side `tenantId` filtering** (the structural equivalent of the old change-stream `$match`). A WAL `UPDATE` surfaces as `operationType: 'replace'` (logical replication carries the full new image). `wal_level=logical` is the enabling GUC. See the [FerretDB Document-Store Runbook](/architecture/ferretdb#change-stream-remediation).
 - **PostgreSQL trigger CDC.** A trigger emits `NOTIFY` on a per-tenant channel (`flc_rt_<md5(schema.table:tenant_id)>`); the engine `LISTEN`s on the caller's channel only. Deletes use `OLD.tenant_id`; payloads above ~8000 bytes are guarded.
 
 Because tenant matching happens **inside** the pipeline/channel, a subscriber can only ever receive its own tenant's changes. A subscribe without tenant identity returns `401`. EventSource can't set headers, so SSE routes accept the anon key as `?apikey=`.
@@ -111,17 +111,17 @@ RLS is only meaningfully testable against a real Postgres (see the [docker-compo
 
 ---
 
-## MongoDB (document backend)
+## Document Store (FerretDB + DocumentDB)
 
-**Chart alias:** `mongodb`
+**Chart aliases:** `ferretdb` + `documentdb` (replaced the former `mongodb` server component, now removed — [ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb))
 
-The document data engine, also the source for Mongo realtime. Isolation is enforced in the **adapter/executor** (injected `tenantId` filter on reads, stamped on writes) rather than in the engine, and reinforced in the change-stream pipeline. It must run as a **replica set** (`rs0`) so change streams (hence realtime) work — the compose stack and the platform run it single-node-RS for development.
+The document data engine, also the source for document realtime. It is a two-layer stack that preserves the **MongoDB wire protocol** while replacing the storage engine: a stateless **FerretDB v2 gateway** speaks the MongoDB wire protocol and translates it to SQL against a **DocumentDB-on-PostgreSQL 17** engine. Falcone's existing MongoDB driver and the data-API executor connect unchanged via `MONGO_URI`. Isolation is enforced in the **adapter/executor** (injected `tenantId` filter on reads, stamped on writes) rather than in the engine. There is **no replica set and no keyfile** — durable state lives in the engine's PostgreSQL volume. Document realtime is not change streams: it is sourced from a Postgres **`pgoutput`** logical-replication slot (`wal_level=logical`, `REPLICA IDENTITY FULL`, consumer-side `tenantId` filter). For topology, the two-layer design, the tenancy model and day-2 operations see the [FerretDB Document-Store Runbook](/architecture/ferretdb).
 
 ---
 
 ## Object Storage (SeaweedFS)
 
-**Chart alias:** `seaweedfs` (replaces the legacy MinIO `storage` component — [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs))
+**Chart alias:** `seaweedfs` (replaced the former MinIO `storage` component, now removed — [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs))
 
 S3-compatible object storage (SeaweedFS, Apache-2.0) exposed as `…/objects/{bucket}/{key}` (`data_access`). Object paths are tenant-scoped so one tenant's keys never resolve into another's namespace. For topology, the filer-on-PostgreSQL metadata store, the per-tenant identity model and day-2 operations see the [SeaweedFS Storage Runbook](/architecture/seaweedfs).
 
@@ -137,9 +137,9 @@ A tenant-scoped publish/subscribe stream (`/v1/events/publish`, `/v1/events/subs
 
 ## Serverless Functions
 
-**Chart alias:** `openwhisk` (functions runtime)
+**Chart alias:** none — functions are provisioned by the control-plane executor, not a datastore component.
 
-Per-tenant serverless functions: deploy (`POST /v1/functions`, `structural_admin`/`function_deployment`) and invoke (`POST /v1/functions/{id}/invoke`, `data_access`). The platform runs functions on a **Knative-based runtime** (migrated off OpenWhisk; the chart alias is retained). The control plane manages function lifecycle via Kubernetes RBAC (`templates/control-plane-rbac.yaml`).
+Per-tenant serverless functions: deploy (`POST /v1/functions`, `structural_admin`/`function_deployment`) and invoke (`POST /v1/functions/{id}/invoke`, `data_access`). The platform runs functions on a **Knative-based runtime** (migrated off OpenWhisk): the control-plane executor provisions one Knative Service per function from `FN_RUNTIME_IMAGE` and manages function lifecycle via Kubernetes RBAC (`templates/control-plane-rbac.yaml`). The public API keeps the OpenWhisk-compatible action/package/trigger/rule model.
 
 ---
 
@@ -173,7 +173,7 @@ Keycloak is the OIDC identity provider. It backs console login, issues per-tenan
 
 **Chart aliases:** `vault`, `eso`
 
-Secrets are sourced from **HashiCorp Vault** via the **External Secrets Operator**, so the chart references secret *names* rather than embedding secret values. The dev compose stack runs Vault in `-dev` mode. (Sensitive material like the MongoDB replica-set keyfile is created as a Kubernetes Secret and mounted via `secretKeyRef`, never inlined.)
+Secrets are sourced from **HashiCorp Vault** via the **External Secrets Operator**, so the chart references secret *names* rather than embedding secret values. The dev compose stack runs Vault in `-dev` mode. (Sensitive material like the FerretDB/DocumentDB Postgres credentials behind `MONGO_URI` is created as a Kubernetes Secret and mounted via `secretKeyRef`, never inlined.)
 
 ---
 

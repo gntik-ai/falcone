@@ -198,7 +198,7 @@ useEffect(() => {
 }, [])
 ```
 
-Changes made by *this tenant* — from another browser tab, a teammate, or a server-side `service` key — now appear instantly. Other tenants' changes never arrive: the realtime pipeline matches on the verified tenant inside the change stream. See [Realtime Subscriptions](/api/realtime) for the full model.
+Changes made by *this tenant* — from another browser tab, a teammate, or a server-side `service` key — now appear instantly. Other tenants' changes never arrive: the realtime pipeline matches on the verified tenant inside the source (a consumer-side `tenantId` filter on the document store's Postgres logical-replication stream). See [Realtime Subscriptions](/api/realtime) for the full model.
 
 ## Where to go next
 

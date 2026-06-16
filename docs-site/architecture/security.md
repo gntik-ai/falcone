@@ -42,13 +42,13 @@ Edge checks are necessary but not sufficient — isolation is also enforced wher
 - The app connects as a **non-`BYPASSRLS` role** — `falcone_app`, with `anon` / `service` variants. RLS does **not** apply to superusers or `BYPASSRLS` roles, so connecting as a constrained role is precisely what makes the policy enforce.
 - The executor sets the tenant context and role per request (`SET LOCAL`), so every statement is filtered — even one a bug forgot to scope.
 
-### MongoDB — adapter-injected predicate
+### FerretDB / DocumentDB — adapter-injected predicate
 
-The data adapter injects a `tenantId` filter into every read and stamps it on every write; the realtime change-stream pipeline `$match`es the verified tenant. There is no path to issue an unscoped query through the adapter.
+The data adapter injects a `tenantId` filter into every read and stamps it on every write; the FerretDB/DocumentDB document store has no RLS / `SET ROLE`, so the adapter predicate **is** the isolation boundary (a forged `tenantId` is rejected with `403`). Document realtime carries the same verified tenant via a consumer-side `tenantId` filter on the Postgres logical-replication stream (see below). There is no path to issue an unscoped query through the adapter.
 
 ### Realtime — tenant-scoped at the source
 
-Subscriptions match the verified tenant **inside** the Mongo change-stream pipeline / Postgres `LISTEN` channel, so a subscriber only ever receives its own tenant's events. Deletes are tenant-scoped via pre-images (Mongo) / `OLD.tenant_id` (Postgres). Subscribing without tenant identity returns `401`.
+Subscriptions match the verified tenant **inside** the source — for the document store, a consumer-side `tenantId` filter on the Postgres **`pgoutput`** logical-replication stream (the structural equivalent of the old change-stream `$match`); for PostgreSQL, the `LISTEN` channel. A subscriber only ever receives its own tenant's events. Deletes are tenant-scoped via `REPLICA IDENTITY FULL` pre-images (document store) / `OLD.tenant_id` (Postgres). Subscribing without tenant identity returns `401`.
 
 ### Beyond the database
 
@@ -67,7 +67,7 @@ APISIX `limit-count` uses `key_type: var_combination` with `$http_apikey`, givin
 
 ## Secrets
 
-Secrets come from **Vault** via the **External Secrets Operator**; the chart references secret *names*, not values. Sensitive material (e.g. the MongoDB replica-set keyfile) is created as a Kubernetes Secret and mounted by reference — never inlined into manifests or values.
+Secrets come from **Vault** via the **External Secrets Operator**; the chart references secret *names*, not values. Sensitive material (e.g. the FerretDB/DocumentDB Postgres credentials behind `MONGO_URI`) is created as a Kubernetes Secret and mounted by reference — never inlined into manifests or values.
 
 ## Transport & SSRF safety
 

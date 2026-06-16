@@ -26,7 +26,7 @@ import {
 const DEFAULT_STARTED_AT = '2026-03-27T00:00:00Z';
 const DEFAULT_COMPLETED_AT = '2026-03-27T00:00:00Z';
 const DEFAULT_MODE = 'full';
-const DEFAULT_PROVIDERS = Object.freeze(['minio', 'garage']);
+const DEFAULT_PROVIDERS = Object.freeze(['seaweedfs', 'garage']);
 const DEFAULT_BOUNDARY_OBJECT_SIZE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_BOUNDARY_PAGE_SIZE = 2;
 const PROVIDER_CONFIG_FIELD_WHITELIST = Object.freeze(['providerType', 'displayName', 'backendFamily']);
@@ -763,7 +763,7 @@ export function buildVerificationRun(input = {}) {
 
 export function buildVerificationScenario(input = {}) {
   const category = isScenarioCategorySupported(input.category) ? input.category : 'bucket.create';
-  const providerType = normalizeProviderType(input.providerType) ?? 'minio';
+  const providerType = normalizeProviderType(input.providerType) ?? 'seaweedfs';
   const operation = input.operation ?? category;
   const expectedOutcome = input.expectedOutcome ?? 'verification scenario completed';
 
@@ -920,7 +920,7 @@ export function buildErrorTaxonomyConsistencyResult(input = {}) {
 }
 
 export function buildTenantIsolationVerificationResult(input = {}) {
-  const providerType = normalizeProviderType(input.providerType) ?? 'minio';
+  const providerType = normalizeProviderType(input.providerType) ?? 'seaweedfs';
   const scenario = input.scenario ?? 'cross_tenant_bucket_access';
   const observedAt = input.observedAt ?? DEFAULT_STARTED_AT;
   const fixture = buildVerificationFixture(providerType, observedAt);

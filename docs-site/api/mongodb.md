@@ -1,6 +1,6 @@
 # API Reference — MongoDB Data API
 
-REST CRUD and querying over document collections, with **cursor pagination**. Tenant isolation is enforced by an adapter-injected `tenantId` predicate on every read and stamped on every write (see [Security](/architecture/security)).
+REST CRUD and querying over document collections, with **cursor pagination**. The document store is **FerretDB v2 over DocumentDB-on-PostgreSQL**, which speaks the **MongoDB wire protocol**, so the data API and its Mongo-style filters are unchanged (see the [FerretDB Document-Store Runbook](/architecture/ferretdb)). Tenant isolation is enforced by an adapter-injected `tenantId` predicate on every read and stamped on every write (see [Security](/architecture/security)).
 
 Authenticate with an `apikey` header.
 
@@ -48,8 +48,8 @@ curl -sX DELETE $API/v1/collections/profiles/documents/<id> -H "apikey: $KEY"
 
 ## Realtime
 
-Document changes can be streamed live — see [Realtime Subscriptions](/api/realtime). Mongo realtime requires the database to run as a **replica set** (change streams), and tenant-scoped deletes require collection **pre-images**.
+Document changes can be streamed live — see [Realtime Subscriptions](/api/realtime). FerretDB v2 has no MongoDB change streams, so document realtime is sourced from **Postgres logical replication** (a `pgoutput` slot on the DocumentDB engine): no replica set is involved, and tenant-scoped deletes use `REPLICA IDENTITY FULL` pre-images on the WAL stream (see the [FerretDB Document-Store Runbook](/architecture/ferretdb#change-stream-remediation)).
 
 ## Isolation
 
-The adapter never issues an unscoped query: the `tenantId` filter is injected into reads and stamped onto writes, and the realtime pipeline `$match`es the verified tenant. There is no client-controllable path to another tenant's documents.
+The adapter never issues an unscoped query: the `tenantId` filter is injected into reads and stamped onto writes, and the realtime pipeline applies a consumer-side `tenantId` filter to the verified tenant. There is no client-controllable path to another tenant's documents.

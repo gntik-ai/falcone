@@ -116,7 +116,7 @@ function resolveProviderProfile({ tenantStorageContext, storage = {}, region = D
       ...storage,
       config: storage.config ?? {
         inline: {
-          providerType: tenantStorageContext?.providerType ?? storage.providerType ?? 'minio',
+          providerType: tenantStorageContext?.providerType ?? storage.providerType ?? 'seaweedfs',
           region
         }
       }

@@ -1,6 +1,6 @@
 # API Reference — Realtime Subscriptions
 
-Realtime delivers live data changes over **Server-Sent Events (SSE)**. It is tenant-scoped **at the source** — matching happens inside the change-stream pipeline / notify channel — so a subscriber can only ever receive its own tenant's changes.
+Realtime delivers live data changes over **Server-Sent Events (SSE)**. It is tenant-scoped **at the source** — matching happens inside the logical-replication consumer / notify channel — so a subscriber can only ever receive its own tenant's changes.
 
 ## Subscribe (SSE)
 
@@ -36,14 +36,14 @@ Each change is delivered as a JSON event:
   "document": { "...": "the full document (or the prior document for a delete)" } }
 ```
 
-- `insert` / `update` / `replace` carry the full current document (`fullDocument`).
-- `delete` carries the **prior** document (`fullDocumentBeforeChange`), which is also how the delete is kept tenant-scoped.
+- `insert` / `update` / `replace` carry the full current document. For the document store, a logical-replication `UPDATE` carries the full new image, so updates surface as `replace`.
+- `delete` carries the **prior** document, which is also how the delete is kept tenant-scoped.
 
 ## Sources
 
 | Backend | Mechanism | Notes |
 | --- | --- | --- |
-| MongoDB | `collection.watch()` change stream with a tenant `$match` | Requires a **replica set**; deletes need collection **pre-images** (`changeStreamPreAndPostImages`, MongoDB 6.0+, enabled best-effort on subscribe) |
+| FerretDB / DocumentDB (document store) | Postgres **`pgoutput`** logical-replication slot on the DocumentDB engine's `documentdb_data` tables, with consumer-side `tenantId` filtering | FerretDB v2 has **no MongoDB change streams**; **no replica set** is involved. Requires `wal_level=logical`; deletes use `REPLICA IDENTITY FULL` pre-images. See the [FerretDB Document-Store Runbook](/architecture/ferretdb#change-stream-remediation) |
 | PostgreSQL | trigger → `NOTIFY` on a per-tenant channel + `LISTEN` | Channel `flc_rt_<md5(schema.table:tenant_id)>`; deletes via `OLD.tenant_id`; payloads above ~8000 bytes are guarded |
 
 ## Events (publish/subscribe)
@@ -58,6 +58,6 @@ curl -sX POST $API/v1/events/publish -H "apikey: $KEY" \
 
 ## Isolation guarantees
 
-- Tenant matching is **server-side, inside the pipeline/channel** — not a client filter.
-- Mongo deletes are scoped via the pre-image's `tenantId`; if pre-images can't be enabled, deletes are simply **not delivered** (never leaked).
+- Tenant matching is **server-side, inside the logical-replication consumer / channel** — not a client filter.
+- Document-store deletes are scoped via the WAL pre-image's `tenantId` (`REPLICA IDENTITY FULL`); a row that does not match the verified tenant is simply **not delivered** (never leaked).
 - Postgres subscribers `LISTEN` only on their own tenant's channel.
