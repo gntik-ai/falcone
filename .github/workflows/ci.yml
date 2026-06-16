@@ -72,6 +72,22 @@ jobs:
           MIGRATION_MANIFEST: ${{ vars.SEAWEEDFS_MIGRATION_MANIFEST }}
         run: bash tests/blackbox/run.sh
 
+      # FerretDB migration validation (change add-ferretdb-migration-validation).
+      # Gated OFF by default (repo variable FERRETDB_VALIDATION != '1') so normal CI is
+      # unaffected; enable only when a FerretDB v2 + DocumentDB endpoint is reachable
+      # (operator supplies FERRETDB_URI + the migration manifest as repo vars/secrets).
+      # Runs the document-parity checker + per-tenant data-API smoke (incl. ADR-14 risk-area
+      # probes) via the blackbox entrypoint; FERRETDB_VALIDATION_NO_COMPOSE skips local compose
+      # bring-up when the endpoint is an external service rather than tests/env docker-compose.
+      - name: FerretDB migration validation (gated)
+        if: ${{ vars.FERRETDB_VALIDATION == '1' }}
+        env:
+          FERRETDB_VALIDATION: '1'
+          FERRETDB_VALIDATION_NO_COMPOSE: '1'
+          FERRETDB_URI: ${{ secrets.FERRETDB_URI }}
+          MIGRATION_MANIFEST: ${{ vars.FERRETDB_MIGRATION_MANIFEST }}
+        run: bash tests/blackbox/run.sh
+
       - name: Plan Enforcement Coherence Tests
         run: node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs
         env:
