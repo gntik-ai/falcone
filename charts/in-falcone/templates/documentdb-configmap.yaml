@@ -27,4 +27,49 @@ data:
     # Managed by Helm — add-ferretdb-documentdb-engine. Do not edit in-cluster.
     shared_preload_libraries = 'pg_cron,pg_documentdb_core,pg_documentdb'
     cron.database_name = 'postgres'
+{{- if .Values.documentdb.logicalReplication.enabled }}
+  # NOTE: wal_level=logical is NOT set here. The engine image does not `include_dir` this conf.d
+  # file, so server GUCs must be passed on the postgres command line instead — see documentdb.args
+  # in values.yaml (add-ferretdb-realtime-cdc-remediation #460; confirmed on a live kind engine:
+  # a conf.d wal_level was silently ignored, GUC source stayed `default`).
+  # Logical-replication provisioning SQL, run once by the post-install init Job via `psql -f`
+  # (add-ferretdb-realtime-cdc-remediation #460). Idempotent. :role / :pw / :pub are passed by the
+  # Job via `psql -v` (client-side, safely quoted); %I/%L quote identifiers/literals server-side.
+  # Validated against ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0.
+  provision-logical-replication.sql: |
+    -- 1. REPLICATION-privileged login role (distinct from falcone_app / per-tenant roles).
+    SELECT format('CREATE ROLE %I LOGIN REPLICATION PASSWORD %L', :'role', :'pw')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'role') \gexec
+    SELECT format('ALTER ROLE %I WITH LOGIN REPLICATION PASSWORD %L', :'role', :'pw') \gexec
+    -- 2. Grants. The walsender decodes the `bson` columns via documentdb_core.bson_out, so the role
+    --    needs USAGE on every documentdb* schema (without it streaming dies "permission denied for
+    --    schema documentdb_core"). The consumer's CollectionCatalog also reads the collections
+    --    catalog. SELECT on documents_* is NOT required (WAL decode reads WAL, not the tables).
+    SELECT format('GRANT USAGE ON SCHEMA %I TO %I', nspname, :'role')
+      FROM pg_namespace WHERE nspname LIKE 'documentdb%' \gexec
+    SELECT format('GRANT SELECT ON documentdb_api_catalog.collections TO %I', :'role') \gexec
+    -- 3. Scoped publication (idempotent).
+    SELECT format('CREATE PUBLICATION %I FOR TABLES IN SCHEMA documentdb_data', :'pub')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = :'pub') \gexec
+    -- 4. REPLICA IDENTITY FULL on existing documents_* tables (delete pre-images).
+    DO $$ DECLARE r record; BEGIN
+      FOR r IN SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+               WHERE n.nspname = 'documentdb_data' AND relname LIKE 'documents\_%' AND relkind = 'r'
+      LOOP EXECUTE format('ALTER TABLE documentdb_data.%I REPLICA IDENTITY FULL', r.relname); END LOOP;
+    END $$;
+    -- 5. Event trigger: keep RI FULL applied to documents_* tables created later (new collections).
+    CREATE OR REPLACE FUNCTION falcone_documents_ri_full() RETURNS event_trigger
+    LANGUAGE plpgsql AS $fn$
+    DECLARE obj record; BEGIN
+      FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE'
+      LOOP
+        IF obj.schema_name = 'documentdb_data' AND obj.object_identity ~ '\.documents_[0-9]+$' THEN
+          EXECUTE format('ALTER TABLE %s REPLICA IDENTITY FULL', obj.object_identity);
+        END IF;
+      END LOOP;
+    END $fn$;
+    DROP EVENT TRIGGER IF EXISTS falcone_documents_ri_full_trg;
+    CREATE EVENT TRIGGER falcone_documents_ri_full_trg ON ddl_command_end
+      WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION falcone_documents_ri_full();
+{{- end }}
 {{- end }}

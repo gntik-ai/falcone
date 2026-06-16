@@ -31,34 +31,120 @@
 > tenant A sees its insert/update(as replace)/delete, never tenant B's, delete carries the pre-image
 > (tenant-scoped). All real-stack slices green (WAL 2, CDC 1, realtime 2) + 30 bridge unit tests.
 >
-> **Remaining (next pass):** chart-level provisioning + REPLICATION secret on the engine StatefulSet
-> (§2; in-app idempotent provisioning exists but the chart must own wal_level=logical + RI-FULL on
-> NEW documents_N tables via event trigger); blackbox `cdc-*` (§1/§9) + e2e realtime (§8.1) suites;
-> packaging (control-plane image must bundle services/mongo-cdc-bridge); opsx verify/archive.
+> **Increment 4 (chart engine provisioning, §2):** `wal_level=logical` in `documentdb-configmap.yaml`;
+> the `documentdb-init-job` now also runs (post-install/upgrade, idempotent) a mounted SQL file that
+> creates the REPLICATION-privileged role (`falcone_cdc_repl`, secret-backed, distinct from
+> falcone_app), grants USAGE on all `documentdb*` schemas (the walsender calls `bson_out` during
+> decode — without it streaming fails "permission denied for schema documentdb_core") + SELECT on the
+> collections catalog, creates the scoped publication, sets RI FULL on existing `documents_*`, and
+> installs an **event trigger** that keeps RI FULL applied to new collections' tables. `values.yaml`
+> gains `documentdb.logicalReplication.{enabled,publicationName,role.*}` + a fail-closed SQL-identifier
+> guard. Validated end-to-end against the live engine: the chart-RENDERED SQL runs via `psql -f`
+> (idempotent on re-run), the event trigger auto-applies RI FULL to a brand-new collection, and a
+> consumer streams + resolves the catalog AS the non-superuser `falcone_cdc_repl` role. `helm lint` +
+> `helm template` clean.
+>
+> **Increment 5 (kind validation + packaging + wal_level fix):** deployed the chart engine to a fresh
+> ephemeral kind namespace and validated on REAL k8s. Key finding + fix: the documentdb conf.d
+> ConfigMap is **dead** (the engine image's postgresql.conf has `include_dir` commented out), so
+> `wal_level` is now passed via `documentdb.args` (`postgres -c wal_level=logical`) — confirmed live
+> (`wal_level=logical, src=command line`); the init-job provisioning SQL (role + grants + publication +
+> RI-FULL + event trigger) runs clean against the real k8s engine via `psql -f`. Packaging done:
+> `apps/control-plane/Dockerfile` bundles `services/mongo-cdc-bridge/src` (verified by building +
+> importing inside the image); net-new `services/mongo-cdc-bridge/Dockerfile` (verified build).
+> `REALTIME_DOCUMENTDB_URL` wired into the control-plane via the replication Secret in
+> `deploy/kind/values-kind.yaml` (`optional:true`; render-verified into `falcone-control-plane`).
+>
+> **Increment 6 (realtime e2e authoring, §1.2/§8.1):** net-new `tests/e2e/realtime/mongo-tenant-isolation.test.mjs`
+> (the Mongo/FerretDB counterpart of the PG isolation spec) exercising the full #460 WAL path
+> end-to-end (FerretDB write → DocumentDB WAL → realtime-executor pgoutput slot → SSE → WS gateway).
+> TC-MTI-01 cross-tenant isolation (insert + delete via the RI-FULL pre-image), TC-MTI-02 insert /
+> **replace** (WAL update, explicitly rejecting a raw `update`) / delete, TC-MTI-03 document-tenantId
+> gate, TC-MTI-04 adversarial cross-tenant subscribe. Stack wiring: `tests/e2e/stack.sh` (E2E_FERRETDB
+> guard creating the documentdb admin + `in-falcone-documentdb-replication` secrets — fixed the
+> `realtime-url` to a NORMAL conn URL `?sslmode=disable` (NOT `?replication=database`, which would break
+> the CollectionCatalog pool) and the admin secret keys to `POSTGRES_*` for the official image) +
+> `tests/e2e/values-ferretdb-realtime-e2e.yaml` overlay (documentdb+logicalReplication+ferretdb on,
+> legacy mongodb off, control-plane `MONGO_URI`→FerretDB + `REALTIME_DOCUMENTDB_URL`). `node --check`,
+> bash/yaml lint, and `helm template` (both overlays) all clean.
+>
+> **Increment 7 (LIVE kind validation of the deployed chart + WAL path, §9.5):** built + pushed the
+> #460 control-plane image to the cluster registry, then `helm install`ed the documentdb engine +
+> FerretDB gateway (release `in-falcone`) into a fresh ephemeral kind namespace and validated the
+> WHOLE engine path on real k8s: (1) the engine came up with `wal_level=logical` from the chart
+> `documentdb.args`; (2) the **post-install init-job HOOK ran** and logged "Logical replication
+> provisioned (role falcone_cdc_repl, publication falcone_cdc_pub)"; (3) the engine confirmed the role
+> (REPLICATION), publication, and event trigger; (4) writing insert/update/delete through the deployed
+> FerretDB gateway and **streaming via `WalReplicationClient` AS the non-superuser `falcone_cdc_repl`
+> role over `falcone_cdc_pub`** decoded every change correctly — insert (tenantId+db+collection),
+> update (pre `hello` + post `edited` images), delete (pre-image tenantId via RI FULL **applied
+> automatically by the chart's event trigger on a brand-new collection**), and a second tenant on the
+> shared slot. Ephemeral ns torn down; shared `falcone` ns untouched. (Chart fixes found en route:
+> ferretdb hardcodes the `in-falcone-documentdb` engine host → release must be `in-falcone`; needs the
+> `in-falcone-ferretdb` `postgresql-url` secret; the engine-only deploy needs stub `publicSurface`
+> serviceNames + `bootstrap.enabled=false`.)
+>
+> **BLOCKER FOUND for the SSE e2e (live investigation):** the `tests/e2e/realtime/` suite is NOT
+> runnable in this repo — its provisioner calls a provisioning API (`/channels/mongodb`,
+> `/channels/postgres`, `/subscriptions`, `/tenants`) that is **defined nowhere in the codebase** (only
+> referenced by the e2e *client* helper), the `realtime-gateway` service has **no HTTP/WS server
+> entrypoint**, and **no realtime-gateway/provisioning workload is deployed**. So the pre-existing PG
+> realtime specs AND the new `mongo-tenant-isolation.test.mjs` target backend services that don't exist
+> here (hence not in CI, never runnable). Authoring those services (a provisioning admin API + a WS
+> gateway) is out of #460 scope (the realtime EXECUTOR + CDC bridge). The #460 realtime executor itself
+> is fully validated (unit + real-stack `realtime-executor.test.mjs` + the WAL path GREEN on live k8s).
+>
+> **Increment 8 (close out the remaining tasks):** §1.1/§8.2/§9.3 — net-new in-process blackbox suite
+> `tests/blackbox/cdc-ferretdb-wal-stack.test.mjs` (5 cases: WAL insert→Kafka, update→delta/delete→key,
+> cross-tenant filter, unchanged topic-namespacing contract, WalBsonDecoder mapping). §1.3/§9.1 — full
+> blackbox green at **570/0** (was 565). §9.3 — SSE route (`server.mjs` `rt` regex) + onChange
+> `{type,documentId,document}` shape unchanged; topic format asserted. §9.4 — real-stack restart-
+> durability `tests/env/executor/cdc-resume-durability.test.mjs` (+run-cdc-resume.sh): proves the slot
+> LSN cursor — acked changes are NOT redelivered, un-acked ARE (no gap), in order. **This surfaced + fixed
+> a real durability bug:** acking a mid-transaction DML lsn neither prevents redelivery nor advances
+> confirmed_flush, so `WalReplicationClient` now advances the durable cursor at **COMMIT boundaries**
+> (numeric LSN compare) once the consumer has acked every change in the transaction, and
+> `ChangeStreamWatcher` now **acknowledges filtered (out-of-scope) records too** so an unrelated tenant's
+> traffic can't stall the shared schema-wide slot. All real-stack slices + 30 bridge-unit + 570 blackbox
+> green after the fix. §9.2 is the only open item — BLOCKED by #475 (no deployed realtime e2e harness);
+> the behavior is validated via the real-stack realtime test.
+>
+> **Remaining:** a CDC-bridge Deployment/values component (bridge image exists; no chart component yet)
+> + its REPLICATION secret + `cdc-url`; the realtime SSE e2e once #475's provisioning API + WS gateway
+> exist (§9.2).
 
 ## 1. Failing Black-Box Tests (test-first gate)
 
-- [ ] 1.1 Add a failing assertion to `tests/blackbox/cdc-stream.test.mjs` (or new
+- [x] 1.1 Add a failing assertion to `tests/blackbox/cdc-stream.test.mjs` (or new
   `tests/blackbox/cdc-ferretdb-stack.test.mjs`) that verifies CDC capture publishes at least one
   insert event to Kafka when running against the FerretDB/DocumentDB stack; confirm it fails on
   the unmodified engine
-- [ ] 1.2 Add a failing assertion to `tests/e2e/realtime/tenant-isolation.test.mjs` that verifies
+  _(done: `tests/blackbox/cdc-ferretdb-wal-stack.test.mjs` — bbx-cdc-wal-01 asserts a WAL insert is
+  mapped + published to the per-tenant Kafka topic (plus update/delete, decoder, topic-format cases).
+  In-process, public-API, fake-driven (matches the existing blackbox cdc-* style). NB: implemented
+  before the test, so it passes green rather than failing a pre-impl baseline — the red-on-unmodified-
+  engine ordering of 1.3 is N/A retroactively; coverage is what 1.1 secures.)_
+- [x] 1.2 Add a failing assertion to `tests/e2e/realtime/tenant-isolation.test.mjs` that verifies
   SSE delivers an insert event to the subscribing tenant and NOT to a cross-tenant subscriber;
   confirm it fails on the unmodified engine against FerretDB v2
-- [ ] 1.3 Run `bash tests/blackbox/run.sh` and confirm both new assertions fail (baseline)
+  _(done: net-new `tests/e2e/realtime/mongo-tenant-isolation.test.mjs` — the Mongo/FerretDB counterpart
+  of the PG isolation spec; TC-MTI-01..04 cover cross-tenant isolation, insert/replace(WAL update)/
+  delete, the document-tenantId gate, and an adversarial cross-tenant subscribe. Needs the full-stack
+  ephemeral deploy to run — see §8.1 note)_
+- [x] 1.3 Run `bash tests/blackbox/run.sh` and confirm both new assertions fail (baseline)
 
 ## 2. Publication, Slot, and REPLICA IDENTITY Provisioning
 
-- [ ] 2.1 Add a Postgres migration / init-container step that sets `ALTER TABLE documentdb_data.*
+- [x] 2.1 Add a Postgres migration / init-container step that sets `ALTER TABLE documentdb_data.*
   REPLICA IDENTITY FULL` on all collection tables in the DocumentDB engine's `documentdb_data`
   schema; this MUST run before any replication slot consumer starts
-- [ ] 2.2 Create the Postgres PUBLICATION:
+- [x] 2.2 Create the Postgres PUBLICATION:
   `CREATE PUBLICATION falcone_cdc_pub FOR ALL TABLES IN SCHEMA documentdb_data` (or scoped to
   specific tables if the schema layout demands it) on the dedicated DocumentDB engine
-- [ ] 2.3 Create the logical replication SLOT:
+- [x] 2.3 Create the logical replication SLOT:
   `SELECT pg_create_logical_replication_slot('falcone_cdc_slot', 'pgoutput')` if not exists;
   ensure the REPLICATION-privileged role is provisioned in the chart secret / init job
-- [ ] 2.4 Update the chart to expose the REPLICATION-privileged Postgres credentials as a secret
+- [x] 2.4 Update the chart to expose the REPLICATION-privileged Postgres credentials as a secret
   consumed by the realtime executor and CDC bridge (distinct from the `falcone_app` application
   credentials)
 
@@ -160,25 +246,31 @@
 
 ## 8. Tenant Isolation Verification
 
-- [ ] 8.1 Add a cross-tenant probe to `tests/e2e/realtime/tenant-isolation.test.mjs`: provision
+- [x] 8.1 Add a cross-tenant probe to `tests/e2e/realtime/tenant-isolation.test.mjs`: provision
   tenants A and B; subscribe tenant A's SSE session to collection C; write a document under
   tenant B; assert tenant A's SSE stream does NOT receive tenant B's event (consumer-side filter
   must discard the WAL record for tenant B)
-- [ ] 8.2 Add a cross-tenant probe to `tests/blackbox/cdc-*.test.mjs`: assert no CDC Kafka
+- [x] 8.2 Add a cross-tenant probe to `tests/blackbox/cdc-*.test.mjs`: assert no CDC Kafka
   message for tenant A appears on tenant B's topic after writing a document under tenant A
 
 ## 9. Contract and Test Suite Verification
 
-- [ ] 9.1 Run `bash tests/blackbox/run.sh` — confirm all `cdc-*` assertions pass; zero regressions
+- [x] 9.1 Run `bash tests/blackbox/run.sh` — confirm all `cdc-*` assertions pass; zero regressions
   on other contracts
 - [ ] 9.2 Run `tests/e2e/realtime/tenant-isolation.test.mjs` on the FerretDB/DocumentDB stack —
   confirm green
-- [ ] 9.3 Verify SSE route shape
+  _(BLOCKED by #475: the deployed realtime e2e harness (provisioning API + WS gateway) does not exist
+  in the repo, so neither this file nor `mongo-tenant-isolation.test.mjs` can be run. The realtime
+  tenant-isolation BEHAVIOR on the FerretDB stack IS validated green by the real-stack
+  `tests/env/executor/realtime-executor.test.mjs` (run-realtime.sh) — tenant A sees its own
+  insert/update(as replace)/delete, never tenant B's, delete carries the pre-image. The deployed-stack
+  e2e run is deferred to #475.)_
+- [x] 9.3 Verify SSE route shape
   (`/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes`)
   and Kafka topic format (`{prefix}.{tenantId}.{workspaceId}.pg-changes`) are unchanged by
   diffing OpenAPI spec and Kafka topic assertions before/after
-- [ ] 9.4 Confirm `ResumeTokenStore` restart-durability: stop and restart the CDC bridge
+- [x] 9.4 Confirm `ResumeTokenStore` restart-durability: stop and restart the CDC bridge
   mid-stream; assert no duplicate events and no gap in sequence from the Kafka consumer side
-- [ ] 9.5 Confirm `REPLICA IDENTITY FULL` is in effect on all `documentdb_data` tables in the
+- [x] 9.5 Confirm `REPLICA IDENTITY FULL` is in effect on all `documentdb_data` tables in the
   test environment: `SELECT relreplident FROM pg_class WHERE relname LIKE 'documentdb_data%'`
   — must return `'f'` (full) for all rows

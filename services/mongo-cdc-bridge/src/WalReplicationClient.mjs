@@ -35,6 +35,13 @@ import { decodeWalMessage } from './WalBsonDecoder.mjs'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// Postgres LSNs are "HH/LL" hex pairs; compare them numerically (lexicographic compare is wrong).
+const lsnToBigInt = (lsn) => {
+  const [hi, lo] = String(lsn).split('/')
+  return (BigInt('0x' + (hi || '0')) << 32n) + BigInt('0x' + (lo || '0'))
+}
+const lsnGte = (a, b) => lsnToBigInt(a) >= lsnToBigInt(b)
+
 export class WalReplicationClient extends EventEmitter {
   constructor({
     connectionConfig,
@@ -65,7 +72,14 @@ export class WalReplicationClient extends EventEmitter {
     this.onChange = onChange
     this.service = null
     this._stopped = false
-    this._confirmedLsn = null
+    // Durability cursor (manual-ack mode). The consumer acknowledges the DML lsn it has durably
+    // handled (_confirmedChangeLsn); _lastChangeLsn is the latest emitted change. confirmed_flush is
+    // only advanced to a COMMIT lsn (_durableLsn) once the consumer has acked every change in that
+    // transaction — Postgres cannot advance confirmed_flush to a mid-transaction position, so acking
+    // a DML lsn would both redeliver the whole transaction AND make no durable progress.
+    this._confirmedChangeLsn = null
+    this._lastChangeLsn = null
+    this._durableLsn = null
     this._loop = null
   }
 
@@ -93,10 +107,10 @@ export class WalReplicationClient extends EventEmitter {
       this.service = service
       service.on('data', (lsn, log) => this._onData(lsn, log))
       service.on('heartbeat', (lsn, _timestamp, shouldRespond) => {
-        // Keep the connection alive. In manual-ack mode only confirm up to what the consumer has
-        // durably persisted (never past it), so a crash cannot skip an unpublished change.
-        if (shouldRespond && !this.autoAck && this._confirmedLsn) {
-          service.acknowledge(this._confirmedLsn).catch((err) => this.emit('error', err))
+        // Keep the connection alive. In manual-ack mode only confirm up to the last durably-committed
+        // position (never past it), so a crash cannot skip an unpublished change.
+        if (shouldRespond && !this.autoAck && this._durableLsn) {
+          service.acknowledge(this._durableLsn).catch((err) => this.emit('error', err))
         }
       })
       service.on('error', (err) => this.emit('error', err))
@@ -124,6 +138,18 @@ export class WalReplicationClient extends EventEmitter {
   }
 
   async _onData(lsn, log) {
+    // COMMIT boundary: advance the durable cursor to this transaction's commit lsn once the consumer
+    // has acknowledged every change it emitted (FerretDB writes are single-doc transactions). Acking
+    // the commit lsn — not the mid-transaction DML lsn — is what lets confirmed_flush make progress
+    // without redelivering the just-committed transaction on restart. (autoAck mode lets the library
+    // advance freely; nothing to do here.)
+    if (log?.tag === 'commit') {
+      if (!this.autoAck && this._confirmedChangeLsn && (!this._lastChangeLsn || lsnGte(this._confirmedChangeLsn, this._lastChangeLsn))) {
+        this._durableLsn = lsn
+        await this.service?.acknowledge(lsn).catch((err) => this.emit('error', err))
+      }
+      return
+    }
     let decoded
     try {
       decoded = decodeWalMessage(log)
@@ -145,18 +171,20 @@ export class WalReplicationClient extends EventEmitter {
       fullDocument: decoded.fullDocument,
       fullDocumentBeforeChange: decoded.fullDocumentBeforeChange
     }
+    this._lastChangeLsn = lsn
     this.emit('change', record)
     // Awaited: with flowControl this pauses the stream until the consumer has handled (and, for the
     // CDC bridge, durably persisted + acknowledged) this change — preserving order and at-least-once.
     if (this.onChange) await this.onChange(record)
   }
 
-  // Durably advance the confirmed LSN (manual-ack consumers call this AFTER persisting a change).
+  // Manual-ack consumers call this AFTER durably handling the change at `lsn` (published + persisted,
+  // or filtered/skipped). It records the consumer's progress; the durable confirmed_flush is advanced
+  // at the next COMMIT boundary (see _onData) so the cursor only ever sits on a committed position.
   async acknowledge(lsn) {
     if (!lsn) return
-    this._confirmedLsn = lsn
-    if (this.service && !this.autoAck) {
-      await this.service.acknowledge(lsn).catch((err) => this.emit('error', err))
+    if (!this._confirmedChangeLsn || lsnGte(lsn, this._confirmedChangeLsn)) {
+      this._confirmedChangeLsn = lsn
     }
   }
 
