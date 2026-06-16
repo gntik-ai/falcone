@@ -29,13 +29,13 @@ To use an externally managed credential, set `existingSecret` to your Secret (an
 
 ## Sensitive material is mounted by reference, never inlined
 
-The platform never embeds secret values in manifests or values. Generated material is created as a Secret and consumed via `secretKeyRef`. For example, the MongoDB replica-set keyfile:
+The platform never embeds secret values in manifests or values. Generated material is created as a Secret and consumed via `secretKeyRef`. The document store is **FerretDB over DocumentDB-on-PostgreSQL**, so there is **no replica-set keyfile** — the gateway authenticates to its engine with Postgres credentials. For example, the DocumentDB engine password the FerretDB gateway connects with:
 
 ```bash
 openssl rand -hex 24 | tr -d '\n' | \
-  kubectl create secret generic falcone-mongodb-rs-key \
-    --from-file=MONGODB_REPLICA_SET_KEY=/dev/stdin -n falcone
-# referenced via secretKeyRef, not an inline value
+  kubectl create secret generic in-falcone-documentdb \
+    --from-file=password=/dev/stdin -n falcone
+# referenced via secretKeyRef (it feeds FERRETDB_POSTGRESQL_URL / MONGO_URI), not an inline value
 ```
 
 > [!TIP]

@@ -39,10 +39,10 @@ global:
       type: RuntimeDefault
     fsGroup: null                   # <- unset: let the SCC inject it (was 1001)
 
-# Functions: Knative is provided by OpenShift Serverless; the chart's bundled
-# OpenWhisk component is disabled (migration OpenWhisk -> Knative).
-openwhisk:
-  enabled: false
+# Functions run on Knative (provided by OpenShift Serverless): the control-plane
+# executor creates a Knative Service per function (scale-to-zero, HTTP invoke).
+# There is no in-chart functions datastore component to toggle — the former bundled
+# OpenWhisk component was removed in the OpenWhisk -> Knative migration.
 
 # SCC: stateless components also pin podSecurityContext.fsGroup: 1001 (inherited
 # from global.podSecurity in the chart defaults). global.podSecurity.fsGroup:null
@@ -88,18 +88,19 @@ controlPlane:
     - { name: KEYCLOAK_BASE_URL, value: "http://falcone-keycloak:8080" }
     - { name: KEYCLOAK_ADMIN_USERNAME, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: username } } }
     - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: password } } }
-    # Provider-neutral S3 endpoint (STORAGE_S3_* authoritative; point at a SeaweedFS
-    # S3 gateway on port 8333 / path-style once add-seaweedfs-deployment lands).
-    - { name: STORAGE_S3_ENDPOINT, value: "http://falcone-storage:9000" }
-    - { name: STORAGE_S3_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_USER } } }
-    - { name: STORAGE_S3_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_PASSWORD } } }
-    # Legacy MINIO_* names retained as backward-compatible fallbacks.
-    - { name: MINIO_ENDPOINT, value: "http://falcone-storage:9000" }
-    - { name: MINIO_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_USER } } }
-    - { name: MINIO_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: MINIO_ROOT_PASSWORD } } }
-    - { name: MONGO_HOST, value: "falcone-mongodb:27017" }
-    - { name: MONGO_USER, value: root }
-    - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } } }
+    # Provider-neutral S3 endpoint (STORAGE_S3_* authoritative), pointed at the
+    # SeaweedFS S3 gateway (path-style; HTTPS port 8334 per the SCC overlay below).
+    # SeaweedFS replaced MinIO (ADR-13); enable the `seaweedfs` component below. The
+    # in-falcone-storage Secret key names are the SeaweedFS S3 access/secret keys.
+    - { name: STORAGE_S3_ENDPOINT, value: "https://falcone-seaweedfs-s3:8334" }
+    - { name: STORAGE_S3_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: s3_access_key } } }
+    - { name: STORAGE_S3_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: s3_secret_key } } }
+    # Document store: FerretDB gateway over the DocumentDB (PostgreSQL) engine — MongoDB
+    # wire-protocol. The gateway passes the DocumentDB Postgres credentials to the engine.
+    - { name: MONGO_HOST, value: "falcone-ferretdb:27017" }
+    - { name: MONGO_BACKEND, value: ferretdb }
+    - { name: MONGO_USER, value: falcone }
+    - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
     - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
     # Functions: the executor reads this to template each function's Knative Service.
     - { name: FN_RUNTIME_IMAGE, value: "harbor.example.com/falcone/gntik-ai/in-falcone-fn-runtime:0.1.0" }
@@ -120,15 +121,10 @@ webConsole:
 # SCC: every stateful component pins podSecurityContext.fsGroup: 1001 in the chart
 # defaults, which restricted-v2 REJECTS (fsGroup must come from the namespace's
 # assigned range). Null it per-component so the SCC injects a valid fsGroup — the
-# Bitnami/MinIO/Prometheus images all support an arbitrary uid+fsGroup. (Setting
+# Bitnami/SeaweedFS/Prometheus images all support an arbitrary uid+fsGroup. (Setting
 # only global.podSecurity.fsGroup:null is not enough: the per-component value wins
 # via mergeOverwrite.) Drop fsGroupChangePolicy too (irrelevant once fsGroup is SCC-set).
 postgresql:
-  volumePermissions: { enabled: false }
-  podSecurityContext:
-    fsGroup: null
-    fsGroupChangePolicy: null
-mongodb:
   volumePermissions: { enabled: false }
   podSecurityContext:
     fsGroup: null
@@ -164,11 +160,6 @@ ferretdb:
   securityContext:
     runAsUser: null                 # base pins 1000 (FerretDB image uid); SCC injects here
 kafka:
-  volumePermissions: { enabled: false }
-  podSecurityContext:
-    fsGroup: null
-    fsGroupChangePolicy: null
-storage:
   volumePermissions: { enabled: false }
   podSecurityContext:
     fsGroup: null

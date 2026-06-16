@@ -13,7 +13,7 @@ In Falcone is configured through the umbrella chart `charts/in-falcone`. This pa
 | `platform` | `target` (kubernetes/openshift), `network.exposureKind`, `securityProfile` |
 | `config` | ConfigMap names + `secretRefs` (existing-secret references) + inheritance order |
 | `bootstrap` | Reconcile payload (gateway routes, realm), lock/marker ConfigMaps |
-| `apisix`, `keycloak`, `postgresql`, `mongodb`, `kafka`, `openwhisk`, `storage`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole` | Per-component config (each toggled by `<component>.enabled`) |
+| `apisix`, `keycloak`, `postgresql`, `ferretdb`, `documentdb`, `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole` | Per-component config (each toggled by `<component>.enabled`). `ferretdb` + `documentdb` are the document store ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)); `seaweedfs` is the object store ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)). The former `mongodb` and `storage` (MinIO) components have been removed; functions run on Knative (provisioned by the control-plane executor — no datastore component). |
 | `gatewayPolicy` | Gateway routing/scope/rate-limit policy |
 | `eso`, `vault` | Secret management (External Secrets Operator + Vault) |
 
@@ -62,10 +62,12 @@ mcp:             { enabled: true }   # MCP server hosting (RBAC + internal-only 
 ```
 
 Object storage is the `seaweedfs` component (**SeaweedFS**, S3-compatible, Apache-2.0;
-[ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), replacing the
-legacy MinIO `storage` component) and the document API is the `mongodb` component; the
-FerretDB + DocumentDB document-DB alternative on the [Roadmap](/guide/roadmap) is not yet
-implemented in the chart.
+[ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), which replaced the
+former MinIO `storage` component). The document API is served by the **FerretDB + DocumentDB**
+two-layer stack — the `ferretdb` gateway (MongoDB-wire-compatible) over the `documentdb` engine
+(DocumentDB-on-PostgreSQL; [ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)).
+Both **are implemented in the chart** and enabled by default; the former `mongodb` server component
+has been removed. See the [FerretDB Document-Store Runbook](/architecture/ferretdb).
 
 ## Exposure & TLS
 

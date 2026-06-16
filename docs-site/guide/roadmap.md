@@ -30,14 +30,21 @@ These have landed and are documented; they remain **Preview** under the not-prod
 - **Direct MCP-protocol connection** — connect to a per-server ksvc instead of mediating tool calls
   through the control-plane.
 
-## Infrastructure — under evaluation — *planned*
+## Infrastructure migrations — *complete*
 
-- **Document DB alternative.** The platform ships **MongoDB** (document API) today; a
-  source-available alternative (FerretDB over a DocumentDB-compatible backend) is **under
-  evaluation** and swappable at the deployment layer. (Object storage has migrated to
-  **SeaweedFS** (Apache-2.0) — see
-  [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs) and the
-  [SeaweedFS Storage Runbook](/architecture/seaweedfs).)
+- **Object storage — MinIO → SeaweedFS.** **SeaweedFS** (Apache-2.0) is the object store
+  ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)), deployed by
+  the umbrella chart and enabled by default. The former MinIO `storage` component has been removed
+  and the cutover window is closed. See the [SeaweedFS Storage Runbook](/architecture/seaweedfs).
+- **Document store — MongoDB → FerretDB + DocumentDB.** **FerretDB v2** (Apache-2.0,
+  MongoDB-wire-compatible) over a **DocumentDB / PostgreSQL** engine (MIT) is the document store
+  ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)),
+  deployed by the umbrella chart. The former MongoDB server component has been removed and the
+  cutover/rollback window is closed. The MongoDB driver, wire protocol and Mongo-style data API are
+  unchanged. See the [FerretDB Document-Store Runbook](/architecture/ferretdb).
+- **Functions — OpenWhisk → Knative.** Functions run on a Knative-based runtime provisioned by the
+  control-plane executor; the bundled OpenWhisk engine has been removed. The public functions API
+  keeps the OpenWhisk-compatible action/package/trigger/rule model.
 
 ## Toward a first stable release — *planned*
 

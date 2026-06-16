@@ -45,15 +45,12 @@ apisix:
 postgresql:
   persistence:
     size: 100Gi
-mongodb:
+documentdb:
   persistence:
     size: 100Gi
 kafka:
   persistence:
     size: 200Gi
-storage:
-  persistence:
-    size: 500Gi
 controlPlane:
   replicas: 3
 webConsole:

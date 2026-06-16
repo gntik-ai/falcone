@@ -13,10 +13,7 @@
     "apisix",
     "keycloak",
     "postgresql",
-    "mongodb",
     "kafka",
-    "openwhisk",
-    "storage",
     "observability",
     "controlPlane",
     "webConsole"
@@ -599,16 +596,13 @@
         }
       ]
     },
-    "mongodb": {
-      "$ref": "#/definitions/component"
-    },
     "kafka": {
       "$ref": "#/definitions/component"
     },
-    "openwhisk": {
+    "documentdb": {
       "$ref": "#/definitions/component"
     },
-    "storage": {
+    "ferretdb": {
       "$ref": "#/definitions/component"
     },
     "observability": {
@@ -1590,7 +1584,7 @@
             },
             "routes": {
               "type": "array",
-              "minItems": 2
+              "minItems": 1
             }
           },
           "additionalProperties": true
