@@ -4,7 +4,7 @@ layout: home
 hero:
   name: In Falcone
   text: Multi-tenant Backend-as-a-Service
-  tagline: Postgres & MongoDB data APIs, object storage, events, serverless functions and realtime — behind one gateway, isolated per tenant, deployable to Kubernetes, OpenShift or air-gapped clusters.
+  tagline: Postgres & FerretDB document data APIs, object storage, events, serverless functions and realtime — behind one gateway, isolated per tenant, deployable to Kubernetes, OpenShift or air-gapped clusters.
   image:
     src: /img/logo-wide.png
     alt: In Falcone
@@ -22,12 +22,12 @@ hero:
 features:
   - icon: 🏢
     title: Tenant isolation by construction
-    details: Every data path is scoped by tenant. PostgreSQL Row-Level Security + a non-BYPASSRLS application role, MongoDB adapter-injected tenant filters, and per-tenant realtime channels. Cross-tenant access fails closed.
+    details: Every data path is scoped by tenant. PostgreSQL Row-Level Security + a non-BYPASSRLS application role, FerretDB/DocumentDB adapter-injected tenant filters, and per-tenant realtime channels. Cross-tenant access fails closed.
     link: /architecture/security
     linkText: Security model
   - icon: 🗄️
-    title: Postgres & MongoDB data APIs
-    details: REST data access over both engines with keyset pagination, filtering and DDL. One control plane, two storage shapes.
+    title: Postgres & FerretDB document data APIs
+    details: REST data access over both engines (relational + MongoDB-wire document store) with keyset pagination, filtering and DDL. One control plane, two storage shapes.
     link: /api/postgresql
     linkText: Data API
   - icon: 🔑
@@ -37,7 +37,7 @@ features:
     linkText: Gateway & keys
   - icon: ⚡
     title: Realtime subscriptions
-    details: Server-Sent Events backed by MongoDB change streams and PostgreSQL trigger-based CDC, tenant-scoped inside the pipeline.
+    details: Server-Sent Events backed by Postgres logical replication (FerretDB/DocumentDB) and PostgreSQL trigger-based CDC, tenant-scoped inside the pipeline.
     link: /api/realtime
     linkText: Realtime
   - icon: 📦
@@ -75,7 +75,7 @@ In Falcone ships with a web console for tenant administration and data explorati
 
 ![PostgreSQL table browser](/screens/21-postgres-table.png)
 
-![MongoDB document explorer](/screens/19-mongo-documents.png)
+![Document explorer (FerretDB-backed)](/screens/19-mongo-documents.png)
 
 ![Serverless function invocation](/screens/27-functions-invoke.png)
 

@@ -175,7 +175,7 @@ siguen siendo Preview bajo la advertencia de "no apto para producción" anterior
 | **Autenticación e IAM** | Login de consola delegado por OIDC, registro con activación pendiente, recuperación de contraseña. Administración Keycloak (realm por tenant) de realms, clientes, roles, scopes y usuarios. Validación de JWT vía JWKS en caché con introspección de respaldo. |
 | **Cuentas de servicio y apps OAuth2** | Clientes OAuth2 y cuentas de servicio con API-key por workspace, con validación de URI de redirección HTTPS y límites según el plan. |
 | **PostgreSQL** | API de datos acotada por tenant más administración/gobernanza, captura de cambios (CDC), métricas y auditoría. Aislamiento por seguridad a nivel de fila (`app.tenant_id` / `app.workspace_id`) y esquemas por tenant. |
-| **MongoDB** | API de documentos por tenant/workspace, administración, change streams, métricas y auditoría. |
+| **FerretDB + DocumentDB** | API de documentos por tenant/workspace, administración, change streams, métricas y auditoría. |
 | **Almacenamiento de objetos** | Buckets compatibles con S3, cargas multipart, URLs prefirmadas, políticas de acceso, notificaciones de eventos y cuotas de capacidad por tenant. |
 | **Eventos (Kafka)** | Gestión de topics y change streams CDC acotados por tenant (`<prefijo>.<tenant>.<workspace>`), más topics de sistema de auditoría/cuota/ciclo de vida. |
 | **Tiempo real** | Suscripciones WebSocket (`/v1/websockets`) con autenticación Bearer-JWT, aplicación de scope a canal y aislamiento de tenant por sesión. |
@@ -237,7 +237,7 @@ docker compose -f tests/env/docker-compose.yml ps
 | API gateway (APISIX) | <http://localhost:9080> | Bearer JWT de Keycloak |
 | Keycloak (IdP) | <http://localhost:8081> | `admin` / `admin` |
 | PostgreSQL | `localhost:55432` | `falcone` / `falcone` |
-| MongoDB (rs0) | `localhost:57017` | — |
+| FerretDB gateway (MongoDB wire) | `localhost:57017` | `falcone` / `falcone` |
 | Redpanda (Kafka) | `localhost:19092` | — |
 | SeaweedFS (API S3) | <http://localhost:58333> | Clave de acceso / clave secreta S3 (path-style) |
 | Vault (dev) | <http://localhost:58200> | token `root` |
