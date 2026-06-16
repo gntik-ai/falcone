@@ -1,5 +1,5 @@
 {{- define "in-falcone.validate" -}}
-{{- $components := list "apisix" "keycloak" "postgresql" "mongodb" "kafka" "openwhisk" "storage" "observability" "controlPlane" "webConsole" -}}
+{{- $components := list "apisix" "keycloak" "postgresql" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "webConsole" -}}
 {{- $supportedExposureKinds := list "Ingress" "LoadBalancer" "Route" -}}
 {{- range $components }}
   {{- $component := index $.Values . -}}

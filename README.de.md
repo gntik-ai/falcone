@@ -82,19 +82,19 @@ Oberfläche behält — statt einer Flotte handgebauter Backends.
                         ┌──────────────────────────────────────────┐
                         │ control-plane  — 250+ REST-Endpoints      │
                         │ tenants · workspaces · auth/IAM · pg ·    │
-                        │ mongo · storage · events · functions ·    │
+                        │ documents · storage · events · functions ·│
                         │ metrics · plans · quotas · backup ·       │
                         │ flows (/v1/flows) · MCP (/v1/mcp) [Prev.] │
                         └───────────────┬──────────────────────────┘
             ┌───────────────────────────┼─────────────────────────────┐
             ▼                           ▼                             ▼
    provisioning-orchestrator   realtime-gateway / webhook-engine   cdc-bridges
-   (Sagas, Appliers)           scheduling-engine / backup-status   (pg & mongo → Kafka)
+   (Sagas, Appliers)           scheduling-engine / backup-status   (pg & documents → Kafka)
                                workflow-worker (Flows-Interpreter)
             │                           │                             │
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
-   │ PostgreSQL (RLS + Schema pro Mandant) · MongoDB · Kafka · SeaweedFS ·    │
+   │ PostgreSQL (RLS + Schema pro Mandant) · FerretDB+DocumentDB · Kafka · SeaweedFS · │
    │ Vault (Secrets) · Keycloak (Realm pro Mandant + OAuth 2.1 für MCP) ·     │
    │ Temporal (Flows-Engine) · Knative (Funktionen + MCP-Runtime pro Mandant) │
    └────────────────────────────────────────────────────────────────────────┘
@@ -155,13 +155,16 @@ bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
   Replikas; Custom-Hosting (eigenes Image) auf dem Live-Erstellungspfad; das Verdrahten von
   Workflows-as-MCP-Tools; und eine direkte MCP-Protokoll-Verbindung pro Server (heute vermittelt die
   Control-Plane die Tool-Aufrufe).
-- **Objektspeicher — Migration MinIO → SeaweedFS.** **SeaweedFS** (Apache-2.0) ist der
-  übernommene Zielobjektspeicher ([ADR-13](docs-site/architecture/adrs.md)); er wird vom
-  Umbrella-Chart deployt und MinIO wird nur während des Umstellungsfensters beibehalten. Siehe das
+- **Objektspeicher — MinIO → SeaweedFS (abgeschlossen).** **SeaweedFS** (Apache-2.0) ist der
+  Objektspeicher ([ADR-13](docs-site/architecture/adrs.md)), wird vom Umbrella-Chart deployt und ist
+  standardmäßig aktiviert; die ehemalige MinIO-`storage`-Komponente wurde entfernt. Siehe das
   [SeaweedFS-Storage-Runbook](docs-site/architecture/seaweedfs.md).
-- **Alternative für Dokument-DB** — *geplant, in Evaluierung.* Die Plattform nutzt **MongoDB**
-  (Dokument-API); eine source-available Alternative (FerretDB über ein DocumentDB-kompatibles
-  Backend) wird evaluiert und ist auf der Deployment-Ebene austauschbar.
+- **Dokumentspeicher — MongoDB → FerretDB + DocumentDB (abgeschlossen).** **FerretDB v2** (Apache-2.0,
+  kompatibel mit dem MongoDB-Wire-Protokoll) über eine **DocumentDB-/PostgreSQL**-Engine (MIT) ist der
+  Dokumentspeicher ([ADR-14](docs-site/architecture/adrs.md#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)),
+  wird vom Umbrella-Chart deployt; die ehemalige MongoDB-Server-Komponente wurde entfernt. Der
+  MongoDB-Treiber, das Wire-Protokoll und die Daten-API im Mongo-Stil sind unverändert. Siehe das
+  [FerretDB-Dokumentspeicher-Runbook](docs-site/architecture/ferretdb.md).
 - **Auf dem Weg zu einem ersten stabilen Release** — *geplant.* Sicherheitsaudit,
   Stabilitätszusicherungen für APIs/Schemata und Migrationswerkzeuge (siehe den Hinweis oben).
 
@@ -172,12 +175,12 @@ bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
 | Bereich | Was es einem Mandanten bietet |
 | --- | --- |
 | **Mandanten-Lebenszyklus** | Mandanten anlegen, sperren, soft-löschen und endgültig löschen über eine geschützte Zustandsmaschine (`draft → provisioning → active → suspended → soft_deleted`), mit Governance-Dashboards und Doppelbestätigung bei destruktiven Aktionen. |
-| **Provisioning-Saga** | Asynchrone Orchestrierung, die einen Mandanten über alle Bereiche hinweg aufbaut (oder abbaut) — IAM-Realm, Kafka-Namespace, Postgres-Schema, MongoDB, Speicher-Namespace, Funktions-Namespace — mit Vorabprüfungen und Rollback bei Fehlern. |
+| **Provisioning-Saga** | Asynchrone Orchestrierung, die einen Mandanten über alle Bereiche hinweg aufbaut (oder abbaut) — IAM-Realm, Kafka-Namespace, Postgres-Schema, Dokumentspeicher (FerretDB/DocumentDB), Speicher-Namespace, Funktions-Namespace — mit Vorabprüfungen und Rollback bei Fehlern. |
 | **Workspaces** | Sub-Mandanten-Grenzen mit eigenem Slug, eigener Umgebung, IAM-Scope und Mitgliedschaft. Workspaces mit expliziten Richtlinien klonen; Auflösung der Vererbung von geteilten vs. spezialisierten Ressourcen. |
 | **Authentifizierung & IAM** | OIDC-delegierter Konsolen-Login, Registrierung mit ausstehender Aktivierung, Passwort-Wiederherstellung. Keycloak-Administration (Realm pro Mandant) von Realms, Clients, Rollen, Scopes und Benutzern. JWT-Validierung über gecachtes JWKS mit Introspection-Fallback. |
 | **Service-Accounts & OAuth2-Apps** | OAuth2-Clients und API-Key-Service-Accounts pro Workspace, mit HTTPS-Redirect-URI-Validierung und planbasierten Limits. |
 | **PostgreSQL** | Mandanten-eingegrenzte Daten-API plus Administration/Governance, Change-Data-Capture, Metriken und Audit. Isolation über Row-Level-Security (`app.tenant_id` / `app.workspace_id`) und Schemas pro Mandant. |
-| **FerretDB + DocumentDB** | Dokument-API pro Mandant/Workspace, Administration, Change Streams, Metriken und Audit. |
+| **Dokumentspeicher (FerretDB + DocumentDB)** | Dokument-API pro Mandant/Workspace, Administration, Echtzeit/CDC (logische Replikation von Postgres), Metriken und Audit. Kompatibel mit dem MongoDB-Wire-Protokoll; ersetzt MongoDB (ADR-14). |
 | **Objektspeicher** | S3-kompatible Buckets, Multipart-Uploads, vorsignierte URLs, Zugriffsrichtlinien, Event-Benachrichtigungen und Kapazitätskontingente pro Mandant. |
 | **Events (Kafka)** | Topic-Verwaltung und mandanten-eingegrenzte CDC-Change-Streams (`<Präfix>.<Mandant>.<Workspace>`), plus System-Topics für Audit/Kontingent/Lebenszyklus. |
 | **Echtzeit** | WebSocket-Abonnements (`/v1/websockets`) mit Bearer-JWT-Authentifizierung, Scope-zu-Channel-Durchsetzung und Mandanten-Isolation pro Sitzung. |
@@ -198,7 +201,7 @@ bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
 
 Das Repository liefert einen Compose-Stack, der die **echten Backing-Services**
 hochfährt, mit denen Falcone spricht — PostgreSQL, Keycloak, Redpanda (Kafka),
-MongoDB (Single-Node-Replica-Set), SeaweedFS (S3) und Vault — sowie ein
+FerretDB + DocumentDB (Dokumentspeicher mit MongoDB-Wire-Protokoll), SeaweedFS (S3) und Vault — sowie ein
 APISIX-Gateway und einen Action-Runner. Das ist der schnellste Weg zu einer
 funktionierenden Umgebung auf deiner Maschine.
 
@@ -218,7 +221,7 @@ pnpm install
 
 ### 2. Den Stack mit Docker Compose hochfahren
 
-Das Hilfsskript richtet Health-Checks, Migrationen, das Mongo-Replica-Set, den
+Das Hilfsskript richtet Health-Checks, Migrationen, den FerretDB + DocumentDB-Dokumentspeicher, den
 SeaweedFS-Bucket und das Vault-Audit-Device für dich ein:
 
 ```bash
@@ -297,16 +300,14 @@ source-available** (kein OSI-Open-Source) — siehe den folgenden Kompatibilitä
 | Komponente | Rolle in Falcone | Lizenz (SPDX) | Link |
 | --- | --- | --- | --- |
 | PostgreSQL 16 (+ pgvector) | Primärer Mandanten-Datastore; RLS + Schema-pro-Mandant-Isolation; pgvector für Vektorsuche | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
-| MongoDB Server 7 | Dokument-Daten-API pro Mandant/Workspace | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
+| FerretDB v2 (über DocumentDB / PostgreSQL 17) | Dokument-Daten-API — kompatibel mit dem MongoDB-Wire-Protokoll ([ADR-14](docs-site/architecture/adrs.md)) | `Apache-2.0` (Gateway) + `MIT` (DocumentDB-Erweiterung) | [ferretdb](https://github.com/FerretDB/FerretDB) · [documentdb](https://github.com/microsoft/documentdb) |
 | Redpanda 24.2 | Kafka-kompatibler Event-Bus / CDC-Streaming | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
-| SeaweedFS 4.33 | S3-kompatibler Objektspeicher (Zielsystem, [ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
-| MinIO | S3-kompatibler Objektspeicher (Legacy — während der Umstellung beibehalten) | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| SeaweedFS 4.33 | S3-kompatibler Objektspeicher ([ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
 | HashiCorp Vault 1.18 | Secrets-Management | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
 | Keycloak 26 | IAM mit Realm pro Mandant / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API-Gateway (öffentliche `/v1`-Oberfläche) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
 | Temporal (Server 1.25 + TypeScript-SDK 1.18) | Langlebige Workflow-Engine hinter Flows | `MIT` | [temporal](https://github.com/temporalio/temporal) · [sdk-typescript](https://github.com/temporalio/sdk-typescript) |
 | Knative Serving + Kourier | Serverless-Funktions-Runtime | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
-| Apache OpenWhisk | Alte / optionale Funktions-Engine | `Apache-2.0` | [openwhisk](https://github.com/apache/openwhisk) |
 | Kubernetes + Helm | Deployment & Orchestrierung | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Service-Runtime | `MIT` | [nodejs](https://github.com/nodejs/node) |
 | nginx | Statisches Ausliefern des Web-Konsolen-Images | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
@@ -322,7 +323,7 @@ source-available** (kein OSI-Open-Source) — siehe den folgenden Kompatibilitä
 | React Flow (`@xyflow/react`) | Canvas des visuellen Flows-Designers | `MIT` | [xyflow](https://github.com/xyflow/xyflow) |
 | Monaco Editor (+ `monaco-yaml`) | Code-/YAML-Bearbeitung in der Konsole | `MIT` | [monaco-editor](https://github.com/microsoft/monaco-editor) |
 | node-postgres (`pg`) | PostgreSQL-Client | `MIT` | [node-postgres](https://github.com/brianc/node-postgres) |
-| MongoDB Node Driver (`mongodb`) | MongoDB-Client | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
+| MongoDB Node Driver (`mongodb`) | Dokumentspeicher-Client — MongoDB-Wire-Protokoll (MongoDB / FerretDB) | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
 | KafkaJS | Kafka-/Redpanda-Client | `MIT` | [kafkajs](https://github.com/tulios/kafkajs) |
 | AWS SDK for JS v3 (`@aws-sdk/client-s3`) | S3-Objektspeicher-Client (SeaweedFS) | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
 | jose + jwks-rsa | JWT-/JWKS-Validierung | `MIT` | [jose](https://github.com/panva/jose) · [node-jwks-rsa](https://github.com/auth0/node-jwks-rsa) |
@@ -336,23 +337,28 @@ source-available** (kein OSI-Open-Source) — siehe den folgenden Kompatibilitä
 > mit der Nutzung aller oben genannten permissiven Komponenten (MIT, Apache-2.0, ISC, BSD,
 > PostgreSQL) kompatibel ist. Die mit ⚠ markierten Komponenten sind **kein** OSI-Open-Source und
 > verdienen eine Prüfung:
-> - **MongoDB (`SSPL-1.0`)**, **MinIO (`AGPL-3.0`)**, **Redpanda (`BSL-1.1` + `RCL`)** und
->   **Vault (`BUSL-1.1`)** sind copyleft oder source-available.
+> - **Redpanda (`BSL-1.1` + `RCL`)** und **Vault (`BUSL-1.1`)** sind copyleft oder source-available.
+>   Die ehemaligen Abhängigkeiten **MongoDB (`SSPL-1.0`)** und **MinIO (`AGPL-3.0`)** wurden
+>   **entfernt** — abgelöst durch **FerretDB** (`Apache-2.0`, [ADR-14](docs-site/architecture/adrs.md))
+>   bzw. **SeaweedFS** (`Apache-2.0`, [ADR-13](docs-site/architecture/adrs.md)), womit ihr
+>   SSPL-/AGPL-Risiko entfällt.
 > - Sie als **separate Backing-Services zu betreiben, mit denen Falcone über das Netzwerk spricht**,
 >   erlegt deren Lizenz dem MIT-Code von Falcone für sich genommen nicht auf (kein Linking / kein
 >   abgeleitetes Werk). **Aber** ihre „Als-Service-anbieten"- / „Wettbewerbsdienst"-Klauseln sind für
 >   ein mandantenfähiges BaaS, das deren Funktionalität an Mandanten **weiter exponiert**, direkt
->   relevant — eine Mongo-Daten-API, eine Kafka-/Event-API, eine S3-Speicher-API. Insbesondere
->   **zielen §13 der SSPL und §13 der AGPL darauf, die Funktionalität der Software als Service
->   anzubieten**, und die BSL-Gewährungen von Redpanda/Vault schließen konkurrierende
->   Managed-Angebote aus. Prüfe diese Bedingungen vor jedem gehosteten oder kommerziellen Angebot.
->   Alle vier sind auf der Deployment-Ebene austauschbar, falls ihre Bedingungen nicht zu deinem
->   Anwendungsfall passen.
+>   relevant — eine Kafka-/Event-API. Insbesondere schließen die BSL-Gewährungen von Redpanda/Vault
+>   konkurrierende Managed-Angebote aus. Prüfe diese Bedingungen vor jedem gehosteten oder
+>   kommerziellen Angebot; beide sind auf der Deployment-Ebene austauschbar, falls ihre Bedingungen
+>   nicht zu deinem Anwendungsfall passen.
 > - **Objektspeicher: MinIO → SeaweedFS (Apache-2.0).** Gemäß
->   [ADR-13](docs-site/architecture/adrs.md) ist **SeaweedFS** der übernommene Zielobjektspeicher,
->   gezielt gewählt, um das mit MinIO verbundene **AGPL-§13**-Risiko des „Als-Service-Anbietens" für
->   ein BaaS zu beseitigen, das S3 an Mandanten weiter exponiert. MinIO wird nur während des
->   Umstellungsfensters beibehalten.
+>   [ADR-13](docs-site/architecture/adrs.md) ist **SeaweedFS** der Objektspeicher, gezielt gewählt, um
+>   das mit MinIO verbundene **AGPL-§13**-Risiko des „Als-Service-Anbietens" für ein BaaS zu
+>   beseitigen, das S3 an Mandanten weiter exponiert. Die ehemalige MinIO-Abhängigkeit wurde entfernt.
+> - **Dokumentspeicher: MongoDB → FerretDB + DocumentDB (Apache-2.0 + MIT).** Gemäß
+>   [ADR-14](docs-site/architecture/adrs.md) ist **FerretDB v2** über eine DocumentDB-/PostgreSQL-Engine
+>   der Dokumentspeicher, womit das mit MongoDB verbundene **SSPL-§13**-Risiko entfällt. FerretDB
+>   behält den MongoDB-Treiber und das Wire-Protokoll unverändert bei; die ehemalige
+>   MongoDB-Server-Abhängigkeit wurde entfernt.
 
 **Nicht vollständig.** Diese Tabelle listet die **wichtigsten** Drittanbieter-Komponenten auf,
 nicht den vollständigen Baum transitiver Abhängigkeiten (kleinere Hilfsbibliotheken — `undici`,

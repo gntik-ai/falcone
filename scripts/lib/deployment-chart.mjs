@@ -14,12 +14,9 @@ export const REQUIRED_COMPONENT_ALIASES = [
   'apisix',
   'keycloak',
   'postgresql',
-  'mongodb',
   'documentdb',
   'ferretdb',
   'kafka',
-  'openwhisk',
-  'storage',
   'observability',
   'controlPlane',
   'controlPlaneExecutor',
@@ -61,7 +58,7 @@ const REQUIRED_PUBLIC_API_ROUTE_NAMES = [
   'public-api-metrics',
   'public-api-websockets'
 ];
-const REQUIRED_PASSTHROUGH_ROUTE_NAMES = ['native-keycloak-admin', 'native-openwhisk-admin'];
+const REQUIRED_PASSTHROUGH_ROUTE_NAMES = ['native-keycloak-admin'];
 
 export function readRootChart() {
   return readYaml(ROOT_CHART_PATH);

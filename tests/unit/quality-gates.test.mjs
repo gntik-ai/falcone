@@ -24,7 +24,7 @@ test('validateImagePolicy rejects mutable tags and missing repositories', () => 
   assert.deepEqual(violations, [
     'controlPlane must define image.repository.',
     "controlPlane image tag must not use the mutable 'latest' tag.",
-    'controlPlane image tag must be semver-like (for example 0.1.0 or 0.1.0-rc1); received latest.'
+    'controlPlane image tag must be semver-like (for example 0.1.0 or 0.1.0-rc1) when not digest-pinned; received latest.'
   ]);
 });
 

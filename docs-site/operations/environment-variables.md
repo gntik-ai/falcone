@@ -26,16 +26,19 @@ The Postgres DSN is built from discrete vars, or supplied whole:
 > [!IMPORTANT]
 > `PGUSER` must be a **non-`BYPASSRLS`** role (default `falcone_app`). RLS does not apply to superusers, so connecting as one would silently disable tenant isolation.
 
-## MongoDB
+## Document store (FerretDB / DocumentDB)
+
+The `MONGO_*` variables are retained and now point at the **FerretDB gateway** (which speaks the MongoDB wire protocol over a DocumentDB-on-PostgreSQL engine), so the existing MongoDB driver and data API are unchanged.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MONGO_URI` | — | Full URI (takes precedence) |
+| `MONGO_URI` | — | Full URI (takes precedence); points at the FerretDB gateway (`mongodb://…@<release>-ferretdb:27017/`) |
 | `MONGO_HOST` | — | Host (used to build the URI) |
 | `MONGO_USER` / `MONGO_PASSWORD` | — | Credentials |
 | `MONGO_AUTH_SOURCE` | `admin` | Auth source when a user is set |
+| `MONGO_BACKEND` | — | Set to `ferretdb` so the data API rejects unsupported multi-document `transaction` ops at the boundary (HTTP 501) |
 
-For change streams / realtime the URI must point at a **replica set** (e.g. `?replicaSet=rs0`).
+There is **no replica set** — FerretDB v2 has no change streams, so realtime/CDC is served from a Postgres **logical-replication** slot on the DocumentDB engine (`wal_level=logical`), not from a `?replicaSet=rs0` connection. See the [FerretDB Document-Store Runbook](/architecture/ferretdb).
 
 ## Events & functions
 

@@ -6,15 +6,15 @@
 #   - keycloak : internal IdP. Tenants map 1:1 to realms (realm name == tenantId);
 #                a realm's displayName is the authoritative tenant name.
 #   - redpanda : Kafka API broker (events, audit, CDC change streams).
-#   - mongodb  : document store. Run as a single-node replica set (rs0) because
-#                Falcone's CDC change streams require a replica set.
+#   - ferretdb : document store (MongoDB-wire) over the documentdb (PostgreSQL+DocumentDB)
+#                engine. FerretDB has no change streams; realtime/CDC uses Postgres logical replication.
 #   - seaweedfs: S3-compatible object storage (workspace SDK artifacts, storage
 #                config export); all-in-one server on :58333. Bucket `falcone-test` created on `up`.
 #   - vault    : secret store (dev mode). Emits a FILE audit log to a host-mounted
 #                path that secret-audit-handler tails (VAULT_AUDIT_LOG_PATH).
 #
 # Lifecycle is driven by tests/env/up.sh (waits for health, provisions the admin
-# service account, applies migrations, initiates the Mongo replica set, creates
+# service account, applies migrations, brings up the FerretDB+DocumentDB document store, creates
 # the SeaweedFS bucket, enables the Vault file audit device) and tests/env/down.sh.
 #
 # OUT OF SCOPE here (these stay on the Kubernetes/Helm path): OpenWhisk/functions

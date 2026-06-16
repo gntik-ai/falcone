@@ -18,10 +18,11 @@ export KEYCLOAK_ADMIN_CLIENT_SECRET="falcone-admin-secret"
 # Kafka (Redpanda) — events, audit, CDC change streams.
 export KAFKA_BROKERS="localhost:19092"
 
-# MongoDB — document store; single-node replica set (rs0) so CDC change streams
-# work. directConnection avoids client-side replica-set discovery of the in-net
-# `mongodb:27017` host (only the host-mapped 57017 is reachable from the host).
-export MONGO_URI="mongodb://localhost:57017/?replicaSet=rs0&directConnection=true"
+# Document store — FerretDB gateway over the DocumentDB engine (MongoDB wire protocol),
+# host-mapped on 57017. No replica set: FerretDB has no MongoDB change streams; realtime/CDC
+# uses Postgres logical replication (set MONGO_BACKEND=ferretdb).
+export MONGO_URI="mongodb://falcone:falcone@localhost:57017/"
+export MONGO_BACKEND="ferretdb"
 export MONGO_TEST_URI="$MONGO_URI"
 
 # SeaweedFS (S3-compatible object storage; replaces MinIO — ADR-13). Path-style on

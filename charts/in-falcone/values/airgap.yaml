@@ -19,18 +19,18 @@ keycloak:
 postgresql:
   image:
     repository: registry.airgap.in-falcone.local/bitnami/postgresql
-mongodb:
+documentdb:
   image:
-    repository: registry.airgap.in-falcone.local/bitnami/mongodb
+    repository: registry.airgap.in-falcone.local/ferretdb/postgres-documentdb
+ferretdb:
+  image:
+    repository: registry.airgap.in-falcone.local/ferretdb/ferretdb
 kafka:
   image:
     repository: registry.airgap.in-falcone.local/bitnami/kafka
-openwhisk:
+seaweedfs:
   image:
-    repository: registry.airgap.in-falcone.local/apache/openwhisk-controller
-storage:
-  image:
-    repository: registry.airgap.in-falcone.local/minio/minio
+    repository: registry.airgap.in-falcone.local/chrislusf/seaweedfs
 observability:
   image:
     repository: registry.airgap.in-falcone.local/prometheus/prometheus

@@ -162,9 +162,13 @@ export function validateImagePolicy(values) {
       violations.push(`${target.name} image tag must not use the mutable 'latest' tag.`);
     }
 
-    if (typeof tag === 'string' && tag && !IMAGE_TAG_PATTERN.test(tag)) {
+    // A digest pin (sha256:...) is the immutability guarantee, so the tag is only a
+    // human-readable label and need not be semver-like (e.g. upstream images such as
+    // postgres-documentdb:17-0.107.0-ferretdb-2.7.0). Enforce the semver-like tag form
+    // only when the image is NOT digest-pinned.
+    if (typeof tag === 'string' && tag && !digest && !IMAGE_TAG_PATTERN.test(tag)) {
       violations.push(
-        `${target.name} image tag must be semver-like (for example 0.1.0 or 0.1.0-rc1); received ${tag}.`
+        `${target.name} image tag must be semver-like (for example 0.1.0 or 0.1.0-rc1) when not digest-pinned; received ${tag}.`
       );
     }
 
