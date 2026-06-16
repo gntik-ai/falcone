@@ -1,4 +1,14 @@
-# Proposed OpenSpec epics & GitHub issues — DRY RUN (no issues created yet)
+# Falcone live-audit epics & GitHub issues
+
+> **STATUS: CREATED** on `gntik-ai/falcone` (2026-06-16) after sign-off.
+> Epics: **A #484** · **B #485** · **C #486** · **D #487**.
+> Children: A1 #488 · A2 #489 · A3 #490 · A4 #491 · A5 #492 · A6 #493 ·
+> B1 #494 · B2 #495 · B3 #496 · B4 #497 · B5 #498 · C1 #499 · C2 #500 ·
+> D1 #501 · D2 #502 · D3 #503 · D4 #504 · D5 #505.
+> D6 verified clean (not filed). OpenSpec change packages under `openspec/changes/<change-id>/`.
+
+# (original dry-run below)
+
 
 Grouped into epics with child issues, formatted to the repo conventions (OpenSpec change-id +
 labels). **Nothing is created until you confirm.** Labels use the repo set: `bug`/`enhancement`,
