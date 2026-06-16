@@ -1,0 +1,153 @@
+# E2E values overlay for the Mongo/FerretDB realtime tenant-isolation suite.
+# Change: add-ferretdb-realtime-cdc-remediation (#460)
+#
+# Applied on top of the base kind values with:
+#   E2E_FERRETDB=true \
+#   E2E_HELM_VALUES="-f deploy/kind/values-kind.yaml -f tests/e2e/values-ferretdb-realtime-e2e.yaml" \
+#   bash tests/e2e/stack.sh up
+#
+# What this overlay does:
+#   1. Enables the DocumentDB engine (postgres-documentdb + wal_level=logical).
+#   2. Enables the FerretDB gateway (MongoDB wire-protocol proxy → DocumentDB).
+#   3. Points the control-plane MONGO_URI at the FerretDB gateway.
+#   4. Sets REALTIME_DOCUMENTDB_URL from the in-falcone-documentdb-replication
+#      Secret (created by stack.sh when E2E_FERRETDB=true).
+#   5. Enables logical replication provisioning (logicalReplication.enabled=true)
+#      so the init Job creates falcone_cdc_repl, the publication, and REPLICA
+#      IDENTITY FULL on documents_* tables.
+#   6. The control-plane realtime SSE path is driven by the #460 WAL executor;
+#      no MongoDB change-stream dependency.
+#
+# Image requirements (must be pushed to localhost:30500 before `stack.sh up`):
+#   - localhost:30500/in-falcone-control-plane:<tag>   (must include #460 changes)
+#   - The postgres-documentdb image (ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0)
+#     is pulled from the public ghcr.io registry on first deploy.
+#   - The FerretDB gateway image (ghcr.io/ferretdb/ferretdb:2.7.0) is pulled from ghcr.io.
+#
+# Port-forwards (E2E_FWD override):
+#   svc/falcone-control-plane:8080:8080   — realtime SSE + data API (REALTIME_ENDPOINT)
+#   svc/falcone-ferretdb:27017:27017      — FerretDB wire (WS_MONGO_CONN_STR)
+#   svc/falcone-keycloak:8180:8080        — IAM helpers (KEYCLOAK_BASE_URL)
+#
+# After stack.sh up, set the test env vars:
+#   export REALTIME_ENDPOINT=ws://localhost:8080/realtime
+#   export PROVISIONING_API_BASE_URL=http://localhost:8080/v1
+#   export WS_MONGO_CONN_STR=mongodb://falcone:falcone@localhost:27017/
+#   export KEYCLOAK_BASE_URL=http://localhost:8180
+#   export KEYCLOAK_REALM=in-falcone-platform
+#   export KEYCLOAK_ADMIN_CLIENT_ID=in-falcone-console
+#   export KEYCLOAK_ADMIN_SECRET=<secret from keycloak>
+#   export PROVISIONING_ADMIN_TOKEN=<admin token>
+# Then run:
+#   node --test tests/e2e/realtime/mongo-tenant-isolation.test.mjs
+
+# Enable DocumentDB engine (postgres-documentdb, wal_level=logical).
+# The chart component-wrapper sub-chart alias is `documentdb`.
+documentdb:
+  enabled: true
+  logicalReplication:
+    enabled: true
+    publicationName: falcone_cdc_pub
+    role:
+      name: falcone_cdc_repl
+      passwordSecretName: in-falcone-documentdb-replication
+      passwordSecretKey: password
+
+# Enable FerretDB gateway (MongoDB wire-protocol proxy).
+ferretdb:
+  enabled: true
+
+# Disable legacy MongoDB (replaced by FerretDB/DocumentDB).
+mongodb:
+  enabled: false
+
+# Control-plane: point MONGO_URI at the FerretDB gateway and wire the realtime
+# executor to the DocumentDB engine (REALTIME_DOCUMENTDB_URL from the replication secret).
+# NOTE: controlPlane.env is a LIST; Helm replaces lists across -f overlays. This list
+# MUST be complete (including the base PG/Keycloak/storage vars) or those will be lost.
+# For a clean overlay we keep only the additions needed for Mongo realtime; the base
+# vars come from the preceding -f deploy/kind/values-kind.yaml. If Helm merge drops
+# the base list, duplicate all env entries from values-kind.yaml here.
+controlPlane:
+  enabled: true
+  env:
+    # --- Postgres (data-plane) ---
+    - name: PGHOST
+      value: falcone-postgresql
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      value: falcone
+    - name: PGDATABASE
+      value: in_falcone
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    # --- Identity (Keycloak) ---
+    - name: KEYCLOAK_JWKS_URL
+      value: http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs
+    - name: KEYCLOAK_BASE_URL
+      value: http://falcone-keycloak:8080
+    - name: KEYCLOAK_ADMIN_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: username
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: password
+    # --- FerretDB gateway (replaces legacy MongoDB MONGO_HOST) ---
+    # The control-plane's mongoUri() reads MONGO_URI first; no MONGO_HOST fallback needed.
+    - name: MONGO_URI
+      value: mongodb://falcone:falcone@falcone-ferretdb:27017/
+    - name: MONGO_BACKEND
+      value: ferretdb
+    # --- Realtime SSE over DocumentDB logical replication (#460) ---
+    # REALTIME_DOCUMENTDB_URL is a REPLICATION-privileged Postgres URL to the DocumentDB
+    # engine. Read from the in-falcone-documentdb-replication Secret (created by stack.sh
+    # when E2E_FERRETDB=true). optional:true keeps the pod starting if the secret is absent
+    # (realtime is gracefully OFF in main.mjs until it is provided).
+    - name: REALTIME_DOCUMENTDB_URL
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb-replication
+          key: realtime-url
+          optional: true
+    # --- Events (Kafka) ---
+    - name: KAFKA_BROKERS
+      value: falcone-kafka:9092
+    # --- Storage (MinIO) ---
+    - name: STORAGE_S3_ENDPOINT
+      value: http://falcone-storage:9000
+    - name: STORAGE_S3_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_USER
+    - name: STORAGE_S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_PASSWORD
+    - name: MINIO_ENDPOINT
+      value: http://falcone-storage:9000
+    - name: MINIO_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_USER
+    - name: MINIO_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: MINIO_ROOT_PASSWORD
+    # --- Functions ---
+    - name: FN_RUNTIME_IMAGE
+      value: localhost:30500/in-falcone-fn-runtime:0.1.0
+    # --- Deployment profile ---
+    - name: DEPLOYMENT_PROFILE
+      value: e2e
