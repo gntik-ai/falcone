@@ -99,11 +99,14 @@ credential can only ever touch its own resources; the gateway authenticates and 
 ## A6 — Auth-as-a-service end users land in the shared platform realm
 - **change-id:** `fix-end-user-tenant-realm-placement` · **Labels:** `bug` `security` `tenant-isolation` `P1` `cap:auth` `openspec`
 - **Problem:** `POST /v1/auth/signups {tenantId}` creates the user in `in-falcone-platform`
-  (alongside `superadmin`), not in the tenant's realm; the user gets no `tenant_id` attribute.
+  (alongside `superadmin`), not in the tenant's realm; the user gets no `tenant_id` attribute. Note:
+  the **admin** path `POST /v1/tenants/{t}/users` (`createTenantUser`) correctly creates users in the
+  tenant's `iam_realm` — so this is specifically the **self-service signup** path placing app end-users
+  in the shared platform realm.
 - **Evidence:** `evidence/09-auth-and-governance.md` (enduser1 appeared in platform realm; tenant realm
-  stayed empty).
-- **Proposed solution:** route self-service signup to the tenant's `iam_realm`; stamp the
-  `tenant_id`/`workspace_id` attributes + protocol mappers so tokens are tenant-scoped.
+  stayed empty); contrast `b-handlers.mjs::createTenantUser`.
+- **Proposed solution:** route self-service signup to the tenant's `iam_realm` (as `createTenantUser`
+  does); stamp `tenant_id`/`workspace_id` attributes (the `tenant-context` scope already maps them).
 - **Acceptance:** a signup for tenant T creates the user only in T's realm with tenant claims; platform
   realm holds only platform principals.
 - **Affected capability:** auth / identity.
@@ -138,11 +141,16 @@ credential can only ever touch its own resources; the gateway authenticates and 
 - **change-id:** `fix-auth-as-a-service-login` · **Labels:** `bug` `P1` `cap:auth` `openspec`
 - **Problem:** After `POST /v1/auth/signups` → 201, `POST /v1/auth/login-sessions` and direct Keycloak
   ROPC both fail `invalid_grant "Account is not fully set up"`, although the user is
-  `enabled/emailVerified/requiredActions:[]` and has a password credential.
-- **Evidence:** `evidence/09-auth-and-governance.md`. **Likely cause:** a realm default required-action
-  or missing client scope. **Proposed solution:** complete account setup on signup (clear default
-  required actions / set the required client scopes) so the issued credentials authenticate.
-  **Acceptance:** register→login→token→authorized call succeeds end-to-end.
+  `enabled/emailVerified/requiredActions:[]` and has a password credential. **Confirmed broader:** the
+  same failure occurs for a user created directly via the Keycloak admin API in `in-falcone-platform`
+  — so **no newly-created platform user can authenticate via ROPC** (only the bootstrap `superadmin`
+  works). The realm has **no default required actions** (`defaultAction=false` for all), so the cause
+  is the realm/client direct-grant flow or `in-falcone-console` consent config.
+- **Evidence:** `evidence/09-auth-and-governance.md` + D6 probe. **Impact:** broadened — blocks
+  onboarding of *any* new platform/tenant principal, not just self-service signup. **Proposed
+  solution:** fix the `in-falcone-console` direct-grant flow/consent so a fully-set-up user
+  authenticates. **Acceptance:** a freshly created platform user (and a signup) can log in → token →
+  authorized call.
 
 ## B4 — Quota/usage consumption is never measured
 - **change-id:** `fix-quota-consumption-measurement` · **Labels:** `bug` `P2` `cap:quotas` `openspec`
@@ -233,13 +241,14 @@ credential can only ever touch its own resources; the gateway authenticates and 
   to reach the control-plane; a real browser on the console host gets HTML for every API call.
   **Evidence:** CONS-3. **Acceptance:** the console reaches the API end-to-end in the deployed topology.
 
-## D6 — (FOLLOW-UP) Verify management-plane tenant-list scoping for non-superadmin
-- **change-id:** `verify-mgmt-tenant-list-scoping` · **Labels:** `security` `tenant-isolation` `P1` `cap:api` `needs-verification`
-- **Problem:** the console filters tenants **client-side** over the full `/v1/tenants` list; whether
-  `GET /v1/tenants` is **server-side scoped for a non-superadmin tenant principal** is unconfirmed (no
-  tenant-scoped console user exists to test). If it returns all tenants, the console only cosmetically
-  hides them (management-plane info leak). **Evidence:** CONS-4. **Action:** create a tenant-owner
-  user with a `tenant_id` claim and confirm `GET /v1/tenants` returns only that tenant; fix if not.
+## D6 — RESOLVED (not filed): management-plane tenant scoping is correct
+- **Verified clean (code-confirmed):** `routes.mjs` makes `GET /v1/tenants` **superadmin-only**
+  (`auth:'superadmin'`) — a non-superadmin can't fetch the list at all; `getTenant`
+  (`/v1/tenants/{id}`, `auth:'authenticated'`) enforces
+  `identity.tenantId === t.id` → **403 "cannot read another tenant"**; `canManageTenant` gates
+  user-management to the owning tenant. So the console's client-side filter (CONS-4) is moot. **No
+  management-plane cross-tenant leak — do NOT file.** (Could not runtime-exercise from a tenant
+  principal only because tenant logins are blocked by B3; the code path is correct.)
 
 ---
 

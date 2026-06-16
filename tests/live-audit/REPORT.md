@@ -220,11 +220,12 @@ Both SSE change streams are deployed and were proven empirically (subscribe → 
   controller exists, so the SPA's same-origin `/v1/*` calls have nothing routing them to the
   control-plane (a real browser on the console host would get HTML for every API call). The agent
   worked around this with Playwright request-rewriting to APISIX.
-- **CONS-4 (follow-up, isolation):** console tenant scoping is **client-side only** (filters the full
-  `/v1/tenants` list). For superadmin this is correct; whether `GET /v1/tenants` is **server-side
-  scoped for a non-superadmin tenant principal** could not be confirmed (no tenant-scoped console user
-  exists). If the API returns all tenants to a tenant user, the console would only cosmetically hide
-  them. **Open management-plane isolation question — flagged for follow-up.**
+- **CONS-4 (RESOLVED — clean):** the console filters tenants client-side, but the management plane is
+  **code-confirmed own-only scoped** — `GET /v1/tenants` is **superadmin-only** (non-superadmin → 403,
+  can't fetch the list) and `getTenant` enforces `identity.tenantId === t.id` (403 "cannot read another
+  tenant"). So there is **no management-plane cross-tenant leak**; the client-side filter is moot.
+  (D6 verification; the only caveat is it couldn't be runtime-exercised because tenant logins are
+  blocked by AAS-1/B3 — which itself affects *all* newly-created platform users, not just signups.)
 - Positive: the **management API is authenticated at the gateway** (`GET`/`POST /v1/tenants` without
   auth → 401, even via APISIX) — unlike the data-plane executor (GW-1).
 
