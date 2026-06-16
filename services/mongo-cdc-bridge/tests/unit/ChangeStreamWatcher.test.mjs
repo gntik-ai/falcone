@@ -75,14 +75,15 @@ test('publishes an insert, then persists + acknowledges the LSN', async () => {
   assert.deepEqual(walClient.acks, ['0/AA']);
 });
 
-test('filters out cross-tenant and cross-collection changes (no publish, no ack)', async () => {
+test('filters out cross-tenant and cross-collection changes (no publish/persist, but acked for cursor progress)', async () => {
   const { watcher, walClient, published, upserts } = harness();
   await watcher.start();
-  await walClient.onChange(rec({ tenantId: 'ten_b', documentId: 'x', fullDocument: { _id: 'x', tenantId: 'ten_b' } }));
-  await walClient.onChange(rec({ collection: 'other', documentId: 'y' }));
+  await walClient.onChange(rec({ lsn: '0/B1', tenantId: 'ten_b', documentId: 'x', fullDocument: { _id: 'x', tenantId: 'ten_b' } }));
+  await walClient.onChange(rec({ lsn: '0/B2', collection: 'other', documentId: 'y' }));
   assert.equal(published.length, 0, 'no cross-tenant / cross-collection publish');
-  assert.equal(upserts.length, 0);
-  assert.equal(walClient.acks.length, 0);
+  assert.equal(upserts.length, 0, 'out-of-scope records are not persisted to the resume store');
+  // Out-of-scope records ARE acknowledged so the shared schema-wide slot's cursor keeps advancing.
+  assert.deepEqual(walClient.acks, ['0/B1', '0/B2']);
 });
 
 test('delta-mode UPDATE synthesises updateDescription from the pre/post images', async () => {
