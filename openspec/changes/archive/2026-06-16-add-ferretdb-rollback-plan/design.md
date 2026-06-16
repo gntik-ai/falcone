@@ -9,14 +9,20 @@ MongoDB is deployed as a Bitnami StatefulSet via the `mongodb:` chart stanza
 `ghcr.io/ferretdb/ferretdb:2.7.0`) replaces this StatefulSet while keeping the same
 `MONGO_URI` contract.
 
-**Critical constraint: change streams are unsupported on FerretDB.** Both
-`apps/control-plane/src/runtime/realtime-executor.mjs:66` (`collection.watch()`) and
-`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs:42` raise
-`CommandNotSupported(115)` on FerretDB 2.7.0. `changeStreamPreAndPostImages` raises
-`UnknownBsonField(40415)`. Multi-document transactions are also unsupported (commit
-raises `CommandNotFound(59)`; abort is a silent no-op), ruling out transactional reverse
-sync. During the FerretDB window, realtime and CDC are served exclusively by the Postgres
-pgoutput logical-replication pipeline owned by `add-ferretdb-realtime-cdc-remediation`.
+**Critical constraint: change streams are unsupported on FerretDB.** The pre-#460 builds of
+`apps/control-plane/src/runtime/realtime-executor.mjs` and
+`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` used `collection.watch()`, which
+raises `CommandNotSupported(115)` on FerretDB 2.7.0 (`changeStreamPreAndPostImages` raises
+`UnknownBsonField(40415)`). `add-ferretdb-realtime-cdc-remediation` (#460) therefore
+RE-ARCHITECTED both modules onto a Postgres pgoutput logical-replication pipeline: the
+current builds no longer call `collection.watch()` (the realtime executor now requires a
+DocumentDB-engine REPLICATION connection — `engineConnectionConfig` — and consumes a
+`WalReplicationClient` slot, throwing at construction without one). Multi-document
+transactions are also unsupported (commit raises `CommandNotFound(59)`; abort is a silent
+no-op), ruling out transactional reverse sync. During the FerretDB window, realtime and
+CDC are served exclusively by that pgoutput pipeline. Because the current build has no
+MongoDB change-stream code, restoring realtime to MongoDB on rollback requires redeploying
+the pre-#460 image — NOT a configuration change.
 
 The FerretDB stack has two distinct PVCs: (1) the MongoDB PVC (the rollback anchor —
 retained until the rollback window closes), and (2) the dedicated Postgres engine PVC
@@ -90,15 +96,24 @@ completes.
 Alternative considered: bidirectional automated sync. Rejected because FerretDB's lack
 of change-stream and transaction support makes it technically impossible.
 
-### D3 — Realtime/CDC rollback decommissions pgoutput pipeline, restores MongoDB change streams
+### D3 — Realtime/CDC rollback decommissions pgoutput pipeline, redeploys the pre-#460 change-stream image
 
 During the FerretDB window, realtime is served by the Postgres pgoutput logical-replication
-pipeline (`add-ferretdb-realtime-cdc-remediation`). Rolling back means:
+pipeline (`add-ferretdb-realtime-cdc-remediation`, #460). Rolling back means:
 1. Decommissioning the pgoutput pipeline.
-2. Restoring the MongoDB change-stream path: `realtime-executor.mjs:66` and
-   `ChangeStreamWatcher.mjs:42` resume `collection.watch()` against MongoDB (where it
-   works). There is no "revert on the FerretDB side" — change streams were never
-   functional there and never need to be verified against FerretDB.
+2. Restoring the MongoDB change-stream path by REDEPLOYING the pre-#460 release image of the
+   control-plane + `mongo-cdc-bridge` (the build whose `realtime-executor.mjs` /
+   `ChangeStreamWatcher.mjs` still call `collection.watch()`) against the retained MongoDB,
+   where `collection.watch()` works. A `MONGO_URI` re-point alone does NOT restore realtime:
+   #460 deleted the change-stream code and the current realtime executor requires a
+   DocumentDB-engine REPLICATION connection (it cannot watch a MongoDB). There is no
+   "revert on the FerretDB side" — change streams were never functional there and never need
+   to be verified against FerretDB.
+
+This makes the pre-#460 image tag a cutover PREREQUISITE: it must be recorded before cutover
+so it can be redeployed on rollback (a realtime rollback cannot use an image that was never
+preserved). The data-API rollback (`MONGO_URI` re-point) remains config-only and is
+independent of this image redeploy.
 
 ### D4 — Non-prod validation gate before decommission
 

@@ -40,13 +40,16 @@ the system SHALL start the Postgres DocumentDB engine before starting the Ferret
 
 The system SHALL provide an ordered rollback procedure checklist that includes: trigger
 conditions, steps to freeze writes, re-point `MONGO_URI` back to MongoDB (reversing the
-`apps/control-plane/src/runtime/main.mjs::mongoUri` resolution), decommission the
-Postgres pgoutput realtime/CDC pipeline (`add-ferretdb-realtime-cdc-remediation`
-components), restore the MongoDB change-stream path
-(`apps/control-plane/src/runtime/realtime-executor.mjs:66` and
-`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs:42`), a per-tenant data-API
-smoke validation step, confirmation that MongoDB change-stream delivery is functional
-after rollback, a resume step, and the point-of-no-return marker.
+`apps/control-plane/src/runtime/main.mjs::mongoUri` resolution — this restores the DATA-API
+path and is config-only), decommission the Postgres pgoutput realtime/CDC pipeline
+(`add-ferretdb-realtime-cdc-remediation` components), restore the MongoDB change-stream path
+by REDEPLOYING the pre-#460 release image of the control-plane and `mongo-cdc-bridge` (the
+build whose `apps/control-plane/src/runtime/realtime-executor.mjs` and
+`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` still call `collection.watch()`;
+#460 re-architected the current build onto pgoutput, so a `MONGO_URI` re-point alone does
+NOT restore realtime), a per-tenant data-API smoke validation step, confirmation that
+MongoDB change-stream delivery is functional after rollback, a resume step, and the
+point-of-no-return marker.
 
 #### Scenario: Rollback triggered by FerretDB failure within window
 
@@ -56,8 +59,9 @@ after rollback, a resume step, and the point-of-no-return marker.
   (2) re-point `MONGO_URI` to MongoDB endpoint,
   (3) decommission the Postgres pgoutput realtime/CDC pipeline
       (`add-ferretdb-realtime-cdc-remediation` components),
-  (4) restore the MongoDB change-stream path (`realtime-executor.mjs:66`,
-      `ChangeStreamWatcher.mjs:42`) and confirm `collection.watch()` is functional
+  (4) restore the MongoDB change-stream path by redeploying the pre-#460 image (whose
+      `realtime-executor.mjs` / `ChangeStreamWatcher.mjs` still call `collection.watch()`)
+      against the retained MongoDB, and confirm `collection.watch()` is functional
       against MongoDB,
   (5) run per-tenant data-API smoke test,
   (6) confirm smoke green and MongoDB change-stream delivery verified,
@@ -82,19 +86,24 @@ after rollback, a resume step, and the point-of-no-return marker.
 
 The rollback procedure SHALL decommission the Postgres pgoutput logical-replication
 pipeline (`add-ferretdb-realtime-cdc-remediation`) and SHALL restore the MongoDB
-change-stream path. During the FerretDB window, realtime and CDC are served exclusively
-by that pgoutput pipeline. The system SHALL NOT attempt to verify change-stream delivery
+change-stream path by REDEPLOYING the pre-#460 release image of the control-plane and
+`mongo-cdc-bridge` (the build that still calls `collection.watch()`). During the FerretDB
+window, realtime and CDC are served exclusively by that pgoutput pipeline, and the current
+build contains no MongoDB change-stream code, so a `MONGO_URI` re-point alone SHALL NOT be
+treated as restoring realtime. The system SHALL NOT attempt to verify change-stream delivery
 against FerretDB at any point — change streams are unsupported on FerretDB
-(`CommandNotSupported(115)` at `realtime-executor.mjs:66` and
-`ChangeStreamWatcher.mjs:42`); the verification gate applies only to MongoDB after rollback.
+(`CommandNotSupported(115)` is why #460 removed `collection.watch()` from
+`realtime-executor.mjs` and `ChangeStreamWatcher.mjs`); the verification gate applies only
+to MongoDB after rollback.
 
 #### Scenario: pgoutput pipeline decommissioned before MongoDB change-stream path is restored
 
 - **WHEN** the `MONGO_URI` has been re-pointed to MongoDB as part of rollback
 - **THEN** the operator SHALL decommission the Postgres pgoutput realtime/CDC pipeline
   components introduced by `add-ferretdb-realtime-cdc-remediation`
-- **THEN** the operator SHALL restore the MongoDB change-stream path
-  (`realtime-executor.mjs:66` and `ChangeStreamWatcher.mjs:42`)
+- **THEN** the operator SHALL restore the MongoDB change-stream path by redeploying the
+  pre-#460 release image (whose `realtime-executor.mjs` / `ChangeStreamWatcher.mjs` still
+  call `collection.watch()`); a `MONGO_URI` re-point alone does NOT restore realtime
 - **THEN** `collection.watch()` SHALL be confirmed functional against MongoDB before
   writes are resumed
 - **THEN** no verification of change-stream delivery SHALL be attempted against FerretDB
@@ -106,6 +115,32 @@ against FerretDB at any point — change streams are unsupported on FerretDB
   change stream cursor without raising `CommandNotSupported`
 - **THEN** the CDC bridge (`services/mongo-cdc-bridge/`) SHALL be confirmed as connected
   to MongoDB before writes are resumed
+
+### Requirement: Pre-#460 change-stream image is recorded before cutover for realtime rollback
+
+The system SHALL record, before cutover, the release image tag of the control-plane and
+`mongo-cdc-bridge` that still contains the MongoDB `collection.watch()` path — the last
+build before `add-ferretdb-realtime-cdc-remediation` (#460) re-architected realtime/CDC onto
+the Postgres pgoutput pipeline. A realtime/CDC rollback redeploys this image against the
+retained MongoDB; the rollback CANNOT restore realtime from an image that was never
+preserved, because the post-#460 build has no `collection.watch()` code.
+
+#### Scenario: Pre-#460 image tag is recorded at cutover time
+
+- **WHEN** the cutover runbook step is initiated
+- **THEN** the operator SHALL record the pre-#460 control-plane and `mongo-cdc-bridge` image
+  tag (the build containing `collection.watch()`) in the rollback runbook
+- **THEN** the recorded image tag SHALL be the redeploy target for the realtime/CDC rollback
+  step
+
+#### Scenario: Realtime rollback redeploys the recorded pre-#460 image
+
+- **WHEN** a realtime/CDC rollback is executed and the `MONGO_URI` has been re-pointed to
+  MongoDB
+- **THEN** the operator SHALL redeploy the recorded pre-#460 image against the retained
+  MongoDB rather than relying on the `MONGO_URI` re-point to restore realtime
+- **THEN** `collection.watch()` SHALL be confirmed functional against MongoDB on the
+  redeployed image before writes are resumed
 
 ### Requirement: Non-prod rollback validation gate before decommission
 
