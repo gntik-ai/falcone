@@ -137,6 +137,8 @@ MongoDB remains authoritative. If a rollback is required **after Step 6**:
 2. Re-apply via Helm upgrade / pod restart.
 3. Resume against MongoDB.
 
-See `add-ferretdb-rollback-plan` (#463) for the full rollback procedure, including the read-only
-fallback window. Validation thresholds and per-tenant smoke checks are owned by
-`add-ferretdb-migration-validation` (#462).
+See **`ROLLBACK-RUNBOOK.md`** (`add-ferretdb-rollback-plan`, #463) for the full rollback procedure,
+including the read-only fallback window, the two-plane model (data-API re-point vs realtime/CDC
+pre-#460 image redeploy), the best-effort delta-back sync, and the non-prod validation gate.
+Validation thresholds and per-tenant smoke checks are owned by `add-ferretdb-migration-validation`
+(#462).

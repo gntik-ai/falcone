@@ -7,14 +7,20 @@ the cutover can be treated as production-safe.
 
 The connection entry point is `apps/control-plane/src/runtime/main.mjs::mongoUri`
 (lines 33-34), which reads `MONGO_URI` from the environment. MongoDB is deployed via the
-`mongodb:` stanza in `charts/in-falcone/values.yaml` (lines 1792-1874). Realtime and
-CDC during the FerretDB window are served by the Postgres pgoutput logical-replication
-pipeline introduced by `add-ferretdb-realtime-cdc-remediation` — NOT by MongoDB change
-streams, which are unsupported on FerretDB (`collection.watch()` at
-`apps/control-plane/src/runtime/realtime-executor.mjs:66` and
-`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs:42` both raise
-`CommandNotSupported(115)` on FerretDB 2.7.0). The FerretDB engine is a dedicated
-Postgres StatefulSet whose PVC is a separate retention concern from the MongoDB PVC.
+`mongodb:` stanza in `charts/in-falcone/values.yaml` (line 1792, `enabled: true`).
+Realtime and CDC are served by the Postgres pgoutput logical-replication pipeline
+introduced by `add-ferretdb-realtime-cdc-remediation` (#460). **That change REPLACED the
+MongoDB change-stream code**: `apps/control-plane/src/runtime/realtime-executor.mjs` and
+`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` were re-architected onto pgoutput
+and no longer call `collection.watch()` at all — the realtime executor now requires a
+DocumentDB-engine REPLICATION connection (`engineConnectionConfig`) and consumes a
+`WalReplicationClient` slot, throwing at construction without one. MongoDB change streams
+are unsupported on FerretDB (`collection.watch()` raises `CommandNotSupported(115)` on
+FerretDB 2.7.0), which is WHY #460 removed that path. Consequently, rolling realtime/CDC
+back to MongoDB is NOT a `MONGO_URI` re-point: it requires REDEPLOYING the pre-#460
+release image (the last build that still contains the `collection.watch()` path) against
+the retained MongoDB. The FerretDB engine is a dedicated Postgres StatefulSet whose PVC
+is a separate retention concern from the MongoDB PVC.
 
 ## What Changes
 
@@ -22,16 +28,24 @@ Postgres StatefulSet whose PVC is a separate retention concern from the MongoDB 
   accepted) for a defined window (N days, default 7) by keeping the side-by-side chart
   toggle active and not reclaiming its PVC.
 - A rollback procedure is documented as an ordered checklist: freeze writes, re-point
-  `MONGO_URI` in the chart back to MongoDB, decommission the pgoutput realtime/CDC
-  pipeline (`add-ferretdb-realtime-cdc-remediation` components), restore the MongoDB
-  change-stream path (`realtime-executor.mjs:66`, `ChangeStreamWatcher.mjs:42`), validate
-  with the per-tenant data-API smoke test and MongoDB change-stream delivery, then resume
-  traffic.
+  `MONGO_URI` in the chart back to MongoDB (restores the DATA-API path — config-only),
+  decommission the pgoutput realtime/CDC pipeline (`add-ferretdb-realtime-cdc-remediation`
+  components), restore the MongoDB change-stream path by REDEPLOYING the pre-#460 release
+  image of the control-plane + `mongo-cdc-bridge` (the build that still calls
+  `collection.watch()`) against the retained MongoDB, validate with the per-tenant
+  data-API smoke test and MongoDB change-stream delivery, then resume traffic.
 - The realtime/CDC rollback path is explicitly covered: rolling back to MongoDB means
-  decommissioning the Postgres pgoutput pipeline and restoring the MongoDB change-stream
-  path. MongoDB change streams (`collection.watch()`) DO work on MongoDB; there is
-  nothing to verify or revert on the FerretDB side — change streams were never functional
-  there.
+  decommissioning the Postgres pgoutput pipeline AND redeploying the pre-#460 image — the
+  build whose `realtime-executor.mjs` / `ChangeStreamWatcher.mjs` still call
+  `collection.watch()`. #460 removed the change-stream code from the current build, so a
+  `MONGO_URI` re-point alone does NOT restore realtime (the current realtime executor
+  requires a DocumentDB-engine REPLICATION connection and cannot watch a MongoDB).
+  `collection.watch()` DOES work against MongoDB — it was only unsupported on FerretDB — so
+  once the pre-#460 image runs against MongoDB, realtime is functional again; there is
+  nothing to verify or revert on the FerretDB side.
+- A new prerequisite: the pre-#460 control-plane + `mongo-cdc-bridge` image tag (the last
+  build with the MongoDB `collection.watch()` path) MUST be recorded before cutover — a
+  realtime rollback cannot redeploy an image that was never preserved.
 - Writes that land on FerretDB+DocumentDB (Postgres engine) during the window are synced
   back via idempotent single-document UPSERT export keyed on `_id` from the DocumentDB
   engine — NOT via change-stream or oplog tailing (both unsupported on FerretDB). If full
@@ -67,11 +81,14 @@ Postgres StatefulSet whose PVC is a separate retention concern from the MongoDB 
   re-point target for both cutover and rollback.
 - `charts/in-falcone/values.yaml` (lines 1792-1874): MongoDB StatefulSet + PVC must not
   be torn down at cutover; chart side-by-side toggle drives retention.
-- `apps/control-plane/src/runtime/realtime-executor.mjs:66`: MongoDB change-stream path
-  (`collection.watch()`) is restored on rollback. Was non-functional during the FerretDB
-  window (CommandNotSupported); becomes functional again once `MONGO_URI` points to MongoDB.
-- `services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs:42`: CDC change-stream watcher
-  is restored on rollback. Same unsupported/restored pattern.
+- `apps/control-plane/src/runtime/realtime-executor.mjs`: post-#460 this module is
+  pgoutput-only (consumes a `WalReplicationClient` against the DocumentDB engine; no
+  `collection.watch()`). Restoring the MongoDB change-stream path on rollback requires
+  REDEPLOYING the pre-#460 image, not a `MONGO_URI` re-point. `collection.watch()` works
+  against MongoDB once that image is running.
+- `services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs`: post-#460 this watcher consumes
+  a `WalReplicationClient` (pgoutput) instead of `collection.watch()`. Same pre-#460-image
+  redeploy is required to restore the MongoDB change-stream CDC path on rollback.
 - `add-ferretdb-realtime-cdc-remediation`: the pgoutput realtime/CDC pipeline introduced
   by that change is the realtime source during the FerretDB window and is decommissioned
   as part of rollback.

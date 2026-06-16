@@ -1790,6 +1790,14 @@ postgresql:
         drop:
           - ALL
 mongodb:
+  # --- FerretDB rollback window (add-ferretdb-rollback-plan #463) ----------------------------
+  # After the MongoDB -> FerretDB cutover this component is KEPT as the rollback anchor: it stays
+  # deployed but READ-ONLY (no new write routes) for the rollback window (N days, default 7). Do
+  # NOT disable this toggle or tear down the StatefulSet until the window closes AND the non-prod
+  # rollback gate (tools/migration/ferretdb/rollback-validate.sh) is green. Realtime/CDC rollback
+  # additionally requires REDEPLOYING the pre-#460 change-stream image — a MONGO_URI re-point alone
+  # does not restore realtime (see tools/migration/ferretdb/ROLLBACK-RUNBOOK.md). The FerretDB
+  # Postgres (DocumentDB) engine PVC is a SEPARATE retention item — do not confuse the two.
   enabled: true
   wrapper:
     componentId: mongodb
@@ -1829,6 +1837,12 @@ mongodb:
     - in-falcone-mongodb
   envFromConfigMaps: []
   persistence:
+    # ROLLBACK ANCHOR / point-of-no-return (add-ferretdb-rollback-plan #463): this PVC holds the
+    # MongoDB data the rollback falls back to. StatefulSet PVCs are NOT auto-reclaimed on helm
+    # upgrade/uninstall, so the data is retained for the rollback window by default — do NOT delete
+    # this PVC manually until the non-prod rollback gate is green (deleting it makes rollback
+    # impossible without a backup restore). To make retention explicit on a non-StatefulSet claim,
+    # set annotations: { helm.sh/resource-policy: keep }.
     enabled: true
     existingClaim: ""
     size: 20Gi
