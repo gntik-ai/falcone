@@ -61,8 +61,9 @@ It starts:
 
 | Service | Image | Purpose |
 | --- | --- | --- |
-| `postgres` | `postgres:16-alpine` | Relational backend (with tenant RLS) |
-| `mongodb` | `mongo:7` (`--replSet rs0`) | Document backend + change streams |
+| `postgres` | `pgvector/pgvector:pg16` | Relational backend (tenant RLS) + pgvector |
+| `ferretdb` | `ghcr.io/ferretdb/ferretdb:2.7.0` | Document-store **gateway** — speaks the MongoDB wire protocol; host port **57017** |
+| `documentdb` | `ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0` | Document-store **engine** — DocumentDB-on-PostgreSQL 17 (`wal_level=logical`); host port **55433** |
 | `keycloak` | `quay.io/keycloak/keycloak:26.0` | Identity (OIDC), realm auto-imported |
 | `redpanda` | `redpandadata/redpanda:v24.2.7` | Kafka-compatible event bus |
 | `seaweedfs` | `chrislusf/seaweedfs:4.33` | S3-compatible object storage |
@@ -70,11 +71,7 @@ It starts:
 | `apisix` | `apache/apisix:3.9.1-debian` | API gateway |
 
 > [!IMPORTANT]
-> MongoDB runs as a **single-node replica set (`rs0`)** because change streams (used by realtime) require one. The first time you start a fresh data directory you may need to initiate it:
-> ```bash
-> docker compose exec mongodb mongosh --eval \
->   'rs.initiate({_id:"rs0",members:[{_id:0,host:"mongodb:27017"}]})'
-> ```
+> The document store is **FerretDB v2 over DocumentDB** (MongoDB-wire-compatible) — there is **no `mongodb` service and no replica set / `rs.initiate`**. The `ferretdb` gateway never connects before the `documentdb` engine is healthy (`depends_on: service_healthy`), so engine-first startup is automatic; `MONGO_URI` consumers reach the gateway unchanged on host port **57017**. Document realtime is sourced from Postgres logical replication (`wal_level=logical` on the engine), not change streams.
 
 Tear down (and wipe volumes):
 
@@ -190,7 +187,8 @@ global:
 apisix:    { image: { repository: registry.airgap.in-falcone.local/apache/apisix } }
 keycloak:  { image: { repository: registry.airgap.in-falcone.local/keycloak/keycloak } }
 postgresql:{ image: { repository: registry.airgap.in-falcone.local/bitnami/postgresql } }
-mongodb:   { image: { repository: registry.airgap.in-falcone.local/bitnami/mongodb } }
+ferretdb:  { image: { repository: registry.airgap.in-falcone.local/ferretdb/ferretdb } }
+documentdb:{ image: { repository: registry.airgap.in-falcone.local/ferretdb/postgres-documentdb } }
 kafka:     { image: { repository: registry.airgap.in-falcone.local/bitnami/kafka } }
 seaweedfs: { image: { repository: registry.airgap.in-falcone.local/chrislusf/seaweedfs } }
 controlPlane: { image: { repository: registry.airgap.in-falcone.local/example/in-falcone-control-plane } }
@@ -236,5 +234,5 @@ Then continue to the [Quickstart](/guide/quickstart) to create your first tenant
 ### Troubleshooting
 
 - **`helm upgrade` fails values schema validation** — the chart ships a strict `values.schema.json`. If you are iterating on a partial values set, add `--skip-schema-validation` to the Helm command.
-- **MongoDB realtime not delivering** — ensure MongoDB is a replica set; change streams (and therefore realtime) require it.
+- **Document realtime not delivering** — the document store (FerretDB v2) has no change streams; realtime rides a Postgres **logical-replication** slot on the DocumentDB engine. Ensure the engine runs with `wal_level=logical` (so `pg_create_logical_replication_slot` succeeds) and that the engine is Ready before the FerretDB gateway.
 - **Air-gapped images `ImagePullBackOff`** — confirm the pull secret name matches `global.imagePullSecrets` and the CA bundle configmap exists in the namespace.

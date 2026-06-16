@@ -27,7 +27,7 @@ platform deployed via a single Helm chart on Kubernetes or OpenShift.
 
 - Node.js 20+ ESM, pnpm workspaces
 - React 18 + Vite + Tailwind (web-console)
-- PostgreSQL, MongoDB, Kafka, OpenWhisk, S3-compatible
+- PostgreSQL, FerretDB (MongoDB-wire-compatible document store, over DocumentDB/PostgreSQL), Kafka, Knative (functions runtime), SeaweedFS (S3-compatible object store)
 - Keycloak for identity (two-realm tier)
 - APISIX as gateway
 - External Secrets Operator + Vault for secret distribution

@@ -167,12 +167,16 @@ config:
         - username
         - password
         - database
+    # Document-store credentials feed MONGO_USER/MONGO_PASSWORD/MONGO_DATABASE for the
+    # control-plane's connection to the FerretDB gateway (which passes them through to the
+    # DocumentDB engine). After the MongoDB-server -> FerretDB cutover these come from the
+    # DocumentDB engine Secret (in-falcone-documentdb), not the removed in-falcone-mongodb.
     mongoCredentials:
-      existingSecret: in-falcone-mongodb
+      existingSecret: in-falcone-documentdb
       keys:
-        - username
-        - password
-        - database
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_DB
     kafkaCredentials:
       existingSecret: in-falcone-kafka
       keys:
@@ -1472,50 +1476,6 @@ bootstrap:
           upstream:
             component: keycloak
             port: 8080
-        - routeId: "3002"
-          name: native-openwhisk-admin
-          uri: /_native/openwhisk/api/v1/*
-          methods: *a2
-          priority: 320
-          enabledInModes:
-            - enabled
-          labels:
-            gateway.in-falcone.io/route-kind: passthrough
-            gateway.in-falcone.io/passthrough-id: openwhisk_admin
-            gateway.in-falcone.io/audit-required: "true"
-          plugins:
-            openid-connect: *a4
-            cors: *a1
-            limit-count:
-              count: 30
-              time_window: 60
-              rejected_code: 429
-              key_type: var
-              key: $consumer_name
-              allow_degradation: false
-            client-control:
-              max_body_size: 524288
-            request-validation: *a5
-            proxy-rewrite:
-              headers: *a6
-              regex_uri:
-                - ^/_native/openwhisk/api/v1/(.*)
-                - /api/v1/$1
-            authz-keycloak:
-              discovery: https://iam.dev.in-falcone.example.com/auth/realms/in-falcone-platform/.well-known/openid-configuration
-              client_id: in-falcone-gateway
-              policy_enforcement_mode: ENFORCING
-              permissions:
-                - gateway.native.openwhisk.admin
-            http-logger:
-              uri: http://control-plane.{{ .Release.Namespace
-                }}.svc.cluster.local:8080/control-plane/internal/audit/gateway-passthrough
-              include_req_body: false
-              max_retry_count: 1
-              buffer_duration: 1
-          upstream:
-            component: openwhisk
-            port: 3233
 apisix:
   enabled: true
   wrapper:
@@ -1789,114 +1749,8 @@ postgresql:
       capabilities:
         drop:
           - ALL
-mongodb:
-  # --- FerretDB rollback window (add-ferretdb-rollback-plan #463) ----------------------------
-  # After the MongoDB -> FerretDB cutover this component is KEPT as the rollback anchor: it stays
-  # deployed but READ-ONLY (no new write routes) for the rollback window (N days, default 7). Do
-  # NOT disable this toggle or tear down the StatefulSet until the window closes AND the non-prod
-  # rollback gate (tools/migration/ferretdb/rollback-validate.sh) is green. Realtime/CDC rollback
-  # additionally requires REDEPLOYING the pre-#460 change-stream image — a MONGO_URI re-point alone
-  # does not restore realtime (see tools/migration/ferretdb/ROLLBACK-RUNBOOK.md). The FerretDB
-  # Postgres (DocumentDB) engine PVC is a SEPARATE retention item — do not confuse the two.
-  enabled: true
-  wrapper:
-    componentId: mongodb
-    workload:
-      kind: StatefulSet
-  image:
-    repository: docker.io/bitnami/mongodb
-    tag: 8.0.0
-    pullPolicy: IfNotPresent
-  replicas: 1
-  serviceAccount:
-    create: true
-    name: ""
-    automountToken: false
-  service:
-    enabled: true
-    type: ClusterIP
-    port: 27017
-    targetPort: 27017
-    portName: tcp-mongodb
-    annotations: {}
-  ports:
-    - name: tcp-mongodb
-      containerPort: 27017
-      protocol: TCP
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1
-      memory: 2Gi
-  env:
-    - name: MONGODB_DATABASE
-      value: in_falcone
-  envFromSecrets:
-    - in-falcone-mongodb
-  envFromConfigMaps: []
-  persistence:
-    # ROLLBACK ANCHOR / point-of-no-return (add-ferretdb-rollback-plan #463): this PVC holds the
-    # MongoDB data the rollback falls back to. StatefulSet PVCs are NOT auto-reclaimed on helm
-    # upgrade/uninstall, so the data is retained for the rollback window by default — do NOT delete
-    # this PVC manually until the non-prod rollback gate is green (deleting it makes rollback
-    # impossible without a backup restore). To make retention explicit on a non-StatefulSet claim,
-    # set annotations: { helm.sh/resource-policy: keep }.
-    enabled: true
-    existingClaim: ""
-    size: 20Gi
-    storageClass: ""
-    accessModes:
-      - ReadWriteOnce
-    mountPath: /bitnami/mongodb
-    annotations: {}
-  podAnnotations: {}
-  podLabels: {}
-  podSecurityContext:
-    fsGroup: 1001
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
-    capabilities:
-      drop:
-        - ALL
-    runAsNonRoot: true
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  extraVolumes: []
-  extraVolumeMounts: []
-  config:
-    inline:
-      tenantPartitionKey: tenantId
-  initContainers: []
-  volumePermissions:
-    enabled: false
-    image:
-      repository: docker.io/library/busybox
-      tag: 1.36.1
-      pullPolicy: IfNotPresent
-    command: []
-    securityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: true
-      capabilities:
-        drop:
-          - ALL
-# DocumentDB engine (FerretDB document-store backend). Dedicated Postgres 17.6
-# StatefulSet rendered by the component-wrapper sub-chart (alias `documentdb` in
-# Chart.yaml). OFF by default — coexists with the mongodb backend during the
-# MongoDB -> DocumentDB cutover (add-ferretdb-* epic). The image is a
-# MongoDB-wire-compatible Postgres extension stack; it requires the SERVER-START GUC
-# `shared_preload_libraries='pg_cron,pg_documentdb_core,pg_documentdb'`, which the
-# bitnami/postgresql relational tier cannot provide — hence a dedicated instance
-# (ADR-14 / add-ferretdb-adr-spike #455). Tenants never reach this engine directly;
-# the FerretDB gateway (add-ferretdb-gateway) is the only in-cluster consumer.
 documentdb:
-  enabled: false
+  enabled: true
   wrapper:
     componentId: documentdb
     workload:
@@ -2086,7 +1940,7 @@ documentdb:
 # applied (documentdb_api schema present) before the gateway connects — enforced by the
 # engine-gate initContainer below + the readiness probe.
 ferretdb:
-  enabled: false
+  enabled: true
   wrapper:
     componentId: ferretdb
     workload:
@@ -2361,224 +2215,6 @@ kafka:
       capabilities:
         drop:
           - ALL
-openwhisk:
-  # DISABLED: functions migrated to Knative (the control-plane function executor
-  # creates a Knative Service per function). On OpenShift use OpenShift Serverless;
-  # on kind, Knative Serving + Kourier (see deploy/kind/knative/). The OpenWhisk
-  # Python2/ansible init images are also incompatible with newer kernels.
-  enabled: false
-  wrapper:
-    componentId: openwhisk
-    workload:
-      kind: Deployment
-  image:
-    repository: docker.io/apache/openwhisk-controller
-    tag: 2.0.0
-    pullPolicy: IfNotPresent
-  replicas: 2
-  serviceAccount:
-    create: true
-    name: ""
-    automountToken: false
-  service:
-    enabled: true
-    type: ClusterIP
-    port: 3233
-    targetPort: 3233
-    portName: http
-    annotations: {}
-  ports:
-    - name: http
-      containerPort: 3233
-      protocol: TCP
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1
-      memory: 1Gi
-  env:
-    - name: OPENWHISK_RUNTIME_ENV
-      value: kubernetes
-  envFromSecrets: []
-  envFromConfigMaps: []
-  persistence:
-    enabled: false
-    existingClaim: ""
-    size: ""
-    storageClass: ""
-    accessModes:
-      - ReadWriteOnce
-    mountPath: /openwhisk
-    annotations: {}
-  podAnnotations: {}
-  podLabels: {}
-  podSecurityContext: {}
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
-    capabilities:
-      drop:
-        - ALL
-    runAsNonRoot: true
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  extraVolumes: []
-  extraVolumeMounts: []
-  config:
-    inline:
-      executionPlane: serverless
-  initContainers: []
-  volumePermissions:
-    enabled: false
-    image:
-      repository: docker.io/library/busybox
-      tag: 1.36.1
-      pullPolicy: IfNotPresent
-    command: []
-    securityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: true
-      capabilities:
-        drop:
-          - ALL
-# ---------------------------------------------------------------------------
-# MinIO `storage` component (legacy object-storage tier).
-#
-# MIGRATION / ROLLBACK NOTE (add-seaweedfs-rollback-plan, #438):
-# During the MinIO -> SeaweedFS cutover this StatefulSet is the SIDE-BY-SIDE
-# fallback. Keep `enabled: true` and DO NOT reclaim its PVC for the full rollback
-# retention window (N days, default 7 — see tools/migration/ROLLBACK.md). After
-# cutover the app is re-pointed to SeaweedFS (STORAGE_S3_ENDPOINT -> ...seaweedfs-s3:8333),
-# so MinIO receives NO new writes and is effectively READ-ONLY — it exists only
-# as the rollback target (re-point STORAGE_S3_ENDPOINT back to
-# http://<release>-storage:9000). Persistence below uses `existingClaim: ""` with
-# no delete-on-upgrade / delete-on-uninstall annotation, so a `helm upgrade`/
-# `uninstall` does NOT delete the PVC (StatefulSet volumeClaimTemplate retention).
-# Deleting this component or its PVC is the POINT-OF-NO-RETURN and is GATED on the
-# non-prod rollback test being green (tools/migration/ROLLBACK.md, sections 4-5).
-# ---------------------------------------------------------------------------
-storage:
-  # Object store cut over to SeaweedFS (ADR-13). MinIO is OFF by default and kept only as
-  # an explicit rollback toggle — set `storage.enabled: true` to re-deploy MinIO during the
-  # retention window (tools/migration/ROLLBACK.md). PVCs are retained on disable.
-  enabled: false
-  wrapper:
-    componentId: storage
-    workload:
-      kind: StatefulSet
-  image:
-    repository: docker.io/minio/minio
-    tag: 2026.3.23
-    pullPolicy: IfNotPresent
-  command:
-    - /usr/bin/docker-entrypoint.sh
-  args:
-    - minio
-    - server
-    - /data
-    - --console-address=:9001
-  replicas: 1
-  serviceAccount:
-    create: true
-    name: ""
-    automountToken: false
-  service:
-    enabled: true
-    type: ClusterIP
-    port: 9000
-    targetPort: 9000
-    portName: http
-    annotations: {}
-  ports:
-    - name: http
-      containerPort: 9000
-      protocol: TCP
-    - name: console
-      containerPort: 9001
-      protocol: TCP
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1
-      memory: 2Gi
-  env:
-    - name: MINIO_BROWSER_REDIRECT_URL
-      value: https://console.dev.in-falcone.example.com
-  envFromSecrets:
-    - in-falcone-storage
-  envFromConfigMaps: []
-  persistence:
-    enabled: true
-    existingClaim: ""
-    size: 100Gi
-    storageClass: ""
-    accessModes:
-      - ReadWriteOnce
-    mountPath: /data
-    annotations: {}
-  podAnnotations: {}
-  podLabels: {}
-  podSecurityContext:
-    fsGroup: 1001
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
-    capabilities:
-      drop:
-        - ALL
-    runAsNonRoot: true
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  extraVolumes: []
-  extraVolumeMounts: []
-  config:
-    inline:
-      provider: s3-compatible
-      providerType: minio
-      providerSelectionMode: explicit
-  initContainers: []
-  volumePermissions:
-    enabled: false
-    image:
-      repository: docker.io/library/busybox
-      tag: 1.36.1
-      pullPolicy: IfNotPresent
-    command: []
-    securityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: true
-      capabilities:
-        drop:
-          - ALL
-# ---------------------------------------------------------------------------
-# SeaweedFS — HA object-storage tier (add-seaweedfs-deployment, #432).
-#
-# Sub-chart `seaweedfs` (upstream chart 4.33.0 / appVersion 4.33), pinned in
-# Chart.yaml and gated by `seaweedfs.enabled`. DEFAULT OFF: SeaweedFS and the
-# bundled MinIO `storage` component co-exist during the MinIO -> SeaweedFS
-# cutover (CUTOVER TOGGLE — flip this per environment; rollback = set it back to
-# false, MinIO is untouched). When false the sub-chart renders nothing (no pods,
-# PVCs, or Services).
-#
-# Topology (dev/base): 1 master, 1 volume server (100Gi PVC), 1 filer (20Gi PVC,
-# metadata in PostgreSQL), 1 S3 gateway on port 8333, replication 001. The HA
-# profile (values/profiles/ha.yaml) raises master->3 (Raft quorum), volume->3
-# (1Ti each), S3->2, replication->011.
-#
-# All keys below are nested under `seaweedfs:` so they are passed to the upstream
-# sub-chart verbatim (Helm subchart value-passing). Field paths were mapped from
-# `helm show values seaweedfs/seaweedfs --version 4.33.0`.
-# ---------------------------------------------------------------------------
 seaweedfs:
   # Default-active object store after the MinIO -> SeaweedFS cutover (ADR-13).
   enabled: true
@@ -2893,8 +2529,8 @@ seaweedfsTls:
 # gateway (seaweedfs.s3.existingConfigSecret above).
 #
 # CONSUMER WIRING (#434): the live runtime reads provider-neutral
-# STORAGE_S3_ENDPOINT / STORAGE_S3_ACCESS_KEY / STORAGE_S3_SECRET_KEY (with
-# MINIO_* fallback) — see deploy/kind/values-kind.yaml + values-openshift.yaml.
+# STORAGE_S3_ENDPOINT / STORAGE_S3_ACCESS_KEY / STORAGE_S3_SECRET_KEY — see
+# deploy/kind/values-kind.yaml + values-openshift.yaml (both point at SeaweedFS).
 # To point consumers at SeaweedFS, wire:
 #   STORAGE_S3_ENDPOINT   -> http://<release>-seaweedfs-s3:8333  (path-style)
 #   STORAGE_S3_ACCESS_KEY -> secret in-falcone-seaweedfs-s3-creds key s3AccessKey
@@ -3025,23 +2661,28 @@ observability:
             metricsPath: /metrics
             interval: 30s
             maxStaleness: 120s
+          # Capability subsystems repointed to the current backends after the
+          # OpenWhisk->Knative / MinIO->SeaweedFS / MongoDB-server->FerretDB cutover.
+          # TODO: the scrape metricsPath/metric names below are placeholders — verify
+          # against the new backends (DocumentDB = Postgres exporter; FerretDB = /debug/metrics;
+          # SeaweedFS = per-component ServiceMonitors; functions = Knative via control-plane).
           mongodb:
             collectionMode: scrape
-            component: mongodb
+            component: documentdb
             portName: metrics
             metricsPath: /metrics
             interval: 30s
             maxStaleness: 120s
           openwhisk:
             collectionMode: scrape
-            component: openwhisk
+            component: controlPlane
             portName: metrics
             metricsPath: /metrics
             interval: 30s
             maxStaleness: 120s
           storage:
             collectionMode: hybrid
-            component: storage
+            component: seaweedfs
             portName: metrics
             metricsPath: /metrics
             interval: 60s
@@ -3090,7 +2731,7 @@ controlPlane:
     # deploy/openshift/values-openshift.yaml). RBAC: templates/control-plane-rbac.yaml.
     automountToken: false
   # Function executor (Knative): RBAC + the per-function runtime image. The data-plane
-  # connection env (PG/KEYCLOAK/MINIO/MONGO/KAFKA host+secret refs) is environment-
+  # connection env (PG/KEYCLOAK/STORAGE_S3/MONGO/KAFKA host+secret refs) is environment-
   # specific (release-prefixed service DNS + external secrets) and lives in the overlay
   # values (deploy/kind/values-kind.yaml, deploy/openshift/values-openshift.yaml).
   functionExecutor:
@@ -3211,9 +2852,9 @@ controlPlaneExecutor:
   #     - { name: PGHOST, value: <release>-postgresql }
   #     - { name: PGUSER, value: falcone }
   #     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
-  #     - { name: MONGO_HOST, value: <release>-mongodb:27017 }
-  #     - { name: MONGO_USER, value: root }
-  #     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-mongodb, key: MONGODB_ROOT_PASSWORD } } }
+  #     - { name: MONGO_HOST, value: <release>-ferretdb:27017 }
+  #     - { name: MONGO_USER, value: falcone }
+  #     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
   #     - { name: KAFKA_BROKERS, value: <release>-kafka:9092 }
   #     # Optional: verify Bearer JWTs in the executor (Keycloak/OIDC). Enables admin/user
   #     # auth WITHOUT the gateway injecting x-tenant-id (e.g. API-key issuance via an
@@ -3844,18 +3485,6 @@ gatewayPolicy:
         requiredRoles:
           - superadmin
         auditAction: keycloak_admin_passthrough
-      - id: openwhisk_admin
-        title: OpenWhisk admin passthrough
-        enabledInModes:
-          - enabled
-        pathPrefix: /_native/openwhisk/api/v1/*
-        qosProfile: native_admin
-        requestValidationProfile: native_admin
-        requiredScopes:
-          - gateway.native.openwhisk.admin
-        requiredRoles:
-          - superadmin
-        auditAction: openwhisk_admin_passthrough
   internalRequests:
     mode: validated_attestation
     requiredHeaders:
@@ -4071,7 +3700,6 @@ gatewayPolicy:
           - profile
           - tenant.admin
           - gateway.native.keycloak.admin
-          - gateway.native.openwhisk.admin
         planId: pln_01enterprise
     assertions:
       - persona: workspace_owner
@@ -4297,10 +3925,6 @@ gatewayPolicy:
       - persona: superadmin
         routeKind: passthrough
         routeId: keycloak_admin
-        expect: allow
-      - persona: superadmin
-        routeKind: passthrough
-        routeId: openwhisk_admin
         expect: allow
 
 # Optional infrastructure sub-charts — disabled by default; opt-in for operators

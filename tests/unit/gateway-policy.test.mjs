@@ -23,19 +23,16 @@ test('enabled APISIX routes honor passthrough mode switches', () => {
   const enabledNames = listEnabledApisixRoutes(values).map((route) => route.name);
 
   assert.equal(enabledNames.includes('native-keycloak-admin'), true);
-  assert.equal(enabledNames.includes('native-openwhisk-admin'), true);
 
   const limited = structuredClone(values);
   limited.gatewayPolicy.passthrough.mode = 'limited';
   const limitedNames = listEnabledApisixRoutes(limited).map((route) => route.name);
   assert.equal(limitedNames.includes('native-keycloak-admin'), true);
-  assert.equal(limitedNames.includes('native-openwhisk-admin'), false);
 
   const disabled = structuredClone(values);
   disabled.gatewayPolicy.passthrough.mode = 'disabled';
   const disabledNames = listEnabledApisixRoutes(disabled).map((route) => route.name);
   assert.equal(disabledNames.includes('native-keycloak-admin'), false);
-  assert.equal(disabledNames.includes('native-openwhisk-admin'), false);
 });
 
 test('access matrix evaluation differentiates product and passthrough access', () => {

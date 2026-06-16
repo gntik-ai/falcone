@@ -81,19 +81,19 @@ lugar de una flota de backends hechos a mano.
                         ┌──────────────────────────────────────────┐
                         │ control-plane  — 250+ endpoints REST      │
                         │ tenants · workspaces · auth/IAM · pg ·    │
-                        │ mongo · storage · events · functions ·    │
+                        │ documents · storage · events · functions ·│
                         │ metrics · plans · quotas · backup ·       │
                         │ flows (/v1/flows) · MCP (/v1/mcp) [Prev.] │
                         └───────────────┬──────────────────────────┘
             ┌───────────────────────────┼─────────────────────────────┐
             ▼                           ▼                             ▼
    provisioning-orchestrator   realtime-gateway / webhook-engine   cdc-bridges
-   (sagas, appliers)           scheduling-engine / backup-status   (pg & mongo → Kafka)
+   (sagas, appliers)           scheduling-engine / backup-status   (pg & documents → Kafka)
                                workflow-worker (intérprete de Flows)
             │                           │                             │
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
-   │ PostgreSQL (RLS + esquema por tenant) · MongoDB · Kafka · SeaweedFS ·    │
+   │ PostgreSQL (RLS + esquema por tenant) · FerretDB+DocumentDB · Kafka · SeaweedFS · │
    │ Vault (secretos) · Keycloak (IAM realm por tenant + OAuth 2.1 para MCP) ·│
    │ Temporal (motor de Flows) · Knative (functions + runtime MCP por tenant) │
    └────────────────────────────────────────────────────────────────────────┘
@@ -153,13 +153,16 @@ siguen siendo Preview bajo la advertencia de "no apto para producción" anterior
   multirréplica; hosting personalizado (imagen propia) en la ruta de creación en vivo; conectar los
   workflows-as-MCP-tools; y una conexión MCP directa por servidor (hoy el control-plane media las
   invocaciones de herramientas).
-- **Almacenamiento de objetos — migración de MinIO a SeaweedFS.** **SeaweedFS** (Apache-2.0) es el
-  almacén de objetos adoptado como rumbo futuro ([ADR-13](docs-site/architecture/adrs.md)); lo
-  despliega el chart umbrella y MinIO solo se conserva durante la ventana de transición. Véase el
+- **Almacenamiento de objetos — MinIO → SeaweedFS (completado).** **SeaweedFS** (Apache-2.0) es el
+  almacén de objetos ([ADR-13](docs-site/architecture/adrs.md)), desplegado por el chart umbrella y
+  habilitado por defecto; el antiguo componente `storage` de MinIO se ha eliminado. Véase el
   [runbook de almacenamiento de SeaweedFS](docs-site/architecture/seaweedfs.md).
-- **Alternativa de base documental** — *planificado, en evaluación.* La plataforma usa **MongoDB**
-  (API documental); se evalúa una alternativa source-available (FerretDB sobre un backend compatible
-  con DocumentDB), intercambiable en la capa de despliegue.
+- **Base documental — MongoDB → FerretDB + DocumentDB (completado).** **FerretDB v2** (Apache-2.0,
+  compatible con el wire protocol de MongoDB) sobre un motor **DocumentDB / PostgreSQL** (MIT) es la
+  base documental ([ADR-14](docs-site/architecture/adrs.md#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)),
+  desplegada por el chart umbrella; el antiguo componente de servidor MongoDB se ha eliminado. El
+  driver de MongoDB, el wire protocol y la API de datos estilo Mongo no han cambiado. Véase el
+  [runbook de la base documental FerretDB](docs-site/architecture/ferretdb.md).
 - **Hacia una primera versión estable** — *planificado.* Revisión de seguridad, garantías de
   estabilidad de API/esquemas y herramientas de migración (véase el aviso al inicio).
 
@@ -170,12 +173,12 @@ siguen siendo Preview bajo la advertencia de "no apto para producción" anterior
 | Dominio | Lo que ofrece a un tenant |
 | --- | --- |
 | **Ciclo de vida del tenant** | Crear, suspender, eliminar (soft-delete) y purgar tenants mediante una máquina de estados protegida (`draft → provisioning → active → suspended → soft_deleted`), con paneles de gobernanza y doble confirmación en acciones destructivas. |
-| **Saga de aprovisionamiento** | Orquestación asíncrona que levanta (o desmonta) un tenant en cada dominio — realm IAM, namespace Kafka, esquema Postgres, MongoDB, namespace de almacenamiento, namespace de funciones — con verificaciones previas y rollback ante fallos. |
+| **Saga de aprovisionamiento** | Orquestación asíncrona que levanta (o desmonta) un tenant en cada dominio — realm IAM, namespace Kafka, esquema Postgres, base documental (FerretDB/DocumentDB), namespace de almacenamiento, namespace de funciones — con verificaciones previas y rollback ante fallos. |
 | **Workspaces** | Fronteras sub-tenant con su propio slug, entorno, alcance IAM y membresía. Clonado de workspaces con políticas explícitas; resolución de herencia de recursos compartidos vs. especializados. |
 | **Autenticación e IAM** | Login de consola delegado por OIDC, registro con activación pendiente, recuperación de contraseña. Administración Keycloak (realm por tenant) de realms, clientes, roles, scopes y usuarios. Validación de JWT vía JWKS en caché con introspección de respaldo. |
 | **Cuentas de servicio y apps OAuth2** | Clientes OAuth2 y cuentas de servicio con API-key por workspace, con validación de URI de redirección HTTPS y límites según el plan. |
 | **PostgreSQL** | API de datos acotada por tenant más administración/gobernanza, captura de cambios (CDC), métricas y auditoría. Aislamiento por seguridad a nivel de fila (`app.tenant_id` / `app.workspace_id`) y esquemas por tenant. |
-| **FerretDB + DocumentDB** | API de documentos por tenant/workspace, administración, change streams, métricas y auditoría. |
+| **Base documental (FerretDB + DocumentDB)** | API de documentos por tenant/workspace, administración, tiempo real/CDC (replicación lógica de Postgres), métricas y auditoría. Compatible con el wire protocol de MongoDB; reemplaza a MongoDB (ADR-14). |
 | **Almacenamiento de objetos** | Buckets compatibles con S3, cargas multipart, URLs prefirmadas, políticas de acceso, notificaciones de eventos y cuotas de capacidad por tenant. |
 | **Eventos (Kafka)** | Gestión de topics y change streams CDC acotados por tenant (`<prefijo>.<tenant>.<workspace>`), más topics de sistema de auditoría/cuota/ciclo de vida. |
 | **Tiempo real** | Suscripciones WebSocket (`/v1/websockets`) con autenticación Bearer-JWT, aplicación de scope a canal y aislamiento de tenant por sesión. |
@@ -196,7 +199,7 @@ siguen siendo Preview bajo la advertencia de "no apto para producción" anterior
 
 El repositorio incluye un stack de Compose que levanta los **servicios reales de
 respaldo** con los que habla Falcone — PostgreSQL, Keycloak, Redpanda (Kafka),
-MongoDB (replica set de un nodo), SeaweedFS (S3) y Vault — más un gateway APISIX y un
+FerretDB + DocumentDB (base documental con wire protocol de MongoDB), SeaweedFS (S3) y Vault — más un gateway APISIX y un
 action runner. Es la forma más rápida de tener un entorno funcional en tu máquina.
 
 ### Requisitos previos
@@ -215,8 +218,8 @@ pnpm install
 
 ### 2. Levantar el stack con Docker Compose
 
-El script auxiliar configura los health checks, las migraciones, el replica set de
-Mongo, el bucket de SeaweedFS y el dispositivo de auditoría de Vault por ti:
+El script auxiliar configura los health checks, las migraciones, la base documental
+FerretDB + DocumentDB, el bucket de SeaweedFS y el dispositivo de auditoría de Vault por ti:
 
 ```bash
 cd tests/env
@@ -294,16 +297,14 @@ disponible** (no son open source según la OSI) — véase la nota de compatibil
 | Componente | Función en Falcone | Licencia (SPDX) | Enlace |
 | --- | --- | --- | --- |
 | PostgreSQL 16 (+ pgvector) | Almacén de datos principal del tenant; aislamiento RLS + esquema por tenant; pgvector para búsqueda vectorial | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
-| MongoDB Server 7 | API de datos de documentos por tenant/workspace | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
+| FerretDB v2 (sobre DocumentDB / PostgreSQL 17) | API de datos de documentos — compatible con el wire protocol de MongoDB ([ADR-14](docs-site/architecture/adrs.md)) | `Apache-2.0` (gateway) + `MIT` (extensión DocumentDB) | [ferretdb](https://github.com/FerretDB/FerretDB) · [documentdb](https://github.com/microsoft/documentdb) |
 | Redpanda 24.2 | Bus de eventos compatible con Kafka / streaming CDC | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
-| SeaweedFS 4.33 | Almacenamiento de objetos compatible con S3 (rumbo futuro, [ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
-| MinIO | Almacenamiento de objetos compatible con S3 (heredado — conservado durante la transición) | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| SeaweedFS 4.33 | Almacenamiento de objetos compatible con S3 ([ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
 | HashiCorp Vault 1.18 | Gestión de secretos | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
 | Keycloak 26 | IAM con realm por tenant / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API gateway (superficie pública `/v1`) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
 | Temporal (servidor 1.25 + SDK de TypeScript 1.18) | Motor de flujos de trabajo duraderos detrás de Flows | `MIT` | [temporal](https://github.com/temporalio/temporal) · [sdk-typescript](https://github.com/temporalio/sdk-typescript) |
 | Knative Serving + Kourier | Runtime de funciones serverless | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
-| Apache OpenWhisk | Motor de funciones heredado / opcional | `Apache-2.0` | [openwhisk](https://github.com/apache/openwhisk) |
 | Kubernetes + Helm | Despliegue y orquestación | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Runtime de los servicios | `MIT` | [nodejs](https://github.com/nodejs/node) |
 | nginx | Servido estático de la imagen de la consola web | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
@@ -319,7 +320,7 @@ disponible** (no son open source según la OSI) — véase la nota de compatibil
 | React Flow (`@xyflow/react`) | Lienzo del diseñador visual de Flows | `MIT` | [xyflow](https://github.com/xyflow/xyflow) |
 | Monaco Editor (+ `monaco-yaml`) | Edición de código / YAML en la consola | `MIT` | [monaco-editor](https://github.com/microsoft/monaco-editor) |
 | node-postgres (`pg`) | Cliente de PostgreSQL | `MIT` | [node-postgres](https://github.com/brianc/node-postgres) |
-| MongoDB Node Driver (`mongodb`) | Cliente de MongoDB | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
+| MongoDB Node Driver (`mongodb`) | Cliente de la base documental — wire protocol de MongoDB (MongoDB / FerretDB) | `Apache-2.0` | [node-mongodb-native](https://github.com/mongodb/node-mongodb-native) |
 | KafkaJS | Cliente de Kafka / Redpanda | `MIT` | [kafkajs](https://github.com/tulios/kafkajs) |
 | AWS SDK for JS v3 (`@aws-sdk/client-s3`) | Cliente de almacenamiento de objetos S3 (SeaweedFS) | `Apache-2.0` | [aws-sdk-js-v3](https://github.com/aws/aws-sdk-js-v3) |
 | jose + jwks-rsa | Validación de JWT / JWKS | `MIT` | [jose](https://github.com/panva/jose) · [node-jwks-rsa](https://github.com/auth0/node-jwks-rsa) |
@@ -332,22 +333,27 @@ disponible** (no son open source según la OSI) — véase la nota de compatibil
 > **Compatibilidad de licencias — requiere revisión.** El propio código de Falcone es **MIT**, que
 > es compatible con el uso de todos los componentes permisivos anteriores (MIT, Apache-2.0, ISC,
 > BSD, PostgreSQL). Los componentes ⚠ **no** son open source según la OSI y merecen revisión:
-> - **MongoDB (`SSPL-1.0`)**, **MinIO (`AGPL-3.0`)**, **Redpanda (`BSL-1.1` + `RCL`)** y
->   **Vault (`BUSL-1.1`)** son copyleft o de código disponible.
+> - **Redpanda (`BSL-1.1` + `RCL`)** y **Vault (`BUSL-1.1`)** son copyleft o de código disponible.
+>   Las antiguas dependencias **MongoDB (`SSPL-1.0`)** y **MinIO (`AGPL-3.0`)** se han **eliminado**
+>   — sustituidas por **FerretDB** (`Apache-2.0`, [ADR-14](docs-site/architecture/adrs.md)) y
+>   **SeaweedFS** (`Apache-2.0`, [ADR-13](docs-site/architecture/adrs.md)) respectivamente, retirando
+>   su exposición a SSPL/AGPL.
 > - Ejecutarlos como **servicios de respaldo separados con los que Falcone se comunica por red** no
 >   impone, por sí mismo, su licencia al código MIT de Falcone (sin enlazado / obra derivada). **Pero**
 >   sus cláusulas de "ofrecer como servicio" / "servicio competidor" son directamente relevantes para
->   un BaaS multitenant que **reexpone** su funcionalidad a los tenants — una API de datos de Mongo,
->   una API de Kafka/eventos, una API de almacenamiento S3. En particular, **la §13 de SSPL y la §13
->   de AGPL apuntan a ofrecer la funcionalidad del software como servicio**, y las concesiones BSL de
->   Redpanda/Vault excluyen las ofertas gestionadas competidoras. Revisa estos términos antes de
->   cualquier oferta alojada o comercial. Los cuatro son intercambiables en la capa de despliegue si
->   sus términos no encajan con tu caso de uso.
+>   un BaaS multitenant que **reexpone** su funcionalidad a los tenants — una API de Kafka/eventos. En
+>   particular, las concesiones BSL de Redpanda/Vault excluyen las ofertas gestionadas competidoras.
+>   Revisa estos términos antes de cualquier oferta alojada o comercial; ambos son intercambiables en
+>   la capa de despliegue si sus términos no encajan con tu caso de uso.
 > - **Almacén de objetos: MinIO → SeaweedFS (Apache-2.0).** Según
->   [ADR-13](docs-site/architecture/adrs.md), **SeaweedFS** es el almacén de objetos adoptado como
->   rumbo futuro, elegido específicamente para retirar la exposición de la **§13 de AGPL** de "ofrecer
->   como servicio" de MinIO para un BaaS que reexpone S3 a los tenants. MinIO solo se conserva durante
->   la ventana de transición.
+>   [ADR-13](docs-site/architecture/adrs.md), **SeaweedFS** es el almacén de objetos, elegido
+>   específicamente para retirar la exposición de la **§13 de AGPL** de "ofrecer como servicio" de
+>   MinIO para un BaaS que reexpone S3 a los tenants. La antigua dependencia de MinIO se ha eliminado.
+> - **Base documental: MongoDB → FerretDB + DocumentDB (Apache-2.0 + MIT).** Según
+>   [ADR-14](docs-site/architecture/adrs.md), **FerretDB v2** sobre un motor DocumentDB / PostgreSQL
+>   es la base documental, retirando la exposición de la **§13 de SSPL** de MongoDB. FerretDB mantiene
+>   sin cambios el driver y el wire protocol de MongoDB; la antigua dependencia del servidor MongoDB
+>   se ha eliminado.
 
 **No exhaustivo.** Esta tabla enumera los componentes de terceros **principales**, no el árbol
 completo de dependencias transitivas (se omiten utilidades menores — `undici`, `clsx`,

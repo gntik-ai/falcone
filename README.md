@@ -146,15 +146,16 @@ remain Preview under the not-production-ready posture above:
 - **MCP next increments** — a durable (Postgres-backed) multi-replica server registry; custom
   (bring-your-own-image) hosting on the live create path; wiring workflows-as-MCP-tools; and a
   direct per-server MCP-protocol connection (the control-plane mediates tool calls today).
-- **Object storage — migrating MinIO → SeaweedFS.** **SeaweedFS** (Apache-2.0) is the adopted
-  go-forward object store ([ADR-13](docs-site/architecture/adrs.md)); it is deployed by the
-  umbrella chart and MinIO is retained only during the cutover window. See the
+- **Object storage — MinIO → SeaweedFS (complete).** **SeaweedFS** (Apache-2.0) is the object
+  store ([ADR-13](docs-site/architecture/adrs.md)), deployed by the umbrella chart and enabled by
+  default; the former MinIO `storage` component has been removed. See the
   [SeaweedFS Storage Runbook](docs-site/architecture/seaweedfs.md).
-- **Document store — migrating MongoDB → FerretDB + DocumentDB.** **FerretDB v2** (Apache-2.0,
-  MongoDB-wire-compatible) over a **DocumentDB / PostgreSQL** engine (MIT) is the adopted
-  go-forward document store ([ADR-14](docs-site/architecture/adrs.md#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb));
-  it is deployed by the umbrella chart and MongoDB is retained only during the cutover/rollback
-  window. See the [FerretDB Document-Store Runbook](docs-site/architecture/ferretdb.md).
+- **Document store — MongoDB → FerretDB + DocumentDB (complete).** **FerretDB v2** (Apache-2.0,
+  MongoDB-wire-compatible) over a **DocumentDB / PostgreSQL** engine (MIT) is the document store
+  ([ADR-14](docs-site/architecture/adrs.md#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)),
+  deployed by the umbrella chart; the former MongoDB server component has been removed. The MongoDB
+  driver, wire protocol and Mongo-style data API are unchanged. See the
+  [FerretDB Document-Store Runbook](docs-site/architecture/ferretdb.md).
 - **Toward a first stable release** — *planned.* Security review, API/schema stability guarantees,
   and migration tooling (see the notice at the top).
 
@@ -289,17 +290,14 @@ see the compatibility note that follows.
 | Component | Role in Falcone | License (SPDX) | Link |
 | --- | --- | --- | --- |
 | PostgreSQL 16 (+ pgvector) | Primary tenant datastore; RLS + schema-per-tenant isolation; pgvector for vector search | `PostgreSQL` | [postgresql.org](https://www.postgresql.org/about/licence/) · [pgvector](https://github.com/pgvector/pgvector) |
-| FerretDB v2 (over DocumentDB / PostgreSQL 17) | Document data API — MongoDB-wire-compatible (go-forward, [ADR-14](docs-site/architecture/adrs.md)) | `Apache-2.0` (gateway) + `MIT` (DocumentDB extension) | [ferretdb](https://github.com/FerretDB/FerretDB) · [documentdb](https://github.com/microsoft/documentdb) |
-| MongoDB Server 7 | Per-tenant/workspace document data API (legacy — retained during cutover) | ⚠ `SSPL-1.0` | [mongodb.com](https://www.mongodb.com/legal/licensing/community-edition) |
+| FerretDB v2 (over DocumentDB / PostgreSQL 17) | Document data API — MongoDB-wire-compatible ([ADR-14](docs-site/architecture/adrs.md)) | `Apache-2.0` (gateway) + `MIT` (DocumentDB extension) | [ferretdb](https://github.com/FerretDB/FerretDB) · [documentdb](https://github.com/microsoft/documentdb) |
 | Redpanda 24.2 | Kafka-compatible event bus / CDC streaming | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
-| SeaweedFS 4.33 | S3-compatible object storage (go-forward, [ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
-| MinIO | S3-compatible object storage (legacy — retained during cutover) | ⚠ `AGPL-3.0` | [LICENSE](https://github.com/minio/minio/blob/master/LICENSE) |
+| SeaweedFS 4.33 | S3-compatible object storage ([ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
 | HashiCorp Vault 1.18 | Secrets management | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
 | Keycloak 26 | Realm-per-tenant IAM / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API gateway (public `/v1` surface) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
 | Temporal (server 1.25 + TypeScript SDK 1.18) | Durable workflow engine behind Flows | `MIT` | [temporal](https://github.com/temporalio/temporal) · [sdk-typescript](https://github.com/temporalio/sdk-typescript) |
 | Knative Serving + Kourier | Serverless functions runtime | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
-| Apache OpenWhisk | Legacy / optional functions engine | `Apache-2.0` | [openwhisk](https://github.com/apache/openwhisk) |
 | Kubernetes + Helm | Deployment & orchestration | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Service runtime | `MIT` | [nodejs](https://github.com/nodejs/node) |
 | nginx | Static serving of the web-console image | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
@@ -328,22 +326,26 @@ see the compatibility note that follows.
 > **License compatibility — review needed.** Falcone's own code is **MIT**, which is compatible
 > with consuming all the permissive components above (MIT, Apache-2.0, ISC, BSD, PostgreSQL).
 > The ⚠ components are **not** OSI open source and deserve review:
-> - **MongoDB (`SSPL-1.0`)**, **MinIO (`AGPL-3.0`)**, **Redpanda (`BSL-1.1` + `RCL`)** and
->   **Vault (`BUSL-1.1`)** are copyleft or source-available. MongoDB and MinIO are **legacy, being
->   retired** in favour of **FerretDB** (`Apache-2.0`, [ADR-14](docs-site/architecture/adrs.md)) and
->   **SeaweedFS** (`Apache-2.0`, [ADR-13](docs-site/architecture/adrs.md)) respectively.
+> - **Redpanda (`BSL-1.1` + `RCL`)** and **Vault (`BUSL-1.1`)** are copyleft or source-available.
+>   The former **MongoDB (`SSPL-1.0`)** and **MinIO (`AGPL-3.0`)** dependencies have been **removed**
+>   — replaced by **FerretDB** (`Apache-2.0`, [ADR-14](docs-site/architecture/adrs.md)) and
+>   **SeaweedFS** (`Apache-2.0`, [ADR-13](docs-site/architecture/adrs.md)) respectively, retiring
+>   their SSPL/AGPL exposure.
 > - Running them as **separate backing services Falcone talks to over the network** does not, by
 >   itself, impose their license on Falcone's MIT code (no linking / derivative work). **But** their
 >   "offer-as-a-service" / "competitive service" clauses are directly relevant to a multitenant BaaS
->   that **re-exposes** their functionality to tenants — a Mongo data API, a Kafka/events API, an
->   S3 storage API. In particular, **SSPL §13 and AGPL §13 target offering the software's
->   functionality as a service**, and the Redpanda/Vault BSL grants exclude competing managed
->   offerings. Review these terms before any hosted or commercial offering. All four are swappable
->   at the deployment layer if their terms don't fit your use.
+>   that **re-exposes** their functionality to tenants — a Kafka/events API. In particular, the
+>   Redpanda/Vault BSL grants exclude competing managed offerings. Review these terms before any
+>   hosted or commercial offering; both are swappable at the deployment layer if their terms don't
+>   fit your use.
 > - **Object store: MinIO → SeaweedFS (Apache-2.0).** Per
->   [ADR-13](docs-site/architecture/adrs.md), **SeaweedFS** is the adopted go-forward object store,
->   chosen specifically to retire the MinIO **AGPL §13** "offer-as-a-service" exposure for a BaaS
->   that re-exposes S3 to tenants. MinIO is retained only during the cutover window.
+>   [ADR-13](docs-site/architecture/adrs.md), **SeaweedFS** is the object store, chosen specifically
+>   to retire the MinIO **AGPL §13** "offer-as-a-service" exposure for a BaaS that re-exposes S3 to
+>   tenants. The former MinIO dependency has been removed.
+> - **Document store: MongoDB → FerretDB + DocumentDB (Apache-2.0 + MIT).** Per
+>   [ADR-14](docs-site/architecture/adrs.md), **FerretDB v2** over a DocumentDB / PostgreSQL engine
+>   is the document store, retiring the MongoDB **SSPL §13** exposure. FerretDB keeps the MongoDB
+>   driver and wire protocol unchanged; the former MongoDB server dependency has been removed.
 
 **Not exhaustive.** This table lists the **principal** third-party components, not the full
 transitive dependency tree (minor utilities — `undici`, `clsx`, `lucide-react`, `uuid`,

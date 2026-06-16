@@ -44,4 +44,4 @@ This drives the restore behaviour against the workflow harness and can write a s
 
 - Schedule per-tenant backups so each tenant can be restored independently — this is what keeps restore from being an all-or-nothing platform operation.
 - Always restore through the preflight when the target tenant differs from the source, so identifiers are remapped rather than colliding.
-- Treat the underlying backends (PostgreSQL, MongoDB, object storage, Kafka) with your standard infrastructure backup tooling in addition to the tenant-level artifact, for full disaster recovery.
+- Treat the underlying backends (PostgreSQL, the FerretDB + DocumentDB document store, object storage, Kafka) with your standard infrastructure backup tooling in addition to the tenant-level artifact, for full disaster recovery. The document store's durable state lives in the DocumentDB engine's PostgreSQL volume, so back it up as a Postgres instance.

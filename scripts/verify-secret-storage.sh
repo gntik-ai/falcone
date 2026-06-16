@@ -14,7 +14,7 @@ count=$(kubectl get pods -A -o json | jq '[.items[].spec.containers[]?.env[]? | 
 
 echo '[2/4] Checking Vault platform paths'
 vault kv list secret/platform >/tmp/falcone-secret-platform-list.txt
-for required in postgresql mongodb kafka s3 openwhisk; do
+for required in postgresql documentdb kafka s3; do
   grep -q "$required" /tmp/falcone-secret-platform-list.txt || fail "missing Vault path $required"
 done
 

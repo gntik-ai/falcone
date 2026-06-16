@@ -7,7 +7,7 @@ In Falcone is developed test-first against **real backends**, with spec-driven c
 Bring up the real backends with docker-compose and run the suites against them:
 
 ```bash
-cd tests/env && docker compose up -d      # Postgres, Mongo (rs0), Keycloak, Redpanda, SeaweedFS, Vault, APISIX
+cd tests/env && docker compose up -d      # Postgres, FerretDB + DocumentDB, Keycloak, Redpanda, SeaweedFS, Vault, APISIX
 ```
 
 See [Installation → Docker Compose](/guide/installation#docker-compose-local).
@@ -20,7 +20,7 @@ See [Installation → Docker Compose](/guide/installation#docker-compose-local).
 | `npm run test:adapters` | Adapter (plan-builder) tests |
 | `npm run test:contracts` | API/OpenAPI contract tests |
 | `npm run test:e2e:console` / `:deployment` / `:observability` / `:workflows` | E2E families |
-| `npm run test:e2e:realtime` | Realtime (needs a Mongo replica set) |
+| `npm run test:e2e:realtime` | Realtime (needs the FerretDB + DocumentDB document store with `wal_level=logical` for the logical-replication slot) |
 | `npm run test:e2e:restore` | Tenant backup/restore workflows |
 | `npm run test:resilience` | Resilience tests |
 
