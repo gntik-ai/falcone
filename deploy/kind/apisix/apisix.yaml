@@ -237,7 +237,19 @@ routes:
   # data routes (2005-2008 above) so a key request wins; without the header the request
   # falls through to the JWT route -> control-plane. These forward to the EXECUTOR, which
   # verifies the key and derives tenant/workspace FROM the key (authoritative over any
-  # client-supplied identity header). cors-only — no JWT enforcement at the gateway.
+  # client-supplied identity header).
+  #
+  # SECURITY (fix-gateway-authn-and-strip-tenant-headers #488): All executor-bound routes
+  # strip inbound x-tenant-id / x-workspace-id / x-auth-subject / x-actor-roles headers
+  # from the client request (proxy-rewrite: set header to "" = remove) and inject
+  # x-gateway-auth with the shared secret so the executor can verify the request came from
+  # the authenticated gateway, not from an unauthenticated direct caller. The secret value
+  # MUST be kept in sync with GATEWAY_SHARED_SECRET on the executor deployment.
+  #
+  # NOTE: full OIDC/JWT auth plugin wiring on these executor routes is a tracked follow-up
+  # (see tasks.md task 2.1). The header-strip + x-gateway-auth injection closes the primary
+  # exploit (unauthenticated header-only impersonation) in combination with the executor
+  # gate added in server.mjs. API-key auth for data-plane routes is verified by the executor.
   - id: "2005-key"
     uri: "/v1/postgres/*"
     priority: 335
@@ -246,6 +258,19 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      # Strip client-supplied identity headers and inject the gateway trust signal.
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            # x-gateway-auth value is the shared secret; must match GATEWAY_SHARED_SECRET
+            # on the executor. Set via a Helm-rendered secret or env substitution in prod.
+            # Placeholder for the kind dev install — replace with the real value or mount
+            # from a Kubernetes Secret via APISIX environment variable interpolation.
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
       # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
       limit-count:
         count: 120
@@ -267,6 +292,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
       # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
       limit-count:
         count: 120
@@ -288,6 +321,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
       # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
       limit-count:
         count: 120
@@ -309,6 +350,14 @@ routes:
       - ["http_apikey", "~~", "^flc_"]
     plugins:
       cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
       # Per-key rate limit (noisy-neighbor guard for the public anon/service surface).
       limit-count:
         count: 120
@@ -334,6 +383,14 @@ routes:
       - ["uri", "~~", "/changes$"]
     plugins:
       cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
       limit-count:
         count: 120
         time_window: 60
@@ -355,6 +412,8 @@ routes:
   # route (2003 -> control-plane). Admin (Bearer JWT) auth: APISIX forwards the Authorization
   # header and the executor verifies the JWT itself (KEYCLOAK_JWKS_URL) — the standalone
   # gateway does not inject x-tenant-id, so the executor is the auth authority here.
+  # SECURITY (#488): strip client-supplied identity headers and inject x-gateway-auth so
+  # the executor knows the request was forwarded by the authenticated gateway.
   - id: "2003-keys"
     uri: "/v1/workspaces/*"
     priority: 337
@@ -363,6 +422,14 @@ routes:
       - ["uri", "~~", "^/v1/workspaces/[^/]+/api-keys"]
     plugins:
       cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
     upstream:
       type: roundrobin
       scheme: http

@@ -2862,6 +2862,14 @@ controlPlaneExecutor:
   #     - { name: KEYCLOAK_JWKS_URL, value: "http://<release>-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
   #     # - { name: KEYCLOAK_ISSUER, value: "https://iam.<env>.in-falcone.example.com/realms/in-falcone-platform" }
   #     # - { name: KEYCLOAK_AUDIENCE, value: in-falcone-console }
+  #     # REQUIRED (security): shared secret between the APISIX gateway and the executor.
+  #     # When set, the executor only trusts x-tenant-id/x-workspace-id identity headers
+  #     # that arrive with a matching x-gateway-auth header (injected by APISIX after
+  #     # authentication). Without this env var the executor runs in legacy dev mode
+  #     # (header-only identity trusted unconditionally) — NEVER leave unset in production.
+  #     # The same secret value MUST be configured in the APISIX standalone route table
+  #     # (proxy-rewrite x-gateway-auth) so that gateway-forwarded requests carry the signal.
+  #     - { name: GATEWAY_SHARED_SECRET, valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } } }
   env: []
   readinessProbe:
     httpGet:
