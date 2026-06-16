@@ -6,14 +6,17 @@ FerretDB 2.7.0 / postgres-documentdb:17-0.107.0-ferretdb-2.7.0) established
 the live compatibility matrix for the two-layer stack. That spike surfaced two
 hard constraints that invalidate the earlier E2E scope:
 
-1. **Mongo change-stream realtime is unsupported on FerretDB.** The realtime
-   executor (`apps/control-plane/src/runtime/realtime-executor.mjs:66`) calls
-   `collection.watch(...)` and `collMod changeStreamPreAndPostImages` — both
-   return `CommandNotSupported(115)` / `UnknownBsonField(40415)` on FerretDB.
-   All existing `tests/e2e/realtime/` specs exercise this Mongo change-stream
-   path and WILL NOT pass against a FerretDB backend until the pgoutput CDC
-   remediation (`add-ferretdb-realtime-cdc-remediation`) lands. Declaring them
-   "SHALL pass" in this change would be incorrect.
+1. **Realtime/CDC is a separate, pgoutput-based suite (already remediated).**
+   `add-ferretdb-realtime-cdc-remediation` (#460, MERGED) replaced the Mongo
+   change-stream path: `apps/control-plane/src/runtime/realtime-executor.mjs` no
+   longer calls `collection.watch()` — it owns a pgoutput logical-replication slot
+   on the DocumentDB engine (`WalReplicationClient`). The realtime E2E specs
+   (`tests/e2e/realtime/`) are now pgoutput-based and owned by #460. They are a
+   SEPARATE suite and out of scope for this document-store change, which neither
+   runs nor modifies them. (Mongo change streams were only ever unsupported on
+   FerretDB — `CommandNotSupported(115)` / `UnknownBsonField(40415)` — which is
+   exactly why #460 removed that path; declaring those specs in this change would
+   conflate two suites.)
 
 2. **There is no `/v1/collections/{name}/indexes` route.** The route catalog
    (`services/gateway-config/public-route-catalog.json`) exposes only
@@ -38,13 +41,15 @@ validated through the data API (app-layer tenantId scoping is authoritative).
   aggregation (adapter-allowed stages, `$out`/`$merge` blocked, cross-DB
   `$lookup` rejected), vector-index creation/deletion, transaction unsupported
   error, auth rejection, and cross-tenant isolation probe (A/B tenants).
-- Scope the Mongo change-stream realtime path (`tests/e2e/realtime/`) as an
-  explicit known failure on FerretDB; those specs are NOT run as part of this
-  change and carry a documented out-of-scope note.
-- Extend `tests/e2e/stack.sh up` to deploy the FerretDB + DocumentDB two-layer
-  stack with ENGINE-FIRST readiness ordering (DocumentDB engine Ready before
-  FerretDB gateway) into the ephemeral namespace; teardown trap preserved
-  unchanged.
+- Scope the realtime suite (`tests/e2e/realtime/`, now pgoutput-based, owned by
+  #460) as out of scope; those specs are NOT run or modified by this change and
+  carry a documented out-of-scope note.
+- Reuse the existing FerretDB E2E wiring in `tests/e2e/stack.sh up`
+  (`E2E_FERRETDB=true` enables the `documentdb` + `ferretdb` sub-charts of the
+  in-falcone chart with the FerretDB values overlay; ENGINE-FIRST is enforced by
+  the chart's DocumentDB readiness and the existing `healthy()` gate), adding only
+  the two FerretDB image pre-pulls and confirming teardown coverage; the existing
+  path and teardown trap are preserved unchanged.
 - Provide a per-issue runner path:
   `bash tests/e2e/run-issue.sh add-ferretdb-document-store-e2e`.
 
@@ -72,14 +77,15 @@ _(none — specs fall under the existing `data-api` capability)_
   and cross-tenant isolation probe.
 - `tests/e2e/helpers/document-store/` — new helpers: tenant-fixtures re-export,
   typed API client for document-store routes, live-gate probe function.
-- `tests/e2e/stack.sh` — FerretDB + DocumentDB wiring with ENGINE-FIRST
-  readiness ordering (conditional, additive; existing path unchanged).
+- `tests/e2e/stack.sh` — reuse the existing `E2E_FERRETDB=true` FerretDB +
+  DocumentDB wiring (additive image pre-pull + comments; existing path unchanged).
 - `openspec/changes/add-ferretdb-document-store-e2e/specs/data-api/spec.md` —
   ADDED requirements delta.
 - Depends on: `add-ferretdb-gateway` (FerretDB gateway Helm chart),
   `add-ferretdb-documentdb-engine` (DocumentDB backend),
   `add-ferretdb-data-access-cutover` (MONGO_URI repoint).
-- Explicitly does NOT depend on `add-ferretdb-realtime-cdc-remediation` — that
-  change resolves the out-of-scope Mongo change-stream failure.
+- Does NOT depend on `add-ferretdb-realtime-cdc-remediation` (#460, MERGED) — that
+  change re-architected realtime onto pgoutput; its E2E suite (`tests/e2e/realtime/`)
+  is separate and out of scope here.
 - GitHub issue: #464. Epic: #454.
 - Labels: `e2e`, `tenant-isolation`, priority `P2`.

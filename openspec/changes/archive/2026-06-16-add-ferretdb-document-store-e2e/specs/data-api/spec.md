@@ -11,12 +11,14 @@ query (`POST /v1/collections/{name}/query`), and aggregation
 (`ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`) backend
 deployed by `tests/e2e/stack.sh` on the kind test cluster.
 
-> **Known out-of-scope:** the Mongo change-stream realtime path
-> (`apps/control-plane/src/runtime/realtime-executor.mjs:54,66` — `collMod
-> changeStreamPreAndPostImages` + `collection.watch()`) returns
-> CommandNotSupported(115) / UnknownBsonField(40415) on FerretDB 2.7.0. All
-> `tests/e2e/realtime/` specs exercise this path and are NOT included in this
-> requirement. They are tracked on `add-ferretdb-realtime-cdc-remediation`.
+> **Known out-of-scope:** the realtime/CDC suite (`tests/e2e/realtime/`) is owned by
+> `add-ferretdb-realtime-cdc-remediation` (#460, MERGED), which re-architected realtime
+> onto a Postgres pgoutput logical-replication slot — `apps/control-plane/src/runtime/
+> realtime-executor.mjs` no longer calls `collection.watch()` (it consumes a
+> `WalReplicationClient` against the DocumentDB engine). Those specs are a SEPARATE,
+> pgoutput-based suite; this requirement neither runs nor modifies them. (Mongo change
+> streams were only ever unsupported on FerretDB — `CommandNotSupported(115)` /
+> `UnknownBsonField(40415)` — which is exactly why #460 removed that path.)
 
 #### Scenario: Create document returns HTTP 201 with a document ID
 - **WHEN** an authenticated Tenant A request is sent to `POST /v1/collections/{name}/documents` with a valid JSON body
@@ -129,29 +131,32 @@ surface.
 - **WHEN** Tenant B sends `POST /v1/collections/{name}/query` with a filter that would match Tenant A's documents, using Tenant B's identity headers
 - **THEN** the response status is 200 with an empty result set, or the response status is 403 or 404
 
-#### Scenario: Tenant B cannot create documents in Tenant A's collection
-- **WHEN** Tenant B sends `POST /v1/collections/{name}/documents` targeting a collection owned by Tenant A, using Tenant B's identity headers
-- **THEN** the response status is 403 or 404 (access denied or resource not found for the requesting tenant)
+#### Scenario: Tenant B cannot leak into Tenant A's documents via create
+- **WHEN** Tenant B sends `POST /v1/collections/{name}/documents` targeting the same collection name Tenant A has written into, using Tenant B's identity headers
+- **THEN** either the response status is 403 or 404, OR — in Falcone's shared-collection model where collections are not tenant-owned and the `tenantId` field is the boundary — the write succeeds scoped to Tenant B and the created document does NOT appear in Tenant A's view of the collection (app-layer tenantId scoping prevents cross-tenant leakage either way)
 
 ---
 
 ### Requirement: FerretDB + DocumentDB stack wiring with ENGINE-FIRST readiness ordering
 
 The system SHALL deploy the FerretDB gateway and DocumentDB engine into the
-ephemeral E2E namespace via `tests/e2e/stack.sh up` when
-`E2E_DOCUMENT_BACKEND=ferretdb` is set, with the DocumentDB engine deployed
-and rolled out to Ready before the FerretDB gateway is installed (ENGINE-FIRST
-ordering). Both images shall be pre-pulled into the kind node cache before Helm
-install. The stack SHALL always delete the ephemeral namespace on `stack.sh down`
-via the mandatory EXIT/INT/TERM teardown trap.
+ephemeral E2E namespace via `tests/e2e/stack.sh up` when `E2E_FERRETDB=true` is
+set — the existing FerretDB E2E wiring, where the `documentdb` and `ferretdb`
+sub-charts of the in-falcone chart are enabled by the FerretDB values overlay and
+stack.sh provisions the DocumentDB engine secrets. The DocumentDB engine SHALL be
+rolled out to Ready before the FerretDB gateway accepts connections (ENGINE-FIRST
+ordering, enforced by the chart's DocumentDB readiness and the `healthy()` gate that
+waits on every Deployment and StatefulSet). Both images shall be pre-pulled into the
+kind node cache before Helm install. The stack SHALL always delete the ephemeral
+namespace on `stack.sh down` via the mandatory EXIT/INT/TERM teardown trap.
 
-#### Scenario: stack.sh up deploys DocumentDB engine before FerretDB gateway
-- **WHEN** `stack.sh up` is invoked with `E2E_DOCUMENT_BACKEND=ferretdb`
-- **THEN** the DocumentDB engine (`ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`) Deployment/StatefulSet rollout completes and all its pods report Ready before the FerretDB gateway (`ghcr.io/ferretdb/ferretdb:2.7.0`) Helm release is installed
+#### Scenario: stack.sh up deploys DocumentDB engine before FerretDB gateway accepts connections
+- **WHEN** `stack.sh up` is invoked with `E2E_FERRETDB=true`
+- **THEN** the DocumentDB engine (`ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`) StatefulSet rollout completes and reports Ready before the FerretDB gateway (`ghcr.io/ferretdb/ferretdb:2.7.0`) is treated as ready (ENGINE-FIRST, enforced by the chart's DocumentDB readiness dependency)
 
 #### Scenario: stack.sh up gates on all pods Ready before test runner is invoked
-- **WHEN** `stack.sh up` is invoked with `E2E_DOCUMENT_BACKEND=ferretdb`
-- **THEN** the script does not proceed to the port-forward or smoke-check step until all Deployments and StatefulSets in the ephemeral namespace (including both FerretDB components) report all pods Ready
+- **WHEN** `stack.sh up` is invoked with `E2E_FERRETDB=true`
+- **THEN** the existing `healthy()` gate does not return until all Deployments and StatefulSets in the ephemeral namespace (including both FerretDB components) report all pods Ready
 
 #### Scenario: stack.sh down always deletes the ephemeral namespace
 - **WHEN** `stack.sh down` is invoked (including via the EXIT/INT/TERM trap)
