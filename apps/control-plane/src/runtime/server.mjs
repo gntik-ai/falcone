@@ -117,10 +117,16 @@ function bearerJwtFromHeaders(headers) {
 //   2. Bearer JWT (when a verifier is configured) → identity from verified token claims.
 //      This lets admin/user requests authenticate WITHOUT the gateway injecting x-tenant-id,
 //      so e.g. API-key issuance works through an OIDC-less gateway (kind standalone).
-//   3. Otherwise → gateway-injected JWT identity headers (the gateway validated the token
-//      and stripped client-supplied context headers).
-// A presented-but-invalid key or JWT fails closed (401) — no fallback to spoofable headers.
-async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifier, queryApiKey) {
+//   3. Gateway-injected identity headers — ONLY when a mutually-authenticated trust signal
+//      is present. The trust signal is one of:
+//        a. x-gateway-auth header matches the operator-configured gatewaySharedSecret.
+//        b. No gatewaySharedSecret is configured at all (dev/test mode — headers trusted
+//           unconditionally; identical to the legacy behaviour before this fix).
+//      When a secret IS configured but the header is absent or wrong → 401 fail-closed.
+//      This ensures that a client cannot impersonate a tenant by setting x-tenant-id
+//      without going through an authenticated gateway, closing the GW-1 exploit.
+// A presented-but-invalid key or JWT, or a wrong/absent trust signal, fails closed (401).
+async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifier, queryApiKey, gatewaySharedSecret) {
   // queryApiKey is only supplied for SSE routes: a browser EventSource cannot set headers,
   // so the (low-privilege, read-only) anon key arrives as ?apikey=. Header still wins.
   const key = apiKeyFromHeaders(headers) ?? (typeof queryApiKey === 'string' && queryApiKey.startsWith('flc_') ? queryApiKey : undefined);
@@ -147,7 +153,18 @@ async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifie
     const verified = await jwtVerifier.verify(jwt, pathWorkspaceId).catch(() => undefined);
     return verified ?? { tenantId: undefined }; // invalid JWT → 401, fail closed
   }
-  return identityFromHeaders(headers, pathWorkspaceId); // no credential → trust gateway headers
+  // No authoritative credential. Fall through to header-based identity ONLY when the
+  // gateway trust signal is valid. When gatewaySharedSecret is set (production), the
+  // x-gateway-auth header MUST match; an absent/wrong header → 401, fail-closed.
+  // When no secret is configured (dev/test), headers are trusted unconditionally
+  // (legacy behaviour: the caller is responsible for security at that layer).
+  if (gatewaySharedSecret) {
+    const presented = headers['x-gateway-auth'];
+    if (!presented || presented !== gatewaySharedSecret) {
+      return { tenantId: undefined }; // missing or wrong trust signal → 401
+    }
+  }
+  return identityFromHeaders(headers, pathWorkspaceId); // gateway-injected → trust
 }
 
 function primaryKeyFromQuery(searchParams) {
@@ -677,7 +694,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, jwtVerifier, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, jwtVerifier, gatewaySharedSecret, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
@@ -701,7 +718,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
 
       // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
       const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;
-      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey);
+      const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey, gatewaySharedSecret);
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
       }
