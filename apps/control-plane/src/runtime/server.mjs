@@ -130,6 +130,10 @@ async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifie
       return {
         tenantId: resolved.tenantId,
         workspaceId: resolved.workspaceId,
+        // credentialWorkspaceId is the workspace this key is explicitly bound to.
+        // It is used by the workspace binding check (path↔credential) and is always
+        // set for API keys (a key is always issued for a specific workspace).
+        credentialWorkspaceId: resolved.workspaceId,
         actorId: `apikey:${resolved.keyType}`,
         roleName: resolved.roleName,
         dbRole: resolved.dbRole, // assumed via SET LOCAL ROLE → RLS enforced for anon keys
@@ -700,6 +704,19 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey);
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
+      }
+      // Credential workspace binding check: when the authenticated credential explicitly
+      // binds a workspace (identity.credentialWorkspaceId is set — from an API key or a JWT
+      // with a workspace_id claim), the workspace in the URL path MUST match. A mismatch
+      // means the caller is using a credential bound to workspace B to access workspace A's
+      // resources — cross-tenant/cross-workspace IDOR — and is rejected with 403 before any
+      // handler or executor runs. Credentials without a workspace binding (tenant-only JWTs,
+      // gateway-injected identity headers) are not subject to this check.
+      if (!opts?.noAuth && identity.credentialWorkspaceId) {
+        const workspaceInPath = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1];
+        if (workspaceInPath && workspaceInPath !== identity.credentialWorkspaceId) {
+          return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Credential workspace does not match the requested workspace' });
+        }
       }
       // Key management must not be performed with an anon/service API key — admin (JWT) only.
       const isKeyMgmt = url.pathname.includes('/api-keys');
