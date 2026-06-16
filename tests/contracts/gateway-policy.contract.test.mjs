@@ -38,7 +38,7 @@ test('gateway contract publishes APISIX policy for every public family and passt
   assert.ok(realtimeRoute);
   assert.equal(realtimeRoute.enableWebsocket, true);
 
-  for (const routeId of ['keycloak_admin', 'openwhisk_admin']) {
+  for (const routeId of ['keycloak_admin']) {
     const route = enabledRoutes.find((entry) => entry.labels?.['gateway.in-falcone.io/passthrough-id'] === routeId);
     assert.ok(route, `missing enabled passthrough route ${routeId}`);
     assert.deepEqual(Object.keys(route.plugins).sort(), REQUIRED_PASSTHROUGH_PLUGINS.slice().sort());

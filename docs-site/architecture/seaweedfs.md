@@ -6,13 +6,13 @@ store, **SeaweedFS**. For the decision record see
 the cutover and rollback procedures see the migration runbooks linked under
 [Day-2 Operations](#day-2-operations).
 
-> **Migration status.** SeaweedFS is the **adopted go-forward** object store (ADR-13) and
-> is deployed by the umbrella chart (`charts/in-falcone/charts/seaweedfs`). During the
-> cutover window MinIO (`storage.enabled: true`) may still run **alongside** SeaweedFS
-> (`seaweedfs.enabled`) so operators can flip the backend per environment and roll back
-> without data loss. The local Docker Compose dev stack (`tests/env/docker-compose.yml`)
-> still ships MinIO until its cutover lands. Treat MinIO as **legacy / being phased out**,
-> not as the target backend.
+> **Migration status.** SeaweedFS is the object store (ADR-13), deployed by the umbrella
+> chart (`charts/in-falcone/charts/seaweedfs`) and enabled by default. The migration off
+> MinIO is **complete**: the former MinIO `storage` component has been removed from the
+> chart and the cutover/rollback window is closed. The local Docker Compose dev stack
+> (`tests/env/docker-compose.yml`) runs SeaweedFS (the `seaweedfs` all-in-one service on
+> host port 58333). The migration runbooks below remain as the historical record of the
+> MinIO → SeaweedFS cutover.
 
 ## Overview
 
@@ -210,8 +210,9 @@ Source: `charts/in-falcone/values.yaml` (per-component `data`/`persistence` bloc
 
 ## Day-2 Operations
 
-**Enable / disable.** SeaweedFS is a chart component toggled by `seaweedfs.enabled`. During
-cutover it coexists with MinIO (`storage.enabled`); see the cutover and rollback runbooks below.
+**Enable / disable.** SeaweedFS is a chart component toggled by `seaweedfs.enabled` (on by
+default). It is the sole object store; the former MinIO `storage` component has been removed.
+The cutover and rollback runbooks below remain as the historical migration record.
 
 **Add a volume server (scale out / enable replication).**
 1. Increase the volume StatefulSet replica count (HA profile runs 3).

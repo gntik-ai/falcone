@@ -28,20 +28,6 @@ keycloak:
                   values:
                     - keycloak
             topologyKey: kubernetes.io/hostname
-openwhisk:
-  replicas: 3
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchExpressions:
-                - key: app.kubernetes.io/name
-                  operator: In
-                  values:
-                    - openwhisk
-            topologyKey: kubernetes.io/hostname
 controlPlane:
   replicas: 3
   affinity:
@@ -73,19 +59,10 @@ webConsole:
 postgresql:
   persistence:
     size: 200Gi
-mongodb:
-  persistence:
-    size: 200Gi
 kafka:
   replicas: 3
   persistence:
     size: 250Gi
-storage:
-  # MinIO stays OFF in HA too (inherits the base cutover default); the 1Ti size below
-  # only applies if MinIO is re-enabled for rollback (tools/migration/ROLLBACK.md).
-  enabled: false
-  persistence:
-    size: 1Ti
 # SeaweedFS HA overrides (add-seaweedfs-deployment, D2/D3). master -> 3-node Raft
 # quorum, volume -> 3 servers at 1Ti each, S3 -> 2 replicas, replication 011 (one
 # cross-rack copy). filer stays at 1 replica (stateless w.r.t. object data;
@@ -113,8 +90,8 @@ seaweedfs:
 # DocumentDB engine HA (add-ferretdb-documentdb-engine). Applies only when
 # documentdb.enabled=true; harmless otherwise. 2 replicas spread across nodes
 # (preferred anti-affinity, like every other component here — `required` would leave
-# the second replica Pending on a single-node cluster). 200Gi PVC matches the mongodb
-# document-store sibling above. Primary selection (Patroni / streaming replication) is
+# the second replica Pending on a single-node cluster). 200Gi PVC sizes the
+# document store. Primary selection (Patroni / streaming replication) is
 # a follow-up change; this only delivers the StatefulSet + PVC HA foundation.
 documentdb:
   replicas: 2
