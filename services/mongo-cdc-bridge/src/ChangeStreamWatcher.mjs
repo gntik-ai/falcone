@@ -81,7 +81,15 @@ export class ChangeStreamWatcher {
   }
 
   async _handle(record) {
-    if (!this.running || !this._matches(record)) return;
+    if (!this.running) return;
+    // Out of scope for this capture config (the schema-wide publication delivers ALL tenants'/
+    // collections' changes to every per-config slot). Don't publish it, but DO acknowledge it so the
+    // slot's confirmed LSN keeps advancing — otherwise unrelated tenants' traffic stalls the cursor
+    // and pins WAL forever.
+    if (!this._matches(record)) {
+      await this.walClient.acknowledge(record.lsn);
+      return;
+    }
     try {
       const rawDoc = this._toRawChangeDoc(record);
       const envelope = mapEvent(rawDoc, this.captureConfig);
