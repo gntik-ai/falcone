@@ -257,7 +257,7 @@
 
 - [x] 9.1 Run `bash tests/blackbox/run.sh` — confirm all `cdc-*` assertions pass; zero regressions
   on other contracts
-- [~] 9.2 Run `tests/e2e/realtime/tenant-isolation.test.mjs` on the FerretDB/DocumentDB stack —
+- [ ] 9.2 Run `tests/e2e/realtime/tenant-isolation.test.mjs` on the FerretDB/DocumentDB stack —
   confirm green
   _(BLOCKED by #475: the deployed realtime e2e harness (provisioning API + WS gateway) does not exist
   in the repo, so neither this file nor `mongo-tenant-isolation.test.mjs` can be run. The realtime
