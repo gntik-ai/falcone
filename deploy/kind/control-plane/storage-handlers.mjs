@@ -135,23 +135,41 @@ export async function putObject(bucket, key, body, contentType = 'application/oc
   await s3('PUT', `/${bucket}/${key}`, { headers: { 'content-type': contentType }, body });
 }
 
+// Ownership gate: returns true for superadmin/internal (cross-tenant allowed),
+// false for all other actors so each handler can enforce a 404 (no-existence-leak).
+function isSuperOrInternal(identity) {
+  return identity.actorType === 'superadmin' || identity.actorType === 'internal';
+}
+
 // ---- handlers (ctx = { params, query, body, identity, pool, callerContext }) ----
 async function storageListBuckets(ctx) {
   const all = await listBuckets();
   const map = await store.bucketWorkspaceMap(ctx.pool);
-  const items = all.map((b) => {
-    const m = map[b.name];
-    return {
-      resourceId: b.name, bucketName: b.name,
-      tenantId: m?.tenant_id ?? null, workspaceId: m?.workspace_id ?? null,
-      region: REGION, status: 'active',
-      timestamps: { createdAt: m?.created_at ?? b.creationDate, lastModifiedAt: b.creationDate }
-    };
-  });
+  const isSuperadmin = isSuperOrInternal(ctx.identity);
+  const items = all
+    .map((b) => {
+      const m = map[b.name];
+      return {
+        resourceId: b.name, bucketName: b.name,
+        tenantId: m?.tenant_id ?? null, workspaceId: m?.workspace_id ?? null,
+        region: REGION, status: 'active',
+        timestamps: { createdAt: m?.created_at ?? b.creationDate, lastModifiedAt: b.creationDate }
+      };
+    })
+    // Non-superadmin callers see only their own tenant's buckets.
+    .filter((item) => isSuperadmin || item.tenantId === ctx.identity.tenantId);
   return ok(200, { items, page: { size: items.length } });
 }
 async function storageListObjects(ctx) {
   const bucket = ctx.params.bucketId;
+  // Ownership check: look up the bucket's owning tenant and compare to caller.
+  // Superadmin/internal bypass the check. Non-owners get 404 (no existence leak).
+  if (!isSuperOrInternal(ctx.identity)) {
+    const rec = await store.getBucketRecord(ctx.pool, bucket);
+    if (!rec || rec.tenant_id !== ctx.identity.tenantId) {
+      return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+    }
+  }
   const max = Number(ctx.query['page[size]'] ?? 50) || 50;
   const after = ctx.query['page[after]'] || undefined;
   try {
@@ -167,6 +185,13 @@ async function storageListObjects(ctx) {
 }
 async function storageObjectMetadata(ctx) {
   const bucket = ctx.params.bucketId;
+  // Ownership check: same pattern as storageListObjects.
+  if (!isSuperOrInternal(ctx.identity)) {
+    const rec = await store.getBucketRecord(ctx.pool, bucket);
+    if (!rec || rec.tenant_id !== ctx.identity.tenantId) {
+      return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+    }
+  }
   const key = decodeURIComponent(ctx.params.objectKey);
   try {
     const meta = await headObject(bucket, key);
@@ -178,6 +203,14 @@ async function storageObjectMetadata(ctx) {
 }
 async function storageWorkspaceUsage(ctx) {
   const workspaceId = ctx.params.workspaceId;
+  // Ownership check: verify the workspace belongs to the caller's tenant.
+  // Superadmin/internal bypass the check. Non-owners get 404 (no existence leak).
+  if (!isSuperOrInternal(ctx.identity)) {
+    const ws = await store.getWorkspace(ctx.pool, workspaceId);
+    if (!ws || ws.tenant_id !== ctx.identity.tenantId) {
+      return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+    }
+  }
   const mapped = await store.listBucketsForWorkspace(ctx.pool, workspaceId);
   let totalBytes = 0, objectCount = 0; const bucketEntries = [];
   for (const row of mapped) {
@@ -202,6 +235,10 @@ async function storageProvisionBucket(ctx) {
   const workspaceId = ctx.params.workspaceId;
   const ws = await store.getWorkspace(ctx.pool, workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  // Ownership check: only superadmin/internal or the workspace-owning tenant may provision.
+  if (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId) {
+    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  }
   // DNS-safe bucket name (lowercase, [a-z0-9-], 3..63). This is the canonical rule
   // codified in services/provisioning-orchestrator/src/utils/bucket-name-validator.mjs;
   // it is duplicated inline here because this kind-runtime image bundles only

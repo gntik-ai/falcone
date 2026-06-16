@@ -241,6 +241,12 @@ export async function bucketWorkspaceMap(pool) {
   for (const r of rows) map[r.bucket_name] = r;
   return map;
 }
+export async function getBucketRecord(pool, bucketName) {
+  const { rows } = await pool.query(
+    `SELECT id, workspace_id, tenant_id, bucket_name, region, created_at
+       FROM workspace_buckets WHERE bucket_name=$1 LIMIT 1`, [bucketName]);
+  return rows[0] ?? null;
+}
 
 // ---- workspace topics (event store mapping) --------------------------------
 export async function insertTopic(pool, { id, workspaceId, tenantId, topicName, physicalTopicName, partitions }) {
