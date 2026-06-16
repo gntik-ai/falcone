@@ -65,10 +65,13 @@ export const kcAdmin = {
     catch (e) { if (e.kcStatus !== 409) throw e; } // 409 = already exists, fine
   },
   async getRealmRole(realm, name) { return (await kc('GET', `/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(name)}`)).json; },
-  async createUser(realm, { username, email, firstName, lastName, password, enabled = true, temporary = false }) {
+  async createUser(realm, { username, email, firstName, lastName, password, enabled = true, temporary = false, attributes }) {
     const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/users`, {
       username, email, firstName, lastName, enabled, emailVerified: true,
-      ...(password ? { credentials: [{ type: 'password', value: password, temporary }] } : {})
+      ...(password ? { credentials: [{ type: 'password', value: password, temporary }] } : {}),
+      ...(attributes && Object.keys(attributes).length > 0
+        ? { attributes: Object.fromEntries(Object.entries(attributes).map(([k, v]) => [k, [String(v)]])) }
+        : {})
     });
     let id = created.id;
     if (!id) { // some KC versions omit Location; look up by username
