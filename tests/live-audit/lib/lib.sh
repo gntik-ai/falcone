@@ -96,11 +96,14 @@ EXEC="${EXEC:-http://127.0.0.1:18082}"   # cp-executor: serves data-plane locall
 # Trust-header path (gateway-bypass): the executor trusts x-tenant-id/x-workspace-id when no
 # credential is presented. Used for DDL/admin ops and for isolation boundary probes.
 # exh <METHOD> <path> <tenantId> <workspaceId> [json-body]
+# When LA_GW_SECRET is set, sends the gateway shared-secret header (simulates the
+# authenticated gateway) so post-A1 the trust-header path is honored for legit ops.
 exh() {
   local method="$1" path="$2" t="$3" w="$4" body="${5:-}"
   local args=(-s -X "$method" -H "x-tenant-id: $t" -H "x-workspace-id: $w"
               -H "X-API-Version: $API_VERSION" -H "X-Correlation-Id: la-$(date +%s%N)"
               -H "Idempotency-Key: la-$RANDOM$RANDOM")
+  [ -n "${LA_GW_SECRET:-}" ] && args+=(-H "x-gateway-auth: $LA_GW_SECRET")
   [ -n "$body" ] && args+=(-H "Content-Type: application/json" --data "$body")
   curl -g -m 30 -w $'\n__HTTP__%{http_code}' "${args[@]}" "$EXEC$path"
 }
