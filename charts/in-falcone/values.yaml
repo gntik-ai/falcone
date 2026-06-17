@@ -1566,6 +1566,15 @@ apisix:
   env:
     - name: APISIX_STAND_ALONE
       value: "true"
+    # The standalone route table injects `x-gateway-auth: ${{GATEWAY_SHARED_SECRET}}` on
+    # executor-bound routes and reads the value from this env var; without it APISIX fails
+    # to load config and CrashLoops. Sourced from the chart-managed gatewaySharedSecret
+    # (templates/gateway-shared-secret.yaml). Fixed name (env is not tpl-rendered).
+    - name: GATEWAY_SHARED_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-gateway-shared-secret
+          key: secret
   envFromSecrets: []
   envFromConfigMaps:
     - in-falcone-gateway-config
@@ -2602,6 +2611,18 @@ seaweedfsS3Creds:
   # Identity name advertised inside the SeaweedFS identities JSON.
   identityName: falcone-s3-admin
 
+gatewaySharedSecret:
+  # Chart-managed shared secret bridging the APISIX gateway and the control-plane executor
+  # (fix-apisix-gateway-shared-secret-provisioning, D3). APISIX signs forwarded requests with
+  # `x-gateway-auth: ${{GATEWAY_SHARED_SECRET}}` and reads the value from its process env; the
+  # executor trusts gateway-injected identity headers only when x-gateway-auth matches its own
+  # GATEWAY_SHARED_SECRET. Without it APISIX CrashLoops on config load. Wired into apisix.env and
+  # controlPlaneExecutor.env via secretKeyRef on the fixed name below.
+  # Set create=false and pre-create a Secret named `secretName` to supply your own value.
+  create: true
+  secretName: in-falcone-gateway-shared-secret
+  secretKey: secret
+
 grafana:
   # Grafana for Falcone dashboards (#499). Provisioned with a Prometheus datasource (the
   # observability service) + the Falcone dashboards in templates/grafana.yaml.
@@ -2954,7 +2975,15 @@ controlPlaneExecutor:
   #     # The same secret value MUST be configured in the APISIX standalone route table
   #     # (proxy-rewrite x-gateway-auth) so that gateway-forwarded requests carry the signal.
   #     - { name: GATEWAY_SHARED_SECRET, valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } } }
-  env: []
+  # Default-wire the chart-managed gateway shared secret so the executor enforces gateway trust
+  # when enabled (fix-apisix-gateway-shared-secret-provisioning, D3). Overlays that REPLACE this
+  # list with the environment-specific data-connection env (above) MUST include this entry.
+  env:
+    - name: GATEWAY_SHARED_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-gateway-shared-secret
+          key: secret
   readinessProbe:
     httpGet:
       path: /healthz
