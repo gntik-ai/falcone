@@ -54,7 +54,7 @@ function renderTemplate(template) {
 /** Extract a YAML literal block scalar (`<key>: |`) and dedent it. Regex only; no YAML lib. */
 function extractBlockScalar(stream, key) {
   const lines = String(stream).split('\n');
-  const keyRe = new RegExp(`^(\\s*)${key.replace(/[.\-]/g, '\\$&')}:\\s*\\|`);
+  const keyRe = new RegExp(`^(\\s*)${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*\\|`);
   const start = lines.findIndex((l) => keyRe.test(l));
   assert.ok(start >= 0, `expected a "${key}: |" block`);
   const keyIndent = lines[start].match(/^(\s*)/)[1].length;
