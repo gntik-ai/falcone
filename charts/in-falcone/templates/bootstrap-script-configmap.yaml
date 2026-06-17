@@ -367,6 +367,17 @@ data:
         exit 1
       fi
 
+      # finding A1 (live E2E campaign 2026-06-17): the fresh superadmin payload now sets
+      # enabled/emailVerified, but create-only provisioning never updates an existing user, so an
+      # older deployment's superadmin stays DISABLED (login -> 401 "Account disabled"). Idempotently
+      # back-fill the account state before resetting the password so re-bootstrap heals it.
+      curl -fsS \
+        -X PUT \
+        -H "Authorization: Bearer $token" \
+        -H 'Content-Type: application/json' \
+        --data '{"enabled":true,"emailVerified":true,"requiredActions":[]}' \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/users/$user_id" >/dev/null
+
       curl -fsS \
         -X PUT \
         -H "Authorization: Bearer $token" \
