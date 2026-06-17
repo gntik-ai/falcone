@@ -22,6 +22,7 @@ import { routes as seedRoutes } from './routes.mjs';
 import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import { ensureSchema } from './tenant-store.mjs';
 import { ensureSagaSchema, recoverSagas } from './saga.mjs';
+import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 
 const { Pool } = pg;
 
@@ -224,9 +225,18 @@ async function invokeRoute(route, handler, params, callerContext, identity, db) 
 // ---- request handler -------------------------------------------------------
 const server = http.createServer(async (req, res) => {
   const method = (req.method ?? 'GET').toUpperCase();
+  // Prometheus scrape endpoint (no auth) — this process's HTTP metrics (#499).
+  if (method === 'GET' && (req.url === '/metrics' || req.url === '/metrics/')) {
+    res.writeHead(200, { 'content-type': METRICS_CONTENT_TYPE });
+    return res.end(renderMetrics());
+  }
+  const startNs = process.hrtime.bigint();
+  const metric = { method, route: 'unmatched', tenantId: '' };
+  res.on('finish', () => recordHttp({ ...metric, status: res.statusCode, durationSeconds: Number(process.hrtime.bigint() - startNs) / 1e9 }));
   try {
     const parsed = new URL(req.url, `http://localhost:${PORT}`);
     const path = parsed.pathname;
+    metric.route = normalizeRoute(path);
 
     if (method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
     if (path === '/healthz' || path === '/readyz') {
@@ -249,6 +259,7 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing or invalid Bearer token' });
       if (!authzOk(route, identity)) return sendJson(res, 403, { code: 'FORBIDDEN', message: `requires ${route.auth}` });
     }
+    metric.tenantId = identity?.tenantId ?? '';
 
     const query = Object.fromEntries(parsed.searchParams.entries());
     const rawBody = await readBody(req);

@@ -9,6 +9,7 @@
 // DDL family (schema/table/column/index); other OpenAPI families plug into the same table.
 import http from 'node:http';
 import https from 'node:https';
+import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 
@@ -702,9 +703,19 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
   const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine);
 
   return http.createServer(async (req, res) => {
+    const method = (req.method ?? 'GET').toUpperCase();
+    // Prometheus scrape endpoint (no auth) — exposes this process's HTTP metrics (#499).
+    if (method === 'GET' && (req.url === '/metrics' || req.url === '/metrics/')) {
+      res.writeHead(200, { 'content-type': METRICS_CONTENT_TYPE });
+      return res.end(renderMetrics());
+    }
+    // Record every request on completion (final status, regardless of code path).
+    const startNs = process.hrtime.bigint();
+    const metric = { method, route: 'unmatched', tenantId: '' };
+    res.on('finish', () => recordHttp({ ...metric, status: res.statusCode, durationSeconds: Number(process.hrtime.bigint() - startNs) / 1e9 }));
     try {
-      const method = (req.method ?? 'GET').toUpperCase();
       const url = new URL(req.url, 'http://control-plane.local');
+      metric.route = normalizeRoute(url.pathname);
 
       const match = routes.find(([m, re]) => m === method && re.test(url.pathname));
       if (!match) {
@@ -719,6 +730,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
       const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;
       const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey, gatewaySharedSecret);
+      metric.tenantId = identity.tenantId ?? '';
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
       }

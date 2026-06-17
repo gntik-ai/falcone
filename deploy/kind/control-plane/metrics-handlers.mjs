@@ -101,9 +101,32 @@ async function usage(ctx) {
     })
   });
 }
-// ---- series (Observability) — no per-tenant time series in this deploy ------
-async function series() {
-  return ok(200, { points: [] });
+// ---- series (Observability) — real per-tenant time series from Prometheus ---
+// Backs the Observability page with the in-cluster Prometheus (#499): queries the tenant's HTTP
+// request rate (from the falcone_http_requests_total counter the control-plane/executor now
+// expose) over the last hour. Falls back to empty points (never errors) if Prometheus is
+// unreachable, so the page degrades gracefully.
+const PROMETHEUS_URL = process.env.PROMETHEUS_URL ?? 'http://falcone-observability:9090';
+async function series(ctx) {
+  const tenantId = String(ctx.params?.tenantId ?? ctx.identity?.tenantId ?? '').replace(/[^A-Za-z0-9_-]/g, '');
+  const metricKey = ctx.query?.metric ?? 'http_requests_per_second';
+  const promQL = `sum(rate(falcone_http_requests_total{tenant_id="${tenantId}"}[5m]))`;
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - 3600;
+  try {
+    const u = new URL('/api/v1/query_range', PROMETHEUS_URL);
+    u.searchParams.set('query', promQL);
+    u.searchParams.set('start', String(start));
+    u.searchParams.set('end', String(end));
+    u.searchParams.set('step', '60');
+    const res = await fetch(u, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return ok(200, { metricKey, points: [], source: 'prometheus_unavailable' });
+    const data = await res.json();
+    const points = (data?.data?.result?.[0]?.values ?? []).map(([t, v]) => ({ timestamp: new Date(t * 1000).toISOString(), value: Number(v) }));
+    return ok(200, { metricKey, points, source: 'prometheus' });
+  } catch {
+    return ok(200, { metricKey, points: [], source: 'prometheus_unreachable' });
+  }
 }
 // ---- audit records (Observability) — no audit store/reader in this deploy --
 async function auditRecords() {
