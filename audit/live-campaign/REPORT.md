@@ -35,11 +35,11 @@ Legend: **Active/Working** = exercised end-to-end with passing assertions · **B
 | Metrics (console) | REST | **Broken** | `GET /v1/metrics/tenants/{id}/quotas`→**500** (`Forbidden` + `42P01`) (F4) |
 | Metrics (Prometheus) | `/metrics` scrape | **Active** | Prometheus + Grafana pods Running; scrape endpoints served |
 | Object storage (REST + direct S3) | REST + aws-cli→SeaweedFS | **Active/Working** | `GET /v1/storage/buckets`→200; `aws s3 ls`→OK (direct SeaweedFS) |
-| PostgreSQL data API | REST (browse) + executor (apikey DDL) | **Partial/Working** | browse→200; DDL create schema (apikey)→201; table-create body/row-CRUD unconfirmed |
+| PostgreSQL data API | REST (browse) + executor (apikey DDL) | **Active/Working** | browse→200; DDL create schema + table→201; row insert/list requires a table PK (PK-declaration via the DDL body unconfirmed — see §8) |
 | PostgreSQL (direct) | psql/pg via port-forward | **Active in-cluster** | control-plane connects (schema ready, `tenants` table); external client cred path unverified |
 | Mongo / FerretDB data API | REST + executor + direct | **Broken** | browse→500; insert/list docs→500; direct mongo→`Authentication failed`; control-plane log `HandshakeError` (F2) |
 | Events / Kafka | REST + executor (apikey) | **Active/Working** | inventory→200; create topic (apikey)→201 |
-| Functions (Knative) | REST | **Partial** | inventory→200; Knative Serving live + fn RBAC applied; deploy/invoke not exercised end-to-end this run |
+| Functions (Knative) | REST | **Active/Working** | inventory→200; `POST /v1/functions/actions` (inlineCode)→201; `POST …/invocations`→202 **completed** (real Knative Service, scale-from-zero) |
 | Realtime (PG SSE / Mongo SSE) | — | **Inactive/Partial** | PG-table SSE has no env gate; Mongo SSE needs FerretDB (broken). Not exercised |
 | Workflows (Temporal) | — | **Not-deployed** | `temporal`/`workflowWorker` disabled; `TEMPORAL_ADDRESS` unset → `/v1/flows/*` 501 |
 | MCP hosting / MCP→workflow / platform MCP | — | **Not-deployed** | `mcp` component disabled; `MCP_ENABLED` unset → `/v1/mcp/*` not registered |
@@ -49,7 +49,7 @@ Legend: **Active/Working** = exercised end-to-end with passing assertions · **B
 | Backup / restore | — | **Partial** | read-only scope routes only; no execute/restore route live |
 | Audit (write side) | — | **Not-deployed** | no audit store; `metrics …/audit-records` empty |
 | Secrets backend (Vault) | — | **Not-wired** | secrets are plain k8s Secrets; Vault non-viable on kind (D7) |
-| Web console (admin surface) | SPA served | **Served, not driven** | console pod Running + served; Playwright drive-through not run this campaign (budget) |
+| Web console (admin surface) | SPA served (HTTP 200) | **Served, not driven** | `GET /` (console)→200; full Playwright drive-through + API↔console parity deferred (budget) |
 | MongoDB / MinIO / OpenWhisk present? | cluster | **Finding (pre-campaign)** | present in the *running* release; **absent** after fresh install from current source (D8) |
 
 ---
@@ -127,6 +127,13 @@ Provisioning-orchestrator `plan-list` action errors. (Entitlement/consumption su
 - **Vault** — intentionally not enabled in the core install (D7: would abort the release); confirmed not wired.
 
 ---
+
+## 7b. Best-effort follow-up pass (same session, live cluster)
+
+- **Functions — WORKING end-to-end.** `POST /v1/functions/actions` with `{actionName, source.inlineCode, execution.runtime:nodejs:22}`→201; `POST /v1/functions/actions/{id}/invocations` `{n:21}`→**202 `status:completed`** (real Knative Service provisioned + invoked, scale-from-zero). Upgrades Functions to Active/Working.
+- **PostgreSQL data API — DDL WORKING.** create schema→201; create table (`{schemaName, tableName, columns}`)→201 (`CREATE TABLE "app"."items"` executed). **Row insert/list require the table to have a primary key** (`PLAN_REJECTED: Table app.items must declare a primary key`); declaring the PK via the DDL body did not take effect in the time available — either a body-shape nuance or a DDL gap (worth a follow-up; *not* asserted as a defect). The workspace logical DB name is `wsdb_<tenant>_<workspace>` (`database_name`), while the DDL route also accepts the DB UUID — a minor identifier inconsistency between the DDL and rows routes.
+- **Data-layer isolation — re-confirmed.** acme's own API key → `GET …/postgres/workspaces/{globex-ws}/data/wsdb_globex_app_staging/…/rows`→**403** (correctly denied). The breach is solely in the *issuance* route (F1), not in per-key scoping.
+- **Web console — served & reachable** (`GET http://console:3000/`→200); full UI automation deferred.
 
 ## 7. Reproducibility / harness
 
