@@ -281,6 +281,45 @@ data:
       log "ensured Keycloak client $client_id"
     }
 
+    # Idempotently assign standard Keycloak default client scopes (e.g. roles/basic/profile) to a
+    # client (finding A2). create-only ensure_keycloak_client never UPDATES an existing client, so
+    # on an upgrade of a deployment whose console/gateway clients were created without these scopes
+    # — issued tokens then carried no realm_access.roles and every role check 403'd — this back-fills
+    # them via the REST API. Idempotent: a PUT of an already-assigned scope is a no-op. Built-in
+    # scopes are auto-created with the realm, so they resolve here.
+    ensure_client_default_scopes() {
+      local token="$1" client_id="$2"
+      shift 2
+      local clients_json scopes_json client_uuid scope_id status
+      clients_json="$(curl -fsS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/clients?clientId=$client_id")"
+      client_uuid="$(printf '%s' "$clients_json" | sed -n 's/.*"id":"\([^"]*\)","clientId":"'$client_id'".*/\1/p' | head -1)"
+      if [ -z "$client_uuid" ]; then
+        echo "[bootstrap] cannot resolve client $client_id to assign default scopes" >&2
+        exit 1
+      fi
+      scopes_json="$(curl -fsS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/client-scopes")"
+      for scope_name in "$@"; do
+        # Keycloak serializes a client-scope as "id":"<uuid>","name":"<scope>"; the exact-name
+        # match avoids colliding with nested protocol-mapper names.
+        scope_id="$(printf '%s' "$scopes_json" | grep -oE '"id":"[^"]*","name":"'"$scope_name"'"' | sed -n 's/"id":"\([^"]*\)".*/\1/p' | head -1)"
+        if [ -z "$scope_id" ]; then
+          echo "[bootstrap] default client scope '$scope_name' not present in realm; skipping" >&2
+          continue
+        fi
+        status="$(curl -sS -o /dev/null -w '%{http_code}' \
+          -X PUT \
+          -H "Authorization: Bearer $token" \
+          "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/clients/$client_uuid/default-client-scopes/$scope_id")"
+        if [ "$status" != "204" ] && [ "$status" != "200" ]; then
+          echo "[bootstrap] failed to assign default scope '$scope_name' to $client_id; status=$status" >&2
+          exit 1
+        fi
+        log "ensured default client scope '$scope_name' on $client_id"
+      done
+    }
+
     lookup_keycloak_user_id() {
       local token="$1"
       local response
@@ -418,6 +457,12 @@ data:
         client_id="${client_id#client-}"
         ensure_keycloak_client "$token" "$client_id" "$client_file"
       done
+
+      # Back-fill the standard default client scopes on the platform clients so issued tokens carry
+      # realm_access.roles (finding A2) — required on upgrades since client creation is create-only.
+{{- range .Values.bootstrap.oneShot.keycloak.clients }}
+      ensure_client_default_scopes "$token" "{{ .clientId }}" roles basic profile
+{{- end }}
 
       ensure_keycloak_superadmin "$token"
     }
