@@ -15,9 +15,24 @@ vault:
   tls:
     enabled: true
     secretName: vault-server-tls
+    # finding D7/C.6: how the server TLS Secret (<secretName>) is provisioned.
+    #   cert-manager -> render a cert-manager.io/v1 Certificate (needs cert-manager CRDs; the
+    #                   default, for clusters that run cert-manager).
+    #   self-signed  -> a pre-install/pre-upgrade hook Job generates a self-signed CA + server
+    #                   cert with openssl and writes <secretName> directly. KIND-COMPATIBLE: no
+    #                   cert-manager required, so `vault.enabled=true` no longer aborts the release.
+    # The Secret carries tls.crt/tls.key/ca.crt; ESO's caProvider reads its ca.crt to trust Vault.
+    mode: cert-manager
     issuerRef:
       name: selfsigned-issuer
       kind: ClusterIssuer
+    # Used only when mode=self-signed.
+    bootstrap:
+      image:
+        repository: docker.io/bitnami/kubectl
+        tag: "1.32.2"
+        pullPolicy: IfNotPresent
+      days: 3650
   service:
     type: ClusterIP
     port: 8200
