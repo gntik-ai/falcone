@@ -34,6 +34,7 @@ echo "==> running control-plane executor + HTTP tests (Postgres)"
 # auto-embedding-write needs pgvector; it self-skips if the extension is unavailable. It proves
 # the write-time auto-embed round-trip (insert -> KNN) for change add-write-time-auto-embedding.
 node --test "$HERE"/postgres-data-executor.test.mjs "$HERE"/postgres-ddl-executor.test.mjs \
+  "$HERE"/postgres-ddl-grants-rls.test.mjs \
   "$HERE"/control-plane-http.test.mjs "$HERE"/app-api-keys-rls.test.mjs \
   "$HERE"/postgres-realtime-executor.test.mjs "$HERE"/vector-search-knn-rls.test.mjs \
   "$HERE"/embedding-provider-persistence.test.mjs "$HERE"/postgres-extension-preflight.test.mjs \

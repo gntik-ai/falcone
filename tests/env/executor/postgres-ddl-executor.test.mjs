@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 import { createConnectionRegistry } from '../../../apps/control-plane/src/runtime/connection-registry.mjs';
 import { executePostgresDdl } from '../../../apps/control-plane/src/runtime/postgres-ddl-executor.mjs';
+import { ensureDataApiRoles } from './data-api-roles.mjs';
 
 const { Pool } = pg;
 const ADMIN_URL =
@@ -41,6 +42,8 @@ before(async () => {
   await bootstrap.query(`CREATE DATABASE ${PROBE_DB}`);
   admin = new Pool({ connectionString: probeUrl(), max: 2 });
   await admin.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+  // A table create now GRANTs to these data-API roles (#494), so they must exist.
+  await ensureDataApiRoles(admin);
   const dsn = probeUrl();
   // DDL runs on the admin connection; here both point at the superuser probe DSN.
   registry = createConnectionRegistry({ resolveConnection: () => ({ dsn, adminDsn: dsn }) });

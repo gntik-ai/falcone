@@ -275,6 +275,57 @@ bootstrap:
           rememberMe: true
           verifyEmail: true
           resetPasswordAllowed: true
+      # Keycloak 26 declarative user profile. The default profile marks email/firstName/lastName
+      # REQUIRED for role "user"; a user provisioned via the admin API without those (or any
+      # programmatically-created platform principal) then fails Direct Access Grant (ROPC) with
+      # invalid_grant "Account is not fully set up" — even with requiredActions:[] — blocking
+      # onboarding of every new principal except the bootstrap superadmin (fix-auth-as-a-service-login,
+      # #496). We PUT this relaxed profile to the platform realm so those attributes are optional
+      # (username/email validations are retained). Proven against real KC26 in
+      # tests/env/keycloak/auth-ropc-user-profile.test.mjs.
+      userProfile:
+        attributes:
+          - name: username
+            displayName: ${username}
+            validations:
+              length: { min: 3, max: 255 }
+              username-prohibited-characters: {}
+              up-username-not-idn-homograph: {}
+            permissions:
+              view: [admin, user]
+              edit: [admin, user]
+            multivalued: false
+          - name: email
+            displayName: ${email}
+            validations:
+              email: {}
+              length: { max: 255 }
+            permissions:
+              view: [admin, user]
+              edit: [admin, user]
+            multivalued: false
+          - name: firstName
+            displayName: ${firstName}
+            validations:
+              length: { max: 255 }
+              person-name-prohibited-characters: {}
+            permissions:
+              view: [admin, user]
+              edit: [admin, user]
+            multivalued: false
+          - name: lastName
+            displayName: ${lastName}
+            validations:
+              length: { max: 255 }
+              person-name-prohibited-characters: {}
+            permissions:
+              view: [admin, user]
+              edit: [admin, user]
+            multivalued: false
+        groups:
+          - name: user-metadata
+            displayHeader: User metadata
+            displayDescription: Attributes, which refer to user metadata
       realmRoles:
         - superadmin
         - platform_admin

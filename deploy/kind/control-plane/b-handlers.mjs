@@ -7,7 +7,9 @@ import { kcAdmin, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { startSaga } from './saga.mjs';
-import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential } from './dataplane.mjs';
+import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase } from './dataplane.mjs';
+import { deleteBucket } from './storage-handlers.mjs';
+import { deleteTopics } from './kafka-handlers.mjs';
 import { METRICS_HANDLERS } from './metrics-handlers.mjs';
 import { STORAGE_HANDLERS } from './storage-handlers.mjs';
 import { MONGO_HANDLERS } from './mongo-handlers.mjs';
@@ -192,6 +194,56 @@ function canManageTenantId(identity, tenantId) {
   return ['tenant_owner', 'tenant_admin'].includes(identity.actorType) && identity.tenantId === tenantId;
 }
 
+// ---- tenant offboarding (add-tenant-delete-purge-cascade #501) --------------
+// DELETE /v1/tenants/{tenantId} — soft delete: mark the tenant 'deleted' (reversible;
+// resources are retained until an explicit purge). Returns 404 only if the tenant is unknown.
+async function deleteTenant(ctx) {
+  const { params, identity, pool } = ctx;
+  const tenant = await store.getTenant(pool, params.tenantId);
+  if (!tenant) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+  if (!canManageTenantId(identity, tenant.id)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  const rec = await store.markTenantDeleted(pool, tenant.id);
+  return ok(200, { tenant: { id: tenant.id, status: rec?.status ?? 'deleted' },
+    message: 'tenant marked deleted; POST /v1/tenants/{id}/purge to remove all owned resources' });
+}
+
+// POST /v1/tenants/{tenantId}/purge — hard cascade: remove EVERY resource the tenant owns
+// (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows), leaving
+// no orphaned data. Physical teardown (DB drop, realm delete) is reliable; bucket/topic teardown
+// is best-effort (the registry rows are removed regardless, so no orphaned rows remain).
+async function purgeTenant(ctx) {
+  const { params, identity, pool } = ctx;
+  const tenant = await store.getTenant(pool, params.tenantId);
+  if (!tenant) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+  if (!canManageTenantId(identity, tenant.id)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  const realm = tenant.iam_realm;
+
+  // 1. Delete all registry rows + collect the physical resources to tear down.
+  const phys = await store.purgeTenant(pool, tenant.id);
+  // 2. Drop each physical workspace database (catalog-level isolation teardown).
+  const databasesDropped = [];
+  for (const db of phys.databases) { try { await dropWorkspaceDatabase(pool, db); databasesDropped.push(db); } catch { /* best-effort */ } }
+  // 3. Delete the tenant's Keycloak realm — cascades its clients, users, and roles.
+  let realmDeleted = false;
+  if (realm) { try { await kcAdmin.deleteRealm(realm); realmDeleted = true; } catch { /* best-effort */ } }
+  // 4. Best-effort physical object-store + topic teardown (rows already removed above).
+  const bucketsDeleted = [];
+  for (const b of phys.buckets) { try { await deleteBucket(b); bucketsDeleted.push(b); } catch { /* best-effort */ } }
+  let topicsDeleted = [];
+  try { await deleteTopics(phys.topics); topicsDeleted = phys.topics; } catch { /* best-effort */ }
+
+  return ok(200, {
+    tenantId: tenant.id, purged: true,
+    removed: {
+      workspaces: phys.workspaceIds.length,
+      databases: databasesDropped, realm: realmDeleted ? realm : null,
+      buckets: bucketsDeleted, topics: topicsDeleted,
+    },
+    // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
+    residual: { knativeServices: phys.ksvcs },
+  });
+}
+
 // ---- workspaces ------------------------------------------------------------
 // POST /v1/tenants/{tenantId}/workspaces
 async function createWorkspace(ctx) {
@@ -204,7 +256,19 @@ async function createWorkspace(ctx) {
   const slug = slugify(body.slug ?? displayName);
   if (await store.workspaceSlugTaken(pool, tenant.id, slug)) return err(409, 'SLUG_TAKEN', `workspace slug '${slug}' already exists in tenant`);
   const ws = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: tenant.id, slug, displayName, createdBy: identity.sub });
-  return ok(201, { workspace: workspaceOut(ws), ...workspaceOut(ws) });
+  // Provision the workspace's real backing database as part of creation (#502), so the data API
+  // routes to a real, isolated database instead of co-mingling in the shared control-plane DB.
+  // Best-effort: the saga leaves NO orphaned registry row on failure, and the data API falls back
+  // to the shared DB, so the workspace is still usable and provisioning can be retried via
+  // POST /v1/workspaces/{id}/database. `database: null` signals the DB is not yet ready.
+  let database = null;
+  try {
+    const out = await runWorkspaceDbProvisionSaga(pool, { ws, tenant, identity, callerContext: ctx.callerContext });
+    database = out.database;
+  } catch {
+    database = null;
+  }
+  return ok(201, { workspace: workspaceOut(ws), ...workspaceOut(ws), database });
 }
 // GET /v1/workspaces  (superadmin: all; tenant scope: own tenant)
 async function listWorkspaces(ctx) {
@@ -366,29 +430,43 @@ async function iamListClients(ctx) {
 // ---- data plane: workspace database provisioning ---------------------------
 // POST /v1/workspaces/{workspaceId}/database — provision a REAL Postgres
 // database for the workspace (catalog-level isolation), via a durable saga.
+// Provision the workspace's real Postgres database via the durable saga (createDatabase →
+// insertRecord). The saga creates the physical DB BEFORE the registry row and compensates on
+// failure (drops the DB), so a failure never leaves a workspace_databases row without a backing
+// database (#502). Shared by the explicit endpoint and by auto-provisioning at workspace create.
+// Throws on failure (after marking the saga failed); the caller maps/handles it.
+async function runWorkspaceDbProvisionSaga(pool, { ws, tenant, identity, callerContext }) {
+  const saga = await startSaga(pool, 'provisionWorkspaceDatabase', { workspaceId: ws.id, tenantId: ws.tenant_id }, {
+    tenantId: ws.tenant_id, workspaceId: ws.id, actorId: identity.sub, actorType: identity.actorType ?? 'superadmin',
+    correlationId: callerContext?.correlationId, operationType: 'workspace.database.provision'
+  });
+  try {
+    const conn = await saga.step('createDatabase',
+      () => provisionWorkspaceDatabase(pool, { tenantSlug: tenant?.slug ?? ws.tenant_id, wsSlug: ws.slug ?? ws.id }),
+      (val) => ({ type: 'pg.dropDatabase', args: { database: val.database } }));
+    const rec = await saga.step('insertRecord',
+      () => store.insertWorkspaceDatabase(pool, {
+        id: randomUUID(), workspaceId: ws.id, tenantId: ws.tenant_id, engine: conn.engine,
+        databaseName: conn.database, mode: conn.mode, username: conn.username, host: conn.host, port: conn.port, createdBy: identity.sub }),
+      (val) => ({ type: 'store.deleteWorkspaceDatabase', args: { id: val.id } }));
+    await saga.complete({ database: conn.database });
+    return { database: rec, connection: conn, sagaId: saga.runId };
+  } catch (e) {
+    await saga.fail(e);
+    throw e;
+  }
+}
+
 async function provisionDatabase(ctx) {
   const { pool, identity } = ctx;
   const r = await resolveWorkspaceForManage(ctx); if (r.error) return r.error;
   if (await store.getWorkspaceDatabase(pool, r.ws.id)) return err(409, 'DB_ALREADY_PROVISIONED', 'workspace already has a database');
   const tenant = await store.getTenant(pool, r.ws.tenant_id);
-  const saga = await startSaga(pool, 'provisionWorkspaceDatabase', { workspaceId: r.ws.id, tenantId: r.ws.tenant_id }, {
-    tenantId: r.ws.tenant_id, workspaceId: r.ws.id, actorId: identity.sub, actorType: identity.actorType ?? 'superadmin',
-    correlationId: ctx.callerContext?.correlationId, operationType: 'workspace.database.provision'
-  });
   try {
-    const conn = await saga.step('createDatabase',
-      () => provisionWorkspaceDatabase(pool, { tenantSlug: tenant?.slug ?? r.ws.tenant_id, wsSlug: r.ws.slug ?? r.ws.id }),
-      (val) => ({ type: 'pg.dropDatabase', args: { database: val.database } }));
-    const rec = await saga.step('insertRecord',
-      () => store.insertWorkspaceDatabase(pool, {
-        id: randomUUID(), workspaceId: r.ws.id, tenantId: r.ws.tenant_id, engine: conn.engine,
-        databaseName: conn.database, mode: conn.mode, username: conn.username, host: conn.host, port: conn.port, createdBy: identity.sub }),
-      (val) => ({ type: 'store.deleteWorkspaceDatabase', args: { id: val.id } }));
-    await saga.complete({ database: conn.database });
+    const out = await runWorkspaceDbProvisionSaga(pool, { ws: r.ws, tenant, identity, callerContext: ctx.callerContext });
     // The role password is surfaced ONCE here (not persisted); rotate to re-issue.
-    return ok(201, { database: rec, connection: conn, sagaId: saga.runId });
+    return ok(201, { database: out.database, connection: out.connection, sagaId: out.sagaId });
   } catch (e) {
-    await saga.fail(e);
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PROVISION_DB_FAILED', String(e.message ?? e));
   }
 }
@@ -486,7 +564,7 @@ async function iamRemoveUserFromGroup(ctx) {
 }
 
 export const LOCAL_HANDLERS = {
-  createTenant, listTenants, getTenant, createTenantUser, listTenantUsers,
+  createTenant, listTenants, getTenant, deleteTenant, purgeTenant, createTenantUser, listTenantUsers,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
