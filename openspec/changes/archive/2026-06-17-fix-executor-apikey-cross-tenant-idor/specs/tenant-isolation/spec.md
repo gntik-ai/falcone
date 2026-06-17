@@ -1,6 +1,6 @@
 # tenant-isolation — spec delta for fix-executor-apikey-cross-tenant-idor
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: API-key issuance must be scoped to the caller's tenant
 
