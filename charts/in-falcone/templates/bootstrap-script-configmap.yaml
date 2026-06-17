@@ -423,6 +423,14 @@ data:
     }
 
     run_upgrade_reconciliation() {
+{{- if eq (toString (dig "config" "inline" "APISIX_STAND_ALONE" "false" .Values.apisix)) "true" }}
+      # APISIX runs in standalone mode (APISIX_STAND_ALONE=true, the chart default): routes are
+      # served from the mounted standalone config (apisix.yaml), and the admin API targeted below
+      # is unavailable. Issuing PUT /apisix/admin/routes there fails and aborts the Job, leaving
+      # the platform realm / clients / superadmin unprovisioned (finding D2). Skip the admin-API
+      # reconciliation entirely in standalone mode — emit zero admin-API calls.
+      log "APISIX_STAND_ALONE=true; skipping APISIX admin-API route reconciliation (standalone serves routes from mounted config)"
+{{- else }}
 {{- $mode := .Values.gatewayPolicy.passthrough.mode }}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
 {{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled. */ -}}
@@ -430,6 +438,43 @@ data:
       ensure_apisix_route "{{ .routeId }}" "$PAYLOAD_DIR/route-{{ .routeId }}.json"
 {{- end }}
 {{- end }}
+{{- end }}
+    }
+
+    # Final smoke check (finding D2): confirm the auth layer the create-only phase is responsible
+    # for is actually present in Keycloak before the Job reports success, so a broken bootstrap can
+    # never exit 0 with the realm/clients/superadmin missing. Reuses the same admin-API query
+    # idioms as the create-only functions; hits Keycloak directly (not via APISIX).
+    verify_auth_layer() {
+      local token missing=0
+      token="$(require_keycloak_token)"
+
+      if [ "$(curl -sS -o /dev/null -w '%{http_code}' \
+        -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID")" != "200" ]; then
+        echo "[bootstrap] verify: platform realm $KEYCLOAK_REALM_ID is absent" >&2
+        missing=1
+      fi
+{{- range .Values.bootstrap.oneShot.keycloak.clients }}
+      if ! curl -sS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/clients?clientId={{ .clientId }}" \
+        | grep -q '"clientId":"{{ .clientId }}"'; then
+        echo "[bootstrap] verify: Keycloak client {{ .clientId }} is absent" >&2
+        missing=1
+      fi
+{{- end }}
+      if ! curl -sS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/users?username=$KEYCLOAK_SUPERADMIN_USERNAME&exact=true" \
+        | grep -q '"username":"'$KEYCLOAK_SUPERADMIN_USERNAME'"'; then
+        echo "[bootstrap] verify: superadmin $KEYCLOAK_SUPERADMIN_USERNAME is absent" >&2
+        missing=1
+      fi
+
+      if [ "$missing" != "0" ]; then
+        echo "[bootstrap] auth-layer verification failed; refusing to report success" >&2
+        exit 1
+      fi
+      log "verified auth layer: platform realm, Keycloak clients, and superadmin are present"
     }
 
     main() {
@@ -450,6 +495,7 @@ data:
 
       log "running upgrade reconciliation phase"
       run_upgrade_reconciliation
+      verify_auth_layer
       write_marker
       log "bootstrap completed successfully"
     }
