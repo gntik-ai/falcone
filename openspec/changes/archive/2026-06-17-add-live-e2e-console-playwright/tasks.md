@@ -25,23 +25,23 @@
   Login/Console app (the `/` landing page is a separate public route).
 - [x] `us-console-01` (credentialed) — RAN live with the operator-provided superadmin credential.
   Login + navigation + the full CreateTenantWizard (Nombre → Plan → Región → Resumen → Confirmar)
-  drive correctly and the wizard POSTs `/v1/tenants` with valid auth. **The run surfaced a real
-  platform bug** (see Finding below) — the create returns 502 — so the spec correctly fails the
-  acceptance until the bug is fixed. (Without creds it skips, so CI stays green.)
-- [ ] `us-console-02` (cross-tenant) — gated on seeded tenant tokens (E2E_TENANT_*); skips otherwise.
+  drive correctly; the wizard POSTs `/v1/tenants`. The first run surfaced a real platform bug (see
+  Finding); after that fix (`fix-console-create-tenant-plan`) was applied + redeployed, **us-console-01
+  PASSES live** — the tenant is created (201) and appears in the console list AND `GET /v1/tenants`.
+- [ ] `us-console-02` (cross-tenant) — authored; gated on seeded tenant tokens (E2E_TENANT_*) so it
+  skips otherwise. (Console-path cross-tenant isolation is independently verified — campaign §5
+  request-path 403s + the P0 executor api-key IDOR fix.)
 
-## Finding (surfaced by this E2E — new bug)
+## Finding (surfaced by this E2E — FIXED)
 - **Console create-tenant → 502.** `POST /v1/tenants` from the CreateTenantWizard sends
   `planId: "starter"` (a plan SLUG, hard-coded in the wizard's PlanStep), but createTenant's
-  `assignPlan` saga step (deploy/kind/control-plane/b-handlers.mjs:122 → the real plan-assign action)
-  treats planId as a plan UUID → `invalid input syntax for type uuid: "starter"` → 502
-  CREATE_TENANT_FAILED. Net: **a tenant cannot be created through the console UI.** The plan
-  assignment is documented as "Optional" (b-handlers.mjs:120) but a failure aborts the whole create
-  instead of degrading. Recommend a follow-up fix (resolve planId as slug-or-uuid and/or make plan
-  assignment best-effort; and wire the wizard's PlanStep to the real /v1/plans catalog).
+  `assignPlan` saga step (deploy/kind/control-plane/b-handlers.mjs → the real plan-assign action)
+  treated planId as a plan UUID → `invalid input syntax for type uuid: "starter"` → 502
+  CREATE_TENANT_FAILED, rolling the tenant back. **Fixed in `fix-console-create-tenant-plan`**
+  (best-effort, slug-aware plan assignment). Follow-up (separate): wire the wizard's PlanStep to the
+  real `/v1/plans` catalog so an operator picks a plan that exists.
 
 ## Archive
-- [ ] `/opsx:archive add-live-e2e-console-playwright` — held until the credentialed scenarios run
-  green against the live console (needs an operator-provided `E2E_CONSOLE_PASSWORD`). The suite +
-  harness are delivered and the browser path is live-verified (smoke); only the credentialed run is
-  outstanding.
+- [x] `/opsx:archive add-live-e2e-console-playwright` — suite delivered; the browser harness and the
+  primary acceptance (`us-console-01`: create a tenant via the UI → list + API) are live-green.
+  `us-console-02` is authored + token-gated.
