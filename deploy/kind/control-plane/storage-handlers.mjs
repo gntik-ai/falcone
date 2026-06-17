@@ -131,6 +131,12 @@ export async function createBucket(bucket) {
   try { await s3('PUT', `/${bucket}`); }
   catch (e) { if (!/BucketAlreadyOwnedByYou|BucketAlreadyExists/.test(e.body ?? '')) throw e; }
 }
+// Delete a bucket (best-effort teardown for tenant purge, #501). SeaweedFS removes the bucket
+// and its objects; a missing bucket (already gone / never created) is treated as success.
+export async function deleteBucket(bucket) {
+  try { await s3('DELETE', `/${bucket}`); }
+  catch (e) { if (!/NoSuchBucket|404/.test(String(e.body ?? e.message ?? ''))) throw e; }
+}
 export async function putObject(bucket, key, body, contentType = 'application/octet-stream') {
   await s3('PUT', `/${bucket}/${key}`, { headers: { 'content-type': contentType }, body });
 }
