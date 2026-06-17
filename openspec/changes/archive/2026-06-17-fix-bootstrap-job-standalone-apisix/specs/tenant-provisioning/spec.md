@@ -1,6 +1,6 @@
 # tenant-provisioning — spec delta for fix-bootstrap-job-standalone-apisix
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Bootstrap Job completes successfully on a fresh kind install
 
