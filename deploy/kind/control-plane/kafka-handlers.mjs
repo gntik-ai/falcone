@@ -33,6 +33,14 @@ async function producer() {
   return producerP;
 }
 
+// Best-effort physical topic teardown for tenant purge (#501). Missing topics are ignored.
+export async function deleteTopics(physicalNames) {
+  const topics = (physicalNames ?? []).filter(Boolean);
+  if (topics.length === 0) return;
+  const a = await admin();
+  try { await a.deleteTopics({ topics }); } catch (e) { if (!/UNKNOWN_TOPIC_OR_PARTITION|does not exist/i.test(String(e.message ?? e))) throw e; }
+}
+
 // GET /v1/events/workspaces/{workspaceId}/inventory
 async function eventsInventory(ctx) {
   const workspaceId = ctx.params.workspaceId;

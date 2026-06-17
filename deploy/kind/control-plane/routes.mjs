@@ -37,6 +37,8 @@ export const routes = [
   { method: 'POST', path: '/v1/tenants', localHandler: 'createTenant', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/tenants', localHandler: 'listTenants', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}', localHandler: 'getTenant', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/tenants/{tenantId}', localHandler: 'deleteTenant', auth: 'superadmin' },
+  { method: 'POST', path: '/v1/tenants/{tenantId}/purge', localHandler: 'purgeTenant', auth: 'superadmin' },
   { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/users', localHandler: 'listTenantUsers', auth: 'authenticated' },
 

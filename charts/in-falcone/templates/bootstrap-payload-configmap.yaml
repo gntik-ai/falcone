@@ -14,6 +14,10 @@ metadata:
 data:
   realm.json: |
 {{ toPrettyJson .Values.bootstrap.oneShot.keycloak.realm | nindent 4 }}
+{{- if .Values.bootstrap.oneShot.keycloak.userProfile }}
+  user-profile.json: |
+{{ toPrettyJson .Values.bootstrap.oneShot.keycloak.userProfile | nindent 4 }}
+{{- end }}
   superadmin.json: |
 {{ toPrettyJson .Values.bootstrap.oneShot.keycloak.superadmin | nindent 4 }}
   tenant-realm-template.json: |
