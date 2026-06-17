@@ -8,7 +8,7 @@ After `POST /v1/auth/signups` returns 201, both `POST /v1/auth/login-sessions` a
 
 ## What Changes
 
-- Fix the `in-falcone-console` client direct-grant flow / consent configuration so a fully-set-up user authenticates successfully.
+- Root cause (corrected after a live KC26 repro — NOT the client direct-grant/consent config, which is already correct: `directAccessGrantsEnabled: true`, public client): Keycloak 26's declarative **user profile** marks `email`/`firstName`/`lastName` REQUIRED for role `user`, so a principal provisioned via the admin API without them fails ROPC with `invalid_grant "Account is not fully set up"` even though `requiredActions:[]`. Relax the realm user profile so those attributes are optional, in both realm-provisioning paths: the chart bootstrap for the platform realm (`bootstrap.oneShot.keycloak.userProfile` + `ensure_keycloak_user_profile`) and the runtime for tenant realms (`kc-admin.mjs::relaxUserProfile`).
 
 ## Capabilities
 
