@@ -1,6 +1,6 @@
 # tenant-provisioning — spec delta for fix-ferretdb-init-documentdb-host
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: FerretDB init container resolves the DocumentDB host dynamically
 
