@@ -163,8 +163,16 @@ controlPlane:
       value: falcone-ferretdb:27017
     - name: MONGO_BACKEND
       value: ferretdb
+    # FerretDB v2 delegates auth to the DocumentDB Postgres backend, so the Mongo client
+    # identity MUST be a real Postgres login role. Source the username from the SAME secret
+    # as the password (in-falcone-documentdb POSTGRES_USER, the documentdb admin role that the
+    # FerretDB postgresql-url also uses) — a hardcoded `falcone` did not match the admin role
+    # (`falcone_doc_admin`), so the handshake failed and all /v1/mongo/* 500'd (finding F2).
     - name: MONGO_USER
-      value: falcone
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb
+          key: POSTGRES_USER
     - name: MONGO_PASSWORD
       valueFrom:
         secretKeyRef:
