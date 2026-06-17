@@ -518,6 +518,12 @@ bootstrap:
         email: platform-admin@in-falcone.example.com
         firstName: Platform
         lastName: Admin
+        # finding A1 (live E2E campaign 2026-06-17): a UserRepresentation POSTed without `enabled`
+        # is created DISABLED by Keycloak, so the bootstrap superadmin could not log in
+        # (login -> 401 "Account disabled") until manually enabled. Create it ready to use.
+        enabled: true
+        emailVerified: true
+        requiredActions: []
         realmRoles:
           - superadmin
     governanceCatalog:

@@ -1,6 +1,6 @@
 # tenant-rbac — spec delta for fix-superadmin-created-disabled
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Bootstrap superadmin user is created enabled and can log in immediately
 
