@@ -60,7 +60,9 @@ test('buildVerificationRun creates a single-provider run without leaking credent
   assert.equal(run.configuration.providers[0].providerType, 'seaweedfs');
   assert.deepEqual(run.scenarios, []);
   assert.equal(JSON.stringify(run).includes('secret://'), false);
-  assert.equal(JSON.stringify(run).includes('https://seaweedfs.internal'), false);
+  // The provider endpoint must not be serialized into the verification run output.
+  // Assert the `endpoint` field is absent (rather than substring-matching a URL).
+  assert.equal(JSON.stringify(run).includes('"endpoint"'), false);
 });
 
 test('buildVerificationRun creates unique run ids for equivalent two-provider inputs', () => {
