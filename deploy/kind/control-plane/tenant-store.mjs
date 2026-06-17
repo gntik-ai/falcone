@@ -378,3 +378,37 @@ export async function getTenant(pool, idOrSlug) {
 export async function deleteTenant(pool, id) {
   await pool.query('DELETE FROM tenants WHERE id = $1', [id]);
 }
+
+// Soft delete: mark the tenant 'deleted' (offboarding without destroying data yet).
+export async function markTenantDeleted(pool, id) {
+  const { rows } = await pool.query(
+    `UPDATE tenants SET status='deleted' WHERE id=$1 RETURNING id, slug, display_name, status, iam_realm`, [id]);
+  return rows[0] ?? null;
+}
+
+// Cascading purge of every row a tenant owns (add-tenant-delete-purge-cascade, #501). Collects
+// the physical resources the caller must tear down (databases/buckets/topics/ksvcs) BEFORE
+// deleting the registry rows, then deletes child rows before parents. Each table delete is
+// best-effort (a table absent in this hand-built runtime — e.g. product-migration plan tables —
+// must not abort the purge); the operation is idempotent, so a partial run can simply be retried.
+export async function purgeTenant(pool, tenantId) {
+  const collect = async (sql) => { try { return (await pool.query(sql, [tenantId])).rows; } catch { return []; } };
+  const databases = (await collect('SELECT database_name FROM workspace_databases WHERE tenant_id=$1')).map((r) => r.database_name);
+  const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE tenant_id=$1')).map((r) => r.bucket_name);
+  const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE tenant_id=$1')).map((r) => r.physical_topic_name);
+  const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE tenant_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
+  const workspaceIds = (await collect('SELECT id FROM workspaces WHERE tenant_id=$1')).map((r) => r.id);
+
+  const del = async (sql, params) => { try { await pool.query(sql, params); } catch (e) { if (e.code !== '42P01') throw e; } }; // ignore undefined_table
+  // fn_activations has no tenant_id — scope by the tenant's workspaces.
+  if (workspaceIds.length) await del('DELETE FROM fn_activations WHERE workspace_id = ANY($1)', [workspaceIds]);
+  for (const t of ['fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
+                   'workspace_databases', 'workspace_api_keys', 'service_accounts',
+                   'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
+                   'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements']) {
+    await del(`DELETE FROM ${t} WHERE tenant_id = $1`, [tenantId]);
+  }
+  await del('DELETE FROM workspaces WHERE tenant_id = $1', [tenantId]);
+  await del('DELETE FROM tenants WHERE id = $1', [tenantId]);
+  return { databases, buckets, topics, ksvcs, workspaceIds };
+}
