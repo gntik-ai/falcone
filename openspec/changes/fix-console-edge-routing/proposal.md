@@ -8,7 +8,7 @@ Live proof (`tests/live-audit/evidence/12-console-parity.md`, CONS-3): the SPA t
 
 ## What Changes
 
-- Provide an edge (ingress controller + routes, or equivalent) so the console's same-origin `/v1/*` requests are routed to the control-plane/gateway in the deployed topology.
+- Corrected scope after reading the deploy: an ingress controller AND APISIX `/v1/*` routes already exist; the real gap is that the console pod's own nginx had no `/v1` edge, so its SPA catch-all (`try_files … /index.html`) rewrote same-origin `/v1/*` calls to `index.html` — the browser got HTML for every API call. Add a `/v1/` proxy in the console nginx to the gateway (APISIX), so same-origin `/v1/*` reaches the control-plane (APISIX validates the JWT + forwards). The upstream is env-configurable (`GATEWAY_UPSTREAM`, default `falcone-apisix:9080`) so the chart can point it at its own gateway service.
 
 ## Capabilities
 
