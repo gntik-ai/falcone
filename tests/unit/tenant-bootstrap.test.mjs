@@ -65,7 +65,7 @@ test('workspace bootstrap records storage dependency wait when tenant storage co
       tenantId: 'ten_01storagewait',
       state: 'draft',
       namespace: 'tctx-storage-wait-abcd1234',
-      providerType: 'minio',
+      providerType: 'seaweedfs',
       bucketProvisioningAllowed: false,
       provisioning: {
         reasonCode: 'CONTEXT_PENDING'
@@ -82,7 +82,7 @@ test('workspace bootstrap records storage dependency wait when tenant storage co
       tenantId: 'ten_01storageblocked',
       state: 'suspended',
       namespace: 'tctx-storage-blocked-abcd1234',
-      providerType: 'minio',
+      providerType: 'seaweedfs',
       bucketProvisioningAllowed: false,
       provisioning: {
         reasonCode: 'CONTEXT_SUSPENDED'
@@ -99,7 +99,7 @@ test('workspace bootstrap records storage dependency wait when tenant storage co
       tenantId: 'ten_01storageready',
       state: 'active',
       namespace: 'tctx-storage-ready-abcd1234',
-      providerType: 'minio',
+      providerType: 'seaweedfs',
       bucketProvisioningAllowed: true,
       provisioning: {
         reasonCode: null

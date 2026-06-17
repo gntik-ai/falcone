@@ -29,7 +29,7 @@ import {
 } from '../../services/adapters/src/storage-multipart-presigned.mjs';
 
 function makeUnsatisfiedProfile(capabilityId) {
-  const profile = buildStorageProviderProfile({ providerType: 'minio' });
+  const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });
   profile.capabilityDetails = profile.capabilityDetails.map((entry) => (
     entry.capabilityId === capabilityId
       ? { ...entry, state: 'unsatisfied', constraints: [] }
@@ -89,8 +89,8 @@ test('multipart error definitions expose retryability and fallback hints', () =>
   }
 });
 
-test('checkMultipartCapability allows MinIO multipart support', () => {
-  const result = checkMultipartCapability({ providerProfile: buildStorageProviderProfile({ providerType: 'minio' }) });
+test('checkMultipartCapability allows SeaweedFS multipart support', () => {
+  const result = checkMultipartCapability({ providerProfile: buildStorageProviderProfile({ providerType: 'seaweedfs' }) });
   assert.equal(result.allowed, true);
   assert.equal(result.capabilityId, 'object.multipart_upload');
   assert.equal(result.satisfactionState, 'satisfied');
@@ -105,8 +105,8 @@ test('checkMultipartCapability rejects unsatisfied multipart capability', () => 
   assert.equal(result.errorEnvelope.httpStatus, 501);
 });
 
-test('checkPresignedUrlCapability allows MinIO presigned URLs', () => {
-  const result = checkPresignedUrlCapability({ providerProfile: buildStorageProviderProfile({ providerType: 'minio' }) });
+test('checkPresignedUrlCapability allows SeaweedFS presigned URLs', () => {
+  const result = checkPresignedUrlCapability({ providerProfile: buildStorageProviderProfile({ providerType: 'seaweedfs' }) });
   assert.equal(result.allowed, true);
   assert.equal(result.capabilityId, 'bucket.presigned_urls');
 });

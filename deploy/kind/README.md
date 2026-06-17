@@ -88,8 +88,8 @@ verified end-to-end through the gateway with a real superadmin JWT:
   `pg_database`, PUBLIC connect revoked.
 - **Workspace function registry.** `POST /v1/workspaces/{id}/functions` /
   `GET …/functions`. Registers function metadata; reports
-  `runtimeStatus: pending_data_plane` — execution needs the OpenWhisk data plane
-  (a `svc-stub` here), so no fake "deployed" claim.
+  `runtimeStatus: pending_data_plane` — execution needs the Knative data plane,
+  so no fake "deployed" claim until the function is deployed as a ksvc.
 - **Durable saga + compensation.** `saga_runs` + `saga_steps` persist each forward
   step with a SERIALIZABLE compensation (`{type,args}`); `createTenant` and DB
   provisioning record steps. On failure the recorded compensations replay
@@ -203,10 +203,11 @@ this control-plane serves. To make the shell usable end-to-end:
   seeded 3 users / 2 orders / a `email_unique` index → the page shows the database
   (350 B / 2 collections / 3 indexes), collection counts, indexes, and the documents.
   `ConsoleMongoPage` was lazy (React #426) → eager import.
-- The repo's **Storage** page (`/console/storage`) is wired to **REAL MinIO** — a
+- The repo's **Storage** page (`/console/storage`) is wired to **REAL SeaweedFS** — a
   true data-plane page. `storage-handlers.mjs` is a from-scratch S3 client
-  (AWS **SigV4** via `node:crypto`, no SDK) against `falcone-storage:9000`
-  (`MINIO_*` env via secretKeyRef). Endpoints: list buckets (joined with a new
+  (AWS **SigV4** via `node:crypto`, no SDK) against the SeaweedFS S3 gateway
+  `falcone-seaweedfs-s3:8333` (path-style; `STORAGE_S3_*` env via secretKeyRef).
+  Endpoints: list buckets (joined with a new
   `workspace_buckets` map so the page's `bucket.workspaceId===activeWorkspaceId`
   filter works), list objects (ListObjectsV2), object metadata (HEAD), per-workspace
   usage (aggregated), and `POST …/workspaces/{id}/buckets` to provision a real
@@ -251,8 +252,8 @@ this control-plane serves. To make the shell usable end-to-end:
   `deploy/kind/web-console/dist` and build the image.
 
 ### Honest gaps (domain B — still to build)
-- **Function execution** needs the OpenWhisk data plane (deployed as `svc-stub`);
-  the registry is real, the runtime is pending.
+- **Function execution** runs on the Knative data plane (each function is a ksvc;
+  see the Functions section above) — both the registry and the runtime are real.
 - **Dedicated per-workspace DB credentials** need `CREATEROLE`/superuser on
   Postgres (not granted on this deploy) — the code does it when privileges allow,
   else falls back to `mode: shared`.
@@ -279,13 +280,13 @@ Release `falcone` (`helm status falcone -n falcone` → `deployed`). 15 pods Run
 | postgresql | StatefulSet | `bitnamilegacy/postgresql:17.2.0` |
 | mongodb | StatefulSet | `bitnamilegacy/mongodb:8.0.0` |
 | kafka (KRaft, 1 broker) | StatefulSet | `bitnamilegacy/kafka:3.9.0` |
-| storage (MinIO) | StatefulSet | `minio:RELEASE.2025-04-22T22-12-26Z` |
+| storage (SeaweedFS) | StatefulSet | `chrislusf/seaweedfs:4.33` |
 | keycloak | Deployment | `quay.io/keycloak/keycloak:26.1.0` |
 | apisix (gateway) | Deployment | `apache/apisix:3.10.0-debian` |
 | observability (Prometheus) | Deployment | `prom/prometheus:v3.2.1` |
-| control-plane | Deployment | `in-falcone-control-plane:0.6.2` (real runtime: domain B, saga, quota+metrics, REAL MinIO/MongoDB/Postgres/Kafka + KNATIVE functions) |
+| control-plane | Deployment | `in-falcone-control-plane:0.6.2` (real runtime: domain B, saga, quota+metrics, REAL SeaweedFS/MongoDB-wire/Postgres/Kafka + KNATIVE functions) |
 | web-console | Deployment | `in-falcone-web-console:0.2.11` (real SPA: ALL console pages backed by real services) |
-| openwhisk | Deployment | local stub (see deferrals) |
+| functions (Knative Serving + Kourier) | cluster-wide (v1.22.1) | per-function ksvc on `fn-runtime` (see Functions section) |
 | registry (helper) | Deployment | `registry:2` — in-cluster image registry on NodePort 30500 |
 
 ## LAN access
@@ -302,7 +303,7 @@ the services from any LAN device at `http://192.168.1.132:<port>`:
 | API gateway (APISIX) | http://192.168.1.132:31908 |
 | Keycloak | http://192.168.1.132:31808 |
 | Control-plane (stub) | http://192.168.1.132:31818 |
-| MinIO console | http://192.168.1.132:31901 |
+| SeaweedFS filer UI | http://192.168.1.132:31901 |
 | Prometheus | http://192.168.1.132:31909 |
 
 **Start / restart the forwards:**
@@ -320,7 +321,7 @@ publishes those ports (host-side `extraPortMappings` / a host-run port-forward).
 ## Credentials
 
 Generated, gitignored: `deploy/kind/credentials.env` (chmod 600). Keycloak admin,
-MinIO root, Postgres/Mongo, APISIX admin key, platform superadmin password.
+SeaweedFS S3 access/secret keys, Postgres/Mongo, APISIX admin key, platform superadmin password.
 Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
 `in-falcone-console` / `in-falcone-gateway` clients, `superadmin` user).
 
@@ -329,9 +330,11 @@ Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
 - **control-plane**: the repo ships control-plane *modules* but no HTTP server
   entrypoint (the real one is in the deployment wrapper, not this repo), so a
   clearly-labeled stub serves health/info on :8080 and 501s API routes.
-- **openwhisk**: `openwhisk/standalone` requires the host docker socket to spawn
-  action containers and exits without it; this chart profile ships no invokers.
-  Replaced with a health/info stub on :3233 so the service surface is present.
+- **functions runtime**: full Apache OpenWhisk was abandoned on this profile
+  (`openwhisk/standalone` requires the host docker socket to spawn action containers
+  and exits without it; `openwhisk-deploy-kube`'s Python2/old-ansible init images are
+  incompatible with this host kernel). Functions now run on **Knative Serving + Kourier**
+  (installed cluster-wide, each function a ksvc) — see the Functions section above.
 - **APISIX routes**: APISIX runs `APISIX_STAND_ALONE=true` (no Admin API), so
   routes are loaded from a mounted `apisix.yaml` rather than pushed at runtime.
   All 22 chart routes are wired in `deploy/kind/apisix/apisix.yaml` (ConfigMap
@@ -355,7 +358,7 @@ Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
   phase already ran successfully (state is live); its reconcile phase is
   structurally incompatible with standalone APISIX, so the hook is disabled to let
   Helm converge.
-- **images**: chart-pinned Bitnami/apisix/minio/prometheus tags were purged from
+- **images**: chart-pinned Bitnami/apisix/seaweedfs/prometheus tags were purged from
   public registries; `values-kind.yaml` repins to working equivalents.
 
 ## Chromium / Playwright (ubuntu 26.04)

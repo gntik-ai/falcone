@@ -28,7 +28,7 @@ import {
 import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
 
 function makeUnsatisfiedProfile(capabilityId) {
-  const profile = buildStorageProviderProfile({ providerType: 'minio' });
+  const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });
   profile.capabilityDetails = profile.capabilityDetails.map((entry) => (
     entry.capabilityId === capabilityId
       ? { ...entry, state: 'unsatisfied', constraints: [] }
@@ -37,9 +37,9 @@ function makeUnsatisfiedProfile(capabilityId) {
   return profile;
 }
 
-test('MinIO multipart capability exposes maxParts constraint', () => {
-  const minioProfile = buildStorageProviderProfile({ providerType: 'minio' });
-  const result = checkStorageMultipartCapability({ providerProfile: minioProfile });
+test('SeaweedFS multipart capability exposes maxParts constraint', () => {
+  const seaweedfsProfile = buildStorageProviderProfile({ providerType: 'seaweedfs' });
+  const result = checkStorageMultipartCapability({ providerProfile: seaweedfsProfile });
   assert.equal(result.allowed, true);
   assert.equal(result.constraints.some((constraint) => constraint.key === 'maxParts' && constraint.value === 10000), true);
 });
@@ -50,9 +50,9 @@ test('Garage multipart capability is allowed', () => {
   assert.equal(result.allowed, true);
 });
 
-test('MinIO presigned capability is allowed', () => {
-  const minioProfile = buildStorageProviderProfile({ providerType: 'minio' });
-  const result = checkStoragePresignedUrlCapability({ providerProfile: minioProfile });
+test('SeaweedFS presigned capability is allowed', () => {
+  const seaweedfsProfile = buildStorageProviderProfile({ providerType: 'seaweedfs' });
+  const result = checkStoragePresignedUrlCapability({ providerProfile: seaweedfsProfile });
   assert.equal(result.allowed, true);
 });
 
