@@ -123,6 +123,10 @@ export const routes = [
   { method: 'GET',  path: '/v1/storage/workspaces/{workspaceId}/usage', localHandler: 'storageWorkspaceUsage', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/storage/buckets/{bucketId}/objects', localHandler: 'storageListObjects', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/metadata', localHandler: 'storageObjectMetadata', auth: 'authenticated' },
+  // Object I/O — upload/download/delete a single object (#500: previously NO_ROUTE).
+  { method: 'PUT',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storagePutObject', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storageGetObject', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storageDeleteObject', auth: 'authenticated' },
 
   // ---- domain B: Functions (REAL execution via ephemeral k8s Jobs) ----------
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/inventory', localHandler: 'fnInventory', auth: 'authenticated' },
