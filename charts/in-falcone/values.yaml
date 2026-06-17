@@ -2597,6 +2597,18 @@ seaweedfsS3Creds:
   # Identity name advertised inside the SeaweedFS identities JSON.
   identityName: falcone-s3-admin
 
+grafana:
+  # Grafana for Falcone dashboards (#499). Provisioned with a Prometheus datasource (the
+  # observability service) + the Falcone dashboards in templates/grafana.yaml.
+  enabled: true
+  image:
+    repository: docker.io/grafana/grafana
+    tag: 11.4.0
+    pullPolicy: IfNotPresent
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
 observability:
   enabled: true
   wrapper:
@@ -2608,6 +2620,13 @@ observability:
     tag: 3.2.1
     pullPolicy: IfNotPresent
   replicas: 1
+  # Run Prometheus against the real scrape config mounted below (#499) — without an explicit
+  # --config.file it falls back to the default config and scrapes only itself.
+  args:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=15d
+    - --web.enable-lifecycle
   serviceAccount:
     create: true
     name: ""
@@ -2658,8 +2677,17 @@ observability:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-  extraVolumes: []
-  extraVolumeMounts: []
+  # Mount the real prometheus.yml (templates/observability-prometheus-config.yaml) at
+  # /etc/prometheus so --config.file (above) finds it; without this Prometheus scrapes only itself
+  # (#499). ConfigMap name = <release>-prometheus-config (e.g. falcone-prometheus-config).
+  extraVolumes:
+    - name: prometheus-config
+      configMap:
+        name: falcone-prometheus-config
+  extraVolumeMounts:
+    - name: prometheus-config
+      mountPath: /etc/prometheus
+      readOnly: true
   config:
     inline:
       scrapeModel: platform-wide
