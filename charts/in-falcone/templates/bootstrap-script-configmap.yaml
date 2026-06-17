@@ -281,6 +281,45 @@ data:
       log "ensured Keycloak client $client_id"
     }
 
+    # Idempotently assign standard Keycloak default client scopes (e.g. roles/basic/profile) to a
+    # client (finding A2). create-only ensure_keycloak_client never UPDATES an existing client, so
+    # on an upgrade of a deployment whose console/gateway clients were created without these scopes
+    # — issued tokens then carried no realm_access.roles and every role check 403'd — this back-fills
+    # them via the REST API. Idempotent: a PUT of an already-assigned scope is a no-op. Built-in
+    # scopes are auto-created with the realm, so they resolve here.
+    ensure_client_default_scopes() {
+      local token="$1" client_id="$2"
+      shift 2
+      local clients_json scopes_json client_uuid scope_id status
+      clients_json="$(curl -fsS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/clients?clientId=$client_id")"
+      client_uuid="$(printf '%s' "$clients_json" | sed -n 's/.*"id":"\([^"]*\)","clientId":"'$client_id'".*/\1/p' | head -1)"
+      if [ -z "$client_uuid" ]; then
+        echo "[bootstrap] cannot resolve client $client_id to assign default scopes" >&2
+        exit 1
+      fi
+      scopes_json="$(curl -fsS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/client-scopes")"
+      for scope_name in "$@"; do
+        # Keycloak serializes a client-scope as "id":"<uuid>","name":"<scope>"; the exact-name
+        # match avoids colliding with nested protocol-mapper names.
+        scope_id="$(printf '%s' "$scopes_json" | grep -oE '"id":"[^"]*","name":"'"$scope_name"'"' | sed -n 's/"id":"\([^"]*\)".*/\1/p' | head -1)"
+        if [ -z "$scope_id" ]; then
+          echo "[bootstrap] default client scope '$scope_name' not present in realm; skipping" >&2
+          continue
+        fi
+        status="$(curl -sS -o /dev/null -w '%{http_code}' \
+          -X PUT \
+          -H "Authorization: Bearer $token" \
+          "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/clients/$client_uuid/default-client-scopes/$scope_id")"
+        if [ "$status" != "204" ] && [ "$status" != "200" ]; then
+          echo "[bootstrap] failed to assign default scope '$scope_name' to $client_id; status=$status" >&2
+          exit 1
+        fi
+        log "ensured default client scope '$scope_name' on $client_id"
+      done
+    }
+
     lookup_keycloak_user_id() {
       local token="$1"
       local response
@@ -419,10 +458,24 @@ data:
         ensure_keycloak_client "$token" "$client_id" "$client_file"
       done
 
+      # Back-fill the standard default client scopes on the platform clients so issued tokens carry
+      # realm_access.roles (finding A2) — required on upgrades since client creation is create-only.
+{{- range .Values.bootstrap.oneShot.keycloak.clients }}
+      ensure_client_default_scopes "$token" "{{ .clientId }}" roles basic profile
+{{- end }}
+
       ensure_keycloak_superadmin "$token"
     }
 
     run_upgrade_reconciliation() {
+{{- if eq (toString (dig "config" "inline" "APISIX_STAND_ALONE" "false" .Values.apisix)) "true" }}
+      # APISIX runs in standalone mode (APISIX_STAND_ALONE=true, the chart default): routes are
+      # served from the mounted standalone config (apisix.yaml), and the admin API targeted below
+      # is unavailable. Issuing PUT /apisix/admin/routes there fails and aborts the Job, leaving
+      # the platform realm / clients / superadmin unprovisioned (finding D2). Skip the admin-API
+      # reconciliation entirely in standalone mode — emit zero admin-API calls.
+      log "APISIX_STAND_ALONE=true; skipping APISIX admin-API route reconciliation (standalone serves routes from mounted config)"
+{{- else }}
 {{- $mode := .Values.gatewayPolicy.passthrough.mode }}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
 {{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled. */ -}}
@@ -430,6 +483,43 @@ data:
       ensure_apisix_route "{{ .routeId }}" "$PAYLOAD_DIR/route-{{ .routeId }}.json"
 {{- end }}
 {{- end }}
+{{- end }}
+    }
+
+    # Final smoke check (finding D2): confirm the auth layer the create-only phase is responsible
+    # for is actually present in Keycloak before the Job reports success, so a broken bootstrap can
+    # never exit 0 with the realm/clients/superadmin missing. Reuses the same admin-API query
+    # idioms as the create-only functions; hits Keycloak directly (not via APISIX).
+    verify_auth_layer() {
+      local token missing=0
+      token="$(require_keycloak_token)"
+
+      if [ "$(curl -sS -o /dev/null -w '%{http_code}' \
+        -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID")" != "200" ]; then
+        echo "[bootstrap] verify: platform realm $KEYCLOAK_REALM_ID is absent" >&2
+        missing=1
+      fi
+{{- range .Values.bootstrap.oneShot.keycloak.clients }}
+      if ! curl -sS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/clients?clientId={{ .clientId }}" \
+        | grep -q '"clientId":"{{ .clientId }}"'; then
+        echo "[bootstrap] verify: Keycloak client {{ .clientId }} is absent" >&2
+        missing=1
+      fi
+{{- end }}
+      if ! curl -sS -H "Authorization: Bearer $token" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/users?username=$KEYCLOAK_SUPERADMIN_USERNAME&exact=true" \
+        | grep -q '"username":"'$KEYCLOAK_SUPERADMIN_USERNAME'"'; then
+        echo "[bootstrap] verify: superadmin $KEYCLOAK_SUPERADMIN_USERNAME is absent" >&2
+        missing=1
+      fi
+
+      if [ "$missing" != "0" ]; then
+        echo "[bootstrap] auth-layer verification failed; refusing to report success" >&2
+        exit 1
+      fi
+      log "verified auth layer: platform realm, Keycloak clients, and superadmin are present"
     }
 
     main() {
@@ -450,6 +540,7 @@ data:
 
       log "running upgrade reconciliation phase"
       run_upgrade_reconciliation
+      verify_auth_layer
       write_marker
       log "bootstrap completed successfully"
     }

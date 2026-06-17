@@ -99,7 +99,10 @@ controlPlane:
     # wire-protocol. The gateway passes the DocumentDB Postgres credentials to the engine.
     - { name: MONGO_HOST, value: "falcone-ferretdb:27017" }
     - { name: MONGO_BACKEND, value: ferretdb }
-    - { name: MONGO_USER, value: falcone }
+    # FerretDB v2 delegates auth to Postgres: MONGO_USER must be the documentdb admin role,
+    # sourced from the same secret as the password (not a hardcoded `falcone`, which mismatched
+    # the admin role and failed the handshake — finding F2).
+    - { name: MONGO_USER, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_USER } } }
     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
     - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
     # Functions: the executor reads this to template each function's Knative Service.
