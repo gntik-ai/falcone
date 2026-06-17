@@ -2125,8 +2125,13 @@ ferretdb:
           done
           echo "documentdb_api present — gateway may start."
       env:
+        # Resolve the DocumentDB service host from the Helm release name so an install
+        # with any release name converges (was hardcoded `in-falcone-documentdb`, which
+        # deadlocked this init container for releases named other than `in-falcone`).
+        # Rendered via tpl by the component-wrapper workload template, mirroring how the
+        # documentdb-init-job derives the service via in-falcone.componentServiceNameByAlias.
         - name: PGHOST
-          value: in-falcone-documentdb
+          value: "{{ .Release.Name }}-documentdb"
         - name: PGPORT
           value: "5432"
         # The documentdb extension + documentdb_api schema live in the `postgres`
