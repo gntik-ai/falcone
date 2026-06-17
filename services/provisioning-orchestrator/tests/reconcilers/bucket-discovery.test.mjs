@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  discoverMinIOBuckets,
+  discoverS3Buckets,
   mergeDiscoveredBuckets,
   insertMissingWorkspaceBucketRows,
 } from '../../src/reconcilers/bucket-discovery.mjs';
@@ -12,17 +12,17 @@ const rows = [
   { workspace_id: 'w2', tenant_id: 't2', bucket_name: 'ws-w2-assets', region: 'us-east-1' },
 ];
 
-describe('discoverMinIOBuckets', () => {
+describe('discoverS3Buckets', () => {
   it('normalizes the AWS-SDK ListBuckets shape', async () => {
     const client = { listBuckets: async () => ({ Buckets: [{ Name: 'a' }, { Name: 'b' }] }) };
-    assert.deepEqual(await discoverMinIOBuckets(client), ['a', 'b']);
+    assert.deepEqual(await discoverS3Buckets(client), ['a', 'b']);
   });
   it('accepts a plain array of names', async () => {
     const client = { listBuckets: async () => ['x', 'y'] };
-    assert.deepEqual(await discoverMinIOBuckets(client), ['x', 'y']);
+    assert.deepEqual(await discoverS3Buckets(client), ['x', 'y']);
   });
   it('throws without a listBuckets-capable client', async () => {
-    await assert.rejects(() => discoverMinIOBuckets({}), /listBuckets/);
+    await assert.rejects(() => discoverS3Buckets({}), /listBuckets/);
   });
 });
 

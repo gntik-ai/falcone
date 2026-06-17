@@ -23,7 +23,7 @@ import {
   enforceIsolationPolicies,
 } from '../reconcilers/bucket-reconciler.mjs';
 import {
-  discoverMinIOBuckets,
+  discoverS3Buckets,
   mergeDiscoveredBuckets,
   insertMissingWorkspaceBucketRows,
 } from '../reconcilers/bucket-discovery.mjs';
@@ -115,7 +115,7 @@ export async function runReconcileBuckets(opts = {}) {
   // 2. Discovery + backfill (only when a source client is provided).
   let discovery = null;
   if (sourceClient) {
-    const discovered = await discoverMinIOBuckets(sourceClient);
+    const discovered = await discoverS3Buckets(sourceClient);
     const merged = mergeDiscoveredBuckets(discovered, rows);
     let backfill = { inserted: [], skipped: [] };
     if (associate) {

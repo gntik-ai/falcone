@@ -18,7 +18,7 @@ Vault  ──(External Secrets Operator)──▶  Kubernetes Secret  ──(sec
 config:
   secretRefs:
     postgresCredentials:    { existingSecret: in-falcone-postgresql, keys: [username, password, database] }
-    mongoCredentials:       { existingSecret: in-falcone-mongodb,    keys: [username, password, database] }
+    mongoCredentials:       { existingSecret: in-falcone-documentdb, keys: [username, password, database] }
     kafkaCredentials:       { existingSecret: in-falcone-kafka,      keys: [username, password] }
     objectStorageCredentials:{ existingSecret: in-falcone-storage,   keys: [access-key, secret-key] }
     identityClient:         { existingSecret: in-falcone-identity-client, keys: [client-id, client-secret] }

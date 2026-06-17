@@ -18,17 +18,16 @@ import {
 import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
 
 function makeSupportedProfile() {
-  const profile = buildStorageProviderProfile({ providerType: 'minio' });
-  profile.capabilityDetails = [
-    ...profile.capabilityDetails,
-    {
-      capabilityId: storageEventNotificationCapabilityId,
-      required: false,
-      state: 'satisfied',
-      summary: 'Storage event notifications are supported.',
-      constraints: []
-    }
-  ];
+  const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });
+  profile.capabilityDetails = profile.capabilityDetails.map((entry) => entry.capabilityId === storageEventNotificationCapabilityId
+    ? {
+        ...entry,
+        required: false,
+        state: 'satisfied',
+        summary: 'Storage event notifications are supported.',
+        constraints: []
+      }
+    : entry);
   return profile;
 }
 

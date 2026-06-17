@@ -26,7 +26,7 @@ function buildTenantContext() {
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },

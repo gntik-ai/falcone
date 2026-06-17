@@ -173,7 +173,7 @@ remain Preview under the not-production-ready posture above:
 | **PostgreSQL** | Tenant-scoped data API plus admin/governance, change-data-capture, metrics and audit. Isolation by row-level security (`app.tenant_id` / `app.workspace_id`) and per-tenant schemas. |
 | **Document store (FerretDB + DocumentDB)** | Per-tenant/workspace document data API, admin, realtime/CDC (Postgres logical replication), metrics and audit. MongoDB-wire-compatible; replaces MongoDB (ADR-14). |
 | **Object storage** | S3-compatible buckets, multipart uploads, presigned URLs, access policies, event notifications and per-tenant capacity quotas. |
-| **Events (Kafka)** | Topic management and tenant-scoped CDC change streams (`<prefix>.<tenant>.<workspace>`), plus system audit/quota/lifecycle topics. |
+| **Events (Kafka)** | Topic management and tenant-scoped CDC streams (`<prefix>.<tenant>.<workspace>`) fed by PostgreSQL logical replication, plus system audit/quota/lifecycle topics. |
 | **Realtime** | WebSocket subscriptions (`/v1/websockets`) with Bearer-JWT auth, scope-to-channel enforcement and per-session tenant isolation. |
 | **Functions** | Serverless functions with versions, activations, invocations, rollback and cron / Kafka / storage triggers. |
 | **Webhooks** | Signed, retried webhook delivery with SSRF guarding (private, loopback, link-local and ULA ranges blocked, re-checked at delivery time). |

@@ -233,36 +233,6 @@ const STANDARD_EVENT_NOTIFICATION_CONSTRAINTS = Object.freeze([
 ]);
 
 const STORAGE_PROVIDER_DEFINITIONS = Object.freeze({
-  minio: buildProviderDefinition({
-    providerType: 'minio',
-    displayName: 'MinIO',
-    backendFamily: 's3-compatible',
-    selectionKeys: ['minio'],
-    configuredVia: 'storage.config.inline.providerType',
-    defaultRegion: 'us-east-1',
-    capabilityEntries: {
-      'bucket.create': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Creates workspace buckets.' },
-      'bucket.delete': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Deletes eligible buckets.' },
-      'bucket.list': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Lists scoped buckets.' },
-      'object.put': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Stores objects.', constraints: STANDARD_OBJECT_CONSTRAINTS },
-      'object.get': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Downloads object content.' },
-      'object.delete': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Deletes scoped objects.' },
-      'object.list': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Lists bucket objects.' },
-      'object.metadata.get': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Fetches HEAD-style object metadata.' },
-      'object.content_type.preserve': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Preserves content type metadata on write and read.' },
-      'object.integrity.etag_or_checksum': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Returns an ETag or checksum on upload responses.' },
-      'object.list.pagination.deterministic': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Provides deterministic object listing pagination.', constraints: STANDARD_PAGINATION_CONSTRAINTS },
-      'object.conditional.if_match': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports If-Match conditional requests.', constraints: STANDARD_CONDITIONAL_CONSTRAINTS },
-      'object.conditional.if_none_match': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports If-None-Match conditional requests.', constraints: STANDARD_IF_NONE_MATCH_CONSTRAINTS },
-      'bucket.presigned_urls': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports presigned URL flows for future storage increments.' },
-      'object.multipart_upload': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports multipart upload flows.', constraints: [buildCapabilityConstraint({ key: 'maxParts', operator: '<=', value: 10000 })] },
-      'object.versioning': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports object versioning.' },
-      'bucket.policy': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports declarative bucket policy exposure through the common platform surface.', constraints: STANDARD_BUCKET_POLICY_CONSTRAINTS },
-      'bucket.lifecycle': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports bucket lifecycle policy exposure for governed retention workflows.', constraints: STANDARD_BUCKET_LIFECYCLE_CONSTRAINTS },
-      'object.lock': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports object lock and immutability controls when versioning is enabled.', constraints: STANDARD_OBJECT_LOCK_CONSTRAINTS },
-      'bucket.event_notifications': { state: STORAGE_PROVIDER_CAPABILITY_ENTRY_STATES.SATISFIED, summary: 'Supports governed storage event notification integrations.', constraints: STANDARD_EVENT_NOTIFICATION_CONSTRAINTS }
-    }
-  }),
   'ceph-rgw': buildProviderDefinition({
     providerType: 'ceph-rgw',
     displayName: 'Ceph RGW',
