@@ -7,7 +7,7 @@
 // the environment so no secrets are baked into the image.
 import pg from 'pg';
 import { createConnectionRegistry } from './connection-registry.mjs';
-import { createWorkspaceDsnResolver } from './workspace-dsn-resolver.mjs';
+import { createWorkspaceDsnResolver, createWorkspaceTenantResolver } from './workspace-dsn-resolver.mjs';
 import { createControlPlaneServer } from './server.mjs';
 import { createApiKeyStore } from './api-keys.mjs';
 import { createMongoExecutor } from './mongo-data-executor.mjs';
@@ -66,6 +66,11 @@ const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, 
 // no database yet. See workspace-dsn-resolver.mjs for the rationale (credential/role topology).
 const resolveConnection = createWorkspaceDsnResolver({ pool: keyPool, baseDsn: dsn });
 const registry = createConnectionRegistry({ resolveConnection });
+
+// Workspace → owning-tenant resolver (fix-executor-apikey-cross-tenant-idor, #517): lets the
+// request dispatch reject cross-tenant access to a workspace (e.g. minting an api-key in another
+// tenant's workspace). Reads workspace_databases.tenant_id on the same metadata pool.
+const resolveWorkspaceTenant = createWorkspaceTenantResolver({ pool: keyPool });
 
 // Postgres realtime executor (trigger + LISTEN/NOTIFY; needs a connection that can create
 // the capture trigger — the executor's role is a superuser in the data plane).
@@ -305,6 +310,7 @@ const mcpEngine = process.env.MCP_ENABLED === 'true'
 // unauthenticated client-supplied identity headers are rejected with 401.
 const server = createControlPlaneServer({
   registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
+  resolveWorkspaceTenant,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
   gatewaySharedSecret: process.env.GATEWAY_SHARED_SECRET || undefined,
 });
