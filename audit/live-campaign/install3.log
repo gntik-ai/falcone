@@ -1,0 +1,150 @@
+== 1/5 helm uninstall ==
+These resources were kept due to the resource policy:
+[Secret] in-falcone-seaweedfs-s3-creds
+[Secret] in-falcone-seaweedfs-s3-config
+
+release "falcone" uninstalled
+== 2/5 delete namespace falcone (waits for full removal) ==
+namespace "falcone" deleted
+== 3/5 delete cluster-scoped objects the chart created ==
+== 4/5 delete vault auxiliary namespaces ==
+== 5/5 poll until namespace falcone is fully gone ==
+namespace falcone is gone.
+
+== final state ==
+-- namespaces (falcone/secret-store/eso-system should be absent) --
+  (none present — OK)
+-- residual chart cluster-roles (should be none) --
+clusterrolebinding.rbac.authorization.k8s.io/vault-vault-kubernetes-auth-clients                             ClusterRole/system:auth-delegator                                                  16d
+-- residual helm release secrets (should be none) --
+  (none present — OK)
+
+Teardown complete.
+### Falcone from-scratch install (tag campaign-20260617) into namespace falcone ###
+== (a) namespace ==
+namespace/falcone created
+== (a2) registry + image re-push ==
+persistentvolumeclaim/registry-data created
+deployment.apps/registry created
+service/registry created
+Waiting for deployment "registry" rollout to finish: 0 of 1 updated replicas are available...
+deployment "registry" successfully rolled out
+[14:57:55] port-forward svc/registry 5000:5000
+registry /v2/ -> 200
+[14:57:59] push in-falcone-control-plane:campaign-20260617
+[14:58:00]   OK in-falcone-control-plane
+[14:58:00] push in-falcone-control-plane-executor:campaign-20260617
+[14:58:01]   OK in-falcone-control-plane-executor
+[14:58:01] push in-falcone-fn-runtime:campaign-20260617
+[14:58:01]   OK in-falcone-fn-runtime
+[14:58:01] push in-falcone-web-console:campaign-20260617
+[14:58:02]   OK in-falcone-web-console
+[14:58:02] verify tags present in registry:
+{"name":"in-falcone-control-plane","tags":["campaign-20260617"]}
+
+{"name":"in-falcone-control-plane-executor","tags":["campaign-20260617"]}
+
+{"name":"in-falcone-fn-runtime","tags":["campaign-20260617"]}
+
+{"name":"in-falcone-web-console","tags":["campaign-20260617"]}
+
+[14:58:02] DONE rc=0
+== (a3) apisix standalone ConfigMap ==
+configmap/falcone-apisix-standalone created
+== (b) secrets ==
+Authoring Falcone platform secrets in namespace falcone ...
+secret/in-falcone-postgresql created
+  secret/in-falcone-postgresql
+secret/in-falcone-documentdb created
+  secret/in-falcone-documentdb
+secret/in-falcone-ferretdb created
+  secret/in-falcone-ferretdb
+secret/in-falcone-documentdb-replication created
+  secret/in-falcone-documentdb-replication
+secret/in-falcone-kafka created
+  secret/in-falcone-kafka
+secret/in-falcone-storage created
+  secret/in-falcone-storage
+secret/in-falcone-keycloak-admin created
+  secret/in-falcone-keycloak-admin
+secret/in-falcone-identity-client created
+  secret/in-falcone-identity-client
+secret/in-falcone-superadmin created
+  secret/in-falcone-superadmin
+secret/in-falcone-apisix-admin created
+  secret/in-falcone-apisix-admin
+secret/in-falcone-seaweedfs-s3-creds created
+  secret/in-falcone-seaweedfs-s3-creds (helm-adopted)
+secret/in-falcone-dev-api-tls created
+  secret/in-falcone-dev-api-tls (tls)
+secret/in-falcone-dev-console-tls created
+  secret/in-falcone-dev-console-tls (tls)
+secret/in-falcone-dev-identity-tls created
+  secret/in-falcone-dev-identity-tls (tls)
+secret/in-falcone-dev-realtime-tls created
+  secret/in-falcone-dev-realtime-tls (tls)
+
+Done. Created/updated secrets:
+  Opaque: in-falcone-postgresql in-falcone-documentdb in-falcone-ferretdb
+          in-falcone-documentdb-replication in-falcone-kafka in-falcone-storage
+          in-falcone-keycloak-admin in-falcone-identity-client in-falcone-superadmin
+          in-falcone-apisix-admin in-falcone-seaweedfs-s3-creds
+  TLS:    in-falcone-dev-api-tls in-falcone-dev-console-tls
+          in-falcone-dev-identity-tls in-falcone-dev-realtime-tls
+(in-falcone-seaweedfs-s3-config is derived by the chart from the pinned creds)
+== (c) helm dependency build ==
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "seaweedfs" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Saving 14 charts
+Downloading seaweedfs from repo https://seaweedfs.github.io/seaweedfs/helm
+Deleting outdated charts
+== (d) helm install (phase 1: datastores + hooks, bootstrap OFF) ==
+Release "falcone" does not exist. Installing it now.
+NAME: falcone
+LAST DEPLOYED: Wed Jun 17 14:58:05 2026
+NAMESPACE: falcone
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE: None
+NOTES:
+In Falcone umbrella chart
+=========================
+
+Environment: dev
+Namespace: falcone
+Deployment profile: standard
+Exposure kind: Ingress
+TLS mode: clusterManaged
+
+Recommended values layering order:
+1. values.yaml
+2. values/dev.yaml
+3. values/customer-reference.yaml
+4. values/platform-kubernetes.yaml
+5. values/airgap.yaml
+6. values/local.example.yaml
+
+Public endpoints:
+- API: https://api.dev.in-falcone.example.com/control-plane
+- Identity: https://iam.dev.in-falcone.example.com/auth
+- Realtime: https://realtime.dev.in-falcone.example.com/realtime
+- Console: https://console.dev.in-falcone.example.com/
+
+Bootstrap:
+- Hook job: falcone-in-falcone-bootstrap
+- Lock ConfigMap: in-falcone-bootstrap-lock
+- Marker ConfigMap: in-falcone-bootstrap-state
+== (d2) wait for core workloads Ready ==
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+deployment "falcone-keycloak" successfully rolled out
+deployment "falcone-control-plane" successfully rolled out
+Waiting for deployment "falcone-apisix" rollout to finish: 0 of 2 updated replicas are available...
+error: timed out waiting for the condition
+deployment "falcone-ferretdb" successfully rolled out
+== (e) helm upgrade (phase 2: bootstrap ON -> provision Keycloak realm) ==
+level=WARN msg="upgrade failed" name=falcone error="post-upgrade hooks failed: resource Job/falcone/falcone-in-falcone-bootstrap not ready. status: Failed, message: Job Failed. failed: 1/1"
+Error: UPGRADE FAILED: post-upgrade hooks failed: resource Job/falcone/falcone-in-falcone-bootstrap not ready. status: Failed, message: Job Failed. failed: 1/1
