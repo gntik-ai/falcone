@@ -423,6 +423,13 @@ bootstrap:
           standardFlowEnabled: false
           directAccessGrantsEnabled: false
           defaultClientScopes:
+            # Standard Keycloak default scopes (auto-created with the realm). Explicitly listing
+            # ONLY the custom context scopes overrode these, so issued tokens carried no
+            # realm_access.roles and every role check 403'd, incl. superadmin (finding A2). `roles`
+            # injects realm_access.roles; `basic` injects sub/auth_time; `profile` the user claims.
+            - roles
+            - basic
+            - profile
             - tenant-context
             - workspace-context
             - plan-context
@@ -447,6 +454,12 @@ bootstrap:
             - https://console.staging.in-falcone.example.com
             - https://console.in-falcone.example.com
           defaultClientScopes:
+            # Standard Keycloak default scopes (see in-falcone-gateway above): without `roles` the
+            # console's tokens carry no realm_access.roles, so superadmin authorization 403'd until
+            # the scope was added manually (finding A2).
+            - roles
+            - basic
+            - profile
             - tenant-context
             - workspace-context
             - plan-context
