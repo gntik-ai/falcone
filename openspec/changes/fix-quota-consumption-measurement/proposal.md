@@ -8,8 +8,9 @@ Tracking issue: gntik-ai/falcone#497
 
 ## What Changes
 
-- Implement the missing consumption query mappings so each plan dimension is measured against real resource counts (likely tied to the shared-DB wiring in A3).
-- Ensure soft/hard limits enforce once consumption reflects real usage.
+- Root cause (verified against the live `in_falcone` schema): the consumption resolvers queried tables that do not exist there (`pg_databases`/`functions`/`kafka_topics`/`storage_objects`/`api_call_logs`/`workspace_members`) and omitted half the `quota_dimension_catalog` keys — so every dimension returned `NO_QUERY_MAPPING` or `CONSUMPTION_QUERY_FAILED`. Map each catalog dimension to the real live table (`workspace_databases` split by `engine` for pg/mongo, `workspace_functions`, `workspace_topics`, `workspace_api_keys`, `workspaces`), decoupling the live table name from the integration suite's in-memory keys so both paths work.
+- `max_storage_bytes` (object store) and `max_workspace_members` (Keycloak) have no control-plane data source, so they measure 0 instead of erroring — real metering of those is deferred to observability (#499) / IAM.
+- With consumption now real for the countable dimensions, soft/hard limits can enforce against actual usage.
 
 ## Capabilities
 
