@@ -1,6 +1,6 @@
 # tenant-rbac — spec delta for fix-platform-client-default-scopes
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Platform Keycloak clients include standard default scopes
 
