@@ -58,6 +58,25 @@ export const kcAdmin = {
       resetPasswordAllowed: true, verifyEmail: false,
       attributes: { 'in-falcone.realm-type': 'tenant', 'in-falcone.control-plane.platform-realm': 'in-falcone-platform' }
     });
+    // Keycloak 26's declarative user profile requires email/firstName/lastName for role "user",
+    // so a tenant principal provisioned without them fails Direct Access Grant with
+    // invalid_grant "Account is not fully set up" — even with requiredActions:[] (#496). Relax
+    // those to optional so any provisioned user can authenticate (the platform realm gets the
+    // same treatment from the chart bootstrap's ensure_keycloak_user_profile).
+    await this.relaxUserProfile(realm);
+  },
+  // Make email/firstName/lastName optional in the realm's KC26 user profile. Idempotent (PUT).
+  async relaxUserProfile(realm) {
+    const prof = (await kc('GET', `/realms/${encodeURIComponent(realm)}/users/profile`)).json;
+    if (!prof || !Array.isArray(prof.attributes)) return;
+    let changed = false;
+    for (const attr of prof.attributes) {
+      if (['email', 'firstName', 'lastName'].includes(attr.name) && attr.required) {
+        delete attr.required;
+        changed = true;
+      }
+    }
+    if (changed) await kc('PUT', `/realms/${encodeURIComponent(realm)}/users/profile`, prof);
   },
   async deleteRealm(realm) { try { await kc('DELETE', `/realms/${encodeURIComponent(realm)}`); } catch (e) { if (e.kcStatus !== 404) throw e; } },
   async createRealmRole(realm, name) {
