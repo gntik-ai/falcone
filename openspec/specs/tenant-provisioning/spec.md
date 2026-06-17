@@ -181,3 +181,56 @@ reconciliation steps and MUST NOT emit any HTTP calls to the APISIX admin API.
 - **THEN** a superadmin login attempt (`POST /v1/auth/login-sessions`) MUST return 201
   with a `tokenSet` containing valid `realm_access.roles`
 
+### Requirement: helm install --wait converges without deadlock
+
+The FerretDB gateway SHALL be self-sufficient for the documentdb_api schema it depends
+on — its init container SHALL create the `documentdb` extension itself (idempotently,
+failing closed if the engine image lacks it) rather than only waiting for a post-install
+hook — so that `helm install --wait` on a fresh cluster converges to Ready within the
+standard Helm timeout with no circular dependency between main resources and hooks.
+
+#### Scenario: helm install --wait completes on a fresh kind cluster
+
+- **WHEN** `helm install --wait` is executed on a fresh kind cluster
+- **THEN** all main resources (including FerretDB) MUST reach Ready state and the
+  install MUST complete without a `Progress deadline exceeded` timeout
+
+#### Scenario: the gateway creates its own schema dependency
+
+- **WHEN** the FerretDB gateway pod starts
+- **THEN** its init container MUST run `CREATE EXTENSION IF NOT EXISTS documentdb` against
+  the engine and verify the `documentdb_api` schema before the gateway container starts,
+  and MUST NOT depend on the post-install hook Job for that critical-path schema
+
+### Requirement: At least one app secret resolves from Vault when Vault is enabled
+
+The system SHALL wire at least one application secret through Vault (via ESO or
+equivalent) so that enabling Vault provides a real end-to-end secrets resolution path.
+
+#### Scenario: App secret resolves from Vault
+
+- **WHEN** Vault is enabled and a configured secret is stored in Vault
+- **THEN** the consuming application MUST receive the secret value from Vault and
+  MUST NOT fall back to a plain Kubernetes Secret for that value
+
+### Requirement: Deployed release contains no legacy migration-era components
+
+A deployment from current chart source SHALL contain no MongoDB, MinIO (legacy), or
+OpenWhisk workloads, container images, or host env values, and the control-plane and
+executor SHALL reference FerretDB (documentdb) and SeaweedFS respectively. The chart
+SHALL fail closed (render error) if a legacy `mongodb`, `minio`, or `openwhisk` values
+stanza is reintroduced.
+
+#### Scenario: No legacy workloads present after deploy from current chart
+
+- **WHEN** the chart is rendered from current source HEAD
+- **THEN** no rendered workload/Service/Job MUST be named for `mongodb`, `minio`, or
+  `openwhisk`, no container image MUST reference them, and no env value MUST pin a
+  legacy host; the data-plane env MUST reference the documentdb (FerretDB) engine and
+  SeaweedFS
+
+#### Scenario: Guard fails if a legacy stanza is reintroduced
+
+- **WHEN** the chart is rendered with a `mongodb`, `minio`, or `openwhisk` values stanza set
+- **THEN** the render MUST exit non-zero with an error naming the offending legacy component
+

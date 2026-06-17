@@ -48,6 +48,14 @@ async function tenantLimits(ctx, tenantId) {
     const mod = await import(ENTITLEMENTS);
     const res = await mod.main({ tenantId, include: 'consumption', callerContext: ctx.callerContext }, { db: client });
     return res?.body?.quantitativeLimits ?? [];
+  } catch {
+    // finding F4: the metrics route already authorizes the caller (auth + tenant-scoping; a
+    // foreign tenant is denied 403 at the route layer). The inner entitlements action enforces a
+    // STRICTER actor-type allow-list, so an authorized same-tenant non-owner (e.g. tenant_admin)
+    // tripped FORBIDDEN, and a missing quota relation tripped 42P01 — either bubbled to a 500.
+    // Degrade gracefully to an empty (healthy) posture, exactly like workspaceLimits, so the
+    // Quotas page renders instead of erroring; real limits surface when resolvable.
+    return [];
   } finally {
     client.release();
   }
