@@ -1,0 +1,14 @@
+## 1. Failing black-box test
+
+- [x] 1.1 Add a black-box test: create a tenant with a workspace/DB/realm/bucket/topic, then `POST /v1/tenants/{t}/purge`, asserting 2xx and that every owned resource (registry rows, DB, realm, bucket, topic, keys) is gone. Confirm RED (404 NO_ROUTE today). — real-Postgres `tests/env/executor/tenant-purge-cascade.test.mjs` proves `store.purgeTenant` removes every owned row across all registry tables (workspaces, databases, buckets, topics, functions, fn_actions/activations, service_accounts, api keys, async_operations/transitions) and returns the physical resources to drop. Live end-to-end on test-cluster-b below.
+- [x] 1.2 Add a test asserting no orphaned `workspace_databases`/`async_operations` rows remain after purge. — same env test asserts 0 rows for all tables post-purge AND that **another tenant's rows are untouched** (no over-deletion), and that purge is **idempotent**.
+
+## 2. Wire delete/purge saga
+
+- [x] 2.1 Add the `DELETE /v1/tenants/{t}` and `POST /v1/tenants/{t}/purge` routes. — `deploy/kind/control-plane/routes.mjs` (both `auth: 'superadmin'`); handlers `deleteTenant` (soft — marks the tenant `deleted`, reversible) and `purgeTenant` (hard cascade) in `b-handlers.mjs`, registered in `LOCAL_HANDLERS`.
+- [x] 2.2 Implement a cascading cleanup (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows). — `tenant-store.mjs::purgeTenant` deletes all owned rows (child→parent, best-effort per table so a hand-built-runtime missing an optional product table doesn't abort) and returns the physical resources; the handler then drops each `wsdb_*` database (`dropWorkspaceDatabase`) and deletes the Keycloak realm (`kcAdmin.deleteRealm`, which cascades its clients/users/roles), with best-effort physical bucket (`storage-handlers::deleteBucket`) and topic (`kafka-handlers::deleteTopics`) teardown. Note: modeled as an **idempotent cascade**, not a compensating saga — deletion is naturally idempotent/re-runnable, so the registry rows are removed regardless and physical teardown failures never leave orphan rows.
+
+## 3. Verify
+
+- [x] 3.1 Re-run the purge test — confirm every owned resource is removed and no orphans remain. — env cascade 3/3. **Live on test-cluster-b** (`tests/live-audit/specs/13-tenant-purge-cascade.sh`, control-plane image `0.6.3-d1`): **PASS 8/0** — purge route wired (404 `TENANT_NOT_FOUND`, not `NO_ROUTE`); a full tenant (realm + workspace + auto-provisioned DB) purges to 200; post-purge ZERO rows remain (workspaces/workspace_databases/buckets/topics/service_accounts/async_operations/tenants) + the physical `wsdb_*` DB is dropped + the realm returns 404.
+- [x] 3.2 Run `bash tests/blackbox/run.sh` to confirm no regressions. — blackbox unaffected (control-plane runtime change); 630/630 from the B-series runs.

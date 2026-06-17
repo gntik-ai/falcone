@@ -110,6 +110,38 @@ test('delete is tenant-scoped', async () => {
   assert.equal(own.deleted, 1)
 })
 
+// fix-mongo-document-id-objectid-coercion (#495): a document inserted WITHOUT an explicit `_id`
+// is stored with a server/driver-generated ObjectId. The client echoes that id back as a hex
+// STRING on by-id calls; before the fix `{_id: "<hex>"}` never matched the ObjectId and every
+// by-id op silently no-op'd (get → found:false, delete → deleted:0). This proves the round-trip.
+test('by-id round-trip works for an auto-generated ObjectId (insert without _id)', async () => {
+  const ins = await exec.executeMongoData({
+    ...base({ tenantId: TEN_A, workspaceId: WS_A }),
+    operation: 'insert', payload: { document: { body: 'auto-id' } } // no _id → ObjectId generated
+  })
+  const id = String(ins.insertedId) // the hex string a client would echo back
+  assert.match(id, /^[0-9a-fA-F]{24}$/, 'auto-generated id is a 24-hex ObjectId')
+
+  const got = await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'get', documentId: id })
+  assert.equal(got.found, true, 'get-by-id resolves the stored ObjectId')
+  assert.equal(got.item.body, 'auto-id')
+
+  const upd = await exec.executeMongoData({
+    ...base({ tenantId: TEN_A, workspaceId: WS_A }),
+    operation: 'update', documentId: id, payload: { update: { $set: { body: 'auto-id-edited' } } }
+  })
+  assert.equal(upd.matched, 1, 'update-by-id matches the ObjectId doc')
+
+  // A foreign tenant cannot reach it by the same id (tenant predicate still ANDed in).
+  const cross = await exec.executeMongoData({ ...base({ tenantId: TEN_B, workspaceId: WS_B }), operation: 'get', documentId: id })
+  assert.equal(cross.found, false, 'ObjectId coercion does not widen tenant scope')
+
+  const del = await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'delete', documentId: id })
+  assert.equal(del.deleted, 1, 'delete-by-id removes the ObjectId doc')
+  const after = await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'get', documentId: id })
+  assert.equal(after.found, false, 'document is gone after delete')
+})
+
 test('list supports keyset pagination via page.after (default _id sort)', async () => {
   for (const _id of ['pg1', 'pg2', 'pg3']) {
     await exec.executeMongoData({ ...base({ tenantId: TEN_A, workspaceId: WS_A }), operation: 'insert', payload: { document: { _id, body: 'page' } } })

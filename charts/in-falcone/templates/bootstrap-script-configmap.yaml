@@ -152,6 +152,35 @@ data:
       log "ensured Keycloak realm $KEYCLOAK_REALM_DISPLAY_NAME"
     }
 
+    # Relax the realm's Keycloak 26 declarative user profile so email/firstName/lastName are
+    # OPTIONAL (fix-auth-as-a-service-login, #496). The default profile marks them required for
+    # role "user", so a user provisioned via the admin API without them fails Direct Access Grant
+    # with invalid_grant "Account is not fully set up" — even with requiredActions:[] — blocking
+    # onboarding of every new principal but the bootstrap superadmin. Idempotent (PUT). Skipped
+    # when no payload is provided.
+    ensure_keycloak_user_profile() {
+      local token="$1"
+      local status
+      if [ ! -f "$PAYLOAD_DIR/user-profile.json" ]; then
+        log "no Keycloak user-profile payload; leaving the realm default in place"
+        return 0
+      fi
+      status="$(curl -sS -o /tmp/keycloak-user-profile -w '%{http_code}' \
+        -X PUT \
+        -H "Authorization: Bearer $token" \
+        -H 'Content-Type: application/json' \
+        --data @"$PAYLOAD_DIR/user-profile.json" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID/users/profile")"
+
+      if [ "$status" != "200" ]; then
+        cat /tmp/keycloak-user-profile >&2 || true
+        echo "[bootstrap] failed to relax Keycloak user profile; status=$status" >&2
+        exit 1
+      fi
+
+      log "relaxed Keycloak user profile (email/firstName/lastName optional)"
+    }
+
     ensure_keycloak_role_from_file() {
       local token="$1"
       local role_name="$2"
@@ -364,6 +393,7 @@ data:
         --from-file=internal-namespaces.json="$PAYLOAD_DIR/internal-namespaces.json"
 
       ensure_keycloak_realm "$token"
+      ensure_keycloak_user_profile "$token"
 
       for role_file in "$PAYLOAD_DIR"/role-*.json; do
         [ -e "$role_file" ] || continue
