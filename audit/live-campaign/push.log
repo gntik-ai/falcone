@@ -1,0 +1,204 @@
+[14:57:55] port-forward svc/registry 5000:5000
+Forwarding from 127.0.0.1:5000 -> 5000
+Forwarding from [::1]:5000 -> 5000
+Handling connection for 5000
+registry /v2/ -> 200
+[14:57:59] push in-falcone-control-plane:campaign-20260617
+The push refers to repository [localhost:5000/in-falcone-control-plane]
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+9e473a8a4b13: Pushed
+2a35269e7578: Pushed
+6b0a43162ae9: Pushed
+10b21f3fe3b8: Pushed
+f97c09260629: Pushed
+521847476b6a: Pushed
+2b03375268c3: Pushed
+d9e6c0e2203d: Pushed
+55afa1ecc21d: Pushed
+a2a508442c34: Pushed
+d0e0b0052f54: Pushed
+6f79f5d7e8a5: Pushed
+campaign-20260617: digest: sha256:fb3e1b3b9e6e46ef492752628f6e12e6e15cc7654d9a488c22f3d8e580cd98e8 size: 856
+[14:58:00]   OK in-falcone-control-plane
+[14:58:00] push in-falcone-control-plane-executor:campaign-20260617
+The push refers to repository [localhost:5000/in-falcone-control-plane-executor]
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+315efc0c7289: Pushed
+893b1c174375: Pushed
+3bebdde73cd1: Pushed
+6b0a43162ae9: Pushed
+4f4fb700ef54: Pushed
+f121f69d3837: Pushed
+3bb829c43ce8: Pushed
+2b03375268c3: Pushed
+0928175e0f1d: Pushed
+1b0770ba0e7b: Pushed
+84f85c1abbfb: Pushed
+855d933db107: Pushed
+a2a508442c34: Pushed
+55afa1ecc21d: Pushed
+7865f23a8256: Pushed
+6f79f5d7e8a5: Pushed
+campaign-20260617: digest: sha256:86d532ca5238cd0593a6d587a2629394b02e42bb55fb3229bbad561d639ceb24 size: 856
+[14:58:01]   OK in-falcone-control-plane-executor
+[14:58:01] push in-falcone-fn-runtime:campaign-20260617
+The push refers to repository [localhost:5000/in-falcone-fn-runtime]
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+6b0a43162ae9: Pushed
+3add57791b85: Pushed
+7fb49ce056e1: Pushed
+2b03375268c3: Pushed
+a2a508442c34: Pushed
+55afa1ecc21d: Pushed
+6f79f5d7e8a5: Pushed
+campaign-20260617: digest: sha256:a4adc30057d4327b893306e7158495158f73c25054231bf67cd04a6923f3a87e size: 856
+[14:58:01]   OK in-falcone-fn-runtime
+[14:58:01] push in-falcone-web-console:campaign-20260617
+The push refers to repository [localhost:5000/in-falcone-web-console]
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+Handling connection for 5000
+0962fac7c0e1: Pushed
+a2a508442c34: Mounted from in-falcone-fn-runtime
+55afa1ecc21d: Mounted from in-falcone-fn-runtime
+6f79f5d7e8a5: Mounted from in-falcone-fn-runtime
+0aa26ac24e39: Pushed
+6b0a43162ae9: Mounted from in-falcone-fn-runtime
+2b03375268c3: Mounted from in-falcone-fn-runtime
+f5da7ed17956: Pushed
+campaign-20260617: digest: sha256:b49985c8154dae8d01863855f546acdccd768b56993a6d0a79deb0e9a39ad4a1 size: 856
+[14:58:02]   OK in-falcone-web-console
+[14:58:02] verify tags present in registry:
+Handling connection for 5000
+{"name":"in-falcone-control-plane","tags":["campaign-20260617"]}
+
+Handling connection for 5000
+{"name":"in-falcone-control-plane-executor","tags":["campaign-20260617"]}
+
+Handling connection for 5000
+{"name":"in-falcone-fn-runtime","tags":["campaign-20260617"]}
+
+Handling connection for 5000
+{"name":"in-falcone-web-console","tags":["campaign-20260617"]}
+
+[14:58:02] DONE rc=0

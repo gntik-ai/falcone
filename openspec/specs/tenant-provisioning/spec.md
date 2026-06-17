@@ -135,3 +135,49 @@ The system SHALL model environment (e.g. prod/staging/dev) as a first-class conc
 - **WHEN** a client creates an environment for a project
 - **THEN** the system records it as a distinct environment entity with its own provisioned resources
 
+### Requirement: FerretDB init container resolves the DocumentDB host dynamically
+
+The system SHALL derive the DocumentDB service host for the FerretDB init container
+from the Helm release name rather than a hardcoded string, so that an install with
+any release name converges to the Ready state.
+
+#### Scenario: Fresh install with non-default release name reaches Ready
+
+- **WHEN** the Helm chart is installed with a release name other than `in-falcone`
+  (e.g. `falcone`, `my-baas`)
+- **THEN** the FerretDB pod's init container MUST connect to the DocumentDB service
+  at the correct release-prefixed hostname and MUST transition to `Running` within
+  the standard timeout
+
+#### Scenario: Fresh install with default release name is unaffected
+
+- **WHEN** the Helm chart is installed with the default release name `in-falcone`
+- **THEN** the FerretDB pod MUST continue to reach Ready state as before
+
+### Requirement: Bootstrap Job completes successfully on a fresh kind install
+
+The system SHALL ensure the Keycloak bootstrap Job reaches the `Complete` state on
+a fresh install regardless of the APISIX deployment mode (standalone or admin-API).
+
+When `APISIX_STAND_ALONE=true` the bootstrap Job MUST skip all APISIX admin-API
+reconciliation steps and MUST NOT emit any HTTP calls to the APISIX admin API.
+
+#### Scenario: Fresh kind install — bootstrap Job completes
+
+- **WHEN** the Helm chart is installed on a fresh kind cluster with
+  `apisix.standaloneMode=true` (or equivalent)
+- **THEN** the bootstrap Job MUST reach status `Complete` and the platform realm,
+  console client, gateway client, and superadmin user MUST be present in Keycloak
+
+#### Scenario: Bootstrap skips APISIX admin-API in standalone mode
+
+- **WHEN** `APISIX_STAND_ALONE=true` is set and the bootstrap Job runs
+- **THEN** the Job log MUST NOT contain any failed HTTP calls to the APISIX admin API
+  (`127.0.0.1:9180` or equivalent) and the Job MUST exit 0
+
+#### Scenario: Superadmin can log in after a fresh install
+
+- **WHEN** the bootstrap Job has completed on a fresh install
+- **THEN** a superadmin login attempt (`POST /v1/auth/login-sessions`) MUST return 201
+  with a `tokenSet` containing valid `realm_access.roles`
+

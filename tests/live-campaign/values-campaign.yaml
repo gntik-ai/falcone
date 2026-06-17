@@ -1,0 +1,176 @@
+# Campaign overlay for a from-scratch kind reinstall (campaign-20260617 images).
+#
+# LAYERING: applied AFTER deploy/kind/values-kind.yaml
+#   helm upgrade --install falcone charts/in-falcone -n falcone \
+#     -f deploy/kind/values-kind.yaml -f tests/live-campaign/values-campaign.yaml
+#
+# WHY A FULL controlPlane.env LIST: Helm does NOT deep-merge YAML *lists* across
+# -f files — the last file that defines `controlPlane.env` REPLACES the whole list.
+# values-kind.yaml defines controlPlane.env with FN_RUNTIME_IMAGE pinned to an old
+# tag (in-falcone-fn-runtime:0.1.0). To repoint just that one entry to the campaign
+# tag WITHOUT dropping the other env vars, we re-declare the ENTIRE list here (a
+# verbatim copy of values-kind.yaml's controlPlane.env with FN_RUNTIME_IMAGE bumped).
+# Keep this list in sync with deploy/kind/values-kind.yaml if that file changes.
+#
+# This overlay also: pins control-plane + web-console image tags to the campaign
+# tag, turns the Keycloak bootstrap hook back ON (fresh Keycloak needs provisioning),
+# and turns Vault ON (operator request). It does NOT re-enable storage(minio),
+# openwhisk, mongodb (none are chart deps), eso, temporal, mcp, or the executor
+# (the executor is applied out-of-band via deploy/kind/executor-demo.yaml).
+
+bootstrap:
+  # Re-enable the one-shot Keycloak provisioning for a fresh Keycloak (realm
+  # in-falcone-platform + roles + clients + superadmin). values-kind.yaml disables
+  # it (the realm already existed on the live cluster); on a from-scratch install it
+  # MUST run. Its apisix reconcile phase still emits ZERO admin-API calls because the
+  # only route is gated to a non-active mode (noop placeholder inherited from
+  # values-kind.yaml), so the Job completes under APISIX_STAND_ALONE=true.
+  enabled: true
+
+vault:
+  # DISABLED in the CORE install — installed/tested SEPARATELY in a second wave
+  # (tests/live-campaign/vault-probe.sh) so a Vault failure can't abort the whole
+  # release. Reality (verified from source): the vault subchart's TLS Certificate is a
+  # cert-manager.io/v1 resource, but cert-manager is NOT installed on this cluster, so
+  # `vault.enabled=true` would fail to render/apply and abort `helm upgrade`. Moreover
+  # NO Falcone component reads secrets FROM Vault — every app/datastore reads native
+  # k8s Secrets (envFromSecrets/secretKeyRef); ESO is disabled and there is no agent
+  # injection. So "secrets via Vault" is not wired regardless of whether the pod runs.
+  enabled: false
+
+controlPlane:
+  image:
+    repository: localhost:30500/in-falcone-control-plane
+    tag: "campaign-20260617"
+  env:
+    - name: PGHOST
+      value: falcone-postgresql
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      value: falcone
+    - name: PGDATABASE
+      value: in_falcone
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    - name: KEYCLOAK_JWKS_URL
+      value: http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs
+    - name: ROUTE_MAP_FILE
+      value: /app/route-map.runtime.json
+    - name: KEYCLOAK_BASE_URL
+      value: http://falcone-keycloak:8080
+    - name: KEYCLOAK_ADMIN_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: username
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: password
+    - name: STORAGE_S3_ENDPOINT
+      value: http://falcone-seaweedfs-s3:8333
+    - name: STORAGE_S3_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: s3_access_key
+    - name: STORAGE_S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-storage
+          key: s3_secret_key
+    - name: MONGO_HOST
+      value: falcone-ferretdb:27017
+    - name: MONGO_BACKEND
+      value: ferretdb
+    # FerretDB v2 delegates auth to Postgres — MONGO_USER must be the documentdb admin role
+    # (same secret as the password), not a hardcoded `falcone` (finding F2).
+    - name: MONGO_USER
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb
+          key: POSTGRES_USER
+    - name: MONGO_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb
+          key: POSTGRES_PASSWORD
+    - name: REALTIME_DOCUMENTDB_URL
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb-replication
+          key: realtime-url
+          optional: true
+    - name: KAFKA_BROKERS
+      value: falcone-kafka:9092
+    # Functions runtime image — campaign tag. Each function = a Knative Service that
+    # the control-plane creates on demand from this image (no static ksvc to apply).
+    - name: FN_RUNTIME_IMAGE
+      value: localhost:30500/in-falcone-fn-runtime:campaign-20260617
+
+webConsole:
+  image:
+    repository: localhost:30500/in-falcone-web-console
+    tag: "campaign-20260617"
+
+apisix:
+  # APISIX standalone config (deploy/kind/apisix/apisix.yaml) injects
+  # `x-gateway-auth: ${{GATEWAY_SHARED_SECRET}}` on executor-bound routes and reads the
+  # value from its process env; without it APISIX fails to load config and CrashLoops
+  # ("can't find environment variable GATEWAY_SHARED_SECRET"). The component-wrapper
+  # renders .env onto the container. (Merges with values-kind.yaml's apisix.extraVolumes
+  # — different keys, so both apply.)
+  env:
+    - name: GATEWAY_SHARED_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-gateway-shared-secret
+          key: secret
+
+ferretdb:
+  # CHART-DEFAULT BUG for release name "falcone": the ferretdb init container hardcodes
+  # PGHOST=in-falcone-documentdb (chart-name prefix), but the documentdb Service is
+  # release-prefixed -> falcone-documentdb. The init's pg_isready/schema wait can never
+  # connect, so the pod stays Init:0/1 forever. Re-declare the WHOLE initContainers list
+  # (helm replaces lists, no deep-merge) with PGHOST repointed to falcone-documentdb.
+  initContainers:
+    - name: wait-for-documentdb
+      image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
+      imagePullPolicy: IfNotPresent
+      command:
+        - /bin/bash
+        - -ec
+        - |
+          export PGUSER="${POSTGRES_USER:-postgres}" PGPASSWORD="${POSTGRES_PASSWORD:-}"
+          echo "Waiting for documentdb engine ${PGHOST}:${PGPORT} ..."
+          until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}"; do
+            echo "  engine not ready; retry in 2s"; sleep 2
+          done
+          echo "Engine up. Waiting for documentdb_api schema (CREATE EXTENSION done) ..."
+          until [ "$(psql -h "${PGHOST}" -p "${PGPORT}" -d "${PGDATABASE}" -tAc \
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'documentdb_api'")" = "1" ]; do
+            echo "  documentdb_api absent; retry in 2s"; sleep 2
+          done
+          echo "documentdb_api present — gateway may start."
+      env:
+        - name: PGHOST
+          value: falcone-documentdb
+        - name: PGPORT
+          value: "5432"
+        - name: PGDATABASE
+          value: postgres
+        - name: HOME
+          value: /tmp
+      envFrom:
+        - secretRef:
+            name: in-falcone-documentdb
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 999

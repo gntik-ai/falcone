@@ -117,3 +117,65 @@ The system SHALL allow any newly created, fully-set-up user (enabled, email-veri
 - **WHEN** a self-service signup completes and the user submits credentials
 - **THEN** the system returns a valid token (no `invalid_grant` "Account is not fully set up")
 
+### Requirement: Platform Keycloak clients include standard default scopes
+
+The system SHALL create the `in-falcone-console` and `in-falcone-gateway` Keycloak
+clients with the standard default client scopes `roles`, `basic`, and `profile` so
+that tokens issued to those clients carry `realm_access.roles` and standard profile
+claims.
+
+#### Scenario: Superadmin token contains realm_access.roles after fresh install
+
+- **WHEN** a superadmin authenticates via `POST /v1/auth/login-sessions` on a fresh
+  install
+- **THEN** the returned JWT MUST contain `realm_access.roles` with at least
+  `["superadmin"]` and the scope string MUST include `roles`
+
+#### Scenario: Role-gated operations succeed with freshly issued superadmin token
+
+- **WHEN** a superadmin uses the freshly issued token to call a superadmin-gated
+  endpoint (e.g. `POST /v1/tenants`)
+- **THEN** the response MUST be **201** (or the appropriate success code) and MUST NOT
+  be **403**
+
+#### Scenario: Non-superadmin token is correctly denied role-gated endpoints
+
+- **WHEN** a token without the `superadmin` role attempts a superadmin-only operation
+- **THEN** the response MUST be **403** — the role check MUST remain effective
+
+### Requirement: Tenant realm is provisioned with a client and tenant_id mapper at tenant creation
+
+The system SHALL, as part of the tenant creation flow, provision in the tenant's
+Keycloak realm:
+- A client (e.g. `<tenant-slug>-app`) that end-users can authenticate against.
+- A `tenant_id` protocol mapper that embeds the tenant's ID into every token issued
+  by that realm.
+
+#### Scenario: Tenant-realm token contains tenant_id claim
+
+- **WHEN** a tenant user authenticates against the tenant realm
+- **THEN** the issued JWT MUST contain a `tenant_id` claim equal to the owning
+  tenant's ID
+
+### Requirement: Executor accepts tokens from tenant-realm issuers
+
+The system SHALL accept JWTs issued by a tenant realm's JWKS endpoint in addition to
+the platform realm JWKS, so that tenant users can reach the data-plane and issue API
+keys using their tenant-realm token.
+
+The executor MUST validate the `tenant_id` claim from the token and MUST NOT accept
+a tenant-A token as authorization for tenant-B resources.
+
+#### Scenario: Tenant owner token is accepted by the executor
+
+- **WHEN** a tenant owner presents a JWT issued by their tenant realm (with a valid
+  `tenant_id` claim)
+- **THEN** the executor MUST authenticate the request and authorize operations scoped
+  to that tenant
+
+#### Scenario: Tenant-A token is denied access to tenant-B resources
+
+- **WHEN** a token issued by tenant-A's realm (with `tenant_id = ten_A`) is used to
+  access a resource belonging to `ten_B`
+- **THEN** the executor MUST respond **403** and MUST NOT expose tenant-B data
+

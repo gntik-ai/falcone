@@ -86,6 +86,17 @@ async function createTenant(ctx) {
     await saga.step('createRealmRoles',
       async () => { for (const role of TENANT_REALM_ROLES) await kcAdmin.createRealmRole(realm, role); });
 
+    // Tenant-realm app client + un-forgeable tenant_id claim (fix-tenant-realm-token-issuance, A3).
+    // Without a client the tenant realm cannot issue tokens at all; the hardcoded tenant_id mapper
+    // stamps the owning tenant id (== realm name) so tokens carry tenant_id for claim consumers,
+    // while the executor independently derives it from the verified issuer. (No separate
+    // compensation: the client lives in the realm, which createRealm's compensation deletes.)
+    await saga.step('createTenantAppClient',
+      async () => {
+        const clientUuid = await kcAdmin.createPublicAppClient(realm, { clientId: `${slug}-app`, name: `${displayName} App` });
+        await kcAdmin.addHardcodedClaimMapper(realm, clientUuid, { name: 'tenant_id', claimName: 'tenant_id', claimValue: tenantId });
+      });
+
     let owner = null;
     if (body.ownerUsername || body.ownerEmail) {
       const username = body.ownerUsername ?? body.ownerEmail;

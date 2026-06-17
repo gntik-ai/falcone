@@ -1,0 +1,145 @@
+{
+  "when": "2026-06-17T15:28:40.036Z",
+  "pass": 13,
+  "total": 23,
+  "results": [
+    {
+      "cap": "tenant-lifecycle",
+      "name": "list tenants (superadmin)",
+      "pass": false,
+      "detail": "status=200 count=?"
+    },
+    {
+      "cap": "tenant-lifecycle",
+      "name": "get own tenant (acme-ops)",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "cap": "workspace-lifecycle",
+      "name": "list own workspaces",
+      "pass": true,
+      "detail": "status=200 count={\"items\":[{\"id\":\"b6b4d972-bc55-4471-a101-6baea4c6fa0b\",\"tena"
+    },
+    {
+      "cap": "quotas-plans",
+      "name": "list plans (superadmin)",
+      "pass": false,
+      "detail": "status=500"
+    },
+    {
+      "cap": "metrics",
+      "name": "tenant quotas",
+      "pass": false,
+      "detail": "status=500 body={\"code\":\"42P01\",\"message\":\"Internal server error\"}"
+    },
+    {
+      "cap": "storage",
+      "name": "list buckets",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "cap": "events",
+      "name": "events inventory",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "cap": "functions",
+      "name": "functions inventory",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "cap": "postgres-data-api",
+      "name": "pg databases browse",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "cap": "mongo-data-api",
+      "name": "mongo databases browse",
+      "pass": false,
+      "detail": "status=500"
+    },
+    {
+      "cap": "postgres-data-api",
+      "name": "DDL create schema (apikey)",
+      "pass": true,
+      "detail": "status=201 {\"executed\":true,\"executionMode\":\"execute\",\"statementCount\":1,\"statements\":[\"CRE"
+    },
+    {
+      "cap": "postgres-data-api",
+      "name": "DDL create table (apikey)",
+      "pass": false,
+      "detail": "status=400 {\"code\":\"DDL_INVALID\",\"message\":\"DDL request rejected: Column type serial is not"
+    },
+    {
+      "cap": "postgres-data-api",
+      "name": "insert row (apikey)",
+      "pass": false,
+      "detail": "status=404 {\"code\":\"TABLE_NOT_FOUND\",\"message\":\"Table app.items not found\"}"
+    },
+    {
+      "cap": "postgres-data-api",
+      "name": "list rows (apikey)",
+      "pass": false,
+      "detail": "status=404 {\"code\":\"TABLE_NOT_FOUND\",\"message\":\"Table app.items not found\"}"
+    },
+    {
+      "cap": "mongo-data-api",
+      "name": "insert document (apikey)",
+      "pass": false,
+      "detail": "status=500 {\"code\":\"CONTROL_PLANE_ERROR\",\"message\":\"Internal server error\"}"
+    },
+    {
+      "cap": "mongo-data-api",
+      "name": "list documents (apikey)",
+      "pass": false,
+      "detail": "status=500 {\"code\":\"CONTROL_PLANE_ERROR\",\"message\":\"Internal server error\"}"
+    },
+    {
+      "cap": "events",
+      "name": "create topic (apikey)",
+      "pass": true,
+      "detail": "status=201 {\"created\":true}"
+    },
+    {
+      "cap": "isolation",
+      "name": "acme-ops GET globex tenant",
+      "pass": true,
+      "detail": "status=403 (expect 403/404)"
+    },
+    {
+      "cap": "isolation",
+      "name": "acme-ops list globex workspaces",
+      "pass": true,
+      "detail": "status=403 (expect 403/404)"
+    },
+    {
+      "cap": "isolation",
+      "name": "acme-ops globex entitlements",
+      "pass": true,
+      "detail": "status=403 (expect 403/404)"
+    },
+    {
+      "cap": "isolation",
+      "name": "acme apikey -> globex workspace data",
+      "pass": true,
+      "detail": "status=403 (expect deny)"
+    },
+    {
+      "cap": "isolation",
+      "name": "acme-ops issue key in globex ws",
+      "pass": false,
+      "detail": "status=201 (expect deny)"
+    },
+    {
+      "cap": "isolation",
+      "name": "acme-ops globex metrics",
+      "pass": true,
+      "detail": "status=403 (expect 403/404)"
+    }
+  ]
+}

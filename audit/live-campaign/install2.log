@@ -1,0 +1,80 @@
+### Falcone from-scratch install (tag campaign-20260617) into namespace falcone ###
+== (a) namespace ==
+namespace/falcone unchanged
+== (a2) registry + image re-push ==
+persistentvolumeclaim/registry-data unchanged
+deployment.apps/registry unchanged
+service/registry unchanged
+deployment "registry" successfully rolled out
+[14:38:55] port-forward svc/registry 5000:5000
+registry /v2/ -> 200
+[14:38:59] push in-falcone-control-plane:campaign-20260617
+[14:38:59]   OK in-falcone-control-plane
+[14:38:59] push in-falcone-control-plane-executor:campaign-20260617
+[14:39:00]   OK in-falcone-control-plane-executor
+[14:39:00] push in-falcone-fn-runtime:campaign-20260617
+[14:39:00]   OK in-falcone-fn-runtime
+[14:39:00] push in-falcone-web-console:campaign-20260617
+[14:39:00]   OK in-falcone-web-console
+[14:39:00] verify tags present in registry:
+{"name":"in-falcone-control-plane","tags":["campaign-20260617"]}
+
+{"name":"in-falcone-control-plane-executor","tags":["campaign-20260617"]}
+
+{"name":"in-falcone-fn-runtime","tags":["campaign-20260617"]}
+
+{"name":"in-falcone-web-console","tags":["campaign-20260617"]}
+
+[14:39:00] DONE rc=0
+== (b) secrets ==
+Authoring Falcone platform secrets in namespace falcone ...
+secret/in-falcone-postgresql configured
+  secret/in-falcone-postgresql
+secret/in-falcone-documentdb configured
+  secret/in-falcone-documentdb
+secret/in-falcone-ferretdb configured
+  secret/in-falcone-ferretdb
+secret/in-falcone-documentdb-replication configured
+  secret/in-falcone-documentdb-replication
+secret/in-falcone-kafka unchanged
+  secret/in-falcone-kafka
+secret/in-falcone-storage configured
+  secret/in-falcone-storage
+secret/in-falcone-keycloak-admin configured
+  secret/in-falcone-keycloak-admin
+secret/in-falcone-identity-client configured
+  secret/in-falcone-identity-client
+secret/in-falcone-superadmin configured
+  secret/in-falcone-superadmin
+secret/in-falcone-apisix-admin configured
+  secret/in-falcone-apisix-admin
+secret/in-falcone-seaweedfs-s3-creds configured
+  secret/in-falcone-seaweedfs-s3-creds (helm-adopted)
+secret/in-falcone-dev-api-tls configured
+  secret/in-falcone-dev-api-tls (tls)
+secret/in-falcone-dev-console-tls configured
+  secret/in-falcone-dev-console-tls (tls)
+secret/in-falcone-dev-identity-tls configured
+  secret/in-falcone-dev-identity-tls (tls)
+secret/in-falcone-dev-realtime-tls configured
+  secret/in-falcone-dev-realtime-tls (tls)
+
+Done. Created/updated secrets:
+  Opaque: in-falcone-postgresql in-falcone-documentdb in-falcone-ferretdb
+          in-falcone-documentdb-replication in-falcone-kafka in-falcone-storage
+          in-falcone-keycloak-admin in-falcone-identity-client in-falcone-superadmin
+          in-falcone-apisix-admin in-falcone-seaweedfs-s3-creds
+  TLS:    in-falcone-dev-api-tls in-falcone-dev-console-tls
+          in-falcone-dev-identity-tls in-falcone-dev-realtime-tls
+(in-falcone-seaweedfs-s3-config is derived by the chart from the pinned creds)
+== (c) helm dependency build ==
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "seaweedfs" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Saving 14 charts
+Downloading seaweedfs from repo https://seaweedfs.github.io/seaweedfs/helm
+Deleting outdated charts
+== (d) helm upgrade --install ==
+Release "falcone" does not exist. Installing it now.
+Error: resource Deployment/falcone/falcone-apisix not ready. status: Failed, message: Progress deadline exceeded
+resource Deployment/falcone/falcone-ferretdb not ready. status: Failed, message: Progress deadline exceeded
