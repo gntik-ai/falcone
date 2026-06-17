@@ -16,9 +16,9 @@
  * @param {object} sourceClient - S3 client exposing `listBuckets()`
  * @returns {Promise<string[]>} bucket names
  */
-export async function discoverMinIOBuckets(sourceClient) {
+export async function discoverS3Buckets(sourceClient) {
   if (!sourceClient || typeof sourceClient.listBuckets !== 'function') {
-    throw new Error('discoverMinIOBuckets requires a source S3 client with listBuckets()');
+    throw new Error('discoverS3Buckets requires a source S3 client with listBuckets()');
   }
   const res = await sourceClient.listBuckets();
   const list = Array.isArray(res) ? res : res?.Buckets ?? res?.buckets ?? [];
@@ -31,7 +31,7 @@ export async function discoverMinIOBuckets(sourceClient) {
  * Partition discovered buckets into those that already have a `workspace_buckets`
  * row (no action) and those that do not (to be inserted).
  *
- * @param {string[]} discovered - bucket names from {@link discoverMinIOBuckets}
+ * @param {string[]} discovered - bucket names from {@link discoverS3Buckets}
  * @param {Array<{ bucket_name: string }>} workspaceBuckets - rows from workspace_buckets
  * @returns {{ existing: Array<{bucketName:string, row:object}>, missing: Array<{bucketName:string}> }}
  */

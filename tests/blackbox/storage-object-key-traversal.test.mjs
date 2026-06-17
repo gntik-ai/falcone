@@ -37,13 +37,13 @@ const BUCKET_FIXTURE = {
     planId: 'plan-basic'
   },
   storage: {
-    providerType: 'minio',
-    config: { inline: { providerType: 'minio', region: 'us-east-1' } }
+    providerType: 'seaweedfs',
+    config: { inline: { providerType: 'seaweedfs', region: 'us-east-1' } }
   },
   tenantStorageContext: {
     entityType: 'tenant_storage_context',
     tenantId: TENANT_A,
-    providerType: 'minio',
+    providerType: 'seaweedfs',
     namespace: 'ns-a',
     state: 'active',
     bucketProvisioningAllowed: true,

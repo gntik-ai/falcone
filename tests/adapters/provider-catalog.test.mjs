@@ -96,7 +96,7 @@ test('consumer-specific adapter views remain separated', () => {
   const provisioningIds = new Set(listProvisioningAdapters().map((adapter) => adapter.id));
   const auditIds = new Set(listAuditAdapters().map((adapter) => adapter.id));
   const storageProfiles = listStorageProviderProfiles();
-  const minioProfile = getStorageProviderProfile({ providerType: 'minio' });
+  const seaweedfsProfile = getStorageProviderProfile({ providerType: 'seaweedfs' });
   const garageProfile = getStorageProviderProfile({ providerType: 'garage' });
   const unavailableProfile = getStorageProviderProfile({ providerType: 'unsupported' });
   const compatibility = getStorageProviderCompatibilitySummary({ providerType: 'garage' });
@@ -109,21 +109,22 @@ test('consumer-specific adapter views remain separated', () => {
   assert.ok(auditIds.has('storage'));
   assert.ok(!auditIds.has('keycloak'));
 
-  assert.equal(supportedStorageProviderTypes.includes('minio'), true);
+  assert.equal(supportedStorageProviderTypes.includes('minio'), false);
+  assert.equal(supportedStorageProviderTypes.includes('seaweedfs'), true);
   assert.equal(supportedStorageProviderTypes.includes('ceph-rgw'), true);
   assert.equal(storageProfiles.length >= 2, true);
-  assert.equal(minioProfile.status, 'ready');
-  assert.equal(minioProfile.capabilityManifestVersion, storageProviderCapabilityManifestVersion);
-  assert.equal(minioProfile.capabilityManifest.bucketOperations, true);
-  assert.equal(minioProfile.capabilityManifest.bucketPolicies, true);
-  assert.equal(minioProfile.capabilityManifest.bucketLifecycle, true);
-  assert.equal(minioProfile.capabilityManifest.objectLock, true);
-  assert.equal(minioProfile.capabilityManifest.eventNotifications, true);
-  assert.equal(minioProfile.capabilityBaseline.version, storageProviderCapabilityBaselineVersion);
-  assert.equal(minioProfile.capabilityBaseline.eligible, true);
-  assert.equal(minioProfile.capabilityDetails.length, storageProviderCapabilityIds.length);
-  assert.equal(minioProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.policy').state, storageProviderCapabilityEntryStates.SATISFIED);
-  assert.equal(minioProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.lifecycle').state, storageProviderCapabilityEntryStates.SATISFIED);
+  assert.equal(seaweedfsProfile.status, 'ready');
+  assert.equal(seaweedfsProfile.capabilityManifestVersion, storageProviderCapabilityManifestVersion);
+  assert.equal(seaweedfsProfile.capabilityManifest.bucketOperations, true);
+  assert.equal(seaweedfsProfile.capabilityManifest.bucketPolicies, true);
+  assert.equal(seaweedfsProfile.capabilityManifest.bucketLifecycle, false);
+  assert.equal(seaweedfsProfile.capabilityManifest.objectLock, false);
+  assert.equal(seaweedfsProfile.capabilityManifest.eventNotifications, false);
+  assert.equal(seaweedfsProfile.capabilityBaseline.version, storageProviderCapabilityBaselineVersion);
+  assert.equal(seaweedfsProfile.capabilityBaseline.eligible, true);
+  assert.equal(seaweedfsProfile.capabilityDetails.length, storageProviderCapabilityIds.length);
+  assert.equal(seaweedfsProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.policy').state, storageProviderCapabilityEntryStates.SATISFIED);
+  assert.equal(seaweedfsProfile.capabilityDetails.find((entry) => entry.capabilityId === 'bucket.lifecycle').state, storageProviderCapabilityEntryStates.UNSATISFIED);
   assert.equal(unavailableProfile.status, 'unavailable');
   assert.equal(compatibility.providerType, 'garage');
   assert.equal(compatibility.capabilityCount >= 4, true);
@@ -164,7 +165,7 @@ test('provider catalog exposes tenant storage context helpers without leaking se
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -204,7 +205,7 @@ test('provider catalog exposes deterministic storage logical organization helper
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -250,7 +251,7 @@ test('provider catalog exposes deterministic storage logical organization helper
 test('provider catalog exposes normalized storage errors and internal-safe diagnostics', () => {
   const normalized = getStorageNormalizedError({
     providerCode: 'NoSuchKey',
-    providerMessage: 'NoSuchKey returned by https://minio.internal/object-store for secret://tenants/ten_01error/storage/context',
+    providerMessage: 'NoSuchKey returned by https://seaweedfs.internal/object-store for secret://tenants/ten_01error/storage/context',
     requestId: 'req_storage_err_01',
     tenantId: 'ten_01error',
     workspaceId: 'wrk_01error',
@@ -288,7 +289,7 @@ test('provider catalog exposes normalized storage errors and internal-safe diagn
     operation: 'object.put',
     bucketName: 'error-bucket',
     objectKey: 'uploads/file.txt',
-    providerType: 'minio',
+    providerType: 'seaweedfs',
     observedAt: '2026-03-27T21:10:07Z'
   });
 
@@ -476,7 +477,7 @@ test('unavailable storage provider variants expose a stable all-unsatisfied capa
     {
       errorCode: 'AMBIGUOUS_PROVIDER_SELECTION',
       input: {
-        providerType: 'minio',
+        providerType: 'ceph-rgw',
         storage: {
           config: {
             inline: {

@@ -578,7 +578,7 @@ test('storage quota guardrail contracts are additive and structurally valid', ()
       storage: {
         config: {
           inline: {
-            providerType: 'minio'
+            providerType: 'seaweedfs'
           }
         }
       },
@@ -686,12 +686,12 @@ test('storage policy contracts are additive and structurally valid', () => {
 
 test('storage verification report schema is additive and structurally valid', () => {
   const run = buildVerificationRun({
-    providers: ['minio', 'garage'],
+    providers: ['ceph-rgw', 'garage'],
     startedAt: '2026-03-27T22:10:00Z'
   });
   const report = buildVerificationReport({
     runId: run.runId,
-    providers: ['minio', 'garage'],
+    providers: ['ceph-rgw', 'garage'],
     startedAt: '2026-03-27T22:10:00Z',
     completedAt: '2026-03-27T22:11:00Z',
     scenarioResults: [],
@@ -700,7 +700,7 @@ test('storage verification report schema is additive and structurally valid', ()
     capabilityBaselineResults: [],
     tenantIsolationResults: [],
     verdicts: {
-      minio: 'fail',
+      'ceph-rgw': 'fail',
       garage: 'fail'
     },
     overallVerdict: 'fail',

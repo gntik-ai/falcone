@@ -1,7 +1,7 @@
 # Kind test-cluster-b install values.
 # - Replaces chart-pinned images that no longer exist on public registries
-#   (Bitnami purged public tags -> bitnamilegacy; apisix/prometheus/minio tag
-#   conventions; openwhisk standalone serves :3233).
+#   (Bitnami purged public tags -> bitnamilegacy; apisix/prometheus/seaweedfs tag
+#   conventions; functions execute on Knative Services, not a standalone runtime).
 # - Points the two placeholder app images (ghcr.io/example/...) at the
 #   in-cluster registry (NodePort 30500; containerd allows plain-HTTP localhost).
 # - Installs into namespace `falcone` (shared cluster; musematic untouched).

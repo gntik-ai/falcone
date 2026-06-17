@@ -182,7 +182,7 @@ bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
 | **PostgreSQL** | Mandanten-eingegrenzte Daten-API plus Administration/Governance, Change-Data-Capture, Metriken und Audit. Isolation über Row-Level-Security (`app.tenant_id` / `app.workspace_id`) und Schemas pro Mandant. |
 | **Dokumentspeicher (FerretDB + DocumentDB)** | Dokument-API pro Mandant/Workspace, Administration, Echtzeit/CDC (logische Replikation von Postgres), Metriken und Audit. Kompatibel mit dem MongoDB-Wire-Protokoll; ersetzt MongoDB (ADR-14). |
 | **Objektspeicher** | S3-kompatible Buckets, Multipart-Uploads, vorsignierte URLs, Zugriffsrichtlinien, Event-Benachrichtigungen und Kapazitätskontingente pro Mandant. |
-| **Events (Kafka)** | Topic-Verwaltung und mandanten-eingegrenzte CDC-Change-Streams (`<Präfix>.<Mandant>.<Workspace>`), plus System-Topics für Audit/Kontingent/Lebenszyklus. |
+| **Events (Kafka)** | Topic-Verwaltung und mandanten-eingegrenzte CDC-Streams (`<Präfix>.<Mandant>.<Workspace>`), gespeist durch die logische Replikation von PostgreSQL, plus System-Topics für Audit/Kontingent/Lebenszyklus. |
 | **Echtzeit** | WebSocket-Abonnements (`/v1/websockets`) mit Bearer-JWT-Authentifizierung, Scope-zu-Channel-Durchsetzung und Mandanten-Isolation pro Sitzung. |
 | **Funktionen** | Serverless-Funktionen mit Versionen, Aktivierungen, Aufrufen, Rollback und Cron- / Kafka- / Storage-Triggern. |
 | **Webhooks** | Signierte Webhook-Zustellung mit Retries und SSRF-Schutz (private, Loopback-, Link-Local- und ULA-Bereiche blockiert, zum Zustellzeitpunkt erneut geprüft). |

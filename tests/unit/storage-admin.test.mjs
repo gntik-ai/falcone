@@ -148,12 +148,12 @@ test('storage provider support normalizes explicit provider selection into a rea
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     }
   });
-  const baseline = summarizeStorageCapabilityBaseline({ providerType: 'minio' });
+  const baseline = summarizeStorageCapabilityBaseline({ providerType: 'seaweedfs' });
   const details = summarizeStorageCapabilityDetails({ providerType: 'ceph-rgw' });
 
   assert.equal(profile.providerType, 'ceph-rgw');
@@ -175,7 +175,8 @@ test('storage provider support normalizes explicit provider selection into a rea
   assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.lifecycle'), true);
   assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'object.lock'), true);
   assert.equal(profile.capabilityDetails.some((entry) => entry.capabilityId === 'bucket.event_notifications'), true);
-  assert.equal(profile.supportedProviderTypes.includes('minio'), true);
+  assert.equal(profile.supportedProviderTypes.includes('minio'), false);
+  assert.equal(profile.supportedProviderTypes.includes('seaweedfs'), true);
   assert.equal(profile.supportedProviderTypes.includes('ceph-rgw'), true);
   assert.equal(JSON.stringify(profile).includes('should-not-leak'), false);
 
@@ -184,12 +185,12 @@ test('storage provider support normalizes explicit provider selection into a rea
   assert.equal(details.find((entry) => entry.capabilityId === 'bucket.event_notifications').state, STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG.PARTIALLY_SATISFIED);
   assert.equal(details.find((entry) => entry.capabilityId === 'object.lock').state, STORAGE_PROVIDER_CAPABILITY_ENTRY_STATE_CATALOG.PARTIALLY_SATISFIED);
 
-  assert.equal(compatibility.providerType, 'minio');
+  assert.equal(compatibility.providerType, 'seaweedfs');
   assert.equal(compatibility.status, 'ready');
   assert.equal(compatibility.capabilityManifest.bucketPolicies, true);
-  assert.equal(compatibility.capabilityManifest.bucketLifecycle, true);
-  assert.equal(compatibility.capabilityManifest.objectLock, true);
-  assert.equal(compatibility.capabilityManifest.eventNotifications, true);
+  assert.equal(compatibility.capabilityManifest.bucketLifecycle, false);
+  assert.equal(compatibility.capabilityManifest.objectLock, false);
+  assert.equal(compatibility.capabilityManifest.eventNotifications, false);
   assert.equal(compatibility.routeIds.includes('getStorageProviderIntrospection'), true);
   assert.equal(compatibility.publicBucketRoutes.includes('createStorage'), true);
   assert.equal(compatibility.publicBucketRoutes.includes('listStorage'), true);
@@ -204,7 +205,7 @@ test('storage provider support fails safely for missing, unknown, and ambiguous 
   const missing = summarizeStorageProviderSupport({});
   const unknown = summarizeStorageProviderSupport({ providerType: 'unknown-provider' });
   const ambiguous = summarizeStorageProviderSupport({
-    providerType: 'minio',
+    providerType: 'ceph-rgw',
     storage: {
       config: {
         inline: {
@@ -213,7 +214,7 @@ test('storage provider support fails safely for missing, unknown, and ambiguous 
       }
     }
   });
-  const introspection = summarizeStorageProviderIntrospection({ providerType: 'minio' });
+  const introspection = summarizeStorageProviderIntrospection({ providerType: 'seaweedfs' });
 
   assert.equal(missing.status, 'unavailable');
   assert.equal(missing.errorCode, STORAGE_ADMIN_ERROR_CODES.MISSING_PROVIDER_TYPE);
@@ -235,7 +236,7 @@ test('storage provider support fails safely for missing, unknown, and ambiguous 
 
 test('storage admin summaries preserve canonical capability ordering and stable unavailable fallback shape', () => {
   const profiles = [
-    summarizeStorageProviderSupport({ providerType: 'minio' }),
+    summarizeStorageProviderSupport({ providerType: 'seaweedfs' }),
     summarizeStorageProviderSupport({ providerType: 'ceph-rgw' }),
     summarizeStorageProviderSupport({ providerType: 'garage' }),
     summarizeStorageProviderSupport({ providerType: 'unknown-provider' })
@@ -268,7 +269,7 @@ test('tenant storage context summary is tenant-isolated, introspectable, and sec
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -285,7 +286,7 @@ test('tenant storage context summary is tenant-isolated, introspectable, and sec
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -405,7 +406,7 @@ test('storage logical organization previews are deterministic and reserve platfo
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -456,7 +457,7 @@ test('bucket and object previews stay scope-bound and expose bounded metadata/do
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -529,7 +530,7 @@ test('bucket and object previews stay scope-bound and expose bounded metadata/do
 test('storage error previews normalize provider failures without leaking provider secrets', () => {
   const normalized = previewStorageNormalizedError({
     providerCode: 'NoSuchBucket',
-    providerMessage: 'NoSuchBucket returned from https://minio.internal for secret://tenants/ten_01unit/storage/context',
+    providerMessage: 'NoSuchBucket returned from https://seaweedfs.internal for secret://tenants/ten_01unit/storage/context',
     requestId: 'req_unit_storage_01',
     tenantId: 'ten_01unit',
     workspaceId: 'wrk_01unit',
@@ -782,7 +783,7 @@ test('tenant storage context lifecycle gating and bucket deletion rules block un
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },
@@ -805,7 +806,7 @@ test('tenant storage context lifecycle gating and bucket deletion rules block un
     storage: {
       config: {
         inline: {
-          providerType: 'minio'
+          providerType: 'seaweedfs'
         }
       }
     },

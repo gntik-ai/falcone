@@ -183,7 +183,7 @@ elles restent en Preview sous l'avertissement « non prêt pour la production »
 | **PostgreSQL** | API de données délimitée par tenant plus administration/gouvernance, capture de changements (CDC), métriques et audit. Isolation par sécurité au niveau des lignes (`app.tenant_id` / `app.workspace_id`) et schémas par tenant. |
 | **Base documentaire (FerretDB + DocumentDB)** | API de documents par tenant/workspace, administration, temps réel/CDC (réplication logique de Postgres), métriques et audit. Compatible avec le wire protocol de MongoDB ; remplace MongoDB (ADR-14). |
 | **Stockage d'objets** | Buckets compatibles S3, uploads multipart, URLs présignées, politiques d'accès, notifications d'événements et quotas de capacité par tenant. |
-| **Événements (Kafka)** | Gestion des topics et change streams CDC délimités par tenant (`<préfixe>.<tenant>.<workspace>`), plus topics système d'audit/quota/cycle de vie. |
+| **Événements (Kafka)** | Gestion des topics et flux CDC délimités par tenant (`<préfixe>.<tenant>.<workspace>`) alimentés par la réplication logique de PostgreSQL, plus topics système d'audit/quota/cycle de vie. |
 | **Temps réel** | Abonnements WebSocket (`/v1/websockets`) avec authentification Bearer-JWT, application du scope au canal et isolation du tenant par session. |
 | **Fonctions** | Fonctions serverless avec versions, activations, invocations, rollback et déclencheurs cron / Kafka / stockage. |
 | **Webhooks** | Livraison de webhooks signée et avec retries, avec protection SSRF (plages privées, loopback, link-local et ULA bloquées, revérifiées au moment de la livraison). |
