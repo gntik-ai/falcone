@@ -1,6 +1,6 @@
 # tenant-lifecycle — spec delta for fix-control-plane-schema-migration-retry
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Control-plane schema migrations retry on transient DB unavailability
 

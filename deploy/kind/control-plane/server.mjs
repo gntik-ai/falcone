@@ -22,6 +22,7 @@ import { routes as seedRoutes } from './routes.mjs';
 import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import { ensureSchema } from './tenant-store.mjs';
 import { ensureSagaSchema, recoverSagas } from './saga.mjs';
+import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 
 const { Pool } = pg;
@@ -330,11 +331,21 @@ loadRoutes();
 // Domain B needs the `tenants` registry + saga tables (no in-repo migration
 // creates them). After the schema is ready, sweep any saga left 'running' by a
 // prior crash and run its durable compensations (rollback survives a restart).
-ensureSchema(pool)
-  .then(() => ensureSagaSchema(pool))
-  .then(() => recoverSagas(pool))
-  .then((n) => console.log(`[control-plane] schema ready; recovered ${n} orphaned saga(s)`))
-  .catch((e) => console.error('[control-plane] schema/recovery failed:', e.message));
+// Postgres may not be ready when we start (fresh install / rolling restart). Retry the
+// schema/recovery with exponential backoff (D5); without it an ECONNREFUSED left the
+// `tenants` table uncreated and every tenant op 500'd until a manual pod restart. If the DB
+// is still unreachable after the timeout, exit non-zero so Kubernetes restarts the pod and
+// retries — never serve indefinitely against a missing schema.
+runWithRetry(async (attempt) => {
+  await ensureSchema(pool);
+  await ensureSagaSchema(pool);
+  const n = await recoverSagas(pool);
+  console.log(`[control-plane] schema ready; recovered ${n} orphaned saga(s) (attempt ${attempt})`);
+  return n;
+}, migrationRetryConfig()).catch((e) => {
+  console.error('[control-plane] schema/recovery permanently failed; exiting for restart:', e?.message ?? e);
+  process.exit(1);
+});
 if (ROUTE_MAP_FILE) {
   readFile(ROUTE_MAP_FILE, 'utf8').then((txt) => {
     try { const extra = JSON.parse(txt); loadRoutes(Array.isArray(extra) ? extra : []); console.log(`[control-plane] loaded ${ROUTES.length} routes (seed + ${ROUTE_MAP_FILE})`); }
