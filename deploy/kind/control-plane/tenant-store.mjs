@@ -30,10 +30,16 @@ export async function ensureSchema(pool) {
       slug TEXT,
       display_name TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
+      environment TEXT NOT NULL DEFAULT 'dev',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_by TEXT,
       UNIQUE (tenant_id, slug)
     )`);
+  // First-class environment (add-environment-first-class-isolation, #503): a workspace is the
+  // delivery boundary for ONE runtime environment (prod/staging/dev/...). Backfill the column on
+  // pre-existing tables; carry it on the workspace_databases registry so the per-workspace
+  // database (D2) is attributable to its environment.
+  await pool.query("ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'dev'");
   await pool.query(`
     CREATE TABLE IF NOT EXISTS service_accounts (
       id TEXT PRIMARY KEY,
@@ -63,6 +69,7 @@ export async function ensureSchema(pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_by TEXT
     )`);
+  await pool.query("ALTER TABLE workspace_databases ADD COLUMN IF NOT EXISTS environment TEXT");
   // ---- data plane: object-store buckets mapped to a workspace -------------
   // CANONICAL tenant-to-bucket mapping (bucket-per-workspace). This table is the
   // single source of truth for storage reconciliation (add-seaweedfs-bucket-
@@ -197,10 +204,10 @@ export async function latestFnActivation(pool, resourceId) {
 // ---- workspace databases ---------------------------------------------------
 export async function insertWorkspaceDatabase(pool, d) {
   const { rows } = await pool.query(
-    `INSERT INTO workspace_databases (id, workspace_id, tenant_id, engine, database_name, mode, username, host, port, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-     RETURNING id, workspace_id, tenant_id, engine, database_name, mode, username, host, port, status, created_at, created_by`,
-    [d.id, d.workspaceId, d.tenantId, d.engine, d.databaseName, d.mode, d.username, d.host, d.port, d.createdBy]);
+    `INSERT INTO workspace_databases (id, workspace_id, tenant_id, engine, database_name, mode, username, host, port, environment, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING id, workspace_id, tenant_id, engine, database_name, mode, username, host, port, environment, status, created_at, created_by`,
+    [d.id, d.workspaceId, d.tenantId, d.engine, d.databaseName, d.mode, d.username, d.host, d.port, d.environment ?? 'dev', d.createdBy]);
   return rows[0];
 }
 export async function databaseWorkspaceMap(pool) {
@@ -296,27 +303,43 @@ export async function workspaceSlugTaken(pool, tenantId, slug) {
   const { rows } = await pool.query('SELECT 1 FROM workspaces WHERE tenant_id=$1 AND slug=$2 LIMIT 1', [tenantId, slug]);
   return rows.length > 0;
 }
-export async function insertWorkspace(pool, { id, tenantId, slug, displayName, createdBy }) {
+export async function insertWorkspace(pool, { id, tenantId, slug, displayName, environment = 'dev', createdBy }) {
   const { rows } = await pool.query(
-    `INSERT INTO workspaces (id, tenant_id, slug, display_name, created_by)
-     VALUES ($1,$2,$3,$4,$5)
-     RETURNING id, tenant_id, slug, display_name, status, created_at, created_by`,
-    [id, tenantId, slug, displayName, createdBy]);
+    `INSERT INTO workspaces (id, tenant_id, slug, display_name, environment, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     RETURNING id, tenant_id, slug, display_name, status, environment, created_at, created_by`,
+    [id, tenantId, slug, displayName, environment, createdBy]);
   return rows[0];
 }
 export async function listWorkspaces(pool, { tenantId = null, limit = 100, offset = 0 } = {}) {
   const where = tenantId ? 'WHERE tenant_id = $3' : '';
   const params = tenantId ? [limit, offset, tenantId] : [limit, offset];
   const { rows } = await pool.query(
-    `SELECT id, tenant_id, slug, display_name, status, created_at, created_by, COUNT(*) OVER() AS total
+    `SELECT id, tenant_id, slug, display_name, status, environment, created_at, created_by, COUNT(*) OVER() AS total
        FROM workspaces ${where} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, params);
   return { items: rows.map(({ total, ...r }) => r), total: Number(rows[0]?.total ?? 0) };
 }
 export async function getWorkspace(pool, idOrSlug) {
   const { rows } = await pool.query(
-    `SELECT id, tenant_id, slug, display_name, status, created_at, created_by
+    `SELECT id, tenant_id, slug, display_name, status, environment, created_at, created_by
        FROM workspaces WHERE id = $1 OR slug = $1 LIMIT 1`, [idOrSlug]);
   return rows[0] ?? null;
+}
+// List a tenant's first-class environments (#503): one entry per environment, each with its
+// workspaces + provisioned databases — proving multiple isolated environments per project, every
+// environment carrying its own isolated resource set (the per-workspace wsdb_* DB from D2/#502).
+export async function listTenantEnvironments(pool, tenantId) {
+  const { rows } = await pool.query(
+    `SELECT w.environment,
+            COUNT(*)::int AS workspace_count,
+            json_agg(json_build_object('workspaceId', w.id, 'slug', w.slug, 'displayName', w.display_name,
+                                       'database', d.database_name) ORDER BY w.created_at) AS workspaces
+       FROM workspaces w
+       LEFT JOIN workspace_databases d ON d.workspace_id = w.id
+      WHERE w.tenant_id = $1
+      GROUP BY w.environment
+      ORDER BY w.environment`, [tenantId]);
+  return rows.map((r) => ({ environment: r.environment, workspaceCount: r.workspace_count, workspaces: r.workspaces }));
 }
 
 // ---- service accounts ------------------------------------------------------
