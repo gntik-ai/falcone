@@ -11,6 +11,7 @@ import { createConnectionRegistry } from '../../../apps/control-plane/src/runtim
 import { createApiKeyStore } from '../../../apps/control-plane/src/runtime/api-keys.mjs';
 import { executePostgresData } from '../../../apps/control-plane/src/runtime/postgres-data-executor.mjs';
 import { executePostgresDdl } from '../../../apps/control-plane/src/runtime/postgres-ddl-executor.mjs';
+import { ensureDataApiRoles } from './data-api-roles.mjs';
 
 const { Pool } = pg;
 const ADMIN_URL =
@@ -41,9 +42,10 @@ before(async () => {
   await admin.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
   // Non-superuser, non-BYPASSRLS roles the keys resolve to (RLS applies to them).
+  // Ensure-create (no DROP): these are now a shared fixture across the executor suite (#494),
+  // so a per-file DROP+CREATE would race with a sibling file granting to the same role.
+  await ensureDataApiRoles(admin);
   for (const role of ['falcone_anon', 'falcone_service']) {
-    await admin.query(`DROP ROLE IF EXISTS ${role}`);
-    await admin.query(`CREATE ROLE ${role} NOSUPERUSER NOBYPASSRLS`);
     await admin.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
   }
 

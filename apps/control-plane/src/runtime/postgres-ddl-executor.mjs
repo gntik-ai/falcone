@@ -27,6 +27,42 @@ function quoteIdent(name, what) {
   return `"${name}"`;
 }
 
+// The shared api-key DB roles the data API connects as (see connection-registry: SET LOCAL
+// ROLE <dbRole> per request) and the GUC the RLS context is set in.
+const DATA_API_ROLES = ['falcone_service', 'falcone_anon'];
+const TENANT_COLUMN = 'tenant_id';
+
+// B1 (#494): a table created through the DDL API must be (a) immediately usable by the data
+// API and (b) isolated per tenant. The data API runs as a SHARED api-key role
+// (falcone_service/falcone_anon) and scopes every row by `tenant_id` — the executor stamps it
+// on writes and the adapter injects a `tenant_id = current_setting('app.tenant_id')` predicate
+// (postgres-data-executor.mjs: gated on the table HAVING a tenant_id column). Before this fix
+// CREATE TABLE emitted no GRANT (so the role couldn't even see the table → TABLE_NOT_FOUND) and
+// no tenant_id column / RLS (so a table would leak across tenants). So at creation we:
+//   1. ensure a `tenant_id` column exists (no-op if the caller already declared it),
+//   2. GRANT the api-key roles schema USAGE + table DML, and
+//   3. install FORCE row-level security keyed on tenant_id — mirroring the executor's policy,
+//      so even a forgotten adapter predicate cannot cross tenants.
+// These run on the RLS-bypassing admin/owner connection, inside the same create transaction.
+function tableIsolationStatements(schemaName, tableName) {
+  const schema = quoteIdent(schemaName, 'schemaName');
+  const table = `${schema}.${quoteIdent(tableName, 'tableName')}`;
+  const roles = DATA_API_ROLES.map((role) => quoteIdent(role, 'role')).join(', ');
+  const tenantMatch = `${quoteIdent(TENANT_COLUMN, 'column')} = current_setting('app.tenant_id', true)`;
+  const policy = quoteIdent(`${tableName}_tenant_isolation`, 'policyName');
+  return [
+    // Tenant discriminator the executor stamps and the RLS policy keys on. NOT NULL + a GUC
+    // default means a row can never be written without a tenant; on a freshly created (empty)
+    // table the ADD COLUMN is unconditional.
+    `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${quoteIdent(TENANT_COLUMN, 'column')} text NOT NULL DEFAULT current_setting('app.tenant_id', true)`,
+    `GRANT USAGE ON SCHEMA ${schema} TO ${roles}`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON ${table} TO ${roles}`,
+    `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`,
+    `ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`,
+    `CREATE POLICY ${policy} ON ${table} USING (${tenantMatch}) WITH CHECK (${tenantMatch})`,
+  ];
+}
+
 // Build the DDL statement plan for a resource kind. database/schema are rendered
 // directly (the adapter keeps those builders internal); everything else uses the
 // adapter's structural/governance SQL renderers.
@@ -57,7 +93,18 @@ function buildDdlPlan({ resourceKind, action, payload }) {
       return buildPostgresGovernanceSqlPlan({ resourceKind, action, payload, context });
     }
     if (POSTGRES_STRUCTURAL_RESOURCE_KINDS.includes(resourceKind) && resourceKind !== 'type') {
-      return buildPostgresStructuralSqlPlan({ resourceKind, action, payload, context });
+      const structural = buildPostgresStructuralSqlPlan({ resourceKind, action, payload, context });
+      // B1 (#494): make a newly created table immediately usable by the data API and
+      // tenant-isolated by appending grants + tenant_id + FORCE RLS to the same DDL unit.
+      if (resourceKind === 'table' && action === 'create') {
+        const schemaName = payload.schemaName ?? context.schemaName;
+        const tableName = payload.tableName ?? context.tableName;
+        structural.statements = [
+          ...(structural.statements ?? []),
+          ...tableIsolationStatements(schemaName, tableName),
+        ];
+      }
+      return structural;
     }
   } catch (error) {
     if (error.validation) {
