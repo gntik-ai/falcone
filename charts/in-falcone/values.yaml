@@ -322,6 +322,30 @@ bootstrap:
               view: [admin, user]
               edit: [admin, user]
             multivalued: false
+          # finding A4 (live E2E campaign 2026-06-17): the tenant-context / workspace-context client
+          # scopes map user.attribute tenant_id / workspace_id into the token, but with a declarative
+          # user profile and unmanagedAttributePolicy off, an undeclared attribute is silently
+          # dropped — so a platform user could not carry tenant scope. Declare them as MANAGED
+          # attributes (admin-edit only: a user cannot self-assign tenant scope) so the values
+          # persist and surface in the issued JWT, without opening up arbitrary unmanaged attributes.
+          - name: tenant_id
+            displayName: Tenant ID
+            group: user-metadata
+            validations:
+              length: { max: 255 }
+            permissions:
+              view: [admin, user]
+              edit: [admin]
+            multivalued: false
+          - name: workspace_id
+            displayName: Workspace ID
+            group: user-metadata
+            validations:
+              length: { max: 255 }
+            permissions:
+              view: [admin, user]
+              edit: [admin]
+            multivalued: false
         groups:
           - name: user-metadata
             displayHeader: User metadata
@@ -518,6 +542,12 @@ bootstrap:
         email: platform-admin@in-falcone.example.com
         firstName: Platform
         lastName: Admin
+        # finding A1 (live E2E campaign 2026-06-17): a UserRepresentation POSTed without `enabled`
+        # is created DISABLED by Keycloak, so the bootstrap superadmin could not log in
+        # (login -> 401 "Account disabled") until manually enabled. Create it ready to use.
+        enabled: true
+        emailVerified: true
+        requiredActions: []
         realmRoles:
           - superadmin
     governanceCatalog:
@@ -2140,7 +2170,21 @@ ferretdb:
           until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}"; do
             echo "  engine not ready; retry in 2s"; sleep 2
           done
-          echo "Engine up. Waiting for documentdb_api schema (CREATE EXTENSION done) ..."
+          # finding C.4 (helm install --wait deadlock): do NOT merely WAIT for the documentdb_api
+          # schema. Under `helm install --wait` the post-install init Job that runs CREATE EXTENSION
+          # fires only AFTER all main resources are Ready, but this gateway (a main resource) blocks
+          # on that schema -> circular dependency -> "Progress deadline exceeded". CREATE the
+          # extension here so the gateway is self-sufficient and the install converges. Idempotent;
+          # the post-install Job stays the canonical owner for upgrades + logical-replication.
+          echo "Engine up. Verifying the documentdb extension is available ..."
+          if [ "$(psql -h "${PGHOST}" -p "${PGPORT}" -d "${PGDATABASE}" -tAc \
+            "SELECT 1 FROM pg_available_extensions WHERE name = 'documentdb'")" != "1" ]; then
+            echo "ERROR: 'documentdb' absent from pg_available_extensions (wrong image?). Failing closed." >&2
+            exit 1
+          fi
+          echo "Ensuring documentdb extension (loads the documentdb_api schema) ..."
+          psql -h "${PGHOST}" -p "${PGPORT}" -d "${PGDATABASE}" -v ON_ERROR_STOP=1 \
+            -c "CREATE EXTENSION IF NOT EXISTS documentdb CASCADE"
           until [ "$(psql -h "${PGHOST}" -p "${PGPORT}" -d "${PGDATABASE}" -tAc \
             "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'documentdb_api'")" = "1" ]; do
             echo "  documentdb_api absent; retry in 2s"; sleep 2
