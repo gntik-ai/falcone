@@ -12,3 +12,14 @@ The system SHALL have the console "new tenant" wizard submit to the real `POST /
 - **WHEN** an operator completes the console "new tenant" wizard
 - **THEN** the console submits to `POST /v1/tenants` and the tenant is created (no `404 NO_ROUTE`)
 
+### Requirement: Console E2E suite includes cross-tenant isolation probes
+
+The system SHALL ensure the console E2E suite includes a cross-tenant isolation probe
+that verifies a logged-in tenant user cannot view another tenant's resources in the UI.
+
+#### Scenario: Tenant-A user cannot see tenant-B resources in the console
+
+- **WHEN** a tenant-A user is logged in to the console
+- **THEN** tenant-B's workspaces, databases, and users MUST NOT appear in any console
+  list view accessible to tenant-A's user
+
