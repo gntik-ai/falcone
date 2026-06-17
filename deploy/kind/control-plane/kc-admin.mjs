@@ -124,6 +124,31 @@ export const kcAdmin = {
     if (!uuid) { const c = await this.findClient(realm, clientId); uuid = c?.id; }
     return uuid;
   },
+  // Per-tenant app client in the tenant realm (fix-tenant-realm-token-issuance, A3): a public
+  // client with the password (ROPC) + standard flows enabled, so tenant owners/users in the realm
+  // can actually obtain tokens. Returns the client UUID (idempotent on clientId).
+  async createPublicAppClient(realm, { clientId, name, redirectUris = ['*'], webOrigins = ['*'] }) {
+    const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/clients`, {
+      clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect',
+      publicClient: true, standardFlowEnabled: true, directAccessGrantsEnabled: true, serviceAccountsEnabled: false,
+      redirectUris, webOrigins, attributes: { 'in-falcone.kind': 'tenant-app' }
+    });
+    let uuid = created.id;
+    if (!uuid) { const c = await this.findClient(realm, clientId); uuid = c?.id; }
+    return uuid;
+  },
+  // Hardcoded claim mapper (A3): injects a FIXED claim value into the client's tokens regardless of
+  // user attributes — used to stamp the un-forgeable tenant_id (== realm name) into tenant-realm
+  // tokens, so a tenant user cannot set it to another tenant's id.
+  async addHardcodedClaimMapper(realm, clientUuid, { name, claimName, claimValue }) {
+    await kc('POST', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/protocol-mappers/models`, {
+      name, protocol: 'openid-connect', protocolMapper: 'oidc-hardcoded-claim-mapper',
+      config: {
+        'claim.name': claimName, 'claim.value': claimValue, 'jsonType.label': 'String',
+        'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true',
+      },
+    });
+  },
   async getClientSecret(realm, clientUuid) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/client-secret`)).json?.value ?? null;
   },

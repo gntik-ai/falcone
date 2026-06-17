@@ -1,6 +1,6 @@
 # tenant-rbac — spec delta for fix-tenant-realm-token-issuance
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Tenant realm is provisioned with a client and tenant_id mapper at tenant creation
 
