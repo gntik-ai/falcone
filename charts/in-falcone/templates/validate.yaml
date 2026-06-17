@@ -10,6 +10,15 @@
     {{- fail (printf "%s.persistence.size is required when persistence is enabled without existingClaim" .) -}}
   {{- end -}}
 {{- end -}}
+{{- /* finding D8/C.7: refuse to render any legacy migration-era component. FerretDB superseded
+   MongoDB, SeaweedFS superseded MinIO, and Knative superseded OpenWhisk; a values stanza for any
+   of them is an incomplete migration leaking back into the deploy (the live release ran a
+   falcone-mongodb StatefulSet + a minio NodePort + an openwhisk svc-stub). Fail closed. */ -}}
+{{- range $legacy := list "mongodb" "minio" "openwhisk" -}}
+  {{- if hasKey $.Values $legacy -}}
+    {{- fail (printf "legacy component %q must not be present in values: FerretDB/SeaweedFS/Knative supersede MongoDB/MinIO/OpenWhisk (finding D8/C.7)" $legacy) -}}
+  {{- end -}}
+{{- end -}}
 {{- if and .Values.global.airgap.enabled (not .Values.global.privateRegistry.registry) -}}
   {{- fail "global.privateRegistry.registry is required when global.airgap.enabled=true" -}}
 {{- end -}}
