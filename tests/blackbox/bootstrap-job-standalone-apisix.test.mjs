@@ -54,7 +54,7 @@ function renderScript(extraArgs = []) {
 /** Extract a YAML literal block scalar (`<key>: |`) and dedent it. Regex only; no YAML lib. */
 function extractBlockScalar(stream, key) {
   const lines = String(stream).split('\n');
-  const start = lines.findIndex((l) => new RegExp(`^(\\s*)${key.replace('.', '\\.')}:\\s*\\|`).test(l));
+  const start = lines.findIndex((l) => new RegExp(`^(\\s*)${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*\\|`).test(l));
   assert.ok(start >= 0, `expected a "${key}: |" block in the rendered ConfigMap`);
   const keyIndent = lines[start].match(/^(\s*)/)[1].length;
   const body = [];
