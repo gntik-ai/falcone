@@ -23,6 +23,41 @@ function slugify(s) {
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 
+// A plan id in the catalog is a UUID; the console CreateTenantWizard sends a SLUG (e.g. "starter").
+// Detect so we can resolve a slug -> id before the real plan-assign action (which keys on the UUID).
+function isPlanUuid(id) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id ?? ''));
+}
+
+// Assign a plan to a freshly-created tenant BEST-EFFORT (fix-console-create-tenant-plan). Plan
+// assignment is optional (see createTenant), so an unresolvable/invalid plan must NEVER abort tenant
+// creation. Resolve a slug -> id, assign when the plan exists, and otherwise return a structured
+// {assigned:false, reason} instead of throwing — previously a non-uuid planId (the wizard's slug)
+// made the assignPlan saga step throw "invalid input syntax for type uuid", rolling the tenant back
+// with a 502. Loaders are injectable so the resolution/best-effort logic is unit-testable.
+async function assignPlanBestEffort(pool, { tenantId, planId, assignedBy }, deps = {}) {
+  const loadPlanRepo = deps.loadPlanRepo
+    ?? (() => import('/repo/services/provisioning-orchestrator/src/repositories/plan-repository.mjs'));
+  const loadPlanAssign = deps.loadPlanAssign
+    ?? (async () => (await import('/repo/services/provisioning-orchestrator/src/actions/plan-assign.mjs')).main);
+  try {
+    let resolvedPlanId = planId;
+    if (!isPlanUuid(planId)) {
+      const planRepo = await loadPlanRepo();
+      const plan = await planRepo.findBySlug(pool, planId);
+      if (!plan) return { assigned: false, requestedPlanId: planId, reason: `no plan matches "${planId}"` };
+      resolvedPlanId = plan.id;
+    }
+    const planAssign = await loadPlanAssign();
+    const res = await planAssign(
+      { tenantId, planId: resolvedPlanId, assignedBy, callerContext: { actor: { id: assignedBy, type: 'superadmin' } } },
+      { db: pool });
+    return { assigned: true, ...(res?.body ?? {}) };
+  } catch (e) {
+    return { assigned: false, requestedPlanId: planId, reason: String(e?.message ?? e) };
+  }
+}
+
 // The web-console SPA consumes camelCase shapes ({tenantId, workspaceId,
 // displayName, slug, state} and {items, page}); our rows are snake_case. Map at
 // the edge, keeping the original columns too so existing API callers still work.
@@ -117,17 +152,13 @@ async function createTenant(ctx) {
       () => store.insertTenant(pool, { id: tenantId, slug, displayName, iamRealm: realm, createdBy: identity.sub }),
       { type: 'store.deleteTenant', args: { id: tenantId } });
 
-    // Optional: assign a plan immediately (reuses the REAL plan-assign action).
+    // Optional: assign a plan immediately (reuses the REAL plan-assign action). BEST-EFFORT —
+    // resolves a slug->id and never throws, so an unknown/empty-catalog plan does not roll the
+    // tenant back (fix-console-create-tenant-plan).
     let planAssignment = null;
     if (body.planId) {
-      planAssignment = await saga.step('assignPlan', async () => {
-        const planAssign = (await import('/repo/services/provisioning-orchestrator/src/actions/plan-assign.mjs')).main;
-        const res = await planAssign(
-          { tenantId, planId: body.planId, assignedBy: identity.sub,
-            callerContext: { actor: { id: identity.sub, type: 'superadmin' } } },
-          { db: pool });
-        return res?.body ?? null;
-      });
+      planAssignment = await saga.step('assignPlan',
+        () => assignPlanBestEffort(pool, { tenantId, planId: body.planId, assignedBy: identity.sub }));
     }
 
     await saga.complete({ tenantId, realm });
@@ -615,3 +646,6 @@ export const LOCAL_HANDLERS = {
   ...FN_HANDLERS,
   ...AUTH_HANDLERS
 };
+
+// Exported for unit testing the plan-resolution / best-effort assignment contract.
+export { isPlanUuid, assignPlanBestEffort };
