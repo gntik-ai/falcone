@@ -43,7 +43,9 @@ export function CreateTenantWizard({ open, onOpenChange, onCreated }: { open: bo
       { label: 'Locale', value: data.locale ?? 'es' }
     ]}
     onSubmit={async (data) => {
-      const response = await submitWizardRequest<{ tenantId: string; tenantSlug?: string }>('/v1/admin/tenants', { name: data.name ?? '', planId: data.planId ?? '', region: data.region ?? '', preferences: { locale: data.locale ?? 'es' } })
+      // The published catalog + runtime expose tenant creation at POST /v1/tenants; the old
+      // /v1/admin/tenants path is not routed (404 NO_ROUTE) — fix-console-tenant-create-path (#504).
+      const response = await submitWizardRequest<{ tenantId: string; tenantSlug?: string }>('/v1/tenants', { name: data.name ?? '', planId: data.planId ?? '', region: data.region ?? '', preferences: { locale: data.locale ?? 'es' } })
       onCreated?.()
       return { resourceId: response.tenantId, resourceUrl: '/console/tenants' }
     }}
