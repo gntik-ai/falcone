@@ -52,3 +52,39 @@ export function createWorkspaceDsnResolver({ pool, baseDsn }) {
   resolveConnection.invalidate = (workspaceId) => cache.delete(String(workspaceId));
   return resolveConnection;
 }
+
+// Resolve a workspace to its OWNING tenant from the same `workspace_databases` registry
+// (fix-executor-apikey-cross-tenant-idor, #517). Used by the executor's request dispatch to
+// reject cross-tenant access: a caller may only operate on a workspace its own tenant owns.
+//
+// Returns the owning tenant_id (string), or undefined when the workspace has no provisioned
+// database / no ownership record yet — callers treat "unknown owner" as "not a known foreign
+// tenant" (the api-key path then binds the key to the caller's own tenant and RLS scopes it).
+// A registry-lookup failure also resolves to undefined: the metadata pool that backs this lookup
+// also backs api-key issuance itself, so a real outage fails the write rather than the check.
+// pool: a control-plane metadata pool (where workspace_databases lives).
+export function createWorkspaceTenantResolver({ pool }) {
+  if (!pool || typeof pool.query !== 'function') throw new TypeError('createWorkspaceTenantResolver requires a pg pool');
+  const cache = new Map(); // workspaceId -> owning tenant_id (only positive results cached)
+
+  async function resolveWorkspaceTenant(workspaceId) {
+    const wsId = workspaceId ? String(workspaceId) : '';
+    if (!wsId) return undefined;
+    const cached = cache.get(wsId);
+    if (cached) return cached;
+    try {
+      const { rows } = await pool.query(
+        'SELECT tenant_id FROM workspace_databases WHERE workspace_id = $1 LIMIT 1',
+        [wsId],
+      );
+      const owner = rows[0]?.tenant_id;
+      if (owner) cache.set(wsId, owner); // a workspace's owning tenant never changes once set
+      return owner ?? undefined;
+    } catch {
+      return undefined; // registry unreachable → unknown owner (issuance write fails closed elsewhere)
+    }
+  }
+
+  resolveWorkspaceTenant.invalidate = (workspaceId) => cache.delete(String(workspaceId));
+  return resolveWorkspaceTenant;
+}
