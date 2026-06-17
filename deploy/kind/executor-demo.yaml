@@ -47,7 +47,12 @@ spec:
               GRANT falcone_service TO falcone;
               GRANT CREATE, USAGE ON SCHEMA public TO falcone;
               GRANT USAGE ON SCHEMA public TO falcone_anon, falcone_service;
-              ALTER DEFAULT PRIVILEGES FOR ROLE falcone IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO falcone_anon, falcone_service;
+              -- NOTE: the blanket ALTER DEFAULT PRIVILEGES that previously granted
+              -- SELECT, INSERT, UPDATE, DELETE on ALL tables to falcone_service/falcone_anon
+              -- has been REMOVED (PG-3 fix, #490). That grant was overly broad and allowed
+              -- data roles to read control-plane tables (workspace_api_keys, etc.).
+              -- Per-table grants are now applied explicitly by the DDL executor at table
+              -- creation time (tracked in fix-postgres-ddl-grants-and-rls / B1 / #494).
               SQL
 ---
 apiVersion: apps/v1

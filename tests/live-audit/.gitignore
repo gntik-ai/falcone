@@ -1,0 +1,6 @@
+# Never commit minted credentials, tokens, or raw secret-bearing captures.
+*.creds
+creds.env
+*.local
+*.token
+.env.local

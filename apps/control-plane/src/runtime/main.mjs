@@ -286,9 +286,18 @@ const mcpEngine = process.env.MCP_ENABLED === 'true'
 // data-plane + DDL slice itself and proxies every other path under those prefixes
 // (browse/inventory/management) to the legacy control-plane at CONTROL_PLANE_UPSTREAM.
 // Unset → unmatched paths return 404 (standalone/pure-executor mode).
+//
+// GATEWAY_SHARED_SECRET: when set, the executor only trusts x-tenant-id/x-workspace-id
+// identity headers that arrive together with a matching x-gateway-auth header (injected
+// by the APISIX gateway after authentication). Without this value the executor runs in
+// legacy dev/test mode: header-only identity is trusted unconditionally. Production MUST
+// set this secret; the gateway injects the matching x-gateway-auth on every forwarded
+// request so that legitimate gateway-authenticated traffic continues to work while
+// unauthenticated client-supplied identity headers are rejected with 401.
 const server = createControlPlaneServer({
   registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
+  gatewaySharedSecret: process.env.GATEWAY_SHARED_SECRET || undefined,
 });
 
 // Initialise all metadata schemas (they share keyPool) before listening.
