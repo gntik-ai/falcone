@@ -8,7 +8,9 @@ An "environment" (prod/staging/dev) is only a workspace slug today (e.g. workspa
 
 ## What Changes
 
-- Introduce a first-class environment concept so a project can hold multiple environments (prod/staging/dev), each with its own isolated resource set (database, bucket, topics, secrets).
+- Design note: the domain model already frames a workspace as the "delivery boundary for ONE runtime environment" with a required `environment` field — but it was unimplemented (no column; `workspaceOut` always returned `null`). So "first-class environment" = make that declared field real, with a tenant/project holding multiple workspaces across environments, each isolated by its own per-workspace database (D2/#502).
+- Add an `environment` column to `workspaces` (+ carry it on `workspace_databases`), accept + validate it on workspace create against an environment catalog (dev/staging/prod/sandbox/preview; default dev), and return it on the workspace.
+- Add `GET /v1/tenants/{t}/environments` listing a tenant's first-class environments, each with its workspaces and provisioned (isolated) databases.
 
 ## Capabilities
 
