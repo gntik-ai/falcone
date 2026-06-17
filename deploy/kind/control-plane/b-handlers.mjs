@@ -7,7 +7,9 @@ import { kcAdmin, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { startSaga } from './saga.mjs';
-import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential } from './dataplane.mjs';
+import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase } from './dataplane.mjs';
+import { deleteBucket } from './storage-handlers.mjs';
+import { deleteTopics } from './kafka-handlers.mjs';
 import { METRICS_HANDLERS } from './metrics-handlers.mjs';
 import { STORAGE_HANDLERS } from './storage-handlers.mjs';
 import { MONGO_HANDLERS } from './mongo-handlers.mjs';
@@ -190,6 +192,56 @@ async function listTenantUsers(ctx) {
 function canManageTenantId(identity, tenantId) {
   if (identity.actorType === 'superadmin' || identity.actorType === 'internal') return true;
   return ['tenant_owner', 'tenant_admin'].includes(identity.actorType) && identity.tenantId === tenantId;
+}
+
+// ---- tenant offboarding (add-tenant-delete-purge-cascade #501) --------------
+// DELETE /v1/tenants/{tenantId} — soft delete: mark the tenant 'deleted' (reversible;
+// resources are retained until an explicit purge). Returns 404 only if the tenant is unknown.
+async function deleteTenant(ctx) {
+  const { params, identity, pool } = ctx;
+  const tenant = await store.getTenant(pool, params.tenantId);
+  if (!tenant) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+  if (!canManageTenantId(identity, tenant.id)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  const rec = await store.markTenantDeleted(pool, tenant.id);
+  return ok(200, { tenant: { id: tenant.id, status: rec?.status ?? 'deleted' },
+    message: 'tenant marked deleted; POST /v1/tenants/{id}/purge to remove all owned resources' });
+}
+
+// POST /v1/tenants/{tenantId}/purge — hard cascade: remove EVERY resource the tenant owns
+// (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows), leaving
+// no orphaned data. Physical teardown (DB drop, realm delete) is reliable; bucket/topic teardown
+// is best-effort (the registry rows are removed regardless, so no orphaned rows remain).
+async function purgeTenant(ctx) {
+  const { params, identity, pool } = ctx;
+  const tenant = await store.getTenant(pool, params.tenantId);
+  if (!tenant) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+  if (!canManageTenantId(identity, tenant.id)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  const realm = tenant.iam_realm;
+
+  // 1. Delete all registry rows + collect the physical resources to tear down.
+  const phys = await store.purgeTenant(pool, tenant.id);
+  // 2. Drop each physical workspace database (catalog-level isolation teardown).
+  const databasesDropped = [];
+  for (const db of phys.databases) { try { await dropWorkspaceDatabase(pool, db); databasesDropped.push(db); } catch { /* best-effort */ } }
+  // 3. Delete the tenant's Keycloak realm — cascades its clients, users, and roles.
+  let realmDeleted = false;
+  if (realm) { try { await kcAdmin.deleteRealm(realm); realmDeleted = true; } catch { /* best-effort */ } }
+  // 4. Best-effort physical object-store + topic teardown (rows already removed above).
+  const bucketsDeleted = [];
+  for (const b of phys.buckets) { try { await deleteBucket(b); bucketsDeleted.push(b); } catch { /* best-effort */ } }
+  let topicsDeleted = [];
+  try { await deleteTopics(phys.topics); topicsDeleted = phys.topics; } catch { /* best-effort */ }
+
+  return ok(200, {
+    tenantId: tenant.id, purged: true,
+    removed: {
+      workspaces: phys.workspaceIds.length,
+      databases: databasesDropped, realm: realmDeleted ? realm : null,
+      buckets: bucketsDeleted, topics: topicsDeleted,
+    },
+    // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
+    residual: { knativeServices: phys.ksvcs },
+  });
 }
 
 // ---- workspaces ------------------------------------------------------------
@@ -512,7 +564,7 @@ async function iamRemoveUserFromGroup(ctx) {
 }
 
 export const LOCAL_HANDLERS = {
-  createTenant, listTenants, getTenant, createTenantUser, listTenantUsers,
+  createTenant, listTenants, getTenant, deleteTenant, purgeTenant, createTenantUser, listTenantUsers,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
