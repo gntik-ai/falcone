@@ -8,9 +8,11 @@ The in-chart Falcone Prometheus scrapes only itself (1 target, 0 Falcone metrics
 
 ## What Changes
 
-- Add ServiceMonitors for the control-plane and executor and expose `/metrics` on those services.
-- Ship Falcone Grafana dashboards (including a per-tenant view).
-- Back the metrics API with the real Prometheus series so it no longer returns zeros.
+- Corrected scope after reading the deploy: the pipeline was MORE broken than "missing ServiceMonitors" — the in-cluster Prometheus mounted no config at all (ran the default, scraped only itself) and no Grafana was deployed.
+- Expose a Prometheus `/metrics` endpoint on the control-plane and executor, backed by a zero-dep in-process registry (`metrics-registry.mjs`) recording HTTP request counts + a latency histogram with bounded route/status/tenant labels.
+- Render a real `prometheus.yml` (scrape control-plane/executor/apisix `/metrics`) and mount it into the observability Deployment with `--config.file` (it previously had no config volume).
+- Deploy Grafana (Deployment + Service) with a provisioned Prometheus datasource and Falcone dashboards (platform overview + per-tenant), built on the `falcone_*` metrics.
+- Back the metrics API `series()` with a real Prometheus PromQL query (it returned a hardcoded empty array before).
 
 ## Capabilities
 
