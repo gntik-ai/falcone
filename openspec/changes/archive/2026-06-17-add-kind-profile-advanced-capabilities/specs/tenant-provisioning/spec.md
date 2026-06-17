@@ -15,9 +15,16 @@ deployment.
 - **THEN** the realtime SSE endpoint (PG-table change stream) MUST respond to a
   subscription request and MUST deliver change events
 
-#### Scenario: Workflow route returns non-501 with the advanced kind profile
+#### Scenario: Flows API responds with the advanced kind profile
 
-- **WHEN** the chart is installed with the advanced kind values overlay and Temporal
-  is enabled
-- **THEN** `GET /v1/flows` MUST return 200 (or the appropriate list response) and
-  MUST NOT return 501 `Not implemented`
+- **WHEN** the chart is installed with the advanced kind values overlay (Temporal +
+  workflow-worker up and `TEMPORAL_ADDRESS` set on the executor)
+- **THEN** the workspace-scoped Flows endpoints (`GET /v1/flows/workspaces/{ws}/task-types`
+  and `GET /v1/flows/workspaces/{ws}/flows`) MUST return 200 with a list response and
+  MUST NOT return 404 / 501
+
+#### Scenario: MCP hosting routes are registered with the advanced kind profile
+
+- **WHEN** the chart is installed with the advanced kind values overlay (`MCP_ENABLED=true`)
+- **THEN** `GET /v1/mcp/workspaces/{ws}/servers` MUST be a registered route returning 200
+  (not 404)
