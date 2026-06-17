@@ -79,19 +79,25 @@ credentialed('us-console-01: admin creates a tenant via the UI; it appears in th
   expect(token, 'login must yield an access token').toBeTruthy()
 
   const name = uniqueName('e2e-tenant')
-  // open the CreateTenantWizard and step through Nombre -> Plan -> Región -> submit
+  // the "Nuevo tenant" button lives on the tenants page (ConsoleTenantsPage)
+  await page.goto('/console/tenants')
   await page.getByRole('button', { name: /nuevo tenant/i }).click()
-  await page.locator('input[name="name"], input[name="displayName"]').first().fill(name)
-  // advance through the wizard steps (plan + region are selected from the live catalog)
-  for (let step = 0; step < 3; step++) {
-    const next = page.getByRole('button', { name: /siguiente|continuar/i })
-    if (await next.isVisible().catch(() => false)) { await next.click(); continue }
-    break
-  }
-  await Promise.all([
-    page.waitForResponse((r) => r.url().includes('/v1/tenants') && r.request().method() === 'POST' && r.status() < 400),
-    page.getByRole('button', { name: /crear|finalizar/i }).click(),
+  // CreateTenantWizard: Nombre -> Plan -> Región (WizardShell nav: Siguiente / Confirmar)
+  await page.locator('#tenant-name').fill(name)
+  await page.getByRole('button', { name: /siguiente/i }).click()
+  await page.locator('#tenant-plan').selectOption('starter')
+  await page.getByRole('button', { name: /siguiente/i }).click()
+  await page.locator('#tenant-region').selectOption('eu-west')
+  await page.getByRole('button', { name: /siguiente/i }).click() // -> Resumen (summary) step
+  const [createRes] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/v1/tenants') && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /confirmar/i }).click(),
   ])
+  if (!createRes.ok()) {
+    // surface the API error to make a failing run diagnosable
+    const txt = await createRes.text().catch(() => '')
+    throw new Error(`POST /v1/tenants -> ${createRes.status()} ${txt.slice(0, 300)}`)
+  }
 
   // appears in the console tenant list (UI)
   await expect(page.getByText(name)).toBeVisible({ timeout: 15_000 })
