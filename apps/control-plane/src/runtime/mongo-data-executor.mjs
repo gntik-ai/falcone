@@ -6,10 +6,45 @@
 // adapter, which injects the tenant predicate into every query filter and stamps the
 // tenant onto inserted documents — so a forgotten filter cannot cross tenants and a
 // write cannot forge another tenant. (Mongo has no RLS/SET ROLE; the filter IS the guard.)
-import { MongoClient } from 'mongodb'
+import { MongoClient, ObjectId } from 'mongodb'
 
 import { buildMongoDataApiPlan, encodeMongoDataCursor } from '../../../../services/adapters/src/mongodb-data-api.mjs'
 import { clientError } from './errors.mjs'
+
+const OBJECT_ID_HEX = /^[0-9a-fA-F]{24}$/
+
+// A document inserted without an explicit `_id` is stored with a BSON ObjectId (the driver
+// generates it client-side), but the by-id handlers carry the id through as the plain hex
+// STRING the client echoes back — so `{_id: "<hex>"}` never matches the stored ObjectId and
+// get/update/replace/delete by id silently no-op (fix-mongo-document-id-objectid-coercion, #495).
+// When the by-id value is a 24-char hex string, match EITHER the ObjectId or the raw string so
+// that auto-generated ObjectId ids resolve while custom string ids (incl. hex-looking ones) keep
+// matching. Non-ObjectId ids are left untouched (string fallback, per spec).
+//
+// The adapter merges the tenant predicate via `mergeFilters`, which yields `{$and:[{tenantId},
+// {_id}]}` — so the `_id` clause is NESTED inside `$and`, not at the top level. We therefore
+// descend through the logical operators (`$and`/`$or`/`$nor`) and rewrite each `_id` equality
+// branch, never touching the tenant clause: the `$or` only widens the `_id` match, the tenant
+// scope is ANDed in exactly as before. Exported for deterministic unit coverage.
+export function coerceDocumentIdFilter(node) {
+  if (Array.isArray(node)) return node.map(coerceDocumentIdFilter)
+  if (!node || typeof node !== 'object') return node
+  const rewritten = {}
+  let idOr
+  for (const [key, value] of Object.entries(node)) {
+    if (key === '_id' && typeof value === 'string' && OBJECT_ID_HEX.test(value)) {
+      idOr = { $or: [{ _id: new ObjectId(value) }, { _id: value }] }
+      continue
+    }
+    rewritten[key] = (key === '$and' || key === '$or' || key === '$nor') && Array.isArray(value)
+      ? value.map(coerceDocumentIdFilter)
+      : value
+  }
+  if (!idOr) return rewritten
+  if (Object.keys(rewritten).length === 0) return idOr
+  // Sibling clauses (e.g. an explicit `$or` from a caller) stay ANDed with the id match.
+  return '$or' in rewritten ? { $and: [rewritten, idOr] } : { ...rewritten, ...idOr }
+}
 
 export function createMongoExecutor(options = {}) {
   if (typeof options.resolveUri !== 'function') {
@@ -102,7 +137,7 @@ export function createMongoExecutor(options = {}) {
         return { items, page: { size: limit, returned: items.length, after } }
       }
       if (op === 'get') {
-        const doc = await collection.findOne(plan.query.filter, { projection: plan.query.projection })
+        const doc = await collection.findOne(coerceDocumentIdFilter(plan.query.filter), { projection: plan.query.projection })
         return { found: doc != null, item: doc ?? null }
       }
       if (op === 'insert') {
@@ -110,15 +145,15 @@ export function createMongoExecutor(options = {}) {
         return { item: { ...plan.write.document, _id: plan.write.document._id ?? result.insertedId }, insertedId: result.insertedId }
       }
       if (op === 'update') {
-        const result = await collection.updateOne(plan.query.filter, plan.write.update, { upsert: plan.write.upsert === true })
+        const result = await collection.updateOne(coerceDocumentIdFilter(plan.query.filter), plan.write.update, { upsert: plan.write.upsert === true })
         return { matched: result.matchedCount, modified: result.modifiedCount, upsertedId: result.upsertedId ?? null }
       }
       if (op === 'replace') {
-        const result = await collection.replaceOne(plan.query.filter, plan.write.replacement, { upsert: plan.write.upsert === true })
+        const result = await collection.replaceOne(coerceDocumentIdFilter(plan.query.filter), plan.write.replacement, { upsert: plan.write.upsert === true })
         return { matched: result.matchedCount, modified: result.modifiedCount, upsertedId: result.upsertedId ?? null }
       }
       if (op === 'delete') {
-        const result = await collection.deleteOne(plan.query.filter)
+        const result = await collection.deleteOne(coerceDocumentIdFilter(plan.query.filter))
         return { deleted: result.deletedCount }
       }
       throw clientError(`Operation ${op} is not yet executed by the Mongo executor`, 400, 'UNSUPPORTED_OPERATION')
