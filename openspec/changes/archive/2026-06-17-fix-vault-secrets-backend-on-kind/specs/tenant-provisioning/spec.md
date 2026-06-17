@@ -1,18 +1,21 @@
 # tenant-provisioning — spec delta for fix-vault-secrets-backend-on-kind
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Vault secrets backend installs cleanly on kind without cert-manager
 
-The system SHALL provide a kind-compatible Vault installation path that does not
-require cert-manager, so that enabling Vault does not abort the release.
+The chart SHALL provide a kind-compatible Vault TLS path selected by `vault.tls.mode`:
+`cert-manager` (default) renders the cert-manager Certificate; `self-signed` instead
+renders a pre-install hook Job that generates the server TLS Secret with openssl, so that
+enabling Vault on a cluster without cert-manager does not abort the release.
 
 #### Scenario: vault.enabled=true installs without cert-manager on kind
 
-- **WHEN** the chart is installed with `vault.enabled=true` on a kind cluster that
-  does not have cert-manager
-- **THEN** the release MUST install cleanly without errors related to missing CRDs
-  or certificates
+- **WHEN** the chart is installed with `vault.enabled=true` and `vault.tls.mode=self-signed`
+  on a kind cluster that does not have cert-manager
+- **THEN** the render MUST contain no `cert-manager.io/v1` resource and MUST contain a
+  pre-install hook Job that provisions the `vault-server-tls` Secret, so the release installs
+  cleanly without errors related to missing CRDs or certificates
 
 ## ADDED Requirements
 

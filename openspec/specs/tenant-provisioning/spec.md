@@ -202,3 +202,14 @@ standard Helm timeout with no circular dependency between main resources and hoo
   the engine and verify the `documentdb_api` schema before the gateway container starts,
   and MUST NOT depend on the post-install hook Job for that critical-path schema
 
+### Requirement: At least one app secret resolves from Vault when Vault is enabled
+
+The system SHALL wire at least one application secret through Vault (via ESO or
+equivalent) so that enabling Vault provides a real end-to-end secrets resolution path.
+
+#### Scenario: App secret resolves from Vault
+
+- **WHEN** Vault is enabled and a configured secret is stored in Vault
+- **THEN** the consuming application MUST receive the secret value from Vault and
+  MUST NOT fall back to a plain Kubernetes Secret for that value
+
