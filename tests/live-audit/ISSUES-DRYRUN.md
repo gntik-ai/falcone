@@ -9,7 +9,6 @@
 
 # (original dry-run below)
 
-
 Grouped into epics with child issues, formatted to the repo conventions (OpenSpec change-id +
 labels). **Nothing is created until you confirm.** Labels use the repo set: `bug`/`enhancement`,
 `P0|P1|P2`, `cap:<name>`, `security`/`tenant-isolation`, `openspec`, `e2e` (where relevant).
@@ -20,6 +19,7 @@ broken or high-impact isolation gap · **P2** = correctness/observability gap.
 ---
 
 # EPIC A — Tenant isolation is not enforced on the live stack (CRITICAL)
+
 **Labels:** `epic` `security` `tenant-isolation` `P0` `cap:multitenancy`
 **Problem:** With two real tenants, cross-tenant **read/write/delete** was empirically demonstrated
 on Postgres, Kafka events and Functions, plus IDOR on Storage; and an **unauthenticated** caller can
@@ -29,6 +29,7 @@ impersonate any tenant via the public gateway. The cardinal BaaS guarantee is ab
 credential can only ever touch its own resources; the gateway authenticates and strips tenant headers.
 
 ## A1 — Gateway: authenticate requests and strip client tenant-context headers
+
 - **change-id:** `fix-gateway-authn-and-strip-tenant-headers` · **Labels:** `bug` `security` `tenant-isolation` `P0` `cap:gateway` `openspec`
 - **Problem:** The live standalone APISIX (`falcone-apisix-standalone`, public via
   `api.dev.in-falcone.example.com`) carries only `cors`+`proxy-rewrite` — **no auth plugin** and **no
@@ -50,6 +51,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   now; external exposure is currently inert only because no ingress controller is deployed.
 
 ## A2 — Executor: bind every data-plane op to the credential's workspace (not the URL path)
+
 - **change-id:** `fix-executor-enforce-credential-workspace` · **Labels:** `bug` `security` `tenant-isolation` `P0` `cap:data-plane` `openspec`
 - **Problem:** Handlers take `workspaceId`/`databaseName`/`bucketId` from the **path** and never assert
   it matches the authenticated credential (`identity.workspaceId === path.workspaceId`). A correctly
@@ -64,6 +66,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
 - **Affected capability:** data-plane (postgres/events/functions/realtime).
 
 ## A3 — Postgres: real per-workspace DB isolation + RLS on user tables
+
 - **change-id:** `fix-postgres-tenant-db-isolation-and-rls` · **Labels:** `bug` `security` `tenant-isolation` `P0` `cap:database` `openspec`
 - **Problem:** `apps/control-plane/src/runtime/main.mjs:57` `resolveConnection = () => ({ dsn })`
   ignores `workspaceId` → **all workspaces share `in_falcone`** (the control-plane metadata DB); the
@@ -75,13 +78,14 @@ credential can only ever touch its own resources; the gateway authenticates and 
   `public.workspace_api_keys` (all tenants).
 - **Proposed solution:** make `resolveConnection` return the real per-workspace DSN from the data-plane
   provisioner (the registry already supports it); OR if staying single-DB, enforce schema-per-workspace
-  + `FORCE ROW LEVEL SECURITY` with `tenant_id`/`workspace_id` policies on every table and revoke broad
+  - `FORCE ROW LEVEL SECURITY` with `tenant_id`/`workspace_id` policies on every table and revoke broad
   `falcone_service` grants on control-plane tables.
 - **Acceptance:** B's key cannot see/modify A's table; data API never connects to `in_falcone` for
   tenant data; `falcone_service` has no SELECT on control-plane tables.
 - **Affected capability:** database (Postgres data API).
 
 ## A4 — Storage: enforce bucket ownership + per-tenant S3 identity
+
 - **change-id:** `fix-storage-bucket-ownership-and-identity` · **Labels:** `bug` `security` `tenant-isolation` `P0` `cap:storage` `openspec`
 - **Problem:** `deploy/kind/control-plane/storage-handlers.mjs` `listObjects(ctx.params.bucketId)` /
   `workspaceUsage(ctx.params.workspaceId)` never reference `identity.tenantId` → IDOR. The platform
@@ -96,6 +100,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
 - **Affected capability:** storage. **Depends on:** A2.
 
 ## A5 — Knative function routes are not tenant-scoped
+
 - **change-id:** `fix-knative-function-tenant-scope` · **Labels:** `bug` `security` `tenant-isolation` `P1` `cap:functions` `openspec`
 - **Problem:** Control-plane Knative function routes are `auth:'authenticated'` with no tenant scope;
   `getFnAction(pool, resourceId)` has no `tenant_id` predicate → any authenticated principal can
@@ -107,6 +112,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
 - **Affected capability:** functions.
 
 ## A6 — Auth-as-a-service end users land in the shared platform realm
+
 - **change-id:** `fix-end-user-tenant-realm-placement` · **Labels:** `bug` `security` `tenant-isolation` `P1` `cap:auth` `openspec`
 - **Problem:** `POST /v1/auth/signups {tenantId}` creates the user in `in-falcone-platform`
   (alongside `superadmin`), not in the tenant's realm; the user gets no `tenant_id` attribute. Note:
@@ -124,10 +130,12 @@ credential can only ever touch its own resources; the gateway authenticates and 
 ---
 
 # EPIC B — Core data-plane & auth flows are broken end-to-end (HIGH)
+
 **Labels:** `epic` `bug` `P1` `cap:data-plane`
 **Problem:** Even ignoring isolation, several primary capabilities don't complete a basic flow.
 
 ## B1 — Postgres DDL→data round-trip: API-created tables are unusable
+
 - **change-id:** `fix-postgres-ddl-grants-and-rls` · **Labels:** `bug` `P1` `cap:database` `openspec`
 - **Problem:** DDL `create table` emits only `CREATE TABLE …` — no GRANT to the api-key DB roles
   (`falcone_service`/`falcone_anon`) and no RLS. The data API (runs as the api-key role) then returns
@@ -139,6 +147,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   issuing tenant only.
 
 ## B2 — Document by-id CRUD silently no-ops (ObjectId vs string)
+
 - **change-id:** `fix-mongo-document-id-objectid-coercion` · **Labels:** `bug` `P1` `cap:document-db` `openspec`
 - **Problem:** `_id` is stored as a BSON `ObjectId` but by-id handlers query `{_id: "<hex>"}` → never
   match. get/update/replace/delete by id all no-op; DELETE returns `200 {deleted:0}` (silent data
@@ -148,6 +157,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   mongo executor. **Acceptance:** by-id round-trip on the returned id works; DELETE of a real id → removed.
 
 ## B3 — Auth-as-a-service login fails after signup ("Account is not fully set up")
+
 - **change-id:** `fix-auth-as-a-service-login` · **Labels:** `bug` `P1` `cap:auth` `openspec`
 - **Problem:** After `POST /v1/auth/signups` → 201, `POST /v1/auth/login-sessions` and direct Keycloak
   ROPC both fail `invalid_grant "Account is not fully set up"`, although the user is
@@ -163,6 +173,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   authorized call.
 
 ## B4 — Quota/usage consumption is never measured
+
 - **change-id:** `fix-quota-consumption-measurement` · **Labels:** `bug` `P2` `cap:quotas` `openspec`
 - **Problem:** `GET /v1/tenants/{t}/plan/consumption` and `/v1/metrics/.../usage` return every dimension
   `currentUsage:null`/`measuredValue:0` with `NO_QUERY_MAPPING` / `CONSUMPTION_QUERY_FAILED`. Usage-based
@@ -172,6 +183,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   reflects real resource counts; soft/hard limits enforce.
 
 ## B5 — Realtime: Mongo collection DELETE events are never delivered
+
 - **change-id:** `fix-mongo-realtime-delete-preimage` · **Labels:** `bug` `P2` `cap:realtime` `openspec`
 - **Problem:** On the Mongo change-stream SSE path, `delete` events never reach subscribers even with
   `changeStreamPreAndPostImages` enabled — `fullDocumentBeforeChange` isn't populated, so the
@@ -186,9 +198,11 @@ credential can only ever touch its own resources; the gateway authenticates and 
 ---
 
 # EPIC C — Observability & REST surface completeness (MED)
+
 **Labels:** `epic` `enhancement` `P2` `cap:observability`
 
 ## C1 — Falcone application/tenant metrics don't flow; no Falcone dashboards
+
 - **change-id:** `add-falcone-metrics-scrape-and-dashboards` · **Labels:** `bug` `P2` `cap:observability` `openspec`
 - **Problem:** the in-chart Falcone Prometheus scrapes only itself (1 target, 0 falcone metrics); no
   ServiceMonitor for control-plane/executor; Grafana has 0 Falcone dashboards; metrics API returns zeros.
@@ -197,6 +211,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   **Acceptance:** Prometheus scrapes falcone targets; a Falcone tenant dashboard shows non-zero data.
 
 ## C2 — Advertised-but-unwired REST routes (completeness/parity)
+
 - **change-id:** `add-wire-advertised-public-routes` · **Labels:** `enhancement` `P2` `cap:api` `openspec`
 - **Problem:** the live runtime implements a fraction of the 392-route OpenAPI catalog; `NO_ROUTE` for
   storage object I/O, function secrets/triggers/rules, tenant memberships/invitations/custom-roles,
@@ -209,9 +224,11 @@ credential can only ever touch its own resources; the gateway authenticates and 
 ---
 
 # EPIC D — Tenant lifecycle & web console (MED/HIGH)
+
 **Labels:** `epic` `P1` `cap:provisioning` `cap:web-console`
 
 ## D1 — No tenant deletion / purge / cascading cleanup (offboarding gap)
+
 - **change-id:** `add-tenant-delete-purge-cascade` · **Labels:** `bug` `tenant-isolation` `P1` `cap:provisioning` `openspec`
 - **Problem:** `DELETE /v1/tenants/{t}`, `POST /v1/tenants/{t}/purge` (and deactivate/suspend/archive)
   → **404 NO_ROUTE**. There is no way to offboard a tenant or clean up its resources; tenants,
@@ -225,6 +242,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   no orphaned rows/DBs/realms/buckets remain.
 
 ## D2 — Workspace physical database is never provisioned
+
 - **change-id:** `fix-workspace-db-provisioning-saga` · **Labels:** `bug` `P1` `cap:provisioning` `openspec`
 - **Problem:** `POST /v1/workspaces` creates a `workspace_databases` registry row but the backing
   `wsdb_*` Postgres database is never created (only the two long-lived demo workspaces have real DBs).
@@ -233,6 +251,7 @@ credential can only ever touch its own resources; the gateway authenticates and 
   data API actually connects to.
 
 ## D3 — Multiple isolated environments per project not supported
+
 - **change-id:** `add-environment-first-class-isolation` · **Labels:** `enhancement` `P2` `cap:provisioning` `openspec`
 - **Problem:** "environment" (prod/staging/dev) is only a workspace slug; no environment entity and no
   isolated per-environment resource set (the requirement asks for prod/staging/dev with isolated
@@ -240,18 +259,21 @@ credential can only ever touch its own resources; the gateway authenticates and 
   topics/secrets.
 
 ## D4 — Console "new tenant" wizard targets a non-existent route
+
 - **change-id:** `fix-console-tenant-create-path` · **Labels:** `bug` `P2` `cap:web-console` `openspec`
 - **Problem:** the console POSTs to `/v1/admin/tenants` (404; not in the catalog); only `/v1/tenants`
   exists. UI-driven tenant creation fails. **Evidence:** `evidence/12-console-parity.md` (CONS-1).
   **Acceptance:** creating a tenant from the console succeeds.
 
 ## D5 — Console not edge-routable as deployed
+
 - **change-id:** `fix-console-edge-routing` · **Labels:** `bug` `P2` `cap:web-console` `openspec`
 - **Problem:** no ingress controller is deployed, so the SPA's same-origin `/v1/*` calls have no edge
   to reach the control-plane; a real browser on the console host gets HTML for every API call.
   **Evidence:** CONS-3. **Acceptance:** the console reaches the API end-to-end in the deployed topology.
 
 ## D6 — RESOLVED (not filed): management-plane tenant scoping is correct
+
 - **Verified clean (code-confirmed):** `routes.mjs` makes `GET /v1/tenants` **superadmin-only**
   (`auth:'superadmin'`) — a non-superadmin can't fetch the list at all; `getTenant`
   (`/v1/tenants/{id}`, `auth:'authenticated'`) enforces
@@ -263,11 +285,12 @@ credential can only ever touch its own resources; the gateway authenticates and 
 ---
 
 # Not filed as bugs (NOT-DEPLOYED / in-flight)
+
 Temporal/Flows (workflows), MCP server hosting (modules not wired), FerretDB-wired document path
 (wiring gap), OpenBao secrets, storage object I/O, Kafka→function/workflow triggers, team-management
 API. Tracked as deployment/enablement work, not defects (see `evidence/14-inflight-features.md`).
 
 ---
 
-_Pending additions from the still-running agents: Realtime/CDC, Provisioning lifecycle
-(orphaned-resource cleanup), Web console / API↔console parity._
+*Pending additions from the still-running agents: Realtime/CDC, Provisioning lifecycle
+(orphaned-resource cleanup), Web console / API↔console parity.*

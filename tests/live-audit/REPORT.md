@@ -167,10 +167,12 @@ This is a REST↔spec completeness gap that also affects REST↔console parity (
   half (event bus, function invoke) works in isolation; the binding between them is absent.
 
 ## 6. API ↔ Console parity
-_Pending console agent — see §3 update on completion._ Structural note: the console is a thin SPA
+
+_Pending console agent — see §3 update on completion.* Structural note: the console is a thin SPA
 over the same control-plane API, so parity is bounded by the same REST completeness gaps in §4.
 
 ## 9. In-flight / not-deployed features (→ `evidence/14-inflight-features.md`)
+
 Classified **not-deployed, not bugs** (per the brief):
 - **Workflows (Temporal/Flows)** — not deployed live (`/v1/flows` NO_ROUTE, no Temporal). Tested
   **green-when-deployed**: 8 real-run Playwright specs (design/publish, triggers, run/observe,
@@ -185,6 +187,7 @@ Classified **not-deployed, not bugs** (per the brief):
   deploy-ready suites + merge history, not a CI gate.
 
 ## 7. Realtime / CDC (→ `evidence/08-realtime.md`) — WORKING, isolation HOLDS
+
 Both SSE change streams are deployed and were proven empirically (subscribe → mutate → frame captured):
 - **Postgres table** (trigger + LISTEN/NOTIFY): insert/update/**delete** all delivered with full row. ✅
 - **Mongo collection** (change stream on a 1-node replica set): insert/update delivered; **delete
@@ -196,6 +199,7 @@ Both SSE change streams are deployed and were proven empirically (subscribe → 
   URL path — i.e. this surface implements the correct pattern the broken surfaces (§4) lack.
 
 ## 8. Provisioning lifecycle (→ `evidence/11-provisioning-lifecycle.md`)
+
 - **Create:** `POST /v1/tenants` creates a metadata row (no realm/workspace auto-provisioned);
   `POST /v1/workspaces` creates a workspace + `workspace_databases` registry row + async saga.
 - **PROV-1 (MED):** the workspace's **physical Postgres database is never provisioned** — new
@@ -209,6 +213,7 @@ Both SSE change streams are deployed and were proven empirically (subscribe → 
   remediation path. (Probe tenants had to be removed by direct SQL.)
 
 ## 6. Web console + API↔console parity (→ `evidence/12-console-parity.md`) — WORKS; parity HOLDS
+
 - The console is a static thin SPA (`/v1/*` same-origin). **Superadmin login works end-to-end**
   (`POST /v1/auth/login-sessions → 201` → `/console/overview`); overview/tenants/workspaces/plans/
   iam-access/members all render real data with zero JS errors (11 screenshots captured).
@@ -232,6 +237,7 @@ Both SSE change streams are deployed and were proven empirically (subscribe → 
 ---
 
 ## 10. What could not be (fully) tested
+
 - **Tenant-scoped JWT** to the data plane: the executor only verifies **platform-realm** JWTs and
   platform users carry no `tenant_id`; tenant-realm tokens aren't accepted. Data-plane principal
   testing therefore used API keys + trust headers (which is itself the GW-1/AUTHZ-1 finding).

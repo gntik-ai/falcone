@@ -4,6 +4,7 @@
 and all probe tenants it created were cleaned up — final tenant count back to the original 9.)
 
 ## Create — PARTIAL/ASYNC
+
 - `POST /v1/tenants` → creates a tenant row (no `iam_realm` and no workspace are auto-provisioned;
   the probe tenants `laprov*`/`laconsoleparity*` had `iam_realm=null`).
 - `POST /v1/workspaces` → creates a workspace + a `workspace_databases` registry row and kicks off an
@@ -23,6 +24,7 @@ and all probe tenants it created were cleaned up — final tenant count back to 
   Multiple isolated environments per project = **not supported**.
 
 ## Delete / purge — NOT WIRED (no offboarding)
+
 - **PROV-2 (HIGH): tenant deletion + cascading cleanup is not deployed.**
   `DELETE /v1/tenants/{t}` → **404 NO_ROUTE**; `POST /v1/tenants/{t}/purge` → **404 NO_ROUTE**
   (also deactivate/suspend/archive per the console agent). There is **no API path to delete or purge a
@@ -34,6 +36,7 @@ and all probe tenants it created were cleaned up — final tenant count back to 
   control-plane DB (done; verified clean).
 
 ## Status
+
 | Step | Status |
 |---|---|
 | Create tenant | Active (metadata row) |

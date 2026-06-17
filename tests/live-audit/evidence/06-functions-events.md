@@ -44,6 +44,7 @@ Code refs: `apps/control-plane/src/runtime/server.mjs:313-332`, `…/functions-e
 | **Kafka → workflow** end-to-end | **Not-deployed** | no Temporal, no `workflow-worker`/`event-gateway` deploy; flows route → `NO_ROUTE` |
 
 ## Functions invoke → correct result: PROVEN on BOTH runtimes
+
 - **Executor (worker_threads):** `main({a:6,b:7})` → `{product:42}`. Real in-thread execution (`process` present, logs captured).
 - **Knative (real ksvc):** `fn-primary-multiplier` (`fn_27a950f2-f89`) → `{engine:"knative",product:42,greeting:"hola mundo"}`, 1.3 s cold start. This is the production-style runtime.
 
@@ -74,6 +75,7 @@ wins** and the verified API key's bound workspace is never enforced. `resolveIde
 `identity.workspaceId === path workspaceId`** for the functions/events families.
 
 Empirical proof — **Tenant B's real `flc_service` key, with Tenant A's workspace id in the path**:
+
 ```
 POST /v1/functions/workspaces/<A_ws>/actions/lafn…mult/invocations   (B key) {a:2,b:3}
  -> 200 {"status":"success","result":{"product":6,"tenant":"A"}}         # B INVOKES A's function
@@ -86,6 +88,7 @@ GET  /v1/events/workspaces/<A_ws>/topics/laevt…t/messages            (B key)
 POST /v1/events/workspaces/<A_ws>/topics/laevt…t/publish             (B key) {value:{from:"B"}}
  -> 202 {"published":1,…"baseOffset":"1"}                                # B WRITES into A's topic
 ```
+
 Sanity (proves the leak is the path override, not a shared store): with **B's own** workspace path,
 B sees none of A's resources (`…/topics` → `{"items":[]}`, `…/actions` → `{"items":[]}`).
 Severity CRITICAL — cross-tenant read AND write of functions and event streams; the Kafka
@@ -112,18 +115,21 @@ results/logs.
   IS workspace-scoped; only the resourceId routes leak.
 
 ## Cross-tenant isolation probe — RESULT
+
 - **Executor functions/events: LEAK (FE-1, CRITICAL).** Tenant B → invoke/list/get/consume/**publish**
   on Tenant A's functions and topics, by putting A's ws id in the path. Read + write, both directions.
 - **Control-plane Knative functions: structural leak (FE-2, HIGH).** Routes authenticate but never
   scope by tenant; `getFnAction` ignores tenant — invoke/read any resourceId.
 
 ## Not-deployed (do NOT file as bugs)
+
 - Function **triggers** and **rules** (no route on either runtime).
 - **Kafka→function** binding and **Kafka→workflow** binding (no trigger consumer; no Temporal/worker).
 - Function deploy on the **executor** uses the dev worker_threads backend (in-memory, single-replica,
   ephemeral) — not Knative; the Knative path is the separate control-plane runtime.
 
 ## Cleanup / residue
+
 - Kafka topic `evt.<A_ws>.laevt<rand>t` created by the spec: left as **harmless test residue** —
   exec-write (topic delete) was out of the brief's read-only `kubectl exec` scope, and the executor
   exposes no topic-delete route. Named with the `laevt` prefix; one tiny test message.

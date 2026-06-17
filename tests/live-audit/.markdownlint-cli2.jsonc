@@ -1,0 +1,11 @@
+{
+  // Scoped override for the live-audit auditor-output docs ONLY (does not change the
+  // repo-wide markdownlint policy). These are evidence transcripts and a grouped issue
+  // catalog, so two cosmetic rules are relaxed here:
+  //   MD040 — terminal / SQL / mixed output blocks are language-agnostic.
+  //   MD025 — the issue catalog uses multiple top-level (#) epic sections by design.
+  "config": {
+    "MD040": false,
+    "MD025": false
+  }
+}

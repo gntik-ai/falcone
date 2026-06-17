@@ -1,6 +1,7 @@
 # Evidence — Metrics / Observability (live)
 
 ## Falcone metrics API (control-plane `/v1/metrics/workspaces/{ws}/…`)
+
 - ACTIVE (200) routes: `overview`, `usage`, `series`, `quotas`, `audit-records`.
 - NOT wired (404, advertised in catalog): `kafka-topics`, `event-dashboards`, `gateway-streams`.
 - **MET-1 (MED): metrics API returns structure but NO real data.**
@@ -9,6 +10,7 @@
   (matches QUOTA-1 `CONSUMPTION_QUERY_FAILED`). Dashboards built on these would show zeros.
 
 ## Prometheus / Grafana
+
 - Platform stack `platform-observability` (kube-prometheus-stack + Grafana 11.3 + Loki + Jaeger)
   is deployed and Grafana is healthy (datasources Prometheus/Loki/Jaeger all present).
 - **MET-2 (MED): the Falcone in-chart Prometheus scrapes nothing.**
@@ -22,6 +24,7 @@
   adjacent to Falcone.)
 
 ## Status
+
 | Functionality | Status |
 |---|---|
 | Metrics API overview/usage/series/quotas/audit | Active (routes) but **no real data** (MET-1) |

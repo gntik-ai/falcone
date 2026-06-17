@@ -12,6 +12,7 @@ The executor's `resolveIdentity` (server.mjs) falls back to `identityFromHeaders
 `x-tenant-id`/`x-workspace-id`) when no JWT/API-key is presented.
 
 **Live proof — through APISIX (`:9080`), no Authorization header, spoofed `x-tenant-id`:**
+
 ```
 POST http://<apisix>/v1/workspaces/<A_ws>/api-keys
   -H 'x-tenant-id: <A_tenant>' -H 'x-workspace-id: <A_ws>'   (NO auth)
@@ -20,6 +21,7 @@ GET  http://<apisix>/v1/workspaces/<A_ws>/api-keys -H 'x-tenant-id: <A_tenant>'
   -> 200  {items:[…A's keys…]}                               # listed A's keys
 GET  (same) WITHOUT x-tenant-id -> 401 UNAUTHENTICATED "Missing tenant identity"
 ```
+
 So **any party that can reach the gateway can impersonate any tenant by setting one header** — no
 credentials — and then mint keys / read+write that tenant's data-plane. (Test key was revoked.)
 kindnet does not enforce NetworkPolicy, so the executor is also directly reachable in-cluster.
@@ -43,6 +45,7 @@ still caller-controlled and tenants co-mingle in one physical collection. The in
 the boundary is per-handler and incomplete, not enforced centrally.
 
 ## Root causes (for fixes)
+
 1. Gateway (APISIX) does not authenticate or strip client tenant-context headers; the standalone
    config lacks the OIDC/JWT plugins the design assumes ("executor is the auth authority").
 2. Executor `resolveIdentity` trusts `x-tenant-id` headers as a fallback (intended for a trusted
@@ -53,6 +56,7 @@ the boundary is per-handler and incomplete, not enforced centrally.
    user tables created via the DDL API get no RLS and no tenant scoping.
 
 ## Net
+
 Tenant isolation — the cardinal requirement for a multitenant BaaS — is **not enforced** on the
 live deployment. Cross-tenant read/write/delete is demonstrated on Postgres, Events, Functions and
 Storage, and an **unauthenticated** attacker can impersonate any tenant through the public gateway.

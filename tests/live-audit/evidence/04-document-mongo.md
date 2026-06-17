@@ -58,6 +58,7 @@ A GET  appdb/<coll>  -> 200 items=[A's doc only]                      ← A does
 ```
 
 Raw driver confirms both docs co-exist in ONE physical collection:
+
 ```
 PHYSICAL appdb.<coll> holds 2 docs:
    owner=tenantA tenantId=ffd33d99-…-c1cc
@@ -91,11 +92,13 @@ DELETE…/documents/6a31adfe…  -> 200 {"deleted":0}
 
 Root cause proven with the raw driver: `_id` is stored as `ObjectId`, but the by-id handler
 queries with the **string** form:
+
 ```
 stored _id: ObjectId('6a31adfe668e23a903644cca')
 query {_id: STRING}    matches: NO  ← the bug
 query {_id: ObjectId}  matches: YES
 ```
+
 The handler passes `params.documentId` as a raw string to the `{_id}` filter without
 `new ObjectId(id)` coercion (and likely the same on the `tenantId`-scoped update/delete filters).
 **Severity: P1** — half of the documented CRUD surface (read-one, update, replace, delete by id)
@@ -120,6 +123,7 @@ Repro (one line): `K=$(mint_key "$TA_TENANT" "$TA_WS" service); ID=$(exk POST "/
   (the source's read-only console handler does not), so the running image differs from this source.
 
 ## Not testable / out of scope here
+
 - The full admin surface (`/v1/mongo/databases`, collections/indexes/users/views/templates CRUD)
   requires a Bearer JWT and is proxied to the control-plane; via the executor data-plane it returns
   `401 UNAUTHENTICATED`. Many of those 53 catalog routes are intended-surface only.

@@ -51,6 +51,7 @@ Backend facts (verified):
 ## Push-confirmation evidence (actual SSE frames captured)
 
 ### Mongo — insert + update delivered (subscribe → mutate → frame appears)
+
 ```
 event: insert
 data: {"type":"insert","documentId":"6a31afa9668e23a903644cce",
@@ -63,6 +64,7 @@ data: {"type":"update","documentId":"6a31afe9668e23a903644cd1",
 ```
 
 ### Postgres — insert + update + delete ALL delivered
+
 ```
 event: insert
 data: {"type":"insert","documentId":"lart28871",
@@ -81,19 +83,23 @@ Setup: B subscribes to **A's** collection/table path (B's `flc_service` key, A's
 the URL). A then mutates via the data API. A also subscribes to its own path as a positive control.
 
 **Mongo** — `appdb/lart16266x`, A inserts `{secret:"A-ONLY-16266"}`:
+
 ```
 A's stream  (control): event: insert ... "secret":"A-ONLY-16266"   ← A sees it
 B's stream  (probe):   retry: 3000\n\n   (EMPTY)                    ← B sees NOTHING
 ```
+
 Mechanism: change-stream pipeline `$match` on `fullDocument.tenantId === <verified tenant>`
 (realtime-executor `66ea6f0`). B's verified tenant (`a5db1fad…`) ≠ A's doc tenantId
 (`ffd33d99…`) → filtered out server-side. **No cross-tenant leak.**
 
 **Postgres** — `public.rt_pg_demo`, A inserts `{id:lart16700x, body:"A-SECRET-16700"}`:
+
 ```
 A's stream  (control): event: insert + event: delete ... "A-SECRET-16700"   ← A sees it
 B's stream  (probe):   retry: 3000\n\n   (EMPTY)                            ← B sees NOTHING
 ```
+
 Mechanism: per-(table,tenant) NOTIFY channel `flc_rt_<md5(schema.table:tenant_id)>`
 (postgres-realtime-executor). A's writes NOTIFY A's tenant-channel; B's LISTEN is on B's
 tenant-channel computed from B's *verified* tenant → never receives A's events. **No cross-tenant
@@ -118,11 +124,13 @@ Isolated empirically (rules out pre-image timing):
 - Verified `collMod ... changeStreamPreAndPostImages:{enabled:true}` **succeeds** on this mongo and
   the option is set (`listCollections` options show `{"changeStreamPreAndPostImages":{"enabled":true}}`).
 - Result: the `insert` frame is delivered; the `delete` frame is **NOT**:
+
 ```
 event: insert
 data: {"type":"insert","documentId":"6a31b034...","document":{...,"marker":"DEL2-14682",...}}
 (no delete frame ever arrives)
 ```
+
 Likely cause: the executor enables pre-images on the collection at subscribe time but the change
 stream's `fullDocumentBeforeChange` is not populated for the delete (so the `$match` delete branch
 `fullDocumentBeforeChange.tenantId` matches nothing and the event is dropped) — i.e. the
@@ -134,6 +142,7 @@ on the change stream to invalidate caches / sync local state will keep stale/del
 Postgres path does NOT have this bug (delete delivered, prior row included).
 
 Repro (one-liner-ish):
+
 ```
 K=$(mint_key "$TA_TENANT" "$TA_WS" service); C=lartX
 ( curl -sN -m12 "$EXEC/v1/realtime/workspaces/$TA_WS/data/appdb/collections/$C/changes?apikey=$K" >/tmp/s ) &
@@ -143,6 +152,7 @@ sleep 3; exk POST ".../collections/$C/documents" "$K" '{"x":1}'   # -> insert fr
 ```
 
 ## Cross-references
+
 - Mongo by-id CRUD broken (evidence/04 BUG): forces use of the raw driver to drive update/delete
   in this test — does not affect the realtime stream behavior itself.
 - Shared `in_falcone` DB / shared `falcone_service` role (evidence/03): the pg realtime path
@@ -150,6 +160,7 @@ sleep 3; exk POST ".../collections/$C/documents" "$K" '{"x":1}'   # -> insert fr
   per-tenant NOTIFY channel, NOT on DB-level isolation.
 
 ## Not tested / out of scope
+
 - Resume/Last-Event-ID replay: the realtime SSE handler (`runRealtimeSse`) does NOT emit `id:`
   lines or honor `Last-Event-ID` (only the flow-monitoring SSE handler does), so there is nothing
   to resume — live-only, no history replay.

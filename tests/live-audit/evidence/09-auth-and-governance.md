@@ -1,6 +1,7 @@
 # Evidence — Auth-as-a-service, Keycloak/IAM, plans/quotas/audit (live)
 
 ## Keycloak / platform auth — WORKING
+
 - Platform realm `in-falcone-platform`: superadmin ROPC via `in-falcone-console` (public, directGrant)
   yields a token whose `iss=http://falcone-keycloak:8080/realms/in-falcone-platform`; the control-plane
   accepts it (200 on `/v1/tenants`). Token carries realm role `superadmin`, **no** `tenant_id`/`workspace_id`.
@@ -8,6 +9,7 @@
   listing `GET /v1/iam/realms/{realm}/users` → 200.
 
 ## Auth-as-a-service (tenant-app end users) — BROKEN (register works, login fails)
+
 - `GET /v1/auth/signups/policy` → 200 `{selfServiceEnabled:true, mode:"self_service", passwordPolicy:{minLength:8}}`.
 - `POST /v1/auth/signups {tenantId,workspaceId,email,password,username}` → **201** `{registrationId,userId,state:"active","Account created. You can now sign in."}`.
 - **AAS-1 (HIGH, functional): login fails after signup.**
@@ -28,6 +30,7 @@
 (Test user cleaned up / deleted.)
 
 ## Plans / quotas / governance — MOSTLY ACTIVE, consumption measurement BROKEN
+
 - ACTIVE (200): `/v1/plans`, `/v1/capability-catalog`, `/v1/quota-dimensions`,
   `/v1/tenants/{t}/plan`, `/plan/effective-entitlements`, `/v1/tenants/{t}/effective-capabilities`,
   `/v1/tenants/{t}/quota/effective-limits`, `/quota/overrides`, `/quota/audit`,
@@ -42,6 +45,7 @@
 - Completeness gaps: `/v1/tenants/{t}/dashboard` → 404 (advertised, unwired).
 
 ## Status summary
+
 | Functionality | Status |
 |---|---|
 | Platform/superadmin OIDC (control-plane mgmt) | Active |

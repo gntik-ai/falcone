@@ -7,6 +7,7 @@ Playwright (system Google Chrome `/opt/google/chrome/chrome` — the pinned Play
 chromium has no ubuntu-26.04 build).
 
 ## Summary verdict
+
 - **Console reachable:** YES (SPA + JS bundle served, 200).
 - **Login as superadmin:** WORKS end-to-end (redirects to `/console/overview`).
 - **Admin pages exercised:** overview, tenants, workspaces, plans, iam-access, members — all
@@ -21,10 +22,12 @@ chromium has no ubuntu-26.04 build).
 ## 1. Console reachability + runtime config
 
 `GET http://127.0.0.1:13000/ → 200`, serves the built SPA:
+
 ```html
 <title>In Falcone Console</title>
 <script type="module" crossorigin src="/assets/index-Cl8T7T73.js"></script>
 ```
+
 `/assets/index-Cl8T7T73.js → 200` (644 KB bundle). `/healthz → 200`.
 
 **Runtime config is NOT a `/config.js` / `window.__ENV` file.** The container is configured
@@ -46,9 +49,11 @@ API call against the **page origin** (`console.dev.in-falcone.example.com`).
 
 The console pod does **not** proxy the API: `static-server.mjs` only `listen(3000)` static files,
 `nginx.conf` only `try_files … /index.html` (SPA fallback). Confirmed live:
+
 ```
 GET http://127.0.0.1:13000/v1/tenants  → 200 text/html  (SPA fallback HTML, NOT JSON)
 ```
+
 Therefore the console **requires an edge that routes `console.dev…/v1/*` and `/realms/*` to the
 control-plane / Keycloak**. The APISIX standalone config does have host-independent `/v1/*` routes,
 but the nginx **Ingress** maps `console.dev…/ → falcone-web-console` only — and **no ingress
@@ -57,6 +62,7 @@ inert). The realm/issuer endpoint is built relative too: the bundle constructs
 ``/realms/${realm}/protocol/openid-connect/token`` (same-origin).
 
 ### Testability constraint (documented, as the brief anticipated)
+
 The SPA's same-origin `/v1/*` calls cannot be served by the console host as deployed (no edge
 routes them; the hostnames don't resolve from the harness). **Worked around** in Playwright by
 intercepting same-origin `^/(v1|realms|auth|api)/` requests and re-issuing them to the local
@@ -73,7 +79,7 @@ typed into the form, never printed), submits.
 |---|---|
 | `GET /login` | 200, form renders (`name=username`, `name=password`, "Entrar a la consola") |
 | Submit login | **redirects to `/console/overview`** — authenticated |
-| `/console/overview` | renders shell: "Platform Admin / platform-admin@in-falcone.example.com" |
+| `/console/overview` | renders shell: "Platform Admin / <platform-admin@in-falcone.example.com>" |
 | `/console/tenants` | "Gestión de tenants", **tenant context selector populated**, "Nuevo tenant" |
 | `/console/workspaces` | renders (workspace selector populated after tenant pick: "WS Staging", "WS Prod") |
 | `/console/plans` | **Plan catalog table** with real rows + "Create Plan" |
@@ -159,6 +165,7 @@ of consequence were observed for the surfaces tested (tenants, workspaces, plans
 ## 5. Bugs / findings (severity + repro)
 
 ### CONS-1 (MEDIUM) — console "Nuevo tenant" wizard POSTs to a route that doesn't exist live
+
 `apps/web-console/src/components/console/wizards/CreateTenantWizard.tsx` →
 `submitWizardRequest('/v1/admin/tenants', …)`. The live control-plane (and APISIX, and the
 392-route public catalog) expose only **`POST /v1/tenants`**, never `/v1/admin/tenants`.
@@ -170,6 +177,7 @@ prefix (`src/api/config*.ts`).
   expected route and the deployed API surface.
 
 ### CONS-2 (LOW / hygiene) — no tenant-deletion route wired on the live runtime
+
 `DELETE /v1/tenants/{tenantId}` and `POST /v1/tenants/{tenantId}/purge` are in the route catalog
 but return **404 NO_ROUTE** live (also `…/deactivate|suspend|archive` → 404). Consequence: the
 parity-test tenant `LA Console Parity 17734` (`a5edd8c2-…`) **could not be cleaned up** — it is a
@@ -177,6 +185,7 @@ metadata-only record with no workspace/DB provisioned and a clearly-prefixed nam
 agents left the same `LA Prov*` residue, confirming the constraint is systemic, not a test error.
 
 ### CONS-3 (MEDIUM, deployment) — console is not edge-routable as deployed
+
 The SPA issues **same-origin relative** `/v1/*` and `/realms/*` calls but (a) the console pod is a
 pure static host (no proxy), (b) the nginx Ingress routes `console.dev…/ → web-console` only, and
 (c) **no ingress controller is deployed** (Ingress object inert). With this manifest set, a real
@@ -186,6 +195,7 @@ APISIX `/v1/*` host-independent routes can do this, but the Ingress doesn't send
 is the same class of "front-door not wired" gap noted for the gateway in 15-gateway-and-executor-authz.
 
 ### CONS-4 (informational / isolation) — console tenant scoping is CLIENT-SIDE only
+
 `console-context.tsx` fetches the **full** `/v1/tenants` list, then hides rows client-side via
 `filterTenantOptions(options, principal.tenantIds)`; if `tenantIds` is empty it returns ALL. For
 superadmin (`tenantIds:[]`) showing all 12 is correct. **Risk:** if the control-plane returns the
@@ -198,6 +208,7 @@ tenant-scoped user and check whether `GET /v1/tenants` is server-filtered to the
 ---
 
 ## Cross-tenant isolation probe (this surface)
+
 - Management API is authenticated: `GET /v1/tenants` and `POST /v1/tenants` **without auth → 401**
   (also 401 via APISIX). Unlike the data-plane executor (GW-1), the mgmt/console API does not trust
   spoofed headers.
@@ -205,16 +216,19 @@ tenant-scoped user and check whether `GET /v1/tenants` is server-filtered to the
   client-side filtering; not verifiable here for lack of a tenant-user credential.
 
 ## Repro (exact steps; no spec.sh for the interactive browser flow)
+
 1. Ensure port-forwards: console 13000, apisix 19080, CP 18080, keycloak 18081 (already running).
 2. Non-interactive parity + auth checks: `bash tests/live-audit/specs/12-console-parity.sh`
    (14/14 PASS).
 3. Browser flow (needs system Chrome + the repo's playwright-core):
+
    ```bash
    export KUBECONFIG=./kubeconfig-test-cluster-b.yaml
    export SA_PW="$(kubectl -n falcone get secret in-falcone-superadmin -o jsonpath='{.data.password}' | base64 -d)"
    node /tmp/la-console/drive.mjs        # login + admin pages + screenshots
    WANT_NAME="<created tenant name>" node /tmp/la-console/verify-created.mjs
    ```
+
    The driver uses Playwright `ctx.route('**/*')` to re-issue same-origin `^/(v1|realms|auth|api)/`
    requests to `http://127.0.0.1:19080` (APISIX) with `Host: console.dev.in-falcone.example.com`,
    which is what makes the hostname-pinned SPA functional from the harness.
