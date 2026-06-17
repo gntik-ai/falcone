@@ -2,7 +2,7 @@
 
 ### Requirement: Mongo collection delete events MUST be delivered to the owning tenant
 
-The system SHALL deliver Mongo change-stream `delete` events to the owning tenant's subscribers by keying the event off the change-stream `documentKey` and stored `tenantId` (or a pre-image lookup), instead of relying on `fullDocumentBeforeChange` which may be unpopulated.
+The system SHALL deliver collection `delete` events to the owning tenant's subscribers, keyed off the change pre-image so the event can be tenant-scoped. On the live realtime path — Postgres logical replication over the DocumentDB engine (add-ferretdb-realtime-cdc-remediation, #460), which replaced the MongoDB change-stream engine — `REPLICA IDENTITY FULL` makes the delete pre-image (`fullDocumentBeforeChange`) available and the executor filters on its `tenantId` consumer-side, so deletes are delivered and never cross tenants.
 
 #### Scenario: Owning tenant's subscriber receives a delete frame
 

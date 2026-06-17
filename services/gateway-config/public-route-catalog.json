@@ -77,12 +77,6 @@
     "function_privilege_subdomain": "function_deployment"
   },
   {
-    "method": "PUT",
-    "path": "/v1/functions/{id}/config",
-    "privilege_domain": "structural_admin",
-    "function_privilege_subdomain": "function_deployment"
-  },
-  {
     "method": "POST",
     "path": "/v1/api-keys",
     "privilege_domain": "structural_admin"
@@ -90,11 +84,6 @@
   {
     "method": "DELETE",
     "path": "/v1/api-keys/{id}",
-    "privilege_domain": "structural_admin"
-  },
-  {
-    "method": "POST",
-    "path": "/v1/services/configure",
     "privilege_domain": "structural_admin"
   },
   {
@@ -164,17 +153,17 @@
   },
   {
     "method": "GET",
-    "path": "/v1/objects/{bucket}/{key}",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}",
     "privilege_domain": "data_access"
   },
   {
     "method": "PUT",
-    "path": "/v1/objects/{bucket}/{key}",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}",
     "privilege_domain": "data_access"
   },
   {
     "method": "DELETE",
-    "path": "/v1/objects/{bucket}/{key}",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}",
     "privilege_domain": "data_access"
   },
   {
@@ -182,11 +171,6 @@
     "path": "/v1/functions/{id}/invoke",
     "privilege_domain": "data_access",
     "function_privilege_subdomain": "function_deployment"
-  },
-  {
-    "method": "GET",
-    "path": "/v1/analytics/query",
-    "privilege_domain": "data_access"
   },
   {
     "method": "POST",

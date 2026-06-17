@@ -140,6 +140,14 @@ export async function deleteBucket(bucket) {
 export async function putObject(bucket, key, body, contentType = 'application/octet-stream') {
   await s3('PUT', `/${bucket}/${key}`, { headers: { 'content-type': contentType }, body });
 }
+// Download an object's body (add-wire-advertised-public-routes, #500 — object I/O was NO_ROUTE).
+export async function getObject(bucket, key) {
+  const { text, headers } = await s3('GET', `/${bucket}/${key}`);
+  return { content: text, contentType: headers.get('content-type') ?? 'application/octet-stream', sizeBytes: Number(headers.get('content-length') ?? Buffer.byteLength(text)) };
+}
+export async function deleteObject(bucket, key) {
+  await s3('DELETE', `/${bucket}/${key}`);
+}
 
 // Ownership gate: returns true for superadmin/internal (cross-tenant allowed),
 // false for all other actors so each handler can enforce a 404 (no-existence-leak).
@@ -147,7 +155,45 @@ function isSuperOrInternal(identity) {
   return identity.actorType === 'superadmin' || identity.actorType === 'internal';
 }
 
+// Shared bucket-ownership gate for object I/O: superadmin/internal bypass; others must own the
+// bucket (else 404, no existence leak). Returns an error response to short-circuit, or null.
+async function denyUnlessBucketOwner(ctx, bucket) {
+  if (isSuperOrInternal(ctx.identity)) return null;
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec || rec.tenant_id !== ctx.identity.tenantId) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  return null;
+}
+
 // ---- handlers (ctx = { params, query, body, identity, pool, callerContext }) ----
+// Object I/O — upload/download/delete a single object (#500). Tenant-scoped via the bucket owner
+// gate. Content is carried as a string in the JSON envelope (text/JSON blobs — the common data-API
+// case); binary streaming is a later refinement.
+async function storagePutObject(ctx) {
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const key = decodeURIComponent(ctx.params.objectKey);
+  const content = ctx.body?.content ?? '';
+  const contentType = ctx.body?.contentType ?? 'application/octet-stream';
+  try {
+    await putObject(bucket, key, content, contentType);
+    return ok(201, { objectKey: key, bucketName: bucket, sizeBytes: Buffer.byteLength(content), contentType });
+  } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_PUT_FAILED', String(e.message ?? e)); }
+}
+async function storageGetObject(ctx) {
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const key = decodeURIComponent(ctx.params.objectKey);
+  try {
+    const o = await getObject(bucket, key);
+    return ok(200, { objectKey: key, bucketName: bucket, content: o.content, contentType: o.contentType, sizeBytes: o.sizeBytes });
+  } catch (e) { return err(e.statusCode === 404 ? 404 : 502, 'STORAGE_GET_FAILED', String(e.message ?? e)); }
+}
+async function storageDeleteObject(ctx) {
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const key = decodeURIComponent(ctx.params.objectKey);
+  try {
+    await deleteObject(bucket, key);
+    return ok(200, { objectKey: key, bucketName: bucket, deleted: true });
+  } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_DELETE_FAILED', String(e.message ?? e)); }
+}
 async function storageListBuckets(ctx) {
   const all = await listBuckets();
   const map = await store.bucketWorkspaceMap(ctx.pool);
@@ -265,5 +311,6 @@ async function storageProvisionBucket(ctx) {
 }
 
 export const STORAGE_HANDLERS = {
-  storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket
+  storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
+  storagePutObject, storageGetObject, storageDeleteObject
 };

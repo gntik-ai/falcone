@@ -145,3 +145,26 @@ The system SHALL strip inbound `x-tenant-id`, `x-workspace-id`, and `x-auth-subj
 - **WHEN** an authenticated client sends a request that includes a forged `x-tenant-id` header for another tenant
 - **THEN** the gateway discards the client header and the backend receives only the tenant identity derived from the verified credential
 
+### Requirement: Advertised public routes MUST match the runtime
+
+The system SHALL ensure that every route published in the public OpenAPI catalog either responds at runtime or is removed from the catalog, so that no advertised route returns `NO_ROUTE`.
+
+#### Scenario: An advertised route responds or is not advertised
+
+- **WHEN** a client calls any route present in the published OpenAPI catalog
+- **THEN** the route responds (success or a defined error) and does not return `NO_ROUTE`
+
+#### Scenario: Catalog and runtime are in parity
+
+- **WHEN** the published catalog is compared against the live runtime routes
+- **THEN** there are no advertised routes that are unimplemented at runtime
+
+### Requirement: Console same-origin API calls MUST be edge-routable
+
+The system SHALL provide an edge (ingress controller and routes, or equivalent) in the deployed topology that routes the console host's same-origin `/v1/*` requests to the control-plane/gateway, so a browser receives API responses rather than the SPA HTML fallback.
+
+#### Scenario: Console reaches the API end-to-end
+
+- **WHEN** a browser on the console host issues a same-origin `/v1/*` API request
+- **THEN** the request is routed to the control-plane and returns an API (JSON) response, not the SPA HTML fallback
+
