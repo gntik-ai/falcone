@@ -1,0 +1,87 @@
+# Kind overlay — enable the ADVANCED capabilities on the kind profile (change:
+# add-kind-profile-advanced-capabilities, campaign 2026-06-17).
+#
+# The base kind profile (deploy/kind/values-kind.yaml) ships the core platform but leaves the
+# Temporal-backed Flows API, MCP hosting and the realtime change-stream OFF. This opt-in overlay
+# turns them on so the full capability surface can be exercised and tested on kind.
+#
+# Usage (layered on the base):
+#   helm upgrade --install falcone charts/in-falcone --skip-schema-validation \
+#     -f deploy/kind/values-kind.yaml -f deploy/kind/values-kind-advanced.yaml
+#
+# WHAT THIS ENABLES (all live-verified on test-cluster-b, 2026-06-17):
+#   - Flows   : the executor (apps/control-plane) registers /v1/flows/workspaces/{ws}/* ONLY when
+#               TEMPORAL_ADDRESS is set. With Temporal + the workflow-worker up, GET .../task-types
+#               and .../flows return 200 (not 404/501).
+#   - MCP     : MCP_ENABLED=true makes the executor register /v1/mcp/workspaces/{ws}/servers (200).
+#   - Realtime: the PG change-stream SSE (/v1/realtime/workspaces/{ws}/data/{db}/.../changes) is
+#               served by the executor's pgRealtimeExecutor; a subscription returns
+#               text/event-stream and an insert is delivered as an `event: insert` SSE frame.
+#
+# NOTE on the executor env: the component-wrapper renders `config.inline` as a ConfigMap consumed
+# via envFrom, so these values are ADDED on top of the base executor env (the data-plane wiring set
+# by the base profile) without replacing it.
+
+# ---- Temporal (durable workflow engine for Flows) -------------------------------------------
+temporal:
+  enabled: true
+  ui:
+    enabled: false            # operator-only; not needed on kind
+  persistence:
+    host: falcone-postgresql
+    port: 5432
+    user: falcone
+    password: falcone
+    database: temporal
+    visibilityDatabase: temporal_visibility
+    # 4 shards keeps the single-replica history pod within kind CPU limits (the default 512
+    # starves the SDK client on constrained nodes — see tests/e2e/values-flows-e2e.yaml).
+    numHistoryShards: 4
+  bootstrap:
+    namespace: falcone-flows
+    retentionDays: 1
+
+# ---- Workflow worker (executes the Flows DSL on the flows-main task queue) -------------------
+workflowWorker:
+  enabled: true
+  replicas: 1
+  config:
+    inline:
+      TEMPORAL_ADDRESS: falcone-temporal-frontend:7233
+      TEMPORAL_NAMESPACE: falcone-flows
+      TEMPORAL_TASK_QUEUE: flows-main
+      WORKER_HEALTH_PORT: "8080"
+
+# ---- Executor: serves the data-plane + realtime + flows + MCP -------------------------------
+# The base kind profile does not configure the executor, so this overlay provides its full env:
+# the data-plane wiring (env) plus the advanced-cap flags (config.inline, appended via envFrom so
+# they never clobber the data env). Realtime SSE is inherent to the executor — no flag needed.
+controlPlaneExecutor:
+  enabled: true
+  replicas: 1
+  image:
+    repository: localhost:30500/in-falcone-control-plane-executor
+    tag: campaign-20260617
+    pullPolicy: IfNotPresent
+  env:
+    # REQUIRED: proxy non-data-plane (browse/inventory/management) routes to the control-plane.
+    - { name: CONTROL_PLANE_UPSTREAM, value: http://falcone-control-plane:8080 }
+    - { name: PGHOST, value: falcone-postgresql }
+    - { name: PGUSER, value: falcone }
+    - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
+    - { name: MONGO_HOST, value: falcone-ferretdb:27017 }
+    - { name: MONGO_USER, value: falcone }
+    - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
+    - { name: KAFKA_BROKERS, value: falcone-kafka:9092 }
+  config:
+    inline:
+      # Flows routes register only when TEMPORAL_ADDRESS is present; the worker drains the queue.
+      TEMPORAL_ADDRESS: falcone-temporal-frontend:7233
+      TEMPORAL_NAMESPACE: falcone-flows
+      TEMPORAL_TASK_QUEUE: flows-main
+      # MCP hosting routes (/v1/mcp/workspaces/{ws}/servers).
+      MCP_ENABLED: "true"
+
+# ---- MCP hosting component (Knative-backed MCP servers) --------------------------------------
+mcp:
+  enabled: true

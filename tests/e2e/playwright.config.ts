@@ -41,8 +41,23 @@ export default defineConfig({
       },
     },
     {
+      name: 'console',
+      testMatch: '**/specs/console/**/*.spec.ts',
+      // The console suite drives the real SPA in a browser. Playwright's bundled Chromium does not
+      // support ubuntu 26.04; use the system Google Chrome (set E2E_CHROME_BIN / GOOGLE_CHROME_BIN).
+      use: {
+        baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+        trace: 'on-first-retry',
+        screenshot: 'only-on-failure',
+        actionTimeout: 15_000,
+        ...(process.env.E2E_CHROME_BIN || process.env.GOOGLE_CHROME_BIN
+          ? { launchOptions: { executablePath: (process.env.E2E_CHROME_BIN || process.env.GOOGLE_CHROME_BIN)!, args: ['--no-sandbox'] } }
+          : {}),
+      },
+    },
+    {
       name: 'other',
-      testIgnore: '**/specs/flows/**',
+      testIgnore: ['**/specs/flows/**', '**/specs/console/**'],
       timeout: 30_000,
     },
   ],
