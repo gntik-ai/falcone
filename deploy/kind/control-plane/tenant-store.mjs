@@ -242,6 +242,49 @@ export async function ensureSchema(pool) {
     ON plan_audit_events (tenant_id, created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_plan_audit_events_action_created
     ON plan_audit_events (action_type, created_at DESC)`);
+
+  // ---- product schema: quota dimension catalog + overrides (finding F4) -----
+  // The console Quotas page (/v1/metrics/tenants/{id}/quotas) resolves real limits via the
+  // tenant-effective-entitlements action, whose quantitative query reads quota_dimension_catalog,
+  // quota_overrides and plans.quota_type_config. None existed in this runtime, so an authorized
+  // tenant's own quota view 500'd with 42P01. Mirror migrations 098 (base limits) + 103 (hard/soft
+  // overrides) for exactly those relations so the entitlements query resolves (empty catalog ->
+  // empty limits on a fresh platform, which is correct). Idempotent.
+  await pool.query("ALTER TABLE plans ADD COLUMN IF NOT EXISTS quota_type_config JSONB NOT NULL DEFAULT '{}'::jsonb");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quota_dimension_catalog (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      dimension_key VARCHAR(64) NOT NULL UNIQUE,
+      display_label VARCHAR(255) NOT NULL,
+      unit VARCHAR(20) NOT NULL CHECK (unit IN ('count', 'bytes')),
+      default_value BIGINT NOT NULL CHECK (default_value >= -1),
+      description TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by VARCHAR(255) NOT NULL DEFAULT 'system'
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quota_overrides (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id VARCHAR(255) NOT NULL,
+      dimension_key VARCHAR(64) NOT NULL REFERENCES quota_dimension_catalog(dimension_key),
+      override_value BIGINT NOT NULL CHECK (override_value >= -1),
+      quota_type VARCHAR(10) NOT NULL DEFAULT 'hard' CHECK (quota_type IN ('hard', 'soft')),
+      grace_margin INTEGER NOT NULL DEFAULT 0 CHECK (grace_margin >= 0),
+      justification TEXT NOT NULL CHECK (length(trim(justification)) BETWEEN 1 AND 1000),
+      expires_at TIMESTAMPTZ,
+      status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'superseded', 'revoked', 'expired')),
+      created_by VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      superseded_by UUID REFERENCES quota_overrides(id),
+      revoked_by VARCHAR(255),
+      revoked_at TIMESTAMPTZ,
+      revocation_justification TEXT CHECK (revocation_justification IS NULL OR length(trim(revocation_justification)) <= 1000),
+      modified_by VARCHAR(255),
+      modified_at TIMESTAMPTZ,
+      modification_justification TEXT CHECK (modification_justification IS NULL OR length(trim(modification_justification)) <= 1000)
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_quota_overrides_tenant_active ON quota_overrides (tenant_id) WHERE status = \'active\'');
 }
 
 // ---- function actions (real executor) --------------------------------------
