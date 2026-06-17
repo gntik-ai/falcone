@@ -244,6 +244,22 @@ async function purgeTenant(ctx) {
   });
 }
 
+// First-class environment catalog (#503). The set of runtime environments a workspace may belong
+// to; a tenant/project holds multiple workspaces across these, each environment carrying its own
+// isolated resource set (its per-workspace wsdb_* database, bucket, topics).
+const ENVIRONMENT_CATALOG = ['dev', 'staging', 'prod', 'sandbox', 'preview'];
+
+// GET /v1/tenants/{tenantId}/environments — list the tenant's first-class environments, each with
+// its workspaces + provisioned databases (proves multiple isolated environments per project).
+async function listEnvironments(ctx) {
+  const { params, identity, pool } = ctx;
+  const tenant = await store.getTenant(pool, params.tenantId);
+  if (!tenant) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+  if (!canManageTenantId(identity, tenant.id)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  const environments = await store.listTenantEnvironments(pool, tenant.id);
+  return ok(200, { tenantId: tenant.id, catalog: ENVIRONMENT_CATALOG, environments });
+}
+
 // ---- workspaces ------------------------------------------------------------
 // POST /v1/tenants/{tenantId}/workspaces
 async function createWorkspace(ctx) {
@@ -255,7 +271,14 @@ async function createWorkspace(ctx) {
   if (!displayName) return err(400, 'VALIDATION_ERROR', 'displayName is required');
   const slug = slugify(body.slug ?? displayName);
   if (await store.workspaceSlugTaken(pool, tenant.id, slug)) return err(409, 'SLUG_TAKEN', `workspace slug '${slug}' already exists in tenant`);
-  const ws = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: tenant.id, slug, displayName, createdBy: identity.sub });
+  // First-class environment (#503): a workspace is the delivery boundary for one runtime
+  // environment. Validate against the environment catalog (domain rule: "Workspace environment
+  // must align with the deployment topology environment catalog"); default to 'dev'.
+  const environment = String(body.environment ?? 'dev').toLowerCase();
+  if (!ENVIRONMENT_CATALOG.includes(environment)) {
+    return err(400, 'INVALID_ENVIRONMENT', `environment must be one of: ${ENVIRONMENT_CATALOG.join(', ')}`);
+  }
+  const ws = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: tenant.id, slug, displayName, environment, createdBy: identity.sub });
   // Provision the workspace's real backing database as part of creation (#502), so the data API
   // routes to a real, isolated database instead of co-mingling in the shared control-plane DB.
   // Best-effort: the saga leaves NO orphaned registry row on failure, and the data API falls back
@@ -447,7 +470,8 @@ async function runWorkspaceDbProvisionSaga(pool, { ws, tenant, identity, callerC
     const rec = await saga.step('insertRecord',
       () => store.insertWorkspaceDatabase(pool, {
         id: randomUUID(), workspaceId: ws.id, tenantId: ws.tenant_id, engine: conn.engine,
-        databaseName: conn.database, mode: conn.mode, username: conn.username, host: conn.host, port: conn.port, createdBy: identity.sub }),
+        databaseName: conn.database, mode: conn.mode, username: conn.username, host: conn.host, port: conn.port,
+        environment: ws.environment ?? 'dev', createdBy: identity.sub }),
       (val) => ({ type: 'store.deleteWorkspaceDatabase', args: { id: val.id } }));
     await saga.complete({ database: conn.database });
     return { database: rec, connection: conn, sagaId: saga.runId };
@@ -564,7 +588,7 @@ async function iamRemoveUserFromGroup(ctx) {
 }
 
 export const LOCAL_HANDLERS = {
-  createTenant, listTenants, getTenant, deleteTenant, purgeTenant, createTenantUser, listTenantUsers,
+  createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
