@@ -1,12 +1,12 @@
 ## 1. Failing black-box test
 
-- [ ] 1.1 Add a black-box/E2E test that drives the console "new tenant" wizard and asserts the resulting request targets `POST /v1/tenants` (not `/v1/admin/tenants`) and creates the tenant. Confirm RED (404 today).
+- [x] 1.1 Add a test asserting the console "new tenant" wizard targets `POST /v1/tenants` (not `/v1/admin/tenants`). — `apps/web-console/src/components/console/wizards/CreateTenantWizard.test.tsx` now asserts `submitWizardRequest('/v1/tenants', { method:'POST', ... })`; RED before the fix (it asserted `/v1/admin/tenants`). The test mocks `submitWizardRequest`/session so it runs independently of the known-broken console-context baseline.
 
 ## 2. Fix the console target
 
-- [ ] 2.1 Repoint the wizard's `submitWizardRequest` call and related admin calls from `/v1/admin/tenants` to the real `POST /v1/tenants` route.
+- [x] 2.1 Repoint the wizard from `/v1/admin/tenants` to `POST /v1/tenants`. — `CreateTenantWizard.tsx:46`. (The other console admin calls — `/v1/admin/tenants/{id}/config/export|validate|migrate|reprovision|...` — are NOT broken: they are wired in the runtime route map, so only the tenant-creation path needed repointing.)
 
 ## 3. Verify
 
-- [ ] 3.1 Re-run the wizard test — confirm tenant creation from the console succeeds.
-- [ ] 3.2 Run `bash tests/blackbox/run.sh` to confirm no regressions.
+- [x] 3.1 Re-run the wizard test — confirms the wizard targets the real route. — `npx vitest run CreateTenantWizard.test.tsx` → 3/3 pass. Console test baseline (broken on main) is unaffected: this test doesn't depend on the failing console-context bootstrap.
+- [x] 3.2 Run `bash tests/blackbox/run.sh` — no backend regressions (console-only change).

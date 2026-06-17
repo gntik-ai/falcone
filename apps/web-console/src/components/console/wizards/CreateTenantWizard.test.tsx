@@ -40,7 +40,8 @@ describe('CreateTenantWizard', () => {
     await user.selectOptions(screen.getByLabelText(/región/i), 'eu-west')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
-    expect(requestMock).toHaveBeenCalledWith('/v1/admin/tenants', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ name: 'Tenant Nuevo', planId: 'starter', region: 'eu-west' }) }))
+    // #504: the wizard must target the REAL route POST /v1/tenants (not the unrouted /v1/admin/tenants).
+    expect(requestMock).toHaveBeenCalledWith('/v1/tenants', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ name: 'Tenant Nuevo', planId: 'starter', region: 'eu-west' }) }))
   })
 
   it('[RW-07] cuota excedida bloquea el wizard con aviso — RF-UI-025 / T02-AC7', async () => {
