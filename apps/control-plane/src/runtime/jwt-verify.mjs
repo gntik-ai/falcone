@@ -19,9 +19,15 @@ export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
   const scopes = typeof claims.scope === 'string'
     ? claims.scope.split(' ').filter(Boolean)
     : (Array.isArray(claims.scopes) ? claims.scopes : []);
+  // credentialWorkspaceId is set only when the JWT explicitly carries a workspace_id claim.
+  // A tenant-only token (no workspace_id claim) leaves credentialWorkspaceId undefined,
+  // which suppresses the path↔credential workspace binding check (the token is not
+  // workspace-scoped and must not be rejected for addressing a specific workspace path).
+  const credentialWorkspaceId = claims.workspace_id ?? undefined;
   return {
     tenantId: claims.tenant_id ?? undefined,
-    workspaceId: claims.workspace_id ?? pathWorkspaceId,
+    workspaceId: credentialWorkspaceId ?? pathWorkspaceId,
+    credentialWorkspaceId,
     actorId: claims.sub,
     roleName: 'falcone_app', // a user/admin JWT is not an api-key → no SET ROLE / RLS dbRole
     roles,
