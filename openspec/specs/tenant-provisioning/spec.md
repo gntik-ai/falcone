@@ -107,3 +107,17 @@ The tenant purge sweep SHALL include an MCP domain teardown that removes the ten
 - **WHEN** the MCP teardown runs again for a tenant whose MCP resources are already gone (or were never provisioned)
 - **THEN** it removes nothing and returns without error
 
+### Requirement: Workspace creation MUST provision a real backing database
+
+The system SHALL, when a workspace is created, complete the provisioning saga that creates the backing `wsdb_*` Postgres database, and SHALL NOT leave a `workspace_databases` registry row without a corresponding physical database.
+
+#### Scenario: A new workspace gets a real database
+
+- **WHEN** a client calls `POST /v1/workspaces` and the provisioning saga completes
+- **THEN** the backing `wsdb_*` Postgres database exists and the data API connects to it
+
+#### Scenario: No orphaned registry rows
+
+- **WHEN** a workspace's provisioning saga fails to create the physical database
+- **THEN** the system does not report the workspace as ready with an orphaned registry row
+
