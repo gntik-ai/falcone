@@ -8,7 +8,9 @@ Live proof (`tests/live-audit/evidence/11-provisioning-lifecycle.md`): `wsdb_lap
 
 ## What Changes
 
-- Complete the workspace provisioning saga so that creating a workspace actually creates its `wsdb_*` Postgres database (and any other backing resources the registry row promises).
+- Corrected scope after reading the code: the provisioning saga and `provisionWorkspaceDatabase` already create the physical `wsdb_*` database correctly (DB **before** the registry row, with compensation — so no orphan row), and the live `falcone` role has `CREATEDB`. The real gaps are: (1) the executor's `resolveConnection` ignored `workspaceId` and always used the shared `in_falcone` DB (A3's explicitly-deferred per-workspace-DSN routing), so provisioned databases were never used; and (2) workspace creation never triggered provisioning (it was a separate endpoint), so workspaces had no database at all.
+- Route each data-plane connection to the requesting workspace's own `wsdb_*` database via the `workspace_databases` registry, falling back to the shared DSN when none exists (`apps/control-plane/src/runtime/workspace-dsn-resolver.mjs`).
+- Auto-provision the backing database as part of `POST /v1/tenants/{t}/workspaces`, reusing the durable saga (DB-before-row, compensated) so a new workspace gets a real database and no orphan registry row.
 
 ## Capabilities
 

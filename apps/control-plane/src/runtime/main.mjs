@@ -7,6 +7,7 @@
 // the environment so no secrets are baked into the image.
 import pg from 'pg';
 import { createConnectionRegistry } from './connection-registry.mjs';
+import { createWorkspaceDsnResolver } from './workspace-dsn-resolver.mjs';
 import { createControlPlaneServer } from './server.mjs';
 import { createApiKeyStore } from './api-keys.mjs';
 import { createMongoExecutor } from './mongo-data-executor.mjs';
@@ -54,15 +55,23 @@ function dataDsn() {
 }
 
 const dsn = dataDsn();
-const resolveConnection = () => ({ dsn });
+
+// Control-plane metadata pool (workspace_databases registry, api keys, embedding config, ...).
+// Defaults to the data DSN when CONTROL_DB_URL is unset (the kind deploy shares in_falcone).
+// Defined here (ahead of the registry) because per-workspace DSN routing reads the registry.
+const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 });
+
+// Route each data-plane connection to the requesting workspace's own provisioned database
+// (fix-workspace-db-provisioning-saga, #502); falls back to the shared DSN when a workspace has
+// no database yet. See workspace-dsn-resolver.mjs for the rationale (credential/role topology).
+const resolveConnection = createWorkspaceDsnResolver({ pool: keyPool, baseDsn: dsn });
 const registry = createConnectionRegistry({ resolveConnection });
 
 // Postgres realtime executor (trigger + LISTEN/NOTIFY; needs a connection that can create
 // the capture trigger — the executor's role is a superuser in the data plane).
 const pgRealtimeExecutor = createPostgresRealtimeExecutor({ resolveConnection });
 
-// API-key store on the control-plane metadata DB (defaults to the data DSN for now).
-const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 });
+// API-key store on the control-plane metadata DB (keyPool defined above for DSN routing).
 const apiKeyStore = createApiKeyStore({ pool: keyPool });
 
 // Embedding-provider executor (in-platform embedding for KNN queryText). The provider
