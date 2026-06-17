@@ -41,8 +41,8 @@ test('provider catalog evaluates storage access decisions and bucket attachment 
     tenantStorageContext: {
       entityType: 'tenant_storage_context',
       tenantId: 'ten_01',
-      providerType: 'minio',
-      providerDisplayName: 'MinIO',
+      providerType: 'seaweedfs',
+      providerDisplayName: 'SeaweedFS',
       namespace: 'tenants/ten_01',
       state: 'active',
       bucketProvisioningAllowed: true,

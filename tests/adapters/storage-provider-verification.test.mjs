@@ -20,10 +20,10 @@ import {
   listErrorScenarioCodes
 } from '../../services/adapters/src/storage-provider-verification.mjs';
 
-test('MinIO baseline verification is eligible', () => {
-  const baseline = getStorageProviderCapabilityBaseline({ providerType: 'minio' });
+test('SeaweedFS baseline verification is eligible', () => {
+  const baseline = getStorageProviderCapabilityBaseline({ providerType: 'seaweedfs' });
   const result = buildCapabilityBaselineVerificationResult({
-    providerType: 'minio',
+    providerType: 'seaweedfs',
     baseline
   });
 
@@ -74,7 +74,7 @@ test('every providerCodeByType map includes an explicit seaweedfs key matching t
   }
 });
 
-test('error taxonomy consistency remains true for MinIO, Garage, and SeaweedFS across required codes', () => {
+test('error taxonomy consistency remains true for Ceph RGW, Garage, and SeaweedFS across required codes', () => {
   for (const errorCode of [
     'OBJECT_NOT_FOUND',
     'BUCKET_NOT_FOUND',
@@ -84,7 +84,7 @@ test('error taxonomy consistency remains true for MinIO, Garage, and SeaweedFS a
   ]) {
     const result = buildErrorTaxonomyConsistencyResult({
       errorCode,
-      providers: ['minio', 'garage', 'seaweedfs']
+      providers: ['ceph-rgw', 'garage', 'seaweedfs']
     });
 
     assert.equal(result.consistent, true);
@@ -92,7 +92,7 @@ test('error taxonomy consistency remains true for MinIO, Garage, and SeaweedFS a
   }
 });
 
-test('error taxonomy consistency remains true for MinIO vs Garage across required codes', () => {
+test('error taxonomy consistency remains true for Ceph RGW vs Garage across required codes', () => {
   for (const errorCode of [
     'OBJECT_NOT_FOUND',
     'BUCKET_NOT_FOUND',
@@ -102,7 +102,7 @@ test('error taxonomy consistency remains true for MinIO vs Garage across require
   ]) {
     const result = buildErrorTaxonomyConsistencyResult({
       errorCode,
-      providers: ['minio', 'garage']
+      providers: ['ceph-rgw', 'garage']
     });
 
     assert.equal(result.consistent, true);
@@ -116,7 +116,7 @@ test('cross-provider equivalence assessments expose divergent provider outcomes'
     results: [
       {
         category: 'object.get',
-        providerType: 'minio',
+        providerType: 'ceph-rgw',
         operation: 'object.get',
         expectedOutcome: 'download succeeds',
         status: 'passed'
@@ -140,11 +140,11 @@ test('cross-provider equivalence assessments expose divergent provider outcomes'
 
 test('buildStorageVerificationReport returns the expected top-level fields', () => {
   const report = buildStorageVerificationReport({
-    providers: ['minio', 'garage'],
+    providers: ['ceph-rgw', 'garage'],
     scenarioResults: [
       {
         category: 'bucket.create',
-        providerType: 'minio',
+        providerType: 'ceph-rgw',
         operation: 'bucket.create',
         expectedOutcome: 'accepted',
         status: 'passed'
@@ -181,17 +181,17 @@ test('buildStorageVerificationReport returns the expected top-level fields', () 
 test('summaries from provider catalog do not leak secret references', () => {
   const summary = summarizeStorageVerificationReport(buildStorageVerificationReport({
     providers: [{
-      providerType: 'minio',
-      endpoint: 'https://minio.internal',
-      secretRef: 'secret://providers/minio'
+      providerType: 'seaweedfs',
+      endpoint: 'https://seaweedfs.internal',
+      secretRef: 'secret://providers/seaweedfs'
     }],
     scenarioResults: [
       {
         category: 'bucket.create',
-        providerType: 'minio',
+        providerType: 'seaweedfs',
         operation: 'bucket.create',
         expectedOutcome: 'accepted',
-        actualOutcome: 'failure routed to https://minio.internal using accessKey=minio',
+        actualOutcome: 'failure routed to https://seaweedfs.internal using accessKey=seaweedfs',
         status: 'failed'
       }
     ],

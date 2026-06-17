@@ -45,10 +45,10 @@ const REQUIRED_CATEGORIES = [
 test('buildVerificationRun creates a single-provider run without leaking credentials', () => {
   const run = buildVerificationRun({
     providers: [{
-      providerType: 'minio',
-      endpoint: 'https://minio.internal',
-      accessKey: 'minio',
-      secretRef: 'secret://providers/minio'
+      providerType: 'seaweedfs',
+      endpoint: 'https://seaweedfs.internal',
+      accessKey: 'seaweedfs',
+      secretRef: 'secret://providers/seaweedfs'
     }],
     startedAt: '2026-03-27T21:30:00Z'
   });
@@ -57,15 +57,17 @@ test('buildVerificationRun creates a single-provider run without leaking credent
   assert.equal(run.startedAt, '2026-03-27T21:30:00Z');
   assert.equal(run.configuration.providers.length, 1);
   assert.deepEqual(Object.keys(run.configuration.providers[0]).sort(), ['backendFamily', 'displayName', 'providerType']);
-  assert.equal(run.configuration.providers[0].providerType, 'minio');
+  assert.equal(run.configuration.providers[0].providerType, 'seaweedfs');
   assert.deepEqual(run.scenarios, []);
   assert.equal(JSON.stringify(run).includes('secret://'), false);
-  assert.equal(JSON.stringify(run).includes('https://minio.internal'), false);
+  // The provider endpoint must not be serialized into the verification run output.
+  // Assert the `endpoint` field is absent (rather than substring-matching a URL).
+  assert.equal(JSON.stringify(run).includes('"endpoint"'), false);
 });
 
 test('buildVerificationRun creates unique run ids for equivalent two-provider inputs', () => {
   const input = {
-    providers: ['minio', 'garage'],
+    providers: ['ceph-rgw', 'garage'],
     startedAt: '2026-03-27T21:31:00Z'
   };
 
@@ -104,7 +106,7 @@ test('buildVerificationScenario creates structurally valid records for represent
 test('buildVerificationResult omits failure data for passing scenarios', () => {
   const result = buildVerificationResult({
     category: 'bucket.create',
-    providerType: 'minio',
+    providerType: 'seaweedfs',
     operation: 'bucket.create',
     expectedOutcome: 'accepted',
     status: 'passed',
@@ -121,7 +123,7 @@ test('buildVerificationResult omits failure data for passing scenarios', () => {
 test('classifyVerificationFailure marks zero-retry failures as deterministic', () => {
   const result = buildVerificationResult({
     category: 'object.get',
-    providerType: 'minio',
+    providerType: 'seaweedfs',
     operation: 'object.get',
     expectedOutcome: 'download succeeds',
     actualOutcome: 'normalized to OBJECT_NOT_FOUND',
@@ -147,11 +149,11 @@ test('classifyVerificationFailure marks failed-after-retry results with prior pa
 
 test('buildVerificationReport returns pass when both providers pass all scenarios', () => {
   const report = buildVerificationReport({
-    providers: ['minio', 'garage'],
+    providers: ['seaweedfs', 'garage'],
     scenarioResults: [
       {
         category: 'bucket.create',
-        providerType: 'minio',
+        providerType: 'seaweedfs',
         operation: 'bucket.create',
         expectedOutcome: 'accepted',
         status: 'passed'
@@ -168,7 +170,7 @@ test('buildVerificationReport returns pass when both providers pass all scenario
       {
         operation: 'bucket.create',
         equivalent: true,
-        providers: ['minio', 'garage']
+        providers: ['seaweedfs', 'garage']
       }
     ],
     errorTaxonomyConsistencyResults: [],
@@ -177,18 +179,18 @@ test('buildVerificationReport returns pass when both providers pass all scenario
   });
 
   assert.equal(report.overallVerdict, VERIFICATION_VERDICT.PASS);
-  assert.equal(report.verdicts.minio, VERIFICATION_VERDICT.PASS);
+  assert.equal(report.verdicts.seaweedfs, VERIFICATION_VERDICT.PASS);
   assert.equal(report.verdicts.garage, VERIFICATION_VERDICT.PASS);
   assert.deepEqual(report.divergences, []);
 });
 
 test('buildVerificationReport returns partial when one provider fails a scenario', () => {
   const report = buildVerificationReport({
-    providers: ['minio', 'garage'],
+    providers: ['seaweedfs', 'garage'],
     scenarioResults: [
       {
         category: 'bucket.create',
-        providerType: 'minio',
+        providerType: 'seaweedfs',
         operation: 'bucket.create',
         expectedOutcome: 'accepted',
         status: 'passed'
@@ -209,14 +211,14 @@ test('buildVerificationReport returns partial when one provider fails a scenario
   });
 
   assert.equal(report.overallVerdict, VERIFICATION_VERDICT.PARTIAL);
-  assert.equal(report.verdicts.minio, VERIFICATION_VERDICT.PASS);
+  assert.equal(report.verdicts.seaweedfs, VERIFICATION_VERDICT.PASS);
   assert.equal(report.verdicts.garage, VERIFICATION_VERDICT.FAIL);
   assert.equal(report.divergences.length, 1);
   assert.equal(report.divergences[0].operation, 'bucket.create');
 });
 
-test('buildCapabilityBaselineVerificationResult marks MinIO as eligible', () => {
-  const result = buildCapabilityBaselineVerificationResult({ providerType: 'minio' });
+test('buildCapabilityBaselineVerificationResult marks SeaweedFS as eligible', () => {
+  const result = buildCapabilityBaselineVerificationResult({ providerType: 'seaweedfs' });
 
   assert.equal(result.eligible, true);
   assert.deepEqual(result.missingCapabilities, []);
@@ -225,7 +227,7 @@ test('buildCapabilityBaselineVerificationResult marks MinIO as eligible', () => 
 
 test('buildCapabilityBaselineVerificationResult exposes missing pagination capability for negative fixtures', () => {
   const result = buildCapabilityBaselineVerificationResult({
-    providerType: 'minio',
+    providerType: 'seaweedfs',
     baseline: {
       version: 'v1',
       checkedAt: '2026-03-27T21:35:00Z',
@@ -240,7 +242,7 @@ test('buildCapabilityBaselineVerificationResult exposes missing pagination capab
   assert.equal(result.missingCapabilities.includes('object.list.pagination.deterministic'), true);
 });
 
-test('buildErrorTaxonomyConsistencyResult is consistent for all required normalized error codes across MinIO and Garage', () => {
+test('buildErrorTaxonomyConsistencyResult is consistent for all required normalized error codes across Ceph RGW and Garage', () => {
   for (const errorCode of [
     'OBJECT_NOT_FOUND',
     'BUCKET_NOT_FOUND',
@@ -250,7 +252,7 @@ test('buildErrorTaxonomyConsistencyResult is consistent for all required normali
   ]) {
     const result = buildErrorTaxonomyConsistencyResult({
       errorCode,
-      providers: ['minio', 'garage']
+      providers: ['ceph-rgw', 'garage']
     });
 
     assert.equal(result.consistent, true);
@@ -263,9 +265,9 @@ test('buildErrorTaxonomyConsistencyResult is consistent for all required normali
 test('buildErrorTaxonomyConsistencyResult surfaces diverging provider HTTP status values', () => {
   const result = buildErrorTaxonomyConsistencyResult({
     errorCode: 'OBJECT_NOT_FOUND',
-    providers: ['minio', 'garage'],
+    providers: ['ceph-rgw', 'garage'],
     providerResultOverrides: {
-      minio: {
+      'ceph-rgw': {
         code: 'OBJECT_NOT_FOUND',
         httpStatus: 404,
         retryability: 'not_retryable'
@@ -300,17 +302,17 @@ test('buildTenantIsolationVerificationResult records denied cross-tenant access 
 test('summarizeVerificationReport redacts secret and URL-like content', () => {
   const summary = summarizeVerificationReport(buildVerificationReport({
     providers: [{
-      providerType: 'minio',
-      endpoint: 'https://minio.internal',
-      secretRef: 'secret://providers/minio'
+      providerType: 'seaweedfs',
+      endpoint: 'https://seaweedfs.internal',
+      secretRef: 'secret://providers/seaweedfs'
     }],
     scenarioResults: [
       {
         category: 'bucket.create',
-        providerType: 'minio',
+        providerType: 'seaweedfs',
         operation: 'bucket.create',
         expectedOutcome: 'accepted',
-        actualOutcome: 'accepted via https://minio.internal with accessKey=minio',
+        actualOutcome: 'accepted via https://seaweedfs.internal with accessKey=seaweedfs',
         status: 'failed'
       }
     ],

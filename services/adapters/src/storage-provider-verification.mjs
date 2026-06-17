@@ -78,7 +78,6 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
     operation: 'object.get',
     expectedOutcome: 'OBJECT_NOT_FOUND:404:not_retryable',
     providerCodeByType: Object.freeze({
-      minio: 'NoSuchKey',
       'ceph-rgw': 'NoSuchKey',
       garage: 'NoSuchKey',
       seaweedfs: 'NoSuchKey',
@@ -90,7 +89,6 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
     operation: 'bucket.get',
     expectedOutcome: 'BUCKET_NOT_FOUND:404:not_retryable',
     providerCodeByType: Object.freeze({
-      minio: 'NoSuchBucket',
       'ceph-rgw': 'NoSuchBucket',
       garage: 'NoSuchBucket',
       seaweedfs: 'NoSuchBucket',
@@ -102,7 +100,6 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
     operation: 'bucket.create',
     expectedOutcome: 'BUCKET_ALREADY_EXISTS:409:not_retryable',
     providerCodeByType: Object.freeze({
-      minio: 'BucketAlreadyExists',
       'ceph-rgw': 'BucketAlreadyExists',
       garage: 'BucketAlreadyExists',
       seaweedfs: 'BucketAlreadyExists',
@@ -114,7 +111,6 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
     operation: 'object.delete',
     expectedOutcome: 'STORAGE_ACCESS_DENIED:403:not_retryable',
     providerCodeByType: Object.freeze({
-      minio: 'AccessDenied',
       'ceph-rgw': 'AccessDenied',
       garage: 'AccessDenied',
       seaweedfs: 'AccessDenied',
@@ -126,7 +122,6 @@ const ERROR_SCENARIO_DEFINITIONS = Object.freeze({
     operation: 'bucket.create',
     expectedOutcome: 'STORAGE_INVALID_REQUEST:400:not_retryable',
     providerCodeByType: Object.freeze({
-      minio: 'InvalidBucketName',
       'ceph-rgw': 'InvalidBucketName',
       garage: 'InvalidBucketName',
       seaweedfs: 'InvalidBucketName',
