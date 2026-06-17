@@ -695,7 +695,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, jwtVerifier, gatewaySharedSecret, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
@@ -745,6 +745,22 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         const workspaceInPath = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1];
         if (workspaceInPath && workspaceInPath !== identity.credentialWorkspaceId) {
           return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Credential workspace does not match the requested workspace' });
+        }
+      }
+      // Workspace-ownership check (fix-executor-apikey-cross-tenant-idor, #517): a caller may only
+      // operate on a workspace owned by its own tenant. This closes a cross-tenant IDOR that the
+      // credential-binding check above misses — a tenant-only admin JWT (no workspace binding)
+      // could mint/manage api-keys and reach the data plane in ANOTHER tenant's workspace. When the
+      // path names a workspace whose owning tenant is known and differs from the caller's verified
+      // tenant, reject before any handler runs. Workspaces with no ownership record are left to RLS
+      // (which scopes them to the caller's own tenant), so they are not a cross-tenant exposure.
+      if (!opts?.noAuth && resolveWorkspaceTenant && identity.tenantId) {
+        const workspaceInPath = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1];
+        if (workspaceInPath) {
+          const owningTenantId = await resolveWorkspaceTenant(workspaceInPath);
+          if (owningTenantId && owningTenantId !== identity.tenantId) {
+            return sendJson(res, 403, { code: 'CROSS_TENANT_VIOLATION', message: "Workspace does not belong to the caller's tenant" });
+          }
         }
       }
       // Key management must not be performed with an anon/service API key — admin (JWT) only.
