@@ -440,6 +440,12 @@ export async function workspaceSlugTaken(pool, tenantId, slug) {
   const { rows } = await pool.query('SELECT 1 FROM workspaces WHERE tenant_id=$1 AND slug=$2 LIMIT 1', [tenantId, slug]);
   return rows.length > 0;
 }
+// Current workspace count for the tenant — the usage figure the max_workspaces
+// quota gate compares against (#556).
+export async function countTenantWorkspaces(pool, tenantId) {
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM workspaces WHERE tenant_id=$1', [tenantId]);
+  return rows[0]?.n ?? 0;
+}
 export async function insertWorkspace(pool, { id, tenantId, slug, displayName, environment = 'dev', createdBy }) {
   const { rows } = await pool.query(
     `INSERT INTO workspaces (id, tenant_id, slug, display_name, environment, created_by)
@@ -532,6 +538,15 @@ export async function getTenant(pool, idOrSlug) {
   const { rows } = await pool.query(
     `SELECT id, tenant_id, slug, display_name, status, iam_realm, created_at, created_by
        FROM tenants WHERE id = $1 OR slug = $1 LIMIT 1`, [idOrSlug]);
+  return rows[0] ?? null;
+}
+
+// Resolve the tenant that owns a Keycloak realm — used to authorize a tenant
+// owner/admin to manage end-users in their own realm (#567).
+export async function getTenantByRealm(pool, realm) {
+  const { rows } = await pool.query(
+    `SELECT id, tenant_id, slug, display_name, status, iam_realm, created_at, created_by
+       FROM tenants WHERE iam_realm = $1 LIMIT 1`, [realm]);
   return rows[0] ?? null;
 }
 

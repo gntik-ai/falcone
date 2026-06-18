@@ -8,12 +8,30 @@
 // is cluster-wide so it uses the shared control-plane pool. Read-only.
 import pg from 'pg';
 import * as store from './tenant-store.mjs';
+import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
 
 const { Client } = pg;
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 const coll = (items) => ({ items, page: { total: items.length } });
 const D = (s) => decodeURIComponent(s);
+
+// Tenant-scope guard for the by-name database browse routes (route auth is only
+// `authenticated`, so any verified caller reaches these). A database is owned by
+// the tenant recorded in `workspace_databases`; the platform control DB
+// `in_falcone` (and any unmapped system DB) has no such row. Mirrors the P0
+// browse fixes (ISO-MONGO/ISO-EVENTS): platform callers (superadmin/internal) may
+// browse any DB; a tenant caller may browse ONLY a DB its tenant owns; everything
+// else 404s with NO existence leak. (#551 ISO-PG-META)
+async function assertDbScope(ctx) {
+  const db = D(ctx.params.db);
+  const map = await store.databaseWorkspaceMap(ctx.pool);
+  const owningTenant = map[db]?.tenant_id ?? null;
+  if (!canManageTenant(ctx?.identity, owningTenant)) {
+    return err(404, 'PG_DATABASE_NOT_FOUND', `database ${db} not found`);
+  }
+  return null;
+}
 
 async function withDb(database, fn) {
   const c = new Client({
@@ -25,21 +43,31 @@ async function withDb(database, fn) {
   try { return await fn(c); } finally { await c.end().catch(() => {}); }
 }
 
-// GET /v1/postgres/databases — all non-template databases (cluster-wide).
+// GET /v1/postgres/databases — non-template databases. The raw cluster scan would
+// list EVERY tenant's `wsdb_*` databases plus the platform control DB `in_falcone`
+// (a cross-tenant metadata/structure leak). Restrict the result to the databases
+// the caller's tenant owns (per `workspace_databases`); platform callers
+// (superadmin/internal) still see the full cluster. (#551 ISO-PG-META)
 async function pgListDatabases(ctx) {
   const { rows } = await ctx.pool.query(
     `SELECT d.datname, r.rolname AS owner
        FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba
       WHERE d.datistemplate = false ORDER BY d.datname`);
   const map = await store.databaseWorkspaceMap(ctx.pool);
-  const items = rows.map((x) => ({
-    databaseName: x.datname, state: 'active', ownerRoleName: x.owner, placementMode: 'shared',
-    tenantId: map[x.datname]?.tenant_id ?? null, workspaceId: map[x.datname]?.workspace_id ?? null
-  }));
+  const scope = callerTenantScope(ctx?.identity);
+  const items = rows
+    .map((x) => ({
+      databaseName: x.datname, state: 'active', ownerRoleName: x.owner, placementMode: 'shared',
+      tenantId: map[x.datname]?.tenant_id ?? null, workspaceId: map[x.datname]?.workspace_id ?? null
+    }))
+    // A tenant caller sees only databases mapped to its own tenant; this drops both
+    // other tenants' `wsdb_*` and unmapped system DBs (`in_falcone`, postgres, …).
+    .filter((it) => scope == null || it.tenantId === scope);
   return ok(200, coll(items));
 }
 
 async function pgListSchemas(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   try {
     return await withDb(D(ctx.params.db), async (c) => {
       const { rows } = await c.query(
@@ -61,6 +89,7 @@ async function pgListSchemas(ctx) {
 }
 
 async function pgListTables(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema);
   try {
     return await withDb(D(ctx.params.db), async (c) => {
@@ -75,6 +104,7 @@ async function pgListTables(ctx) {
 }
 
 async function pgColumns(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema); const table = D(ctx.params.table);
   try {
     return await withDb(D(ctx.params.db), async (c) => {
@@ -90,6 +120,7 @@ async function pgColumns(ctx) {
 }
 
 async function pgIndexes(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema); const table = D(ctx.params.table);
   try {
     return await withDb(D(ctx.params.db), async (c) => {
@@ -112,6 +143,7 @@ async function pgIndexes(ctx) {
 }
 
 async function pgPolicies(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema); const table = D(ctx.params.table);
   try {
     return await withDb(D(ctx.params.db), async (c) => {
@@ -128,6 +160,7 @@ async function pgPolicies(ctx) {
 }
 
 async function pgSecurity(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema); const table = D(ctx.params.table);
   try {
     return await withDb(D(ctx.params.db), async (c) => {
@@ -144,6 +177,7 @@ async function pgSecurity(ctx) {
 }
 
 async function pgViews(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema);
   try {
     return await withDb(D(ctx.params.db), async (c) => {
@@ -156,6 +190,7 @@ async function pgViews(ctx) {
 }
 
 async function pgMatViews(ctx) {
+  const denied = await assertDbScope(ctx); if (denied) return denied;
   const schema = D(ctx.params.schema);
   try {
     return await withDb(D(ctx.params.db), async (c) => {

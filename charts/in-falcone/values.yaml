@@ -2560,6 +2560,15 @@ seaweedfs:
     # are a single source of truth shared with `in-falcone-seaweedfs-s3-creds`.
     enableAuth: true
     existingConfigSecret: in-falcone-seaweedfs-s3-config
+    # Reserved platform/system bucket (scaffolding for the per-tenant identity
+    # model, #553). Tenant buckets are namespaced `t-…` per-workspace; the
+    # per-workspace SCOPED identities (built by seaweedfs-s3-identities-config.mjs)
+    # are the tenant-facing credentials. The chart admin/service identity is NOT
+    # confined to this bucket yet (it backs the storage REST API) — the live
+    # master-key retirement is tracked under epic #430. Keep the name in sync with
+    # seaweedfsS3Creds.platformBucketPrefix + the `system` suffix.
+    createBuckets:
+      - name: falcone-platform-system
     # No bucket-subdomain routing (path-style only); leave domainName empty.
     domainName: ""
     # Iceberg REST catalog (port 8181) is a new surface Falcone does not use —
@@ -2660,13 +2669,28 @@ seaweedfsTls:
 # (left to the cutover step / data-migration change; #434's values are untouched.)
 # ---------------------------------------------------------------------------
 seaweedfsS3Creds:
-  # Secret holding the human-facing credential keys (s3AccessKey/s3SecretKey).
+  # Secret holding the human-facing credential keys (s3AccessKey/s3SecretKey)
+  # plus the adminAccessKey/adminSecretKey the runtime IAM client signs per-tenant
+  # identity writes with (#553).
   secretName: in-falcone-seaweedfs-s3-creds
   # Secret holding the SeaweedFS identities JSON (key: seaweedfs_s3_config) that
   # the gateway loads via -s3.config; derived from the same generated values.
   configSecretName: in-falcone-seaweedfs-s3-config
   # Identity name advertised inside the SeaweedFS identities JSON.
   identityName: falcone-s3-admin
+  # TENANT ISOLATION (#553). The bootstrap admin identity is scoped to per-bucket
+  # action strings under THIS reserved prefix only (`Action:<prefix>system`) — it
+  # is NOT a cross-tenant skeleton key over `t-…` tenant buckets. Tenant buckets
+  # are namespaced `t-<tenantHash>-<workspaceHash>` (deriveWorkspaceBucketName).
+  # Keep in sync with PLATFORM_RESERVED_BUCKET_PREFIX in
+  # services/adapters/src/seaweedfs-s3-identities-config.mjs.
+  platformBucketPrefix: falcone-platform-
+  # Admin endpoint the runtime IAM client (seaweedfs-iam-client.mjs) calls to
+  # onboard/rotate/revoke per-workspace identities live. Wire SEAWEEDFS_S3_ADMIN_
+  # ENDPOINT to this and SEAWEEDFS_ADMIN_ACCESS_KEY/SEAWEEDFS_ADMIN_SECRET_KEY to
+  # the adminAccessKey/adminSecretKey keys of `secretName` for the provisioning
+  # workloads that issue tenant identities.
+  adminEndpoint: http://in-falcone-seaweedfs-s3:8333
 
 gatewaySharedSecret:
   # Chart-managed shared secret bridging the APISIX gateway and the control-plane executor

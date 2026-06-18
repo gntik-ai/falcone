@@ -1,0 +1,61 @@
+// Governance schema bootstrap for the kind control-plane (#555 BUG-GOV-SCHEMA).
+//
+// The wireable governance routes (capability-catalog, plan-assign, scope-enforcement
+// audit, quota dimensions / effective-limits) dispatch to the REAL product actions
+// dynamically imported under `/repo/services/provisioning-orchestrator/...`. Those
+// actions query tables that live in the provisioning-orchestrator MIGRATIONS — but
+// the kind boot only ran `ensureSchema` (the hand-written domain-B tables: tenants /
+// workspaces / workspace_databases / saga). The governance migrations were never
+// applied to `in_falcone` (the planning note `required-migrations.txt` listed them but
+// nothing consumed it), so every governance read/write hit a missing relation and
+// 500'd with PostgreSQL 42P01. This module applies that governance migration set at
+// boot so the actions resolve.
+//
+// Ordering is dependency-safe (and numeric): 093 (scope_enforcement_denials, standalone)
+// → 097 (defines set_updated_at_timestamp() + plans, the prerequisites for the rest)
+// → 098 (creates AND seeds quota_dimension_catalog, before 103/105 FK it)
+// → 100 (tenant_plan_change_history) → 103 (quota_overrides) → 104 (boolean_capability_catalog)
+// → 105 (workspace_sub_quotas) → 121 (seeds the flow quota dimensions). Every file is
+// `CREATE TABLE IF NOT EXISTS` + `INSERT … ON CONFLICT DO NOTHING`, so re-running boot is a
+// no-op (idempotent). The whole `services/provisioning-orchestrator` tree (including these
+// .sql files) is COPYed into the image under /repo by deploy/kind/control-plane/Dockerfile.
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+export const GOVERNANCE_MIGRATIONS = [
+  'services/provisioning-orchestrator/src/migrations/093-scope-enforcement.sql',
+  'services/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql',
+  'services/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql',
+  'services/provisioning-orchestrator/src/migrations/100-plan-change-impact-history.sql',
+  'services/provisioning-orchestrator/src/migrations/103-hard-soft-quota-overrides.sql',
+  'services/provisioning-orchestrator/src/migrations/104-plan-boolean-capabilities.sql',
+  'services/provisioning-orchestrator/src/migrations/105-effective-limit-resolution.sql',
+  'services/provisioning-orchestrator/src/migrations/121-flow-quota-dimensions.sql',
+];
+
+// The control-plane action modules resolve under /repo in the image; allow override
+// (REPO_ROOT) so the same code path is exercisable from a checkout.
+const DEFAULT_REPO_ROOT = process.env.REPO_ROOT || '/repo';
+
+/**
+ * Apply the governance migration set (in order) to the in_falcone database.
+ * Idempotent. Injectable I/O for tests.
+ *
+ * @param {{query:(sql:string)=>Promise<any>}} pool  control-plane Postgres pool
+ * @param {object} [opts]
+ * @param {string} [opts.repoRoot]                    where the /repo tree lives
+ * @param {(p:string,enc:string)=>Promise<string>} [opts.read]  file reader
+ * @param {{log:Function}} [opts.log]                 logger
+ * @returns {Promise<string[]>}  the migration paths applied, in order
+ */
+export async function applyGovernanceSchema(pool, opts = {}) {
+  const { repoRoot = DEFAULT_REPO_ROOT, read = readFile, log = console } = opts;
+  const applied = [];
+  for (const rel of GOVERNANCE_MIGRATIONS) {
+    const sql = await read(resolve(repoRoot, rel), 'utf8');
+    await pool.query(sql);
+    applied.push(rel);
+  }
+  log.log?.(`[control-plane] governance schema ready (${applied.length} migrations)`);
+  return applied;
+}

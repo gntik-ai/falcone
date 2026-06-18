@@ -10,12 +10,25 @@
  *   TEMPORAL_TASK_QUEUE Task queue to poll                  (default flows-main)
  *   WORKER_HEALTH_PORT  HTTP health-probe port for K8s      (default 8080)
  *
+ * Postgres executor wiring (fix-flows-worker-db-activity-wiring / #563):
+ *   WORKER_DATA_DSN     Full postgres DSN for the data-plane DB (highest priority).
+ *   DATA_DB_URL / DB_URL  Alternative DSN env names (mirrors control-plane main.mjs).
+ *   PGHOST / PGUSER / PGPASSWORD / PGDATABASE / PGPORT
+ *                       Component env vars (Helm-injected in the kind/chart profile).
+ *
  * Graceful shutdown: on SIGTERM/SIGINT the worker stops accepting new tasks, drains the
  * current poll, and exits 0 within terminationGracePeriodSeconds.
  */
 import { Worker, NativeConnection } from '@temporalio/worker';
 import { createServer, type Server } from 'node:http';
 import * as activities from './activities';
+
+// Runtime ESM loader — same `new Function` trick as activities/index.ts so tsc does NOT
+// downlevel `import()` into `require()` (which cannot load .mjs ESM modules).
+const dynamicImport: (spec: string) => Promise<any> = new Function(
+  'spec',
+  'return import(spec)',
+) as (spec: string) => Promise<any>;
 
 const ADDRESS = process.env.TEMPORAL_ADDRESS ?? '127.0.0.1:7233';
 const NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows';
@@ -50,6 +63,15 @@ async function run(): Promise<void> {
   const state = { ready: false };
   const health = startHealthServer(() => state);
 
+  // Wire the postgres executor into the activity catalog BEFORE the worker starts polling.
+  // This ensures every db.query activity can reach the workspace Postgres under the
+  // execution's tenant RLS context (fix-flows-worker-db-activity-wiring / #563).
+  const { wireActivityDeps } = await dynamicImport('./worker-deps.mjs');
+  const { deps, close: closeRegistry } = await wireActivityDeps();
+  activities.setActivityDeps(deps);
+  // eslint-disable-next-line no-console
+  console.log('[workflow-worker] postgres executor wired into db.query activity');
+
   const connection = await NativeConnection.connect({ address: ADDRESS });
   const worker = await Worker.create({
     connection,
@@ -76,6 +98,7 @@ async function run(): Promise<void> {
   } finally {
     await connection.close();
     health.close();
+    await closeRegistry();
   }
 }
 

@@ -23,3 +23,12 @@ that verifies a logged-in tenant user cannot view another tenant's resources in 
 - **THEN** tenant-B's workspaces, databases, and users MUST NOT appear in any console
   list view accessible to tenant-A's user
 
+### Requirement: Console shell unusable for tenant operators
+
+The system SHALL ensure that console shell unusable for tenant operators is corrected: Drive operator context from `/v1/workspaces` / `/v1/tenant/*` (own-scope) instead of the superadmin tenant list; fix the singular `/v1/tenant/plan` route authz.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** An operator logs in and sees their own tenant/workspaces/plan
+

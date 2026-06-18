@@ -67,7 +67,13 @@ spec:
     matchLabels: { app: falcone-cp-executor }
   template:
     metadata:
-      labels: { app: falcone-cp-executor }
+      # `app` is the Service selector; `app.kubernetes.io/name: control-plane-executor`
+      # is the contract the FerretDB (and SeaweedFS/Kafka) NetworkPolicies' ingress
+      # allowlists match on (ferretdb.networkPolicy.allowedAppComponents). Without it,
+      # kindnet drops the executor->FerretDB TCP and mongo CRUD times out (500). (#559)
+      labels:
+        app: falcone-cp-executor
+        app.kubernetes.io/name: control-plane-executor
     spec:
       securityContext:
         runAsNonRoot: true
