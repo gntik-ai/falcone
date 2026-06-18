@@ -1,0 +1,89 @@
+{{- /*
+  SeaweedFS admin-identity seed (#553, filer-based dynamic IAM).
+
+  In filer-mode (seaweedfs.s3.enableAuth=false), the s3 gateway loads its IAM
+  identities from the FILER instead of a static `-config` file, so per-workspace
+  identities can be onboarded at runtime (`weed shell s3.configure -apply`) without
+  a gateway restart. But a freshly-installed filer has ZERO identities — which would
+  leave the gateway anonymous/open — so this post-install/post-upgrade hook seeds the
+  backend admin identity (`falcone-s3-admin`, the STORAGE_S3_* credential the
+  control-plane uses to provision/serve every tenant's bucket) into the filer.
+
+  The admin keys come from the chart-managed `in-falcone-seaweedfs-s3-creds` Secret
+  (the single source of truth for the admin/service credential). The pod is labelled
+  `app.kubernetes.io/name: seaweedfs` so the master/filer NetworkPolicies admit it.
+
+  Only rendered when seaweedfs is enabled AND in filer-mode (enableAuth=false). The
+  static-config path (enableAuth=true) seeds identities via the mounted file and needs
+  no seed Job.
+*/ -}}
+{{- if and .Values.seaweedfs.enabled (not .Values.seaweedfs.s3.enableAuth) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-admin-seed
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seaweedfs-admin-seed
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-8"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 20
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.labels" . | nindent 8 }}
+        # Admit through the master/filer NetworkPolicies (intra-SeaweedFS ingress is
+        # allowed from app.kubernetes.io/name: seaweedfs).
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: seaweedfs-admin-seed
+    spec:
+      restartPolicy: Never
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ .name | default . }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: admin-seed
+          # Pinned to the seaweedfs subchart's app version (Chart.yaml dep seaweedfs-4.33.0).
+          image: chrislusf/seaweedfs:4.33
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SW_MASTER
+              value: "{{ .Release.Name }}-seaweedfs-master.{{ .Values.global.namespace | default .Release.Namespace }}:9333"
+            - name: ADMIN_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.seaweedfsS3Creds.secretName }}
+                  key: s3AccessKey
+            - name: ADMIN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.seaweedfsS3Creds.secretName }}
+                  key: s3SecretKey
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "Seeding falcone-s3-admin into the SeaweedFS filer (master $SW_MASTER)..."
+              i=1
+              while [ "$i" -le 60 ]; do
+                out=$(printf 's3.configure -apply -user falcone-s3-admin -access_key %s -secret_key %s -actions Admin,Read,Write,List,Tagging\n' \
+                        "$ADMIN_ACCESS_KEY" "$ADMIN_SECRET_KEY" \
+                      | weed shell -master="$SW_MASTER" 2>&1) || true
+                if printf '%s' "$out" | grep -q 'falcone-s3-admin'; then
+                  echo "OK: admin identity present in the filer IAM config."
+                  exit 0
+                fi
+                echo "attempt $i: master/filer not ready or seed not confirmed; retry in 5s"
+                i=$((i + 1)); sleep 5
+              done
+              echo "FAILED to seed the admin identity into the filer." >&2
+              exit 1
+{{- end }}

@@ -2554,19 +2554,27 @@ seaweedfs:
     # (upstream defaults) so the gateway is internal-only (no tenant-facing path).
     service:
       type: ClusterIP
-    # Path-style, in-cluster only. Auth is ON: the gateway authenticates S3
-    # requests against an identities JSON. We supply that JSON via a
-    # chart-managed Secret (templates/seaweedfs-s3-creds.yaml) so the credentials
-    # are a single source of truth shared with `in-falcone-seaweedfs-s3-creds`.
-    enableAuth: true
+    # FILER-BASED dynamic IAM (#553). Auth is enforced, but the gateway loads its
+    # identities from the FILER (not a static `-config` file) so per-workspace
+    # identities can be onboarded at runtime via `weed shell s3.configure -apply` and
+    # take effect WITHOUT a gateway restart (verified live 2026-06-18). A static
+    # `-config` file (the old `enableAuth: true` path) is loaded once at start and
+    # IGNORES filer-stored identities — incompatible with per-tenant onboarding.
+    #   - `enableAuth: false` drops `-config` so the gateway reads IAM from the filer.
+    #   - `-iam.readOnly=false` permits dynamic identity writes.
+    # The backend admin identity (`falcone-s3-admin`, the STORAGE_S3_* credential) is
+    # seeded into the filer by templates/seaweedfs-admin-seed-hook.yaml so the gateway
+    # still authenticates it (and so the filer is never empty -> never anonymous).
+    enableAuth: false
+    extraArgs:
+      - "-iam.readOnly=false"
+    # Retained but UNUSED while enableAuth is false (filer-mode ignores it); kept so a
+    # rollback to static-config mode is just the enableAuth flip.
     existingConfigSecret: in-falcone-seaweedfs-s3-config
-    # Reserved platform/system bucket (scaffolding for the per-tenant identity
-    # model, #553). Tenant buckets are namespaced `t-…` per-workspace; the
-    # per-workspace SCOPED identities (built by seaweedfs-s3-identities-config.mjs)
-    # are the tenant-facing credentials. The chart admin/service identity is NOT
-    # confined to this bucket yet (it backs the storage REST API) — the live
-    # master-key retirement is tracked under epic #430. Keep the name in sync with
-    # seaweedfsS3Creds.platformBucketPrefix + the `system` suffix.
+    # Reserved platform/system bucket. Tenant buckets are fronted by per-workspace
+    # SCOPED identities (seaweedfs-s3-identities-config.mjs + the runtime issuer); the
+    # admin/service identity stays broad (it backs the storage REST API) but is NO
+    # LONGER the only credential — tenants get scoped keys. (#553)
     createBuckets:
       - name: falcone-platform-system
     # No bucket-subdomain routing (path-style only); leave domainName empty.
