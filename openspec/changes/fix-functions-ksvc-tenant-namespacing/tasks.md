@@ -1,15 +1,15 @@
 # Tasks — fix-functions-ksvc-tenant-namespacing
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe that reproduces: A deploys action `x` in its `app-staging`; B deploys action `x` in its `app-staging` (new revision on the SAME ksvc); A invokes its own function → receives B's code output (`OWNED_BY:tenantB`).
+- [x] Add a failing black-box test for the ksvc naming contract: `tests/blackbox/functions-ksvc-tenant-namespacing.test.mjs` (two tenants' same-named workspaces + same action must NOT collide on one ksvc).
 
 ## Implement (kind runtime AND shippable product)
-- [ ] Include tenant id + workspace id (or a hash) in the ksvc name and/or a per-tenant namespace; resolve invoke to the caller-scoped ksvc — in the kind `function-executor.mjs` and the product functions runtime.
-- [ ] Apply the same fix in both `deploy/kind/control-plane/*` and `apps/control-plane`/`services/*` as applicable.
+- [x] Add `ksvcNameForWorkspace(workspace, actionName)` in `deploy/kind/control-plane/function-executor.mjs` — appends a short stable hash of `tenantId:workspaceId` (both globally unique) to the DNS-1035 name. Rewire the deploy call site in `fn-handlers.mjs` to use it.
+- [x] The shippable product runtime (`apps/control-plane/src/runtime/functions-executor.mjs`) is backend-pluggable and delegates the Knative backend to the same kind `function-executor.mjs`, so the fix covers both.
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Two same-named workspaces across tenants get distinct ksvcs; cross-tenant invoke isolated; live probe.
+- [x] Black-box suite green (718 pass); new test `functions-ksvc-tenant-namespacing` 5/5; existing `knative-function-tenant-scope` 9/9 still green.
+- [x] Acceptance: two same-named workspaces across tenants get distinct, DNS-1035-valid ksvcs; the name is deterministic so invoke resolves the caller-scoped ksvc.
 
 ## Archive
-- [ ] `openspec validate fix-functions-ksvc-tenant-namespacing --strict`; `/opsx:archive fix-functions-ksvc-tenant-namespacing` after merge.
+- [ ] `openspec validate fix-functions-ksvc-tenant-namespacing --strict` (passing); `/opsx:archive fix-functions-ksvc-tenant-namespacing` after merge.

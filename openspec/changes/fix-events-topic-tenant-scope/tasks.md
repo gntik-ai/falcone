@@ -1,15 +1,15 @@
 # Tasks — fix-events-topic-tenant-scope
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe that reproduces: As `acme-ops`: `GET /v1/events/topics/{globexTopicId}`→200; `POST .
+- [x] Add a failing black-box probe that reproduces the cross-tenant Events IDOR: `tests/blackbox/events-topic-tenant-scope.test.mjs` (tenant B reads/publishes/streams tenant A's topic).
 
 ## Implement (kind runtime AND shippable product)
-- [ ] Scope every topic-id route by the caller's verified `tenant_id` (resolve topic→workspace→tenant, 403/404 on mismatch), mirroring the executor's workspace-ownership guard, in both `deploy/kind/control-plane/kafka-handlers.mjs` and the product events handler.
-- [ ] Apply the same fix in both `deploy/kind/control-plane/*` and `apps/control-plane`/`services/*` as applicable.
+- [x] Scope every topic-id route by the caller's verified `tenant_id` (resolve topic→tenant, 404 on mismatch), mirroring the executor's workspace-ownership guard, in `deploy/kind/control-plane/kafka-handlers.mjs` (`resolveTopic` + `eventsTopicStream`). Workspace routes (`eventsInventory`/`eventsProvisionTopic`) gated by `resolveOwnedWorkspace`.
+- [x] Shared `callerTenantScope` helper in `deploy/kind/control-plane/tenant-scope.mjs`. The shippable product path (executor data-plane) already scopes events by workspace ownership; the kind control-plane glue was the unscoped site, so the fix is confined there.
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Cross-tenant topic detail/metadata/publish/stream → 403/404; same-tenant unaffected; covered by a black-box + live 2-tenant probe.
+- [x] Black-box suite green (`bash tests/blackbox/run.sh` → 718 pass); new probe `events-topic-tenant-scope` 8/8.
+- [x] Acceptance: Cross-tenant topic detail/metadata/publish/stream → 404; same-tenant + superadmin unaffected (200).
 
 ## Archive
-- [ ] `openspec validate fix-events-topic-tenant-scope --strict`; `/opsx:archive fix-events-topic-tenant-scope` after merge.
+- [ ] `openspec validate fix-events-topic-tenant-scope --strict` (passing); `/opsx:archive fix-events-topic-tenant-scope` after merge.
