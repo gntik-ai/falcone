@@ -29,11 +29,15 @@ CREATE TABLE IF NOT EXISTS tenant_plan_quota_impacts (
   display_label TEXT NULL,
   unit TEXT NULL,
   previous_effective_value_kind TEXT NOT NULL CHECK (previous_effective_value_kind IN ('bounded', 'unlimited', 'missing')),
-  previous_effective_value INTEGER NULL,
+  -- Quota limit/usage values are measured in the dimension's unit, which for storage is
+  -- BYTES — a 5 GB usage (5,368,709,120) overflows INTEGER (max ~2.1e9) and made EVERY
+  -- plan assignment 500, so no tenant could hold a plan (P1, live 2026-06-18). These are
+  -- BIGINT (matching the sibling 098/103 limit columns).
+  previous_effective_value BIGINT NULL,
   new_effective_value_kind TEXT NOT NULL CHECK (new_effective_value_kind IN ('bounded', 'unlimited', 'missing')),
-  new_effective_value INTEGER NULL,
+  new_effective_value BIGINT NULL,
   comparison TEXT NOT NULL CHECK (comparison IN ('increased', 'decreased', 'unchanged', 'added', 'removed')),
-  observed_usage INTEGER NULL,
+  observed_usage BIGINT NULL,
   usage_observed_at TIMESTAMPTZ NULL,
   usage_source TEXT NULL,
   usage_status TEXT NOT NULL CHECK (usage_status IN ('within_limit', 'at_limit', 'over_limit', 'unknown')),
@@ -42,6 +46,24 @@ CREATE TABLE IF NOT EXISTS tenant_plan_quota_impacts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (history_entry_id, dimension_key)
 );
+
+-- Upgrade existing deployments that created these columns as INTEGER (this migration
+-- re-runs idempotently each boot). The guard only ALTERs when still `integer`, so a
+-- table already on BIGINT incurs no lock/rewrite.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'tenant_plan_quota_impacts'
+      AND column_name = 'observed_usage'
+      AND data_type = 'integer'
+  ) THEN
+    ALTER TABLE tenant_plan_quota_impacts
+      ALTER COLUMN observed_usage TYPE BIGINT,
+      ALTER COLUMN previous_effective_value TYPE BIGINT,
+      ALTER COLUMN new_effective_value TYPE BIGINT;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tenant_plan_quota_impacts_dimension_usage_status
   ON tenant_plan_quota_impacts (dimension_key, usage_status);
