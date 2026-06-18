@@ -18,7 +18,7 @@ import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
-import { createFlowTriggerRegistry, createTriggerStore } from './flow-trigger-registry.mjs';
+import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
@@ -218,9 +218,17 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
 // platform-event triggers (enabled only when KAFKA_BROKERS is set). It calls back into the
 // executor's startTriggeredExecution for platform-event-initiated starts. The trigger registration
 // store persists on the SAME metadata pool as the flow definition store.
-if (flowExecutor) {
-  let scheduleClientP = null;
-  const flowTriggerRegistry = createFlowTriggerRegistry({
+// Boot wiring for the trigger plane (change: add-event-trigger-integration / #564). Defined as an
+// async boot step (invoked from the ensureSchema chain below, AFTER the trigger-store table exists)
+// so the on-boot consumer subscription can query already-persisted platform-event registrations. The
+// previous inline wiring constructed the registry but NEVER started the consumer on boot — a flow
+// published in a prior process left a dormant consumer, so a matching event started no execution
+// (the live-campaign gap). wireFlowTriggers() refreshes the subscription to existing registrations.
+let scheduleClientP = null;
+async function bootFlowTriggers() {
+  if (!flowExecutor) return;
+  await wireFlowTriggers({
+    flowExecutor,
     store: createTriggerStore({ pool: keyPool }),
     temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
     secretMasterKey: process.env.FLOW_TRIGGER_SECRET_KEY,
@@ -252,9 +260,7 @@ if (flowExecutor) {
           };
         }
       : undefined,
-    startTriggeredExecution: (args) => flowExecutor.startTriggeredExecution(args),
   });
-  flowExecutor.setTriggerRegistry(flowTriggerRegistry);
 }
 
 // Flow-monitoring executor (change: add-console-flow-monitoring / #366). The execution
@@ -318,6 +324,11 @@ const server = createControlPlaneServer({
 // Initialise all metadata schemas (they share keyPool) before listening.
 Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve()])
   .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
+  // Wire + START the platform-event trigger consumer AFTER the schemas exist, so the on-boot
+  // subscription can read already-persisted registrations (a flow published in a prior process).
+  // Best-effort: a Temporal/Kafka outage at boot never blocks the HTTP server from listening.
+  .then(() => bootFlowTriggers())
+  .catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', error))
   .finally(() => {
     server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
   });

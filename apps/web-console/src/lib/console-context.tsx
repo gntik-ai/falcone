@@ -227,6 +227,18 @@ export function ConsoleContextProvider({
     () => (Array.isArray(session?.principal?.workspaceIds) ? session?.principal?.workspaceIds.filter(Boolean) : []),
     [session?.principal?.workspaceIds]
   )
+  // A TENANT operator (tenant_owner / tenant_admin, without a platform role) cannot use the
+  // superadmin collection endpoint GET /v1/tenants (it 403s) — they must bootstrap tenant
+  // context from their own-scope singular endpoints. Platform users (superadmin /
+  // platform_admin / platform_operator) keep the collection endpoint. (#569)
+  const isTenantOperator = useMemo(
+    () => {
+      const roles: string[] = Array.isArray(session?.principal?.platformRoles) ? session!.principal!.platformRoles : []
+      const isPlatformUser = roles.includes('superadmin') || roles.includes('platform_admin') || roles.includes('platform_operator')
+      return !isPlatformUser && (roles.includes('tenant_owner') || roles.includes('tenant_admin'))
+    },
+    [session?.principal?.platformRoles]
+  )
   const [tenants, setTenants] = useState<ConsoleTenantOption[]>([])
   const [workspaces, setWorkspaces] = useState<ConsoleWorkspaceOption[]>([])
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null)
@@ -309,7 +321,7 @@ export function ConsoleContextProvider({
       setTenantsError(null)
 
       try {
-        const collection = await listAccessibleTenants()
+        const collection = await listAccessibleTenants({ isTenantOperator, ownTenantIds: tenantIds })
         const options = filterTenantOptions(normalizeTenantOptions(collection.items), tenantIds)
         const nextTenantId = resolveInitialTenantId(options, persistedSnapshot?.tenantId ?? null)
 
@@ -350,7 +362,7 @@ export function ConsoleContextProvider({
     return () => {
       cancelled = true
     }
-  }, [persistSelection, tenantIds, tenantReloadKey, userId])
+  }, [isTenantOperator, persistSelection, tenantIds, tenantReloadKey, userId])
 
   useEffect(() => {
     if (!userId || !activeTenantId) {
@@ -561,7 +573,7 @@ export function persistConsoleContextSelection(userId: string, tenantId: string 
 }
 
 export function clearPersistedConsoleContext(): void {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return
   }
 
@@ -769,7 +781,30 @@ export function formatConsoleEnumLabel(value: string | null | undefined): string
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-async function listAccessibleTenants(): Promise<TenantCollectionResponse> {
+// Fetch the list of tenants accessible to the current user.
+// Platform users (superadmin / platform_admin / platform_operator): use the collection
+// endpoint GET /v1/tenants. Tenant operators (tenant_owner / tenant_admin): use the
+// own-scope singular endpoint GET /v1/tenants/{tenantId} per tenantId in their session —
+// the collection endpoint is superadmin-only and 403s for them. A tenant operator with no
+// tenantIds returns an empty collection rather than calling the superadmin endpoint. (#569)
+async function listAccessibleTenants(options: {
+  isTenantOperator: boolean
+  ownTenantIds: string[]
+}): Promise<TenantCollectionResponse> {
+  if (options.isTenantOperator) {
+    if (options.ownTenantIds.length === 0) {
+      return { items: [], page: { after: null } }
+    }
+    const responses = await Promise.all(
+      options.ownTenantIds.map((tenantId) =>
+        requestConsoleSessionJson<{ tenant?: Tenant } & Tenant>(`/v1/tenants/${tenantId}`)
+      )
+    )
+    const items = responses
+      .map((res) => (res.tenant ? res.tenant : (res as Tenant)))
+      .filter((t): t is Tenant => Boolean(t?.tenantId))
+    return { items, page: { after: null } }
+  }
   const searchParams = new URLSearchParams({ 'page[size]': '100', sort: 'displayName' })
   return requestConsoleSessionJson<TenantCollectionResponse>(`/v1/tenants?${searchParams.toString()}`)
 }
@@ -936,7 +971,7 @@ function getConsoleContextErrorMessage(rawError: unknown, fallback: string): str
 }
 
 function readContextStorage(): string | null {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return null
   }
 
@@ -944,7 +979,7 @@ function readContextStorage(): string | null {
 }
 
 function writeContextStorage(value: string): void {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return
   }
 
