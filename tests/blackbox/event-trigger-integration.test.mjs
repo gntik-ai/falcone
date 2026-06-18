@@ -277,3 +277,45 @@ test('bbx-evt-trig-int-06: the kind advanced overlay does not drop the search-at
   assert.deepEqual(regs, ['flowId', 'flowVersion', 'tenantId', 'triggerType', 'workspaceId'],
     'exactly the 5 chart-default search attributes are registered under the kind overlay');
 });
+
+// -------------------------------------------------------------------------
+// bbx-evt-trig-int-07: adding a trigger topic to an ALREADY-RUNNING consumer must
+// stop -> subscribe -> re-run. KafkaJS FORBIDS subscribe() while running, so a publish
+// after the boot-time wiring (bootFlowTriggers already started the consumer) regressed
+// to 502 TRIGGER_REGISTRATION_FAILED. (live campaign 2026-06-18, #564 consumer-lifecycle.)
+// The prior fakes never enforced the constraint, so the bug slipped past them; this fake
+// throws exactly as the real KafkaJS consumer does.
+// -------------------------------------------------------------------------
+test('bbx-evt-trig-int-07: subscribing a new topic on a running consumer stops then re-runs (no subscribe-while-running 502)', async () => {
+  const calls = { subscriptions: [], runs: 0, stopped: 0 };
+  let running = false;
+  const kafka = {
+    calls,
+    factory: async () => ({
+      subscribe: async ({ topics }) => {
+        if (running) throw new Error('Cannot subscribe to topic while consumer is running'); // KafkaJS contract
+        for (const t of topics) calls.subscriptions.push(t);
+      },
+      run: async () => { calls.runs += 1; running = true; },
+      stop: async () => { calls.stopped += 1; running = false; },
+      disconnect: async () => {},
+    }),
+  };
+  const { flowExecutor } = wire({ temporal: makeFakeTemporal(), kafka });
+  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc' };
+
+  // First publish: subscribe(order-placed) + run() -> consumer now RUNNING.
+  await flowExecutor.executeFlows({ operation: 'create_definition', identity, flowId: 'f1', body: { name: 'A', definition: EVENT_DEF } });
+  await flowExecutor.executeFlows({ operation: 'publish_version', identity, flowId: 'f1' });
+  assert.equal(calls.runs, 1, 'consumer started after the first registration');
+
+  // Second publish adds a NEW topic while the consumer is running. With the fix this stops,
+  // re-subscribes to the union, and re-runs — WITHOUT the fix it throws subscribe-while-running.
+  const def2 = { ...EVENT_DEF, name: 'B', triggers: [{ kind: 'platform-event', eventType: 'order-shipped' }] };
+  await flowExecutor.executeFlows({ operation: 'create_definition', identity, flowId: 'f2', body: { name: 'B', definition: def2 } });
+  await flowExecutor.executeFlows({ operation: 'publish_version', identity, flowId: 'f2' });
+
+  assert.ok(calls.stopped >= 1, 'the running consumer was stopped before re-subscribing');
+  assert.ok(calls.runs >= 2, 'the consumer run loop was restarted after re-subscribing');
+  assert.ok(calls.subscriptions.includes(`evt.${WS}.order-shipped`), 'the new trigger topic was subscribed');
+});

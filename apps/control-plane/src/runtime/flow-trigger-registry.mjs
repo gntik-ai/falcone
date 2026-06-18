@@ -493,16 +493,20 @@ export function createFlowTriggerRegistry({
       consumerSubscriptions = wanted;
       return;
     }
-    // KafkaJS requires subscribe() BEFORE run(); on the FIRST registration we subscribe to the full
-    // wanted set, then start the run loop. A later registration that adds a NEW topic re-subscribes
-    // (KafkaJS tolerates subscribe-after-run for incremental topics) so newly published triggers are
-    // picked up without restarting the consumer (design.md risk: subscription drift).
+    // KafkaJS requires subscribe() BEFORE run() and FORBIDS subscribe() while the consumer is
+    // running ("Cannot subscribe to topic while consumer is running"). On the FIRST registration we
+    // subscribe to the full wanted set then start the run loop. To add/remove a topic on an
+    // ALREADY-RUNNING consumer we must stop the run loop, re-subscribe to the full wanted set, then
+    // restart it — otherwise a publish after boot-time wiring (bootFlowTriggers already started the
+    // consumer) 502s with TRIGGER_REGISTRATION_FAILED. (live campaign 2026-06-18, #564.)
     if (!consumer) {
       consumer = await kafkaConsumerFactory();
       await consumer.subscribe({ topics: [...wanted] });
       await consumer.run({ eachMessage: onConsumerMessage });
     } else {
+      if (typeof consumer.stop === 'function') await consumer.stop();
       await consumer.subscribe({ topics: [...wanted] });
+      await consumer.run({ eachMessage: onConsumerMessage });
     }
     consumerSubscriptions = wanted;
   }

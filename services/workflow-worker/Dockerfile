@@ -23,11 +23,15 @@ RUN npm run build
 
 # ---- runtime ----
 FROM node:22-slim AS runtime
-WORKDIR /app/services/workflow-worker
-
-# Production deps only.
+# Install the production deps at the /app ROOT (not under services/workflow-worker) so
+# `pg` resolves from BOTH the worker dist (/app/services/workflow-worker/dist) AND the
+# copied apps/control-plane runtime modules (/app/apps/control-plane/src/runtime) — the
+# latter `import 'pg'` and the ESM resolver only walks up to a node_modules in an ANCESTOR
+# dir. Worker package.json has no "type", so dist/worker.js stays CJS. (#563 wiring.)
+WORKDIR /app
 COPY services/workflow-worker/package.json ./package.json
 RUN npm install --omit=dev --no-package-lock
+WORKDIR /app/services/workflow-worker
 
 # Compiled output.
 COPY --from=build /app/services/workflow-worker/dist ./dist
