@@ -8,6 +8,7 @@
 // usage is workspace-scoped.
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
+import { issueWorkspaceIdentity } from './seaweedfs-identity.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
 // or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
@@ -304,7 +305,22 @@ async function storageProvisionBucket(ctx) {
   try {
     await createBucket(bucket);
     const rec = await store.insertBucket(ctx.pool, { workspaceId: ws.id, tenantId: ws.tenant_id, bucketName: bucket, region: REGION });
-    return ok(201, { bucket: { resourceId: bucket, bucketName: bucket, workspaceId: ws.id, tenantId: ws.tenant_id, region: REGION, status: 'active' }, record: rec });
+    // Issue a per-workspace SeaweedFS identity scoped to ONLY this bucket (#553), so the
+    // tenant gets a credential that can't reach any other tenant's bucket — instead of
+    // sharing the broad admin/master key. Best-effort: a failure here must not fail the
+    // provision (the bucket is still usable via the tenant-gated REST API); the credential
+    // can be re-issued. Only meaningful in filer-mode (STORAGE_TENANT_IDENTITIES=1).
+    let storageCredential = null;
+    if (process.env.STORAGE_TENANT_IDENTITIES === '1') {
+      try {
+        const issued = await issueWorkspaceIdentity({ workspaceId: ws.id, bucket });
+        // Return the one-time secret to the caller; never persist the plaintext secret.
+        storageCredential = { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions };
+      } catch (e) {
+        console.error('[storage] per-workspace identity issuance failed (bucket provisioned without a scoped credential):', e?.message ?? e);
+      }
+    }
+    return ok(201, { bucket: { resourceId: bucket, bucketName: bucket, workspaceId: ws.id, tenantId: ws.tenant_id, region: REGION, status: 'active' }, record: rec, storageCredential });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_PROVISION_FAILED', String(e.message ?? e));
   }
