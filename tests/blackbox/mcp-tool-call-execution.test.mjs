@@ -73,7 +73,7 @@ test('bbx-mcp-call-02: query_<table> self-calls GET …/tables/<t>/rows', async 
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'GET');
   assert.equal(c.path, '/v1/postgres/workspaces/ws-a/data/app/schemas/public/tables/orders/rows');
-  assert.ok(c.url.startsWith(SELF), 'must self-call the executor base url');
+  assert.equal(c.url, `${SELF}${c.path}`, 'must self-call the executor base url (exact, host-anchored)');
 });
 
 test('bbx-mcp-call-03: insert_<table> self-calls POST …/rows with body {row:{...}}', async () => {
