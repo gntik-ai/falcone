@@ -1,0 +1,22 @@
+== 1/5 helm uninstall ==
+These resources were kept due to the resource policy:
+[Secret] in-falcone-seaweedfs-s3-creds
+[Secret] in-falcone-seaweedfs-s3-config
+
+release "falcone" uninstalled
+== 2/5 delete namespace falcone (waits for full removal) ==
+namespace "falcone" deleted
+== 3/5 delete cluster-scoped objects the chart created ==
+== 4/5 delete vault auxiliary namespaces ==
+== 5/5 poll until namespace falcone is fully gone ==
+namespace falcone is gone.
+
+== final state ==
+-- namespaces (falcone/secret-store/eso-system should be absent) --
+  (none present — OK)
+-- residual chart cluster-roles (should be none) --
+clusterrolebinding.rbac.authorization.k8s.io/vault-vault-kubernetes-auth-clients                             ClusterRole/system:auth-delegator                                                  17d
+-- residual helm release secrets (should be none) --
+  (none present — OK)
+
+Teardown complete.

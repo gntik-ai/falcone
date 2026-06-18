@@ -73,6 +73,27 @@ async function call(method, path, { token, apikey, body } = {}) {
   if (aKey && bWs) { r = await call('POST', `/v1/workspaces/${bWs}/api-keys`, { token: A.opsToken, body: { name: 'x' } }); rec('isolation', 'acme-ops issue key in globex ws', [401, 403, 404].includes(r.status), `status=${r.status} (expect deny)`); }
   r = await call('GET', `/v1/metrics/tenants/${B.id}/quotas`, { token: A.opsToken }); rec('isolation', 'acme-ops globex metrics', [403, 404].includes(r.status), `status=${r.status} (expect 403/404)`);
 
+  // ---- P0 isolation breaches fixed this campaign (epic #539) ----
+  // ISO-EVENTS (#547): acme-ops must not read/publish/consume globex's topic.
+  const bTopic = B.workspaces.find(w => w.topic?.id)?.topic?.id;
+  if (bTopic) {
+    r = await call('GET', `/v1/events/topics/${bTopic}`, { token: A.opsToken }); rec('isolation', 'ISO-EVENTS acme-ops GET globex topic', [403, 404].includes(r.status), `status=${r.status} (expect 403/404)`);
+    r = await call('POST', `/v1/events/topics/${bTopic}/publish`, { token: A.opsToken, body: { payload: { evil: true } } }); rec('isolation', 'ISO-EVENTS acme-ops publish to globex topic', [403, 404].includes(r.status), `status=${r.status} (expect 403/404; never 202)`);
+  } else rec('isolation', 'ISO-EVENTS prerequisites', false, 'no globex topic id in fixtures');
+  // ISO-METRICS (#549): acme-ops must not read globex workspace metrics.
+  if (bWs) {
+    r = await call('GET', `/v1/metrics/workspaces/${bWs}/series`, { token: A.opsToken }); rec('isolation', 'ISO-METRICS acme-ops globex workspace series', [403, 404].includes(r.status), `status=${r.status} (expect 403)`);
+    r = await call('GET', `/v1/metrics/workspaces/${bWs}/overview`, { token: A.opsToken }); rec('isolation', 'ISO-METRICS acme-ops globex workspace overview', [403, 404].includes(r.status), `status=${r.status} (expect 403)`);
+  }
+  // ISO-MONGO (#550): acme-ops must not read globex's documents via the browse route.
+  if (bWs) {
+    r = await call('GET', `/v1/mongo/workspaces/${bWs}/data/appdb/collections/things/documents`, { token: A.opsToken });
+    const leaked = JSON.stringify(r.body ?? '').includes('GLOBEX');
+    rec('isolation', 'ISO-MONGO acme-ops read globex documents', ([403, 404].includes(r.status) || (r.status === 200 && (r.body?.items?.length ?? 0) === 0)) && !leaked, `status=${r.status} leaked=${leaked} (expect 404 or empty)`);
+  }
+  // ISO-FUNCTIONS (#548) is structurally fixed (per-(tenant,workspace) ksvc name);
+  // the distinct-ksvc contract is covered by tests/blackbox/functions-ksvc-tenant-namespacing.test.mjs.
+
   const pass = results.filter(x => x.pass).length;
   writeFileSync('audit/live-campaign/results.json', JSON.stringify({ when: new Date().toISOString(), pass, total: results.length, results }, null, 2));
   console.log(`\n=== ${pass}/${results.length} passed; wrote audit/live-campaign/results.json ===`);

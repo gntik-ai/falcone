@@ -12,6 +12,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const SA = '/var/run/secrets/kubernetes.io/serviceaccount';
 export const NS = (() => { try { return fs.readFileSync(`${SA}/namespace`, 'utf8').trim(); } catch { return 'falcone'; } })();
@@ -49,6 +50,27 @@ export function ksvcName(workspaceSlug, actionName) {
   let v = `fn-${workspaceSlug || 'ws'}-${actionName || 'a'}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
   if (!/^[a-z]/.test(v)) v = `fn-${v}`;
   return v.slice(0, 63).replace(/-+$/, '');
+}
+
+// Knative Service name for a function, GLOBALLY UNIQUE per (tenant, workspace).
+// Two tenants frequently share a workspace slug (e.g. both "app-staging");
+// deriving the ksvc name from the slug + action alone collided their same-named
+// actions on ONE shared ksvc, so one tenant's deploy clobbered — and its invoke
+// could run — the other tenant's code (P0 ISO-FUNCTIONS). We append a short,
+// stable hash of `tenantId:workspaceId` (each globally unique) so same-named
+// workspaces across tenants get distinct ksvcs, while keeping the slug for human
+// readability. Deterministic, so a redeploy/invoke resolves the same caller-scoped
+// ksvc. DNS-1035 still holds (<=63, lowercase alnum + '-', starts with a letter).
+export function ksvcNameForWorkspace(workspace = {}, actionName) {
+  const tenantId = workspace.tenant_id ?? workspace.tenantId ?? '';
+  const workspaceId = workspace.id ?? workspace.workspaceId ?? '';
+  const slug = workspace.slug ?? (workspaceId ? String(workspaceId).slice(0, 8) : '');
+  const disc = createHash('sha256').update(`${tenantId}:${workspaceId}`).digest('hex').slice(0, 10);
+  let base = `fn-${slug || 'ws'}-${actionName || 'a'}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  if (!/^[a-z]/.test(base)) base = `fn-${base}`;
+  // Reserve room for the "-<disc>" suffix within the 63-char DNS-1035 limit.
+  base = base.slice(0, 63 - disc.length - 1).replace(/-+$/, '');
+  return `${base}-${disc}`;
 }
 export const ksvcHost = (name) => `${name}.${NS}.svc.cluster.local`;
 

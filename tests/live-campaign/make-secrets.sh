@@ -151,8 +151,13 @@ echo "  secret/in-falcone-seaweedfs-s3-creds (helm-adopted)"
 # routes and reads the value from its PROCESS env; without it APISIX fails to load its
 # standalone config ("can't find environment variable GATEWAY_SHARED_SECRET") and
 # CrashLoops. values-campaign.yaml maps apisix.env GATEWAY_SHARED_SECRET to this secret.
-apply_secret in-falcone-gateway-shared-secret generic in-falcone-gateway-shared-secret \
-  --from-literal=secret="$(rand 24)"
+# NOTE (campaign 2026-06-18): the chart at HEAD now self-manages this secret via
+# templates/gateway-shared-secret.yaml (gatewaySharedSecret.create=true, fix #535/D3).
+# Pre-creating it here WITHOUT Helm ownership labels makes `helm install` abort with
+# "cannot be imported into the current release: invalid ownership metadata". So we let
+# the chart create + own it. (Finding: campaign harness drifted from chart at HEAD.)
+# apply_secret in-falcone-gateway-shared-secret generic in-falcone-gateway-shared-secret \
+#   --from-literal=secret="$(rand 24)"
 
 # --- 12-15. publicSurface TLS secrets (REQUIRED by the rendered Ingress) -----
 # The chart default platform.network.exposureKind=Ingress + publicSurface.tls.mode=
