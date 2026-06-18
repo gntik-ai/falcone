@@ -16,6 +16,11 @@ apisix:
 keycloak:
   image:
     repository: registry.airgap.in-falcone.local/keycloak/keycloak
+  # DB-init initContainer (fix-keycloak-persistent-store) needs a psql client image;
+  # mirror it alongside the postgresql image below.
+  database:
+    initImage:
+      repository: registry.airgap.in-falcone.local/bitnami/postgresql
 postgresql:
   image:
     repository: registry.airgap.in-falcone.local/bitnami/postgresql

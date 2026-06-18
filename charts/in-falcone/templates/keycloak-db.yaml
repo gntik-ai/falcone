@@ -1,0 +1,30 @@
+{{- if and .Values.keycloak.enabled .Values.keycloak.database.enabled }}
+{{- /*
+  Keycloak persistent-store connection config (fix-keycloak-persistent-store).
+
+  The component-wrapper renders keycloak.env verbatim (toYaml, NOT tpl), so the JDBC
+  URL — whose host is the release-scoped postgresql Service — cannot be templated inline
+  in values.yaml. This ConfigMap carries KC_DB_URL with the host resolved from the Helm
+  release name (via in-falcone.componentServiceNameByAlias, exactly as the documentdb
+  init Job resolves its engine host), and is mounted into Keycloak through
+  keycloak.envFromConfigMaps. The name is release-independent (mirrors the fixed-name
+  in-falcone-* Secrets) so keycloak.envFromConfigMaps can reference it literally.
+
+  KC_DB / KC_DB_USERNAME / KC_DB_PASSWORD are set directly on the Keycloak container
+  (keycloak.env) — only the host-bearing URL needs this indirection.
+*/ -}}
+{{- if not (regexMatch "^[a-zA-Z_][a-zA-Z0-9_]*$" .Values.keycloak.database.name) -}}
+  {{- fail (printf "keycloak.database.name %q is not a safe SQL/JDBC identifier" .Values.keycloak.database.name) -}}
+{{- end -}}
+{{- $pgSvc := include "in-falcone.componentServiceNameByAlias" (dict "root" . "component" "postgresql") -}}
+{{- $pgPort := .Values.postgresql.service.port | default 5432 -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: in-falcone-keycloak-db
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    in-falcone.io/component: keycloak
+data:
+  KC_DB_URL: {{ printf "jdbc:postgresql://%s:%v/%s" $pgSvc $pgPort .Values.keycloak.database.name | quote }}
+{{- end }}
