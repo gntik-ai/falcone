@@ -221,7 +221,10 @@ deployment:
     # required by the chart's validate.yaml on every in-place upgrade
     currentVersion: "0.2.0"
 keycloak:
-  # KC 26 re-augments the server on every start; 1Gi gets OOM-killed (exit 137)
+  # KC 26 re-augments the server on every start; 1Gi gets OOM-killed (exit 137).
+  # NOTE: the root cause of the exit-137 OOM was the in-memory H2 store growing with
+  # every realm/user/session; fix-keycloak-persistent-store moves persistence to the
+  # bundled postgresql, so 2Gi now holds. The chart default also raises this to 2Gi.
   resources:
     requests:
       cpu: 250m
@@ -229,3 +232,10 @@ keycloak:
     limits:
       cpu: "2"
       memory: 2Gi
+  # Keep the DB-init initContainer image (fix-keycloak-persistent-store) in lock-step
+  # with the postgresql image: Bitnami relocated its free images to `bitnamilegacy`, so
+  # the chart-default `docker.io/bitnami/postgresql` 404s on public docker.io.
+  database:
+    initImage:
+      repository: docker.io/bitnamilegacy/postgresql
+      tag: 17.2.0
