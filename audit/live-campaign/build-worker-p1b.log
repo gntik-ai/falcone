@@ -1,0 +1,100 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 3.38kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:22-slim
+#2 DONE 0.5s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 484B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 3.41kB done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:22-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752
+#5 resolve docker.io/library/node:22-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752 0.0s done
+#5 CACHED
+
+#6 [build 7/8] COPY services/workflow-worker/scripts ./scripts
+#6 CACHED
+
+#7 [build 2/8] WORKDIR /app/services/workflow-worker
+#7 CACHED
+
+#8 [build 4/8] RUN npm install --no-package-lock
+#8 CACHED
+
+#9 [build 3/8] COPY services/workflow-worker/package.json ./package.json
+#9 CACHED
+
+#10 [build 6/8] COPY services/workflow-worker/src ./src
+#10 CACHED
+
+#11 [build 5/8] COPY services/workflow-worker/tsconfig.json ./tsconfig.json
+#11 CACHED
+
+#12 [build 8/8] RUN npm run build
+#12 CACHED
+
+#13 [runtime 2/9] WORKDIR /app
+#13 DONE 0.0s
+
+#14 [runtime 3/9] COPY services/workflow-worker/package.json ./package.json
+#14 DONE 0.0s
+
+#15 [runtime 4/9] RUN npm install --omit=dev --no-package-lock
+#15 9.490 
+#15 9.490 added 181 packages, and audited 182 packages in 9s
+#15 9.490 
+#15 9.490 42 packages are looking for funding
+#15 9.490   run `npm fund` for details
+#15 9.500 
+#15 9.500 14 vulnerabilities (12 moderate, 2 high)
+#15 9.500 
+#15 9.500 To address issues that do not require attention, run:
+#15 9.500   npm audit fix
+#15 9.500 
+#15 9.500 To address all issues possible (including breaking changes), run:
+#15 9.500   npm audit fix --force
+#15 9.500 
+#15 9.500 Some issues need review, and may require choosing
+#15 9.500 a different dependency.
+#15 9.500 
+#15 9.500 Run `npm audit` for details.
+#15 9.501 npm notice
+#15 9.501 npm notice New major version of npm available! 10.9.8 -> 11.17.0
+#15 9.501 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+#15 9.501 npm notice To update run: npm install -g npm@11.17.0
+#15 9.501 npm notice
+#15 DONE 9.9s
+
+#16 [runtime 5/9] WORKDIR /app/services/workflow-worker
+#16 DONE 0.1s
+
+#17 [runtime 6/9] COPY --from=build /app/services/workflow-worker/dist ./dist
+#17 DONE 0.0s
+
+#18 [runtime 7/9] COPY services/webhook-engine/src /app/services/webhook-engine/src
+#18 DONE 0.0s
+
+#19 [runtime 8/9] COPY apps/control-plane/src/runtime/connection-registry.mjs      apps/control-plane/src/runtime/postgres-data-executor.mjs      apps/control-plane/src/runtime/workspace-dsn-resolver.mjs      apps/control-plane/src/runtime/errors.mjs      /app/apps/control-plane/src/runtime/
+#19 DONE 0.0s
+
+#20 [runtime 9/9] COPY services/adapters/src/postgresql-data-api.mjs      services/adapters/src/postgresql-governance-admin.mjs      /app/services/adapters/src/
+#20 DONE 0.0s
+
+#21 exporting to image
+#21 exporting layers
+#21 exporting layers 11.4s done
+#21 exporting manifest sha256:b804824a71fb4cc60cb7263d55caedea3ee81919cd4745753f94dae0caedccb6 0.0s done
+#21 exporting config sha256:e456ebd971ff541a176ce8fd221513da5d81154ffbfe333c8900a7bb0d2062d6 0.0s done
+#21 exporting attestation manifest sha256:2b9bd8048080672b0141efa710d6e7516240cec78ccda2e2f60c0cbc2b74547c 0.0s done
+#21 exporting manifest list sha256:61bba8174399a6868539d313b962c7008f9786952c81d1884e23f9b06cda47b7 0.0s done
+#21 naming to localhost:5000/in-falcone-workflow-worker:p1fix-20260618b done
+#21 unpacking to localhost:5000/in-falcone-workflow-worker:p1fix-20260618b
+#21 unpacking to localhost:5000/in-falcone-workflow-worker:p1fix-20260618b 2.9s done
+#21 DONE 14.4s

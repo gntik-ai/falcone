@@ -81,9 +81,9 @@ Legend: **Working** = exercised E2E with passing assertions · **Partial** · **
 | C19 | Events/Kafka (topic/publish/consume SSE) | REST | **Working** | create 201, publish 202, SSE frames delivered |
 | C20 | Functions (Knative: deploy/invoke/result/logs) | REST | **Working** | deploy 201, invoke→`{doubled:42}`, real ksvc; **input must be `{parameters:{…}}`** (BUG) |
 | C21 | **Event-driven (Kafka→fn/workflow)** | REST+Kafka | **Not working E2E** | event→function trigger not-deployed; event→flow trigger registers but execution blocked |
-| C22 | **Workflows (Temporal/Flows)** | EXEC | **Engine working; activity not wired** | create→publish→execute→terminal Temporal state; `db.query` activity "not wired" |
-| C23 | **MCP server hosting** | EXEC | **Hosting works; tool-call broken** | create/list/publish/curate 2xx; tool-call returns executor index |
-| C24 | **MCP → workflow** | EXEC | **Gap** | mapping module exists but never wired into the MCP engine |
+| C22 | **Workflows (Temporal/Flows)** | EXEC | **Engine working; db.query broken** | create→publish→execute→Temporal WorkflowExecutionStarted confirmed; `db.query` UPSTREAM_UNAVAILABLE (worker missing PG env vars — BUG-C22-A); isolation PASS |
+| C23 | **MCP server hosting** | EXEC | **Working (internal API); MCP JSON-RPC not exposed** | create/list/publish/curate/tool-call 2xx; tool routes to data plane (confirmed); MCP Streamable HTTP (initialize/tools/list) 404 NO_ROUTE; isolation PASS |
+| C24 | **MCP → workflow** | EXEC | **Working end-to-end** | `run_flow_*` tool auto-generated from `resources.flows`; tool-call → 201 Running Temporal execution (executionId confirmed in Temporal) |
 | C25 | **Falcone platform MCP interface** | EXEC | **Present, non-functional** | "official" server exposes 9 mgmt tools; tool-calls return index page |
 | C26 | **Realtime** (PG change-stream SSE) | EXEC | **Working + isolated** | subscribe→`event: insert` with tenant row; A sees only A's rows. WebSocket **not-deployed** (SSE only); Mongo realtime off (501) |
 | C27 | Secrets/config (Vault) | — | **Not-deployed** | Vault not viable on kind; no component reads Vault |
@@ -176,6 +176,14 @@ results were on pre-fix / stale-cached code):
   `tenant_id` → fixed (declared attribute). **A3** tenant-realm token issuance → fixed (`createTenant` creates the
   `{slug}-app` public client + un-forgeable `tenant_id` mapper; our acme/globex fixtures lack it only because they
   were seeded on the stale image before the refresh).
+
+### Additional corrections from evidence-rerun (2026-06-18 — C22–C26 re-tested with P1 fixes applied)
+
+- **C23 MCP tool-calls** — Previously reported as "returns executor index". Rerun confirms tool-calls route correctly to the data plane (`{"name":"query_items","arguments":{}}` → 200 with real data-plane result). `MCP_SELF_BASE_URL` and `/rows` path were already fixed (#566–#572).
+- **C24 MCP→workflow** — Previously reported as "Gap / mapping orphaned". Rerun confirms `generateFromFlows()` is wired, `run_flow_*` tools are auto-generated, and a tool-call triggers a real Temporal workflow execution (executionId returned + confirmed in Temporal history). Fix landed as part of #566–#572.
+- **BUG-C22-A (new P1):** Worker missing PG env vars (`PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE`) → `db.query` fails with UPSTREAM_UNAVAILABLE indefinitely. Root: Helm overlay for `workflowWorker.env` not applied to the deployed pod.
+- **BUG-C22-B (new P1):** Temporal custom search attributes not auto-registered on fresh install (bootstrap Job stanza not applied) — manually registered during campaign.
+- **BUG-C22-D (new P0 security):** DDL executor without workspace context silently creates objects in platform DB (`in_falcone`) instead of the tenant's workspace DB. Fail-closed guard absent.
 
 ## 7. What could not be fully tested (and why)
 

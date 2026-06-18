@@ -1,0 +1,126 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.96kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:22-slim
+#2 DONE 0.6s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 484B done
+#3 DONE 0.0s
+
+#4 [build 1/8] FROM docker.io/library/node:22-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752
+#4 resolve docker.io/library/node:22-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 231.73kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 2/8] WORKDIR /app/services/workflow-worker
+#6 CACHED
+
+#7 [build 3/8] COPY services/workflow-worker/package.json ./package.json
+#7 DONE 0.0s
+
+#8 [runtime 4/8] RUN npm install --omit=dev --no-package-lock
+#8 ...
+
+#9 [build 4/8] RUN npm install --no-package-lock
+#9 ...
+
+#8 [runtime 4/8] RUN npm install --omit=dev --no-package-lock
+#8 12.85 
+#8 12.85 added 181 packages, and audited 182 packages in 13s
+#8 12.85 
+#8 12.85 42 packages are looking for funding
+#8 12.85   run `npm fund` for details
+#8 12.86 
+#8 12.86 14 vulnerabilities (12 moderate, 2 high)
+#8 12.86 
+#8 12.86 To address issues that do not require attention, run:
+#8 12.86   npm audit fix
+#8 12.86 
+#8 12.86 To address all issues possible (including breaking changes), run:
+#8 12.86   npm audit fix --force
+#8 12.86 
+#8 12.86 Some issues need review, and may require choosing
+#8 12.86 a different dependency.
+#8 12.86 
+#8 12.86 Run `npm audit` for details.
+#8 12.86 npm notice
+#8 12.86 npm notice New major version of npm available! 10.9.8 -> 11.17.0
+#8 12.86 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+#8 12.86 npm notice To update run: npm install -g npm@11.17.0
+#8 12.86 npm notice
+#8 DONE 13.3s
+
+#9 [build 4/8] RUN npm install --no-package-lock
+#9 12.86 
+#9 12.86 added 183 packages, and audited 184 packages in 13s
+#9 12.86 
+#9 12.86 42 packages are looking for funding
+#9 12.86   run `npm fund` for details
+#9 12.87 
+#9 12.87 15 vulnerabilities (13 moderate, 2 high)
+#9 12.87 
+#9 12.87 To address issues that do not require attention, run:
+#9 12.87   npm audit fix
+#9 12.87 
+#9 12.87 To address all issues possible (including breaking changes), run:
+#9 12.87   npm audit fix --force
+#9 12.87 
+#9 12.87 Some issues need review, and may require choosing
+#9 12.87 a different dependency.
+#9 12.87 
+#9 12.87 Run `npm audit` for details.
+#9 12.87 npm notice
+#9 12.87 npm notice New major version of npm available! 10.9.8 -> 11.17.0
+#9 12.87 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+#9 12.87 npm notice To update run: npm install -g npm@11.17.0
+#9 12.87 npm notice
+#9 DONE 13.3s
+
+#10 [build 5/8] COPY services/workflow-worker/tsconfig.json ./tsconfig.json
+#10 DONE 0.1s
+
+#11 [build 6/8] COPY services/workflow-worker/src ./src
+#11 DONE 0.0s
+
+#12 [build 7/8] COPY services/workflow-worker/scripts ./scripts
+#12 DONE 0.0s
+
+#13 [build 8/8] RUN npm run build
+#13 0.208 
+#13 0.208 > @in-falcone/workflow-worker@0.1.0 build
+#13 0.208 > tsc -p tsconfig.json && node scripts/copy-activity-catalog.mjs
+#13 0.208 
+#13 2.060 [copy-activity-catalog] copied 15 .mjs module(s) into dist/activities/
+#13 2.060 [copy-activity-catalog] copied 1 top-level .mjs module(s) into dist/
+#13 DONE 2.1s
+
+#14 [runtime 5/8] COPY --from=build /app/services/workflow-worker/dist ./dist
+#14 DONE 0.1s
+
+#15 [runtime 6/8] COPY services/webhook-engine/src /app/services/webhook-engine/src
+#15 DONE 0.0s
+
+#16 [runtime 7/8] COPY apps/control-plane/src/runtime/connection-registry.mjs      apps/control-plane/src/runtime/postgres-data-executor.mjs      apps/control-plane/src/runtime/workspace-dsn-resolver.mjs      apps/control-plane/src/runtime/errors.mjs      /app/apps/control-plane/src/runtime/
+#16 DONE 0.0s
+
+#17 [runtime 8/8] COPY services/adapters/src/postgresql-data-api.mjs      services/adapters/src/postgresql-governance-admin.mjs      /app/services/adapters/src/
+#17 DONE 0.0s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 11.5s done
+#18 exporting manifest sha256:7994db7f5c0db552d51b47c8ed4ba4d9cf824926245ba2a47573f9415f314ee2 done
+#18 exporting config sha256:3e7e444635ea45bad5bdb8247ce0ddaf8e6de07c325ecdd57fa1d644b6c31a24 done
+#18 exporting attestation manifest sha256:70f6d6bd37fe7142f400abc08f679182be8a2ed2e453535146732abee6ca31c5 0.0s done
+#18 exporting manifest list sha256:71afdc2eb65cf665287595555bed3d5146e452c43bb5235fef4ca3178c10612b 0.0s done
+#18 naming to localhost:5000/in-falcone-workflow-worker:p1fix-20260618 done
+#18 unpacking to localhost:5000/in-falcone-workflow-worker:p1fix-20260618
+#18 unpacking to localhost:5000/in-falcone-workflow-worker:p1fix-20260618 3.1s done
+#18 DONE 14.7s

@@ -1,0 +1,156 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 3.38kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:22-slim
+#2 DONE 0.7s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 484B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 103.50kB 0.0s done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:22-slim@sha256:20b3a9e4bdfe6ee8cc7b14cc360fca2fb6d06f671e06aeb36feaa832364209dd
+#5 resolve docker.io/library/node:22-slim@sha256:20b3a9e4bdfe6ee8cc7b14cc360fca2fb6d06f671e06aeb36feaa832364209dd 0.0s done
+#5 sha256:aafc9ed683951fde1a681129a1f0d99c253586800606e93cf8c4846c9c0dad45 445B / 445B 0.1s done
+#5 sha256:3b89dda362aaa910fe0f00f1359e9c7d75a4daa1996a0c0be6b3dc8fe1b55258 1.05MB / 1.71MB 0.3s
+#5 sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff 0B / 49.93MB 0.2s
+#5 sha256:fd3790d1cc1668bbb96061c9842c9b08637fd0fe865e0fba75a876d9c6f39a74 0B / 3.31kB 0.2s
+#5 sha256:3b89dda362aaa910fe0f00f1359e9c7d75a4daa1996a0c0be6b3dc8fe1b55258 1.71MB / 1.71MB 0.3s done
+#5 sha256:fd3790d1cc1668bbb96061c9842c9b08637fd0fe865e0fba75a876d9c6f39a74 3.31kB / 3.31kB 0.3s done
+#5 extracting sha256:fd3790d1cc1668bbb96061c9842c9b08637fd0fe865e0fba75a876d9c6f39a74 0.0s done
+#5 sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff 11.53MB / 49.93MB 0.6s
+#5 sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff 27.26MB / 49.93MB 0.8s
+#5 sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff 44.04MB / 49.93MB 0.9s
+#5 sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff 49.93MB / 49.93MB 1.0s done
+#5 extracting sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff
+#5 extracting sha256:4c3f9c72f6056cb05411975a19395822d67c1ad0be17b7099144ff827e2696ff 0.8s done
+#5 DONE 1.9s
+
+#5 [build 1/8] FROM docker.io/library/node:22-slim@sha256:20b3a9e4bdfe6ee8cc7b14cc360fca2fb6d06f671e06aeb36feaa832364209dd
+#5 extracting sha256:3b89dda362aaa910fe0f00f1359e9c7d75a4daa1996a0c0be6b3dc8fe1b55258 0.0s done
+#5 extracting sha256:aafc9ed683951fde1a681129a1f0d99c253586800606e93cf8c4846c9c0dad45 done
+#5 DONE 1.9s
+
+#6 [build 2/8] WORKDIR /app/services/workflow-worker
+#6 DONE 0.1s
+
+#7 [runtime 2/9] WORKDIR /app
+#7 DONE 0.1s
+
+#8 [build 3/8] COPY services/workflow-worker/package.json ./package.json
+#8 DONE 0.0s
+
+#9 [runtime 3/9] COPY services/workflow-worker/package.json ./package.json
+#9 DONE 0.0s
+
+#10 [runtime 4/9] RUN npm install --omit=dev --no-package-lock
+#10 ...
+
+#11 [build 4/8] RUN npm install --no-package-lock
+#11 11.21 
+#11 11.21 added 183 packages, and audited 184 packages in 11s
+#11 11.21 
+#11 11.21 42 packages are looking for funding
+#11 11.21   run `npm fund` for details
+#11 11.23 
+#11 11.23 15 vulnerabilities (13 moderate, 2 high)
+#11 11.23 
+#11 11.23 To address issues that do not require attention, run:
+#11 11.23   npm audit fix
+#11 11.23 
+#11 11.23 To address all issues possible (including breaking changes), run:
+#11 11.23   npm audit fix --force
+#11 11.23 
+#11 11.23 Some issues need review, and may require choosing
+#11 11.23 a different dependency.
+#11 11.23 
+#11 11.23 Run `npm audit` for details.
+#11 11.23 npm notice
+#11 11.23 npm notice New major version of npm available! 10.9.8 -> 11.17.0
+#11 11.23 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+#11 11.23 npm notice To update run: npm install -g npm@11.17.0
+#11 11.23 npm notice
+#11 ...
+
+#10 [runtime 4/9] RUN npm install --omit=dev --no-package-lock
+#10 11.22 
+#10 11.22 added 181 packages, and audited 182 packages in 11s
+#10 11.22 
+#10 11.22 42 packages are looking for funding
+#10 11.22   run `npm fund` for details
+#10 11.24 
+#10 11.24 14 vulnerabilities (12 moderate, 2 high)
+#10 11.24 
+#10 11.24 To address issues that do not require attention, run:
+#10 11.24   npm audit fix
+#10 11.24 
+#10 11.24 To address all issues possible (including breaking changes), run:
+#10 11.24   npm audit fix --force
+#10 11.24 
+#10 11.24 Some issues need review, and may require choosing
+#10 11.24 a different dependency.
+#10 11.24 
+#10 11.24 Run `npm audit` for details.
+#10 11.24 npm notice
+#10 11.24 npm notice New major version of npm available! 10.9.8 -> 11.17.0
+#10 11.24 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+#10 11.24 npm notice To update run: npm install -g npm@11.17.0
+#10 11.24 npm notice
+#10 ...
+
+#11 [build 4/8] RUN npm install --no-package-lock
+#11 DONE 11.7s
+
+#10 [runtime 4/9] RUN npm install --omit=dev --no-package-lock
+#10 DONE 11.7s
+
+#12 [runtime 5/9] WORKDIR /app/services/workflow-worker
+#12 DONE 0.2s
+
+#13 [build 5/8] COPY services/workflow-worker/tsconfig.json ./tsconfig.json
+#13 DONE 0.2s
+
+#14 [build 6/8] COPY services/workflow-worker/src ./src
+#14 DONE 0.0s
+
+#15 [build 7/8] COPY services/workflow-worker/scripts ./scripts
+#15 DONE 0.0s
+
+#16 [build 8/8] RUN npm run build
+#16 0.259 
+#16 0.259 > @in-falcone/workflow-worker@0.1.0 build
+#16 0.259 > tsc -p tsconfig.json && node scripts/copy-activity-catalog.mjs
+#16 0.259 
+#16 2.144 [copy-activity-catalog] copied 15 .mjs module(s) into dist/activities/
+#16 2.144 [copy-activity-catalog] copied 1 top-level .mjs module(s) into dist/
+#16 DONE 2.2s
+
+#17 [runtime 6/9] COPY --from=build /app/services/workflow-worker/dist ./dist
+#17 DONE 0.0s
+
+#18 [runtime 7/9] COPY services/webhook-engine/src /app/services/webhook-engine/src
+#18 DONE 0.0s
+
+#19 [runtime 8/9] COPY apps/control-plane/src/runtime/connection-registry.mjs      apps/control-plane/src/runtime/postgres-data-executor.mjs      apps/control-plane/src/runtime/workspace-dsn-resolver.mjs      apps/control-plane/src/runtime/errors.mjs      /app/apps/control-plane/src/runtime/
+#19 DONE 0.1s
+
+#20 [runtime 9/9] COPY services/adapters/src/postgresql-data-api.mjs      services/adapters/src/postgresql-governance-admin.mjs      /app/services/adapters/src/
+#20 DONE 0.0s
+
+#21 exporting to image
+#21 exporting layers
+#21 exporting layers 11.4s done
+#21 exporting manifest sha256:cacd95dea102c8e9bb05492f9339994a0c3d517f3bb1d80dd8c55b7cff0fc065 done
+#21 exporting config sha256:d01d1f4e8f438c0994c3a998435313884228fd7732fc48c674d5c5e935e8429c done
+#21 exporting attestation manifest sha256:99bc2f9da9c3068bbd902c88ea10df98b2e66e61b96a712e33965f84f2d40b9a 0.0s done
+#21 exporting manifest list sha256:bac157a1853610667f7dca3852fb8b7623676e42fb17f9e3f724db0e672bcb0a done
+#21 naming to localhost:5000/in-falcone-workflow-worker:head-20260618 done
+#21 unpacking to localhost:5000/in-falcone-workflow-worker:head-20260618
+#21 unpacking to localhost:5000/in-falcone-workflow-worker:head-20260618 2.9s done
+#21 DONE 14.4s

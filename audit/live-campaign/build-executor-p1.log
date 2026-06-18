@@ -1,0 +1,63 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.32kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:22-alpine
+#2 DONE 0.2s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 484B done
+#3 DONE 0.0s
+
+#4 [ 1/12] FROM docker.io/library/node:22-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd
+#4 resolve docker.io/library/node:22-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 1.26MB 0.0s done
+#5 DONE 0.0s
+
+#6 [ 2/12] WORKDIR /app
+#6 CACHED
+
+#7 [ 3/12] COPY apps/control-plane/package.json /app/package.json
+#7 CACHED
+
+#8 [ 4/12] RUN npm install --omit=dev --no-package-lock
+#8 CACHED
+
+#9 [ 5/12] COPY apps/control-plane/src /app/apps/control-plane/src
+#9 DONE 0.1s
+
+#10 [ 6/12] COPY services/adapters/src /app/services/adapters/src
+#10 DONE 0.0s
+
+#11 [ 7/12] COPY services/internal-contracts/src /app/services/internal-contracts/src
+#11 DONE 0.0s
+
+#12 [ 8/12] COPY services/mongo-cdc-bridge/src /app/services/mongo-cdc-bridge/src
+#12 DONE 0.0s
+
+#13 [ 9/12] COPY services/workflow-worker/src/activities/catalog-names.mjs /app/services/workflow-worker/src/activities/catalog-names.mjs
+#13 DONE 0.0s
+
+#14 [10/12] COPY services/audit/src /app/services/audit/src
+#14 DONE 0.0s
+
+#15 [11/12] COPY services/webhook-engine/src /app/services/webhook-engine/src
+#15 DONE 0.0s
+
+#16 [12/12] WORKDIR /app/apps/control-plane
+#16 DONE 0.0s
+
+#17 exporting to image
+#17 exporting layers 0.1s done
+#17 exporting manifest sha256:574a5e31b953b028d08b5257c843197eab7421f18b6d1e53b53ed865e3ad05c5 done
+#17 exporting config sha256:3482cc921de81e82c98f3626d199abaa62de6cdd7b201b29ee94d0084948f2dd done
+#17 exporting attestation manifest sha256:fa693563cba3b73e0f62697cbec2efb8807a32b21a5d0073eeb79bac7704291c 0.0s done
+#17 exporting manifest list sha256:3e6f62d18a4ed053c85aa91fbe1df5c6ec5f2ab0e5c17f7bdb4884efbf9d9e04 done
+#17 naming to localhost:5000/in-falcone-control-plane-executor:p1fix-20260618 done
+#17 unpacking to localhost:5000/in-falcone-control-plane-executor:p1fix-20260618 0.1s done
+#17 DONE 0.3s

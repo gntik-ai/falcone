@@ -1,0 +1,240 @@
+### Falcone from-scratch install (tag head-20260618) into namespace falcone ###
+== (a) namespace ==
+namespace/falcone created
+== (a2) registry + image re-push ==
+persistentvolumeclaim/registry-data created
+deployment.apps/registry created
+service/registry created
+Waiting for deployment "registry" rollout to finish: 0 of 1 updated replicas are available...
+deployment "registry" successfully rolled out
+[15:49:19] port-forward svc/registry 5000:5000
+registry /v2/ -> 200
+[15:49:23] push in-falcone-control-plane:head-20260618
+[15:49:24]   OK in-falcone-control-plane
+[15:49:24] push in-falcone-control-plane-executor:head-20260618
+[15:49:25]   OK in-falcone-control-plane-executor
+[15:49:25] push in-falcone-fn-runtime:head-20260618
+[15:49:26]   OK in-falcone-fn-runtime
+[15:49:26] push in-falcone-web-console:head-20260618
+[15:49:26]   OK in-falcone-web-console
+[15:49:26] verify tags present in registry:
+{"name":"in-falcone-control-plane","tags":["head-20260618"]}
+
+{"name":"in-falcone-control-plane-executor","tags":["head-20260618"]}
+
+{"name":"in-falcone-fn-runtime","tags":["head-20260618"]}
+
+{"name":"in-falcone-web-console","tags":["head-20260618"]}
+
+[15:49:26] DONE rc=0
+== (a3) apisix standalone ConfigMap ==
+configmap/falcone-apisix-standalone created
+== (b) secrets ==
+Authoring Falcone platform secrets in namespace falcone ...
+secret/in-falcone-postgresql created
+  secret/in-falcone-postgresql
+secret/in-falcone-documentdb created
+  secret/in-falcone-documentdb
+secret/in-falcone-ferretdb created
+  secret/in-falcone-ferretdb
+secret/in-falcone-documentdb-replication created
+  secret/in-falcone-documentdb-replication
+secret/in-falcone-kafka created
+  secret/in-falcone-kafka
+secret/in-falcone-storage created
+  secret/in-falcone-storage
+secret/in-falcone-keycloak-admin created
+  secret/in-falcone-keycloak-admin
+secret/in-falcone-identity-client created
+  secret/in-falcone-identity-client
+secret/in-falcone-superadmin created
+  secret/in-falcone-superadmin
+secret/in-falcone-apisix-admin created
+  secret/in-falcone-apisix-admin
+secret/in-falcone-seaweedfs-s3-creds created
+  secret/in-falcone-seaweedfs-s3-creds (helm-adopted)
+secret/in-falcone-dev-api-tls created
+  secret/in-falcone-dev-api-tls (tls)
+secret/in-falcone-dev-console-tls created
+  secret/in-falcone-dev-console-tls (tls)
+secret/in-falcone-dev-identity-tls created
+  secret/in-falcone-dev-identity-tls (tls)
+secret/in-falcone-dev-realtime-tls created
+  secret/in-falcone-dev-realtime-tls (tls)
+
+Done. Created/updated secrets:
+  Opaque: in-falcone-postgresql in-falcone-documentdb in-falcone-ferretdb
+          in-falcone-documentdb-replication in-falcone-kafka in-falcone-storage
+          in-falcone-keycloak-admin in-falcone-identity-client in-falcone-superadmin
+          in-falcone-apisix-admin in-falcone-seaweedfs-s3-creds
+  TLS:    in-falcone-dev-api-tls in-falcone-dev-console-tls
+          in-falcone-dev-identity-tls in-falcone-dev-realtime-tls
+(in-falcone-seaweedfs-s3-config is derived by the chart from the pinned creds)
+== (c) helm dependency build ==
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "seaweedfs" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Saving 14 charts
+Downloading seaweedfs from repo https://seaweedfs.github.io/seaweedfs/helm
+Deleting outdated charts
+== (d) helm install (phase 1: datastores + hooks, bootstrap OFF) ==
+Release "falcone" does not exist. Installing it now.
+NAME: falcone
+LAST DEPLOYED: Thu Jun 18 15:49:29 2026
+NAMESPACE: falcone
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE: None
+NOTES:
+In Falcone umbrella chart
+=========================
+
+Environment: dev
+Namespace: falcone
+Deployment profile: standard
+Exposure kind: Ingress
+TLS mode: clusterManaged
+
+Recommended values layering order:
+1. values.yaml
+2. values/dev.yaml
+3. values/customer-reference.yaml
+4. values/platform-kubernetes.yaml
+5. values/airgap.yaml
+6. values/local.example.yaml
+
+Public endpoints:
+- API: https://api.dev.in-falcone.example.com/control-plane
+- Identity: https://iam.dev.in-falcone.example.com/auth
+- Realtime: https://realtime.dev.in-falcone.example.com/realtime
+- Console: https://console.dev.in-falcone.example.com/
+
+Bootstrap:
+- Hook job: falcone-in-falcone-bootstrap
+- Lock ConfigMap: in-falcone-bootstrap-lock
+- Marker ConfigMap: in-falcone-bootstrap-state
+== (d2) wait for core workloads Ready ==
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+deployment "falcone-keycloak" successfully rolled out
+deployment "falcone-control-plane" successfully rolled out
+deployment "falcone-apisix" successfully rolled out
+Waiting for deployment "falcone-ferretdb" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "falcone-ferretdb" rollout to finish: 1 of 2 updated replicas are available...
+deployment "falcone-ferretdb" successfully rolled out
+== (e) helm upgrade (phase 2: bootstrap ON -> provision Keycloak realm) ==
+Release "falcone" has been upgraded. Happy Helming!
+NAME: falcone
+LAST DEPLOYED: Thu Jun 18 15:50:20 2026
+NAMESPACE: falcone
+STATUS: deployed
+REVISION: 2
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+In Falcone umbrella chart
+=========================
+
+Environment: dev
+Namespace: falcone
+Deployment profile: standard
+Exposure kind: Ingress
+TLS mode: clusterManaged
+
+Recommended values layering order:
+1. values.yaml
+2. values/dev.yaml
+3. values/customer-reference.yaml
+4. values/platform-kubernetes.yaml
+5. values/airgap.yaml
+6. values/local.example.yaml
+
+Public endpoints:
+- API: https://api.dev.in-falcone.example.com/control-plane
+- Identity: https://iam.dev.in-falcone.example.com/auth
+- Realtime: https://realtime.dev.in-falcone.example.com/realtime
+- Console: https://console.dev.in-falcone.example.com/
+
+Bootstrap:
+- Hook job: falcone-in-falcone-bootstrap
+- Lock ConfigMap: in-falcone-bootstrap-lock
+- Marker ConfigMap: in-falcone-bootstrap-state
+job.batch/falcone-in-falcone-bootstrap condition met
+  bootstrap Job complete (job.batch/falcone-in-falcone-bootstrap)
+== (f) apisix routes ==
+configmap/falcone-apisix-standalone unchanged
+deployment.apps/falcone-apisix restarted
+Waiting for deployment "falcone-apisix" rollout to finish: 0 out of 2 new replicas have been updated...
+Waiting for deployment "falcone-apisix" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "falcone-apisix" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "falcone-apisix" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "falcone-apisix" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "falcone-apisix" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "falcone-apisix" rollout to finish: 1 old replicas are pending termination...
+deployment "falcone-apisix" successfully rolled out
+== (g) function RBAC + cp-executor ==
+Warning: resource roles/falcone-function-executor is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+role.rbac.authorization.k8s.io/falcone-function-executor configured
+Warning: resource rolebindings/falcone-function-executor is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+rolebinding.rbac.authorization.k8s.io/falcone-function-executor configured
+job.batch/cp-executor-setup created
+deployment.apps/falcone-cp-executor created
+service/falcone-cp-executor created
+job.batch/cp-executor-setup condition met
+Waiting for deployment "falcone-cp-executor" rollout to finish: 0 of 1 updated replicas are available...
+deployment "falcone-cp-executor" successfully rolled out
+== (h) function runtime ==
+  Knative Serving present; fn-runtime image localhost:30500/in-falcone-fn-runtime:head-20260618 used on-demand.
+== (i) health gate: rollouts ==
+deployment "falcone-apisix" successfully rolled out
+deployment "falcone-control-plane" successfully rolled out
+deployment "falcone-cp-executor" successfully rolled out
+deployment "falcone-ferretdb" successfully rolled out
+deployment "falcone-grafana" successfully rolled out
+deployment "falcone-keycloak" successfully rolled out
+deployment "falcone-observability" successfully rolled out
+deployment "falcone-seaweedfs-s3" successfully rolled out
+deployment "falcone-web-console" successfully rolled out
+deployment "registry" successfully rolled out
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+partitioned roll out complete: 1 new pods have been updated...
+== (i) health gate: in-cluster smoke probes ==
+  FAIL apisix expected 200 got '404' http://falcone-apisix:9080/health
+  OK   control-plane (200) http://falcone-control-plane:8080/readyz
+  OK   cp-executor (200) http://falcone-cp-executor:8080/healthz
+  OK   keycloak-realm (200) http://falcone-keycloak:8080/realms/in-falcone-platform/.well-known/openid-configuration
+  OK   web-console (200) http://falcone-web-console:3000/
+  FAIL ferretdb tcp://falcone-ferretdb:27017 unreachable
+  OK   seaweedfs-s3 tcp://falcone-seaweedfs-s3:8333
+
+### HEALTH GATE FAILED ###
+NAME                                    READY   STATUS      RESTARTS       AGE
+cp-executor-setup-mjtwz                 0/1     Completed   0              31s
+falcone-apisix-6d696f7d55-58crz         1/1     Running     0              33s
+falcone-apisix-6d696f7d55-9wrzk         1/1     Running     0              34s
+falcone-control-plane-bdc8bfc5f-nbmbm   1/1     Running     0              115s
+falcone-control-plane-bdc8bfc5f-tb2cl   1/1     Running     0              115s
+falcone-cp-executor-757b6d4c94-pz8xc    1/1     Running     0              31s
+falcone-documentdb-0                    1/1     Running     1 (106s ago)   115s
+falcone-documentdb-init-42bqk           0/1     Completed   0              57s
+falcone-ferretdb-bcc9db976-f4sm9        1/1     Running     0              115s
+falcone-ferretdb-bcc9db976-x7nnj        1/1     Running     0              115s
+falcone-grafana-744478dbb6-h578n        1/1     Running     0              115s
+falcone-in-falcone-bootstrap-j76s4      0/1     Completed   0              51s
+falcone-kafka-0                         1/1     Running     0              115s
+falcone-keycloak-65d655bd54-rb7f5       1/1     Running     0              115s
+falcone-observability-8dfb8dc7d-m8nvr   1/1     Running     0              115s
+falcone-postgresql-0                    1/1     Running     0              115s
+falcone-seaweedfs-filer-0               1/1     Running     0              115s
+falcone-seaweedfs-master-0              1/1     Running     0              115s
+falcone-seaweedfs-s3-7cf548ff9-s2xfd    1/1     Running     0              115s
+falcone-seaweedfs-volume-0              1/1     Running     0              115s
+falcone-web-console-59b7789598-drkqh    1/1     Running     0              115s
+falcone-web-console-59b7789598-ttvzj    1/1     Running     0              115s
+registry-6ddc4884d4-zvgl2               1/1     Running     0              2m11s

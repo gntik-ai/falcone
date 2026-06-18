@@ -1,0 +1,60 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.05kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:22-slim
+#2 DONE 0.2s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 484B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 96.49kB 0.0s done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:22-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752
+#5 resolve docker.io/library/node:22-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752 0.0s done
+#5 DONE 0.0s
+
+#6 [build 7/8] COPY services/workflow-worker/scripts ./scripts
+#6 CACHED
+
+#7 [build 4/8] RUN npm install --no-package-lock
+#7 CACHED
+
+#8 [build 5/8] COPY services/workflow-worker/tsconfig.json ./tsconfig.json
+#8 CACHED
+
+#9 [build 2/8] WORKDIR /app/services/workflow-worker
+#9 CACHED
+
+#10 [build 3/8] COPY services/workflow-worker/package.json ./package.json
+#10 CACHED
+
+#11 [runtime 5/6] COPY --from=build /app/services/workflow-worker/dist ./dist
+#11 CACHED
+
+#12 [build 8/8] RUN npm run build
+#12 CACHED
+
+#13 [runtime 4/6] RUN npm install --omit=dev --no-package-lock
+#13 CACHED
+
+#14 [build 6/8] COPY services/workflow-worker/src ./src
+#14 CACHED
+
+#15 [runtime 6/6] COPY services/webhook-engine/src /app/services/webhook-engine/src
+#15 CACHED
+
+#16 exporting to image
+#16 exporting layers done
+#16 exporting manifest sha256:963543969b540dbccc2084157e126b9db00c980c3d6d8bbda55cb9cf67fc0d2b done
+#16 exporting config sha256:58235b10ee1a889fdd433af9d018a92884f7679b60be82a162781dfbcabf72ed done
+#16 exporting attestation manifest sha256:80332425b0560fe09702f8503b1ae75d0e7f1a361c7a4f400e3cd227159c2f07 0.0s done
+#16 exporting manifest list sha256:5e08315b2891fbfce94d2d5bf815ad77d2c18347e6b1dbd7f1b0d6c6b7ad0ec2 done
+#16 naming to localhost:5000/in-falcone-workflow-worker:campaign-20260617 done
+#16 unpacking to localhost:5000/in-falcone-workflow-worker:campaign-20260617 done
+#16 DONE 0.1s

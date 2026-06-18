@@ -12,7 +12,7 @@ change-id (created on the feature branch only after approval). Evidence lives in
 browse / metrics handlers in the kind control-plane** (`deploy/kind/control-plane/*-handlers.mjs`) omit the
 `tenant_id` filter, and **functions compute** is not tenant-namespaced — yielding confirmed cross-tenant data
 access. Fixing the read-handler scoping + the ksvc naming closes the cardinal multitenant risk.
-**Children:** A1 (events P0), A2 (functions P0), A3 (metrics P0), A4 (mongo P1), A5 (pg-metadata P1), A6 (quota-read P2).
+**Children:** A1 (events P0), A2 (functions P0), A3 (metrics P0), A4 (mongo P1), A5 (pg-metadata P1), A6 (quota-read P2), A7 (DDL wrong-DB fallback P0 — added evidence-rerun).
 
 ### A1 — Events/Kafka cross-tenant IDOR (read + publish + consume)  ·  `fix-events-topic-tenant-scope`
 - **Labels:** `bug` `P0` `security` `tenant-isolation` `cap:events` `openspec`
@@ -89,6 +89,17 @@ access. Fixing the read-handler scoping + the ksvc naming closes the cardinal mu
   today, but the authz check is absent — will leak once quota state is populated).
 - **Proposed solution:** add the own-tenant guard used by `/plan/*` routes. **Acceptance:** cross-tenant → 403.
 - **Evidence:** `evidence/26-lifecycle-governance.md`.
+
+### A7 — DDL executor silently creates objects in platform DB when workspace unresolved  ·  `fix-ddl-executor-workspace-fallback`  *(added from evidence-rerun 2026-06-18)*
+- **Labels:** `bug` `P0` `security` `tenant-isolation` `cap:postgres-data-api` `openspec`
+- **Problem:** The DDL executor resolves `workspaceId` from `params.workspaceId ?? identity.workspaceId`. When neither is set (JWT without workspace context claim, or trust-header path without `x-workspace-id`), `workspaceId` is null/undefined and `registry.withAdminClient(null)` falls back to the platform DB (`in_falcone`). A `CREATE TABLE` in URL path `…/databases/wsdb_acme_app_staging/schemas/…` silently creates the table in `in_falcone` instead, returning 201 with no error.
+- **Reproduction:**
+  1. `POST /v1/postgres/databases/wsdb_acme_app_staging/schemas/lc22/tables` — JWT with no workspaceId claim (no `x-workspace-id` header)
+  2. → 201 `{executed:true, statementCount:7}`
+  3. Check `wsdb_acme_app_staging`: schema absent. Check `in_falcone`: schema and table present.
+- **Root cause:** `postgres-ddl-executor.mjs` line 124: `const workspaceId = params.workspaceId ?? identity.workspaceId` — silent null fallback with no 400/403 guard; `registry.withAdminClient(null)` returns platform-DB connection.
+- **Proposed solution:** fail-closed: if `workspaceId` cannot be resolved from params or identity, return 400 `MISSING_WORKSPACE` before opening any DB connection. Add the same guard to any executor handler that calls `registry.withAdminClient()`. **Acceptance:** DDL without workspace context → 400; DDL with workspace context → executes in the correct DB (verified via pg_catalog).
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §BUG-C22-D.
 
 ---
 
@@ -198,16 +209,20 @@ bring-up of the full surface.
 **Summary:** The Temporal engine runs end-to-end, but the worker's data activity isn't wired and the Kafka→flow/
 function path doesn't complete.
 
-### E1 — Workflow db.query activity not wired ("postgres executor not wired")  ·  `fix-flows-worker-db-activity-wiring`
+### E1 — Workflow db.query activity fails: worker missing PG env vars  ·  `fix-flows-worker-pg-env-vars`
 - **Labels:** `bug` `P1` `cap:flows` `openspec`
-- **Problem:** A flow executes to a terminal Temporal state, but the `db.query` activity throws
-  `postgres executor not wired into db.query activity` → no data operation occurs.
-- **Reproduction:** create→publish→`POST …/executions` → execution `Failed`; worker log: ApplicationFailure
-  "postgres executor not wired"; target row not inserted.
-- **Proposed solution:** inject/configure the postgres (and mongo/storage/event) executor into the workflow-worker
-  activities (DSN + tenant RLS context) via the chart `workflowWorker.config`. **Acceptance:** a `db.query` flow
-  inserts/reads a tenant-scoped row and the execution completes successfully.
-- **Evidence:** `evidence/24-flows-mcp-realtime.md`, §C22 REPORT.
+- **Problem (updated — evidence-rerun 2026-06-18):** The `db.query` activity fails with `UPSTREAM_UNAVAILABLE` (retryable). The worker pod only has 4 env vars (TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE, TEMPORAL_TASK_QUEUE, WORKER_HEALTH_PORT); `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` from `values-kind-advanced.yaml` `workflowWorker.env` block are absent. `worker-deps.mjs` falls back to `localhost:5432` → ECONNREFUSED → classified as UPSTREAM_UNAVAILABLE. The activity is wired correctly in code — the issue is a Helm overlay not applying the PG env vars.
+- **Reproduction:** start a flow with a `db.query` node → execution stays Running indefinitely; worker logs show `ApplicationFailure type=UPSTREAM_UNAVAILABLE` (retryable) every ~10s; `kubectl get deploy falcone-workflow-worker -o jsonpath='{.spec.template.spec.containers[0].env}'` shows only 4 vars.
+- **Proposed solution:** ensure `PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` are mounted into the workflow-worker deployment from the chart `workflowWorker.env` stanza. Verify the Helm list-merge between `config.inline` (ConfigMap/envFrom path) and the `env` array path. **Acceptance:** a `db.query` flow inserts/reads a tenant-scoped row and the execution completes.
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §BUG-C22-A.
+
+### E1b — Temporal custom search attributes not auto-registered on fresh install  ·  `fix-temporal-search-attributes-bootstrap`
+- **Labels:** `bug` `P1` `cap:flows` `openspec`
+- **Problem:** 5 required custom search attributes (`tenantId`, `workspaceId`, `flowId`, `flowVersion`, `triggerType`) are not pre-registered in the `falcone-flows` Temporal namespace on a fresh kind install. `flow-executor.mjs::searchAttributesFor()` uses these at workflow start; `countRunningExecutions` queries visibility with `tenantId='...'` which requires them. Without registration, flow execution 500s.
+- **Reproduction:** on a fresh install, `temporal operator search-attribute list --namespace falcone-flows` shows none of the 5 attributes.
+- **Root cause:** `values-kind-advanced.yaml` declares a `temporal.bootstrap.searchAttributes` stanza but the temporal bootstrap Job does not apply them (confirmed by log inspection during campaign).
+- **Proposed solution:** ensure the temporal bootstrap Job registers all 5 attributes at cluster startup. **Acceptance:** fresh install → all 5 attributes present in `falcone-flows` namespace without manual intervention.
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §BUG-C22-B.
 
 ### E2 — Event-driven integration (Kafka → function / workflow) not working E2E  ·  `add-event-trigger-integration`
 - **Labels:** `bug`/`enhancement` `P1` `cap:events` `cap:flows` `cap:functions` `openspec`
@@ -222,25 +237,29 @@ function path doesn't complete.
 
 ## EPIC F — MCP (tool execution, MCP→workflow, platform MCP)
 **Labels:** `epic` `P2` `cap:mcp`
-**Summary:** MCP server hosting + curation work and are tenant-scoped, but no tool actually executes.
+**Summary:** ~~MCP server hosting + curation work and are tenant-scoped, but no tool actually executes.~~ **CORRECTED by evidence-rerun (2026-06-18):** MCP tool-call execution and MCP→workflow ARE working at HEAD. Platform MCP (official server) remains not deployed. One remaining non-deployed item: MCP Streamable HTTP JSON-RPC protocol.
 
-### F1 — MCP tool-calls return the executor index instead of executing  ·  `fix-mcp-tool-call-execution`
-- **Labels:** `bug` `P2` `cap:mcp` `openspec`
-- **Problem:** Any published instant/official MCP server → call any tool → 200 `{"service":"in-falcone-control-plane"}`
-  (the executor index). Cause: `MCP_SELF_BASE_URL` unset (self-call hits the executor index), instant tools omit the
-  `/rows` suffix / reference a non-existent table, official tools target control-plane routes the executor can't serve.
-- **Proposed solution:** set `MCP_SELF_BASE_URL`, fix the instant tool request templates, and route official/platform
-  tools to the control-plane. **Acceptance:** a hosted tool-call performs the real action and returns its result.
-- **Evidence:** `evidence/24-flows-mcp-realtime.md`.
+### F1 — ~~MCP tool-calls return the executor index instead of executing~~  ·  `fix-mcp-tool-call-execution`  **CORRECTED — NOT a bug at HEAD**
+- **Correction (evidence-rerun 2026-06-18):** MCP tool-calls DO route to the data plane correctly. A `POST /v1/mcp/workspaces/{ws}/servers/{serverId}/tool-calls` with `{"name":"query_items","arguments":{}}` returns 200 with the data-plane result (TABLE_NOT_FOUND expected since no test table). The `MCP_SELF_BASE_URL` and `/rows` path suffix were already fixed before the rerun (changes #566–#572 applied to HEAD). **Do not file as a bug.**
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §C23 fn-C23-5.
+- **Still open (new):** MCP Streamable HTTP JSON-RPC protocol (`initialize`/`tools/list`/`tools/call` via `POST /v1/mcp/workspaces/{ws}/servers/{serverId}`) is NOT exposed — 404 NO_ROUTE. The only interface is the internal `tool-calls` endpoint. See `add-mcp-streamable-http-protocol` below.
 
-### F2 — MCP→workflow mapping orphaned; platform MCP non-functional  ·  `add-mcp-workflow-and-platform-binding`
-- **Labels:** `bug`/`enhancement` `P2` `cap:mcp` `cap:flows` `openspec`
-- **Problem:** `apps/control-plane/src/mcp-workflows-tools.mjs` (#395) is imported only by its test; the MCP engine
-  never wires flow-backed tools → an MCP tool cannot trigger a Falcone workflow. The platform "official" MCP server
-  exposes 9 management tools but none execute (same as F1).
-- **Proposed solution:** wire the flow-backed tool generator into the MCP engine; make the platform MCP tools call the
-  control-plane. **Acceptance:** an MCP tool starts a workflow and returns its result; a platform MCP tool creates a
-  project. **Depends on:** F1, E1. **Evidence:** `evidence/24-flows-mcp-realtime.md`.
+### F2 — ~~MCP→workflow mapping orphaned~~  ·  `add-mcp-workflow-and-platform-binding`  **CORRECTED — Working end-to-end at HEAD**
+- **Correction (evidence-rerun 2026-06-18):** MCP→workflow IS wired in the deployed HEAD. Creating an MCP server with `resources.flows` auto-generates `run_flow_*` tools via `generateFromFlows()`. Calling the tool triggers a real Temporal workflow execution (executionId confirmed in Temporal history). **Do not file as a bug.**
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §C24 fn-C24-1 and fn-C24-2.
+- **Still open (not a regression):** Platform "official" MCP server (`mcp-official-server.mjs` + `OFFICIAL_TOOLS`) is coded but has no HTTP route registered in `server.mjs`. This remains NOT DEPLOYED.
+
+### F3 (new) — Platform MCP interface not deployed  ·  `add-platform-mcp-http-route`
+- **Labels:** `enhancement` `P2` `cap:mcp` `openspec`
+- **Problem:** `handleMcpMessage` + `OFFICIAL_TOOLS` catalog (8 management tools: list_workspaces, create_workspace, list_schemas, etc.) are fully coded in `mcp-official-server.mjs` / `mcp-official-catalog.mjs` but the module is never imported by `server.mjs` and no HTTP route is registered.
+- **Proposed solution:** register a route for the platform MCP server (e.g. `POST /v1/mcp/platform`) and wire `handleMcpMessage`. **Acceptance:** an LLM agent can call `create_workspace` via the platform MCP endpoint.
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §C25.
+
+### F4 (new) — MCP Streamable HTTP JSON-RPC protocol not exposed  ·  `add-mcp-streamable-http-protocol`
+- **Labels:** `enhancement` `P2` `cap:mcp` `openspec`
+- **Problem:** The executor exposes only `POST /v1/mcp/workspaces/{ws}/servers/{serverId}/tool-calls` (internal Falcone-specific API). The MCP Streamable HTTP protocol (`initialize` / `tools/list` / `tools/call` as JSON-RPC over HTTP) is not exposed — standard MCP clients cannot connect.
+- **Proposed solution:** expose a `POST /v1/mcp/workspaces/{ws}/servers/{serverId}` endpoint that handles the JSON-RPC MCP protocol, delegating to the existing engine. **Acceptance:** a standard MCP client can `initialize`, `tools/list`, and `tools/call` against a hosted server.
+- **Evidence:** `evidence-rerun/14-workflows-mcp-realtime.md` §C23 fn-C23-6.
 
 ---
 
