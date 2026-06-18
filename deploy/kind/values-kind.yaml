@@ -157,6 +157,14 @@ controlPlane:
         secretKeyRef:
           name: in-falcone-storage
           key: s3_secret_key
+    # Per-workspace SeaweedFS identities (#553). With the s3 gateway in filer-mode
+    # (seaweedfs.s3.enableAuth=false), provisioning a workspace bucket also issues a
+    # bucket-scoped SeaweedFS identity (one-shot seed Job -> weed shell s3.configure)
+    # so tenants get a credential that can't cross to another tenant's bucket. The
+    # admin/service key (STORAGE_S3_*) stays broad for the backend REST API.
+    - { name: STORAGE_TENANT_IDENTITIES, value: "1" }
+    - { name: SEAWEEDFS_MASTER, value: "falcone-seaweedfs-master:9333" }
+    - { name: SEAWEEDFS_IMAGE, value: "chrislusf/seaweedfs:4.33" }
     # Document store: FerretDB gateway over the DocumentDB engine (MongoDB-wire, no plaintext).
     # The gateway passes the DocumentDB Postgres credentials through to the engine.
     - name: MONGO_HOST
