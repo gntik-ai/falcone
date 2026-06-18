@@ -1,0 +1,26 @@
+[15:25:31] === rebuild-all-head: tag=head-20260618 ===
+[15:25:31] --- 4 app images (build-images.sh) ---
+[15:25:31] BUILD 1/4 control-plane (deploy/kind/control-plane/Dockerfile, ctx=root)
+[15:25:39]   OK control-plane
+[15:25:39] BUILD 2/4 executor (apps/control-plane/Dockerfile, ctx=root)
+[15:25:51]   OK executor
+[15:25:51] BUILD 3/4 fn-runtime (deploy/kind/fn-runtime/Dockerfile)
+[15:25:52]   OK fn-runtime
+[15:25:52] BUILD 4/4 web-console — attempt fresh vite build, fall back to committed dist
+[15:26:16]   vite build OK -> refreshing deploy/kind/web-console/dist
+[15:26:18]   OK web-console
+[15:26:18] DONE (rc=0). Images:
+localhost:5000/in-falcone-web-console:head-20260618 251MB
+localhost:5000/in-falcone-fn-runtime:head-20260618 230MB
+localhost:5000/in-falcone-control-plane-executor:head-20260618 357MB
+localhost:5000/in-falcone-control-plane:head-20260618 282MB
+[15:26:18] build-images.sh rc=0
+[15:26:18] --- 5th image: workflow-worker (repo-root context) ---
+[15:26:50]   OK workflow-worker
+[15:26:50] === images tagged head-20260618 ===
+localhost:5000/in-falcone-workflow-worker:head-20260618 949MB
+localhost:5000/in-falcone-web-console:head-20260618 251MB
+localhost:5000/in-falcone-fn-runtime:head-20260618 230MB
+localhost:5000/in-falcone-control-plane-executor:head-20260618 357MB
+localhost:5000/in-falcone-control-plane:head-20260618 282MB
+[15:26:51] === rebuild-all-head DONE rc=0 ===

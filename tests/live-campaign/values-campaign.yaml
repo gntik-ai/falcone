@@ -27,6 +27,16 @@ bootstrap:
   # values-kind.yaml), so the Job completes under APISIX_STAND_ALONE=true.
   enabled: true
 
+seaweedfs:
+  # DEP-SWFS-NETPOL is now FIXED at the source: templates/seaweedfs-networkpolicy.yaml
+  # admits the upstream subchart's post-install bucket-provisioning hook
+  # (`{release}-bucket-hook`) by its Job-name label on the master/filer ports, so a
+  # from-scratch install completes on a NetworkPolicy-ENFORCING CNI (this kind cluster runs
+  # the kube-network-policies agent) WITHOUT disabling the policy. Kept ENABLED so the
+  # campaign re-run exercises the storage-tier isolation together with the hook allowance.
+  networkPolicy:
+    enabled: true
+
 vault:
   # DISABLED in the CORE install — installed/tested SEPARATELY in a second wave
   # (tests/live-campaign/vault-probe.sh) so a Vault failure can't abort the whole
@@ -41,7 +51,7 @@ vault:
 controlPlane:
   image:
     repository: localhost:30500/in-falcone-control-plane
-    tag: "campaign-20260617"
+    tag: "head-20260618"
     # Always re-pull (fix-campaign-image-pull-policy, #561): the campaign tag is REUSED across
     # rebuilds, so with the chart-default IfNotPresent the kind node kept the stale cached image
     # and a rebuilt control-plane silently ran the old code. Always pulls the freshly-pushed image
@@ -116,12 +126,17 @@ controlPlane:
     # Functions runtime image — campaign tag. Each function = a Knative Service that
     # the control-plane creates on demand from this image (no static ksvc to apply).
     - name: FN_RUNTIME_IMAGE
-      value: localhost:30500/in-falcone-fn-runtime:campaign-20260617
+      value: localhost:30500/in-falcone-fn-runtime:head-20260618
+    # Per-workspace SeaweedFS identities (filer-mode). The handler now defaults this ON,
+    # but keep it explicit so this overlay's full env list documents the intent (it
+    # previously dropped the flag → single shared admin S3 cred; P1 tenant-isolation).
+    - name: STORAGE_TENANT_IDENTITIES
+      value: "1"
 
 webConsole:
   image:
     repository: localhost:30500/in-falcone-web-console
-    tag: "campaign-20260617"
+    tag: "head-20260618"
     # Always re-pull (fix-campaign-image-pull-policy, #561): same reusable-tag staleness as the
     # control-plane above — pull the freshly-pushed image from localhost:30500 on every (re)deploy.
     pullPolicy: Always

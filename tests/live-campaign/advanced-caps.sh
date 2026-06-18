@@ -35,6 +35,15 @@ spec:
 YAML
 kubectl -n $NS rollout status deploy/temporal-dev --timeout=180s 2>&1 | tail -1
 
+echo "== 1b/4 register the 5 custom search attributes (Keyword) =="
+# `temporal server start-dev` does NOT register the flow executor's custom search attributes,
+# so the concurrency pre-flight (workflow.list filtered by these) 500'd before any run
+# (BUG-TEMPORAL-SEARCH-ATTRS). Register them idempotently against the dev frontend.
+for _sa in tenantId workspaceId flowId flowVersion triggerType; do
+  kubectl -n $NS exec deploy/temporal-dev -- \
+    temporal operator search-attribute create --namespace "$TQ_NS" --name "$_sa" --type Keyword 2>&1 | tail -1 || true
+done
+
 echo "== 2/4 workflow-worker (fresh image, Always) =="
 cat <<YAML | kubectl apply -f -
 apiVersion: apps/v1
@@ -55,6 +64,15 @@ spec:
             - { name: TEMPORAL_NAMESPACE, value: "$TQ_NS" }
             - { name: TEMPORAL_TASK_QUEUE, value: "flows-main" }
             - { name: WORKER_HEALTH_PORT, value: "8080" }
+            # Postgres wiring for the db.query activity (BUG-WORKER-PG-ENV): without these the
+            # worker-deps DSN fell back to localhost/falcone_app and db.query → UPSTREAM_UNAVAILABLE.
+            # PGDATABASE is in_falcone (matches the executor) so the workspace_databases registry
+            # resolves and per-workspace wsdb_* routing works.
+            - { name: PGHOST, value: "falcone-postgresql" }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGUSER, value: "falcone" }
+            - { name: PGDATABASE, value: "in_falcone" }
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
           ports: [{ containerPort: 8080 }]
 YAML
 kubectl -n $NS rollout status deploy/falcone-workflow-worker --timeout=180s 2>&1 | tail -1

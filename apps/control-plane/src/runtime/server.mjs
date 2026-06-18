@@ -755,9 +755,16 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // tenant, reject before any handler runs. Workspaces with no ownership record are left to RLS
       // (which scopes them to the caller's own tenant), so they are not a cross-tenant exposure.
       if (!opts?.noAuth && resolveWorkspaceTenant && identity.tenantId) {
-        const workspaceInPath = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1];
-        if (workspaceInPath) {
-          const owningTenantId = await resolveWorkspaceTenant(workspaceInPath);
+        // Prefer the workspace named in the path; fall back to the credential's
+        // workspace for routes that target a workspace's resources WITHOUT a
+        // /workspaces/ path segment — notably the DDL routes
+        // (/v1/postgres/databases/{db}/schemas...), which resolve their connection
+        // from identity.workspaceId. Without this fallback a forged trust-header
+        // request (x-workspace-id = a foreign tenant's workspace) could run DDL on
+        // that workspace's database (fix-executor-ddl-db-ownership-guard, B3).
+        const workspaceToCheck = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1] || identity.workspaceId;
+        if (workspaceToCheck) {
+          const owningTenantId = await resolveWorkspaceTenant(workspaceToCheck);
           if (owningTenantId && owningTenantId !== identity.tenantId) {
             return sendJson(res, 403, { code: 'CROSS_TENANT_VIOLATION', message: "Workspace does not belong to the caller's tenant" });
           }

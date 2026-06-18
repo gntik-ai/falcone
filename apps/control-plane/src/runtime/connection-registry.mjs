@@ -14,8 +14,8 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-function failClosed(message, code) {
-  return Object.assign(new Error(message), { code, statusCode: 503 });
+function failClosed(message, code, statusCode = 503) {
+  return Object.assign(new Error(message), { code, statusCode });
 }
 
 export function createConnectionRegistry(options = {}) {
@@ -97,10 +97,24 @@ export function createConnectionRegistry(options = {}) {
 
   // Admin/superuser path: catalog introspection, DDL, migration/sweep work.
   // Bypasses RLS; no implicit transaction (caller manages it if needed).
-  async function withAdminClient(workspaceId, fn) {
+  //
+  // opts.requireDedicatedDatabase: fail closed (403) when the workspace resolves to
+  // the shared/platform database rather than its OWN dedicated wsdb_* (routed === false).
+  // DDL passes this so a caller can NEVER create/alter objects on the platform database
+  // `in_falcone` — e.g. via a forged trust-header request naming an unprovisioned
+  // workspace, which would otherwise fall back to the base DSN
+  // (fix-executor-ddl-db-ownership-guard, B3).
+  async function withAdminClient(workspaceId, fn, opts = {}) {
     if (typeof fn !== 'function') throw new TypeError('withAdminClient requires a callback');
-    const { dsn, adminDsn } = await resolve(workspaceId);
-    const client = await poolFor(adminDsn ?? dsn).connect();
+    const conn = await resolve(workspaceId);
+    if (opts.requireDedicatedDatabase && conn.routed === false) {
+      throw failClosed(
+        `DDL is not permitted on the shared platform database: workspace ${workspaceId} has no dedicated database provisioned`,
+        'DDL_TARGET_DB_FORBIDDEN',
+        403,
+      );
+    }
+    const client = await poolFor(conn.adminDsn ?? conn.dsn).connect();
     try {
       return await fn(client);
     } finally {

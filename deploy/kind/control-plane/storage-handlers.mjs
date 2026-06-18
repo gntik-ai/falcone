@@ -29,6 +29,33 @@ const nowIso = () => new Date().toISOString();
 
 const sha256hex = (data) => crypto.createHash('sha256').update(data).digest('hex');
 const hmac = (key, data) => crypto.createHmac('sha256', key).update(data).digest();
+
+// Physical, DNS-safe bucket name for a workspace's logical bucket. The name embeds
+// a stable hash of the GLOBALLY-UNIQUE workspace id, so two tenants' same-slug
+// workspaces (or two tenants both requesting the bucket name `assets`) get DISTINCT
+// physical buckets (P1: the old slug-derived `ws-<slug>-assets` collided across
+// tenants and `insertBucket`'s ON CONFLICT hijacked the first tenant's registry
+// row). Mirrors the shippable product's hash-based `deriveWorkspaceBucketName`
+// (services/adapters/src/seaweedfs-s3-identities-config.mjs); duplicated inline
+// because this kind-runtime image cannot import the services package. Pure +
+// deterministic, so a given (workspace, name) always maps to the same bucket
+// (idempotent provisioning; the per-workspace S3 identity can reference it).
+export function deriveBucketName(workspaceId, requestedName) {
+  const wsHash = crypto.createHash('sha256').update(`workspace:${String(workspaceId ?? '')}`).digest('hex').slice(0, 12);
+  const nameFrag = String(requestedName ?? 'assets').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  const bucket = `ws-${wsHash}-${nameFrag || 'assets'}`.replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63).replace(/-+$/g, '');
+  return bucket;
+}
+
+// Whether to issue a per-workspace (scoped) SeaweedFS identity on bucket provision.
+// DEFAULT-ON: enabled unless explicitly disabled (STORAGE_TENANT_IDENTITIES=0/false).
+// Defaulting on (rather than requiring =1) means it cannot be silently lost when a
+// Helm values overlay REPLACES the control-plane env list — the failure mode that left
+// the live deploy on a single shared admin S3 credential (P1 tenant-isolation).
+export function tenantIdentitiesEnabled(env = process.env) {
+  const v = String(env.STORAGE_TENANT_IDENTITIES ?? '').toLowerCase();
+  return v !== '0' && v !== 'false' && v !== 'off' && v !== 'no';
+}
 // AWS RFC3986 encoding (encodeURIComponent + the extra reserved chars AWS escapes).
 const enc = (s) => encodeURIComponent(s).replace(/[!*'()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 
@@ -316,12 +343,12 @@ async function storageProvisionBucket(ctx) {
   if (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }
-  // DNS-safe bucket name (lowercase, [a-z0-9-], 3..63). This is the canonical rule
-  // codified in services/provisioning-orchestrator/src/utils/bucket-name-validator.mjs;
-  // it is duplicated inline here because this kind-runtime image bundles only
-  // deploy/kind/control-plane and cannot import the services package.
-  const raw = (ctx.body?.name ?? `ws-${ws.slug ?? ws.id.slice(0, 8)}-assets`).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
-  const bucket = raw.length >= 3 ? raw : `ws-${ws.id.slice(0, 8)}`;
+  // DNS-safe, workspace-id-scoped bucket name. deriveBucketName embeds a stable hash
+  // of the globally-unique workspace id so two same-slug workspaces across tenants
+  // (or two tenants both requesting `assets`) NEVER collide on one physical bucket
+  // or one registry row (P1 tenant-isolation). The DNS rule ([a-z0-9-], 3..63) is the
+  // canonical one from services/provisioning-orchestrator/src/utils/bucket-name-validator.mjs.
+  const bucket = deriveBucketName(ws.id, ctx.body?.name);
   // Reject before any backend call if the derived name still violates the contract.
   if (!/^[a-z0-9-]{3,63}$/.test(bucket)) {
     return err(400, 'STORAGE_INVALID_BUCKET_NAME', `derived bucket name '${bucket}' is not DNS-safe ([a-z0-9-], 3..63)`);
@@ -333,9 +360,13 @@ async function storageProvisionBucket(ctx) {
     // tenant gets a credential that can't reach any other tenant's bucket — instead of
     // sharing the broad admin/master key. Best-effort: a failure here must not fail the
     // provision (the bucket is still usable via the tenant-gated REST API); the credential
-    // can be re-issued. Only meaningful in filer-mode (STORAGE_TENANT_IDENTITIES=1).
+    // can be re-issued. Enabled by DEFAULT (filer-mode) — see tenantIdentitiesEnabled:
+    // gating only on STORAGE_TENANT_IDENTITIES=1 meant a values overlay that REPLACED the
+    // control-plane env list silently dropped the flag, so every provision returned
+    // storageCredential:null and a single shared admin cred served all tenants (P1
+    // tenant-isolation, live 2026-06-18). It can still be turned off explicitly (='0').
     let storageCredential = null;
-    if (process.env.STORAGE_TENANT_IDENTITIES === '1') {
+    if (tenantIdentitiesEnabled()) {
       try {
         const issued = await issueWorkspaceIdentity({ workspaceId: ws.id, bucket });
         // Return the one-time secret to the caller; never persist the plaintext secret.

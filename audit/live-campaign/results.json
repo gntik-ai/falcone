@@ -1,7 +1,7 @@
 {
-  "when": "2026-06-17T23:31:06.652Z",
-  "pass": 14,
-  "total": 17,
+  "when": "2026-06-18T15:58:49.915Z",
+  "pass": 18,
+  "total": 22,
   "results": [
     {
       "cap": "tenant-lifecycle",
@@ -19,7 +19,7 @@
       "cap": "workspace-lifecycle",
       "name": "list own workspaces",
       "pass": true,
-      "detail": "status=200 count={\"items\":[{\"id\":\"a1788efd-6a78-43de-b4ab-2c3ccd8713b2\",\"tena"
+      "detail": "status=200 count={\"items\":[{\"id\":\"4578ce20-1c63-4ca2-b869-455a973f1142\",\"tena"
     },
     {
       "cap": "quotas-plans",
@@ -31,7 +31,7 @@
       "cap": "metrics",
       "name": "tenant quotas",
       "pass": true,
-      "detail": "status=200 body={\"evaluatedAt\":\"2026-06-17T23:31:06.469Z\",\"dimensions\":[],\"hardLimitBreaches\":[]"
+      "detail": "status=200 body={\"evaluatedAt\":\"2026-06-18T15:58:49.730Z\",\"dimensions\":[{\"dimensionId\":\"flow_sig"
     },
     {
       "cap": "storage",
@@ -102,8 +102,38 @@
     {
       "cap": "isolation",
       "name": "acme-ops globex metrics",
+      "pass": true,
+      "detail": "status=403 (expect 403/404)"
+    },
+    {
+      "cap": "isolation",
+      "name": "ISO-EVENTS acme-ops GET globex topic",
       "pass": false,
       "detail": "status=200 (expect 403/404)"
+    },
+    {
+      "cap": "isolation",
+      "name": "ISO-EVENTS acme-ops publish to globex topic",
+      "pass": false,
+      "detail": "status=202 (expect 403/404; never 202)"
+    },
+    {
+      "cap": "isolation",
+      "name": "ISO-METRICS acme-ops globex workspace series",
+      "pass": true,
+      "detail": "status=403 (expect 403)"
+    },
+    {
+      "cap": "isolation",
+      "name": "ISO-METRICS acme-ops globex workspace overview",
+      "pass": true,
+      "detail": "status=403 (expect 403)"
+    },
+    {
+      "cap": "isolation",
+      "name": "ISO-MONGO acme-ops read globex documents",
+      "pass": true,
+      "detail": "status=404 leaked=false (expect 404 or empty)"
     }
   ]
 }
