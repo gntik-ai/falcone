@@ -435,6 +435,56 @@ routes:
       scheme: http
       nodes:
         "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  # ---- Flows engine (definitions + executions) -> executor ----
+  # add-apisix-flows-mcp-routes (#560): the flows control surface is served by the EXECUTOR
+  # (server.mjs registers /v1/flows/workspaces/{ws}/flows + .../task-types), NOT the control-plane.
+  # Without this route /v1/flows/* fell through to the /v1/* catch-all (5000 -> control-plane) and
+  # returned 404 NO_ROUTE. Admin (Bearer JWT) auth: APISIX forwards the Authorization header and the
+  # executor verifies the JWT itself (KEYCLOAK_JWKS_URL); the standalone gateway injects no
+  # x-tenant-id, so the executor is the auth authority here. SECURITY (#488): strip client-supplied
+  # identity headers and inject x-gateway-auth so the executor trusts the forwarded request.
+  # Priority above the /v1/* catch-all (5000 @ 50) so flows wins.
+  - id: "2017-flows"
+    uri: "/v1/flows/*"
+    priority: 245
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  # ---- MCP server hosting management API -> executor ----
+  # add-apisix-flows-mcp-routes (#560): the MCP management surface is served by the EXECUTOR
+  # (server.mjs registers /v1/mcp/workspaces/{ws}/servers). Same gateway-trust idiom as flows.
+  - id: "2018-mcp"
+    uri: "/v1/mcp/*"
+    priority: 244
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
   # Catch-all so EVERY /v1/* the console calls reaches the control-plane server,
   # which validates the Bearer JWT itself and dispatches to the real action
   # (unmapped paths -> a clean 404 from the control-plane, not the gateway).

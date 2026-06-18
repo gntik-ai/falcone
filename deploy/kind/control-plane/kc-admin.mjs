@@ -64,6 +64,10 @@ export const kcAdmin = {
     // those to optional so any provisioned user can authenticate (the platform realm gets the
     // same treatment from the chart bootstrap's ensure_keycloak_user_profile).
     await this.relaxUserProfile(realm);
+    // Apply the chart tenantRealmTemplate.requiredClientScopes to the new realm so a provisioned
+    // tenant realm carries the template's required client scopes (no more template drift) — mirrors
+    // the requiredRealmRoles applied by createRealmRoles (#568).
+    await this.applyRequiredClientScopes(realm, TENANT_REALM_SCOPES);
   },
   // Make email/firstName/lastName optional in the realm's KC26 user profile. Idempotent (PUT).
   async relaxUserProfile(realm) {
@@ -79,6 +83,79 @@ export const kcAdmin = {
     if (changed) await kc('PUT', `/realms/${encodeURIComponent(realm)}/users/profile`, prof);
   },
   async deleteRealm(realm) { try { await kc('DELETE', `/realms/${encodeURIComponent(realm)}`); } catch (e) { if (e.kcStatus !== 404) throw e; } },
+
+  // ---- realm auth-config: login methods + social identity providers (#568) ---
+  // A project owner toggles auth methods (username/password registration, email login,
+  // password reset, remember-me) and configures social IdPs through the Falcone API; these
+  // drive the realm's KC config. Idempotent (read-merge-PUT / upsert), zero-dep like the rest.
+
+  // Read the realm's login options + the social identity providers it has configured.
+  async getRealmAuthConfig(realm) {
+    const r = (await kc('GET', `/realms/${encodeURIComponent(realm)}`)).json ?? {};
+    const idps = await this.listIdentityProviders(realm);
+    return {
+      registrationAllowed: r.registrationAllowed === true,
+      loginWithEmailAllowed: r.loginWithEmailAllowed !== false,
+      resetPasswordAllowed: r.resetPasswordAllowed === true,
+      rememberMe: r.rememberMe === true,
+      verifyEmail: r.verifyEmail === true,
+      identityProviders: idps,
+    };
+  },
+  // Toggle realm login options. Read-merge-PUT so only the supplied flags change (idempotent).
+  async setRealmAuthConfig(realm, patch = {}) {
+    const current = (await kc('GET', `/realms/${encodeURIComponent(realm)}`)).json ?? {};
+    const allowed = ['registrationAllowed', 'loginWithEmailAllowed', 'resetPasswordAllowed', 'rememberMe', 'verifyEmail'];
+    const next = { ...current };
+    for (const k of allowed) if (k in patch && typeof patch[k] === 'boolean') next[k] = patch[k];
+    await kc('PUT', `/realms/${encodeURIComponent(realm)}`, next);
+  },
+
+  // ---- social identity providers (Keycloak /identity-provider/instances) ------
+  async listIdentityProviders(realm) {
+    const list = (await kc('GET', `/realms/${encodeURIComponent(realm)}/identity-provider/instances`)).json ?? [];
+    return list.map((p) => ({ alias: p.alias, providerId: p.providerId, enabled: p.enabled !== false, displayName: p.displayName ?? null }));
+  },
+  // Create-or-update a social IdP (idempotent on alias): POST when new, PUT when it exists.
+  async upsertIdentityProvider(realm, { alias, providerId, enabled = true, displayName, config = {} }) {
+    const rep = { alias, providerId, enabled: enabled !== false, displayName: displayName ?? alias, config };
+    let exists = false;
+    try { await kc('GET', `/realms/${encodeURIComponent(realm)}/identity-provider/instances/${encodeURIComponent(alias)}`); exists = true; }
+    catch (e) { if (e.kcStatus !== 404) throw e; }
+    if (exists) await kc('PUT', `/realms/${encodeURIComponent(realm)}/identity-provider/instances/${encodeURIComponent(alias)}`, rep);
+    else await kc('POST', `/realms/${encodeURIComponent(realm)}/identity-provider/instances`, rep);
+  },
+  async deleteIdentityProvider(realm, alias) {
+    try { await kc('DELETE', `/realms/${encodeURIComponent(realm)}/identity-provider/instances/${encodeURIComponent(alias)}`); }
+    catch (e) { if (e.kcStatus !== 404) throw e; }
+  },
+
+  // ---- client scopes + realm default scopes (template requiredClientScopes) ----
+  // Ensure a client scope exists (idempotent) and return its id.
+  async ensureClientScope(realm, name) {
+    const list = (await kc('GET', `/realms/${encodeURIComponent(realm)}/client-scopes`)).json ?? [];
+    const found = list.find((s) => s.name === name);
+    if (found) return found.id;
+    const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/client-scopes`, {
+      name, protocol: 'openid-connect', attributes: { 'include.in.token.scope': 'true', 'display.on.consent.screen': 'false' }
+    });
+    if (created.id) return created.id;
+    const after = (await kc('GET', `/realms/${encodeURIComponent(realm)}/client-scopes`)).json ?? [];
+    return after.find((s) => s.name === name)?.id;
+  },
+  // Mark a client scope as a realm default client scope (idempotent PUT). New clients then
+  // get it automatically, so the realm carries the template's required client scopes.
+  async setDefaultClientScope(realm, scopeId) {
+    if (!scopeId) return;
+    await kc('PUT', `/realms/${encodeURIComponent(realm)}/default-default-client-scopes/${encodeURIComponent(scopeId)}`, {});
+  },
+  // Apply the template's required client scopes to a realm: ensure each exists and set it default.
+  async applyRequiredClientScopes(realm, scopeNames = []) {
+    for (const name of scopeNames) {
+      const id = await this.ensureClientScope(realm, name);
+      await this.setDefaultClientScope(realm, id);
+    }
+  },
   async createRealmRole(realm, name) {
     try { await kc('POST', `/realms/${encodeURIComponent(realm)}/roles`, { name }); }
     catch (e) { if (e.kcStatus !== 409) throw e; } // 409 = already exists, fine
@@ -210,4 +287,11 @@ export const TENANT_REALM_ROLES = [
   'tenant_owner', 'tenant_admin', 'tenant_developer', 'tenant_viewer',
   'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
   'workspace_auditor', 'workspace_viewer', 'workspace_service_account'
+];
+
+// The standard per-tenant realm client scopes (charts/in-falcone values:
+// tenantRealmTemplate.requiredClientScopes). Applied to every provisioned tenant realm
+// by createRealm (mirrors TENANT_REALM_ROLES) so realms no longer drift from the template (#568).
+export const TENANT_REALM_SCOPES = [
+  'tenant-context', 'workspace-context', 'plan-context', 'workspace-roles'
 ];

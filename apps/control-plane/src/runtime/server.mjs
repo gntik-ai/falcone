@@ -274,7 +274,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // Insert/bulk-insert/update thread embeddingExecutor + mappingStore so the write-path
     // auto-embed hook fires when a per-collection mapping is configured (no-op otherwise).
     ['POST', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
-      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.values ?? c.body, embeddingExecutor, mappingStore }, 201)],
+      run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.row ?? c.body.values ?? c.body, embeddingExecutor, mappingStore }, 201)],
     ['POST', new RegExp(`${data}/rows/bulk/insert$`), ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'bulk_insert', rows: c.body.rows ?? c.body.items, embeddingExecutor, mappingStore }, 201)],
     ['GET', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
