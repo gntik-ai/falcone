@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
+import { callerTenantScope } from './tenant-scope.mjs';
 
 const BROKERS = (process.env.KAFKA_BROKERS || 'falcone-kafka:9092').split(',').map((s) => s.trim());
 const ok = (statusCode, body) => ({ statusCode, body });
@@ -41,8 +42,21 @@ export async function deleteTopics(physicalNames) {
   try { await a.deleteTopics({ topics }); } catch (e) { if (!/UNKNOWN_TOPIC_OR_PARTITION|does not exist/i.test(String(e.message ?? e))) throw e; }
 }
 
+// Resolve a workspace and enforce that the caller's verified tenant owns it.
+// Platform callers (scope null = superadmin/internal) may reach any workspace;
+// a cross-tenant id is reported as 404 (no existence leak), mirroring the
+// executor's workspace-ownership guard.
+async function resolveOwnedWorkspace(ctx) {
+  const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
+  if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+  const scope = callerTenantScope(ctx.identity);
+  if (scope != null && ws.tenant_id !== scope) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+  return { ws };
+}
+
 // GET /v1/events/workspaces/{workspaceId}/inventory
 async function eventsInventory(ctx) {
+  const r = await resolveOwnedWorkspace(ctx); if (r.error) return r.error;
   const workspaceId = ctx.params.workspaceId;
   const topics = await store.listTopicsForWorkspace(ctx.pool, workspaceId);
   let byName = {};
@@ -68,8 +82,8 @@ async function eventsInventory(ctx) {
 
 // POST /v1/events/workspaces/{workspaceId}/topics  — provision a real topic + map.
 async function eventsProvisionTopic(ctx) {
-  const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
-  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw.error;
+  const ws = rw.ws;
   const topicName = slug(ctx.body?.name);
   if (!topicName) return err(400, 'VALIDATION_ERROR', 'topic name is required');
   const partitions = Number(ctx.body?.partitions ?? 1) || 1;
@@ -88,6 +102,11 @@ async function eventsProvisionTopic(ctx) {
 async function resolveTopic(ctx) {
   const t = await store.getTopicByResourceId(ctx.pool, ctx.params.topicId);
   if (!t) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
+  // Enforce the caller's verified tenant owns the topic. A cross-tenant resource
+  // id resolves to 404 (no existence leak) — closing the Events/Kafka IDOR where
+  // a tenant could read/publish/consume another tenant's topic (P0 ISO-EVENTS).
+  const scope = callerTenantScope(ctx.identity);
+  if (scope != null && t.tenant_id !== scope) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
   return { t };
 }
 
@@ -176,7 +195,10 @@ async function eventsTopicPublish(ctx) {
 // GET /v1/events/topics/{resourceId}/stream  (SSE — owns the response)
 async function eventsTopicStream(ctx, res) {
   const t = await store.getTopicByResourceId(ctx.pool, ctx.params.topicId);
-  if (!t) {
+  // Same tenant boundary as resolveTopic — a cross-tenant id must not open an SSE
+  // consumer onto another tenant's topic (P0 ISO-EVENTS).
+  const scope = callerTenantScope(ctx.identity);
+  if (!t || (scope != null && t.tenant_id !== scope)) {
     res.writeHead(404, { 'content-type': 'application/json', ...(ctx.cors ?? {}) });
     res.end(JSON.stringify({ code: 'TOPIC_NOT_FOUND', message: `topic ${ctx.params.topicId} not found` }));
     return;
