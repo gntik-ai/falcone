@@ -107,6 +107,14 @@ export const kcAdmin = {
   async listUsers(realm, { max = 100 } = {}) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users?max=${max}`)).json ?? [];
   },
+  async getUser(realm, userId) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}`)).json ?? null;
+  },
+  // Enable/disable an end-user (KC: PUT with `enabled`). A disabled user can no
+  // longer authenticate (ROPC -> "Account disabled"). (#567)
+  async setUserEnabled(realm, userId, enabled) {
+    await kc('PUT', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}`, { enabled: !!enabled });
+  },
   async deleteUser(realm, userId) { try { await kc('DELETE', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}`); } catch (e) { if (e.kcStatus !== 404) throw e; } },
 
   // ---- clients (service accounts = confidential client w/ service account) ----

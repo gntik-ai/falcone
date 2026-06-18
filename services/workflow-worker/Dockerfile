@@ -23,11 +23,15 @@ RUN npm run build
 
 # ---- runtime ----
 FROM node:22-slim AS runtime
-WORKDIR /app/services/workflow-worker
-
-# Production deps only.
+# Install the production deps at the /app ROOT (not under services/workflow-worker) so
+# `pg` resolves from BOTH the worker dist (/app/services/workflow-worker/dist) AND the
+# copied apps/control-plane runtime modules (/app/apps/control-plane/src/runtime) — the
+# latter `import 'pg'` and the ESM resolver only walks up to a node_modules in an ANCESTOR
+# dir. Worker package.json has no "type", so dist/worker.js stays CJS. (#563 wiring.)
+WORKDIR /app
 COPY services/workflow-worker/package.json ./package.json
 RUN npm install --omit=dev --no-package-lock
+WORKDIR /app/services/workflow-worker
 
 # Compiled output.
 COPY --from=build /app/services/workflow-worker/dist ./dist
@@ -37,6 +41,21 @@ COPY --from=build /app/services/workflow-worker/dist ./dist
 # the same path relative to the dist/ directory as it does in the repo workspace, because
 # webhook-subscription.mjs itself imports from event-catalogue.mjs in the same directory.
 COPY services/webhook-engine/src /app/services/webhook-engine/src
+
+# worker-deps.mjs (fix-flows-worker-db-activity-wiring / #563) dynamically imports the
+# postgres executor (apps/control-plane/src/runtime/) and its plan-builder adapter
+# (services/adapters/src/). These paths must be reachable relative to dist/worker.js:
+#   dist/worker.js  →  ../../../apps/control-plane/src/runtime/*.mjs   ✓
+#   apps/control-plane/src/runtime/postgres-data-executor.mjs imports:
+#       ../../../../services/adapters/src/postgresql-data-api.mjs     ✓
+COPY apps/control-plane/src/runtime/connection-registry.mjs \
+     apps/control-plane/src/runtime/postgres-data-executor.mjs \
+     apps/control-plane/src/runtime/workspace-dsn-resolver.mjs \
+     apps/control-plane/src/runtime/errors.mjs \
+     /app/apps/control-plane/src/runtime/
+COPY services/adapters/src/postgresql-data-api.mjs \
+     services/adapters/src/postgresql-governance-admin.mjs \
+     /app/services/adapters/src/
 
 ENV NODE_ENV=production \
     TEMPORAL_ADDRESS=temporal-frontend:7233 \

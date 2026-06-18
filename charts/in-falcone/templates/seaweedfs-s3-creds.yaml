@@ -1,6 +1,7 @@
 {{- if .Values.seaweedfs.enabled }}
 {{- /*
-  SeaweedFS S3 gateway credentials (add-seaweedfs-deployment, design D7).
+  SeaweedFS S3 gateway credentials (add-seaweedfs-deployment, design D7;
+  scoping hardened by add-seaweedfs-per-tenant-identities, #553).
 
   Two chart-created Secrets, sharing ONE generated access/secret-key pair:
 
@@ -15,6 +16,18 @@
        seaweedfs.s3.existingConfigSecret). Built from the SAME generated values
        so the gateway authenticates with the chart-created credentials.
 
+  TENANT ISOLATION (#553, partial — model + scaffolding). This identity is the
+  TRUSTED INTERNAL backend key (also the control-plane's STORAGE_S3_* credential),
+  so it retains broad bucket management and is never handed to tenants. The
+  tenant-FACING isolation is the per-workspace scoped identities built by
+  services/adapters/src/seaweedfs-s3-identities-config.mjs (deriveWorkspaceBucketName
+  + buildSeaweedFSIdentitiesConfig) and onboarded via the admin endpoint wired
+  below (seaweedfs-iam-client.mjs). Issuing those per-workspace credentials at
+  runtime and RETIRING this master key — the full closure of the live 2026-06-18
+  breach (single global root identity) — is the cutover tracked under
+  epic-seaweedfs-migration (#430); confining this key here would break the storage
+  REST API for every tenant bucket, so it is intentionally NOT confined yet.
+
   STABLE ACROSS RE-INSTALLS: the values are generated once with randAlphaNum and
   then re-read on every subsequent render via `lookup`, so upgrades/re-installs
   do NOT rotate the credentials. The Secrets also carry
@@ -24,6 +37,8 @@
 {{- $credsName := .Values.seaweedfsS3Creds.secretName -}}
 {{- $configName := .Values.seaweedfsS3Creds.configSecretName -}}
 {{- $identityName := .Values.seaweedfsS3Creds.identityName -}}
+{{- $platformPrefix := .Values.seaweedfsS3Creds.platformBucketPrefix | default "falcone-platform-" -}}
+{{- $platformBucket := printf "%ssystem" $platformPrefix -}}
 {{- /* Regeneration guard: reuse existing values when the Secret already exists. */ -}}
 {{- $existing := lookup "v1" "Secret" $ns $credsName -}}
 {{- $accessKey := "" -}}
@@ -38,10 +53,30 @@
 {{- if not $secretKey -}}
   {{- $secretKey = randAlphaNum 40 -}}
 {{- end -}}
+{{- /*
+  Per-bucket-scoped admin actions: `Action:bucket` for each {Admin,Read,Write,
+  List,Tagging} × each reserved platform bucket. A bare global action (no
+  `:bucket` suffix) would re-open the cross-tenant breach, so it is never
+  emitted. Mirrors services/adapters/src/seaweedfs-s3-identities-config.mjs ::
+  buildSeaweedFSIdentitiesConfig (and seaweedfs-iam-client buildSeaweedFSIdentity).
+*/ -}}
+{{- /*
+  TRUSTED BACKEND SERVICE IDENTITY. This identity's keys are also wired to the
+  control-plane's STORAGE_S3_ACCESS_KEY/SECRET (it provisions and serves every
+  tenant's bucket behind the ALREADY tenant-gated storage REST API), so it MUST
+  retain broad bucket management — confining it to the reserved platform prefix
+  would break createBucket/put/get for all `t-…` tenant buckets. It is an internal
+  service key, never handed to tenants. The tenant-FACING credentials are the
+  per-workspace scoped identities (deriveWorkspaceBucketName +
+  buildSeaweedFSIdentitiesConfig in services/adapters/src/seaweedfs-s3-identities-config.mjs,
+  onboarded via the admin endpoint); issuing those at runtime and RETIRING this
+  master key is the live cutover tracked under epic-seaweedfs-migration (#430).
+*/ -}}
+{{- $adminActions := list "Admin" "Read" "Write" "List" "Tagging" -}}
 {{- $identities := dict "identities" (list (dict
       "name" $identityName
       "credentials" (list (dict "accessKey" $accessKey "secretKey" $secretKey))
-      "actions" (list "Admin" "Read" "Write" "List" "Tagging"))) -}}
+      "actions" $adminActions)) -}}
 apiVersion: v1
 kind: Secret
 type: Opaque
@@ -56,6 +91,12 @@ metadata:
 stringData:
   s3AccessKey: {{ $accessKey | quote }}
   s3SecretKey: {{ $secretKey | quote }}
+  # Admin keys the runtime IAM client (seaweedfs-iam-client.mjs) signs per-tenant
+  # identity writes with. Same generated pair; named for the SEAWEEDFS_ADMIN_*
+  # env contract so per-workspace identity onboarding (#553) can be wired by
+  # secretKeyRef without exposing a second credential.
+  adminAccessKey: {{ $accessKey | quote }}
+  adminSecretKey: {{ $secretKey | quote }}
 ---
 apiVersion: v1
 kind: Secret

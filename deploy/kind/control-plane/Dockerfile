@@ -20,6 +20,7 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
      deploy/kind/control-plane/b-handlers.mjs deploy/kind/control-plane/auth-handlers.mjs \
      deploy/kind/control-plane/saga.mjs deploy/kind/control-plane/dataplane.mjs \
      deploy/kind/control-plane/schema-retry.mjs deploy/kind/control-plane/tenant-scope.mjs \
+     deploy/kind/control-plane/governance-schema.mjs deploy/kind/control-plane/workspace-quota.mjs \
      deploy/kind/control-plane/metrics-handlers.mjs deploy/kind/control-plane/metrics-registry.mjs \
      deploy/kind/control-plane/storage-handlers.mjs \
      deploy/kind/control-plane/mongo-handlers.mjs deploy/kind/control-plane/pg-handlers.mjs \

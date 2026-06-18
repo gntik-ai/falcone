@@ -493,16 +493,20 @@ export function createFlowTriggerRegistry({
       consumerSubscriptions = wanted;
       return;
     }
-    // KafkaJS requires subscribe() BEFORE run(); on the FIRST registration we subscribe to the full
-    // wanted set, then start the run loop. A later registration that adds a NEW topic re-subscribes
-    // (KafkaJS tolerates subscribe-after-run for incremental topics) so newly published triggers are
-    // picked up without restarting the consumer (design.md risk: subscription drift).
+    // KafkaJS requires subscribe() BEFORE run() and FORBIDS subscribe() while the consumer is
+    // running ("Cannot subscribe to topic while consumer is running"). On the FIRST registration we
+    // subscribe to the full wanted set then start the run loop. To add/remove a topic on an
+    // ALREADY-RUNNING consumer we must stop the run loop, re-subscribe to the full wanted set, then
+    // restart it — otherwise a publish after boot-time wiring (bootFlowTriggers already started the
+    // consumer) 502s with TRIGGER_REGISTRATION_FAILED. (live campaign 2026-06-18, #564.)
     if (!consumer) {
       consumer = await kafkaConsumerFactory();
       await consumer.subscribe({ topics: [...wanted] });
       await consumer.run({ eachMessage: onConsumerMessage });
     } else {
+      if (typeof consumer.stop === 'function') await consumer.stop();
       await consumer.subscribe({ topics: [...wanted] });
+      await consumer.run({ eachMessage: onConsumerMessage });
     }
     consumerSubscriptions = wanted;
   }
@@ -608,6 +612,56 @@ export function createFlowTriggerRegistry({
     store,
     close,
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Boot wiring (change: add-event-trigger-integration / #564).
+//
+// The SINGLE place a process boots the platform-event trigger plane. It (1) constructs the
+// registry sharing the executor's Temporal client + Kafka consumer factory, (2) attaches it to the
+// flow executor (so a publish registers triggers and a delete deregisters them), and CRUCIALLY
+// (3) STARTS the Kafka consumer for ALREADY-REGISTERED platform-event triggers on boot.
+//
+// Why (3) matters: registerEventTrigger only refreshes the consumer when a NEW trigger is published
+// IN THIS PROCESS. A flow published in a PRIOR process (the live scenario: publish flow, restart /
+// roll the pod, then publish an event) leaves a flow_trigger_registrations row but a DORMANT
+// consumer — so the matching event is consumed by no one and starts no execution (the live-campaign
+// gap, audit/live-campaign/evidence/23-events-functions.md). refreshConsumerSubscriptions() on boot
+// re-subscribes to the union of persisted registrations and starts the run loop, closing the gap.
+//
+// The store query needs its table; the caller is expected to have run ensureSchema() (main.mjs does
+// it for the flow executor's metadata pool). The boot refresh is best-effort: a broker outage at
+// boot logs and does not crash the process — a later publish re-attempts the subscription.
+export async function wireFlowTriggers({
+  flowExecutor,
+  store = createTriggerStore(),
+  temporalClient,
+  getTemporalClient,
+  temporalTaskQueue = 'flows-main',
+  secretMasterKey,
+  kafkaConsumerFactory,
+  logger = console,
+} = {}) {
+  const registry = createFlowTriggerRegistry({
+    store,
+    temporalClient,
+    getTemporalClient,
+    temporalTaskQueue,
+    secretMasterKey,
+    kafkaConsumerFactory,
+    // The platform-event consumer starts the bound flow through the executor's single start path.
+    startTriggeredExecution: (args) => flowExecutor.startTriggeredExecution(args),
+    logger,
+  });
+  flowExecutor.setTriggerRegistry(registry);
+  // Start the consumer for registrations that already exist (a process restart / rolled pod). A
+  // no-op when no consumer factory is wired (no-broker dev/test) or no registrations exist yet.
+  try {
+    await registry.refreshConsumerSubscriptions();
+  } catch (err) {
+    logger?.error?.('[flow-trigger-registry] boot consumer subscription failed (will retry on next publish):', err?.message ?? err);
+  }
+  return registry;
 }
 
 export { WORKFLOW_TYPE };

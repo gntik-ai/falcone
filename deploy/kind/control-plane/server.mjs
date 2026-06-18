@@ -23,6 +23,7 @@ import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import { ensureSchema } from './tenant-store.mjs';
 import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
+import { applyGovernanceSchema } from './governance-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 
 const { Pool } = pg;
@@ -339,6 +340,10 @@ loadRoutes();
 runWithRetry(async (attempt) => {
   await ensureSchema(pool);
   await ensureSagaSchema(pool);
+  // Apply the governance migration set (plans / quota dimensions / change-history /
+  // quota overrides / boolean capabilities / scope-enforcement) so the wireable
+  // governance routes' real actions resolve instead of 500'ing on 42P01 (#555).
+  await applyGovernanceSchema(pool);
   const n = await recoverSagas(pool);
   console.log(`[control-plane] schema ready; recovered ${n} orphaned saga(s) (attempt ${attempt})`);
   return n;

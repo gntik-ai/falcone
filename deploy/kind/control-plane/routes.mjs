@@ -26,6 +26,14 @@ export const routes = [
   { method: 'GET',  path: '/v1/tenant/entitlements', module: `${PO}/tenant-effective-entitlements-get.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeQueryIntoParams: true },
 
+  // own-tenant plan API (tenant-scoped; operators read their OWN plan — no superadmin collection needed)
+  // /v1/tenant/plan/effective-entitlements — full entitlement + consumption profile for the operator's tenant
+  { method: 'GET',  path: '/v1/tenant/plan/effective-entitlements', module: `${PO}/tenant-effective-entitlements-get.mjs`, export: 'main',
+    invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeQueryIntoParams: true },
+  // /v1/tenant/effective-capabilities — plan-derived capability flags for the operator's tenant
+  { method: 'GET',  path: '/v1/tenant/effective-capabilities', module: `${PO}/tenant-effective-capabilities-get.mjs`, export: 'main',
+    invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeQueryIntoParams: true },
+
   // workspace sub-quotas (tenant-scoped write + list)
   { method: 'POST', path: '/v1/workspace-sub-quotas', module: `${PO}/workspace-sub-quota-set.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeBodyIntoParams: true },
@@ -67,6 +75,9 @@ export const routes = [
   // ---- domain B: fine-grained IAM (platform admin; realmId in path) ---------
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamListUsers', auth: 'superadmin' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamCreateUser', auth: 'superadmin' },
+  // app end-user lifecycle (#567): owner-of-realm OR superadmin (handler authorizes); were NO_ROUTE.
+  { method: 'DELETE', path: '/v1/iam/realms/{realmId}/users/{userId}', localHandler: 'iamDeleteUser', auth: 'authenticated' },
+  { method: 'PATCH',  path: '/v1/iam/realms/{realmId}/users/{userId}/status', localHandler: 'iamSetUserStatus', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/roles', localHandler: 'iamListRoles', auth: 'superadmin' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/roles', localHandler: 'iamCreateRole', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/groups', localHandler: 'iamListGroups', auth: 'superadmin' },
