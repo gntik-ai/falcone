@@ -81,10 +81,13 @@ function buildDdlPlan({ resourceKind, action, payload }) {
   const declaresVector =
     /vector/i.test(String(payload.dataType ?? payload.type ?? '')) ||
     ['hnsw', 'ivfflat'].includes(String(payload.indexMethod ?? payload.method ?? '').toLowerCase());
+  // The public create-table body names the table `name`; the structural adapter accepts
+  // either, but the isolation statements below quote the table name directly — resolve the
+  // alias once so a `{ name }` body does not throw "Invalid tableName identifier".
   const context = {
     databaseName: payload.databaseName,
     schemaName: payload.schemaName,
-    tableName: payload.tableName,
+    tableName: payload.tableName ?? payload.name,
     ...(declaresVector ? { clusterFeatures: { enabledExtensions: ['vector'] } } : {}),
   };
 
@@ -98,7 +101,7 @@ function buildDdlPlan({ resourceKind, action, payload }) {
       // tenant-isolated by appending grants + tenant_id + FORCE RLS to the same DDL unit.
       if (resourceKind === 'table' && action === 'create') {
         const schemaName = payload.schemaName ?? context.schemaName;
-        const tableName = payload.tableName ?? context.tableName;
+        const tableName = payload.tableName ?? payload.name ?? context.tableName;
         structural.statements = [
           ...(structural.statements ?? []),
           ...tableIsolationStatements(schemaName, tableName),

@@ -2,11 +2,19 @@
 
 ## ADDED Requirements
 
-### Requirement: Prometheus APISIX scrape target is down
+### Requirement: APISIX exposes a scrapable Prometheus metrics endpoint
 
-The system SHALL ensure that prometheus APISIX scrape target is down: Expose an APISIX metrics endpoint and point the scrape config at it.
+The API gateway SHALL expose Prometheus metrics in exposition format at
+`/apisix/prometheus/metrics` on the gateway port that Prometheus scrapes, and SHALL collect
+request metrics (status, latency, bandwidth) for every proxied route. The Prometheus scrape
+target for the gateway SHALL therefore be UP, returning metric series rather than HTML.
 
-#### Scenario: corrected behavior verified end-to-end
+#### Scenario: the metrics endpoint returns Prometheus exposition
 
-- **WHEN** the conditions in the reproduction are exercised against the running system
-- **THEN** The APISIX scrape target is UP
+- **WHEN** Prometheus scrapes `/apisix/prometheus/metrics` on the gateway
+- **THEN** the response is Prometheus exposition format (not the web-console HTML), so the scrape target is UP
+
+#### Scenario: proxied requests are counted
+
+- **WHEN** requests flow through the gateway and the metrics endpoint is scraped
+- **THEN** per-route request metrics (status/latency/bandwidth) are present in the exposition

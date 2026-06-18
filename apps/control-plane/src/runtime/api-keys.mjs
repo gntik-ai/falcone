@@ -95,7 +95,17 @@ export function createApiKeyStore({ pool }) {
          FROM workspace_api_keys WHERE workspace_id = $1 ORDER BY created_at DESC`,
       [workspaceId],
     );
-    return res.rows; // never includes the hash or the plaintext
+    // Mirror issueKey's camelCase shape so list and mint responses are schema-consistent.
+    // Never includes the hash or the plaintext.
+    return res.rows.map((r) => ({
+      id: r.id,
+      keyType: r.key_type,
+      prefix: r.key_prefix,
+      scopes: r.scopes,
+      status: r.status,
+      createdAt: r.created_at,
+      lastUsedAt: r.last_used_at,
+    }));
   }
 
   async function revokeKey({ id, workspaceId }) {
