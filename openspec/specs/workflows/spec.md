@@ -1876,3 +1876,38 @@ event-triggered start does not fail on a Temporal visibility error before any ru
   (`tenantId`, `workspaceId`, `flowId`, `flowVersion`, `triggerType`) as a
   post-install,post-upgrade hook
 
+### Requirement: Flow trigger tables exist before any trigger registration
+
+The flow trigger store schema SHALL be created at boot whenever flows are enabled — both
+`flow_trigger_registrations` and `flow_trigger_secrets` — so registering a platform-event
+or webhook trigger never fails with a missing-relation error.
+
+#### Scenario: publishing a flow with a trigger succeeds
+
+- **WHEN** a flow with a platform-event or webhook trigger is published
+- **THEN** the trigger registration is persisted (no 502
+  `relation "flow_trigger_registrations" does not exist`) and the event→flow / webhook
+  path is wired.
+
+### Requirement: The flows worker has Postgres env and Temporal search attributes are registered
+
+The workflow-worker deployment SHALL carry Postgres connection env (`PGHOST`, `PGPORT`,
+`PGUSER`, `PGPASSWORD`, and `PGDATABASE` pointing at the database that holds the
+`workspace_databases` registry, i.e. `in_falcone`), so the `db.query` activity resolves
+the workspace database instead of falling back to localhost. The flows bring-up SHALL
+register the five custom Temporal search attributes (`tenantId`, `workspaceId`,
+`flowId`, `flowVersion`, `triggerType`, all Keyword) before workflows run.
+
+#### Scenario: db.query activity reaches the workspace database
+
+- **WHEN** a flow runs a `db.query` activity
+- **THEN** the worker connects with its configured PG env and returns rows (no
+  `UPSTREAM_UNAVAILABLE` from a localhost fallback).
+
+#### Scenario: flow execution does not fail on a missing search attribute
+
+- **WHEN** a flow is started (manually or via a trigger) on a freshly created dev
+  Temporal namespace
+- **THEN** the five custom search attributes are registered, so the concurrency
+  pre-flight (`workflow.list` filtered by them) succeeds instead of 500ing.
+
