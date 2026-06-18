@@ -365,10 +365,17 @@ export async function deleteWorkspaceDatabaseRecord(pool, id) {
 
 // ---- workspace buckets (object store mapping) ------------------------------
 export async function insertBucket(pool, { workspaceId, tenantId, bucketName, region }) {
+  // ON CONFLICT must NEVER reassign workspace_id/tenant_id: the previous
+  // `SET workspace_id=EXCLUDED..., tenant_id=EXCLUDED...` let a second tenant whose
+  // slug-derived bucket name collided HIJACK the first tenant's registry row, so
+  // the first tenant's bucket vanished from their list (P1 tenant-isolation). Bucket
+  // names are now workspace-id-scoped (see storage-handlers deriveBucketName), so a
+  // conflict is always a same-workspace re-provision: keep the owner intact and just
+  // refresh region (idempotent), returning the existing row.
   const { rows } = await pool.query(
     `INSERT INTO workspace_buckets (workspace_id, tenant_id, bucket_name, region)
      VALUES ($1,$2,$3,$4)
-     ON CONFLICT (bucket_name) DO UPDATE SET workspace_id=EXCLUDED.workspace_id, tenant_id=EXCLUDED.tenant_id
+     ON CONFLICT (bucket_name) DO UPDATE SET region=EXCLUDED.region
      RETURNING id, workspace_id, tenant_id, bucket_name, region, created_at`,
     [workspaceId, tenantId, bucketName, region]);
   return rows[0];
@@ -394,10 +401,17 @@ export async function getBucketRecord(pool, bucketName) {
 
 // ---- workspace topics (event store mapping) --------------------------------
 export async function insertTopic(pool, { id, workspaceId, tenantId, topicName, physicalTopicName, partitions }) {
+  // Idempotency is keyed on (workspace_id, topic_name): re-provisioning the same
+  // logical topic in the SAME workspace returns the existing row (original
+  // resourceId). We must NOT key on physical_topic_name alone — that let a second
+  // tenant's slug-derived collision UPDATE/return the first tenant's row (P1
+  // ISO-EVENTS). The conflict can no longer cross tenants because the physical
+  // name now embeds the globally-unique workspace id (see kafka-handlers
+  // physicalTopicName), so a (workspace_id, topic_name) match is always same-tenant.
   const { rows } = await pool.query(
     `INSERT INTO workspace_topics (id, workspace_id, tenant_id, topic_name, physical_topic_name, partitions)
      VALUES ($1,$2,$3,$4,$5,$6)
-     ON CONFLICT (physical_topic_name) DO UPDATE SET topic_name=EXCLUDED.topic_name
+     ON CONFLICT (workspace_id, topic_name) DO UPDATE SET partitions=EXCLUDED.partitions
      RETURNING id, workspace_id, tenant_id, topic_name, physical_topic_name, partitions, created_at`,
     [id, workspaceId, tenantId, topicName, physicalTopicName, partitions]);
   return rows[0];

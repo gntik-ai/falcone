@@ -121,6 +121,14 @@ spec:
             # Verify Bearer JWTs directly (Keycloak platform realm) so admin requests —
             # e.g. API-key issuance — authenticate without the gateway injecting x-tenant-id.
             - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
+            # Gateway trust signal (fix-executor-ddl-db-ownership-guard, B3): without this,
+            # the executor trusted client-supplied x-tenant-id/x-workspace-id headers
+            # UNCONDITIONALLY (legacy dev mode), so a direct (non-gateway) caller could spoof
+            # any tenant/workspace. APISIX (helm-deployed) already injects a matching
+            # x-gateway-auth from this SAME secret, so legitimate gateway traffic is unaffected
+            # while direct header-spoofing now fails closed (401).
+            - name: GATEWAY_SHARED_SECRET
+              valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } }
           readinessProbe:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 3

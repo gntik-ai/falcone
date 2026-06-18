@@ -35,7 +35,15 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
 # families are wired.
 COPY services/provisioning-orchestrator /repo/services/provisioning-orchestrator
 COPY services/internal-contracts        /repo/services/internal-contracts
+COPY services/scheduling-engine         /repo/services/scheduling-engine
 COPY apps/control-plane                 /repo/apps/control-plane
+
+# Fail the BUILD if the route map references a handler module the image did not COPY
+# (fix-scheduling-handler-dockerfile): `/v1/scheduling/*` dispatched to
+# /repo/services/scheduling-engine/... which was never COPY'd, so every scheduling
+# request 500'd with ERR_MODULE_NOT_FOUND at runtime. This static check turns a
+# missing COPY into a build failure instead of a runtime 500.
+RUN node -e "const fs=require('fs');const list=JSON.parse(fs.readFileSync('./route-map.runtime.json','utf8'));const mods=[...new Set(list.filter(r=>typeof r.module==='string').map(r=>r.module))];const miss=mods.filter(p=>!fs.existsSync(p));if(miss.length){console.error('[build] route map references missing handler modules:\n  '+miss.join('\n  '));process.exit(1)}console.log('[build] all '+mods.length+' route handler modules resolve')"
 
 ENV NODE_ENV=production
 USER 1000

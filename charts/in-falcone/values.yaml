@@ -3400,6 +3400,13 @@ workflowWorker:
   #     - { name: TEMPORAL_ADDRESS, value: <release>-temporal-frontend:7233 }
   #     - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
   #     - { name: TEMPORAL_TASK_QUEUE, value: flows-main }
+  #     # Postgres for the db.query activity — point at the database that holds the
+  #     # workspace_databases registry (the control-plane's PGDATABASE). Without it the
+  #     # worker DSN falls back to localhost/falcone_app and db.query → UPSTREAM_UNAVAILABLE.
+  #     - { name: PGHOST, value: <release>-postgresql }
+  #     - { name: PGUSER, value: falcone }
+  #     - { name: PGDATABASE, value: in_falcone }
+  #     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: <release>-postgresql, key: POSTGRESQL_PASSWORD } } }
   env:
     - name: TEMPORAL_NAMESPACE
       value: falcone-flows
