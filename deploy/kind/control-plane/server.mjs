@@ -25,6 +25,7 @@ import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
+import { recordRouteAudit } from './audit-writer.mjs';
 
 const { Pool } = pg;
 
@@ -85,8 +86,9 @@ function lowercaseHeaders(raw) {
 }
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let d = ''; req.on('data', (c) => { d += c; if (d.length > 8e6) req.destroy(); });
-    req.on('end', () => resolve(d)); req.on('error', reject);
+    const chunks = []; let len = 0;
+    req.on('data', (c) => { const b = Buffer.isBuffer(c) ? c : Buffer.from(c); chunks.push(b); len += b.length; if (len > 8e6) req.destroy(); });
+    req.on('end', () => resolve(Buffer.concat(chunks))); req.on('error', reject);
   });
 }
 const CORS = {
@@ -265,8 +267,20 @@ const server = http.createServer(async (req, res) => {
 
     const query = Object.fromEntries(parsed.searchParams.entries());
     const rawBody = await readBody(req);
+    const contentType = String(req.headers['content-type'] ?? '').toLowerCase();
+    // A non-JSON content-type carries an opaque/binary body (e.g. object uploads): keep the exact
+    // bytes for the handler instead of rejecting with INVALID_JSON. JSON (or an unspecified type,
+    // for backward compatibility) is parsed as before.
+    const isJsonBody = contentType.includes('application/json') || contentType.includes('+json') || contentType === '';
     let body = {};
-    if (rawBody) { try { body = JSON.parse(rawBody); } catch { return sendJson(res, 400, { code: 'INVALID_JSON', message: 'Body is not valid JSON' }); } }
+    let rawBodyIsBinary = false;
+    if (rawBody.length) {
+      if (isJsonBody) {
+        try { body = JSON.parse(rawBody.toString('utf8')); } catch { return sendJson(res, 400, { code: 'INVALID_JSON', message: 'Body is not valid JSON' }); }
+      } else {
+        rawBodyIsBinary = true;
+      }
+    }
 
     // Domain B: local control-plane handlers (tenant lifecycle, user management)
     // — real implementations of what the repo only stubs. Dispatched directly,
@@ -274,11 +288,15 @@ const server = http.createServer(async (req, res) => {
     if (route.localHandler) {
       const fn = LOCAL_HANDLERS[route.localHandler];
       if (typeof fn !== 'function') return sendJson(res, 500, { code: 'NO_HANDLER', message: `local handler ${route.localHandler} missing` });
-      const ctx = { params: matched.params, query, body, identity, pool, callerContext: identity ? callerContextFrom(identity, correlationId) : null, req, res, cors: CORS };
+      const ctx = { params: matched.params, query, body, rawBody, contentType, rawBodyIsBinary, identity, pool, callerContext: identity ? callerContextFrom(identity, correlationId) : null, req, res, cors: CORS };
       // Streaming routes (e.g. SSE consume) own the response: the handler writes
       // to `res` directly and ends it; we don't sendJson() after.
       if (route.stream) { await fn(ctx, res); return; }
       const result = await fn(ctx);
+      // Audit WRITER (#557): record a mutating action into the audit store WITH the
+      // request correlation id, scoped to the action's owning tenant. Best-effort and
+      // non-blocking — auditing must never fail or slow the action it describes.
+      void recordRouteAudit(pool, route, ctx, result, correlationId);
       return sendJson(res, result?.statusCode ?? 200, result?.body ?? null);
     }
 

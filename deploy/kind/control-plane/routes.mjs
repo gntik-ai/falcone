@@ -51,11 +51,23 @@ export const routes = [
   { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/users', localHandler: 'listTenantUsers', auth: 'authenticated' },
 
+  // project auth-config (#568): owner enables auth methods + social IdPs for THEIR OWN project's
+  // realm (handler authorizes own-tenant; cross-tenant → 403). Were NO_ROUTE (KC-admin only).
+  { method: 'GET',    path: '/v1/tenants/{tenantId}/auth-config', localHandler: 'getAuthConfig', auth: 'authenticated' },
+  { method: 'PUT',    path: '/v1/tenants/{tenantId}/auth-config', localHandler: 'setAuthConfig', auth: 'authenticated' },
+  { method: 'PUT',    path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}', localHandler: 'setSocialProvider', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}', localHandler: 'deleteSocialProvider', auth: 'authenticated' },
+
   // ---- domain B: workspaces (LOCAL) ----------------------------------------
   { method: 'POST', path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'createWorkspace', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'listTenantWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces', localHandler: 'listWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}', localHandler: 'getWorkspace', auth: 'authenticated' },
+  // Single-workspace cascading teardown (#562): owner-of-the-workspace's-tenant OR superadmin
+  // (handler authorizes own-tenant; cross-tenant → 404). The per-workspace counterpart of
+  // POST /v1/tenants/{tenantId}/purge — drops the wsdb_* DB, deletes the bucket(s)/topic(s), and
+  // removes the workspace + its service-account/api-key rows. Was NO_ROUTE (only tenant purge cascaded).
+  { method: 'DELETE', path: '/v1/workspaces/{workspaceId}', localHandler: 'deleteWorkspace', auth: 'authenticated' },
 
   // ---- domain B: service accounts + credentials (LOCAL) --------------------
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts', localHandler: 'createServiceAccount', auth: 'authenticated' },
@@ -91,6 +103,11 @@ export const routes = [
   { method: 'PUT',    path: '/v1/iam/realms/{realmId}/users/{userId}/groups/{groupId}', localHandler: 'iamAddUserToGroup', auth: 'superadmin' },
   { method: 'DELETE', path: '/v1/iam/realms/{realmId}/users/{userId}/groups/{groupId}', localHandler: 'iamRemoveUserFromGroup', auth: 'superadmin' },
   { method: 'GET',    path: '/v1/iam/realms/{realmId}/groups/{groupId}/members', localHandler: 'iamListGroupMembers', auth: 'superadmin' },
+
+  // ---- scope-enforcement denial ingest (#557) ------------------------------
+  // Sidecar for the gateway scope-enforcement plugin: records denials into
+  // scope_enforcement_denials so the scope-enforcement audit query returns them.
+  { method: 'POST', path: '/v1/internal/scope-enforcement/denials', localHandler: 'recordScopeEnforcementDenial', auth: 'superadmin' },
 
   // ---- domain B: console metrics (Quotas + Observability) -------------------
   // Synthesized from real entitlements/consumption (limits+usage); series/audit

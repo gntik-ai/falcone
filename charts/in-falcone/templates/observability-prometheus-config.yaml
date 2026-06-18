@@ -48,4 +48,43 @@ data:
           - targets: ['{{ $apisix }}']
             labels:
               component: gateway
+      {{- /*
+        Widen the scrape beyond the 3 static targets above (add-deploy-completeness-cluster, #562).
+        Namespace-scoped Kubernetes pod service-discovery: scrape ANY Falcone pod that opts in via
+        the `prometheus.io/scrape: "true"` annotation, reading its metrics port/path from
+        `prometheus.io/port` + `prometheus.io/path` (defaults /metrics). This covers every current
+        AND future metrics-exposing component (control-plane, cp-executor, ...) without hardcoding a
+        per-target job, and includes the cp-executor even when it is applied out-of-band of the chart
+        (as long as it runs in the release namespace carrying the annotation). Components WITHOUT a
+        /metrics endpoint (e.g. workflow-worker, which serves only /livez+/readyz) are simply not
+        annotated, so they are never scraped — no dead targets.
+      */}}
+      - job_name: falcone-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ $ns }}
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: replace
+            target_label: component
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
 {{- end }}

@@ -203,3 +203,24 @@ test('keycloak admin adapter builds stable adapter envelopes and normalized depe
   assert.equal(normalizedError.detail.resourceKind, 'client');
   assert.equal(normalizedError.retryable, false);
 });
+
+test('keycloak admin realm normalization surfaces the template required client scopes (#568)', () => {
+  // The provisioner must carry the chart tenantRealmTemplate.requiredClientScopes onto the
+  // realm so a provisioned tenant realm no longer drifts from the template. The normalizer
+  // surfaces requiredScopes (from requiredClientScopes/requiredScopes), parity with the kind
+  // runtime's TENANT_REALM_SCOPES applied in createRealm.
+  const realm = normalizeKeycloakAdminResource(
+    'realm',
+    {
+      realm: 'tenant-starter-alpha',
+      displayName: 'Starter Alpha',
+      enabled: true,
+      registrationAllowed: true,
+      requiredClientScopes: ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles', 'tenant-context']
+    },
+    { realmId: 'tenant-starter-alpha' }
+  );
+  assert.equal(realm.resourceType, 'iam_realm');
+  assert.equal(realm.login.registrationAllowed, true);
+  assert.deepEqual(realm.requiredScopes, ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles']);
+});

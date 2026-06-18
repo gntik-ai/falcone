@@ -42,6 +42,11 @@ controlPlane:
   image:
     repository: localhost:30500/in-falcone-control-plane
     tag: "campaign-20260617"
+    # Always re-pull (fix-campaign-image-pull-policy, #561): the campaign tag is REUSED across
+    # rebuilds, so with the chart-default IfNotPresent the kind node kept the stale cached image
+    # and a rebuilt control-plane silently ran the old code. Always pulls the freshly-pushed image
+    # from the in-cluster registry (localhost:30500) on every (re)deploy.
+    pullPolicy: Always
   env:
     - name: PGHOST
       value: falcone-postgresql
@@ -117,6 +122,9 @@ webConsole:
   image:
     repository: localhost:30500/in-falcone-web-console
     tag: "campaign-20260617"
+    # Always re-pull (fix-campaign-image-pull-policy, #561): same reusable-tag staleness as the
+    # control-plane above — pull the freshly-pushed image from localhost:30500 on every (re)deploy.
+    pullPolicy: Always
 
 apisix:
   # APISIX standalone config (deploy/kind/apisix/apisix.yaml) injects

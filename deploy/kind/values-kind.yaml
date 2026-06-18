@@ -97,6 +97,13 @@ observability:
     tag: v3.2.1
   securityContext:
     runAsUser: 65534  # prom image USER is the non-numeric "nobody" (uid 65534)
+  # Opt into the SA token mount on the kind/campaign profile so the widened Prometheus scrape
+  # (add-deploy-completeness-cluster, #562) can do Kubernetes pod service-discovery — it reads pods
+  # in the release namespace (granted by templates/observability-prometheus-rbac.yaml) and scrapes
+  # any pod annotated prometheus.io/scrape=true, covering metrics-exposing components beyond the 3
+  # hardcoded static targets. The base chart keeps automountToken=false (hardened default).
+  serviceAccount:
+    automountToken: true
 controlPlane:
   # Real control-plane runtime (server.mjs): validates the Keycloak JWT and
   # dispatches /v1/* to the repo's action modules (was a health-only stub).

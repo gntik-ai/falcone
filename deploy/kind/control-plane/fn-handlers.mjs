@@ -12,6 +12,19 @@ import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspac
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 
+// Resolve the function's invocation input from the request body. The documented body is the
+// `{ parameters: {...} }` envelope (OpenAPI FunctionInvocationWriteRequest); a bare top-level
+// input map is also accepted so a body like {n:21} is honored, not silently dropped. Envelope-only
+// fields are never passed to the function as input.
+export function invocationInput(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
+  if (body.parameters && typeof body.parameters === 'object' && !Array.isArray(body.parameters)) {
+    return body.parameters;
+  }
+  const { parameters, responseMode, triggerContext, idempotencyScope, versionId, execution, ...rest } = body;
+  return rest;
+}
+
 // Returns the caller's tenantId to use as a scope predicate on fn_actions queries,
 // or null for superadmin/internal callers (they may operate cross-tenant).
 function callerTenantId(identity) {
@@ -102,7 +115,7 @@ async function fnActionDetail(ctx) {
 async function fnInvoke(ctx) {
   const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.actionId} not found`);
-  const params = ctx.body?.parameters ?? {};
+  const params = invocationInput(ctx.body);
   const startedAt = new Date().toISOString();
   let run;
   if (!r.ksvc_name) {

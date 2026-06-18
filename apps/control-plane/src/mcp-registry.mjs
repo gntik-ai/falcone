@@ -36,6 +36,22 @@ function toolContract(t = {}) {
 }
 
 /**
+ * The routing metadata a stored version needs so a tool-call can self-call the real executor /
+ * control-plane route (method + path template + source segments). The agent-visible contract
+ * (toolContract / diffVersions) deliberately ignores these — they never affect review drift — but
+ * the runtime engine (mcp-engine invokeTool) requires them, so without persisting them every
+ * tool-call lost its method/path and fell through to the executor index. Keep separate from
+ * toolContract so the review diff stays description/scope-only.
+ */
+function toolRouting(t = {}) {
+  return {
+    method: t.method ?? null,
+    path: t.path ?? null,
+    source: t.source ?? null,
+  };
+}
+
+/**
  * Register a new server version. Requires a digest-pinned image (a mutable tag alone is refused).
  * Mutates `reg` and returns { ok, version?, violations }.
  * @param {object} reg
@@ -71,7 +87,7 @@ export function registerVersion(reg, { tenantId, serverId, version, image, manif
     image,
     digest,
     source: source ?? null,
-    tools: (manifest.tools ?? []).map(toolContract),
+    tools: (manifest.tools ?? []).map((t) => ({ ...toolContract(t), ...toolRouting(t) })),
     signatureVerified: !!signatureVerified,
     requiresReview: false, // resolved against the active version below
     approved: false,

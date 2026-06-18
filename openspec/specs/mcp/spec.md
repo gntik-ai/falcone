@@ -568,3 +568,21 @@ The system SHALL present shipped capabilities (Flows, MCP) as Preview and SHALL 
 - **WHEN** a reader views the roadmap
 - **THEN** Flows and MCP are shown as shipped Preview, and unimplemented items (including the SeaweedFS / FerretDB+DocumentDB alternatives) are clearly marked planned and under evaluation
 
+### Requirement: MCP tool-calls return the executor index instead of executing
+
+The system SHALL ensure that mCP tool-calls return the executor index instead of executing is corrected: Set `MCP_SELF_BASE_URL`, fix the instant tool request templates, and route official/platform tools to the control-plane.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** A hosted tool-call performs the real action and returns its result
+
+### Requirement: MCP->workflow mapping orphaned; platform MCP non-functional
+
+The system SHALL ensure that mCP->workflow mapping orphaned; platform MCP non-functional is corrected: Wire the flow-backed tool generator into the MCP engine; make the platform MCP tools call the control-plane.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** An MCP tool starts a workflow and returns its result
+

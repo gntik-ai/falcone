@@ -94,3 +94,12 @@ The system SHALL ship Falcone Grafana dashboards (including a per-tenant view) a
 - **WHEN** a tenant has activity and an operator opens its Falcone dashboard or queries the metrics API
 - **THEN** the dashboard/API shows non-zero series for that tenant
 
+### Requirement: Audit logging not deployed / scope-enforcement audit broken
+
+The system SHALL ensure that audit logging not deployed / scope-enforcement audit broken is corrected: Deploy/wire an audit writer + the `scope_enforcement_denials` store so actions and denials are recorded with correlation ids.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** An action appears in audit-records with its correlation id
+

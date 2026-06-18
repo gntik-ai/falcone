@@ -151,6 +151,10 @@ async function mongoIndexes(ctx) {
   const db = D(ctx.params.db); const col = C(ctx.params.col);
   const c = await mc(ctx);
   const scope = callerTenantScope(ctx?.identity);
+  // Probe existence first (mirrors mongoCollectionDetail): a missing collection is a clean 404,
+  // never a 500 leaking the raw FerretDB NamespaceNotFound (code 26) from .indexes()/count.
+  const exists = await c.db(db).listCollections({ name: col }).toArray();
+  if (!exists.length) return err(404, 'COLLECTION_NOT_FOUND', `collection ${col} not found`);
   // Tenant callers may only inspect indexes of a collection they have data in —
   // otherwise the collection is reported as not-found (no cross-tenant schema leak).
   if (scope != null && await tenantCollectionCount(c, db, col, scope) === 0) {
