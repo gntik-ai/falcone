@@ -1916,3 +1916,57 @@ accompanied by the matching gateway trust signal.
 - **WHEN** the caller issues DDL against its own workspace's dedicated database
 - **THEN** the ownership and dedicated-database guards pass and DDL proceeds as before.
 
+### Requirement: Postgres DDL column contract + primary key
+
+The Postgres DDL executor SHALL accept the documented public create-table body — the table
+name supplied as `name` (in addition to `tableName`) and each column as `{ name, type }` (in
+addition to `{ columnName, dataType }`) — and SHALL honour a `primaryKey: true` flag declared
+either at the top level of a column or under a nested `constraints` object. A column flagged as
+the primary key SHALL be emitted NOT NULL with an actual `PRIMARY KEY` constraint so the table
+is immediately usable by the data API (which requires a declared primary key).
+
+#### Scenario: documented body shape creates the table
+
+- **WHEN** a create-table request uses `{ name, columns: [{ name, type }] }`
+- **THEN** the table is created and no `Invalid tableName identifier` / `DDL_INVALID` rejection is returned
+
+#### Scenario: primaryKey:true emits a usable PRIMARY KEY
+
+- **WHEN** a column declares `primaryKey: true` (top-level or nested under `constraints`)
+- **THEN** the emitted CREATE TABLE carries an inline `PRIMARY KEY` for that column
+- **AND** the column is created NOT NULL
+- **AND** the resulting table reports a primary key index, so the data API accepts by-primary-key reads/writes
+
+### Requirement: Data-API field/path mismatches (mongo provision, fn inlineCode, bulk path, apikey casing)
+
+The data-plane handlers SHALL accept the documented public request shapes and return
+schema-consistent responses across these four surfaces:
+
+- Mongo database provisioning SHALL accept the database name as `databaseName` (in addition to `name`).
+- Function deploy SHALL accept the nested source shape `{ source: { inlineCode } }` (or `source.code`)
+  in addition to a bare string source, storing the code string so invocation runs the function body.
+- Postgres bulk insert SHALL be reachable at the documented catalog path
+  `.../tables/{tableName}/bulk/insert` (in addition to `.../tables/{tableName}/rows/bulk/insert`).
+- The API-key list response SHALL use the same camelCase field names as the mint response
+  (`keyType`, `prefix`, `createdAt`), not snake_case.
+
+#### Scenario: mongo provision accepts databaseName
+
+- **WHEN** a mongo provision request supplies `{ engine: "mongodb", databaseName }`
+- **THEN** the database is created (no `database name is required` 400)
+
+#### Scenario: function deploy accepts the nested source shape
+
+- **WHEN** a function is deployed with `{ source: { inlineCode } }` and then invoked
+- **THEN** the function body runs and returns its result (the source object is not stringified)
+
+#### Scenario: bulk insert resolves at the documented catalog path
+
+- **WHEN** a bulk insert is sent to `.../tables/{tableName}/bulk/insert`
+- **THEN** the rows are inserted (201) — the catalog path no longer 404s
+
+#### Scenario: api-key list and mint responses are schema-consistent
+
+- **WHEN** API keys are listed after one is minted
+- **THEN** each list item uses the camelCase shape (`keyType`, `createdAt`) matching the mint response
+
