@@ -51,6 +51,13 @@ export const routes = [
   { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/users', localHandler: 'listTenantUsers', auth: 'authenticated' },
 
+  // project auth-config (#568): owner enables auth methods + social IdPs for THEIR OWN project's
+  // realm (handler authorizes own-tenant; cross-tenant → 403). Were NO_ROUTE (KC-admin only).
+  { method: 'GET',    path: '/v1/tenants/{tenantId}/auth-config', localHandler: 'getAuthConfig', auth: 'authenticated' },
+  { method: 'PUT',    path: '/v1/tenants/{tenantId}/auth-config', localHandler: 'setAuthConfig', auth: 'authenticated' },
+  { method: 'PUT',    path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}', localHandler: 'setSocialProvider', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}', localHandler: 'deleteSocialProvider', auth: 'authenticated' },
+
   // ---- domain B: workspaces (LOCAL) ----------------------------------------
   { method: 'POST', path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'createWorkspace', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'listTenantWorkspaces', auth: 'authenticated' },

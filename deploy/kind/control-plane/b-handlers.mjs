@@ -682,8 +682,85 @@ async function iamRemoveUserFromGroup(ctx) {
   catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GROUP_REMOVE_FAILED', String(e.message ?? e)); }
 }
 
+// ---- project (tenant) auth-config: login methods + social providers (#568) --
+// Enabling username/password + configuring social IdPs per project was only possible via raw
+// Keycloak admin (no Falcone API). These owner-scoped handlers drive the realm's auth config.
+// Isolation (cardinal rule): resolve the tenant from the path, then guard against the VERIFIED
+// identity — a tenant owner may configure ONLY their OWN project's realm (cross-tenant → 403).
+async function authorizeAuthConfig(ctx) {
+  const tenant = await store.getTenant(ctx.pool, ctx.params.tenantId);
+  if (!tenant) return { error: err(404, 'TENANT_NOT_FOUND', `tenant ${ctx.params.tenantId} not found`) };
+  if (!canManageTenant(ctx.identity, tenant)) return { error: err(403, 'FORBIDDEN', 'requires superadmin or the tenant owner/admin of this project') };
+  return { realm: tenant.iam_realm, tenant };
+}
+// GET /v1/tenants/{tenantId}/auth-config — read login options + configured social IdPs.
+async function getAuthConfig(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  try {
+    const cfg = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'AUTH_CONFIG_READ_FAILED', String(e.message ?? e));
+  }
+}
+// PUT /v1/tenants/{tenantId}/auth-config — toggle auth methods (registration/email/reset/rememberMe).
+async function setAuthConfig(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  const body = ctx.body ?? {};
+  const allowed = ['registrationAllowed', 'loginWithEmailAllowed', 'resetPasswordAllowed', 'rememberMe', 'verifyEmail'];
+  const patch = {};
+  for (const k of allowed) if (typeof body[k] === 'boolean') patch[k] = body[k];
+  if (Object.keys(patch).length === 0) return err(400, 'VALIDATION_ERROR', `body must include at least one boolean of: ${allowed.join(', ')}`);
+  try {
+    await kc.setRealmAuthConfig(az.realm, patch);
+    const cfg = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'AUTH_CONFIG_WRITE_FAILED', String(e.message ?? e));
+  }
+}
+// PUT /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — create/update a social IdP.
+async function setSocialProvider(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  const alias = ctx.params.alias;
+  const body = ctx.body ?? {};
+  const providerId = body.providerId ?? alias;
+  if (!alias) return err(400, 'VALIDATION_ERROR', 'identity-provider alias is required');
+  if (!providerId) return err(400, 'VALIDATION_ERROR', 'providerId is required');
+  try {
+    await kc.upsertIdentityProvider(az.realm, {
+      alias, providerId, enabled: body.enabled !== false, displayName: body.displayName, config: body.config ?? {},
+    });
+    const cfg = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, providerId, identityProviders: cfg.identityProviders });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SOCIAL_PROVIDER_WRITE_FAILED', String(e.message ?? e));
+  }
+}
+// DELETE /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — remove a social IdP.
+async function deleteSocialProvider(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  const alias = ctx.params.alias;
+  if (!alias) return err(400, 'VALIDATION_ERROR', 'identity-provider alias is required');
+  try {
+    await kc.deleteIdentityProvider(az.realm, alias);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, deleted: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SOCIAL_PROVIDER_DELETE_FAILED', String(e.message ?? e));
+  }
+}
+
 export const LOCAL_HANDLERS = {
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
+  getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,

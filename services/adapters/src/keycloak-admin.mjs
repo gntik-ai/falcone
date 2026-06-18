@@ -169,6 +169,10 @@ export function normalizeKeycloakAdminResource(resourceKind, payload = {}, conte
         }),
         defaultScopes: unique(payload.defaultClientScopes ?? payload.defaultScopes ?? []),
         optionalScopes: unique(payload.optionalClientScopes ?? payload.optionalScopes ?? []),
+        // Template-required client scopes a provisioned tenant realm must carry
+        // (chart tenantRealmTemplate.requiredClientScopes). Surfaced so the realm
+        // contract no longer drifts from the template at provisioning (#568).
+        requiredScopes: unique(payload.requiredClientScopes ?? payload.requiredScopes ?? []),
         attributes: normalizeAttributes(payload.attributes ?? {}),
         metadata: payload.metadata ?? {},
         providerCompatibility
