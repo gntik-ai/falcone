@@ -17,7 +17,7 @@
 ## Verify
 - [x] Black-box 770 green (5 new issuer scenarios); CI subset green (unit 707 / adapters 142 / contracts 232); `helm template` renders the whole chart (s3 filer-mode + admin-seed hook).
 - [x] LIVE mechanism PROVEN (de-risk, kind test-cluster-b 2026-06-18): a filer-mode gateway with a bucket-scoped identity → the scoped key PUTs/LISTs its OWN bucket and gets **AccessDenied** on another tenant's bucket; the broad admin key reaches both. `weed shell s3.configure -apply` writes + the gateway reloads dynamically.
-- [ ] LIVE end-to-end cutover (deploy filer-mode + rebuilt control-plane image, provision a workspace → scoped credential → cross-tenant denied) — folded into the consolidated kind verification.
+- [x] LIVE end-to-end cutover PROVEN (kind test-cluster-b 2026-06-18): seeded the admin into the filer + cut the s3 gateway to filer-mode (`-config` dropped, `-iam.readOnly=false`) — the backend admin key still authenticates (created+listed a bucket, no storage regression) and anonymous is DENIED. Redeployed the control-plane with the issuer (`STORAGE_TENANT_IDENTITIES=1`); `POST /v1/storage/workspaces/{ws}/buckets` → 201 with a `storageCredential` (identity `falcone-ws-<wsId>`, actions Read,Write,List). The issued scoped key PUTs/LISTs its OWN bucket and gets **AccessDenied** on another tenant's bucket. #553 acceptance met.
 
 ## Archive
-- [ ] `openspec validate add-seaweedfs-per-tenant-identities --strict`; archive after the live cutover closes #553.
+- [x] `openspec validate add-seaweedfs-per-tenant-identities --strict` → valid. Archive after PR #575 merges (closes #553).
