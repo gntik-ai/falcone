@@ -82,7 +82,12 @@ spec:
       containers:
         - name: control-plane
           image: localhost:30500/in-falcone-control-plane-executor:0.9.3
-          imagePullPolicy: IfNotPresent
+          # Always re-pull (fix-campaign-image-pull-policy, #561): install.sh rewrites this tag to
+          # the reusable campaign tag and re-pushes the rebuilt image to the local registry
+          # (localhost:30500). With IfNotPresent the kind node kept the stale cached layer, so a
+          # rebuilt executor silently ran the OLD code until a manual re-pull. Always pulls the
+          # freshly-pushed image from the in-cluster registry on every (re)deploy.
+          imagePullPolicy: Always
           ports:
             - { containerPort: 8080, name: http }
           env:

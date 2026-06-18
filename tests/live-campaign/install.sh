@@ -63,9 +63,11 @@ helm dependency build "$CHART"
 # created by the documentdb-init POST-INSTALL HOOK, but hooks run only AFTER --wait
 # completes. Without --wait, helm still waits for the (non-bootstrap) hooks, so
 # documentdb-init runs here, creates the extension, and ferretdb converges. Bootstrap is
-# held OFF this phase because its hook curls Keycloak with only a ~30s retry budget and
-# fresh KC26 is not Ready yet. We never re-enable storage(minio)/openwhisk/mongodb (not
-# chart deps) or temporal/mcp/eso/vault (off).
+# held OFF this phase to keep the datastore-convergence step focused; the chart's bootstrap Job
+# is now itself robust to a not-yet-Ready Keycloak (fix-bootstrap-job-coldstart-retry #558: a
+# wait-for-keycloak initContainer polls the master realm + backoffLimit:6), so re-enabling it in
+# phase 2 (below) converges without a manual re-run. We never re-enable
+# storage(minio)/openwhisk/mongodb (not chart deps) or temporal/mcp/eso/vault (off).
 echo "== (d) helm install (phase 1: datastores + hooks, bootstrap OFF) =="
 helm upgrade --install "$RELEASE" "$CHART" -n "$NS" \
   -f "$REPO_ROOT/deploy/kind/values-kind.yaml" \

@@ -53,6 +53,48 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- /* Keycloak-readiness gate (fix-bootstrap-job-coldstart-retry, #558): a COLD fresh
+             `helm install` previously raced a not-yet-Ready Keycloak — the bootstrap container's
+             ~30s curl --retry budget elapsed before Keycloak accepted the admin token, and with
+             backoffLimit:1 the Job failed without provisioning the realm/clients/superadmin. This
+             initContainer polls the Keycloak service master realm until it answers 200 (or until
+             timeoutSeconds), so the bootstrap container only runs once Keycloak is reachable. */}}
+      {{- if .Values.bootstrap.job.keycloakReadiness.enabled }}
+      initContainers:
+        - name: wait-for-keycloak
+          {{- /* reuse the bootstrap image (it carries curl, as the bootstrap script relies on it) */}}
+          image: "{{ include "component-wrapper.normalizeRepository" (dict "Values" .Values "repository" .Values.bootstrap.job.image.repository) }}:{{ .Values.bootstrap.job.image.tag }}"
+          imagePullPolicy: {{ .Values.bootstrap.job.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              KEYCLOAK_BASE_URL="http://{{ include "in-falcone.componentServiceNameByAlias" (dict "root" . "component" "keycloak") }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.keycloak.service.port }}"
+              DEADLINE=$(( $(date +%s) + {{ .Values.bootstrap.job.keycloakReadiness.timeoutSeconds }} ))
+              echo "[wait-for-keycloak] polling $KEYCLOAK_BASE_URL/realms/master until ready (deadline {{ .Values.bootstrap.job.keycloakReadiness.timeoutSeconds }}s)"
+              until [ "$(curl -sS -o /dev/null -w '%{http_code}' \
+                --max-time {{ .Values.bootstrap.job.keycloakReadiness.requestTimeoutSeconds }} \
+                "$KEYCLOAK_BASE_URL/realms/master")" = "200" ]; do
+                if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                  echo "[wait-for-keycloak] Keycloak not ready before deadline; failing init so the Job retries" >&2
+                  exit 1
+                fi
+                echo "[wait-for-keycloak] Keycloak not ready; retry in {{ .Values.bootstrap.job.keycloakReadiness.intervalSeconds }}s"
+                sleep {{ .Values.bootstrap.job.keycloakReadiness.intervalSeconds }}
+              done
+              echo "[wait-for-keycloak] Keycloak master realm is reachable; proceeding with bootstrap"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          {{- with .Values.bootstrap.job.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.bootstrap.job.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
       containers:
         - name: bootstrap
           {{- /* route through the shared image helper so global.imageRegistry (Harbor) rewrites it */}}
