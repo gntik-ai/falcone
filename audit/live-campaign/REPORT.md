@@ -1,141 +1,197 @@
-# Falcone — Live End-to-End Test Campaign Report
+# Falcone — Live End-to-End Functionality & Isolation Campaign
 
-**Date:** 2026-06-17 · **Cluster:** kind `test-cluster-b` (remote, API-server access only) · **Branch:** `test/live-e2e-campaign-2026-06-17`
-**Method:** Empirical only — every result below comes from an actual call against the running system, not code review. Evidence (HTTP statuses, logs, claims) is inline.
+**Date:** 2026-06-18 · **Cluster:** kind `test-cluster-b` (ns `falcone`) · **Method:** empirical only — every
+result is an actual call against the running system (HTTP/SSE responses, datastore queries, pod logs),
+never code review alone. Evidence per capability under `audit/live-campaign/evidence/20-…27-*.md`.
 
-> Scope note: this campaign **rebuilt all app images from current `main` HEAD**, did a **full namespace teardown + fresh install** of the current chart with **freshly-authored secrets**, on the **post-migration stack** (FerretDB/DocumentDB, SeaweedFS, Knative; Vault as the intended — but unwired — secrets backend). Getting to a usable platform required working around **~12 deployment/auth defects** (themselves findings, §3). Once up, two tenants (`acme`, `globex`) with users, projects, app end-users, topics and API keys were seeded and exercised.
+## How this run was done (single fresh install)
+
+- **Clean teardown + fresh install, once.** `tests/live-campaign/teardown.sh` removed the release, namespace,
+  PVCs and cluster-scoped objects; all 4 app images + the workflow-worker were **rebuilt from current HEAD**;
+  `install.sh` did a health-gated from-scratch install (datastores → control-plane → keycloak → apisix → ferretdb
+  → executor → functions RBAC). Advanced caps (Temporal/Flows + MCP + realtime) were layered on the same install.
+- **CRITICAL methodology correction.** The first probes ran against **stale, node-cached images** because the
+  rebuild reused the tag `campaign-20260617` while pods use `imagePullPolicy: IfNotPresent` — kind kept the 9h-old
+  image. After forcing fresh pulls (`imagePullPolicy: Always` + restart), **F1/F3/F4/D5/A2/A4 — all "bugs" the
+  prior campaign reported — turned out to be FIXED at HEAD** (see §6). Every finding below was (re)confirmed on
+  genuinely-fresh HEAD images.
+- **Fixtures (≥2 tenants).** `acme` (78848e21…) and `globex` (fe63fa39…), each with owner + alice + bob +
+  `<slug>-ops` (platform-realm tenant operator carrying `tenant_id` + `tenant_owner`), **two projects** (`app-staging`,
+  `app-prod`) each with its own `wsdb_<tenant>_<ws>` Postgres DB, Kafka topics, minted API keys, and an app end-user.
+
+## Stack under test (post-migration) — PASS
+
+| Component | Expected | Found | Verdict |
+|---|---|---|---|
+| Document DB | FerretDB/DocumentDB (mongo-wire), NOT MongoDB | FerretDB **v2.7.0** + DocumentDB; `buildInfo`→`ferretdb v2.7.0`; no MongoDB server | **PASS** |
+| Object storage | SeaweedFS, NOT MinIO | seaweedfs master/volume/filer/s3; no MinIO | **PASS** |
+| Functions | Knative, NOT OpenWhisk | real per-fn Knative `ksvc` (scale-to-zero); no OpenWhisk | **PASS** |
+| Secrets | Vault (pre-OpenBao) | **Vault NOT deployed/wired** on kind (cert-manager absent); apps read native k8s Secrets | finding DEP-VAULT |
+
+No MongoDB / MinIO / OpenWhisk workloads exist (confirmed twice on the live cluster).
 
 ---
 
-## 1. Headline results
+## 1. Headline
 
-- **TOP PRIORITY — tenant isolation: MIXED.** Control-plane cross-tenant access is correctly denied (403 across tenant/workspace/metrics/entitlements). **BUT a verified P0 cross-tenant IDOR exists** in the data-plane: a tenant owner of one tenant can mint an API key in **another tenant's** workspace and use it to reach that tenant's data-plane (§4, F1).
-- **The current running deployment (pre-campaign) was mid-migration** — it still ran a MongoDB StatefulSet, a MinIO-named NodePort and an OpenWhisk svc-stub, and its control-plane/executor pointed at **MongoDB, not FerretDB** (§3, D8). The fresh install from current source removes these.
-- **FerretDB / Mongo data API is broken** in this build — neither the control-plane nor a direct Mongo client can authenticate to FerretDB (§4, F2).
-- **The chart cannot be installed unattended** on kind from current source: ferretdb host bug, `--wait` deadlock, missing `GATEWAY_SHARED_SECRET`, a bootstrap Job that fails, console clients missing the `roles` scope, and a control-plane that never retries DB migrations (§3).
-- **Vault is not a functioning secrets backend** (cert-manager absent → enabling it aborts the release; and no component reads from Vault) (§3, D7).
-- Many advanced capabilities are **not deployed in the kind profile** (realtime, workflows/Temporal, MCP, CDC, webhooks, backup-execute, audit-write) — see §5.
+- **Tenant isolation — MIXED (TOP-PRIORITY result).** Strong, empirically-proven isolation on **Postgres row data,
+  Storage REST API, Flows/MCP/Realtime, and Auth/realms**. But **confirmed cross-tenant breaches** on **Events/Kafka
+  (P0)**, **Functions compute (P0)**, **Metrics (P0)**, **Mongo document/browse (P1)**, **Postgres metadata browse
+  (P1)**, and **direct S3 (P1)**. The common root is the kind **control-plane's browse/list/metrics handlers omit the
+  tenant filter** that the executor data-plane enforces, plus per-tenant **compute/storage identities not deployed**.
+- **Core BaaS works end-to-end:** tenant/project provisioning (saga + cascade purge), Postgres data API (DDL+CRUD,
+  per-workspace DBs + FORCE RLS), Storage object I/O (REST + direct SeaweedFS), Events publish/consume (SSE),
+  Functions deploy/invoke (real Knative), Realtime PG change-stream (SSE, tenant-isolated), API-key issuance
+  (cross-tenant now correctly rejected), per-tenant Keycloak realms + app end-user register→login→token.
+- **Workflows (Temporal) — engine PROVEN, data activity not wired.** A flow created→published→executed reached a
+  terminal Temporal state (real workflow run); the `db.query` activity returns "postgres executor not wired".
+- **MCP hosting works; tool execution + MCP→workflow + platform-MCP do not.** Servers create/list/publish/curate
+  fine; every tool-call returns the executor index page; the MCP→workflow module is orphaned.
+- **Governance is largely broken:** plan-assignment/capability-catalog/scope-audit 500 on missing tables, the quota
+  dimension catalog is empty, and **per-project quotas are not enforced**. Audit store is empty.
+- **Advanced caps are executor-only:** APISIX exposes no `/v1/flows` or `/v1/mcp` route (gateway-config gap).
 
 ---
 
 ## 2. Functionality status matrix
 
-Legend: **Active/Working** = exercised end-to-end with passing assertions · **Broken** = deployed but errored · **Inactive/Not-deployed** = no live backing in this profile · **Partial** = some paths work.
+Legend: **Working** = exercised E2E with passing assertions · **Partial** · **Broken** = deployed but errors ·
+**Not-deployed** = no live backing in this profile.
 
-| Capability | Surface(s) exercised | Status | Evidence |
+| # | Capability | Surface(s) | Status | Key evidence |
+|---|---|---|---|---|
+| C1 | Tenant lifecycle (create/list/get/delete/purge-cascade) | REST | **Working** | create 201 (saga: realm+DB+rows); purge → realm 404, DB+rows gone |
+| C2 | Tenant users | REST | **Working** | POST/GET `/tenants/{id}/users` 201/200 (tenant realm) |
+| C3 | Projects (workspaces) create/list | REST, Console | **Partial** | create 201 (→ real `wsdb_*`); **no GET/DELETE route**; **quota not enforced** |
+| C4 | Environments (prod/staging/dev) | REST | **Working (as field)** | per-workspace `environment∈{dev,staging,prod,sandbox,preview}`; `/environments` aggregates; no first-class env CRUD |
+| C5 | Plans / quotas / entitlements | REST | **Broken** | reads empty 200; plan-assign **500**, capability-catalog **500**, dimension catalog empty, no enforcement |
+| C6 | Console/superadmin auth (sessions) | REST→KC | **Working** | login-sessions 201 with tokenSet; refresh/logout present |
+| C7 | AuthZ (roles) | REST | **Working** | superadmin vs tenant_owner enforced; (operator console shell mis-gated — C33) |
+| C8 | IAM admin (realms/users/roles/groups) | REST | **Working (superadmin)** | list/create users/roles 200/201; end-user **delete/disable unrouted** |
+| C9 | Auth-method templates + per-project config | KC, REST | **Partial** | templates are a chart `tenantRealmTemplate` + runtime provisioner (not first-class KC objects); social-IdP enable/reflect/disable works via KC admin; **no Falcone API for IdP/auth-method config** |
+| C10 | App end-user register→login→token→authorized call | KC, REST | **Working (HEAD)** | new tenant: register 201 → ROPC token (un-forgeable `tenant_id`) → resource 200 `rlsEnforced`; social round-trip not run (no real IdP creds) |
+| C11 | Owner manages app end-users | REST | **Partial** | list/view ok; **disable/delete have no Falcone API** |
+| C12 | Service accounts + API keys (issue/rotate/revoke) | REST/EXEC | **Working** | issue 201; **cross-tenant issuance now 403** (F1 fixed) |
+| C13 | Postgres data API (DDL + CRUD + vector) | EXEC (apikey), Console browse | **Working** | DDL 201 (auto tenant_id col + FORCE RLS + policy); CRUD all 2xx; vector **not-deployed** (no pgvector/provider) |
+| C14 | Direct PostgreSQL (scoped) | psql/pg | **Working** | per-ws `wsdb_*` DBs; `falcone`/`falcone_service`/`falcone_anon` non-superuser+non-BYPASSRLS |
+| C15 | Mongo/FerretDB data API (CRUD) | EXEC (apikey) | **Working (after NP fix)** | scoped insert 201 (auto `tenantId`); blocked by a NetworkPolicy label defect until fixed (BUG-MONGO-NP) |
+| C16 | Direct FerretDB (mongo driver) | mongo wire | **Working** | admin auth ok (F2 fixed); one shared cluster, tenancy by `tenantId` field |
+| C17 | Object storage REST (buckets/objects/usage) | REST | **Working** | provision/list/put/get/list/delete/usage all 2xx |
+| C18 | Direct S3/SeaweedFS (scoped) | S3 SDK | **Working (single shared cred)** | put/get/list ok; **one shared root identity** (no per-tenant identities) |
+| C19 | Events/Kafka (topic/publish/consume SSE) | REST | **Working** | create 201, publish 202, SSE frames delivered |
+| C20 | Functions (Knative: deploy/invoke/result/logs) | REST | **Working** | deploy 201, invoke→`{doubled:42}`, real ksvc; **input must be `{parameters:{…}}`** (BUG) |
+| C21 | **Event-driven (Kafka→fn/workflow)** | REST+Kafka | **Not working E2E** | event→function trigger not-deployed; event→flow trigger registers but execution blocked |
+| C22 | **Workflows (Temporal/Flows)** | EXEC | **Engine working; activity not wired** | create→publish→execute→terminal Temporal state; `db.query` activity "not wired" |
+| C23 | **MCP server hosting** | EXEC | **Hosting works; tool-call broken** | create/list/publish/curate 2xx; tool-call returns executor index |
+| C24 | **MCP → workflow** | EXEC | **Gap** | mapping module exists but never wired into the MCP engine |
+| C25 | **Falcone platform MCP interface** | EXEC | **Present, non-functional** | "official" server exposes 9 mgmt tools; tool-calls return index page |
+| C26 | **Realtime** (PG change-stream SSE) | EXEC | **Working + isolated** | subscribe→`event: insert` with tenant row; A sees only A's rows. WebSocket **not-deployed** (SSE only); Mongo realtime off (501) |
+| C27 | Secrets/config (Vault) | — | **Not-deployed** | Vault not viable on kind; no component reads Vault |
+| C28 | Quotas / plan governance enforcement | REST | **Not enforced** | created 4 workspaces past `max_workspaces=3` → all 201 |
+| C29 | Audit logging | REST | **Broken/empty** | audit-records empty; scope-enforcement audit **500** (missing table) |
+| C30 | Provisioning lifecycle (create+delete+cleanup) | REST | **Partial** | create + tenant-purge-cascade work; **no workspace teardown API** |
+| C31 | Metrics (Prometheus + Grafana) | scrape/UI | **Partial** | Prometheus up (only 3 targets, APISIX down); Grafana 2 dashboards w/ real data |
+| C32 | API↔Console parity & completeness | REST+Console | **Consistent but incomplete** | created resources match across surfaces; several console pages have no reachable backend |
+| C33 | Web console admin surface | Console (replayed) | **Partial** | superadmin pages work; **operator shell broken** (tenant-switcher calls superadmin-only route); leaky read pages |
+| C34 | CDC (pg/mongo) | — | **Not-deployed** | no cdc-bridge pods |
+| C35 | Webhooks | EXEC | **Present (flows trigger)** | webhook trigger route exists; dead without flow execution |
+| C36 | Scheduling/cron | — | **Not-deployed** | no scheduling pod/handler reachable |
+| C37 | Backup/restore | REST | **Partial** | read-only scope routes; backup-scope 500 (missing table); no execute/restore |
+
+---
+
+## 3. ISOLATION RESULTS (Phase 3 — TOP PRIORITY)
+
+≥2 tenants (acme/globex), each with 2 projects (prod/staging). For every resource created as A we attempted access
+as B (and vice-versa) through every surface.
+
+### 3a. Isolation that HOLDS (empirically proven)
+
+| Surface | Probe | Result |
+|---|---|---|
+| **Postgres row data** | A-key→B-ws rows; B-key→A-ws; cross-ENV staging→prod; DB-name confusion | **all 403/deny**; A's confidential row lives only in `wsdb_acme_app_staging`; FORCE RLS fails closed |
+| **API-key issuance** (F1) | acme-ops mint key in globex ws | **403 CROSS_TENANT_VIOLATION** (fixed) |
+| **Storage REST API** | A→B bucket/object get/put/delete/usage | **404/401**, no existence leak, victim object intact |
+| **Flows / MCP / Realtime** | A→B flow/server; realtime A vs B in same table | **403/404**; realtime per-tenant NOTIFY channel — A's stream got only A's row |
+| **Auth / realms** | acme token → globex realm users; cross-realm login; cross-tenant end-user JWT→resource | **403 / invalid_grant / 403** (tenant_id from verified issuer, un-forgeable) |
+| **Control-plane mutations** | cross-tenant workspace create / plan assign / quota override | **403** |
+
+### 3b. Isolation BREACHES (confirmed cross-tenant access)
+
+| ID | Sev | Surface | Empirical repro |
 |---|---|---|---|
-| Tenant lifecycle (create/list/get/delete) | REST (superadmin) | **Active/Working** | `POST /v1/tenants`→201 (acme,globex); `GET /v1/tenants`→200; delete probe→2xx |
-| Workspaces / projects (create/list) | REST (ops token) | **Active/Working** | `POST /v1/tenants/{id}/workspaces`→201; `GET …/workspaces`→200 |
-| Environments | REST | **Partial** | workspace `environment` validated to `{dev,staging,prod,sandbox,preview}` (400 on `production`); no first-class env CRUD surface |
-| Tenant users | REST | **Active/Working** | `POST /v1/tenants/{id}/users`→201 (in tenant realm) |
-| App end-users (auth-as-a-service) | REST + Keycloak | **Partial/Broken** | signup→201 into tenant realm; but **no tenant-realm login endpoint** and data-plane rejects tenant-realm tokens (§3 A3) |
-| Console auth (superadmin/platform) | REST→Keycloak | **Active/Working (after fixes)** | `POST /v1/auth/login-sessions`→201 with `tokenSet`; required A1/A2 fixes |
-| AuthZ (roles) | REST | **Active/Working (after fix)** | superadmin role enforced (403→201 after adding `roles` scope, A2) |
-| Quotas / plans / entitlements | REST | **Partial** | entitlements + cross-tenant 403 guard work; `GET /v1/plans`→**500** (F3) |
-| Metrics (console) | REST | **Broken** | `GET /v1/metrics/tenants/{id}/quotas`→**500** (`Forbidden` + `42P01`) (F4) |
-| Metrics (Prometheus) | `/metrics` scrape | **Active** | Prometheus + Grafana pods Running; scrape endpoints served |
-| Object storage (REST + direct S3) | REST + aws-cli→SeaweedFS | **Active/Working** | `GET /v1/storage/buckets`→200; `aws s3 ls`→OK (direct SeaweedFS) |
-| PostgreSQL data API | REST (browse) + executor (apikey DDL) | **Active/Working** | browse→200; DDL create schema + table→201; row insert/list requires a table PK (PK-declaration via the DDL body unconfirmed — see §8) |
-| PostgreSQL (direct) | psql/pg via port-forward | **Active in-cluster** | control-plane connects (schema ready, `tenants` table); external client cred path unverified |
-| Mongo / FerretDB data API | REST + executor + direct | **Broken** | browse→500; insert/list docs→500; direct mongo→`Authentication failed`; control-plane log `HandshakeError` (F2) |
-| Events / Kafka | REST + executor (apikey) | **Active/Working** | inventory→200; create topic (apikey)→201 |
-| Functions (Knative) | REST | **Active/Working** | inventory→200; `POST /v1/functions/actions` (inlineCode)→201; `POST …/invocations`→202 **completed** (real Knative Service, scale-from-zero) |
-| Realtime (PG SSE / Mongo SSE) | — | **Inactive/Partial** | PG-table SSE has no env gate; Mongo SSE needs FerretDB (broken). Not exercised |
-| Workflows (Temporal) | — | **Not-deployed** | `temporal`/`workflowWorker` disabled; `TEMPORAL_ADDRESS` unset → `/v1/flows/*` 501 |
-| MCP hosting / MCP→workflow / platform MCP | — | **Not-deployed** | `mcp` component disabled; `MCP_ENABLED` unset → `/v1/mcp/*` not registered |
-| CDC (pg / mongo) | — | **Not-deployed** | no cdc-bridge pods in kind profile |
-| Webhooks | — | **Not-deployed** | only the flows webhook-trigger route exists; dead without Temporal |
-| Scheduling / cron | — | **Unverified** | `ANY /v1/scheduling/*` present; requires schema + tenant/workspace headers |
-| Backup / restore | — | **Partial** | read-only scope routes only; no execute/restore route live |
-| Audit (write side) | — | **Not-deployed** | no audit store; `metrics …/audit-records` empty |
-| Secrets backend (Vault) | — | **Not-wired** | secrets are plain k8s Secrets; Vault non-viable on kind (D7) |
-| Web console (admin surface) | SPA served (HTTP 200) | **Served, not driven** | `GET /` (console)→200; full Playwright drive-through + API↔console parity deferred (budget) |
-| MongoDB / MinIO / OpenWhisk present? | cluster | **Finding (pre-campaign)** | present in the *running* release; **absent** after fresh install from current source (D8) |
+| **ISO-EVENTS** | **P0** | Events/Kafka | tenant-A JWT → read B's topic detail/metadata (200), **publish into B's topic** (202), **consume B's topic via SSE** (got the events). Bidirectional. Root: `kafka-handlers::getTopicByResourceId` has no tenant scope. |
+| **ISO-FUNCTIONS** | **P0** | Functions compute | `ksvcName = fn-{workspaceName}-{action}` omits tenant; both tenants have a `app-staging` ws → B's deploy clobbered A's shared ksvc; A invoked its own function and got **B's code's output** (`OWNED_BY:tenantB`). All fn ksvcs share one namespace. |
+| **ISO-METRICS** | **P0** | Metrics | acme-ops → `/v1/metrics/tenants|workspaces/{globex…}/*` all **200**; `/metrics/workspaces/{globex-ws}/series` returned globex's **real non-empty `http_requests_per_second`** series. Even a non-existent tenant id → 200. No tenant authz on metrics handlers. |
+| **ISO-MONGO** | **P1** | Document store | acme-ops JWT (gateway) → `GET …/data/{globexDb}/collections/{c}/documents` → **200 returning globex's doc** (`secret:"GLOBEX_PRIVATE"`); `?filter=` exfiltration works; browse lists all tenants' db/collection names. Root: control-plane mongo browse/list handlers omit `tenantId` (the executor path scopes correctly). |
+| **ISO-PG-META** | **P1** | Postgres metadata | acme-ops → `GET /v1/postgres/databases` lists **every tenant's DBs + the platform `in_falcone`**; `…/{globexDb}/schemas|tables|columns` enumerable. `pgListDatabases` scans `pg_database` cluster-wide. Metadata only (row data stays RLS-protected). |
+| **ISO-S3** | **P1** | Direct S3 | one shared SeaweedFS identity (`falcone-s3-admin`) = the only credential; with it I listed **both** tenants' buckets, read globex's object, and **wrote** into globex's bucket (appeared in globex's own REST listing). No per-tenant S3 identities deployed. |
+| **ISO-QUOTA-READ** | **P2** | Quota reads | acme-ops → `/v1/tenants/{globex}/quota/{effective-limits,audit}` → **200** (empty now, but unauthorized). |
+
+**Verdict:** request-path **mutations** and the **executor data-plane** are correctly tenant-scoped; the **read/browse/metrics handlers in the kind control-plane** and the **shared datastore identities** (S3, FerretDB admin) are the cross-tenant exposure.
 
 ---
 
-## 3. Deployment & auth-model findings (surfaced by the mandated fresh install)
+## 4. Bugs (deployed but broken) — beyond the isolation breaches above
 
-| ID | Severity | Finding | Evidence |
-|---|---|---|---|
-| D1 | High | ferretdb init container hardcodes documentdb host `in-falcone-documentdb` (chart-name prefix); for release `falcone` the service is `falcone-documentdb` → pod stuck `Init:0/1` forever | `charts/in-falcone/values.yaml:2129`; pod log `in-falcone-documentdb:5432 - no response` |
-| D2 | High | Keycloak bootstrap Job **fails** on a fresh kind install (its APISIX-standalone reconciliation phase), so the platform realm is never provisioned | Job `falcone-in-falcone-bootstrap` → `Failed`; realm POSTs fine manually (201) so the realm payload is valid → failure is the reconcile phase |
-| D3 | High | APISIX standalone config references `${{GATEWAY_SHARED_SECRET}}` but the chart/kind values never set it → APISIX CrashLoop | pod log `can't find environment variable GATEWAY_SHARED_SECRET` |
-| D4 | High | `helm install --wait` **deadlocks**: ferretdb (main resource) waits on the `documentdb_api` schema created by a *post-install hook* | helm: `falcone-ferretdb not ready … Progress deadline exceeded` |
-| D5 | High | control-plane runs DB migrations once on boot and **never retries** on `ECONNREFUSED`; if Postgres isn't ready, `tenants` table is missing and every tenant op 500s | log `schema/recovery failed: connect ECONNREFUSED …:5432`; `relation "tenants" does not exist`; fixed by pod restart |
-| D6 | Medium | Platform secrets are hand-created and referenced as `existingSecret`; the chart regenerates only the SeaweedFS creds → a namespace delete is unrecoverable without external secret tooling | `helm get … secrets` show `managed-by: <none>` for all but seaweedfs |
-| D7 | High | **Vault is not a working secrets backend**: vault subchart's TLS cert is a `cert-manager.io/v1 Certificate` but cert-manager is absent → `vault.enabled=true` aborts the release; and **no Falcone component reads from Vault** (ESO disabled) | render shows vault Certificate; all apps use `envFromSecrets`/`secretKeyRef` |
-| D8 | High | **Incomplete migration in the *running* (pre-campaign) deployment**: live release still had a `falcone-mongodb` StatefulSet, a `lan-minio-console` NodePort, an `openwhisk` svc-stub, and control-plane/executor env pointed at **MongoDB** (not FerretDB) | `helm get values` (rev 47): `MONGO_HOST: falcone-mongodb`, `mongodb`/`openwhisk`/`storage(minio)` stanzas |
-| A1 | Medium | superadmin user created **disabled** by the bootstrap payload → cannot log in until enabled | login→401 `Account disabled`; PUT enabled→login 201 |
-| A2 | High | `in-falcone-console`/`in-falcone-gateway` clients created **without the standard `roles`/`basic`/`profile` default scopes** → tokens carry no `realm_access.roles` → all role-based authz 403s | token claims had only `openid` scope, no roles; adding `roles` scope → `superadmin` appears → 403→201 |
-| A3 | High | **Realm-per-tenant auth is unusable as shipped**: tenant users land in the tenant realm, but (a) the tenant realm gets **no client / no `tenant_id` mapper**, and (b) the executor verifies JWTs only against the **platform realm JWKS** → tenant tokens are rejected `Missing tenant identity` | owner ROPC token (tenant realm) → api-key issuance 401 `Missing tenant identity` even with `tenant_id` claim |
-| A4 | Medium | Platform realm declarative user profile **drops the `tenant_id` attribute** (unmanaged-attr policy off) → even platform users can't carry tenant scope without enabling unmanaged attributes | setting `tenant_id` attr → absent from token until `unmanagedAttributePolicy=ENABLED` |
+| ID | Sev | Finding |
+|---|---|---|
+| BUG-MONGO-NP | P1 | cp-executor pod label `app=falcone-cp-executor` ≠ FerretDB NetworkPolicy ingress (`app.kubernetes.io/name=control-plane-executor`) → executor mongo CRUD **500** until the label is fixed. (`deploy/kind/executor-demo.yaml`.) |
+| BUG-GOV-SCHEMA | P1 | governance schema incomplete: capability-catalog **500** (`boolean_capability_catalog`), plan-assign **500** (`tenant_plan_change_history`), scope-enforcement audit **500** (`scope_enforcement_denials`), empty `quota_dimension_catalog`. |
+| BUG-QUOTA-ENFORCE | P1 | per-project/workspace quota **not enforced** (4 ws created past `max_workspaces=3`). |
+| BUG-ENDUSER-MGMT | P1 | no Falcone API to disable/delete app end-users (owner routes are create+list only). |
+| BUG-CONSOLE-OPERATOR | P1 | console shell unusable for tenant operators: tenant-switcher calls `GET /v1/tenants` (superadmin-only) → 403 → no tenant context → tenant pages empty; My-plan/Members also 403. |
+| BUG-FLOWS-ACTIVITY | P1 | workflow `db.query` activity returns "postgres executor not wired" → workflows can't perform data ops (engine itself works). |
+| BUG-EVENTDRIVEN | P1 | Kafka→function/workflow not working E2E: event→function trigger not-deployed; event→flow trigger registers but execution blocked. |
+| BUG-MCP-TOOLCALL | P2 | MCP tool-call execution returns the executor index page (`MCP_SELF_BASE_URL` unset + route gaps); MCP→workflow module orphaned; platform-MCP tools non-functional. |
+| BUG-AUDIT | P2 | audit store empty/not-deployed; scope-enforcement audit 500. |
+| BUG-FN-INVOKE-PARAM | P2 | `fnInvoke` reads `body.parameters`; top-level input silently dropped (`{n:21}`→`{doubled:0}`). |
+| BUG-STORAGE-BINARY | P2 | object PUT accepts only JSON `{content,…}`; rejects raw/binary (`400 INVALID_JSON`) → not S3-PUT compatible. |
+| BUG-PG-INSERT-CONTRACT | P2 | insert `{row:{…}}` (per OpenAPI) → 400; executor reads `values`/`changes`. |
+| BUG-MONGO-INDEX-500 | P2 | `…/collections/{c}/indexes` on a missing collection → 500 (leaks Mongo code 26). |
 
-> These were worked around in the campaign harness (`tests/live-campaign/provision-platform-realm.sh`, `provision-tenant-auth.sh`, secret/env fixes in `install.sh`/`make-secrets.sh`/`values-campaign.yaml`) — the platform was made to function, then tested.
+## 5. Deployment / infra findings (surfaced by the mandated fresh install)
 
----
+| ID | Sev | Finding |
+|---|---|---|
+| DEP-BOOTSTRAP | P2 | Keycloak bootstrap **Job fails on a cold fresh install** (`backoffLimit:1`, KC not Ready on the single retry). The logic is correct (re-running the pod provisions realm+roles+clients+superadmin and completes) — not robust to the cold-start race; blocks governance config. |
+| DEP-VAULT | P2 | Vault not a working secrets backend on kind (cert-manager absent → enabling it aborts the release); no component reads from Vault. |
+| DEP-GW-ROUTES | P2 | APISIX has **no `/v1/flows` or `/v1/mcp` route** → Flows + MCP unreachable through the gateway (executor-direct only). `/v1/websockets/*` has no handler. |
+| DEP-IMAGE-PULL | P2 | **(harness)** same image tag + `IfNotPresent` runs stale node-cached images; install must use unique tags or `imagePullPolicy: Always`. Also `make-secrets.sh` pre-created `in-falcone-gateway-shared-secret` which the chart now self-manages → helm ownership conflict (fixed by letting the chart own it). |
+| DEP-PROM-SCRAPE | P2 | Prometheus scrapes only 3 targets (APISIX down / others not scraped). |
+| DEP-WS-DELETE | P2 | no workspace GET/DELETE API (only tenant purge cascades) → can't tear down a single project. |
+| DEP-TEMPORAL-SA | P2 | hand-deployed dev Temporal needs the 5 custom search attributes registered (the chart's `temporal-bootstrap` Job does this); otherwise flow execution 500s. |
+| DEP-TENANT-SCOPES | P2 | chart `tenantRealmTemplate.requiredClientScopes` not applied to tenant realms (template drift). |
 
-## 4. Functional defects (capabilities deployed but broken)
+## 6. CORRECTED — prior-campaign findings that are FIXED at HEAD
 
-### F1 — P0 cross-tenant IDOR: data-plane API-key issuance ignores workspace↔tenant ownership
-**Surface:** `POST /v1/workspaces/{workspaceId}/api-keys` (executor). **Severity: P0 (cross-tenant data exposure).**
-**Reproduction (verified):**
-1. As `acme-ops` (token `tenant_id = <acme>`), call `POST /v1/workspaces/<GLOBEX_workspace>/api-keys` → **201**, returns `flc_anon_…` key.
-2. Use that acme-minted key against globex's workspace data: `GET /v1/postgres/workspaces/<GLOBEX_workspace>/data/postgres/schemas/public/tables/x/rows` → **404 `TABLE_NOT_FOUND`** (i.e. *authorized to globex's database*, not denied).
-**Contrast:** acme's *own* key against globex's workspace → **403** (correctly denied). So per-key scoping is fine; the **issuance route fails to check that `{workspaceId}` belongs to the caller's tenant**.
-**Expected:** issuance in another tenant's workspace → 403/404. **Acceptance:** the api-keys route must resolve the workspace's owning tenant and reject if it ≠ caller's `tenant_id`.
+These were reported by the previous campaign as bugs; on genuinely-fresh HEAD images they are **fixed** (the prior
+results were on pre-fix / stale-cached code):
 
-### F2 — Mongo/FerretDB data API broken (authentication to FerretDB fails)
-**Surface:** `/v1/mongo/*` (browse + data), direct Mongo driver. **Severity: High.**
-**Evidence:** `GET /v1/mongo/databases`→500; insert/list documents→500 `CONTROL_PLANE_ERROR`; control-plane log `MongoServerError … HandshakeError`; direct `mongosh`-equivalent with documentdb creds → `Authentication failed`. The control-plane's `MONGO_USER=falcone` + documentdb password does not authenticate against the FerretDB gateway.
+- **F1** cross-tenant API-key issuance IDOR → **403 CROSS_TENANT_VIOLATION** (`resolveWorkspaceTenant`, #517/#534).
+- **F2** FerretDB/Mongo auth → admin connect + scoped CRUD **work**.
+- **F3** `GET /v1/plans` → **200**; **F4** metrics quotas → **200** (plan/quota tables now created by the CP schema boot).
+- **D5** control-plane schema migration no-retry → fixed (`schema ready … (attempt N)`).
+- **A2** console clients missing `roles` scope → fixed (default scopes present). **A4** platform user-profile drops
+  `tenant_id` → fixed (declared attribute). **A3** tenant-realm token issuance → fixed (`createTenant` creates the
+  `{slug}-app` public client + un-forgeable `tenant_id` mapper; our acme/globex fixtures lack it only because they
+  were seeded on the stale image before the refresh).
 
-### F3 — `GET /v1/plans` (superadmin) → 500
-Provisioning-orchestrator `plan-list` action errors. (Entitlement/consumption sub-routes do respond.)
+## 7. What could not be fully tested (and why)
 
-### F4 — `GET /v1/metrics/tenants/{id}/quotas` → 500
-`metrics-handlers.mjs:49 tenantLimits` throws `Forbidden`; a related path returns `42P01` (missing relation). Console metrics quota view is non-functional.
+- **Social OAuth round-trip:** no real external IdP credentials — verified the config surface + available-options
+  reflection only.
+- **Vector search:** no pgvector image + no embedding provider configured → not-deployed (not a bug).
+- **Real browser console drive-through:** Playwright chromium binary unavailable → console verified by enumerating the
+  SPA routes + replaying the exact `/v1/*` calls each page makes (the console is a thin SPA over the API).
+- **A clean SUCCESSFUL workflow data activity:** the engine runs but `db.query` is "not wired" in the deployed worker.
+- **CDC / scheduling / backup-execute:** not deployed in this profile (expected-but-absent gaps, not silent skips).
 
-### F5 — Mongo database provisioning → 400
-`POST /v1/workspaces/{w}/databases {engine:mongodb}` → 400 (consistent with F2; the document engine path is unhealthy).
+## 8. Reproducibility / harness (feature branch)
 
----
-
-## 5. Isolation results (Phase 3 — top priority)
-
-| Probe | Expected | Actual | Verdict |
-|---|---|---|---|
-| `acme-ops` → `GET /v1/tenants/{globex}` | deny | **403** | PASS |
-| `acme-ops` → `GET /v1/tenants/{globex}/workspaces` | deny | **403** | PASS |
-| `acme-ops` → `GET /v1/tenants/{globex}/plan/effective-entitlements` | deny | **403** | PASS |
-| `acme-ops` → `GET /v1/metrics/tenants/{globex}/quotas` | deny | **403** | PASS |
-| acme's **own** API key → globex workspace data | deny | **403** | PASS |
-| **`acme-ops` → `POST /v1/workspaces/{globex-ws}/api-keys`** | **deny** | **201** | **FAIL (F1)** |
-| acme-minted key → read globex workspace data | deny | **404 (authorized)** | **FAIL (F1)** |
-| Direct S3 (SeaweedFS) scoping | — | creds list buckets; per-tenant bucket scoping not deep-probed (budget) | Partial |
-
-**Conclusion:** control-plane request-path isolation holds; the data-plane key-issuance path has a confirmed cross-tenant breach (F1).
-
----
-
-## 6. What could NOT be fully tested (and why)
-
-- **Web console Playwright drive-through, API↔console parity** — console served & reachable; full UI automation deferred (budget consumed by the deployment defects). Recommend a follow-up `/build-e2e` run now that the platform is up.
-- **Functions deploy→invoke, Kafka→workflow/function, realtime WS push** — functions inventory works and Knative is live, but FerretDB being broken + Temporal/MCP not deployed blocks the event→workflow and realtime-Mongo paths.
-- **Workflows / MCP hosting / MCP→workflow / platform MCP** — **not deployed in the kind profile** (components disabled, env flags unset). These are *expected-but-absent* in this deployment, not silently skipped.
-- **Social OAuth end-user login** — no external IdP credentials (per pre-campaign decision); auth-config wiring was the target, but A3 blocks the tenant-realm login path.
-- **Direct PostgreSQL from an external client** — the platform connects in-cluster (proven), but the external client credential path returned an auth failure that looks like a harness cred-capture issue, not a platform defect; flagged for follow-up.
-- **Vault** — intentionally not enabled in the core install (D7: would abort the release); confirmed not wired.
-
----
-
-## 7b. Best-effort follow-up pass (same session, live cluster)
-
-- **Functions — WORKING end-to-end.** `POST /v1/functions/actions` with `{actionName, source.inlineCode, execution.runtime:nodejs:22}`→201; `POST /v1/functions/actions/{id}/invocations` `{n:21}`→**202 `status:completed`** (real Knative Service provisioned + invoked, scale-from-zero). Upgrades Functions to Active/Working.
-- **PostgreSQL data API — DDL WORKING.** create schema→201; create table (`{schemaName, tableName, columns}`)→201 (`CREATE TABLE "app"."items"` executed). **Row insert/list require the table to have a primary key** (`PLAN_REJECTED: Table app.items must declare a primary key`); declaring the PK via the DDL body did not take effect in the time available — either a body-shape nuance or a DDL gap (worth a follow-up; *not* asserted as a defect). The workspace logical DB name is `wsdb_<tenant>_<workspace>` (`database_name`), while the DDL route also accepts the DB UUID — a minor identifier inconsistency between the DDL and rows routes.
-- **Data-layer isolation — re-confirmed.** acme's own API key → `GET …/postgres/workspaces/{globex-ws}/data/wsdb_globex_app_staging/…/rows`→**403** (correctly denied). The breach is solely in the *issuance* route (F1), not in per-key scoping.
-- **Web console — served & reachable** (`GET http://console:3000/`→200); full UI automation deferred.
-
-## 7. Reproducibility / harness
-
-All campaign scripts are on the feature branch under `tests/live-campaign/` (see §8 of the task list): `build-images.sh`, `push-images.sh`, `teardown.sh`, `make-secrets.sh`, `values-campaign.yaml`, `registry.yaml`, `install.sh`, `provision-platform-realm.sh`, `provision-tenant-auth.sh`, `seed.mjs`, `run-tests.mjs`, `lib/{client.mjs,creds.sh,portforward.sh}`. Seeded fixtures (`/.fixtures.json`) and any secret-bearing files are gitignored. Raw enumeration in `audit/live-campaign/01-…03-…md`; machine results in `audit/live-campaign/results.json`.
+`tests/live-campaign/`: `teardown.sh`, `build-images.sh`, `push-images.sh`, `make-secrets.sh` (gateway-secret fix),
+`values-campaign.yaml`, `install.sh`, `advanced-caps.sh` (Temporal/worker/MCP), `provision-ops-users.sh` (platform
+tenant operators), `complete-fixtures.mjs`, `lib/{client.mjs,creds.sh,portforward.sh,pf-all.sh}`, `seed.mjs`,
+`run-tests.mjs`. Per-capability empirical evidence: `audit/live-campaign/evidence/20…27-*.md`. Secret-bearing files
+(`.fixtures.json`, kubeconfig) are gitignored; no secret values appear in any artifact.
 </content>
