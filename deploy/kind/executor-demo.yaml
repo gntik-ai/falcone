@@ -88,6 +88,11 @@ spec:
           env:
             - { name: NODE_ENV, value: production }
             - { name: PORT, value: "8080" }
+            # MCP self-call base URL: a published MCP tool-call mediates by self-calling this
+            # executor's own HTTP server (data-plane routes served locally; everything else proxied
+            # to CONTROL_PLANE_UPSTREAM). Pinned explicitly so the self-call is robust regardless of
+            # how PORT is resolved; without it a tool-call could hit the executor index (#565).
+            - { name: MCP_SELF_BASE_URL, value: "http://127.0.0.1:8080" }
             # Fallthrough proxy: routes the executor does NOT serve (browse/inventory/
             # management) are forwarded to the real control-plane runtime.
             - { name: CONTROL_PLANE_UPSTREAM, value: "http://falcone-control-plane:8080" }

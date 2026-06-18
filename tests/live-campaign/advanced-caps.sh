@@ -59,12 +59,15 @@ spec:
 YAML
 kubectl -n $NS rollout status deploy/falcone-workflow-worker --timeout=180s 2>&1 | tail -1
 
-echo "== 3/4 patch executor env: TEMPORAL_ADDRESS + MCP_ENABLED =="
+echo "== 3/4 patch executor env: TEMPORAL_ADDRESS + MCP_ENABLED + MCP_SELF_BASE_URL =="
+# MCP_SELF_BASE_URL pins the tool-call self-call to the executor's own HTTP server so a published
+# MCP tool-call reaches the real data-plane route (or proxies upstream) instead of the executor
+# index (#565). Set alongside MCP_ENABLED — the same patch that registers the /v1/mcp routes.
 kubectl -n $NS set env deploy/falcone-cp-executor \
-  TEMPORAL_ADDRESS="$FRONTEND:7233" TEMPORAL_NAMESPACE="$TQ_NS" TEMPORAL_TASK_QUEUE="flows-main" MCP_ENABLED="true" 2>&1 | tail -1
+  TEMPORAL_ADDRESS="$FRONTEND:7233" TEMPORAL_NAMESPACE="$TQ_NS" TEMPORAL_TASK_QUEUE="flows-main" \
+  MCP_ENABLED="true" MCP_SELF_BASE_URL="http://127.0.0.1:8080" 2>&1 | tail -1
 kubectl -n $NS rollout status deploy/falcone-cp-executor --timeout=180s 2>&1 | tail -1
 
 echo "== 4/4 worker + temporal logs =="
 kubectl -n $NS logs deploy/falcone-workflow-worker --tail=8 2>&1 | tail -8
 echo "DONE"
-</content>
