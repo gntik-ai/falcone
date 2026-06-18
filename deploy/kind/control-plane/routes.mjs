@@ -99,6 +99,11 @@ export const routes = [
   { method: 'DELETE', path: '/v1/iam/realms/{realmId}/users/{userId}/groups/{groupId}', localHandler: 'iamRemoveUserFromGroup', auth: 'superadmin' },
   { method: 'GET',    path: '/v1/iam/realms/{realmId}/groups/{groupId}/members', localHandler: 'iamListGroupMembers', auth: 'superadmin' },
 
+  // ---- scope-enforcement denial ingest (#557) ------------------------------
+  // Sidecar for the gateway scope-enforcement plugin: records denials into
+  // scope_enforcement_denials so the scope-enforcement audit query returns them.
+  { method: 'POST', path: '/v1/internal/scope-enforcement/denials', localHandler: 'recordScopeEnforcementDenial', auth: 'superadmin' },
+
   // ---- domain B: console metrics (Quotas + Observability) -------------------
   // Synthesized from real entitlements/consumption (limits+usage); series/audit
   // are empty (no metrics data plane / audit store deployed).

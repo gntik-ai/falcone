@@ -13,6 +13,7 @@
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
+import { queryAuditEvents, auditRowToRecord } from './audit-store.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
@@ -138,9 +139,26 @@ async function series(ctx) {
     return ok(200, { metricKey, points: [], source: 'prometheus_unreachable' });
   }
 }
-// ---- audit records (Observability) — no audit store/reader in this deploy --
-async function auditRecords() {
-  return ok(200, { items: [], page: { size: 0, hasMore: false, nextCursor: null } });
+// ---- audit records (Observability) — read the action-audit store (#557) ----
+// Reads plan_audit_events (the WRITER side, audit-store.mjs), scoped to the path's
+// owning tenant (and workspace, for the workspace route). guarded() has already
+// resolved + authorized the scope tenant, so this only ever returns own-tenant
+// records. Degrades to an empty page (never 500) if the store is unreadable.
+async function auditRecords(ctx) {
+  const scope = await resolveScopeTenant(ctx);
+  if (scope.error) return scope.error;
+  const limit = Math.min(Math.max(Number(ctx.query?.['page[size]'] ?? ctx.query?.limit ?? 50) || 50, 1), 200);
+  try {
+    const rows = await queryAuditEvents(ctx.pool, {
+      tenantId: scope.tenantId,
+      workspaceId: ctx.params.workspaceId ?? null,
+      limit
+    });
+    const items = rows.map(auditRowToRecord);
+    return ok(200, { items, page: { size: items.length, hasMore: false, nextCursor: null } });
+  } catch {
+    return ok(200, { items: [], page: { size: 0, hasMore: false, nextCursor: null } });
+  }
 }
 // ---- audit export (Observability) — accept the request (no export pipeline) -
 async function auditExport(ctx) {

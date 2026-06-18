@@ -25,6 +25,7 @@ import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
+import { recordRouteAudit } from './audit-writer.mjs';
 
 const { Pool } = pg;
 
@@ -292,6 +293,10 @@ const server = http.createServer(async (req, res) => {
       // to `res` directly and ends it; we don't sendJson() after.
       if (route.stream) { await fn(ctx, res); return; }
       const result = await fn(ctx);
+      // Audit WRITER (#557): record a mutating action into the audit store WITH the
+      // request correlation id, scoped to the action's owning tenant. Best-effort and
+      // non-blocking — auditing must never fail or slow the action it describes.
+      void recordRouteAudit(pool, route, ctx, result, correlationId);
       return sendJson(res, result?.statusCode ?? 200, result?.body ?? null);
     }
 

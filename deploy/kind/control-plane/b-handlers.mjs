@@ -17,6 +17,7 @@ import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
+import { recordScopeDenial } from './audit-writer.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -758,8 +759,42 @@ async function deleteSocialProvider(ctx) {
   }
 }
 
+// ---- scope-enforcement denial ingest (#557) --------------------------------
+// The gateway's scope-enforcement plugin (services/gateway-config/plugins/
+// scope-enforcement.lua) POSTs a snake_case denial payload to its sidecar when it
+// denies a request (SCOPE_INSUFFICIENT / WORKSPACE_SCOPE_MISMATCH /
+// PLAN_ENTITLEMENT_DENIED / CONFIG_ERROR). In this runtime that sidecar is this
+// endpoint: it records the denial into scope_enforcement_denials (the store the
+// scope-enforcement audit query reads), carrying tenant_id / workspace_id / actor_id /
+// correlation_id so the audit returns it tenant-scoped. Internal (platform) only.
+async function recordScopeEnforcementDenial(ctx) {
+  const body = ctx.body ?? {};
+  const tenantId = body.tenant_id ?? body.tenantId;
+  const actorId = body.actor_id ?? body.actorId;
+  const correlationId = body.correlation_id ?? body.correlationId ?? ctx.callerContext?.correlationId;
+  if (!tenantId || !actorId || !correlationId) {
+    return err(400, 'VALIDATION_ERROR', 'tenant_id, actor_id and correlation_id are required');
+  }
+  const row = await recordScopeDenial(ctx.pool, {
+    tenantId, workspaceId: body.workspace_id ?? body.workspaceId ?? null,
+    actorId, actorType: body.actor_type ?? body.actorType ?? 'user',
+    denialType: body.denial_type ?? body.denialType ?? 'SCOPE_INSUFFICIENT',
+    httpMethod: body.http_method ?? body.httpMethod ?? 'GET',
+    requestPath: body.request_path ?? body.requestPath ?? '/',
+    requiredScopes: body.required_scopes ?? body.requiredScopes ?? [],
+    presentedScopes: body.presented_scopes ?? body.presentedScopes ?? [],
+    missingScopes: body.missing_scopes ?? body.missingScopes ?? [],
+    requiredEntitlement: body.required_entitlement ?? body.requiredEntitlement ?? null,
+    currentPlanId: body.current_plan_id ?? body.currentPlanId ?? null,
+    sourceIp: body.source_ip ?? body.sourceIp ?? null,
+    correlationId, deniedAt: body.denied_at ?? body.deniedAt ?? new Date().toISOString()
+  });
+  return ok(202, { recorded: Boolean(row), denialId: row?.id ?? null });
+}
+
 export const LOCAL_HANDLERS = {
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
+  recordScopeEnforcementDenial,
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
