@@ -1696,6 +1696,25 @@ keycloak:
     - --http-enabled=true
     - --hostname-strict=false
   replicas: 1
+  # Postgres-backed persistence (fix-keycloak-persistent-store). Keycloak's default
+  # `start` mode with NO KC_DB falls back to an in-memory H2 store: every pod restart
+  # wipes ALL realms (platform + tenant) and the unbounded in-heap dataset OOMKills the
+  # pod under multi-tenant load (live re-run 2026-06-18: exit 137, all realms lost).
+  # Backing Keycloak with the bundled `in-falcone-postgresql` in a DEDICATED `keycloak`
+  # database makes realms durable across restarts AND works for replicas>1 (HA) — an
+  # RWO PVC of H2-file could not. The dedicated DB (not the platform `in_falcone`) avoids
+  # schema/migration coupling, mirroring the Temporal persistence decision.
+  database:
+    enabled: true
+    # Dedicated logical database on the bundled postgresql instance.
+    name: keycloak
+    # Image for the one-shot DB-init initContainer below (needs a PG17 psql client).
+    # Defaults to the bundled postgresql image; private-registry/airgap installs that
+    # remap postgresql.image must remap this too.
+    initImage:
+      repository: docker.io/bitnami/postgresql
+      tag: 17.2.0
+      pullPolicy: IfNotPresent
   serviceAccount:
     create: true
     name: ""
@@ -1714,18 +1733,40 @@ keycloak:
   resources:
     requests:
       cpu: 250m
-      memory: 512Mi
+      memory: 1Gi
     limits:
       cpu: 1
-      memory: 1Gi
+      # Raised from 1Gi: the prior in-memory H2 store grew with every realm/user/session
+      # and OOMKilled the pod under the campaign's multi-tenant load. Postgres-backing
+      # offloads the dataset; the JVM heap is capped below to leave native headroom.
+      memory: 2Gi
   env:
     - name: KC_PROXY_HEADERS
       value: xforwarded
     - name: KC_HEALTH_ENABLED
       value: "true"
+    # Persist to the bundled PostgreSQL (KC_DB_URL is supplied by the
+    # in-falcone-keycloak-db ConfigMap so the host tracks the Helm release name).
+    - name: KC_DB
+      value: postgres
+    - name: KC_DB_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_USERNAME
+    - name: KC_DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    # Cap the JVM heap so KC stays well under the 2Gi limit (Quarkus metaspace +
+    # Infinispan caches + native live outside the heap). Prevents the OOM regression.
+    - name: JAVA_OPTS_KC_HEAP
+      value: "-Xms512m -Xmx1280m"
   envFromSecrets:
     - in-falcone-identity-client
-  envFromConfigMaps: []
+  envFromConfigMaps:
+    - in-falcone-keycloak-db
   persistence:
     enabled: false
     existingClaim: ""
@@ -1753,7 +1794,64 @@ keycloak:
   config:
     inline:
       publicPath: /auth
-  initContainers: []
+  # DB-init: idempotently create the dedicated `keycloak` database on the bundled
+  # postgresql BEFORE Keycloak starts, so KC is self-sufficient under `helm install
+  # --wait` (a post-install hook Job would deadlock — KC could never become Ready
+  # without its DB; mirrors the ferretdb wait-for-documentdb fix). Rendered via `tpl`
+  # by the component-wrapper workload template, so {{ .Release.Name }} resolves the
+  # postgresql Service host for ANY release name (no per-profile override needed).
+  initContainers:
+    - name: keycloak-db-init
+      image: "{{ .Values.database.initImage.repository }}:{{ .Values.database.initImage.tag }}"
+      imagePullPolicy: "{{ .Values.database.initImage.pullPolicy | default \"IfNotPresent\" }}"
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          # Bundled bitnami postgresql: superuser `postgres` (POSTGRESQL_POSTGRES_PASSWORD)
+          # creates the DB owned by the app role (POSTGRESQL_USERNAME), which Keycloak then
+          # connects as and owns its own schema in. POSIX sh (bitnami ships /bin/sh).
+          echo "Waiting for postgresql ${PGHOST}:${PGPORT} ..."
+          until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U postgres; do
+            echo "  not ready; retry in 2s"; sleep 2
+          done
+          export PGPASSWORD="${POSTGRESQL_POSTGRES_PASSWORD}"
+          PSQL="psql -h ${PGHOST} -p ${PGPORT} -U postgres -d postgres -tAc"
+          if [ "$(${PSQL} "SELECT 1 FROM pg_database WHERE datname='${KEYCLOAK_DB_NAME}'")" = "1" ]; then
+            echo "database ${KEYCLOAK_DB_NAME} already present"
+          else
+            echo "creating database ${KEYCLOAK_DB_NAME} (owner ${POSTGRESQL_USERNAME}) ..."
+            # Tolerate a concurrent winner (HA: replicas race) by re-checking on failure.
+            psql -h "${PGHOST}" -p "${PGPORT}" -U postgres -d postgres \
+              -c "CREATE DATABASE \"${KEYCLOAK_DB_NAME}\" OWNER \"${POSTGRESQL_USERNAME}\"" \
+              || [ "$(${PSQL} "SELECT 1 FROM pg_database WHERE datname='${KEYCLOAK_DB_NAME}'")" = "1" ]
+          fi
+          # PostgreSQL 15+: the DB owner does NOT own `public`, and PUBLIC lost CREATE on
+          # it, so Keycloak (connecting as the app role) could not create its schema.
+          # Hand `public` to the app role so KC's auto-migration can DDL. Idempotent.
+          echo "ensuring ${POSTGRESQL_USERNAME} owns schema public in ${KEYCLOAK_DB_NAME} ..."
+          psql -h "${PGHOST}" -p "${PGPORT}" -U postgres -d "${KEYCLOAK_DB_NAME}" -v ON_ERROR_STOP=1 \
+            -c "ALTER SCHEMA public OWNER TO \"${POSTGRESQL_USERNAME}\""
+          echo "keycloak database ready."
+      env:
+        - name: PGHOST
+          value: "{{ .Release.Name }}-postgresql"
+        - name: PGPORT
+          value: "5432"
+        - name: KEYCLOAK_DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: HOME
+          value: /tmp
+      envFrom:
+        - secretRef:
+            name: in-falcone-postgresql
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
   volumePermissions:
     enabled: false
     image:
