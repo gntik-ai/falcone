@@ -55,7 +55,7 @@ access. Fixing the read-handler scoping + the ksvc naming closes the cardinal mu
 - **Evidence:** `evidence/26-lifecycle-governance.md`, `evidence/27-console-parity.md`.
 
 ### A4 — Mongo document/browse handlers leak cross-tenant documents  ·  `fix-mongo-browse-tenant-scope`
-- **Labels:** `bug` `P1` `security` `tenant-isolation` `cap:mongo-data-api` `openspec`
+- **Labels:** `bug` `P0` `security` `tenant-isolation` `cap:mongo-data-api` `openspec` *(bumped P1→P0: API-reachable cross-tenant document-content read)*
 - **Problem:** The gateway routes `/v1/mongo/*` (JWT, no apikey) to the control-plane, whose mongo browse/list/
   document-read handlers omit the `tenantId` filter the executor adapter enforces → any tenant reads any
   database/collection/documents by name and enumerates all names.
@@ -298,6 +298,15 @@ diverge from the OpenAPI.
   returns a clean 404. **Proposed solution:** return 404. **Acceptance:** 404 not 500. **Evidence:** `evidence/21-document-mongo.md`.
 
 ---
+
+### Scope decisions (confirmed with reviewer)
+- **Upload scope:** ALL epics A–H + their child issues.
+- **Fix locus = BOTH kind + product.** The deployed handlers I tested live in `deploy/kind/control-plane/*.mjs`
+  (a bespoke kind runtime that re-implements the data/browse handlers). Because the same logic must ship in the
+  product, every isolation/scope fix (A1–A6, B*, C*) is framed to land in **both** the kind runtime **and** the
+  shippable control-plane/services (`apps/control-plane/src/runtime/*`, `services/*`) — each issue's "Proposed
+  solution" applies to both, and the executor (`apps/control-plane`) already carries the correct scoping pattern to
+  copy from (e.g. its workspace-ownership guard, tenant-stamped data-plane).
 
 ### Notes for the reviewer
 - **Severity rationale:** P0 = cross-tenant data access reachable through the product surface (events read+write,
