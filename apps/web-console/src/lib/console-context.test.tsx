@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   ConsoleContextProvider,
@@ -52,7 +52,7 @@ describe('console-context', () => {
     vi.unstubAllGlobals()
     clearPersistedConsoleContext()
     clearConsoleShellSession()
-    window.localStorage.clear()
+    window.localStorage?.clear()
   })
 
   it('ignora snapshots inválidos del storage', () => {
@@ -300,6 +300,115 @@ describe('console-context', () => {
       expect(screen.getByTestId('tenant-console-user-realm')).toHaveTextContent('realm-beta')
     })
   })
+
+  describe('tenant operator (tenant_owner) — own-scope bootstrap', () => {
+    const localStorageMock: Storage = {
+      length: 0,
+      clear: vi.fn(),
+      getItem: vi.fn(() => null),
+      key: vi.fn(() => null),
+      removeItem: vi.fn(),
+      setItem: vi.fn()
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('localStorage', localStorageMock)
+    })
+
+    // The outer afterEach calls vi.unstubAllGlobals() which removes the localStorage
+    // stub, then calls window.localStorage.clear() which would throw. Re-stub before
+    // the outer cleanup runs (nested afterEach fires before outer afterEach in vitest).
+    afterEach(() => {
+      vi.stubGlobal('localStorage', localStorageMock)
+    })
+
+    const operatorSession: ConsoleShellSession = {
+      sessionId: 'ses_operator_001',
+      authenticationState: 'active',
+      statusView: 'login',
+      issuedAt: '2099-03-28T18:00:00.000Z',
+      expiresAt: '2099-03-28T20:00:00.000Z',
+      refreshExpiresAt: '2099-03-29T18:00:00.000Z',
+      tokenSet: {
+        accessToken: 'access-token-operator-001',
+        refreshToken: 'refresh-token-operator-001',
+        tokenType: 'Bearer',
+        expiresIn: 3600,
+        refreshExpiresIn: 7200,
+        scope: 'openid profile email',
+        expiresAt: '2099-03-28T20:00:00.000Z',
+        refreshExpiresAt: '2099-03-29T18:00:00.000Z'
+      },
+      principal: {
+        userId: 'usr_operator_001',
+        username: 'acme-ops',
+        displayName: 'Acme Operator',
+        primaryEmail: 'ops@acme.example',
+        state: 'active',
+        platformRoles: ['tenant_owner'],
+        tenantIds: ['ten_acme']
+      } as NonNullable<ConsoleShellSession['principal']>
+    }
+
+    it('operator: bootstraps tenant context from own-scope GET /v1/tenants/{id} instead of superadmin collection', async () => {
+      stubContextApiWithOperatorScope({
+        tenantsByid: {
+          ten_acme: createTenant('ten_acme', 'Acme Corp', { identityContext: { consoleUserRealm: 'ten_acme' } })
+        },
+        workspacesByTenant: {
+          ten_acme: [createWorkspace('wrk_acme_dev', 'ten_acme', 'Dev Workspace')]
+        }
+      })
+
+      renderContextProbe(operatorSession)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_acme')
+        expect(screen.getByTestId('tenants-count')).toHaveTextContent('1')
+      })
+    })
+
+    it('operator: does NOT call superadmin GET /v1/tenants collection', async () => {
+      stubContextApiWithOperatorScope({
+        tenantsByid: {
+          ten_acme: createTenant('ten_acme', 'Acme Corp')
+        },
+        workspacesByTenant: {}
+      })
+
+      renderContextProbe(operatorSession)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_acme')
+      })
+
+      const collectionCalls = fetchMock.mock.calls.filter((call) => {
+        const requestUrl = typeof call[0] === 'string' ? call[0] : call[0] instanceof URL ? call[0].toString() : (call[0] as Request).url
+        const parsed = new URL(requestUrl, 'http://localhost')
+        return parsed.pathname === '/v1/tenants' && !parsed.pathname.match(/\/v1\/tenants\/[^/]+$/)
+      })
+
+      expect(collectionCalls).toHaveLength(0)
+    })
+
+    it('operator: autoselects own tenant and loads workspaces', async () => {
+      stubContextApiWithOperatorScope({
+        tenantsByid: {
+          ten_acme: createTenant('ten_acme', 'Acme Corp')
+        },
+        workspacesByTenant: {
+          ten_acme: [createWorkspace('wrk_acme_dev', 'ten_acme', 'Dev Workspace')]
+        }
+      })
+
+      renderContextProbe(operatorSession)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_acme')
+        expect(screen.getByTestId('active-workspace')).toHaveTextContent('wrk_acme_dev')
+      })
+    })
+  })
 })
 
 function ContextProbe() {
@@ -353,6 +462,42 @@ function stubContextApi({
 
     if (parsedUrl.pathname === '/v1/tenants') {
       return createJsonResponse(200, { items: tenants, page: {} })
+    }
+
+    if (parsedUrl.pathname === '/v1/workspaces') {
+      const tenantId = parsedUrl.searchParams.get('filter[tenantId]') ?? ''
+      return createJsonResponse(200, { items: workspacesByTenant[tenantId] ?? [], page: {} })
+    }
+
+    return createJsonResponse(404, { message: 'Not found' })
+  })
+}
+
+function stubContextApiWithOperatorScope({
+  tenantsByid = {},
+  workspacesByTenant = {}
+}: {
+  tenantsByid?: Record<string, ReturnType<typeof createTenant>>
+  workspacesByTenant?: Record<string, Array<ReturnType<typeof createWorkspace>>>
+}) {
+  fetchMock.mockImplementation(async (input) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+    const parsedUrl = new URL(requestUrl, 'http://localhost')
+
+    // Singular tenant fetch: GET /v1/tenants/{tenantId}
+    const singularTenantMatch = parsedUrl.pathname.match(/^\/v1\/tenants\/([^/]+)$/)
+    if (singularTenantMatch) {
+      const tenantId = singularTenantMatch[1]
+      const tenant = tenantsByid[tenantId]
+      if (tenant) {
+        return createJsonResponse(200, { tenant, ...tenant })
+      }
+      return createJsonResponse(404, { code: 'TENANT_NOT_FOUND', message: `tenant ${tenantId} not found` })
+    }
+
+    // Superadmin collection — operators should NOT call this; return 403 to make failures visible
+    if (parsedUrl.pathname === '/v1/tenants') {
+      return createJsonResponse(403, { code: 'FORBIDDEN', message: 'requires superadmin' })
     }
 
     if (parsedUrl.pathname === '/v1/workspaces') {

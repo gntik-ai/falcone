@@ -16,6 +16,7 @@ import { MONGO_HANDLERS } from './mongo-handlers.mjs';
 import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
+import { checkWorkspaceQuota } from './workspace-quota.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -313,6 +314,16 @@ async function createWorkspace(ctx) {
   if (!displayName) return err(400, 'VALIDATION_ERROR', 'displayName is required');
   const slug = slugify(body.slug ?? displayName);
   if (await store.workspaceSlugTaken(pool, tenant.id, slug)) return err(409, 'SLUG_TAKEN', `workspace slug '${slug}' already exists in tenant`);
+  // Enforce the tenant's resolved max_workspaces entitlement (#556 BUG-QUOTA-ENFORCE).
+  // Count BEFORE inserting and gate on the governance model (override → plan → default 3),
+  // so the create that WOULD exceed the limit is rejected. Fails open if governance is
+  // unavailable (availability over a non-isolation governance control).
+  const usedWorkspaces = await store.countTenantWorkspaces(pool, tenant.id);
+  const quota = await checkWorkspaceQuota(pool, tenant.id, usedWorkspaces);
+  if (!quota.allowed) {
+    return err(402, 'QUOTA_EXCEEDED',
+      `workspace quota reached (max_workspaces): ${usedWorkspaces}/${quota.effectiveLimit ?? '?'}`);
+  }
   // First-class environment (#503): a workspace is the delivery boundary for one runtime
   // environment. Validate against the environment catalog (domain rule: "Workspace environment
   // must align with the deployment topology environment catalog"); default to 'dev'.
@@ -492,6 +503,48 @@ async function iamListClients(ctx) {
   return ok(200, { items: clients.map((c) => ({ id: c.id, clientId: c.clientId, enabled: c.enabled, publicClient: c.publicClient, serviceAccountsEnabled: c.serviceAccountsEnabled })), total: clients.length });
 }
 
+// ---- app end-user lifecycle (#567 BUG-ENDUSER-MGMT) -------------------------
+// The owner end-user surface was create+list only; DELETE and status PATCH were in
+// the public route catalog but unrouted (NO_ROUTE 404), so an owner could not disable
+// or delete a registered app end-user. Authorize superadmin OR the owner/admin of the
+// tenant that owns the realm (never cross-tenant), then drive Keycloak.
+async function authorizeRealmManage(ctx) {
+  const realm = ctx.params.realmId;
+  if (ctx.identity?.actorType === 'superadmin' || ctx.identity?.actorType === 'internal') return { realm };
+  const tenant = await store.getTenantByRealm(ctx.pool, realm);
+  if (tenant && canManageTenant(ctx.identity, tenant)) return { realm, tenant };
+  return { error: err(403, 'FORBIDDEN', 'requires superadmin or the owning tenant owner/admin') };
+}
+// DELETE /v1/iam/realms/{realmId}/users/{userId}
+async function iamDeleteUser(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  try {
+    await kc.deleteUser(az.realm, ctx.params.userId);
+    return ok(200, { userId: ctx.params.userId, realmId: az.realm, deleted: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'DELETE_USER_FAILED', String(e.message ?? e));
+  }
+}
+// PATCH /v1/iam/realms/{realmId}/users/{userId}/status  body: {enabled:bool} | {state:'active'|'suspended'}
+async function iamSetUserStatus(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  const body = ctx.body ?? {};
+  let enabled;
+  if (typeof body.enabled === 'boolean') enabled = body.enabled;
+  else if (typeof body.state === 'string') enabled = ['active', 'enabled'].includes(body.state.toLowerCase());
+  else return err(400, 'VALIDATION_ERROR', 'body must include enabled:boolean or state:active|suspended');
+  try {
+    await kc.setUserEnabled(az.realm, ctx.params.userId, enabled);
+    return ok(200, { userId: ctx.params.userId, realmId: az.realm, enabled, state: enabled ? 'active' : 'suspended' });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SET_USER_STATUS_FAILED', String(e.message ?? e));
+  }
+}
+
 // ---- data plane: workspace database provisioning ---------------------------
 // POST /v1/workspaces/{workspaceId}/database — provision a REAL Postgres
 // database for the workspace (catalog-level isolation), via a durable saga.
@@ -635,7 +688,7 @@ export const LOCAL_HANDLERS = {
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
-  iamListUsers, iamCreateUser, iamListRoles, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
+  iamListUsers, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
   iamListUserRoles, iamAssignUserRoles, iamRemoveUserRoles,
   iamListGroupMembers, iamListUserGroups, iamAddUserToGroup, iamRemoveUserFromGroup,
   ...METRICS_HANDLERS,

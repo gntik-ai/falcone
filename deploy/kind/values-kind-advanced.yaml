@@ -40,6 +40,19 @@ temporal:
   bootstrap:
     namespace: falcone-flows
     retentionDays: 1
+    # The five custom search attributes (all Keyword) the flow executor stamps on every workflow
+    # start AND queries in its concurrency pre-flight (countRunningExecutions -> workflow.list).
+    # Without them the dev/kind Temporal 500s the quota pre-flight BEFORE any run starts, so a
+    # manual AND a platform-event-triggered start both fail (live campaign 2026-06-18,
+    # audit/live-campaign/evidence/23-events-functions.md). Declared explicitly here (not just
+    # inherited from the chart default) so a future edit to this overlay's `bootstrap` block cannot
+    # silently drop the set that makes event-driven flow execution work on kind.
+    searchAttributes:
+      - { name: tenantId, type: Keyword }
+      - { name: workspaceId, type: Keyword }
+      - { name: flowId, type: Keyword }
+      - { name: flowVersion, type: Keyword }
+      - { name: triggerType, type: Keyword }
 
 # ---- Workflow worker (executes the Flows DSL on the flows-main task queue) -------------------
 workflowWorker:
@@ -51,6 +64,17 @@ workflowWorker:
       TEMPORAL_NAMESPACE: falcone-flows
       TEMPORAL_TASK_QUEUE: flows-main
       WORKER_HEALTH_PORT: "8080"
+  # Postgres executor wiring (fix-flows-worker-db-activity-wiring / #563).
+  # Helm merges arrays by replacement so this list carries ALL env entries the worker
+  # needs (Temporal + Postgres). PGPASSWORD comes from the chart Secret.
+  env:
+    - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
+    - { name: TEMPORAL_TASK_QUEUE, value: flows-main }
+    - { name: WORKER_HEALTH_PORT, value: "8080" }
+    - { name: PGHOST, value: falcone-postgresql }
+    - { name: PGUSER, value: falcone }
+    - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
+    - { name: PGDATABASE, value: falcone }
 
 # ---- Executor: serves the data-plane + realtime + flows + MCP -------------------------------
 # The base kind profile does not configure the executor, so this overlay provides its full env:

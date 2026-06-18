@@ -38,6 +38,21 @@ COPY --from=build /app/services/workflow-worker/dist ./dist
 # webhook-subscription.mjs itself imports from event-catalogue.mjs in the same directory.
 COPY services/webhook-engine/src /app/services/webhook-engine/src
 
+# worker-deps.mjs (fix-flows-worker-db-activity-wiring / #563) dynamically imports the
+# postgres executor (apps/control-plane/src/runtime/) and its plan-builder adapter
+# (services/adapters/src/). These paths must be reachable relative to dist/worker.js:
+#   dist/worker.js  →  ../../../apps/control-plane/src/runtime/*.mjs   ✓
+#   apps/control-plane/src/runtime/postgres-data-executor.mjs imports:
+#       ../../../../services/adapters/src/postgresql-data-api.mjs     ✓
+COPY apps/control-plane/src/runtime/connection-registry.mjs \
+     apps/control-plane/src/runtime/postgres-data-executor.mjs \
+     apps/control-plane/src/runtime/workspace-dsn-resolver.mjs \
+     apps/control-plane/src/runtime/errors.mjs \
+     /app/apps/control-plane/src/runtime/
+COPY services/adapters/src/postgresql-data-api.mjs \
+     services/adapters/src/postgresql-governance-admin.mjs \
+     /app/services/adapters/src/
+
 ENV NODE_ENV=production \
     TEMPORAL_ADDRESS=temporal-frontend:7233 \
     TEMPORAL_NAMESPACE=falcone-flows \
