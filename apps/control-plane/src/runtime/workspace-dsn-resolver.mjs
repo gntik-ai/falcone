@@ -27,9 +27,13 @@ export function createWorkspaceDsnResolver({ pool, baseDsn }) {
 
   async function resolveConnection(workspaceId) {
     const wsId = workspaceId ? String(workspaceId) : '';
+    // `routed` distinguishes a per-workspace database (a dedicated wsdb_*) from the
+    // shared/platform fallback. Consumers that must NOT operate on the platform
+    // database (DDL — see connection-registry withAdminClient requireDedicatedDatabase)
+    // fail closed when routed === false (fix-executor-ddl-db-ownership-guard).
     if (wsId) {
       const cached = cache.get(wsId);
-      if (cached) return { dsn: cached };
+      if (cached) return { dsn: cached, routed: true };
       try {
         const { rows } = await pool.query(
           'SELECT database_name FROM workspace_databases WHERE workspace_id = $1 LIMIT 1',
@@ -38,14 +42,14 @@ export function createWorkspaceDsnResolver({ pool, baseDsn }) {
         if (rows[0]?.database_name) {
           const routed = dsnWithDatabase(baseDsn, rows[0].database_name);
           cache.set(wsId, routed);
-          return { dsn: routed };
+          return { dsn: routed, routed: true };
         }
       } catch {
         // Registry unreachable or table absent → fall back to the shared DSN (fail-open to the
         // pre-routing behaviour rather than taking the whole data plane down).
       }
     }
-    return { dsn: baseDsn };
+    return { dsn: baseDsn, routed: false };
   }
 
   // Drop a cached mapping (e.g. after a workspace's database is deprovisioned).

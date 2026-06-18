@@ -490,13 +490,20 @@ async function revokeCredential(ctx) {
 // (userId/realmRoles, roleName/composite). realmRoles is enriched per user (small
 // realms), so the Members table shows each user's roles inline.
 async function iamListUsers(ctx) {
+  // A tenant_owner/admin may list the app end-users of ITS OWN realm; superadmin any.
+  // Previously superadmin-only (route gate), so an owner got 403 on its own end-users
+  // (P1 BUG-ENDUSER-OWNER-403). authorizeRealmManage denies cross-tenant (the owner of
+  // another tenant's realm → 403) by resolving realm→tenant + canManageTenant.
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  const kc = ctx.kcAdmin ?? kcAdmin;
   const realm = ctx.params.realmId;
   const max = Number(ctx.query['page[size]'] ?? ctx.query.max ?? 200) || 200;
-  const users = await kcAdmin.listUsers(realm, { max });
+  const users = await kc.listUsers(realm, { max });
   const items = await Promise.all(users.map(async (u) => {
     let realmRoles = [];
     try {
-      realmRoles = (await kcAdmin.listUserRealmRoles(realm, u.id))
+      realmRoles = (await kc.listUserRealmRoles(realm, u.id))
         .map((r) => r.name).filter((n) => n && !String(n).startsWith('default-roles'));
     } catch { /* best-effort: show no roles rather than fail the list */ }
     return {
@@ -508,11 +515,26 @@ async function iamListUsers(ctx) {
   }));
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
+// Extract the password to set on a created user from EITHER the flat `password` field
+// OR the standard Keycloak `credentials: [{type:'password', value, temporary}]` array.
+// The handler previously read only `body.password`, so a caller using the documented
+// `credentials` shape had the password silently dropped — the user was created with no
+// credential and ROPC login failed with invalid_grant (P1, live 2026-06-18).
+export function credentialPasswordFromBody(body = {}) {
+  if (typeof body.password === 'string' && body.password) {
+    return { value: body.password, temporary: body.temporary === true };
+  }
+  const cred = Array.isArray(body.credentials)
+    ? body.credentials.find((c) => c && (c.type ?? 'password') === 'password' && typeof c.value === 'string' && c.value)
+    : null;
+  return cred ? { value: cred.value, temporary: cred.temporary === true } : null;
+}
 async function iamCreateUser(ctx) {
   const { params, body, identity } = ctx;
   if (!body.username && !body.email) return err(400, 'VALIDATION_ERROR', 'username or email required');
   try {
-    const id = await kcAdmin.createUser(params.realmId, { username: body.username ?? body.email, email: body.email ?? null, firstName: body.firstName ?? null, lastName: body.lastName ?? null, password: body.password ?? null, temporary: !body.password });
+    const pw = credentialPasswordFromBody(body);
+    const id = await kcAdmin.createUser(params.realmId, { username: body.username ?? body.email, email: body.email ?? null, firstName: body.firstName ?? null, lastName: body.lastName ?? null, password: pw?.value ?? null, temporary: pw?.temporary === true });
     if (Array.isArray(body.roles) && body.roles.length) await kcAdmin.assignRealmRoles(params.realmId, id, body.roles);
     return ok(201, { userId: id, username: body.username ?? body.email, realm: params.realmId, roles: body.roles ?? [], createdBy: identity.sub });
   } catch (e) { return err(e.kcStatus === 409 ? 409 : (e.statusCode && e.statusCode < 500 ? e.statusCode : 502), 'IAM_CREATE_USER_FAILED', String(e.message ?? e)); }
@@ -833,7 +855,29 @@ async function recordScopeEnforcementDenial(ctx) {
   return ok(202, { recorded: Boolean(row), denialId: row?.id ?? null });
 }
 
+// GET /v1/console/session — lightweight whoami for the web-console. Confirms the bearer
+// session is valid (the reconnect-state-sync probe relies on it for early 401 detection)
+// and returns the VERIFIED principal (never the request body/headers). Authenticated, so
+// tenant operators reach it too. Previously unrouted → 404 broke the reconnect sync and
+// left a dead SPA reference (P1 console operator shell).
+function consoleSession(ctx) {
+  const id = ctx.identity ?? {};
+  return ok(200, {
+    authenticated: true,
+    principal: {
+      sub: id.sub ?? null,
+      tenantId: id.tenantId ?? null,
+      workspaceId: id.workspaceId ?? null,
+      actorType: id.actorType ?? null,
+      roles: id.roles ?? [],
+      scopes: id.scopes ?? [],
+    },
+    serverTime: new Date().toISOString(),
+  });
+}
+
 export const LOCAL_HANDLERS = {
+  consoleSession,
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
   recordScopeEnforcementDenial,
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,

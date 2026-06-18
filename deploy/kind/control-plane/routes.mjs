@@ -42,6 +42,8 @@ export const routes = [
 
   // ---- domain B: tenant lifecycle + user management (LOCAL handlers) --------
   // Real implementations (kc-admin + tenant-store) of what the repo stubs.
+  // Console whoami (any authenticated principal) — was referenced by the SPA but unrouted (404).
+  { method: 'GET',  path: '/v1/console/session', localHandler: 'consoleSession', auth: 'authenticated' },
   { method: 'POST', path: '/v1/tenants', localHandler: 'createTenant', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/tenants', localHandler: 'listTenants', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}', localHandler: 'getTenant', auth: 'authenticated' },
@@ -85,7 +87,10 @@ export const routes = [
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}/functions', localHandler: 'listFunctions', auth: 'authenticated' },
 
   // ---- domain B: fine-grained IAM (platform admin; realmId in path) ---------
-  { method: 'GET',  path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamListUsers', auth: 'superadmin' },
+  // GET users: owner-of-realm OR superadmin (handler authorizes via authorizeRealmManage)
+  // so a tenant_owner can list its OWN app end-users (BUG-ENDUSER-OWNER-403). Cross-tenant
+  // is denied in the handler.
+  { method: 'GET',  path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamListUsers', auth: 'authenticated' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamCreateUser', auth: 'superadmin' },
   // app end-user lifecycle (#567): owner-of-realm OR superadmin (handler authorizes); were NO_ROUTE.
   { method: 'DELETE', path: '/v1/iam/realms/{realmId}/users/{userId}', localHandler: 'iamDeleteUser', auth: 'authenticated' },
