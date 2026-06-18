@@ -1,15 +1,15 @@
 # Tasks — fix-pg-insert-request-contract
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe that reproduces: Live: insert `{row:{.
+- [x] Add a failing black-box probe that reproduces the bug: `tests/blackbox/pg-insert-request-contract.test.mjs` bbx-pg-insert-01 — documented `{row:{...}}` body → 400 PLAN_REJECTED "Unknown column row".
 
 ## Implement (kind runtime AND shippable product)
-- [ ] Align the handler with the contract (or vice-versa) + a contract test — `apps/control-plane` executor + OpenAPI.
-- [ ] Apply the same fix in both `deploy/kind/control-plane/*` and `apps/control-plane`/`services/*` as applicable.
+- [x] Align the handler with the OpenAPI `PostgresDataInsertRequest` contract: the executor `POST .../rows` route now unwraps `c.body.row` (the documented envelope) before `c.body.values`/bare body — `apps/control-plane/src/runtime/server.mjs`.
+- [x] The data plane (`createControlPlaneServer`) is the shared executor for both the kind profile and the shippable product, so the single fix covers both; the kind control-plane proxies data-plane writes to it (no separate kind insert handler). Bulk insert already read `c.body.rows` per `PostgresDataBulkInsertRequest` — unchanged.
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: The documented body inserts a row.
+- [x] Black-box suite green; bbx-pg-insert-01..04 (documented `{row}`, legacy `{values}`, bare body, unknown-column 4xx).
+- [x] Acceptance: the documented body inserts a row (captured INSERT binds the row value).
 
 ## Archive
-- [ ] `openspec validate fix-pg-insert-request-contract --strict`; `/opsx:archive fix-pg-insert-request-contract` after merge.
+- [x] `openspec validate fix-pg-insert-request-contract --strict`; archived with the P2 batch.

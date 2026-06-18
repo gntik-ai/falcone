@@ -1,15 +1,15 @@
 # Tasks — fix-mongo-indexes-missing-collection
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe that reproduces: Live: indexes on a missing collection → 500.
+- [x] Failing black-box probe: `tests/blackbox/mongo-indexes-missing-collection.test.mjs` — indexes on a missing collection threw FerretDB code 26 (NamespaceNotFound) from `.indexes()` (unscoped caller) / `tenantCollectionCount` (tenant caller) → 500.
 
 ## Implement (kind runtime AND shippable product)
-- [ ] Return 404 for a missing collection — kind `mongo-handlers.mjs` + product handler.
-- [ ] Apply the same fix in both `deploy/kind/control-plane/*` and `apps/control-plane`/`services/*` as applicable.
+- [x] `mongoIndexes` now probes existence with `listCollections({name})` up front and returns 404 COLLECTION_NOT_FOUND for a missing collection (mirrors `mongoCollectionDetail`) — `deploy/kind/control-plane/mongo-handlers.mjs`.
+- [x] Kind-only: the collection-indexes browse route is served by the kind control-plane; the executor data-plane (`apps/control-plane`) exposes no index-listing route, so no product-side change is needed.
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: 404 not 500.
+- [x] Black-box suite green: bbx-mongo-index-01 (tenant caller → 404), -02 (superadmin/unscoped → 404), -03 (existing collection → 200 with index items); mongo-browse-tenant-scope regression unchanged.
+- [x] Acceptance: 404 not 500; no Mongo code 26 leak.
 
 ## Archive
-- [ ] `openspec validate fix-mongo-indexes-missing-collection --strict`; `/opsx:archive fix-mongo-indexes-missing-collection` after merge.
+- [x] `openspec validate fix-mongo-indexes-missing-collection --strict`; archived with the P2 batch.
