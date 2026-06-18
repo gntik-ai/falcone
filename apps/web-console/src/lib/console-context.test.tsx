@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   ConsoleContextProvider,
@@ -302,26 +302,12 @@ describe('console-context', () => {
   })
 
   describe('tenant operator (tenant_owner) — own-scope bootstrap', () => {
-    const localStorageMock: Storage = {
-      length: 0,
-      clear: vi.fn(),
-      getItem: vi.fn(() => null),
-      key: vi.fn(() => null),
-      removeItem: vi.fn(),
-      setItem: vi.fn()
-    }
-
-    beforeEach(() => {
-      vi.stubGlobal('localStorage', localStorageMock)
-    })
-
-    // The outer afterEach calls vi.unstubAllGlobals() which removes the localStorage
-    // stub, then calls window.localStorage.clear() which would throw. Re-stub before
-    // the outer cleanup runs (nested afterEach fires before outer afterEach in vitest).
-    afterEach(() => {
-      vi.stubGlobal('localStorage', localStorageMock)
-    })
-
+    // NOTE: do NOT stub `localStorage` via vi.stubGlobal here. jsdom already provides a real
+    // localStorage (cleared between tests by the outer afterEach), and the production storage
+    // helpers guard `!window.localStorage`. vi.stubGlobal('localStorage', …) +
+    // vi.unstubAllGlobals() is a brittle workaround for Node 22+'s experimental global
+    // localStorage (a LOCAL artifact; CI runs Node 20) and risks corrupting the shared
+    // localStorage for later files.
     const operatorSession: ConsoleShellSession = {
       sessionId: 'ses_operator_001',
       authenticationState: 'active',

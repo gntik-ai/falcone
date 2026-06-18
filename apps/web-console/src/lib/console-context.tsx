@@ -227,12 +227,15 @@ export function ConsoleContextProvider({
     () => (Array.isArray(session?.principal?.workspaceIds) ? session?.principal?.workspaceIds.filter(Boolean) : []),
     [session?.principal?.workspaceIds]
   )
-  // Detect if the authenticated user is a platform superadmin. Superadmins use the
-  // collection endpoint; tenant operators must use own-scope singular endpoints.
-  const isSuperadmin = useMemo(
+  // A TENANT operator (tenant_owner / tenant_admin, without a platform role) cannot use the
+  // superadmin collection endpoint GET /v1/tenants (it 403s) — they must bootstrap tenant
+  // context from their own-scope singular endpoints. Platform users (superadmin /
+  // platform_admin / platform_operator) keep the collection endpoint. (#569)
+  const isTenantOperator = useMemo(
     () => {
       const roles: string[] = Array.isArray(session?.principal?.platformRoles) ? session!.principal!.platformRoles : []
-      return roles.includes('superadmin') || roles.includes('platform_admin')
+      const isPlatformUser = roles.includes('superadmin') || roles.includes('platform_admin') || roles.includes('platform_operator')
+      return !isPlatformUser && (roles.includes('tenant_owner') || roles.includes('tenant_admin'))
     },
     [session?.principal?.platformRoles]
   )
@@ -318,7 +321,7 @@ export function ConsoleContextProvider({
       setTenantsError(null)
 
       try {
-        const collection = await listAccessibleTenants({ isSuperadmin, ownTenantIds: tenantIds })
+        const collection = await listAccessibleTenants({ isTenantOperator, ownTenantIds: tenantIds })
         const options = filterTenantOptions(normalizeTenantOptions(collection.items), tenantIds)
         const nextTenantId = resolveInitialTenantId(options, persistedSnapshot?.tenantId ?? null)
 
@@ -359,7 +362,7 @@ export function ConsoleContextProvider({
     return () => {
       cancelled = true
     }
-  }, [isSuperadmin, persistSelection, tenantIds, tenantReloadKey, userId])
+  }, [isTenantOperator, persistSelection, tenantIds, tenantReloadKey, userId])
 
   useEffect(() => {
     if (!userId || !activeTenantId) {
@@ -779,22 +782,16 @@ export function formatConsoleEnumLabel(value: string | null | undefined): string
 }
 
 // Fetch the list of tenants accessible to the current user.
-// Superadmin: use the collection endpoint GET /v1/tenants (returns all tenants).
-// Tenant operator (tenant_owner / tenant_admin): use the own-scope singular endpoint
-// GET /v1/tenants/{tenantId} for each tenantId in their session — the collection
-// endpoint is superadmin-only and returns 403 for operators.
-// Fetch the list of tenants accessible to the current user.
-// Superadmin: use the collection endpoint GET /v1/tenants (returns all tenants).
-// Tenant operator (tenant_owner / tenant_admin): use the own-scope singular endpoint
-// GET /v1/tenants/{tenantId} for each tenantId in their session — the collection
-// endpoint is superadmin-only and returns 403 for operators. When the session carries
-// no tenantIds and the caller is not a superadmin, return an empty collection rather
-// than call the superadmin endpoint (which would 403 and break the bootstrap).
+// Platform users (superadmin / platform_admin / platform_operator): use the collection
+// endpoint GET /v1/tenants. Tenant operators (tenant_owner / tenant_admin): use the
+// own-scope singular endpoint GET /v1/tenants/{tenantId} per tenantId in their session —
+// the collection endpoint is superadmin-only and 403s for them. A tenant operator with no
+// tenantIds returns an empty collection rather than calling the superadmin endpoint. (#569)
 async function listAccessibleTenants(options: {
-  isSuperadmin: boolean
+  isTenantOperator: boolean
   ownTenantIds: string[]
 }): Promise<TenantCollectionResponse> {
-  if (!options.isSuperadmin) {
+  if (options.isTenantOperator) {
     if (options.ownTenantIds.length === 0) {
       return { items: [], page: { after: null } }
     }
