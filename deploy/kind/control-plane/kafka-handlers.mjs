@@ -19,6 +19,17 @@ const nowIso = () => new Date().toISOString();
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 200);
 const safeParse = (s) => { try { return JSON.parse(s); } catch { return s; } };
 
+// Physical Kafka topic name for a workspace's logical topic. Derived from the
+// GLOBALLY-UNIQUE workspace id — NOT the per-tenant `slug`, which is not unique
+// across tenants and made two same-slug workspaces collide on one physical topic
+// (P1 ISO-EVENTS: first tenant's `workspace_topics` row hijacked, second tenant
+// locked out). This matches the executor data-plane (`events-executor.mjs` ->
+// `evt.<workspaceId>.<topic>`) so the JWT (control-plane) and apiKey (executor)
+// paths resolve to the SAME physical topic.
+export function physicalTopicName(workspaceId, topicName) {
+  return `evt.${workspaceId}.${topicName}`;
+}
+
 let kafka = null;
 function getKafka() {
   if (!kafka) kafka = new Kafka({ clientId: 'in-falcone-console', brokers: BROKERS, logLevel: logLevel.NOTHING, retry: { retries: 3 } });
@@ -75,7 +86,7 @@ async function eventsInventory(ctx) {
   return ok(200, {
     workspaceId, tenantId: topics[0]?.tenant_id ?? null, brokerMode: 'shared', isolationMode: 'prefix',
     items, counts: { total: items.length, active: items.length, provisioning: 0, degraded: 0, topics: items.length },
-    namingPolicy: { topicPrefix: 'ws.', topicNameGovernance: 'managed' },
+    namingPolicy: { topicPrefix: 'evt.', topicNameGovernance: 'managed' },
     tenantIsolation: { mode: 'prefix', crossTenantAccessPrevented: true }, observedAt: nowIso(), snapshotId: randomUUID()
   });
 }
@@ -87,7 +98,7 @@ async function eventsProvisionTopic(ctx) {
   const topicName = slug(ctx.body?.name);
   if (!topicName) return err(400, 'VALIDATION_ERROR', 'topic name is required');
   const partitions = Number(ctx.body?.partitions ?? 1) || 1;
-  const physical = `ws.${ws.slug ?? ws.id.slice(0, 8)}.${topicName}`;
+  const physical = physicalTopicName(ws.id, topicName);
   const resourceId = `res_topic_${randomUUID().slice(0, 8)}`;
   try {
     const a = await admin();

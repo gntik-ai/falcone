@@ -53,11 +53,22 @@ spec:
         - protocol: TCP
           port: {{ .Values.seaweedfs.s3.port }}
     # Intra-SeaweedFS control/data plane: master, volume, filer ports — only from
-    # other SeaweedFS pods.
+    # other SeaweedFS pods, PLUS the upstream subchart's post-install bucket-provisioning
+    # hook. That hook ({release}-bucket-hook) runs `weed shell` against the master/filer
+    # but carries only app.kubernetes.io/instance — NOT the name label — so on a
+    # NetworkPolicy-ENFORCING CNI it was DROPPED and hung the whole install
+    # (P1 DEP-SWFS-NETPOL). Admit it narrowly by its Job-name label (both the legacy and
+    # the batch/v1 forms) so a from-scratch install completes without disabling this policy.
     - from:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: seaweedfs
+        - podSelector:
+            matchLabels:
+              job-name: {{ .Release.Name }}-bucket-hook
+        - podSelector:
+            matchLabels:
+              batch.kubernetes.io/job-name: {{ .Release.Name }}-bucket-hook
       ports:
         - protocol: TCP
           port: {{ .Values.seaweedfs.master.port }}        # 9333

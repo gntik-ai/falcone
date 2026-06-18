@@ -137,7 +137,10 @@ export async function executePostgresDdl(registry, params) {
   }
 
   // DDL runs on the admin/owner connection (the app role cannot create objects),
-  // as a single transactional unit (transactional_ddl).
+  // as a single transactional unit (transactional_ddl). requireDedicatedDatabase
+  // fails closed (403) when the workspace has no dedicated wsdb_*, so DDL can never
+  // touch the shared platform database `in_falcone`, even via a forged trust-header
+  // request naming an unprovisioned workspace (fix-executor-ddl-db-ownership-guard).
   return registry.withAdminClient(workspaceId, async (client) => {
     try {
       await client.query('BEGIN');
@@ -150,5 +153,5 @@ export async function executePostgresDdl(registry, params) {
       throw mapPgError(error);
     }
     return { executed: true, executionMode: 'execute', statementCount: statements.length, statements };
-  });
+  }, { requireDedicatedDatabase: true });
 }
