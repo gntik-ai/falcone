@@ -7,7 +7,7 @@
 // FunctionInvocationAccepted / GatewayMutationAccepted).
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcName, ksvcHost } from './function-executor.mjs';
+import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
@@ -59,7 +59,9 @@ async function fnDeploy(ctx) {
   const limits = b.execution?.limits ?? {};
   const memoryMb = Number(limits.memoryMb) || 256;
   const timeoutMs = Number(limits.timeoutMs) || 60000;
-  const name = ksvcName(ws.slug ?? ws.id.slice(0, 8), actionName);
+  // Per-(tenant, workspace) ksvc name so two tenants' same-named workspaces never
+  // collide on a shared Knative Service (P0 ISO-FUNCTIONS).
+  const name = ksvcNameForWorkspace(ws, actionName);
   // Deploy/update the function's Knative Service (new revision on code change).
   try {
     await deployKnativeService(name, code, { memoryMb, timeoutMs });

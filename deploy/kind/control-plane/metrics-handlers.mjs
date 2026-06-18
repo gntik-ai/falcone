@@ -12,8 +12,10 @@
 // Honest: limits are real; usage/series/audit reflect what's actually available.
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
+import { canManageTenant } from './tenant-scope.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
+const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 const nowIso = () => new Date().toISOString();
 const ENTITLEMENTS = '/repo/services/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs';
 const WS_CONSUMPTION = '/repo/services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs';
@@ -147,12 +149,37 @@ async function auditExport(ctx) {
     filters: ctx.body?.filters ?? {} });
 }
 
+// ---- own-tenant authorization (P0 ISO-METRICS) -----------------------------
+// Every metrics route is `auth: authenticated`, so without this guard ANY verified
+// caller could read ANY tenant's metrics by id (and a non-existent id returned a
+// 200). Resolve the path scope to its owning tenant and apply the same own-tenant
+// guard b-handlers uses for tenant/workspace management: tenant owners/admins may
+// read only their own tenant; superadmin/internal may read any.
+async function resolveScopeTenant(ctx) {
+  if (ctx.params.workspaceId) {
+    const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
+    if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+    return { tenantId: ws.tenant_id };
+  }
+  return { tenantId: ctx.params.tenantId };
+}
+function guarded(handler) {
+  return async (ctx) => {
+    const scope = await resolveScopeTenant(ctx);
+    if (scope.error) return scope.error;
+    if (!canManageTenant(ctx.identity, scope.tenantId)) {
+      return err(403, 'FORBIDDEN', 'cannot read another tenant’s metrics');
+    }
+    return handler(ctx);
+  };
+}
+
 // Tenant + workspace share the same handlers (scope inferred from the path params).
 export const METRICS_HANDLERS = {
-  metricsTenantQuotas: quotas, metricsWorkspaceQuotas: quotas,
-  metricsTenantOverview: overview, metricsWorkspaceOverview: overview,
-  metricsTenantUsage: usage, metricsWorkspaceUsage: usage,
-  metricsTenantSeries: series, metricsWorkspaceSeries: series,
-  metricsTenantAudit: auditRecords, metricsWorkspaceAudit: auditRecords,
-  metricsTenantAuditExport: auditExport, metricsWorkspaceAuditExport: auditExport
+  metricsTenantQuotas: guarded(quotas), metricsWorkspaceQuotas: guarded(quotas),
+  metricsTenantOverview: guarded(overview), metricsWorkspaceOverview: guarded(overview),
+  metricsTenantUsage: guarded(usage), metricsWorkspaceUsage: guarded(usage),
+  metricsTenantSeries: guarded(series), metricsWorkspaceSeries: guarded(series),
+  metricsTenantAudit: guarded(auditRecords), metricsWorkspaceAudit: guarded(auditRecords),
+  metricsTenantAuditExport: guarded(auditExport), metricsWorkspaceAuditExport: guarded(auditExport)
 };
