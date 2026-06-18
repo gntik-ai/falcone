@@ -1,14 +1,15 @@
 # Tasks — fix-activate-seaweedfs-tenant-identities
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Deployed control-plane pod env has only STORAGE_S3_ENDPOINT/ACCESS_KEY/SECRET_KEY (no STORAGE_TENANT_IDENTITIES); direct S3 admin cred lists/reads/writes both tenants' buckets.
+- [x] `tests/blackbox/seaweedfs-tenant-identities-default-on.test.mjs` — fails on old code: `tenantIdentitiesEnabled` does not exist and issuance was gated on `=== '1'` (dropped by an env-list overlay → `storageCredential: null`).
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] Ensure the flag is set in every profile (or default-on); verify the per-workspace identity provision/rotate/revoke path issues real per-tenant SeaweedFS credentials and the storage API vends them.
+- [x] `storage-handlers.mjs`: new exported `tenantIdentitiesEnabled(env)` — DEFAULT-ON (disabled only by explicit `0/false/off/no`); the provision path uses it so an env-list overlay can no longer silently disable per-tenant identities.
+- [x] `tests/live-campaign/values-campaign.yaml`: re-add `STORAGE_TENANT_IDENTITIES=1` to the (full-replace) control-plane env list so the campaign profile documents the intent. (`deploy/kind/values-kind.yaml` already sets it.)
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Each workspace gets a distinct S3 identity scoped to its bucket prefix; tenant A's S3 credential cannot access tenant B's buckets.
+- [x] `node --test tests/blackbox/seaweedfs-tenant-identities-default-on.test.mjs` green; seaweedfs identity + storage IDOR/scope tests unaffected.
+- [x] Acceptance: each provisioned bucket vends a distinct, bucket-scoped S3 credential even when the env flag is absent; tenant A's S3 credential cannot access tenant B's buckets (mechanism from #553, verified live).
 
 ## Archive
 - [ ] `openspec validate fix-activate-seaweedfs-tenant-identities --strict`; `/opsx:archive fix-activate-seaweedfs-tenant-identities` after merge.

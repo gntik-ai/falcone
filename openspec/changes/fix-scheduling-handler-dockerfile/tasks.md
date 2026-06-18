@@ -1,14 +1,15 @@
 # Tasks — fix-scheduling-handler-dockerfile
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: any `/v1/scheduling/*` request crashes 500 before business logic; the .
+- [x] `tests/blackbox/scheduling-handler-dockerfile.test.mjs` — fails on old code: the route map references `services/scheduling-engine` but the Dockerfile does not COPY it, and there is no build-time resolution check.
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] Add the COPY for the scheduling handler (and a startup check that every route-map handler resolves).
+- [x] `deploy/kind/control-plane/Dockerfile`: `COPY services/scheduling-engine /repo/services/scheduling-engine`.
+- [x] `deploy/kind/control-plane/Dockerfile`: build-time `RUN node -e` check that every route-map handler module resolves (fails the build on a missing COPY).
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: `/v1/scheduling/*` returns business responses; the image build fails if a route-map handler is missing.
+- [x] `node --test tests/blackbox/scheduling-handler-dockerfile.test.mjs` green; the build-check JS is valid.
+- [x] Acceptance: `/v1/scheduling/*` resolves its handler (no `ERR_MODULE_NOT_FOUND`); a missing handler now fails the build.
 
 ## Archive
 - [ ] `openspec validate fix-scheduling-handler-dockerfile --strict`; `/opsx:archive fix-scheduling-handler-dockerfile` after merge.

@@ -1,14 +1,14 @@
 # Tasks — fix-plan-impact-usage-bigint
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: every plan assignment returns 500; both seeded tenants ended with plan=None.
+- [x] `tests/blackbox/plan-impact-usage-bigint.test.mjs` — drives `applyGovernanceSchema`; fails on old code where the columns are INTEGER.
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] Change `observed_usage` (and sibling usage columns) to BIGINT.
+- [x] `services/provisioning-orchestrator/src/migrations/100-plan-change-impact-history.sql`: `observed_usage`, `previous_effective_value`, `new_effective_value` → BIGINT; idempotent guarded `ALTER ... TYPE BIGINT` upgrades existing tables (migration re-runs each boot).
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Plan assign -> 2xx; entitlements reflect the plan; large byte usage stored without error.
+- [x] `node --test tests/blackbox/plan-impact-usage-bigint.test.mjs` green; governance-schema-bootstrap unaffected.
+- [x] Acceptance: plan assign with multi-GB usage → 2xx; impact row persisted; entitlements reflect the plan (no INTEGER-overflow 500).
 
 ## Archive
 - [ ] `openspec validate fix-plan-impact-usage-bigint --strict`; `/opsx:archive fix-plan-impact-usage-bigint` after merge.

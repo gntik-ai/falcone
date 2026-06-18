@@ -28,21 +28,14 @@ bootstrap:
   enabled: true
 
 seaweedfs:
-  # CAMPAIGN WORKAROUND (finding DEP-SWFS-NETPOL, this re-run): the Falcone-authored
-  # templates/seaweedfs-networkpolicy.yaml restricts the storage tier's internal ports
-  # (master 9333/19333, filer 8888/18888) to pods labeled `app.kubernetes.io/name: seaweedfs`,
-  # but the UPSTREAM seaweedfs subchart's post-install bucket-provisioning hook
-  # (`{release}-bucket-hook`) carries only `app.kubernetes.io/instance` — NO name label.
-  # On any NetworkPolicy-ENFORCING CNI (this kind cluster runs the kube-network-policies
-  # agent; prod Calico/Cilium/OVN likewise) the hook's `wget /cluster/status` to the master
-  # is DROPPED, so it hangs forever and the post-install hook chain (weight -5) blocks the
-  # documentdb-init hook (weight 5) -> ferretdb never converges -> `helm install` times out.
-  # The chart comment wrongly assumes "kind does not enforce NetworkPolicy". Disabling the
-  # netpol here unblocks the from-scratch install; storage-tier network isolation is then not
-  # enforced for this run (tenant data isolation is still proven at the credential/data layer).
-  # PROPER FIX (issue): allow the bucket-hook in the netpol (or label it `name: seaweedfs`).
+  # DEP-SWFS-NETPOL is now FIXED at the source: templates/seaweedfs-networkpolicy.yaml
+  # admits the upstream subchart's post-install bucket-provisioning hook
+  # (`{release}-bucket-hook`) by its Job-name label on the master/filer ports, so a
+  # from-scratch install completes on a NetworkPolicy-ENFORCING CNI (this kind cluster runs
+  # the kube-network-policies agent) WITHOUT disabling the policy. Kept ENABLED so the
+  # campaign re-run exercises the storage-tier isolation together with the hook allowance.
   networkPolicy:
-    enabled: false
+    enabled: true
 
 vault:
   # DISABLED in the CORE install — installed/tested SEPARATELY in a second wave
@@ -134,6 +127,11 @@ controlPlane:
     # the control-plane creates on demand from this image (no static ksvc to apply).
     - name: FN_RUNTIME_IMAGE
       value: localhost:30500/in-falcone-fn-runtime:head-20260618
+    # Per-workspace SeaweedFS identities (filer-mode). The handler now defaults this ON,
+    # but keep it explicit so this overlay's full env list documents the intent (it
+    # previously dropped the flag → single shared admin S3 cred; P1 tenant-isolation).
+    - name: STORAGE_TENANT_IDENTITIES
+      value: "1"
 
 webConsole:
   image:

@@ -1,14 +1,15 @@
 # Tasks — add-tenant-owner-enduser-management
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: as a tenant_owner, listing the project's end-users -> 403; disable/delete are superadmin-only.
+- [x] `tests/blackbox/tenant-owner-enduser-list.test.mjs` — fails on old code: `iamListUsers` had no owner authz and the route was superadmin-only (owner → 403).
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] A project-scoped end-user management API authorized for the owning tenant.
+- [x] `b-handlers.mjs::iamListUsers`: authorize via `authorizeRealmManage` (superadmin OR owning-tenant owner/admin; cross-tenant denied) and accept an injectable `ctx.kcAdmin`.
+- [x] `routes.mjs`: `GET /v1/iam/realms/{realmId}/users` → `auth: 'authenticated'` (handler authorizes), matching the #567 delete/status routes.
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: An owner lists/disables/deletes only its own project's end-users; cross-tenant denied.
+- [x] `node --test tests/blackbox/tenant-owner-enduser-list.test.mjs` green; enduser-lifecycle / iam-realm-binding / iam-user-credentials unaffected.
+- [x] Acceptance: an owner lists (and per #567 disables/deletes) only its own project's end-users; cross-tenant denied (no Keycloak call).
 
 ## Archive
 - [ ] `openspec validate add-tenant-owner-enduser-management --strict`; `/opsx:archive add-tenant-owner-enduser-management` after merge.

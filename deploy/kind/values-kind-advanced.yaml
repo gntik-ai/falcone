@@ -74,7 +74,10 @@ workflowWorker:
     - { name: PGHOST, value: falcone-postgresql }
     - { name: PGUSER, value: falcone }
     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
-    - { name: PGDATABASE, value: falcone }
+    # in_falcone (matches the control-plane/executor): the worker's db.query activity resolves
+    # per-workspace databases via the workspace_databases registry, which lives in in_falcone.
+    # `falcone` was the wrong DB → the registry lookup missed and routing fell back to the base.
+    - { name: PGDATABASE, value: in_falcone }
 
 # ---- Executor: serves the data-plane + realtime + flows + MCP -------------------------------
 # The base kind profile does not configure the executor, so this overlay provides its full env:

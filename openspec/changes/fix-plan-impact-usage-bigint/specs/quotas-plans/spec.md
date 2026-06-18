@@ -2,11 +2,17 @@
 
 ## ADDED Requirements
 
-### Requirement: Plan-impact usage column overflows INTEGER (no tenant can be assigned a plan)
+### Requirement: Plan-impact usage and limit columns are BIGINT
 
-The system SHALL ensure that plan-impact usage column overflows INTEGER (no tenant can be assigned a plan): Change `observed_usage` (and sibling usage columns) to BIGINT.
+Plan-impact usage and effective-limit columns SHALL be stored as `BIGINT`. This covers
+`tenant_plan_quota_impacts.observed_usage`, `previous_effective_value`, and
+`new_effective_value`, because quota values are measured in the dimension's unit (bytes
+for storage) and routinely exceed the `INTEGER` range. The migration SHALL upgrade
+existing deployments idempotently.
 
-#### Scenario: corrected behavior verified end-to-end
+#### Scenario: assigning a plan with multi-GB usage succeeds
 
-- **WHEN** the conditions in the reproduction are exercised against the running system
-- **THEN** Plan assign -> 2xx
+- **WHEN** a tenant is assigned a plan whose observed storage usage is several GB
+  (greater than the INTEGER maximum)
+- **THEN** `POST /v1/tenants/{id}/plan` succeeds (2xx), the impact row is persisted, and
+  entitlements reflect the plan (no INTEGER-overflow 500).

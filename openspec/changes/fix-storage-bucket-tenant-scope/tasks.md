@@ -1,14 +1,15 @@
 # Tasks — fix-storage-bucket-tenant-scope
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Two tenants `POST /v1/storage/workspaces/{ws}/buckets` with no explicit name (both ws slug `app-staging`) -> second create hijacks the first's registry row; first tenant's bucket list drops to 0.
+- [x] `tests/blackbox/storage-bucket-tenant-scope.test.mjs` — fails on the old code: `deriveBucketName` export is absent and `insertBucket`'s ON CONFLICT reassigns `workspace_id`/`tenant_id` (hijack).
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] Include the workspace id in the physical bucket name; key the registry by `(workspace_id, bucket_name)`; never let `ON CONFLICT` cross tenant_id.
+- [x] `storage-handlers.mjs`: new exported `deriveBucketName(workspaceId, name)` — DNS-safe name embedding a stable hash of the unique workspace id (mirrors product `deriveWorkspaceBucketName`); `storageProvisionBucket` uses it.
+- [x] `tenant-store.mjs::insertBucket`: `ON CONFLICT (bucket_name)` no longer reassigns `workspace_id`/`tenant_id` (idempotent, owner-stable).
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Same-slug workspaces across tenants get distinct buckets; neither can hijack the other's registry row.
+- [x] `node --test tests/blackbox/storage-bucket-tenant-scope.test.mjs` green; existing storage/seaweedfs tests unaffected.
+- [x] Acceptance: same-slug workspaces across tenants get distinct buckets; neither can hijack the other's registry row.
 
 ## Archive
 - [ ] `openspec validate fix-storage-bucket-tenant-scope --strict`; `/opsx:archive fix-storage-bucket-tenant-scope` after merge.

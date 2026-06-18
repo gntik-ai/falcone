@@ -1,14 +1,14 @@
 # Tasks — fix-iam-user-credentials
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: register -> 201, but `GET .
+- [x] `tests/blackbox/iam-user-credentials.test.mjs` — fails on old code: the `credentialPasswordFromBody` export is absent and `iamCreateUser` read only `body.password`, dropping the credentials array.
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] Pass the credentials through to Keycloak on create (or expose a set-password sub-route).
+- [x] `b-handlers.mjs`: new exported `credentialPasswordFromBody(body)` accepts the password from the flat `password` field OR the standard `credentials: [{type:'password', value, temporary}]` array; `iamCreateUser` uses it (passes the password + temporary flag through to Keycloak).
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: A user created with a password can immediately log in.
+- [x] `node --test tests/blackbox/iam-user-credentials.test.mjs` green; iam-realm-binding + enduser-lifecycle-management unaffected.
+- [x] Acceptance: a user created with a password (flat or credentials array) can log in immediately; temporary credentials are preserved.
 
 ## Archive
 - [ ] `openspec validate fix-iam-user-credentials --strict`; `/opsx:archive fix-iam-user-credentials` after merge.
