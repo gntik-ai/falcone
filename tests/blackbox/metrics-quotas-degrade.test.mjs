@@ -62,7 +62,14 @@ test('bbx-f4-01: ensureSchema provisions quota_dimension_catalog/overrides + pla
 // bbx-f4-02: the quotas/overview/usage endpoints return 200 and never 500
 // -------------------------------------------------------------------------
 test('bbx-f4-02: metrics quotas/overview/usage return 200 and degrade gracefully', async () => {
-  const ctx = { pool: handlerPool(), callerContext: { actor: { id: 'u', type: 'tenant_admin', tenantId: 'tnt_a' } }, params: { tenantId: 'tnt_a' } };
+  // server.mjs always injects ctx.identity (from the verified JWT) on authenticated
+  // routes; an authorized same-tenant operator reaches the handler and degrades to 200.
+  const ctx = {
+    pool: handlerPool(),
+    identity: { sub: 'u', actorType: 'tenant_admin', tenantId: 'tnt_a', roles: ['tenant_admin'], scopes: [] },
+    callerContext: { actor: { id: 'u', type: 'tenant_admin', tenantId: 'tnt_a' } },
+    params: { tenantId: 'tnt_a' },
+  };
 
   const q = await METRICS_HANDLERS.metricsTenantQuotas(ctx);
   assert.equal(q.statusCode, 200, 'quotas must return 200 (was 500 when the inner path errored)');
