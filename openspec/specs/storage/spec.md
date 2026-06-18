@@ -1160,3 +1160,60 @@ The system SHALL ensure that object PUT is JSON-only (not S3-compatible, no bina
 - **WHEN** the conditions in the reproduction are exercised against the running system
 - **THEN** Binary round-trip is byte-identical
 
+### Requirement: The SeaweedFS netpol admits the bucket-provisioning hook
+
+The SeaweedFS internal-only NetworkPolicy SHALL admit the upstream subchart's
+post-install bucket-provisioning hook (`{release}-bucket-hook`) to the master/filer
+ports, selected narrowly by its Job-name label, so a from-scratch install completes on
+a NetworkPolicy-enforcing CNI without disabling the policy.
+
+#### Scenario: a from-scratch install completes with the netpol enabled
+
+- **WHEN** the chart is installed on a NetworkPolicy-enforcing cluster with
+  `seaweedfs.networkPolicy.enabled=true`
+- **THEN** the bucket-hook can reach the master/filer (its traffic is not dropped), the
+  post-install hook chain completes, and `helm install` does not hang — without disabling
+  the storage-tier network isolation.
+
+### Requirement: Physical bucket names are workspace-id scoped and registry rows are non-hijackable
+
+The control-plane storage provisioning path SHALL derive the physical bucket name
+from the globally-unique workspace id (a stable hash), NOT from the per-tenant
+workspace `slug`. The `workspace_buckets` registry `ON CONFLICT (bucket_name)`
+SHALL NOT reassign `workspace_id` or `tenant_id`, so a name collision can never
+transfer ownership of another tenant's bucket row.
+
+#### Scenario: same-slug workspaces across tenants get distinct buckets
+
+- **WHEN** tenant A and tenant B each provision a bucket in their respective
+  `app-staging` workspaces (same slug, different workspace ids), with or without an
+  explicit name
+- **THEN** each receives a distinct physical bucket name and a distinct registry row
+- **AND** neither tenant's `workspace_buckets` row is overwritten and neither bucket
+  disappears from its owner's listing.
+
+#### Scenario: re-provisioning a bucket is idempotent and owner-stable
+
+- **WHEN** the owning tenant provisions the same bucket twice
+- **THEN** the second call returns the original registry row (idempotent) with the
+  owner (`workspace_id`/`tenant_id`) unchanged.
+
+### Requirement: Per-tenant SeaweedFS identity issuance is on by default
+
+Per-workspace SeaweedFS identity issuance on bucket provision SHALL be enabled by
+default and SHALL NOT depend on an environment flag that a Helm values overlay can
+silently drop by replacing the control-plane env list. Issuance MAY be disabled only
+by an explicit opt-out (`STORAGE_TENANT_IDENTITIES` set to `0`/`false`/`off`/`no`).
+
+#### Scenario: identities are issued even when the env flag is absent
+
+- **WHEN** the control-plane runs with no `STORAGE_TENANT_IDENTITIES` env (e.g. an
+  overlay replaced the env list)
+- **THEN** per-workspace identity issuance is still active, so each provisioned bucket
+  vends a distinct, bucket-scoped S3 credential instead of `storageCredential: null`.
+
+#### Scenario: issuance can still be turned off explicitly
+
+- **WHEN** `STORAGE_TENANT_IDENTITIES` is set to `0` (or `false`/`off`/`no`)
+- **THEN** identity issuance is skipped (for backends without filer-mode support).
+
