@@ -98,3 +98,21 @@ The system SHALL extend `createControlPlaneServer` (`apps/control-plane/src/runt
 - **WHEN** `createControlPlaneServer` is initialised with a `flowExecutor` alongside existing executors
 - **THEN** all previously registered routes (postgres-data, DDL, mongo, events, functions, realtime, embedding) continue to match and respond correctly
 
+### Requirement: cp-executor cannot reach FerretDB (NetworkPolicy label mismatch)
+
+The system SHALL ensure that cp-executor cannot reach FerretDB (NetworkPolicy label mismatch) is corrected: Set `app.kubernetes.io/name: control-plane-executor` on the executor pod template; align the chart `controlPlaneExecutor` labels with the NetworkPolicy contract.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** Executor mongo CRUD 2xx on a clean deploy
+
+### Requirement: Governance schema incomplete (capability-catalog / plan-assignment / scope-audit 500)
+
+The system SHALL ensure that governance schema incomplete (capability-catalog / plan-assignment / scope-audit 500) is corrected: Ensure the control-plane schema bootstrap creates+seeds the full governance schema (or the bootstrap Job runs the governance migrations) so all provisioning-orchestrator actions resolve.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** The four endpoints return 200
+
