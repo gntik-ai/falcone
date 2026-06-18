@@ -561,6 +561,31 @@ export async function markTenantDeleted(pool, id) {
   return rows[0] ?? null;
 }
 
+// Cascading teardown of a SINGLE workspace (add-deploy-completeness-cluster, #562). Mirrors
+// purgeTenant's collect-then-delete, scoped to one workspace_id (NOT a whole tenant): collects
+// the physical resources the caller must tear down (its per-workspace wsdb_* database, bucket(s),
+// topic(s)) BEFORE deleting the registry rows, then deletes the child rows and finally the
+// workspace row. Each delete is best-effort against a table that may be absent in this hand-built
+// runtime (42P01 ignored), keeping the operation idempotent and retryable. The workspace's tenant
+// ownership is enforced by the CALLER (deleteWorkspace) before this runs — this function performs
+// no authorization, only the workspace-scoped row teardown.
+export async function purgeWorkspace(pool, workspaceId) {
+  const collect = async (sql) => { try { return (await pool.query(sql, [workspaceId])).rows; } catch { return []; } };
+  const databases = (await collect('SELECT database_name FROM workspace_databases WHERE workspace_id=$1')).map((r) => r.database_name);
+  const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE workspace_id=$1')).map((r) => r.bucket_name);
+  const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE workspace_id=$1')).map((r) => r.physical_topic_name);
+  const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE workspace_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
+
+  const del = async (sql, params) => { try { await pool.query(sql, params); } catch (e) { if (e.code !== '42P01') throw e; } }; // ignore undefined_table
+  // Child rows first (every workspace-owned table is keyed by workspace_id), then the workspace.
+  for (const t of ['fn_activations', 'fn_actions', 'workspace_functions', 'workspace_topics',
+                   'workspace_buckets', 'workspace_databases', 'workspace_api_keys', 'service_accounts']) {
+    await del(`DELETE FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
+  }
+  await del('DELETE FROM workspaces WHERE id = $1', [workspaceId]);
+  return { databases, buckets, topics, ksvcs, workspaceId };
+}
+
 // Cascading purge of every row a tenant owns (add-tenant-delete-purge-cascade, #501). Collects
 // the physical resources the caller must tear down (databases/buckets/topics/ksvcs) BEFORE
 // deleting the registry rows, then deletes child rows before parents. Each table delete is

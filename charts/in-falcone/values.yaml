@@ -2760,6 +2760,11 @@ observability:
   serviceAccount:
     create: true
     name: ""
+    # Hardened default: NO SA token mounted. The widened Prometheus scrape (add-deploy-completeness-
+    # cluster, #562) uses Kubernetes pod service-discovery, which needs an authenticated API token
+    # + the namespaced pod-list Role (observability-prometheus-rbac.yaml). Deploy overlays that want
+    # pod-discovery (e.g. deploy/kind/values-kind.yaml) opt in by setting automountToken: true; the
+    # base chart stays token-less so the security-hardening default is preserved.
     automountToken: false
   service:
     enabled: true
@@ -2982,7 +2987,14 @@ controlPlane:
       - ReadWriteOnce
     mountPath: /srv/control-plane
     annotations: {}
-  podAnnotations: {}
+  # Prometheus pod-discovery hint (add-deploy-completeness-cluster, #562): the control-plane
+  # exposes falcone_* HTTP metrics at /metrics, so annotate it for the namespace-scoped
+  # kubernetes_sd pod-discovery scrape job (observability-prometheus-config.yaml). This widens
+  # metrics coverage beyond the 3 hardcoded static targets to any annotated component.
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: /metrics
   podLabels: {}
   podSecurityContext: {}
   securityContext:
@@ -3053,6 +3065,14 @@ controlPlaneExecutor:
   ports:
     - name: http
       containerPort: 8080
+  # Prometheus pod-discovery hint (add-deploy-completeness-cluster, #562): the cp-executor
+  # exposes its HTTP metrics at /metrics (runtime/server.mjs), so annotate it for the
+  # namespace-scoped kubernetes_sd pod-discovery scrape job (it is scraped even when applied
+  # out-of-band of the chart, as long as it runs in the release namespace with this annotation).
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: /metrics
   # Data connection env is environment-specific (release-prefixed DNS + external secrets);
   # set it in the overlay, e.g.:
   #   env:

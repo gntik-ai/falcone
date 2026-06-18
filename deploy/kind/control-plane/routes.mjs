@@ -63,6 +63,11 @@ export const routes = [
   { method: 'GET',  path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'listTenantWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces', localHandler: 'listWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}', localHandler: 'getWorkspace', auth: 'authenticated' },
+  // Single-workspace cascading teardown (#562): owner-of-the-workspace's-tenant OR superadmin
+  // (handler authorizes own-tenant; cross-tenant → 404). The per-workspace counterpart of
+  // POST /v1/tenants/{tenantId}/purge — drops the wsdb_* DB, deletes the bucket(s)/topic(s), and
+  // removes the workspace + its service-account/api-key rows. Was NO_ROUTE (only tenant purge cascaded).
+  { method: 'DELETE', path: '/v1/workspaces/{workspaceId}', localHandler: 'deleteWorkspace', auth: 'authenticated' },
 
   // ---- domain B: service accounts + credentials (LOCAL) --------------------
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts', localHandler: 'createServiceAccount', auth: 'authenticated' },

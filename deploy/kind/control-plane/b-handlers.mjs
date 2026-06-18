@@ -374,6 +374,47 @@ async function getWorkspace(ctx) {
   return ok(200, { workspace: workspaceOut(ws), ...workspaceOut(ws) });
 }
 
+// DELETE /v1/workspaces/{workspaceId} — single-workspace cascading teardown
+// (add-deploy-completeness-cluster, #562). Tears down EVERYTHING the workspace owns, scoped to the
+// owning tenant — the per-workspace counterpart of purgeTenant. ISOLATION (cardinal rule): resolve
+// the workspace FIRST, then gate that the caller owns it. A tenant owner/admin may delete ONLY a
+// workspace whose tenant_id matches their verified identity; a cross-tenant id is reported as 404
+// (no existence leak). superadmin/internal may delete any. Mirrors getWorkspace's ownership gate
+// (but 404, not 403, on a foreign workspace, matching the storage/kafka no-existence-leak idiom).
+// Physical teardown (DB drop, bucket/topic delete) is best-effort (try/catch, report what was
+// removed); the registry-row teardown is reliable, so no orphaned rows remain. Teardown ops are
+// injectable (ctx.*) for testing, defaulting to the real module functions.
+async function deleteWorkspace(ctx) {
+  const { params, identity, pool } = ctx;
+  const dropDb = ctx.dropWorkspaceDatabase ?? dropWorkspaceDatabase;
+  const delBucket = ctx.deleteBucket ?? deleteBucket;
+  const delTopics = ctx.deleteTopics ?? deleteTopics;
+
+  const ws = await store.getWorkspace(pool, params.workspaceId);
+  // Resolve-then-gate: a missing OR cross-tenant workspace is 404 (no existence leak). Superadmin/
+  // internal bypass the tenant match; everyone else must own the workspace's tenant.
+  const owns = ws && canManageTenantId(identity, ws.tenant_id);
+  if (!ws || !owns) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
+
+  // 1. Delete the workspace's registry rows + collect the physical resources to tear down.
+  const phys = await store.purgeWorkspace(pool, ws.id);
+  // 2. Drop the per-workspace database(s) — best-effort (rows already removed above).
+  const databasesDropped = [];
+  for (const db of phys.databases) { try { await dropDb(pool, db); databasesDropped.push(db); } catch { /* best-effort */ } }
+  // 3. Best-effort physical object-store + topic teardown.
+  const bucketsDeleted = [];
+  for (const b of phys.buckets) { try { await delBucket(b); bucketsDeleted.push(b); } catch { /* best-effort */ } }
+  let topicsDeleted = [];
+  try { await delTopics(phys.topics); topicsDeleted = phys.topics; } catch { /* best-effort */ }
+
+  return ok(200, {
+    workspaceId: ws.id, tenantId: ws.tenant_id, deleted: true,
+    removed: { databases: databasesDropped, buckets: bucketsDeleted, topics: topicsDeleted },
+    // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
+    residual: { knativeServices: phys.ksvcs },
+  });
+}
+
 // ---- service accounts (= confidential Keycloak client in the tenant realm) --
 async function resolveWorkspaceForManage(ctx) {
   const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
@@ -796,7 +837,7 @@ export const LOCAL_HANDLERS = {
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
   recordScopeEnforcementDenial,
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
-  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
+  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, deleteWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
