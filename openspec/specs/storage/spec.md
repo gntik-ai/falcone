@@ -1151,3 +1151,12 @@ The system SHALL scope each per-workspace SeaweedFS identity to that workspace's
 - **WHEN** an identities document is built for a workspace with an empty or wildcard (`*`) bucket scope
 - **THEN** the build is rejected with `INVALID_IDENTITY_SCOPE` and no identity is written
 
+### Requirement: Object PUT is JSON-only (not S3-compatible, no binary)
+
+The system SHALL ensure that object PUT is JSON-only (not S3-compatible, no binary) is corrected: Accept raw bytes (or base64) so arbitrary objects can be stored.
+
+#### Scenario: corrected behavior verified end-to-end
+
+- **WHEN** the conditions in the reproduction are exercised against the running system
+- **THEN** Binary round-trip is byte-identical
+
