@@ -26,7 +26,7 @@
 - [x] Live on kind: KC starts in production mode Postgres-backed (87 KC tables in the `keycloak` DB),
   create realm `persist-test`+user → **delete the KC pod** → after restart the realm + user SURVIVE
   (admin API 200, public OIDC discovery 200, rows present in Postgres). No re-bootstrap. No OOM.
-- [ ] Black-box suite green (`bash tests/blackbox/run.sh`).
+- [x] Black-box suite green (`bash tests/blackbox/run.sh`) — 896 pass / 0 fail (2026-06-18).
 
 ## Archive
-- [ ] `openspec validate fix-keycloak-persistent-store --strict`; `/opsx:archive` after merge.
+- [x] `openspec validate fix-keycloak-persistent-store --strict` (clean); archived after merge of impl #613 to origin/main.
