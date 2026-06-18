@@ -1,0 +1,43 @@
+{{- if .Values.observability.enabled }}
+{{- /*
+  RBAC for the Prometheus Kubernetes pod service-discovery scrape job
+  (add-deploy-completeness-cluster, #562). The widened scrape config
+  (observability-prometheus-config.yaml) uses `kubernetes_sd_configs` (role: pod,
+  scoped to the release namespace) to discover any Falcone pod annotated
+  `prometheus.io/scrape: "true"`. That discovery requires the Prometheus
+  ServiceAccount to list/watch pods in the namespace. Namespace-scoped (a Role, not
+  a ClusterRole) — discovery is restricted to this release's namespace, so Prometheus
+  never sees pods in other namespaces/tenants. Bound to the observability SA.
+*/ -}}
+{{- $saName := default (printf "%s-observability" .Release.Name) .Values.observability.serviceAccount.name -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-prometheus-pod-discovery
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    in-falcone.io/component: observability
+rules:
+  # Pod service-discovery: read pods (+ their annotations) in this namespace only.
+  - apiGroups: [""]
+    resources: ["pods", "endpoints", "services"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-prometheus-pod-discovery
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    in-falcone.io/component: observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-prometheus-pod-discovery
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName }}
+    namespace: {{ .Values.global.namespace }}
+{{- end }}

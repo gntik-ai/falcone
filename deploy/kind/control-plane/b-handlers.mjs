@@ -17,6 +17,7 @@ import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
+import { recordScopeDenial } from './audit-writer.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -373,6 +374,47 @@ async function getWorkspace(ctx) {
   return ok(200, { workspace: workspaceOut(ws), ...workspaceOut(ws) });
 }
 
+// DELETE /v1/workspaces/{workspaceId} — single-workspace cascading teardown
+// (add-deploy-completeness-cluster, #562). Tears down EVERYTHING the workspace owns, scoped to the
+// owning tenant — the per-workspace counterpart of purgeTenant. ISOLATION (cardinal rule): resolve
+// the workspace FIRST, then gate that the caller owns it. A tenant owner/admin may delete ONLY a
+// workspace whose tenant_id matches their verified identity; a cross-tenant id is reported as 404
+// (no existence leak). superadmin/internal may delete any. Mirrors getWorkspace's ownership gate
+// (but 404, not 403, on a foreign workspace, matching the storage/kafka no-existence-leak idiom).
+// Physical teardown (DB drop, bucket/topic delete) is best-effort (try/catch, report what was
+// removed); the registry-row teardown is reliable, so no orphaned rows remain. Teardown ops are
+// injectable (ctx.*) for testing, defaulting to the real module functions.
+async function deleteWorkspace(ctx) {
+  const { params, identity, pool } = ctx;
+  const dropDb = ctx.dropWorkspaceDatabase ?? dropWorkspaceDatabase;
+  const delBucket = ctx.deleteBucket ?? deleteBucket;
+  const delTopics = ctx.deleteTopics ?? deleteTopics;
+
+  const ws = await store.getWorkspace(pool, params.workspaceId);
+  // Resolve-then-gate: a missing OR cross-tenant workspace is 404 (no existence leak). Superadmin/
+  // internal bypass the tenant match; everyone else must own the workspace's tenant.
+  const owns = ws && canManageTenantId(identity, ws.tenant_id);
+  if (!ws || !owns) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
+
+  // 1. Delete the workspace's registry rows + collect the physical resources to tear down.
+  const phys = await store.purgeWorkspace(pool, ws.id);
+  // 2. Drop the per-workspace database(s) — best-effort (rows already removed above).
+  const databasesDropped = [];
+  for (const db of phys.databases) { try { await dropDb(pool, db); databasesDropped.push(db); } catch { /* best-effort */ } }
+  // 3. Best-effort physical object-store + topic teardown.
+  const bucketsDeleted = [];
+  for (const b of phys.buckets) { try { await delBucket(b); bucketsDeleted.push(b); } catch { /* best-effort */ } }
+  let topicsDeleted = [];
+  try { await delTopics(phys.topics); topicsDeleted = phys.topics; } catch { /* best-effort */ }
+
+  return ok(200, {
+    workspaceId: ws.id, tenantId: ws.tenant_id, deleted: true,
+    removed: { databases: databasesDropped, buckets: bucketsDeleted, topics: topicsDeleted },
+    // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
+    residual: { knativeServices: phys.ksvcs },
+  });
+}
+
 // ---- service accounts (= confidential Keycloak client in the tenant realm) --
 async function resolveWorkspaceForManage(ctx) {
   const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
@@ -682,9 +724,120 @@ async function iamRemoveUserFromGroup(ctx) {
   catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GROUP_REMOVE_FAILED', String(e.message ?? e)); }
 }
 
+// ---- project (tenant) auth-config: login methods + social providers (#568) --
+// Enabling username/password + configuring social IdPs per project was only possible via raw
+// Keycloak admin (no Falcone API). These owner-scoped handlers drive the realm's auth config.
+// Isolation (cardinal rule): resolve the tenant from the path, then guard against the VERIFIED
+// identity — a tenant owner may configure ONLY their OWN project's realm (cross-tenant → 403).
+async function authorizeAuthConfig(ctx) {
+  const tenant = await store.getTenant(ctx.pool, ctx.params.tenantId);
+  if (!tenant) return { error: err(404, 'TENANT_NOT_FOUND', `tenant ${ctx.params.tenantId} not found`) };
+  if (!canManageTenant(ctx.identity, tenant)) return { error: err(403, 'FORBIDDEN', 'requires superadmin or the tenant owner/admin of this project') };
+  return { realm: tenant.iam_realm, tenant };
+}
+// GET /v1/tenants/{tenantId}/auth-config — read login options + configured social IdPs.
+async function getAuthConfig(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  try {
+    const cfg = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'AUTH_CONFIG_READ_FAILED', String(e.message ?? e));
+  }
+}
+// PUT /v1/tenants/{tenantId}/auth-config — toggle auth methods (registration/email/reset/rememberMe).
+async function setAuthConfig(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  const body = ctx.body ?? {};
+  const allowed = ['registrationAllowed', 'loginWithEmailAllowed', 'resetPasswordAllowed', 'rememberMe', 'verifyEmail'];
+  const patch = {};
+  for (const k of allowed) if (typeof body[k] === 'boolean') patch[k] = body[k];
+  if (Object.keys(patch).length === 0) return err(400, 'VALIDATION_ERROR', `body must include at least one boolean of: ${allowed.join(', ')}`);
+  try {
+    await kc.setRealmAuthConfig(az.realm, patch);
+    const cfg = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'AUTH_CONFIG_WRITE_FAILED', String(e.message ?? e));
+  }
+}
+// PUT /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — create/update a social IdP.
+async function setSocialProvider(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  const alias = ctx.params.alias;
+  const body = ctx.body ?? {};
+  const providerId = body.providerId ?? alias;
+  if (!alias) return err(400, 'VALIDATION_ERROR', 'identity-provider alias is required');
+  if (!providerId) return err(400, 'VALIDATION_ERROR', 'providerId is required');
+  try {
+    await kc.upsertIdentityProvider(az.realm, {
+      alias, providerId, enabled: body.enabled !== false, displayName: body.displayName, config: body.config ?? {},
+    });
+    const cfg = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, providerId, identityProviders: cfg.identityProviders });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SOCIAL_PROVIDER_WRITE_FAILED', String(e.message ?? e));
+  }
+}
+// DELETE /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — remove a social IdP.
+async function deleteSocialProvider(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeAuthConfig(ctx);
+  if (az.error) return az.error;
+  const alias = ctx.params.alias;
+  if (!alias) return err(400, 'VALIDATION_ERROR', 'identity-provider alias is required');
+  try {
+    await kc.deleteIdentityProvider(az.realm, alias);
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, deleted: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SOCIAL_PROVIDER_DELETE_FAILED', String(e.message ?? e));
+  }
+}
+
+// ---- scope-enforcement denial ingest (#557) --------------------------------
+// The gateway's scope-enforcement plugin (services/gateway-config/plugins/
+// scope-enforcement.lua) POSTs a snake_case denial payload to its sidecar when it
+// denies a request (SCOPE_INSUFFICIENT / WORKSPACE_SCOPE_MISMATCH /
+// PLAN_ENTITLEMENT_DENIED / CONFIG_ERROR). In this runtime that sidecar is this
+// endpoint: it records the denial into scope_enforcement_denials (the store the
+// scope-enforcement audit query reads), carrying tenant_id / workspace_id / actor_id /
+// correlation_id so the audit returns it tenant-scoped. Internal (platform) only.
+async function recordScopeEnforcementDenial(ctx) {
+  const body = ctx.body ?? {};
+  const tenantId = body.tenant_id ?? body.tenantId;
+  const actorId = body.actor_id ?? body.actorId;
+  const correlationId = body.correlation_id ?? body.correlationId ?? ctx.callerContext?.correlationId;
+  if (!tenantId || !actorId || !correlationId) {
+    return err(400, 'VALIDATION_ERROR', 'tenant_id, actor_id and correlation_id are required');
+  }
+  const row = await recordScopeDenial(ctx.pool, {
+    tenantId, workspaceId: body.workspace_id ?? body.workspaceId ?? null,
+    actorId, actorType: body.actor_type ?? body.actorType ?? 'user',
+    denialType: body.denial_type ?? body.denialType ?? 'SCOPE_INSUFFICIENT',
+    httpMethod: body.http_method ?? body.httpMethod ?? 'GET',
+    requestPath: body.request_path ?? body.requestPath ?? '/',
+    requiredScopes: body.required_scopes ?? body.requiredScopes ?? [],
+    presentedScopes: body.presented_scopes ?? body.presentedScopes ?? [],
+    missingScopes: body.missing_scopes ?? body.missingScopes ?? [],
+    requiredEntitlement: body.required_entitlement ?? body.requiredEntitlement ?? null,
+    currentPlanId: body.current_plan_id ?? body.currentPlanId ?? null,
+    sourceIp: body.source_ip ?? body.sourceIp ?? null,
+    correlationId, deniedAt: body.denied_at ?? body.deniedAt ?? new Date().toISOString()
+  });
+  return ok(202, { recorded: Boolean(row), denialId: row?.id ?? null });
+}
+
 export const LOCAL_HANDLERS = {
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
-  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace,
+  recordScopeEnforcementDenial,
+  getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
+  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, deleteWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,

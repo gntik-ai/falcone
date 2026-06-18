@@ -105,9 +105,65 @@ export function createMcpEngine({
     };
   }
 
+  // Resolve a tool's method/path/body for the real executor (data plane) or control-plane (proxied)
+  // route. The workspace ALWAYS comes from the credential-bound server context (entry.workspaceId);
+  // the tenant from identity — NEVER from args. Per-call dynamic path segments (object key, topic,
+  // flow input) come from args and are stripped of any tenant/workspace the caller tried to smuggle.
+  // Returns { method, path, body } or { error } when a required arg is missing.
+  function resolveCall(entry, tool, args = {}) {
+    const ws = encodeURIComponent(entry.workspaceId);
+    const source = tool.source ?? {};
+    let path = String(tool.path ?? '').replace('{workspaceId}', ws);
+    const method = tool.method ?? 'GET';
+    // Defence in depth: a caller must not steer routing by smuggling tenant/workspace in args.
+    const { tenantId: _t, workspaceId: _w, ...safeArgs } = args ?? {};
+
+    switch (source.type) {
+      case 'postgres': {
+        // …/tables/{table}/rows — GET lists (no body), POST inserts {row:{...}}.
+        const body = method === 'GET' ? undefined : { row: safeArgs.row ?? safeArgs.values ?? safeArgs };
+        return { method, path, body };
+      }
+      case 'function': {
+        // POST …/actions/{name}/invocations — the executor binds invocationInput; send the
+        // documented {parameters:{...}} envelope (a bare map is also accepted upstream).
+        const parameters = safeArgs.parameters ?? safeArgs.payload ?? safeArgs;
+        return { method, path, body: { parameters } };
+      }
+      case 'storage': {
+        // …/objects/{objectKey} — the key is per-call from args; refuse if absent.
+        if (!safeArgs.key) return { error: 'object key is required' };
+        path = path.replace('{objectKey}', encodeURIComponent(safeArgs.key));
+        const body = method === 'PUT' ? { content: safeArgs.content ?? '' } : undefined;
+        return { method, path, body };
+      }
+      case 'events': {
+        // …/topics/{topic}/(publish|messages) — topic is per-call from args; refuse if absent.
+        if (!safeArgs.topic) return { error: 'topic is required' };
+        path = path.replace('{topic}', encodeURIComponent(safeArgs.topic));
+        const body = method === 'GET' ? undefined : (safeArgs.payload ?? {});
+        return { method, path, body };
+      }
+      case 'flow': {
+        // POST …/flows/{flowId}/executions — args become the flow input ({input:{...}}); the
+        // flowId is baked into the tool path, the workspace from the credential context.
+        return { method, path, body: { input: safeArgs } };
+      }
+      default: {
+        // Official/platform control-plane tools (proxied upstream). Path templates use {id} for the
+        // workspace; fill it from the credential context (NEVER trusting args.id). The mutating
+        // tools carry a small JSON body taken from the (tenant/workspace-stripped) args.
+        path = path.replace('{id}', ws);
+        const body = method === 'GET' || method === 'DELETE' ? undefined : safeArgs;
+        return { method, path, body };
+      }
+    }
+  }
+
   // Mediate a tool call: resolve the tool in the active published manifest, enforce its scope, and
-  // self-call the runtime using the tool's own method/path (workspace from the credential context,
-  // NEVER from args). Returns an MCP-style result envelope (tool-level errors live in content).
+  // self-call the runtime using the tool's REAL executor/control-plane route (workspace from the
+  // credential context, NEVER from args). Returns an MCP-style result envelope (tool-level errors
+  // live in content).
   async function invokeTool(identity, entry, registered, toolName, args = {}) {
     const activeRecord = registered.versions.find((v) => v.version === registered.activeVersion);
     const tool = (activeRecord?.tools ?? []).find((t) => t.name === toolName);
@@ -119,8 +175,8 @@ export function createMcpEngine({
     if (!granted.has(BASE_SCOPE)) return { content: [{ type: 'text', text: `missing required scope: ${BASE_SCOPE}` }], isError: true };
     if (tool.mutates && toolScope && !granted.has(toolScope)) return { content: [{ type: 'text', text: `mutating tool requires scope: ${toolScope}` }], isError: true };
 
-    const method = tool.method ?? 'GET';
-    let path = String(tool.path ?? '').replace('{workspaceId}', encodeURIComponent(entry.workspaceId)).replace('{id}', encodeURIComponent(args.workspaceId ?? args.id ?? entry.workspaceId)).replace('{key}', encodeURIComponent(args.key ?? ''));
+    const call = resolveCall(entry, tool, args);
+    if (call.error) return { content: [{ type: 'text', text: call.error }], isError: true };
     const headers = {
       'x-tenant-id': identity.tenantId,
       'x-workspace-id': entry.workspaceId,
@@ -129,10 +185,10 @@ export function createMcpEngine({
       'content-type': 'application/json',
       accept: 'application/json',
     };
-    const init = { method, headers };
-    if (method !== 'GET' && method !== 'DELETE') init.body = JSON.stringify(tool.mutates ? (args.row ?? args.payload ?? args) : {});
+    const init = { method: call.method, headers };
+    if (call.body !== undefined) init.body = JSON.stringify(call.body);
     try {
-      const res = await fetchImpl(`${selfBaseUrl}${path}`, init);
+      const res = await fetchImpl(`${selfBaseUrl}${call.path}`, init);
       let body; try { body = await res.json(); } catch { body = null; }
       return { content: [{ type: 'text', text: typeof body === 'string' ? body : JSON.stringify(body) }], status: res.status };
     } catch (err) {

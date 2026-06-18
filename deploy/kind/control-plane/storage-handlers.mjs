@@ -71,13 +71,21 @@ async function s3(method, path, { query = {}, headers = {}, body } = {}) {
     headers: { ...headers, authorization, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate },
     body: body ?? undefined
   });
-  const text = method === 'HEAD' ? '' : await res.text();
+  // Read the body once as raw bytes, then derive text from it — so binary objects round-trip
+  // byte-identically (await res.text() would lossily UTF-8-decode an octet stream). Real fetch
+  // always exposes arrayBuffer(); fall back to text() only for minimal mocks/runtimes.
+  const buffer = method === 'HEAD'
+    ? Buffer.alloc(0)
+    : typeof res.arrayBuffer === 'function'
+      ? Buffer.from(await res.arrayBuffer())
+      : Buffer.from(await res.text());
+  const text = buffer.toString('utf8');
   if (!res.ok) {
     const e = new Error(`s3 ${method} ${path} -> ${res.status}: ${text.slice(0, 200)}`);
     e.statusCode = res.status; e.body = text;
     throw e;
   }
-  return { status: res.status, headers: res.headers, text };
+  return { status: res.status, headers: res.headers, text, buffer };
 }
 
 // minimal XML helpers for the (simple, known) S3 list responses.
@@ -142,9 +150,10 @@ export async function putObject(bucket, key, body, contentType = 'application/oc
   await s3('PUT', `/${bucket}/${key}`, { headers: { 'content-type': contentType }, body });
 }
 // Download an object's body (add-wire-advertised-public-routes, #500 — object I/O was NO_ROUTE).
+// Returns the exact bytes plus a best-effort UTF-8 view; callers needing binary fidelity use `bytes`.
 export async function getObject(bucket, key) {
-  const { text, headers } = await s3('GET', `/${bucket}/${key}`);
-  return { content: text, contentType: headers.get('content-type') ?? 'application/octet-stream', sizeBytes: Number(headers.get('content-length') ?? Buffer.byteLength(text)) };
+  const { buffer, headers } = await s3('GET', `/${bucket}/${key}`);
+  return { content: buffer.toString('utf8'), bytes: buffer, contentType: headers.get('content-type') ?? 'application/octet-stream', sizeBytes: Number(headers.get('content-length') ?? buffer.length) };
 }
 export async function deleteObject(bucket, key) {
   await s3('DELETE', `/${bucket}/${key}`);
@@ -167,16 +176,31 @@ async function denyUnlessBucketOwner(ctx, bucket) {
 
 // ---- handlers (ctx = { params, query, body, identity, pool, callerContext }) ----
 // Object I/O — upload/download/delete a single object (#500). Tenant-scoped via the bucket owner
-// gate. Content is carried as a string in the JSON envelope (text/JSON blobs — the common data-API
-// case); binary streaming is a later refinement.
+// gate. Objects are stored byte-faithfully: an upload may carry EITHER a raw/binary request body
+// (any non-JSON content-type → ctx.rawBody) OR the JSON envelope { content, contentType, encoding }
+// where encoding:'base64' carries binary inside JSON. Download returns the UTF-8 view plus
+// contentBase64 so binary round-trips byte-identically over the JSON API.
+export function resolveObjectBody(ctx) {
+  // Raw binary upload: the server kept the exact request bytes (non-JSON content-type).
+  if (ctx.rawBodyIsBinary && Buffer.isBuffer(ctx.rawBody)) {
+    return { bytes: ctx.rawBody, contentType: ctx.contentType || 'application/octet-stream' };
+  }
+  // JSON envelope: { content, contentType, encoding? }. base64 decodes to exact bytes; otherwise the
+  // string is stored as UTF-8 (the existing text/JSON-blob behavior).
+  const env = ctx.body ?? {};
+  const contentType = env.contentType ?? 'application/octet-stream';
+  const bytes = env.encoding === 'base64'
+    ? Buffer.from(String(env.content ?? ''), 'base64')
+    : Buffer.from(String(env.content ?? ''), 'utf8');
+  return { bytes, contentType };
+}
 async function storagePutObject(ctx) {
   const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
   const key = decodeURIComponent(ctx.params.objectKey);
-  const content = ctx.body?.content ?? '';
-  const contentType = ctx.body?.contentType ?? 'application/octet-stream';
+  const { bytes, contentType } = resolveObjectBody(ctx);
   try {
-    await putObject(bucket, key, content, contentType);
-    return ok(201, { objectKey: key, bucketName: bucket, sizeBytes: Buffer.byteLength(content), contentType });
+    await putObject(bucket, key, bytes, contentType);
+    return ok(201, { objectKey: key, bucketName: bucket, sizeBytes: bytes.length, contentType });
   } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_PUT_FAILED', String(e.message ?? e)); }
 }
 async function storageGetObject(ctx) {
@@ -184,7 +208,7 @@ async function storageGetObject(ctx) {
   const key = decodeURIComponent(ctx.params.objectKey);
   try {
     const o = await getObject(bucket, key);
-    return ok(200, { objectKey: key, bucketName: bucket, content: o.content, contentType: o.contentType, sizeBytes: o.sizeBytes });
+    return ok(200, { objectKey: key, bucketName: bucket, content: o.content, contentBase64: o.bytes.toString('base64'), encoding: 'base64', contentType: o.contentType, sizeBytes: o.sizeBytes });
   } catch (e) { return err(e.statusCode === 404 ? 404 : 502, 'STORAGE_GET_FAILED', String(e.message ?? e)); }
 }
 async function storageDeleteObject(ctx) {

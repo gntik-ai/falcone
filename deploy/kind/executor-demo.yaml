@@ -82,12 +82,22 @@ spec:
       containers:
         - name: control-plane
           image: localhost:30500/in-falcone-control-plane-executor:0.9.3
-          imagePullPolicy: IfNotPresent
+          # Always re-pull (fix-campaign-image-pull-policy, #561): install.sh rewrites this tag to
+          # the reusable campaign tag and re-pushes the rebuilt image to the local registry
+          # (localhost:30500). With IfNotPresent the kind node kept the stale cached layer, so a
+          # rebuilt executor silently ran the OLD code until a manual re-pull. Always pulls the
+          # freshly-pushed image from the in-cluster registry on every (re)deploy.
+          imagePullPolicy: Always
           ports:
             - { containerPort: 8080, name: http }
           env:
             - { name: NODE_ENV, value: production }
             - { name: PORT, value: "8080" }
+            # MCP self-call base URL: a published MCP tool-call mediates by self-calling this
+            # executor's own HTTP server (data-plane routes served locally; everything else proxied
+            # to CONTROL_PLANE_UPSTREAM). Pinned explicitly so the self-call is robust regardless of
+            # how PORT is resolved; without it a tool-call could hit the executor index (#565).
+            - { name: MCP_SELF_BASE_URL, value: "http://127.0.0.1:8080" }
             # Fallthrough proxy: routes the executor does NOT serve (browse/inventory/
             # management) are forwarded to the real control-plane runtime.
             - { name: CONTROL_PLANE_UPSTREAM, value: "http://falcone-control-plane:8080" }
