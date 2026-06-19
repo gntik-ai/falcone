@@ -82,6 +82,22 @@
         "eventType": {
           "description": "Platform event type to subscribe to (platform-event trigger only).",
           "type": "string"
+        },
+        "options": {
+          "description": "Scheduling options (cron trigger). Mapped to the Temporal Schedule overlap policy + catch-up window by the trigger registry; the friendly lowercase overlap value is normalized to the SDK enum.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "overlap": {
+              "description": "Overlap policy for concurrent fires. Friendly lowercase names mapped to the Temporal ScheduleOverlapPolicy enum.",
+              "type": "string",
+              "enum": ["skip", "allow", "allow_all", "buffer", "buffer_one", "buffer_all", "cancel_other", "terminate_other"]
+            },
+            "catchupWindow": {
+              "description": "Catch-up window for missed fires, as a duration string (e.g. '5m').",
+              "type": "string"
+            }
+          }
         }
       }
     },

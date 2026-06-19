@@ -22,7 +22,7 @@ const sleep = (ms) => new Promise((s) => setTimeout(s, ms));
 // ---- #563: db.query flow executes (not "postgres executor not wired") ----
 {
   const def = { apiVersion: 'v1.0', name: 'p1-dbq', nodes: [
-    { id: 's1', type: 'task', taskType: 'db.query', params: { engine: 'postgres', operation: 'insert', workspaceId: WS, databaseName: DB, schemaName: 'public', tableName: 'p1_probe_rows', values: { label: 'wired-ok' } } },
+    { id: 's1', type: 'task', taskType: 'db.query', input: { engine: 'postgres', operation: 'insert', workspaceId: WS, databaseName: DB, schemaName: 'public', tableName: 'p1_probe_rows', values: { label: 'wired-ok' } } },
   ] };
   const cr = await X('POST', `/v1/flows/workspaces/${WS}/flows`, { name: 'p1-dbq', definition: def });
   const flowId = cr.body?.flowId || cr.body?.id || cr.body?.flow?.id;
@@ -55,7 +55,7 @@ const sleep = (ms) => new Promise((s) => setTimeout(s, ms));
 {
   const ET = 'p1trig';
   const def = { apiVersion: 'v1.0', name: 'p1-evt', triggers: [{ kind: 'platform-event', eventType: ET }],
-    nodes: [{ id: 'n1', type: 'task', taskType: 'db.query', params: { engine: 'postgres', operation: 'list', workspaceId: WS, databaseName: DB, schemaName: 'public', tableName: 'p1_probe_rows' } }] };
+    nodes: [{ id: 'n1', type: 'task', taskType: 'db.query', input: { engine: 'postgres', operation: 'list', workspaceId: WS, databaseName: DB, schemaName: 'public', tableName: 'p1_probe_rows' } }] };
   const cr = await X('POST', `/v1/flows/workspaces/${WS}/flows`, { name: 'p1-evt', definition: def });
   const flowId = cr.body?.flowId || cr.body?.id;
   ok('#564 create platform-event-trigger flow', cr.status === 201 && !!flowId, `status=${cr.status}`);

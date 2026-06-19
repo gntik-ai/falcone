@@ -26,6 +26,9 @@ import {
   validateFlowDefinition,
   FLOW_VALIDATION_ERROR_CODES,
 } from '../../../../services/internal-contracts/src/flow-definition-validator.mjs';
+import {
+  validateFlowDefinitionSchema,
+} from '../../../../services/internal-contracts/src/flow-definition-schema-validator.mjs';
 import { clientError } from './errors.mjs';
 import {
   mintExecutionToken,
@@ -436,10 +439,39 @@ function resolveParsedDefinition(record) {
   return {};
 }
 
-// Run the shared validator. `taskTypeCatalog` / `resolveSubFlow` are injectable seams; when a
-// caller supplies neither, FLW-E006/E004 are no-ops (the validator's documented contract).
+// Run the shared validators in the documented order: JSON Schema (structural) FIRST, then the
+// semantic validator (FLW-E001..009). The semantic layer assumes a structurally-valid document and
+// explicitly skips structural rules (additionalProperties:false, required fields, enums), so a
+// definition that violates the schema — e.g. a task node using `params`/`parameters` instead of
+// `input` (#625) — must be caught here, not silently dropped and then failed at runtime.
+// `taskTypeCatalog` / `resolveSubFlow` are injectable seams; when a caller supplies neither,
+// FLW-E006/E004 are no-ops (the validator's documented contract). Returns
+// `{ ok, kind, errors }` where kind is 'schema' (→ 400) or 'semantic' (→ 422) on failure.
 function runValidation(definition, options = {}) {
-  return validateFlowDefinition(definition, options);
+  const schema = validateFlowDefinitionSchema(definition);
+  if (!schema.ok) return { ok: false, kind: 'schema', errors: schema.errors };
+  const semantic = validateFlowDefinition(definition, options);
+  if (!semantic.ok) return { ok: false, kind: 'semantic', errors: semantic.errors };
+  return { ok: true, kind: null, errors: [] };
+}
+
+// Map a failed runValidation result to the appropriate client error. A structural (JSON Schema)
+// violation is a malformed request (400, FLOW_DEFINITION_INVALID); a semantic violation is
+// unprocessable (422, FLOW_VALIDATION_FAILED) — preserving the established semantic-error contract.
+function validationError({ kind, errors }) {
+  const statusCode = kind === 'schema' ? 400 : 422;
+  const code = kind === 'schema' ? 'FLOW_DEFINITION_INVALID' : 'FLOW_VALIDATION_FAILED';
+  return Object.assign(clientError('Flow definition is invalid', statusCode, code), { errors });
+}
+
+// Structural (JSON Schema) check at the WRITE boundary (create / update-of-definition). An empty
+// draft (no definition supplied) is allowed and validated later at validate/publish; a SUPPLIED
+// definition must satisfy the DSL schema so authors get an actionable 400 before publish rather than
+// a misleading activity failure at runtime (#625).
+function assertWriteDefinitionSchema(definition) {
+  if (!definition || typeof definition !== 'object' || Object.keys(definition).length === 0) return;
+  const schema = validateFlowDefinitionSchema(definition);
+  if (!schema.ok) throw validationError({ kind: 'schema', errors: schema.errors });
 }
 
 // The set of signal names a published version accepts: each approval node id, plus the
@@ -918,6 +950,11 @@ export function createFlowExecutor({
     await enforceQuota('max_flows', { identity, currentUsage });
     const id = flowId ?? body.flow_id ?? body.flowId ?? randomUUID();
     const { definitionYaml, definition } = parseDefinitionInput(body);
+    // Reject a structurally-malformed definition at create time (#625) — e.g. a task node carrying
+    // `params`/`parameters` instead of `input`, or an unsupported top-level shape — so the author
+    // gets a 400 now instead of a misleading activity failure at execution. An empty draft (no
+    // definition) is allowed; validate/publish enforce the schema once a definition exists.
+    assertWriteDefinitionSchema(definition);
     const created = await store.createDefinition({
       tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId: id, name,
       definitionYaml, definition, dslApiVersion: definition.apiVersion ?? body.dsl_api_version ?? 'v1.0',
@@ -936,20 +973,16 @@ export function createFlowExecutor({
   async function validateDraft({ identity, flowId }) {
     const def = await getDefinitionOr404({ identity, flowId });
     const parsed = resolveParsedDefinition(def);
-    const { ok, errors } = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
-    if (!ok) {
-      throw Object.assign(clientError('Flow definition is invalid', 422, 'FLOW_VALIDATION_FAILED'), { errors });
-    }
+    const result = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
+    if (!result.ok) throw validationError(result);
     return { valid: true };
   }
 
   async function publishVersion({ identity, flowId }) {
     const def = await getDefinitionOr404({ identity, flowId });
     const parsed = resolveParsedDefinition(def);
-    const { ok, errors } = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
-    if (!ok) {
-      throw Object.assign(clientError('Flow definition is invalid', 422, 'FLOW_VALIDATION_FAILED'), { errors });
-    }
+    const result = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
+    if (!result.ok) throw validationError(result);
     // Published-version quota gate (per flow). Usage = current published versions of this flow.
     let currentUsage;
     if (quotaGate) {
@@ -1009,6 +1042,10 @@ export function createFlowExecutor({
       case 'update_definition': {
         await getDefinitionOr404({ identity, flowId });
         const { definitionYaml, definition } = parseDefinitionInput(params.body ?? {});
+        // A PATCH that supplies a definition must satisfy the DSL schema too (#625) — otherwise a
+        // malformed definition could be smuggled past create-time validation and only fail at
+        // runtime. A name-only PATCH (no definition) is unaffected.
+        assertWriteDefinitionSchema(definition);
         const changes = {
           ...(params.body?.name !== undefined ? { name: params.body.name } : {}),
           ...(definitionYaml !== null ? { definitionYaml } : {}),

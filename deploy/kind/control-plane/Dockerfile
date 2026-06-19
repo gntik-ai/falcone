@@ -9,13 +9,14 @@
 FROM node:22-alpine
 WORKDIR /app
 
-# Server deps (pg for the DI Pool, jose for JWKS verification).
+# Server deps (pg for the DI Pool; JWT/JWKS verification is dependency-free via node:crypto).
 COPY deploy/kind/control-plane/package.json ./
 RUN npm install --omit=dev --no-audit --no-fund \
   && ln -sfn /app/node_modules /node_modules
 
 # Server source + domain-B modules + the verified runtime route table.
 COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
+     deploy/kind/control-plane/jwt-verify.mjs \
      deploy/kind/control-plane/kc-admin.mjs deploy/kind/control-plane/tenant-store.mjs \
      deploy/kind/control-plane/b-handlers.mjs deploy/kind/control-plane/auth-handlers.mjs \
      deploy/kind/control-plane/saga.mjs deploy/kind/control-plane/dataplane.mjs \
