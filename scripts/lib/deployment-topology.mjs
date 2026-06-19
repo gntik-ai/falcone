@@ -37,6 +37,7 @@ const REQUIRED_COMPONENT_ALIASES = [
   'apisix',
   'keycloak',
   'postgresql',
+  'postgresqlVector',
   'documentdb',
   'ferretdb',
   'kafka',

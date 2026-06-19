@@ -481,6 +481,13 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         runMcp(mcpEngine, { operation: 'approve_version', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, version: decodeURIComponent(v) }, 200)],
       ['POST', new RegExp(`${mcp}/([^/]+)/tool-calls$`), ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'call_tool', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, body: c.body }, 200)],
+      // Standard MCP wire protocol (JSON-RPC 2.0 over HTTP POST) for an external MCP client
+      // (add-mcp-jsonrpc-protocol, #608). The request body is the JSON-RPC message; the server is
+      // resolved from the credential-derived identity + the URL serverId (cross-tenant → 404 in the
+      // engine). Distinct from the REST tool-calls route above; covered by the same gateway
+      // /v1/mcp/* route, so no APISIX change is needed.
+      ['POST', new RegExp(`${mcp}/([^/]+)/rpc$`), ([w, s], c) =>
+        runMcpRpc(mcpEngine, { identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s, message: c.body })],
       ['GET', new RegExp(`${mcp}/([^/]+)/audit$`), ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'list_audit', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s }, 200)],
     ] : []),
@@ -607,6 +614,17 @@ async function runMcp(mcpEngine, params, successStatus) {
   if (!mcpEngine) throw Object.assign(new Error('MCP hosting is not enabled'), { statusCode: 501, code: 'MCP_DISABLED' });
   const result = await mcpEngine.executeMcp(params);
   return { status: successStatus, body: result };
+}
+
+// Hosted-server MCP JSON-RPC dispatcher (add-mcp-jsonrpc-protocol, #608). Always 200 at the HTTP
+// layer for a request (id present) — JSON-RPC carries success/errors in the envelope; a notification
+// (no id) is acknowledged with 202 and no body. Unauthenticated/cross-tenant access is rejected by
+// the dispatch identity gate (401) and the engine's per-tenant server lookup before reaching here.
+async function runMcpRpc(mcpEngine, params) {
+  if (!mcpEngine) throw Object.assign(new Error('MCP hosting is not enabled'), { statusCode: 501, code: 'MCP_DISABLED' });
+  const result = await mcpEngine.executeMcpRpc(params);
+  if (result === null || result === undefined) return { status: 202, body: {} };
+  return { status: 200, body: result };
 }
 
 // Stream a tenant-scoped Mongo change stream to the client as Server-Sent Events. The handler

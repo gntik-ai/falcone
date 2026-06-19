@@ -16,30 +16,32 @@ P2
 
 GitHub epic E. Evidence: `audit/live-campaign/evidence-rerun/12-pg-mongo-data-and-direct.md`.
 
+## Decision (2026-06-19, confirmed with the operator)
+Vector is a **dedicated-DB capability by design** — the shared bitnami instance correctly lacks
+pgvector (`postgres-applier.mjs::_unavailableExtensionMessage` rejects `CREATE EXTENSION vector` with
+an actionable message; `postgresql-structural-admin.mjs` only surfaces the `vector` type when the
+extension is enabled). Force-swapping the shared image is high-risk (bitnami vs official-postgres
+env/uid/volume contract — a failure breaks the whole install). So we take **option (b): an opt-in
+dedicated pgvector Postgres**, realising the existing `postgresql.dedicatedTenantImage` operator
+contract as an actually-deployable instance. The shared instance is untouched (zero install risk).
+
 ## What Changes
-Use the `pgvector/pgvector` image for the shared (or dedicated) Postgres in profiles that must support vector search; verify `CREATE EXTENSION vector` + a KNN query through the data API.
-
-## Status (DEFERRED — corrected scope, 2026-06-19)
-Investigation against the code reclassifies this from a low-risk fix to a larger/by-design item:
-
-- **Vector is a dedicated-DB capability by design.** `postgres-applier.mjs::_unavailableExtensionMessage`
-  deliberately rejects `CREATE EXTENSION vector` on the shared bitnami instance and names the remedy
-  image (`pgvector/pgvector:pgNN`); `postgresql-structural-admin.mjs` documents "pgvector is
-  database-level + dedicated-DB only". The chart records `postgresql.dedicatedTenantImage:
-  pgvector/pgvector:pg17` as an **operator contract** (not chart-applied) for operator-provisioned
-  dedicated-DB tenants. So the live `CREATE EXTENSION vector` failure on a shared-instance workspace
-  DB is **working-as-designed**, with an actionable error — not a defect.
-- **Force-swapping the shared image is high-risk.** The bundled Postgres uses the **bitnami env
-  contract** (`POSTGRESQL_USERNAME`/`POSTGRESQL_PASSWORD`/`POSTGRESQL_POSTGRES_PASSWORD`,
-  `/bitnami/postgresql` data dir, uid 1001); `pgvector/pgvector:pg17` is **official-postgres-based**
-  (`POSTGRES_*`, `/var/lib/postgresql/data`, uid 999). Swapping it would require rewriting the
-  secret/env/volume/securityContext of the foundational datastore — and a failure there breaks the
-  whole `helm install`, blocking live-verification of every other change.
-
-**Decision:** deferred as a separately-scoped item. Two viable real options for later: (a) publish/
-build a bitnami-contract-compatible pgvector image and point the kind profile at it; or (b) stand up
-an opt-in dedicated pgvector Postgres in the kind/eval profile and route a dedicated-DB tenant to it,
-exercising the existing operator contract. Both are larger than the low-risk fix this issue assumed.
+- Add an opt-in dedicated Postgres component on the `pgvector/pgvector:pg17` image
+  (`postgresqlVector` component-wrapper alias + values stanza, **disabled by default**), using the
+  official-postgres image contract (uid 999, `/var/lib/postgresql`, `POSTGRES_*`) like the documentdb
+  engine. Admin creds from the operator-supplied `in-falcone-postgresql-vector` Secret.
+- A kind overlay (`deploy/kind/values-kind-vector.yaml`) enables it; the default kind render contains
+  no pgvector workload and the shared `postgresql` image is unchanged.
+- A dedicated-DB workspace whose connection DSN resolves to this instance gets working
+  `CREATE EXTENSION vector` + KNN. The per-workspace DSN routing primitive already exists
+  (`connection-registry.mjs` `resolveConnection`). The KNN SQL/extension/index path is **proven
+  real-stack** against `pgvector/pgvector` in `tests/env/executor/vector-search-knn-rls.test.mjs`
+  (7/7: `vector(N)` column + HNSW cosine index, KNN `ORDER BY distance`, cross-tenant scan = 0 rows).
 
 ## Impact
 A workspace creates the vector extension and runs a KNN similarity query.
+
+- `charts/in-falcone/Chart.yaml` (+`postgresqlVector` alias), `charts/in-falcone/values.yaml` (stanza).
+- `deploy/kind/values-kind-vector.yaml` (new opt-in overlay).
+- Tests: `tests/blackbox/pgvector-dedicated-instance.test.mjs` (helm-template) + the existing
+  real-stack `tests/env/executor/vector-search-knn-rls.test.mjs`.
