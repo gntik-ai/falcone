@@ -175,6 +175,11 @@ export const routes = [
   // ---- domain B: Functions (REAL execution via ephemeral k8s Jobs) ----------
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/inventory', localHandler: 'fnInventory', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/actions', localHandler: 'fnListActions', auth: 'authenticated' },
+  // Workspace secrets-as-a-service backed by Vault (add-vault-secret-consumption, #612).
+  { method: 'POST',   path: '/v1/functions/workspaces/{workspaceId}/secrets', localHandler: 'secretSet', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/functions/workspaces/{workspaceId}/secrets', localHandler: 'secretList', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/functions/workspaces/{workspaceId}/secrets/{secretName}', localHandler: 'secretGet', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/functions/workspaces/{workspaceId}/secrets/{secretName}', localHandler: 'secretDelete', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions', localHandler: 'fnDeploy', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/actions/{actionId}', localHandler: 'fnActionDetail', auth: 'authenticated' },
   { method: 'PUT',  path: '/v1/functions/actions/{actionId}', localHandler: 'fnDeploy', auth: 'authenticated' },

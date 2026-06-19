@@ -8,9 +8,27 @@
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
+import { vaultStoreFromEnv } from './vault-secrets.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
+
+// Vault-backed workspace-secret store (add-vault-secret-consumption, #612). Null when Vault is not
+// configured (VAULT_ADDR/VAULT_TOKEN unset) — the secrets API then reports the backend disabled and
+// function deploys ignore secret refs, so default behaviour is unchanged.
+const vaultStore = vaultStoreFromEnv();
+
+// Resolve the caller's workspace, returning null on cross-tenant access (no existence leak) so a
+// secret read/write can never reach another tenant's workspace. Superadmin/internal may operate
+// cross-tenant (callerTenantId → null).
+async function ownedWorkspace(ctx, workspaceId) {
+  if (!workspaceId) return null;
+  const ws = await store.getWorkspace(ctx.pool, workspaceId);
+  if (!ws) return null;
+  const t = callerTenantId(ctx.identity);
+  if (t && ws.tenant_id !== t) return null;
+  return ws;
+}
 
 // Resolve the function's invocation input from the request body. The documented body is the
 // `{ parameters: {...} }` envelope (OpenAPI FunctionInvocationWriteRequest); a bare top-level
@@ -75,9 +93,19 @@ async function fnDeploy(ctx) {
   // Per-(tenant, workspace) ksvc name so two tenants' same-named workspaces never
   // collide on a shared Knative Service (P0 ISO-FUNCTIONS).
   const name = ksvcNameForWorkspace(ws, actionName);
+  // Resolve any declared workspace-secret references from Vault and inject them as env vars
+  // (add-vault-secret-consumption, #612). The values are read from THIS workspace's own Vault path,
+  // so a function only ever sees its own tenant/workspace secrets.
+  let secretEnv = [];
+  const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
+  if (Array.isArray(secretRefs) && secretRefs.length > 0) {
+    if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+    try { secretEnv = await vaultStore.resolveEnv(ws.tenant_id, ws.id, secretRefs); }
+    catch (e) { return err(502, 'SECRET_RESOLVE_FAILED', String(e.message ?? e)); }
+  }
   // Deploy/update the function's Knative Service (new revision on code change).
   try {
-    await deployKnativeService(name, code, { memoryMb, timeoutMs });
+    await deployKnativeService(name, code, { memoryMb, timeoutMs, secretEnv });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DEPLOY_FAILED', String(e.message ?? e));
   }
@@ -184,7 +212,64 @@ async function fnRollback(ctx) {
   return ok(202, { requestId: randomUUID(), resourceId: r.resource_id, requestedVersionId: ctx.body?.versionId ?? `v${r.version}`, status: 'accepted', correlationId: randomUUID() });
 }
 
+// ---- Workspace secrets (add-vault-secret-consumption, #612) -----------------------------------
+// Tenant/workspace-scoped secrets-as-a-service backed by Vault KV v2. Values are write-only: a SET
+// stores the value in Vault; GET/LIST return metadata only; a function deploy resolves the value
+// server-side to inject as env. Every path is derived from the caller's verified tenant + the URL
+// workspace, so no tenant can read/write another's secrets.
+
+// POST /v1/functions/workspaces/{workspaceId}/secrets  { name, value }
+async function secretSet(ctx) {
+  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  const b = ctx.body ?? {};
+  const name = b.name ?? b.secretName;
+  const value = b.value ?? b.secretValue;
+  if (!vaultStore.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
+  if (typeof value !== 'string' || value.length === 0) return err(400, 'VALIDATION_ERROR', 'secret value is required');
+  try {
+    const r = await vaultStore.set(ws.tenant_id, ws.id, name, value);
+    return ok(201, { name: r.name, version: r.version, updatedAt: r.updatedAt });
+  } catch (e) { return err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)); }
+}
+
+// GET /v1/functions/workspaces/{workspaceId}/secrets
+async function secretList(ctx) {
+  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  try {
+    const items = await vaultStore.list(ws.tenant_id, ws.id);
+    return ok(200, { items, page: { total: items.length } });
+  } catch (e) { return err(502, 'SECRET_LIST_FAILED', String(e.message ?? e)); }
+}
+
+// GET /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  (metadata only — never the value)
+async function secretGet(ctx) {
+  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  try {
+    const meta = await vaultStore.getMeta(ws.tenant_id, ws.id, ctx.params.secretName);
+    if (!meta) return err(404, 'SECRET_NOT_FOUND', `secret ${ctx.params.secretName} not found`);
+    return ok(200, meta);
+  } catch (e) { return err(502, 'SECRET_READ_FAILED', String(e.message ?? e)); }
+}
+
+// DELETE /v1/functions/workspaces/{workspaceId}/secrets/{secretName}
+async function secretDelete(ctx) {
+  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  try {
+    await vaultStore.delete(ws.tenant_id, ws.id, ctx.params.secretName);
+    return ok(200, { name: ctx.params.secretName, deleted: true });
+  } catch (e) { return err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)); }
+}
+
 export const FN_HANDLERS = {
   fnDeploy, fnInventory, fnListActions, fnActionDetail, fnInvoke,
-  fnActivations, fnActivation, fnActivationLogs, fnActivationResult, fnVersions, fnRollback
+  fnActivations, fnActivation, fnActivationLogs, fnActivationResult, fnVersions, fnRollback,
+  secretSet, secretList, secretGet, secretDelete
 };
