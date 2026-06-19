@@ -8,8 +8,8 @@
     "lint": "node -e \"console.log('webhook-engine lint placeholder')\""
   },
   "dependencies": {
-    "pg": "^8.13.1",
     "kafkajs": "^2.2.4",
-    "undici": "^6.21.0"
+    "pg": "^8.13.1",
+    "undici": "^6.27.0"
   }
 }
