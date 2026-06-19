@@ -27,9 +27,16 @@ import { mcpToolCallTelemetry, mcpAuditEvent, filterAuditRecordsForTenant } from
 
 const SAMPLE_POSTGRES = { database: 'default', name: 'public', tables: [{ name: 'items', columns: [{ name: 'id', type: 'int' }, { name: 'label', type: 'text' }] }] };
 
+// MCP wire protocol version exposed over JSON-RPC (matches the platform MCP server,
+// mcp-official-server.mjs). Bumped together if the protocol revision changes.
+const PROTOCOL_VERSION = '2025-11-25';
+
 function httpError(statusCode, code, message, extra = {}) {
   return Object.assign(new Error(message), { statusCode, code, ...extra });
 }
+
+function rpc(id, result) { return { jsonrpc: '2.0', id: id ?? null, result }; }
+function rpcErr(id, code, message) { return { jsonrpc: '2.0', id: id ?? null, error: { code, message } }; }
 
 function slug(value) {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'server';
@@ -288,5 +295,65 @@ export function createMcpEngine({
     }
   }
 
-  return { executeMcp };
+  // Standard MCP wire protocol (JSON-RPC 2.0) for a HOSTED per-workspace server, so an external MCP
+  // client can `initialize` → `tools/list` → `tools/call` against a tenant's published server. The
+  // server is ALWAYS resolved from the credential-derived identity + the URL serverId (requireServer
+  // rejects a cross-tenant id with 404); the tenant/workspace are NEVER taken from the message. This
+  // reuses the same engine internals as the management API: `tools/list` reads the active published
+  // manifest, `tools/call` goes through `executeMcp('call_tool')` (quota/rate/scope/telemetry/audit
+  // all unchanged). Scope failures surface as a tool-level `isError` result (MCP convention), not a
+  // JSON-RPC error. Notifications (no id) are acknowledged with no body.
+  //   Deferred (tracked, not in this change): Streamable-HTTP SSE transport, sessions, resources/*,
+  //   prompts/* — a standard client can list+call tools over plain JSON-RPC POST without them.
+  async function executeMcpRpc({ identity, workspaceId, serverId, message } = {}) {
+    const { id, method, params } = message ?? {};
+    const isNotification = id === undefined || id === null;
+    if (!identity?.tenantId) throw httpError(401, 'UNAUTHENTICATED', 'Missing tenant identity');
+    const tid = identity.tenantId;
+    try {
+      switch (method) {
+        case 'initialize': {
+          const entry = requireServer(identity, serverId);
+          const registered = getServer(registry, tid, serverId);
+          return rpc(id, {
+            protocolVersion: PROTOCOL_VERSION,
+            serverInfo: { name: entry.name, version: registered?.activeVersion ?? '0.0.0' },
+            capabilities: { tools: {} },
+          });
+        }
+        case 'notifications/initialized':
+        case 'notifications/cancelled':
+          return null; // JSON-RPC notification — acknowledged, no response body
+        case 'ping':
+          return rpc(id, {});
+        case 'tools/list': {
+          requireServer(identity, serverId);
+          const registered = getServer(registry, tid, serverId);
+          const active = registered?.versions?.find((v) => v.version === registered.activeVersion);
+          const tools = (active?.tools ?? []).map((t) => ({
+            name: t.name,
+            description: t.description ?? '',
+            inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
+          }));
+          return rpc(id, { tools });
+        }
+        case 'tools/call': {
+          if (!params?.name) return rpcErr(id, -32602, 'tools/call requires params.name');
+          const out = await executeMcp({
+            operation: 'call_tool', identity, workspaceId, serverId,
+            body: { name: params.name, arguments: params.arguments ?? {} },
+          });
+          return rpc(id, { content: out.content ?? [], isError: !!out.result?.isError });
+        }
+        default:
+          return rpcErr(id, -32601, `method not found: ${method ?? ''}`);
+      }
+    } catch (err) {
+      if (isNotification) return null; // never answer a notification, even on error
+      const code = err.statusCode === 429 ? -32003 : -32001;
+      return rpcErr(id, code, err.message ?? 'MCP error');
+    }
+  }
+
+  return { executeMcp, executeMcpRpc };
 }
