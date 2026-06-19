@@ -1,0 +1,23 @@
+# Kind overlay — enable the dedicated pgvector Postgres for vector/KNN search
+# (add-pgvector-image-for-vector-search, #602).
+#
+# The base chart leaves postgresqlVector disabled: the shared bitnami `postgresql` instance lacks
+# pgvector by design (vector is a dedicated-DB capability; the provisioning pre-flight rejects
+# CREATE EXTENSION vector on it with an actionable message). This overlay stands up an OPT-IN
+# dedicated Postgres on the pgvector/pgvector image so a dedicated-DB tenant can enable the `vector`
+# extension and run KNN similarity queries — without touching the foundational shared instance (so a
+# default kind install is unchanged and never at risk).
+#
+# Usage: helm install falcone charts/in-falcone -f deploy/kind/values-kind.yaml \
+#          -f deploy/kind/values-kind-vector.yaml
+#
+# The admin credentials come from an operator-supplied Secret (mirrors in-falcone-postgresql):
+#   kubectl -n <ns> create secret generic in-falcone-postgresql-vector \
+#     --from-literal=POSTGRES_USER=falcone \
+#     --from-literal=POSTGRES_PASSWORD=<password>
+#
+# A dedicated-DB workspace routed to this instance (the connection registry's resolveConnection DSN ->
+# falcone-postgresql-vector.<ns>.svc:5432/in_falcone_vector) then gets working CREATE EXTENSION vector
+# + KNN. The shared-instance default `postgresql` is untouched.
+postgresqlVector:
+  enabled: true

@@ -74,7 +74,11 @@ export function ksvcNameForWorkspace(workspace = {}, actionName) {
 }
 export const ksvcHost = (name) => `${name}.${NS}.svc.cluster.local`;
 
-function ksvcManifest(name, source, { memoryMb = 256, timeoutMs = 60000 } = {}) {
+function ksvcManifest(name, source, { memoryMb = 256, timeoutMs = 60000, secretEnv = [] } = {}) {
+  // Workspace secrets resolved from Vault (add-vault-secret-consumption, #612) are injected as plain
+  // env vars alongside FN_SRC. The values are read server-side at deploy from the caller's own
+  // tenant/workspace Vault path; only the names a function declares are injected.
+  const env = [{ name: 'FN_SRC', value: source }, ...(Array.isArray(secretEnv) ? secretEnv : [])];
   return {
     apiVersion: 'serving.knative.dev/v1', kind: 'Service',
     metadata: { name, namespace: NS, labels: { 'networking.knative.dev/visibility': 'cluster-local', 'in-falcone.function': 'true' } },
@@ -86,7 +90,7 @@ function ksvcManifest(name, source, { memoryMb = 256, timeoutMs = 60000 } = {}) 
           timeoutSeconds: Math.min(Math.ceil(timeoutMs / 1000) + 5, 300),
           containers: [{
             image: FN_RUNTIME_IMAGE,
-            env: [{ name: 'FN_SRC', value: source }],
+            env,
             resources: { limits: { cpu: '1', memory: `${memoryMb}Mi` }, requests: { cpu: '50m', memory: '64Mi' } },
             // OpenShift-friendly: runAsNonRoot, no fixed uid (image USER 1000 on kind; SCC assigns on OCP).
             securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] }, seccompProfile: { type: 'RuntimeDefault' } }

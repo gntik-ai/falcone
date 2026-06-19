@@ -1965,6 +1965,111 @@ postgresql:
       capabilities:
         drop:
           - ALL
+
+# Dedicated pgvector Postgres (add-pgvector-image-for-vector-search, #602). OPT-IN dedicated-DB
+# instance on the pgvector/pgvector image, for tenants that enable the `vector` extension for KNN
+# similarity search — which the shared bitnami `postgresql` instance deliberately lacks (vector is a
+# dedicated-DB capability by design; the provisioning pre-flight rejects CREATE EXTENSION vector on
+# the shared instance with an actionable message naming this image). This realises the
+# `postgresql.dedicatedTenantImage` operator contract as an actually-deployable instance. A
+# dedicated-DB workspace whose connection DSN resolves to this instance gets working
+# `CREATE EXTENSION vector` + KNN (proven real-stack in tests/env/executor/vector-search-knn-rls).
+# Disabled by default — the shared bitnami instance is unaffected, so the default install is
+# unchanged. Uses the OFFICIAL postgres image contract (POSTGRES_*, /var/lib/postgresql, uid 999),
+# like the documentdb engine. Admin creds come from the operator-supplied in-falcone-postgresql-vector
+# Secret (POSTGRES_USER/POSTGRES_PASSWORD), mirroring in-falcone-postgresql / in-falcone-documentdb.
+postgresqlVector:
+  enabled: false
+  wrapper:
+    componentId: postgresql-vector
+    workload:
+      kind: StatefulSet
+  image:
+    repository: pgvector/pgvector
+    tag: pg17
+    pullPolicy: IfNotPresent
+  replicas: 1
+  serviceAccount:
+    create: true
+    name: ""
+    automountToken: false
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432
+    portName: tcp-pgvector
+    annotations: {}
+  ports:
+    - name: tcp-pgvector
+      containerPort: 5432
+      protocol: TCP
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  env:
+    - name: POSTGRES_DB
+      value: in_falcone_vector
+    # Keep PGDATA in a sub-directory of the mounted PVC so the official postgres entrypoint does not
+    # trip over a non-empty volume root (e.g. lost+found) — same as the documentdb engine.
+    - name: PGDATA
+      value: /var/lib/postgresql/data/pgdata
+  envFromSecrets:
+    - in-falcone-postgresql-vector
+  envFromConfigMaps: []
+  persistence:
+    enabled: true
+    existingClaim: ""
+    size: 10Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: /var/lib/postgresql/data
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    # OFFICIAL postgres image (USER root + gosu drop), so pin the postgres uid (999); the OpenShift
+    # overlay nulls it so the SCC injects a namespace-range uid instead.
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    runAsUser: 999
+    runAsNonRoot: true
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+    runAsNonRoot: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraVolumes: []
+  extraVolumeMounts: []
+  config:
+    inline: {}
+  initContainers: []
+  volumePermissions:
+    enabled: false
+    image:
+      repository: docker.io/library/busybox
+      tag: 1.36.1
+      pullPolicy: IfNotPresent
+    command: []
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+
 documentdb:
   enabled: true
   wrapper:
