@@ -20,6 +20,16 @@ dependencies:
     version: 0.2.0
     repository: file://./charts/component-wrapper
     condition: postgresql.enabled
+  # Dedicated pgvector Postgres (add-pgvector-image-for-vector-search, #602) — an OPT-IN dedicated
+  # Postgres StatefulSet on the pgvector/pgvector image, for the dedicated-DB tenants that enable the
+  # `vector` extension for KNN search. The shared `postgresql` (bitnami) instance deliberately lacks
+  # pgvector (postgres-applier rejects CREATE EXTENSION vector with an actionable message), so vector
+  # is a dedicated-DB capability by design. Disabled by default (operator/eval profiles opt in).
+  - name: component-wrapper
+    alias: postgresqlVector
+    version: 0.2.0
+    repository: file://./charts/component-wrapper
+    condition: postgresqlVector.enabled
   # DocumentDB engine (FerretDB document-store backend) — dedicated Postgres 17
   # StatefulSet rendered by the generic component-wrapper, gated by documentdb.enabled.
   # See add-ferretdb-documentdb-engine. The document store; the legacy MongoDB server was removed.
