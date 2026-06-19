@@ -94,6 +94,7 @@ export default defineConfig({
           text: 'Operations',
           items: [
             { text: 'Helm Configuration', link: '/operations/helm-configuration' },
+            { text: 'OpenShift Air-gapped (Harbor)', link: '/operations/openshift-airgapped-harbor' },
             { text: 'Environment Variables', link: '/operations/environment-variables' },
             { text: 'Secret Management', link: '/operations/secret-management' },
             { text: 'Observability', link: '/operations/observability' },

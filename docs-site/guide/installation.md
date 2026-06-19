@@ -7,6 +7,9 @@ In Falcone is packaged as a single **umbrella Helm chart** (`charts/in-falcone`)
 - [OpenShift](#openshift) — Routes + `restricted-v2` SCC
 - [Air-gapped](#air-gapped) — private registry, no internet
 
+> [!TIP]
+> For a **fully air-gapped OpenShift install using only plain `oc apply` manifests (no Helm, Operators, or templating)** — every image (including build bases, init containers and sidecars) pulled from a private **Harbor** — see the dedicated, end-to-end [OpenShift Air-gapped (Harbor) guide](/operations/openshift-airgapped-harbor). It includes the full image-mirror table, every manifest, an ordered runbook, and OpenShift `restricted-v2` SCC fixes.
+
 > [!NOTE]
 > The chart is an **umbrella**: each platform component (gateway, identity, databases, storage, events, functions, control plane, console, observability) is a dependency wrapped by a shared `component-wrapper` subchart and toggled with `<component>.enabled`. You can run everything in one cluster or point a component at an external managed service.
 
