@@ -87,16 +87,26 @@ export const routes = [
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}/functions', localHandler: 'listFunctions', auth: 'authenticated' },
 
   // ---- domain B: fine-grained IAM (platform admin; realmId in path) ---------
+  // Realm CRUD (fix-iam-route-wiring #598): list is superadmin-only (every tenant realm);
+  // get/update are owner-of-realm OR superadmin (handler authorizes). Were NO_ROUTE (404).
+  { method: 'GET',  path: '/v1/iam/realms', localHandler: 'iamListRealms', auth: 'superadmin' },
+  { method: 'GET',  path: '/v1/iam/realms/{realmId}', localHandler: 'iamGetRealm', auth: 'authenticated' },
+  { method: 'PUT',  path: '/v1/iam/realms/{realmId}', localHandler: 'iamUpdateRealm', auth: 'authenticated' },
   // GET users: owner-of-realm OR superadmin (handler authorizes via authorizeRealmManage)
   // so a tenant_owner can list its OWN app end-users (BUG-ENDUSER-OWNER-403). Cross-tenant
   // is denied in the handler.
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamListUsers', auth: 'authenticated' },
+  // GET one user: owner-of-realm OR superadmin (handler authorizes). Was NO_ROUTE (404).
+  { method: 'GET',  path: '/v1/iam/realms/{realmId}/users/{userId}', localHandler: 'iamGetUser', auth: 'authenticated' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/users', localHandler: 'iamCreateUser', auth: 'superadmin' },
   // app end-user lifecycle (#567): owner-of-realm OR superadmin (handler authorizes); were NO_ROUTE.
   { method: 'DELETE', path: '/v1/iam/realms/{realmId}/users/{userId}', localHandler: 'iamDeleteUser', auth: 'authenticated' },
   { method: 'PATCH',  path: '/v1/iam/realms/{realmId}/users/{userId}/status', localHandler: 'iamSetUserStatus', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/roles', localHandler: 'iamListRoles', auth: 'superadmin' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/roles', localHandler: 'iamCreateRole', auth: 'superadmin' },
+  // GET/DELETE one role by name (fix-iam-route-wiring #598): were NO_ROUTE (404).
+  { method: 'GET',    path: '/v1/iam/realms/{realmId}/roles/{roleName}', localHandler: 'iamGetRole', auth: 'superadmin' },
+  { method: 'DELETE', path: '/v1/iam/realms/{realmId}/roles/{roleName}', localHandler: 'iamDeleteRole', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/groups', localHandler: 'iamListGroups', auth: 'superadmin' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/groups', localHandler: 'iamCreateGroup', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/clients', localHandler: 'iamListClients', auth: 'superadmin' },

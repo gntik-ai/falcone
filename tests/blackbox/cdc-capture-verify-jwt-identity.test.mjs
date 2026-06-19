@@ -11,6 +11,14 @@
  * bbx-cdc-forged-tenant:               forged unsigned JWT with ten_VICTIM as tenant_id must NOT be used;
  *                                       action uses the gateway-header tenant, NOT the JWT payload tenant
  * bbx-cdc-gateway-tenant-scope:        valid gateway headers → create record scoped to gateway tenant
+ *
+ * add-gateway-realtime-config-identity (#611): pg-capture-list addresses the workspace by URL
+ * path (/v1/realtime/workspaces/{workspaceId}/pg-captures) so a tenant-scoped caller (a
+ * tenant_owner JWT, which carries no per-workspace claim) can reach it; the tenant still comes
+ * ONLY from the trusted header and the repo read stays tenant-scoped.
+ * bbx-611-pg-list-path-workspace:    path workspaceId + trusted tenant header → tenant-scoped read
+ * bbx-611-pg-list-cross-tenant-scope: a path workspace from another tenant is still read tenant-scoped
+ * bbx-611-pg-list-no-tenant:         no trusted tenant header → 401 even with a path workspace
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -280,4 +288,44 @@ test('bbx-cdc-gateway-tenant-scope: pg-capture-enable with valid gateway headers
   // Response body should reflect the gateway-provided tenant
   assert.equal(result.body?.tenant_id, TENANT_A, `response body tenant_id must be ${TENANT_A}`);
   assert.equal(result.body?.workspace_id, WS_A, `response body workspace_id must be ${WS_A}`);
+});
+
+// ---------------------------------------------------------------------------
+// Scenario 4 — pg-capture-list addresses the workspace by URL path (#611)
+// ---------------------------------------------------------------------------
+
+// bbx-611-pg-list-path-workspace
+test('bbx-611-pg-list-path-workspace: pg-capture-list uses the URL path workspaceId, tenant from the trusted header', async () => {
+  const configRepo = fakeConfigRepo();
+  const result = await pgList(
+    // tenant_owner JWT path: trusted x-tenant-id, NO x-workspace-id claim; workspace is in the URL path
+    { __ow_headers: { 'x-tenant-id': TENANT_A }, workspaceId: WS_A },
+    { configRepo },
+  );
+  assert.equal(result.statusCode, 200, `expected 200, got ${result.statusCode}`);
+  assert.equal(configRepo.finds.length, 1, 'expected exactly one tenant-scoped read');
+  assert.equal(configRepo.finds[0].tenantId, TENANT_A, 'read must be scoped to the trusted-header tenant');
+  assert.equal(configRepo.finds[0].workspaceId, WS_A, 'read must target the URL path workspace');
+});
+
+// bbx-611-pg-list-cross-tenant-scope
+test('bbx-611-pg-list-cross-tenant-scope: a path workspace from another tenant is still read tenant-scoped (no leak)', async () => {
+  const configRepo = fakeConfigRepo(); // findByWorkspace returns [] (tenant-scoped)
+  const result = await pgList(
+    { __ow_headers: { 'x-tenant-id': TENANT_A }, workspaceId: WS_VICTIM },
+    { configRepo },
+  );
+  assert.equal(result.statusCode, 200);
+  // The read is scoped to the CALLER's tenant — never the victim's — so it yields nothing.
+  assert.equal(configRepo.finds[0].tenantId, TENANT_A, 'tenant scope must stay the caller, not the victim');
+  assert.equal(configRepo.finds[0].workspaceId, WS_VICTIM);
+  assert.deepEqual(result.body.items, [], 'a cross-tenant workspace id returns no rows');
+});
+
+// bbx-611-pg-list-no-tenant
+test('bbx-611-pg-list-no-tenant: pg-capture-list without a trusted tenant header returns 401 even with a path workspace', async () => {
+  const configRepo = fakeConfigRepo();
+  const result = await pgList({ __ow_headers: {}, workspaceId: WS_A }, { configRepo });
+  assert.equal(result.statusCode, 401, `expected 401, got ${result.statusCode}`);
+  assert.equal(configRepo.finds.length, 0, 'no DB read without a trusted tenant');
 });

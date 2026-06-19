@@ -161,24 +161,31 @@ probe_http() { # probe_http <name> <url> <expected-code>
   if [ "$got" = "$want" ]; then echo "  OK   $name ($got) $url"
   else echo "  FAIL $name expected $want got '$got' $url" >&2; FAILED=1; fi
 }
-probe_tcp() { # probe_tcp <name> <host> <port>
-  local name="$1" host="$2" port="$3"
+probe_tcp() { # probe_tcp <name> <host> <port> [pod-label]
+  # A 4th arg labels the throwaway smoke pod so a NetworkPolicy that only admits specific
+  # app components (e.g. ferretdb admits control-plane/-executor/worker) lets the probe through
+  # instead of false-failing an actually-reachable datastore (fix-install-health-gate-probes #605).
+  local name="$1" host="$2" port="$3" label="${4:-}"
+  local labelArg=()
+  [ -n "$label" ] && labelArg=(--labels="$label")
   if kubectl -n "$NS" run smoke-$RANDOM --rm -i --restart=Never --quiet \
-      --image="$SMOKE_IMG" --command -- \
+      "${labelArg[@]}" --image="$SMOKE_IMG" --command -- \
       sh -c "nc -z -w5 $host $port" >/dev/null 2>&1; then
     echo "  OK   $name tcp://$host:$port"
   else echo "  FAIL $name tcp://$host:$port unreachable" >&2; FAILED=1; fi
 }
 FAILED=0
-# apisix root (/*) proxies to web-console; the dedicated /health route proxies to
-# the control-plane (deterministic 200 once ready) — probe that to assert APISIX
-# is up AND routing. (Per deploy/kind/apisix/apisix.yaml route id 1010.)
+# apisix root (/*) proxies to web-console; the dedicated /health route proxies to the
+# control-plane health endpoint (rewritten to /healthz; deterministic 200 once ready) — probe
+# that to assert APISIX is up AND routing. (Per deploy/kind/apisix/apisix.yaml route id 1010.)
 probe_http apisix          http://falcone-apisix:9080/health 200
 probe_http control-plane   http://falcone-control-plane:8080/readyz 200
 probe_http cp-executor     http://falcone-cp-executor:8080/healthz 200
 probe_http keycloak-realm  http://falcone-keycloak:8080/realms/in-falcone-platform/.well-known/openid-configuration 200
 probe_http web-console     http://falcone-web-console:3000/ 200
-probe_tcp  ferretdb        falcone-ferretdb 27017
+# ferretdb only admits the app components on its NetworkPolicy allowlist; label the smoke pod
+# as one of them so the probe reflects real reachability (it is reachable from the executor).
+probe_tcp  ferretdb        falcone-ferretdb 27017 "app.kubernetes.io/name=control-plane-executor"
 probe_tcp  seaweedfs-s3    falcone-seaweedfs-s3 8333
 
 echo ""

@@ -115,4 +115,70 @@ export async function recordScopeDenial(db, {
   }
 }
 
+// Record a quota-enforcement decision into quota_enforcement_log (the store the quota audit
+// reads). Called at an enforcement point (e.g. a 402 QUOTA_EXCEEDED) so a denial leaves a
+// correlated row. Best-effort: a logging failure must not change the (already-decided)
+// response. dimension_key must exist in quota_dimension_catalog (it does whenever a real
+// decision was made — a missing dimension fails open, so no denial reaches here).
+export async function recordQuotaEnforcement(db, {
+  tenantId, workspaceId = null, dimensionKey, attemptedAction = null, currentUsage = null,
+  effectiveLimit, quotaType = 'hard', graceMargin = 0, effectiveCeiling,
+  source = 'default', decision, actorId = null, correlationId = null, warning = null
+} = {}, log = console) {
+  try {
+    if (!tenantId || !dimensionKey || effectiveLimit == null || effectiveCeiling == null || !decision) return null;
+    const res = await db.query(
+      `INSERT INTO quota_enforcement_log (
+        id, tenant_id, workspace_id, dimension_key, attempted_action, current_usage,
+        effective_limit, quota_type, grace_margin, effective_ceiling, source, decision,
+        actor_id, correlation_id, warning
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      RETURNING *`,
+      [randomUUID(), tenantId, workspaceId, dimensionKey, attemptedAction, currentUsage,
+        effectiveLimit, quotaType, graceMargin ?? 0, effectiveCeiling, source ?? 'default', decision,
+        actorId, correlationId, warning]
+    );
+    return res.rows[0] ?? null;
+  } catch (e) {
+    log.warn?.(`[control-plane] quota enforcement write skipped: ${e?.message ?? e}`);
+    return null;
+  }
+}
+
+// Map a verified identity's actorType to the scope_enforcement_denials.actor_type domain.
+function denialActorType(actorType) {
+  const t = String(actorType ?? '').toLowerCase();
+  if (t.includes('api') && t.includes('key')) return 'api_key';
+  if (t.includes('service')) return 'service_account';
+  if (t === 'anonymous' || t === 'anon') return 'anonymous';
+  return 'user';
+}
+
+// Record a scope-enforcement denial for a dispatched local action that returned 403
+// (best-effort). Attributed to the caller's verified tenant + actor and the request
+// correlation id (generated if absent), so a tenant's audit query surfaces its own denied
+// attempts. A non-403 result, or an action with no attributable tenant/actor, records nothing.
+export async function recordRouteDenial(db, route, ctx, result, correlationId, log = console) {
+  try {
+    if ((result?.statusCode ?? 200) !== 403) return null;
+    const identity = ctx.identity ?? {};
+    const tenantId = identity.tenantId ?? null;
+    const actorId = identity.sub ?? identity.actorId ?? null;
+    if (!tenantId || !actorId) return null; // cannot attribute (e.g. unauthenticated/superadmin)
+    return await recordScopeDenial(db, {
+      tenantId,
+      workspaceId: ctx.params?.workspaceId ?? identity.workspaceId ?? null,
+      actorId,
+      actorType: denialActorType(identity.actorType),
+      denialType: 'SCOPE_INSUFFICIENT',
+      httpMethod: route?.method ?? ctx.req?.method ?? 'GET',
+      requestPath: route?.path ?? '/',
+      correlationId: correlationId ?? randomUUID(),
+    }, log);
+  } catch (e) {
+    log.warn?.(`[control-plane] route denial write skipped: ${e?.message ?? e}`);
+    return null;
+  }
+}
+
 export { AUDITABLE_LOCAL_HANDLERS };
