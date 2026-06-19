@@ -203,7 +203,8 @@ async function mongoDocuments(ctx) {
 // engine=mongodb provisioning: create the database + initial collections.
 async function mongoProvision(ctx) {
   const ws = ctx.workspace; // set by the generic dispatcher
-  const name = String(ctx.body?.name ?? '').trim().replace(/[\/\\. "$*<>:|?]/g, '_').slice(0, 63);
+  // The public provision body names the database `databaseName`; accept both that and `name`.
+  const name = String(ctx.body?.name ?? ctx.body?.databaseName ?? '').trim().replace(/[\/\\. "$*<>:|?]/g, '_').slice(0, 63);
   if (!name) return err(400, 'VALIDATION_ERROR', 'database name is required');
   const collections = Array.isArray(ctx.body?.collections) && ctx.body.collections.length ? ctx.body.collections : ['default'];
   try {

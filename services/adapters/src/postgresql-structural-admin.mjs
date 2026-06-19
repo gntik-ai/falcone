@@ -683,7 +683,17 @@ function foldVectorDimension(rawDataType, dimension) {
 function normalizeColumnSpec(column = {}, catalog = []) {
   const rawDataType = foldVectorDimension(column.dataType ?? column.type ?? column.typeName, column.dimension);
   const dataType = normalizeDataType(rawDataType, catalog);
-  const constraints = normalizeConstraints(column.constraints);
+  // Accept the documented column shape where primary-key/unique/check live as top-level
+  // column flags (e.g. `{ name, type, primaryKey: true }`) in addition to the nested
+  // `constraints` object the internal contract uses — be liberal over the public DDL body.
+  const constraints = normalizeConstraints({
+    primaryKey: column.constraints?.primaryKey === true || column.primaryKey === true,
+    unique: column.constraints?.unique === true || column.unique === true,
+    checkExpression: column.constraints?.checkExpression ?? column.checkExpression
+  });
+  // A PRIMARY KEY column is implicitly NOT NULL in SQL, so honour `primaryKey:true` without
+  // forcing callers to also pass `nullable:false` (the validator rejects a nullable PK).
+  const primaryKey = constraints.primaryKey === true;
   const identity = normalizeIdentity(column.identity);
   const generated = column.generatedExpression || column.generated?.expression
     ? {
@@ -695,7 +705,7 @@ function normalizeColumnSpec(column = {}, catalog = []) {
   return compactDefined({
     columnName: normalizeIdentifier(column.columnName ?? column.name),
     dataType,
-    nullable: column.nullable !== false,
+    nullable: primaryKey ? false : column.nullable !== false,
     defaultExpression: column.defaultExpression ? String(column.defaultExpression).trim() : undefined,
     identity,
     generated,

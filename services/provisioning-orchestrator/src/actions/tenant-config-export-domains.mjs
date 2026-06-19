@@ -17,11 +17,19 @@ export async function main(params = {}, overrides = {}) {
   const tenantExistsFn = overrides.tenantExists ?? (async () => true);
 
   // --- Auth ---
-  const auth = overrides.auth ?? parseConfigIdentity(params);
+  // The TARGET tenant is addressed by the URL path (below), so the CALLER may be a platform
+  // operator (superadmin/sre) with no own-tenant claim. requireTenant:false lets identity
+  // resolve from the trusted role/scope headers without x-tenant-id. (Previously a superadmin
+  // JWT → no x-tenant-id → null → 401, even though the tenant is taken from the path.)
+  const auth = overrides.auth ?? parseConfigIdentity(params, { requireTenant: false });
   if (!auth) {
     return { statusCode: 401, body: { code: 'UNAUTHORIZED', error: 'Unauthorized: missing identity headers' } };
   }
-  if (!auth.actor_type || (!auth.scopes?.includes('platform:admin:config:export') && !overrides.auth)) {
+  const authorized = !!overrides.auth
+    || auth.actor_type === 'superadmin'
+    || auth.actor_type === 'sre'
+    || auth.scopes?.includes('platform:admin:config:export');
+  if (!authorized) {
     return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:export' } };
   }
 

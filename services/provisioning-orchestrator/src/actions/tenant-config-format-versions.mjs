@@ -18,11 +18,19 @@ import { parseConfigIdentity } from './tenant-config-identity.mjs';
  */
 export async function main(params = {}, overrides = {}) {
   // --- Auth ---
-  const auth = overrides.auth ?? parseConfigIdentity(params);
+  // This is a tenant-AGNOSTIC platform catalog read (supported config schema versions), so
+  // a platform operator (superadmin/sre) — who carries no own-tenant claim — must be able to
+  // call it. requireTenant:false lets identity resolve from the trusted role/scope headers
+  // even without x-tenant-id. (Previously a superadmin JWT → no x-tenant-id → null → 401.)
+  const auth = overrides.auth ?? parseConfigIdentity(params, { requireTenant: false });
   if (!auth) {
     return { statusCode: 401, body: { code: 'UNAUTHORIZED', error: 'Unauthorized: missing identity headers' } };
   }
-  if (!auth.actor_type || (!auth.scopes?.includes('platform:admin:config:export') && !overrides.auth)) {
+  const authorized = !!overrides.auth
+    || auth.actor_type === 'superadmin'
+    || auth.actor_type === 'sre'
+    || auth.scopes?.includes('platform:admin:config:export');
+  if (!authorized) {
     return { statusCode: 403, body: { error: 'Forbidden: insufficient role or missing scope platform:admin:config:export' } };
   }
 

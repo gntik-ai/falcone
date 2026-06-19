@@ -84,6 +84,36 @@ test('create table executes and the table + columns exist', async () => {
   assert.deepEqual(cols.rows.map((r) => r.column_name), ['id', 'name', 'tenant_id']);
 });
 
+test('documented body shape (name/type + top-level primaryKey) creates the table WITH a real PK', async () => {
+  // fix-ddl-column-contract-and-pk (#600): the public create-table body uses `name` for the
+  // table, `name`/`type` for columns, and a top-level `primaryKey: true` flag. Before the fix
+  // this 400'd ("Invalid tableName identifier") and, even with the internal shape, `primaryKey`
+  // emitted no PRIMARY KEY constraint so the data API rejected the table (no primary key).
+  const res = await executePostgresDdl(registry, {
+    resourceKind: 'table', action: 'create', identity,
+    payload: {
+      databaseName: DB, schemaName: SCHEMA, name: 'docshape',
+      columns: [
+        { name: 'id', type: 'uuid', primaryKey: true },
+        { name: 'label', type: 'text' },
+      ],
+    },
+  });
+  assert.equal(res.executed, true);
+  // The CREATE TABLE statement carries an inline PRIMARY KEY on the id column.
+  assert.ok(res.statements.some((s) => /CREATE TABLE/i.test(s) && /PRIMARY KEY/i.test(s)), 'CREATE TABLE must declare a PRIMARY KEY');
+  // And the database actually has a primary key index on the table (what introspectTable checks).
+  const pk = await admin.query(
+    `SELECT a.attname FROM pg_index i
+       JOIN pg_class c ON c.oid = i.indrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
+      WHERE n.nspname = $1 AND c.relname = $2 AND i.indisprimary`,
+    [SCHEMA, 'docshape'],
+  );
+  assert.deepEqual(pk.rows.map((r) => r.attname), ['id'], 'id must be the primary key');
+});
+
 test('add column executes and the column exists', async () => {
   const res = await executePostgresDdl(registry, {
     resourceKind: 'column', action: 'create', identity,

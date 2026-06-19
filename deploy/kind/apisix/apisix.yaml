@@ -40,11 +40,26 @@ routes:
     methods: ["GET"]
     plugins:
       cors: {}
+      # The control-plane serves health at /healthz (not /health); rewrite so this gateway
+      # health route returns 200 instead of a 404 NO_ROUTE (fix-install-health-gate-probes #605).
+      proxy-rewrite:
+        uri: "/healthz"
     upstream:
       type: roundrobin
       scheme: http
       nodes:
         "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  # Prometheus metrics endpoint (fix-apisix-metrics-target #606). The prometheus plugin is
+  # enabled globally below (global_rules); the public-api plugin exposes its export endpoint
+  # at /apisix/prometheus/metrics on the gateway port. Before this route that path fell through
+  # to the web-console catch-all (/* @ 10) and returned HTML, so the Prometheus target was DOWN.
+  # Highest priority so it wins over every proxy route; no upstream (public-api serves it).
+  - id: "1011-metrics"
+    uri: "/apisix/prometheus/metrics"
+    priority: 400
+    methods: ["GET"]
+    plugins:
+      public-api: {}
   - id: "2001"
     uri: "/v1/platform/*"
     priority: 239
@@ -501,4 +516,13 @@ routes:
       scheme: http
       nodes:
         "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+
+# Collect Prometheus metrics for EVERY request (status, latency, bandwidth) so the gateway
+# scrape target exposes real series, not just process metrics (fix-apisix-metrics-target #606).
+# prefer_name labels series by route/service name rather than numeric id.
+global_rules:
+  - id: "1"
+    plugins:
+      prometheus:
+        prefer_name: true
 #END
