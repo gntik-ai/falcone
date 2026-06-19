@@ -116,6 +116,19 @@ spec:
             - { name: MONGO_USER, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_USER } } }
             - name: MONGO_PASSWORD
               valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } }
+            # Realtime CDC/SSE: replication-privileged DocumentDB URL. createRealtimeExecutor
+            # (apps/control-plane/src/runtime/main.mjs) activates the realtime executor ONLY when
+            # this is set; without it /v1/realtime/* returns 501 REALTIME_DISABLED even though the
+            # replication secret holds the value (#621). Sourced from the documentdb replication
+            # secret and `optional: true` so the executor still starts (realtime stays disabled)
+            # when the secret/key is absent — consistent with the controlPlaneExecutor stanza in
+            # tests/live-campaign/values-campaign.yaml.
+            - name: REALTIME_DOCUMENTDB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: in-falcone-documentdb-replication
+                  key: realtime-url
+                  optional: true
             # Kafka (enables the events API); Functions use the local backend by default.
             - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
             # Verify Bearer JWTs directly (Keycloak platform realm) so admin requests —

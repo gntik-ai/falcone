@@ -73,16 +73,22 @@ spec:
         - name: temporal-{{ $r.role }}
           image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $t.image) | quote }}
           imagePullPolicy: {{ $t.image.pullPolicy | default "IfNotPresent" }}
-          # The plain server image does not template config from env vars, so the broadcast
-          # address (required when binding 0.0.0.0) cannot be injected via env. Copy the
-          # read-only ConfigMap into a writable dir, substitute the pod IP, then start.
+          # The plain server image does not template config from env vars, so neither the broadcast
+          # address (required when binding 0.0.0.0) nor a secret-sourced datastore password can be
+          # injected via env. Copy the read-only ConfigMap into a writable dir, substitute the pod IP
+          # AND — when persistence.existingSecret is set — the DB password (the config carries a
+          # __TEMPORAL_DB_PASSWORD__ placeholder, never plaintext, #623), then start. The password is
+          # sed-escaped so any generated value is injected literally, and it lands ONLY in this
+          # in-pod writable copy — never in the ConfigMap.
           command:
             - /bin/sh
             - -ec
             - |
               mkdir -p /tmp/temporal/config /tmp/temporal/dynamicconfig
+              PWD_ESC=$(printf '%s' "${POSTGRES_PWD}" | sed 's|[&/\\]|\\&|g')
               sed -e "s/__BROADCAST_ADDRESS__/${POD_IP}/g" \
                   -e "s/__BIND_IP__/${POD_IP}/g" \
+                  -e "s/__TEMPORAL_DB_PASSWORD__/${PWD_ESC}/g" \
                 /etc/temporal/config-src/docker.yaml > /tmp/temporal/config/docker.yaml
               cp /etc/temporal/config-src/dynamic_config.yaml /tmp/temporal/dynamicconfig/docker.yaml
               exec /etc/temporal/entrypoint.sh

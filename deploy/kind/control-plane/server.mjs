@@ -17,7 +17,7 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createMultiRealmVerifier } from './jwt-verify.mjs';
 import { routes as seedRoutes } from './routes.mjs';
 import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import { ensureSchema } from './tenant-store.mjs';
@@ -41,7 +41,17 @@ const AUDIENCE = process.env.KEYCLOAK_AUDIENCE || null;
 const ROUTE_MAP_FILE = process.env.ROUTE_MAP_FILE || null; // optional JSON merged over seedRoutes
 
 const pool = DB_URL ? new Pool({ connectionString: DB_URL, max: 12 }) : new Pool({ max: 12 });
-const JWKS = createRemoteJWKSet(new URL(JWKS_URL));
+// Multi-realm JWT verifier (parity with apps/control-plane/src/runtime/jwt-verify.mjs, #622): trusts
+// tokens from the platform realm AND from any per-tenant realm under the same Keycloak base (derived
+// from JWKS_URL/ISSUER), fetching each realm's JWKS on demand. For a tenant-realm token the tenant id
+// comes from the cryptographically-verified issuer (the realm name), not a forgeable claim.
+const ALLOW_TENANT_REALMS = process.env.KEYCLOAK_ALLOW_TENANT_REALMS !== '0';
+const jwtVerifier = createMultiRealmVerifier({
+  jwksUrl: JWKS_URL,
+  issuer: ISSUER,
+  audience: AUDIENCE,
+  allowTenantRealms: ALLOW_TENANT_REALMS,
+});
 
 // ---- route table -----------------------------------------------------------
 // Each route: { method, path, module, export, invoke, deps?, auth?,
@@ -120,23 +130,24 @@ async function authenticate(headers) {
   const auth = headers['authorization'];
   if (!auth || !/^bearer\s+/i.test(auth)) return null;
   const token = auth.replace(/^bearer\s+/i, '');
-  const opts = {};
-  if (ISSUER) opts.issuer = ISSUER;
-  if (AUDIENCE) opts.audience = AUDIENCE;
-  const { payload } = await jwtVerify(token, JWKS, opts);
+  const { payload, trust } = await jwtVerifier.verify(token);
   const roles = payload?.realm_access?.roles ?? [];
   const scopes = typeof payload.scope === 'string' ? payload.scope.split(' ').filter(Boolean)
     : (Array.isArray(payload.scopes) ? payload.scopes : []);
+  // For a per-tenant realm token the tenant id IS the verified issuer's realm name — it is
+  // cryptographically bound to the signature and cannot be forged by a claim, so a tenant-A token
+  // can never act as tenant B. Platform/legacy tokens keep the tenant_id claim.
+  const tenantId = trust.kind === 'tenant' ? trust.realm : (payload.tenant_id ?? null);
   return {
     sub: payload.sub,
-    tenantId: payload.tenant_id ?? null,
+    tenantId,
     workspaceId: payload.workspace_id ?? null,
     actorType: deriveActorType(payload),
     roles, scopes,
     // The trusted x-* headers a Falcone action / buildCallerContext expects.
     trustedHeaders: {
       'x-auth-subject': payload.sub ?? '',
-      'x-tenant-id': payload.tenant_id ?? '',
+      'x-tenant-id': tenantId ?? '',
       'x-workspace-id': payload.workspace_id ?? '',
       'x-actor-type': deriveActorType(payload),
       'x-actor-roles': roles.join(','),

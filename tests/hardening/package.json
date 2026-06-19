@@ -9,10 +9,10 @@
     "run": "node run.mjs"
   },
   "dependencies": {
-    "undici": "^6",
     "kafkajs": "^2",
-    "pg": "^8",
     "node-vault": "^0.10",
+    "pg": "^8",
+    "undici": "^6.27.0",
     "uuid": "^14"
   }
 }
