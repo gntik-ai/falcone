@@ -58319,7 +58319,8 @@
           "dev",
           "sandbox",
           "staging",
-          "prod"
+          "prod",
+          "preview"
         ]
       },
       "Workspace": {

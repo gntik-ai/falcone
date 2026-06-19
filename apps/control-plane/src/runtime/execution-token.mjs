@@ -126,6 +126,3 @@ export function validateExecutionToken(token, expectedTenantId, expectedWorkspac
   }
   return obj;
 }
-
-// Memo key the token is carried under in the Temporal workflow memo (design.md D5).
-export const EXECUTION_TOKEN_MEMO_KEY = 'falconeExecutionToken';
