@@ -1972,3 +1972,85 @@ legitimate cron trigger with options validates rather than being rejected by `ad
 - **WHEN** a cron trigger declares `options: { overlap: <not-in-the-enum> }`
 - **THEN** the definition fails structural validation (`400`)
 
+### Requirement: Trigger-secret master key is externally provided and fails closed
+
+The system SHALL resolve the AES-256-GCM master key used to encrypt per-trigger webhook HMAC
+secrets at rest exclusively from the `FLOW_TRIGGER_SECRET_KEY` environment variable when running
+in a production profile (`NODE_ENV === 'production'`). The system SHALL NOT fall back to any
+hardcoded constant when the variable is unset in production — it SHALL resolve the key to a null
+sentinel and fail closed. In a non-production profile (local development, automated tests) the
+system MAY fall back to a well-known dev-only key so that unmodified local/test runs remain
+functional without additional configuration.
+
+The system SHALL refuse to register a webhook trigger with `503 TRIGGER_SECRET_KEY_UNCONFIGURED`
+when the master key resolves to null, so no per-trigger secret is ever encrypted and persisted
+under a publicly-known constant. The system SHALL return `false` from webhook signature
+verification when the master key resolves to null, so no inbound webhook can be trusted without
+the key.
+
+Every production executor deployment SHALL supply `FLOW_TRIGGER_SECRET_KEY` via an external
+secret mechanism (e.g. a Kubernetes `secretKeyRef`) that is distinct per deployment and not a
+universal code constant.
+
+#### Scenario: webhook trigger registration is refused when the master key is not configured in production
+
+- **WHEN** the executor process runs with `NODE_ENV=production` and `FLOW_TRIGGER_SECRET_KEY`
+  is not set in the environment
+- **THEN** `registerWebhookTrigger` throws an error with `statusCode 503` and
+  `code TRIGGER_SECRET_KEY_UNCONFIGURED`, and no trigger secret is written to the database
+
+#### Scenario: webhook verification fails closed when the master key is absent in production
+
+- **WHEN** the executor process runs with `NODE_ENV=production` and `FLOW_TRIGGER_SECRET_KEY`
+  is not set in the environment
+- **THEN** `verifyWebhook` returns `false` for any inbound webhook, regardless of the
+  signature header or stored cipher, and no workflow run is started
+
+#### Scenario: the dev fallback is active only in non-production profiles
+
+- **WHEN** the process runs with a non-production `NODE_ENV` (e.g. `test`, `development`) and
+  `FLOW_TRIGGER_SECRET_KEY` is not set
+- **THEN** `resolveTriggerSecretKey` returns a non-null dev key so local and test runs remain
+  functional without additional configuration
+
+#### Scenario: registration succeeds with a configured key in production
+
+- **WHEN** `NODE_ENV=production` and `FLOW_TRIGGER_SECRET_KEY` is set to a non-empty value
+- **THEN** `registerWebhookTrigger` succeeds, encrypts the per-trigger secret under the
+  configured key, and returns a one-time signing secret to the caller
+
+### Requirement: Flow execution credentials are not persisted in plaintext in workflow history
+
+The system SHALL NOT write the per-execution flow auth token (the HMAC bearer credential
+minted by `mintExecutionToken` and used by worker activities to authorise data-plane
+operations) into any Temporal workflow memo, search attribute, or visibility field. Because
+no `PayloadCodec`/`DataConverter` is configured on the Temporal client or worker, memo
+payloads are serialised as `json/plain` and stored unencrypted in Temporal workflow history
+and the visibility store; placing a bearer credential there would expose a live,
+tenant-scoped secret to every operator or tooling process with Temporal UI or API access.
+The token SHALL travel exclusively in the Temporal workflow args (the `InlineWorkflowInput`
+tenant envelope at `args[0].tenant.executionToken`), which is where the workflow-worker
+worker reads it to authorise each activity. This constraint applies to both the initial
+execution start (`startExecution`) and every retry start (`retryExecution`).
+
+#### Scenario: Temporal memo contains no execution token on start
+
+- **WHEN** a flow execution is started and the resulting `workflow.start()` options are
+  inspected
+- **THEN** the `memo` field is absent, `null`, or an empty object — it contains no key
+  named `falconeExecutionToken` and the plaintext token value does not appear in the
+  serialised memo
+
+#### Scenario: Execution token is still carried in the workflow args
+
+- **WHEN** a flow execution is started
+- **THEN** `args[0].tenant.executionToken` is a non-empty string (the HMAC bearer token),
+  so the worker can validate it before every data-plane activity
+
+#### Scenario: Temporal memo contains no execution token on retry
+
+- **WHEN** a flow execution is retried and the resulting `workflow.start()` options for the
+  new run are inspected
+- **THEN** the `memo` field is absent, `null`, or an empty object — the freshly minted
+  retry token is not written to the memo and travels only in the workflow args
+
