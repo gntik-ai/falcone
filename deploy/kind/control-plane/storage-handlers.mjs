@@ -201,6 +201,31 @@ async function denyUnlessBucketOwner(ctx, bucket) {
   return null;
 }
 
+// Decode + validate a single object key from the route param, applying the SAME policy as the
+// platform storage adapter (services/adapters/src/storage-bucket-object-ops.mjs::assertObjectKey):
+// reject traversal ('..' segments), a leading '/', backslashes, control characters, an empty/too-
+// long key, and malformed percent-encoding — with a clean 400 BEFORE any S3 backend call. Without
+// this, a traversal probe (e.g. `..%2F..%2Fetc%2Fpasswd`) reached the backend, which rejected the
+// malformed path, and that surfaced to the caller as a 5xx STORAGE_*_FAILED (502) instead of a 4xx
+// (#638). No data escapes the bucket either way, but a 5xx for malicious client input is a defect.
+const OBJECT_KEY_MAX_LEN = 1024;
+function decodeObjectKey(rawKey) {
+  let key;
+  try { key = decodeURIComponent(rawKey); }
+  catch { return { error: err(400, 'INVALID_OBJECT_KEY', 'object key is not valid percent-encoding') }; }
+  const invalid = (msg) => ({ error: err(400, 'INVALID_OBJECT_KEY', msg) });
+  if (typeof key !== 'string' || !key.trim()) return invalid('object key is required');
+  if (key.length > OBJECT_KEY_MAX_LEN) return invalid(`object key exceeds ${OBJECT_KEY_MAX_LEN} characters`);
+  if (key.startsWith('/')) return invalid('object key must not start with "/"');
+  if (key.includes('\\')) return invalid('object key must not contain a backslash');
+  for (let i = 0; i < key.length; i += 1) {
+    const code = key.charCodeAt(i);
+    if (code <= 0x1f || code === 0x7f) return invalid('object key must not contain control characters');
+  }
+  if (key.split('/').some((seg) => seg === '..')) return invalid('object key must not contain ".." path segments');
+  return { key };
+}
+
 // ---- handlers (ctx = { params, query, body, identity, pool, callerContext }) ----
 // Object I/O — upload/download/delete a single object (#500). Tenant-scoped via the bucket owner
 // gate. Objects are stored byte-faithfully: an upload may carry EITHER a raw/binary request body
@@ -222,8 +247,8 @@ export function resolveObjectBody(ctx) {
   return { bytes, contentType };
 }
 async function storagePutObject(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
-  const key = decodeURIComponent(ctx.params.objectKey);
   const { bytes, contentType } = resolveObjectBody(ctx);
   try {
     await putObject(bucket, key, bytes, contentType);
@@ -231,16 +256,16 @@ async function storagePutObject(ctx) {
   } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_PUT_FAILED', String(e.message ?? e)); }
 }
 async function storageGetObject(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
-  const key = decodeURIComponent(ctx.params.objectKey);
   try {
     const o = await getObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, content: o.content, contentBase64: o.bytes.toString('base64'), encoding: 'base64', contentType: o.contentType, sizeBytes: o.sizeBytes });
   } catch (e) { return err(e.statusCode === 404 ? 404 : 502, 'STORAGE_GET_FAILED', String(e.message ?? e)); }
 }
 async function storageDeleteObject(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
-  const key = decodeURIComponent(ctx.params.objectKey);
   try {
     await deleteObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, deleted: true });
@@ -288,6 +313,7 @@ async function storageListObjects(ctx) {
   }
 }
 async function storageObjectMetadata(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId;
   // Ownership check: same pattern as storageListObjects.
   if (!isSuperOrInternal(ctx.identity)) {
@@ -296,7 +322,6 @@ async function storageObjectMetadata(ctx) {
       return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
     }
   }
-  const key = decodeURIComponent(ctx.params.objectKey);
   try {
     const meta = await headObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, contentType: meta.contentType,

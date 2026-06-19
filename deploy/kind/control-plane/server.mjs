@@ -355,7 +355,10 @@ const server = http.createServer(async (req, res) => {
     // message/stack to the client (stack-trace exposure). Return the stable code.
     console.error('[control-plane] request failed:', err);
     const statusCode = err?.statusCode ?? (err?.code === 'FORBIDDEN' ? 403 : 500);
-    const code = err?.code ?? 'CONTROL_PLANE_ERROR';
+    // Never surface a backend-specific code (e.g. a raw Postgres SQLSTATE like "23505") on a 5xx —
+    // those are unmapped internal errors and the SQLSTATE leaks the storage engine (#634). Only echo
+    // the stable application code for deliberately mapped client errors (< 500).
+    const code = statusCode >= 500 ? 'CONTROL_PLANE_ERROR' : (err?.code ?? 'CONTROL_PLANE_ERROR');
     sendJson(res, statusCode, { code, message: statusCode >= 500 ? 'Internal server error' : code });
   }
 });

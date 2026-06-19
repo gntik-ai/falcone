@@ -33,7 +33,6 @@ import { clientError } from './errors.mjs';
 import {
   mintExecutionToken,
   DEFAULT_MAX_RUN_DURATION_MS,
-  EXECUTION_TOKEN_MEMO_KEY,
 } from './execution-token.mjs';
 import {
   buildFlowAuditEvent,
@@ -625,8 +624,9 @@ export function createFlowExecutor({
 
   // Map a stored version row's pinned definition to the Temporal start input (the interpreter's
   // InlineWorkflowInput: parsed definition + tenant-context envelope). The per-execution token is
-  // carried IN the tenant envelope (and mirrored into the workflow memo) so every activity can
-  // validate it against the execution's tenant + workspace before touching tenant data.
+  // carried IN the tenant envelope (the workflow args) so every activity can validate it against
+  // the execution's tenant + workspace before touching tenant data. It is deliberately NOT mirrored
+  // into the Temporal memo, which would store it as plaintext in visibility/history (#633).
   function startInputFor({ identity, flowId, version, definition, state, executionToken }) {
     return {
       definition,
@@ -693,8 +693,10 @@ export function createFlowExecutor({
         taskQueue: temporal.taskQueue,
         args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, state: input, executionToken })],
         searchAttributes: searchAttributesFor({ identity, flowId, version: pinned.version, triggerType }),
-        // Memo carries the token at rest (not queryable, encrypted by Temporal) per design.md D5.
-        memo: { [EXECUTION_TOKEN_MEMO_KEY]: executionToken },
+        // The token is carried in the workflow args (tenant envelope) where the worker reads it; it
+        // is NOT mirrored into the Temporal memo. A memo is persisted as json/plain in Temporal
+        // visibility/history (no PayloadCodec is configured on the client or worker), so a memo copy
+        // would expose the bearer token in plaintext to anyone with Temporal visibility access (#633).
       });
     } catch (err) {
       // Duplicate workflow id (replayed webhook delivery / redelivered Kafka offset) -> the run
@@ -869,7 +871,8 @@ export function createFlowExecutor({
       taskQueue: temporal.taskQueue,
       args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, executionToken })],
       searchAttributes: searchAttributesFor({ identity, flowId, version: pinned.version }),
-      memo: { [EXECUTION_TOKEN_MEMO_KEY]: executionToken },
+      // No memo: the token travels in the workflow args (tenant envelope), never in a plaintext
+      // Temporal memo/visibility entry (#633).
     });
     await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_RETRY, { identity, flowId, flowVersion: pinned.version, executionId: workflowId });
     return {
