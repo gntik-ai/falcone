@@ -22,3 +22,32 @@ vault:
 
 eso:
   enabled: true
+
+# Wire the control-plane to CONSUME this Vault for workspace secrets-as-a-service
+# (add-vault-secret-consumption, #612). The control-plane writes a tenant/workspace secret to Vault
+# (KV v2) when it is set via POST /v1/functions/workspaces/{ws}/secrets, and reads it back to inject
+# into a function's runtime env at deploy. These keys are ADDITIVE (envFromSecrets / extraVolumes are
+# empty in the base values), so they do NOT disturb the base controlPlane.env list and leave the
+# default kind render (without this overlay) entirely Vault-free.
+#
+# The control-plane reads its Vault connection from two operator-supplied Secrets, created alongside
+# enabling Vault (the token needs write on the `secret` KV mount; the CA is the self-signed Vault CA):
+#   kubectl -n <ns> create secret generic in-falcone-vault-workspace-secrets-env \
+#     --from-literal=VAULT_ADDR=https://vault.secret-store.svc.cluster.local:8200 \
+#     --from-literal=VAULT_KV_MOUNT=secret \
+#     --from-literal=NODE_EXTRA_CA_CERTS=/vault/tls/ca.crt \
+#     --from-literal=VAULT_TOKEN=<token-with-write-on-the-kv-mount>
+#   kubectl -n <ns> create secret generic in-falcone-vault-workspace-secrets-tls \
+#     --from-literal=ca.crt="$(kubectl -n secret-store get secret vault-server-tls \
+#         -o jsonpath='{.data.ca\.crt}' | base64 -d)"
+controlPlane:
+  envFromSecrets:
+    - in-falcone-vault-workspace-secrets-env
+  extraVolumes:
+    - name: vault-ca
+      secret:
+        secretName: in-falcone-vault-workspace-secrets-tls
+  extraVolumeMounts:
+    - name: vault-ca
+      mountPath: /vault/tls
+      readOnly: true
