@@ -5,7 +5,7 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- Make all webhook management/subscription plane routes (`/v1/webhooks/*`) reachable and functional on the kind runtime end-to-end.
+- Make the webhook management/subscription plane reachable and functional on the kind runtime end-to-end, in both a workspace-addressed (`/v1/workspaces/{workspaceId}/webhooks/*`) and tenant-addressed (`/v1/webhooks/*`) form, so a real `tenant_owner` principal can actually create and manage subscriptions.
 - Enforce tenant/workspace isolation in the Postgres adapter SQL so that cross-tenant data is never returned at the query layer.
 - Bootstrap the webhook schema idempotently at server startup (no manual migration step required).
 
@@ -42,6 +42,12 @@ Three new control-plane modules are added via `COPY` directives (`webhook-handle
 ### 6. Environment variables (`values-kind.yaml`)
 
 `WEBHOOK_SIGNING_KEY` (a dev placeholder value — not secret-shaped; prod uses `secretKeyRef`) and `WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE` are added to `controlPlane.env`. These are read from `process.env` and forwarded to the action via `params.env`.
+
+### 7. Workspace-addressed routes (primary form), discovered during live verification
+
+Live verification revealed that the webhook-management action derives the workspace from `auth.workspaceId` (the JWT), but the platform's real control-plane principals (console/ops `tenant_owner` users) are **tenant-level** — their tokens carry no `workspace_id`. With only the tenant-addressed `/v1/webhooks/*` form, `POST /v1/webhooks/subscriptions` fails closed with `TENANT_SCOPE_REQUIRED` ("requires a workspace_id"): reachable but not usable. (Issue #643's own expected behavior used a workspace-in-path form.)
+
+So the management surface is also served under `/v1/workspaces/{workspaceId}/webhooks/...` — the workspace comes from the **path** (consistent with `functions`/`storage`/`events`), and the handler authorizes it against the caller's verified tenant via the existing `getWorkspace` + `canManageTenant` helpers (missing OR cross-tenant workspace → `404`, no existence disclosure). The handler rewrites the path to the `/v1/webhooks/...` shape the action understands and injects the path workspace as the scoping workspace; the tenant always comes from the verified token. This form is usable by a `tenant_owner` and rides the existing gateway route `/v1/workspaces/*` (no APISIX change). The tenant-addressed `/v1/webhooks/*` form is retained for a future workspace-scoped principal.
 
 ## Risks / Trade-offs
 

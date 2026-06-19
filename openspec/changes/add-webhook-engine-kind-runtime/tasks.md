@@ -38,7 +38,8 @@
 
 - [x] 8.1 `bash tests/blackbox/run.sh` — 1011 pass / 0 fail (incl. 14 new webhook tests).
 - [x] 8.2 No regression: webhook contract + integration tests pass; all kind control-plane modules `node --check` clean; `LOCAL_HANDLERS.webhookManage` resolves.
-- [ ] 8.3 (Optional, recommended pre/post-merge) Live kind probe via `/e2e-issue add-webhook-engine-kind-runtime`: rebuild the control-plane image, helm upgrade, then `GET /v1/webhooks/event-types`→200, `POST /v1/webhooks/subscriptions`→201, cross-tenant list probe empty, delete→204.
+- [x] 8.3 Live kind verification (test-cluster-b): rebuilt + pushed the control-plane image, rolled `falcone-control-plane`, confirmed boot log `webhook schema ready (2 migrations)`. Through the gateway with real `tenant_owner` principals (acme-ops/globex-ops) + real Postgres + Keycloak: unauth `event-types`→401 (wired, was 404); `GET .../webhooks/event-types`→200; `POST /v1/workspaces/{ws}/webhooks/subscriptions` (own ws)→**201** (+signingSecret); list→200 count=1; globex `CREATE`/`list` on acme's ws→**404** (cross-tenant blocked); `DELETE`→204. Reverted the deployment to the prior image afterward.
+  - Finding driving the workspace-path form: the tenant-addressed `POST /v1/webhooks/subscriptions` failed `TENANT_SCOPE_REQUIRED` because real principals (tenant_owner) carry no `workspace_id` in the JWT — so the surface is also served under `/v1/workspaces/{workspaceId}/webhooks/...` (workspace from path, authorized against the caller's tenant), which is the reachable/usable form and rides the existing gateway route `/v1/workspaces/*`.
 
 ## 9. Archive
 
