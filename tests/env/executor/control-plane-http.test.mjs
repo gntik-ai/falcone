@@ -126,6 +126,17 @@ test('POST bulk insert → 201 affected=2', async () => {
   assert.equal((await res.json()).affected, 2);
 });
 
+test('POST bulk insert via the documented catalog path (…/tables/{t}/bulk/insert) → 201', async () => {
+  // fix-data-api-contract-mismatches (#601): the route catalog documents bulk insert at
+  // `.../tables/{t}/bulk/insert` (no `/rows`); a gateway-proxied catalog path must not 404.
+  const tablePath = rowsPath.replace(/\/rows$/, '');
+  const res = await fetch(`${baseUrl}${tablePath}/bulk/insert`, {
+    method: 'POST', headers: authHeaders, body: JSON.stringify({ rows: [{ body: 'h3' }, { body: 'h4' }] }),
+  });
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).affected, 2);
+});
+
 test('API-key lifecycle over HTTP: issue (201) → list → anon-key cannot manage keys (403) → revoke', async () => {
   // issue an anon key (admin/JWT identity)
   const issueRes = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, {
@@ -141,6 +152,9 @@ test('API-key lifecycle over HTTP: issue (201) → list → anon-key cannot mana
   const list = await listRes.json();
   assert.ok(list.items.some((k) => k.id === issued.id));
   assert.ok(list.items.every((k) => !('key' in k) && !('key_hash' in k)));
+  // fix-data-api-contract-mismatches (#601): list items use the same camelCase shape as mint
+  // (keyType/createdAt), not snake_case (key_type/created_at).
+  assert.ok(list.items.every((k) => 'keyType' in k && 'createdAt' in k && !('key_type' in k) && !('created_at' in k)));
 
   // an API key may NOT manage API keys
   const escalate = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, {

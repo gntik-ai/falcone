@@ -6,7 +6,13 @@
  * the verified token ($jwt_claim_* proxy-rewrite). The gateway strips any
  * client-supplied X-* identity headers, so these values are trustworthy.
  *
- * Required header: x-tenant-id (absent or empty → returns null → 401).
+ * Required header: x-tenant-id (absent or empty → returns null → 401) UNLESS the
+ *   caller passes `{ requireTenant: false }` — used by tenant-agnostic platform-admin
+ *   endpoints (e.g. config format-versions) and by endpoints that address the target
+ *   tenant via the URL path (e.g. config export-domains), where a platform operator
+ *   (superadmin/sre) legitimately carries no own-tenant claim. With requireTenant:false
+ *   and no x-tenant-id, identity is still derived from the trusted role/scope headers and
+ *   returned with `tenantId: null`; authorization is then the action's responsibility.
  * Optional headers: x-auth-subject, x-actor-roles (comma or array),
  *                   x-actor-scopes (space or comma split, both supported).
  *
@@ -56,18 +62,30 @@ const ADMIN_SCOPES = ['platform:admin:config:export', 'platform:admin:config:rep
 
 /**
  * @param {object} params - OpenWhisk action params
- * @returns {{ tenantId: string, actor_id: string, actor_type: string|null, roles: string[], scopes: string[] } | null}
+ * @param {{ requireTenant?: boolean }} [opts] - requireTenant (default true): when false,
+ *        a missing x-tenant-id does not short-circuit to null; identity is still derived
+ *        from the trusted role/scope headers and returned with tenantId: null.
+ * @returns {{ tenantId: string|null, actor_id: string, actor_type: string|null, roles: string[], scopes: string[] } | null}
  */
-export function parseConfigIdentity(params) {
+export function parseConfigIdentity(params, { requireTenant = true } = {}) {
   const headers = params?.__ow_headers ?? {};
 
-  const tenantId = headers['x-tenant-id'];
-  if (!tenantId || tenantId.trim() === '') {
-    return null; // missing required identity header → caller gets 401
+  const rawTenantId = headers['x-tenant-id'];
+  const hasTenant = !!rawTenantId && rawTenantId.trim() !== '';
+  if (!hasTenant && requireTenant) {
+    return null; // tenant-scoped action: missing required identity header → caller gets 401
   }
 
   const roles = splitComma(headers['x-actor-roles']);
   const scopes = splitScopes(headers['x-actor-scopes']);
+
+  // requireTenant:false tolerates a missing x-tenant-id for platform operators, but a request
+  // with NO trusted identity signal at all (no tenant, no roles, no scopes — e.g. a forged
+  // Bearer JWT and nothing else) carries no identity and MUST 401. It is never treated as a
+  // privileged caller: the JWT payload is never read here (anti-spoofing contract).
+  if (!hasTenant && roles.length === 0 && scopes.length === 0) {
+    return null;
+  }
 
   let actor_type = null;
   if (roles.includes('superadmin')) {
@@ -81,7 +99,7 @@ export function parseConfigIdentity(params) {
   }
 
   return {
-    tenantId,
+    tenantId: hasTenant ? rawTenantId : null,
     actor_id: (headers['x-auth-subject'] ?? '').trim() || 'system',
     actor_type,
     roles,

@@ -25,7 +25,7 @@ import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
-import { recordRouteAudit } from './audit-writer.mjs';
+import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
 
 const { Pool } = pg;
 
@@ -297,6 +297,9 @@ const server = http.createServer(async (req, res) => {
       // request correlation id, scoped to the action's owning tenant. Best-effort and
       // non-blocking — auditing must never fail or slow the action it describes.
       void recordRouteAudit(pool, route, ctx, result, correlationId);
+      // Enforcement audit (#594): a 403 from a local handler (e.g. cross-tenant access) is
+      // recorded as a scope-enforcement denial so the table is not silently empty.
+      void recordRouteDenial(pool, route, ctx, result, correlationId);
       return sendJson(res, result?.statusCode ?? 200, result?.body ?? null);
     }
 

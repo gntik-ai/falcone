@@ -22,7 +22,19 @@ test('version entry has required fields', async () => {
   assert.ok(v1.schema_checksum);
 });
 
-test('returns 403 without auth', async () => {
+test('returns 401 without any trusted identity headers', async () => {
+  // No trusted gateway identity headers at all → unauthenticated (401), not forbidden.
+  // (Matches the authoritative anti-spoofing invariant in
+  // tests/blackbox/tenant-config-verify-role-claims.test.mjs: a forged Bearer JWT with no
+  // gateway headers is never treated as identity.)
   const result = await main({});
-  assert.equal(result.statusCode, 403);
+  assert.equal(result.statusCode, 401);
+});
+
+test('returns 200 for a superadmin with no own-tenant claim', async () => {
+  // A platform superadmin carries trusted x-actor-roles but no x-tenant-id; this
+  // tenant-agnostic catalog read must succeed for them (was a 401 regression).
+  const result = await main({ __ow_headers: { 'x-actor-roles': 'superadmin' } });
+  assert.equal(result.statusCode, 200);
+  assert.ok(Array.isArray(result.body.versions));
 });

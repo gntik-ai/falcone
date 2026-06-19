@@ -30,6 +30,19 @@ test('deploy then invoke runs the function and returns its result + logs', async
   assert.ok(res.activationId)
 })
 
+test('deploy with the documented {source:{inlineCode}} body then invoke runs the function', async () => {
+  // fix-data-api-contract-mismatches (#601): the public deploy body nests the code under
+  // `source.inlineCode`. Before the fix the source OBJECT was stored and invoke ran
+  // `[object Object]` → error. It must unwrap to the code string.
+  await exec.executeFunctions({
+    identity: idA, workspaceId: WS_A, operation: 'deploy', name: 'sum_inline',
+    payload: { source: { kind: 'nodejs', inlineCode: SUM, entryFile: 'index.js' } },
+  })
+  const res = await exec.executeFunctions({ identity: idA, workspaceId: WS_A, operation: 'invoke', name: 'sum_inline', payload: { a: 4, b: 5 } })
+  assert.equal(res.status, 'success')
+  assert.deepEqual(res.result, { sum: 9 })
+})
+
 test('list returns deployed functions without leaking source', async () => {
   const res = await exec.executeFunctions({ identity: idA, workspaceId: WS_A, operation: 'list' })
   assert.ok(res.items.some((f) => f.name === 'sum'))

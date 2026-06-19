@@ -42,12 +42,15 @@ export async function checkWorkspaceQuota(pool, tenantId, currentUsage, opts = {
   }
   try {
     const eff = await mods.resolveEffectiveLimit(pool, tenantId, WORKSPACE_DIMENSION);
-    return mods.evaluateQuotaDecision({
+    const decision = mods.evaluateQuotaDecision({
       effectiveLimit: eff.effectiveLimit,
       quotaType: eff.quotaType,
       graceMargin: eff.graceMargin,
       currentUsage,
     });
+    // Carry the resolved source + dimension so a denial can be written to quota_enforcement_log
+    // (fix-audit-enforcement-logging #594) without re-resolving the governance model.
+    return { ...decision, source: eff.source ?? 'default', dimensionKey: WORKSPACE_DIMENSION };
   } catch {
     return { allowed: true, decision: 'quota_unavailable' }; // resolver error → fail open
   }

@@ -17,7 +17,7 @@ import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
-import { recordScopeDenial } from './audit-writer.mjs';
+import { recordScopeDenial, recordQuotaEnforcement } from './audit-writer.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -322,6 +322,14 @@ async function createWorkspace(ctx) {
   const usedWorkspaces = await store.countTenantWorkspaces(pool, tenant.id);
   const quota = await checkWorkspaceQuota(pool, tenant.id, usedWorkspaces);
   if (!quota.allowed) {
+    // Record the quota denial (fix-audit-enforcement-logging #594) — best-effort, never blocks.
+    await recordQuotaEnforcement(pool, {
+      tenantId: tenant.id, dimensionKey: quota.dimensionKey ?? 'max_workspaces',
+      attemptedAction: 'workspace.create', currentUsage: quota.currentUsage ?? usedWorkspaces,
+      effectiveLimit: quota.effectiveLimit, quotaType: quota.quotaType, graceMargin: quota.graceMargin,
+      effectiveCeiling: quota.effectiveCeiling, source: quota.source, decision: quota.decision,
+      actorId: identity.sub, correlationId: ctx.callerContext?.correlationId, warning: quota.warning ?? null,
+    });
     return err(402, 'QUOTA_EXCEEDED',
       `workspace quota reached (max_workspaces): ${usedWorkspaces}/${quota.effectiveLimit ?? '?'}`);
   }
@@ -565,6 +573,90 @@ async function iamCreateGroup(ctx) {
 async function iamListClients(ctx) {
   const clients = await kcAdmin.listClients(ctx.params.realmId);
   return ok(200, { items: clients.map((c) => ({ id: c.id, clientId: c.clientId, enabled: c.enabled, publicClient: c.publicClient, serviceAccountsEnabled: c.serviceAccountsEnabled })), total: clients.length });
+}
+
+// ---- catalogued IAM routes that were unrouted (fix-iam-route-wiring #598) ----
+// getIamUser / getIamRole / deleteIamRole and realm CRUD (list/get/update) were in the public
+// route catalog but returned 404 NO_ROUTE in the kind runtime. Wire them to the existing
+// KC-admin + store helpers; single-entity reads mirror the list handlers' item shapes.
+// GET /v1/iam/realms/{realmId}/users/{userId} — owner-of-realm OR superadmin (handler authorizes).
+async function iamGetUser(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  let u;
+  try { u = await kc.getUser(az.realm, ctx.params.userId); }
+  catch (e) { if (e.kcStatus === 404) u = null; else return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GET_USER_FAILED', String(e.message ?? e)); }
+  if (!u) return err(404, 'USER_NOT_FOUND', `user ${ctx.params.userId} not found`);
+  let realmRoles = [];
+  try { realmRoles = (await kc.listUserRealmRoles(az.realm, u.id)).map((r) => r.name).filter((n) => n && !String(n).startsWith('default-roles')); }
+  catch { /* best-effort: show no roles rather than fail */ }
+  return ok(200, {
+    id: u.id, userId: u.id, realmId: az.realm, username: u.username, email: u.email ?? null,
+    enabled: u.enabled, state: u.enabled ? 'active' : 'suspended',
+    firstName: u.firstName, lastName: u.lastName, createdTimestamp: u.createdTimestamp,
+    realmRoles, requiredActions: u.requiredActions ?? [], attributes: u.attributes ?? {},
+  });
+}
+// GET /v1/iam/realms/{realmId}/roles/{roleName} — superadmin (route-gated).
+async function iamGetRole(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  let r;
+  try { r = await kc.getRealmRole(ctx.params.realmId, ctx.params.roleName); }
+  catch (e) { if (e.kcStatus === 404) r = null; else return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GET_ROLE_FAILED', String(e.message ?? e)); }
+  if (!r) return err(404, 'ROLE_NOT_FOUND', `role ${ctx.params.roleName} not found`);
+  return ok(200, {
+    id: r.id, name: r.name, roleName: r.name, realmId: ctx.params.realmId,
+    description: r.description ?? null, composite: Boolean(r.composite), compositeRoles: [], attributes: r.attributes ?? {},
+  });
+}
+// DELETE /v1/iam/realms/{realmId}/roles/{roleName} — superadmin (route-gated). Idempotent (KC 404 → ok).
+async function iamDeleteRole(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try {
+    await kc.deleteRealmRole(ctx.params.realmId, ctx.params.roleName);
+    return ok(200, { roleName: ctx.params.roleName, realmId: ctx.params.realmId, deleted: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'DELETE_ROLE_FAILED', String(e.message ?? e));
+  }
+}
+// GET /v1/iam/realms — superadmin lists every tenant realm (route-gated to superadmin).
+async function iamListRealms(ctx) {
+  const max = Number(ctx.query.max ?? ctx.query['page[size]'] ?? 200) || 200;
+  const { items } = await store.listTenants(ctx.pool, { limit: max });
+  const realms = items.filter((t) => t.iam_realm).map((t) => ({
+    realmId: t.iam_realm, realm: t.iam_realm, tenantId: t.tenant_id, slug: t.slug,
+    displayName: t.display_name, status: t.status,
+  }));
+  return ok(200, { items: realms, total: realms.length, page: { after: null, size: realms.length } });
+}
+// GET /v1/iam/realms/{realmId} — superadmin OR the owning tenant; includes login options.
+async function iamGetRealm(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  const tenant = az.tenant ?? await store.getTenantByRealm(ctx.pool, az.realm);
+  let authConfig = null;
+  try { authConfig = await kc.getRealmAuthConfig(az.realm); }
+  catch (e) { if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`); return err(502, 'IAM_GET_REALM_FAILED', String(e.message ?? e)); }
+  return ok(200, {
+    realmId: az.realm, realm: az.realm, tenantId: tenant?.tenant_id ?? null, slug: tenant?.slug ?? null,
+    displayName: tenant?.display_name ?? null, status: tenant?.status ?? null, authConfig,
+  });
+}
+// PUT /v1/iam/realms/{realmId} — superadmin OR the owning tenant updates realm login options.
+async function iamUpdateRealm(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  try {
+    await kc.setRealmAuthConfig(az.realm, ctx.body ?? {});
+    const authConfig = await kc.getRealmAuthConfig(az.realm);
+    return ok(200, { realmId: az.realm, realm: az.realm, authConfig });
+  } catch (e) {
+    if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`);
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_UPDATE_REALM_FAILED', String(e.message ?? e));
+  }
 }
 
 // ---- app end-user lifecycle (#567 BUG-ENDUSER-MGMT) -------------------------
@@ -885,7 +977,8 @@ export const LOCAL_HANDLERS = {
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
-  iamListUsers, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
+  iamListUsers, iamGetUser, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamGetRole, iamDeleteRole, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
+  iamListRealms, iamGetRealm, iamUpdateRealm,
   iamListUserRoles, iamAssignUserRoles, iamRemoveUserRoles,
   iamListGroupMembers, iamListUserGroups, iamAddUserToGroup, iamRemoveUserFromGroup,
   ...METRICS_HANDLERS,
