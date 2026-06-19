@@ -200,6 +200,23 @@ export const routes = [
   { method: 'POST', path: '/v1/events/topics/{topicId}/publish', localHandler: 'eventsTopicPublish', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/events/topics/{topicId}/stream', localHandler: 'eventsTopicStream', auth: 'authenticated', stream: true },
 
+  // ---- domain B: Webhooks (outbound events management plane) ----------------
+  // Wires the code-complete webhook-engine management action onto the runtime
+  // (#643). All routes dispatch to the single `webhookManage` local handler,
+  // which wraps webhook-management.mjs::main and parses the sub-path itself.
+  // Delivery EXECUTION (dispatcher/worker/retry on platform events) is follow-up.
+  { method: 'GET',    path: '/v1/webhooks/event-types', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'POST',   path: '/v1/webhooks/subscriptions', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/webhooks/subscriptions', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/webhooks/subscriptions/{subscriptionId}', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'PATCH',  path: '/v1/webhooks/subscriptions/{subscriptionId}', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/webhooks/subscriptions/{subscriptionId}', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'POST',   path: '/v1/webhooks/subscriptions/{subscriptionId}/pause', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'POST',   path: '/v1/webhooks/subscriptions/{subscriptionId}/resume', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'POST',   path: '/v1/webhooks/subscriptions/{subscriptionId}/rotate-secret', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/webhooks/subscriptions/{subscriptionId}/deliveries', localHandler: 'webhookManage', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/webhooks/subscriptions/{subscriptionId}/deliveries/{deliveryId}', localHandler: 'webhookManage', auth: 'authenticated' },
+
   // ---- domain B: console auth (PUBLIC — these mint/verify the session) ------
   { method: 'POST',   path: '/v1/auth/login-sessions', localHandler: 'login', auth: 'public' },
   { method: 'POST',   path: '/v1/auth/signups', localHandler: 'signup', auth: 'public' },

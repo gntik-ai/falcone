@@ -212,6 +212,14 @@ controlPlane:
     # (Harbor path in prod). Each function = a ksvc; invoke = HTTP, scale-to-zero.
     - name: FN_RUNTIME_IMAGE
       value: localhost:30500/in-falcone-fn-runtime:0.1.0
+    # Webhooks (#643): the management plane (/v1/webhooks/*) encrypts each subscription's
+    # HMAC signing secret at rest with WEBHOOK_SIGNING_KEY (AES-256-GCM). This is a dev value
+    # for the kind profile ONLY — in production source it from a Secret via secretKeyRef and
+    # rotate it. WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE caps subscriptions per workspace (409).
+    - name: WEBHOOK_SIGNING_KEY
+      value: kind-dev-webhook-signing-key-do-not-use-in-prod
+    - name: WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE
+      value: "25"
 webConsole:
   image:
     repository: localhost:30500/in-falcone-web-console

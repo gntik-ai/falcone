@@ -28,6 +28,8 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
      deploy/kind/control-plane/kafka-handlers.mjs \
      deploy/kind/control-plane/fn-handlers.mjs deploy/kind/control-plane/function-executor.mjs \
      deploy/kind/control-plane/vault-secrets.mjs \
+     deploy/kind/control-plane/webhook-handlers.mjs deploy/kind/control-plane/webhook-db.mjs \
+     deploy/kind/control-plane/webhook-schema.mjs \
      deploy/kind/control-plane/audit-store.mjs deploy/kind/control-plane/audit-writer.mjs \
      deploy/kind/control-plane/route-map.runtime.json ./
 
@@ -38,6 +40,7 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
 COPY services/provisioning-orchestrator /repo/services/provisioning-orchestrator
 COPY services/internal-contracts        /repo/services/internal-contracts
 COPY services/scheduling-engine         /repo/services/scheduling-engine
+COPY services/webhook-engine            /repo/services/webhook-engine
 COPY apps/control-plane                 /repo/apps/control-plane
 
 # Fail the BUILD if the route map references a handler module the image did not COPY
