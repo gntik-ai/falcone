@@ -69,8 +69,6 @@ re-scope call sites SHALL apply BOTH the `tenantId` and `workspaceId` predicates
   in workspace `prod`
 - **THEN** `found` is false
 
-## MODIFIED Requirements
-
 ### Requirement: Insert rejects a forged tenant identity
 
 The system SHALL reject any insert payload where the document's `tenantId` field differs

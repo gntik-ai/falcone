@@ -132,6 +132,17 @@ boundary. Per-tenant DocumentDB database/role credentials (introduced in
 `add-ferretdb-tenant-isolation-credentials`) are complementary defense-in-depth and do NOT
 substitute for adapter-layer injection.
 
+The system SHALL ALSO inject the verified `workspaceId` predicate into every query filter
+and stamp it onto every inserted/replaced/updated document via the same
+`applyTenantScopeToFilter`/`injectTenantIntoDocument` chokepoint (when a `workspaceId` is
+supplied), so that a document written in one workspace is never readable, updatable, or
+deletable from another workspace of the same tenant — matching the per-workspace SQL
+(`wsdb_*`) and storage (per-workspace bucket) planes. `buildMongoDataApiPlan` SHALL feed
+its `workspaceId` parameter (already verified by the credential→workspace binding at
+`apps/control-plane/src/runtime/server.mjs:846-851`) into `applyTenantScopeToFilter`;
+`buildTenantMatchFilter`, `buildChangeStreamTenantMatch`, and all bulk/transaction/export
+re-scope call sites SHALL apply BOTH the `tenantId` and `workspaceId` predicates.
+
 #### Scenario: List returns only the caller tenant documents
 
 - **WHEN** two tenants each have documents in the same collection and tenant A calls list
@@ -160,11 +171,33 @@ substitute for adapter-layer injection.
 - **WHEN** tenant A sends a delete with the `_id` of a document owned by tenant B
 - **THEN** `deleted` is 0 and the document remains intact
 
+#### Scenario: Cross-workspace read returns nothing
+
+- **WHEN** tenant A writes a document in workspace `prod` (db X, collection c) and lists
+  db X / collection c from workspace `staging` (same tenant)
+- **THEN** the `staging` list returns no documents written by workspace `prod`
+
+#### Scenario: Inserted document is stamped with the caller workspace
+
+- **WHEN** a caller inserts a document into a workspace collection
+- **THEN** the persisted document carries both the caller's `tenantId` and `workspaceId`
+
+#### Scenario: Get by id from another workspace returns not-found
+
+- **WHEN** tenant A requests in workspace `staging` a document `_id` that was written
+  in workspace `prod`
+- **THEN** `found` is false
+
 ### Requirement: Insert rejects a forged tenant identity
 
 The system SHALL reject any insert payload where the document's `tenantId` field differs
 from the verified caller tenant, returning HTTP 403, so that a caller cannot write data
 into another tenant's namespace.
+
+The system SHALL ALSO reject any insert/replace/update whose document payload sets a
+`workspaceId` differing from the caller's bound workspace with HTTP 403
+(`mongo_data_tenant_scope_violation`), so that a caller cannot write into another
+workspace's scope even within the same tenant.
 
 #### Scenario: Insert with a forged tenantId is rejected
 
@@ -172,6 +205,12 @@ into another tenant's namespace.
   tenant B inside the document payload
 - **THEN** the response status is 403, no document is written, and the total document
   count in the collection remains unchanged
+
+#### Scenario: Insert with a forged workspaceId is rejected
+
+- **WHEN** a caller bound to workspace `prod` submits an insert with `workspaceId` set
+  to `staging` in the document payload
+- **THEN** the response is 403 and no document is written
 
 ### Requirement: Missing tenant identity returns 401
 
