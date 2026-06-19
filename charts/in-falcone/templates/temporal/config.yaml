@@ -14,9 +14,12 @@
   are therefore rendered directly from Helm values here. The broadcast address is left to
   the image entrypoint, which derives TEMPORAL_BROADCAST_ADDRESS from the pod IP when
   BIND_ON_IP=0.0.0.0 — so it is intentionally NOT set in this config.
-  The password is the only value that may come from a Secret; when persistence.existingSecret
-  is set, it is injected into the pod env and referenced here via the os-style ${...} that
-  the SQL driver expands. With the default inline password it is rendered literally.
+  The password is the only value that may come from a Secret. Because the plain image does NOT
+  expand ${...} env references in this config, when persistence.existingSecret is set we render a
+  literal "__TEMPORAL_DB_PASSWORD__" placeholder here (NEVER the plaintext password — it must not
+  appear in a ConfigMap, #623) and the server start wrapper in deployments.yaml substitutes it from
+  the POSTGRES_PWD env (injected via secretKeyRef) into a writable in-pod copy before start. With the
+  default inline password (no existingSecret) it is rendered literally for dev/sandbox.
 */ -}}
 {{- $p := $t.persistence -}}
 apiVersion: v1
@@ -43,7 +46,7 @@ data:
             connectAddr: "{{ $p.host }}:{{ $p.port }}"
             connectProtocol: "tcp"
             user: {{ $p.user | quote }}
-            password: {{ $p.password | quote }}
+            password: {{ if $p.existingSecret }}"__TEMPORAL_DB_PASSWORD__"{{ else }}{{ $p.password | quote }}{{ end }}
             maxConns: 20
             maxIdleConns: 20
             maxConnLifetime: "1h"
@@ -54,7 +57,7 @@ data:
             connectAddr: "{{ $p.host }}:{{ $p.port }}"
             connectProtocol: "tcp"
             user: {{ $p.user | quote }}
-            password: {{ $p.password | quote }}
+            password: {{ if $p.existingSecret }}"__TEMPORAL_DB_PASSWORD__"{{ else }}{{ $p.password | quote }}{{ end }}
             maxConns: 10
             maxIdleConns: 10
             maxConnLifetime: "1h"

@@ -56,6 +56,9 @@ importers:
       '@temporalio/client':
         specifier: 1.18.1
         version: 1.18.1
+      ajv:
+        specifier: 8.17.1
+        version: 8.17.1
       bson:
         specifier: ^7.2.0
         version: 7.2.0
@@ -75,8 +78,8 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0
       undici:
-        specifier: ^6.21.0
-        version: 6.24.1
+        specifier: ^6.27.0
+        version: 6.27.0
       yaml:
         specifier: 2.8.3
         version: 2.8.3
@@ -228,6 +231,9 @@ importers:
 
   services/internal-contracts:
     dependencies:
+      ajv:
+        specifier: 8.17.1
+        version: 8.17.1
       cel-js:
         specifier: 0.5.0
         version: 0.5.0
@@ -338,8 +344,8 @@ importers:
         specifier: ^8.13.1
         version: 8.16.3
       undici:
-        specifier: ^6.21.0
-        version: 6.24.1
+        specifier: ^6.27.0
+        version: 6.27.0
 
   services/workflow-worker:
     dependencies:
@@ -402,8 +408,8 @@ importers:
         specifier: ^8
         version: 8.16.3
       undici:
-        specifier: ^6
-        version: 6.24.1
+        specifier: ^6.27.0
+        version: 6.27.0
       uuid:
         specifier: ^14
         version: 14.0.0
@@ -3941,8 +3947,8 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici@6.24.1:
-    resolution: {integrity: sha512-sC+b0tB1whOCzbtlx20fx3WgCXwkW627p4EA9uM+/tNNPkSS+eSEld6pAs9nDv7WbY1UUljBMYPtu9BCOrCWKA==}
+  undici@6.27.0:
+    resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
     engines: {node: '>=18.17'}
 
   unicorn-magic@0.4.0:
@@ -8316,7 +8322,7 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici@6.24.1: {}
+  undici@6.27.0: {}
 
   unicorn-magic@0.4.0: {}
 

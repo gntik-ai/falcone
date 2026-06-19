@@ -29,6 +29,10 @@ export {
   FLOW_VALIDATION_ERROR_CODES,
   validateFlowDefinition
 } from './flow-definition-validator.mjs';
+export {
+  FLOW_SCHEMA_ERROR_CODE,
+  validateFlowDefinitionSchema
+} from './flow-definition-schema-validator.mjs';
 export { default as sagaContract } from './saga-contract.json' with { type: 'json' };
 export { default as consoleWorkflowAuditPolicy } from './console-workflow-audit-policy.json' with { type: 'json' };
 export { default as asyncOperationStateChangedSchema } from './async-operation-state-changed.json' with { type: 'json' };
