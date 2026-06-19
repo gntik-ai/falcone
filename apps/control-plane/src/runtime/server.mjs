@@ -12,6 +12,7 @@ import https from 'node:https';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
+import { handleMcpMessage } from '../mcp-official-server.mjs';
 
 const META_QUERY_KEYS = new Set(['select', 'order', 'page[size]', 'page[after]', 'countMode']);
 
@@ -85,11 +86,18 @@ function readRawBody(req) {
 }
 
 function identityFromHeaders(headers, pathWorkspaceId) {
+  // x-actor-scopes is injected by the gateway from the verified token (space- or comma-separated);
+  // surfaced so scope-gated handlers (e.g. the platform MCP) authorize on the trust-header path too.
+  const rawScopes = headers['x-actor-scopes'];
+  const scopes = typeof rawScopes === 'string'
+    ? rawScopes.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
+    : undefined;
   return {
     tenantId: headers['x-tenant-id'],
     workspaceId: headers['x-workspace-id'] || pathWorkspaceId,
     actorId: headers['x-auth-subject'],
     roleName: headers['x-pg-role'] || 'falcone_app',
+    ...(scopes ? { scopes } : {}),
   };
 }
 
@@ -226,7 +234,7 @@ function jsonQueryParam(searchParams, key) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -476,7 +484,48 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       ['GET', new RegExp(`${mcp}/([^/]+)/audit$`), ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'list_audit', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s }, 200)],
     ] : []),
+
+    // ---- Platform (first-party) MCP server — JSON-RPC over HTTP (add-platform-mcp-http-route) ----
+    // A single Streamable-HTTP JSON-RPC endpoint that exposes the official Falcone management tools
+    // (mcp-official-catalog.mjs) so an MCP client can manage projects/resources. Registered only
+    // when a control-plane upstream is configured (the tool calls proxy there). The tenant is
+    // credential-derived (resolveIdentity) — NEVER from tool arguments; tool scope-gating
+    // (BASE_SCOPE `mcp:invoke` + per-tool mutating scopes) is enforced by handleMcpMessage from the
+    // verified token scopes. Distinct from the workspace MCP-hosting routes (/v1/mcp/workspaces/...).
+    ...(controlPlaneUpstream ? [
+      ['POST', /^\/v1\/mcp\/rpc$/, (_groups, c) => runPlatformMcp(c, controlPlaneUpstream)],
+    ] : []),
   ];
+}
+
+// Platform MCP JSON-RPC dispatcher: hand the request message to the first-party MCP handler with
+// a control-plane client bound to the caller's own credential, so every tool call the MCP makes is
+// authorized + tenant-scoped exactly as if the caller had hit the API directly. Scopes come from the
+// verified identity; the bearer token is forwarded to the control-plane (the only auth it accepts).
+// Always 200 at the HTTP layer — JSON-RPC carries success/errors in the response envelope.
+async function runPlatformMcp(c, upstream) {
+  const grantedScopes = Array.isArray(c.identity?.scopes) ? c.identity.scopes : [];
+  const callFalcone = async (method, path, body) => {
+    // SSRF-safe: `upstream` host/port are fixed; `path` is a first-party catalog constant
+    // (only the {id} segment is arg-derived, encodeURIComponent'd in the handler).
+    const target = new URL(path, upstream);
+    const resp = await fetch(target, {
+      method,
+      headers: {
+        ...(c.authorization ? { authorization: c.authorization } : {}),
+        'content-type': 'application/json',
+      },
+      body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
+    });
+    const text = await resp.text();
+    let parsed;
+    try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+    // Surface the upstream status alongside the body so the MCP tool result is self-describing
+    // (a 401/403/404 from the control-plane reaches the MCP client as content, not a 500).
+    return resp.ok ? parsed : { error: { status: resp.status, body: parsed } };
+  };
+  const result = await handleMcpMessage(c.body, { grantedScopes, callFalcone });
+  return { status: 200, body: result };
 }
 
 // Stream a single Temporal execution's history to the client as Server-Sent Events. Like
@@ -702,7 +751,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream);
 
   return http.createServer(async (req, res) => {
     const method = (req.method ?? 'GET').toUpperCase();
@@ -802,7 +851,10 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       }
       const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
 
-      const { status, body: out } = await handler(groups, { url, identity, body, registry });
+      // `authorization` is threaded through for handlers that must call the control-plane on the
+      // caller's behalf (the platform MCP JSON-RPC route forwards the bearer token to the upstream,
+      // the only credential the control-plane accepts).
+      const { status, body: out } = await handler(groups, { url, identity, body, registry, authorization: req.headers.authorization });
       return sendJson(res, status, out);
     } catch (err) {
       const statusCode = err.statusCode ?? 500;

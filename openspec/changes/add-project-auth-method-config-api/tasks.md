@@ -1,14 +1,9 @@
 # Tasks — add-project-auth-method-config-api
 
-## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: social IdP enable/disable works via the KC admin API and reflects in login options; no `/v1/.
-
-## Implement (kind runtime AND shippable product as applicable)
-- [ ] A project-scoped API to toggle auth methods + configure social providers (credentials redacted).
-
-## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: An owner enables/disables a method via the API and the app's login options reflect it.
+## Status: SUPERSEDED by #568 (no code change)
+- [x] Verified the project auth-method / social-IdP config API already exists (archived `add-project-auth-config-api`, #568): routes `routes.mjs:58-61`, handlers `b-handlers.mjs:853-921`, KC admin client `kc-admin.mjs` (`getRealmAuthConfig`/`setRealmAuthConfig`/`listIdentityProviders`/`upsertIdentityProvider`), audit mapping `audit-writer.mjs`.
+- [x] Confirmed black-box coverage already passes: `tests/blackbox/project-auth-config-api.test.mjs` (8/8).
+- [x] Recorded the corrected scope in `proposal.md`; close GitHub issue #599 as superseded by #568.
 
 ## Archive
-- [ ] `openspec validate add-project-auth-method-config-api --strict`; `/opsx:archive add-project-auth-method-config-api` after merge.
+- [ ] Withdraw/cancel this change (it duplicates archived #568); no spec delta to sync.

@@ -21,6 +21,15 @@
  * bbx-555-02: creates the three missing tables + the quota dimension catalog
  * bbx-555-03: seeds the dimension + capability catalogs idempotently (ON CONFLICT)
  * bbx-555-04: ordering is dependency-safe (function definer + FK targets precede users)
+ *
+ * fix-backup-scope-schema (#595, P1): the same bootstrap omitted migration 114, so
+ * GET /v1/admin/backup/scope and /v1/tenants/{id}/backup/scope 500'd with 42P01
+ * (deployment_profile_registry / backup_scope_entries undefined). The fix adds 114 to
+ * the governance migration set, after 104 (whose boolean_capability_catalog 114 seeds)
+ * and 097 (whose set_updated_at_timestamp() its triggers use).
+ *
+ * bbx-595-01: bootstrap creates the backup-scope tables (deployment_profile_registry + backup_scope_entries)
+ * bbx-595-02: 114 is ordered after 097 (function) and 104 (capability catalog it seeds)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,4 +82,24 @@ test('bbx-555-04: application order is dependency-safe', async () => {
   // 098 creates quota_dimension_catalog, FK'd by 103 and 105.
   assert.ok(idx('098-') < idx('103-'), '098 (dimension catalog) before 103');
   assert.ok(idx('098-') < idx('105-'), '098 before 105');
+});
+
+test('bbx-595-01: bootstrap creates the backup-scope tables', async () => {
+  const { applied, all } = await runBootstrap();
+  assert.ok(
+    applied.some((m) => m.includes('114-backup-scope-deployment-profiles')),
+    'migration 114 (backup-scope) is applied at boot',
+  );
+  for (const table of ['deployment_profile_registry', 'backup_scope_entries']) {
+    assert.match(all, new RegExp(`CREATE TABLE IF NOT EXISTS\\s+${table}\\b`), `must create ${table}`);
+  }
+});
+
+test('bbx-595-02: 114 is ordered after its prerequisites (097 function, 104 capability catalog)', async () => {
+  const idx = (frag) => GOVERNANCE_MIGRATIONS.findIndex((m) => m.includes(frag));
+  // 114's triggers call set_updated_at_timestamp() (defined in 097) and it seeds
+  // boolean_capability_catalog (created in 104) → both must precede 114.
+  assert.ok(idx('114-') > -1, '114 is in the governance set');
+  assert.ok(idx('097-') < idx('114-'), '097 (set_updated_at_timestamp) before 114');
+  assert.ok(idx('104-') < idx('114-'), '104 (boolean_capability_catalog) before 114');
 });

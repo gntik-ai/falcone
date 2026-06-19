@@ -15,7 +15,9 @@
 // → 097 (defines set_updated_at_timestamp() + plans, the prerequisites for the rest)
 // → 098 (creates AND seeds quota_dimension_catalog, before 103/105 FK it)
 // → 100 (tenant_plan_change_history) → 103 (quota_overrides) → 104 (boolean_capability_catalog)
-// → 105 (workspace_sub_quotas) → 121 (seeds the flow quota dimensions). Every file is
+// → 105 (workspace_sub_quotas) → 114 (deployment_profile_registry + backup_scope_entries;
+// uses set_updated_at_timestamp() from 097 and seeds boolean_capability_catalog from 104, so
+// it must come after both) → 121 (seeds the flow quota dimensions). Every file is
 // `CREATE TABLE IF NOT EXISTS` + `INSERT … ON CONFLICT DO NOTHING`, so re-running boot is a
 // no-op (idempotent). The whole `services/provisioning-orchestrator` tree (including these
 // .sql files) is COPYed into the image under /repo by deploy/kind/control-plane/Dockerfile.
@@ -30,6 +32,7 @@ export const GOVERNANCE_MIGRATIONS = [
   'services/provisioning-orchestrator/src/migrations/103-hard-soft-quota-overrides.sql',
   'services/provisioning-orchestrator/src/migrations/104-plan-boolean-capabilities.sql',
   'services/provisioning-orchestrator/src/migrations/105-effective-limit-resolution.sql',
+  'services/provisioning-orchestrator/src/migrations/114-backup-scope-deployment-profiles.sql',
   'services/provisioning-orchestrator/src/migrations/121-flow-quota-dimensions.sql',
 ];
 

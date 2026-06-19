@@ -1,14 +1,10 @@
 # Tasks — add-event-driven-triggers
 
-## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: event->function trigger 404 on GW+EXEC; event->flow trigger registration 502 (missing tables).
-
-## Implement (kind runtime AND shippable product as applicable)
-- [ ] Deploy/wire the event-trigger consumer so a published event invokes the bound function/flow.
-
-## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Publishing an event invokes a function and/or starts a workflow end-to-end.
+## Status: SUPERSEDED for event→flow (#564 + #592); event→function DEFERRED
+- [x] Verified the platform-event → flow trigger consumer is wired (`main.mjs::bootFlowTriggers` → `flow-trigger-registry.mjs::wireFlowTriggers`, KafkaJS consumer → `startTriggeredExecution`) by the archived `add-event-trigger-integration` (#564); the missing trigger tables were fixed by `fix-flow-trigger-schema` (#592, landed). Coverage already exists: `tests/blackbox/event-trigger-integration.test.mjs`, `tests/env/flows-triggers/trigger-lifecycle.test.mjs`.
+- [x] Confirmed the only genuine residual is the documented-but-unwired `createFunctionKafkaTrigger` (direct event→function binding) — a substantial net-new consumer, tracked as a separate deferred feature.
+- [x] Recorded the corrected scope in `proposal.md`; close GitHub issue #610 as superseded-for-event→flow.
+- [ ] Live: publish a matching event on the re-stood-up clean-HEAD cluster → a bound flow execution starts (event→flow E2E).
 
 ## Archive
-- [ ] `openspec validate add-event-driven-triggers --strict`; `/opsx:archive add-event-driven-triggers` after merge.
+- [ ] Withdraw/cancel this change for the event→flow part (covered by #564 + #592); file the direct event→function binding (`createFunctionKafkaTrigger`) as its own feature if/when prioritized.

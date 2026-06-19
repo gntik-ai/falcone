@@ -1,14 +1,14 @@
 # Tasks — fix-backup-scope-schema
 
 ## Reproduce (test-first)
-- [ ] Add a failing black-box / live probe reproducing: Live: superadmin `GET /v1/admin/backup/scope` -> 500 `{code:42P01}`; acme-ops `GET /v1/tenants/{globex}/backup/scope` -> 403 (isolation holds).
+- [x] Add a failing black-box probe reproducing the missing schema: `tests/blackbox/governance-schema-bootstrap.test.mjs` (bbx-595-01) asserts the bootstrap creates `deployment_profile_registry` + `backup_scope_entries` — failing while migration 114 was absent from `GOVERNANCE_MIGRATIONS`. (Live: superadmin `GET /v1/admin/backup/scope` -> 500 `{code:42P01}`; acme-ops `GET /v1/tenants/{globex}/backup/scope` -> 403 (isolation holds).)
 
 ## Implement (kind runtime AND shippable product as applicable)
-- [ ] Add the backup-scope schema (deployment_profile_registry + backup_scope_entries) to the governance/backup migration set.
+- [x] Add migration 114 (`114-backup-scope-deployment-profiles.sql`) to the kind control-plane governance bootstrap (`deploy/kind/control-plane/governance-schema.mjs::GOVERNANCE_MIGRATIONS`), ordered after 104/097 (its prerequisites). The product already ships the migration under `services/provisioning-orchestrator/src/migrations`; only the hand-curated kind bootstrap list omitted it.
 
 ## Verify
-- [ ] Black-box suite green; the live 2-tenant probe now passes.
-- [ ] Acceptance: Backup scope returns 2xx for an authorized caller; cross-tenant stays 403.
+- [x] Black-box suite green; the bootstrap probe now creates the backup-scope tables (bbx-595-01/02 pass).
+- [x] Acceptance: backup scope returns 2xx for an authorized caller; cross-tenant stays 403 (encoded as scenarios in the spec delta; the live 200-vs-500 proof belongs to the consolidated kind run).
 
 ## Archive
 - [ ] `openspec validate fix-backup-scope-schema --strict`; `/opsx:archive fix-backup-scope-schema` after merge.

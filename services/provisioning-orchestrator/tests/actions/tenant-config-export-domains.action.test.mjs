@@ -42,9 +42,29 @@ describe('tenant-config-export-domains action', () => {
     assert.ok(new Date(result.body.queried_at).toISOString());
   });
 
-  it('returns 403 for unauthorized role', async () => {
-    const result = await main({ tenant_id: 'acme' }, { ...baseOverrides(), auth: null });
+  it('returns 403 for an authenticated caller with an insufficient role', async () => {
+    // Trusted gateway identity present but unprivileged (tenant_owner, no admin scope) → 403.
+    const result = await main(
+      { tenant_id: 'acme', __ow_headers: { 'x-tenant-id': 'acme', 'x-actor-roles': 'tenant_owner', 'x-actor-scopes': 'openid profile' } },
+      { ...baseOverrides(), auth: null },
+    );
     assert.equal(result.statusCode, 403);
+  });
+
+  it('returns 401 when no trusted identity headers are present', async () => {
+    // No trusted gateway identity at all → unauthenticated (401), per the anti-spoofing invariant.
+    const result = await main({ tenant_id: 'acme' }, { ...baseOverrides(), auth: null });
+    assert.equal(result.statusCode, 401);
+  });
+
+  it('returns 200 for a superadmin addressing the target tenant by path (no own-tenant claim)', async () => {
+    // The TARGET tenant comes from the path/param; a platform superadmin carries no x-tenant-id.
+    const result = await main(
+      { tenant_id: 'acme', __ow_headers: { 'x-actor-roles': 'superadmin' } },
+      { ...baseOverrides(), auth: null },
+    );
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.tenant_id, 'acme');
   });
 
   it('returns 404 for unknown tenant', async () => {
