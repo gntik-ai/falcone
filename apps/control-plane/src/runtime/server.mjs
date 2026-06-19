@@ -400,6 +400,8 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // record by (tenant_id, workspace_id) — never trusting a tenantId in the request body.
     ['PUT', new RegExp(`${emb}$`), ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
+    ['GET', new RegExp(`${emb}$`), ([w], c) =>
+      runEmbeddingProvider(embeddingExecutor, 'get', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
     ['DELETE', new RegExp(`${emb}$`), ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
 
@@ -745,6 +747,14 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
     // record by (tenant_id, workspace_id). deployProvider strips any plaintext apiKey/secret.
     const result = await embeddingExecutor.store.deployProvider(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
     return { status: successStatus, body: result };
+  }
+  if (action === 'get') {
+    // Read-back of the workspace's provider config, scoped to the verified identity's tenantId so
+    // a workspaceId shared across tenants resolves THIS tenant's record only. The stored record
+    // carries a `secretRef` ONLY — the plaintext key is never persisted, so GET cannot leak it (#635).
+    const record = await embeddingExecutor.store.getProvider(params.workspaceId, params.tenantId);
+    if (!record) throw Object.assign(new Error('No embedding provider configured for this workspace'), { statusCode: 404, code: 'EMBEDDING_PROVIDER_NOT_FOUND' });
+    return { status: successStatus, body: record };
   }
   const result = await embeddingExecutor.store.removeProvider(params.workspaceId, params.tenantId);
   return { status: successStatus, body: result };

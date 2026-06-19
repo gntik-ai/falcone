@@ -340,7 +340,17 @@ async function createWorkspace(ctx) {
   if (!ENVIRONMENT_CATALOG.includes(environment)) {
     return err(400, 'INVALID_ENVIRONMENT', `environment must be one of: ${ENVIRONMENT_CATALOG.join(', ')}`);
   }
-  const ws = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: tenant.id, slug, displayName, environment, createdBy: identity.sub });
+  let ws;
+  try {
+    ws = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: tenant.id, slug, displayName, environment, createdBy: identity.sub });
+  } catch (e) {
+    // Concurrent same-slug create (#634): the workspaceSlugTaken pre-check above is a TOCTOU read;
+    // the (tenant_id, slug) UNIQUE constraint is the real atomicity guarantee. Map the loser's
+    // unique-violation (SQLSTATE 23505) to a clean 409 Conflict instead of letting the raw
+    // SQLSTATE surface as a 500 with code "23505".
+    if (e?.code === '23505') return err(409, 'WORKSPACE_SLUG_CONFLICT', `workspace slug '${slug}' already exists in tenant`);
+    throw e;
+  }
   // Provision the workspace's real backing database as part of creation (#502), so the data API
   // routes to a real, isolated database instead of co-mingling in the shared control-plane DB.
   // Best-effort: the saga leaves NO orphaned registry row on failure, and the data API falls back

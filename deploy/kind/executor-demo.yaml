@@ -8,6 +8,20 @@
 #   kubectl -n falcone rollout status deploy/falcone-cp-executor
 #   kubectl -n falcone port-forward svc/falcone-cp-executor 8088:8080
 ---
+# Master key that AES-256-GCM-encrypts per-trigger webhook HMAC secrets at rest (#636). Self-
+# contained so the kind dev executor boots (it now fails closed without this key under
+# NODE_ENV=production instead of using the old hardcoded 'flow-trigger-dev-master-key' default).
+# This is a kind-LOCAL placeholder, NOT a production secret — a real deployment provisions its own
+# high-entropy value; the point is that the value is per-deployment, not a universal code constant.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: in-falcone-flow-trigger-secret
+  namespace: falcone
+type: Opaque
+stringData:
+  secret: "kind-local-dev-flow-trigger-master-key-override-in-production"
+---
 # One-time setup (runs as the postgres SUPERUSER): pgcrypto + the non-superuser roles
 # the API keys resolve to, granted to `falcone` so the executor can SET ROLE to them.
 apiVersion: batch/v1
@@ -142,6 +156,11 @@ spec:
             # while direct header-spoofing now fails closed (401).
             - name: GATEWAY_SHARED_SECRET
               valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } }
+            # Master key for per-trigger webhook secret encryption. REQUIRED: the executor runs
+            # NODE_ENV=production and the code fails closed without it (#636), never falling back to
+            # a hardcoded default. Sourced from a Secret so it is not visible in the Deployment spec.
+            - name: FLOW_TRIGGER_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: in-falcone-flow-trigger-secret, key: secret } }
           readinessProbe:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 3

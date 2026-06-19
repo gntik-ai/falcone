@@ -450,6 +450,34 @@ routes:
       scheme: http
       nodes:
         "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  # ---- BYOK embedding-provider config (workspace-scoped) -> executor ----
+  # Matches just the embedding-provider subpath at higher priority than the generic /v1/workspaces/*
+  # route (2003 -> control-plane). The PUT/GET/DELETE handler lives in the EXECUTOR (server.mjs
+  # registers /v1/workspaces/{ws}/embedding-provider); without this route it fell through to 2003 ->
+  # control-plane, which has no embedding handler, and returned 404 NO_ROUTE (#635). Same auth model
+  # as 2003-keys: APISIX forwards the Bearer JWT and the executor verifies it; SECURITY (#488) strip
+  # client-supplied identity headers and inject x-gateway-auth so the executor trusts the request.
+  - id: "2003-embedding"
+    uri: "/v1/workspaces/*"
+    priority: 337
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["uri", "~~", "^/v1/workspaces/[^/]+/embedding-provider"]
+    plugins:
+      cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
   # ---- Flows engine (definitions + executions) -> executor ----
   # add-apisix-flows-mcp-routes (#560): the flows control surface is served by the EXECUTOR
   # (server.mjs registers /v1/flows/workspaces/{ws}/flows + .../task-types), NOT the control-plane.
