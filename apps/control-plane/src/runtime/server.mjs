@@ -92,12 +92,20 @@ function identityFromHeaders(headers, pathWorkspaceId) {
   const scopes = typeof rawScopes === 'string'
     ? rawScopes.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
     : undefined;
+  // x-actor-roles is injected by the gateway from the verified token; surfaced so role-gated handlers
+  // (e.g. API-key management) enforce on the trust-header path too (#624). It was declared in the
+  // gateway contract but previously never read by the executor.
+  const rawRoles = headers['x-actor-roles'];
+  const roles = typeof rawRoles === 'string'
+    ? rawRoles.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
+    : undefined;
   return {
     tenantId: headers['x-tenant-id'],
     workspaceId: headers['x-workspace-id'] || pathWorkspaceId,
     actorId: headers['x-auth-subject'],
     roleName: headers['x-pg-role'] || 'falcone_app',
     ...(scopes ? { scopes } : {}),
+    ...(roles ? { roles } : {}),
   };
 }
 
@@ -230,6 +238,30 @@ function jsonQueryParam(searchParams, key) {
   } catch {
     throw Object.assign(new Error(`Query parameter ${key} must be valid JSON`), { statusCode: 400, code: 'INVALID_QUERY_JSON' });
   }
+}
+
+// Roles permitted to manage API keys (issue/list/rotate/revoke). A non-admin role (e.g.
+// tenant_developer) is denied; an API key never manages keys. See requestGate role check (#624).
+const KEY_MGMT_ADMIN_ROLES = new Set(['tenant_owner', 'tenant_admin', 'workspace_owner', 'workspace_admin', 'platform_admin', 'superadmin']);
+
+// Executor-side data-plane scope requirements (#624), enforced for API-key credentials as
+// defense-in-depth when the gateway scope-enforcement plugin is not wired. Mirrors the API-key scope
+// vocabulary (api-keys.mjs SCOPES_BY_TYPE): data:write gates data writes, ddl:write gates DDL. These are
+// the privilege-escalation paths the bug exposed (a data:read key could write / run DDL). Reads are the
+// baseline capability every key carries (data:read) and are not gated here; the POST-but-read vector
+// search route is likewise a read. Routes not covered (events/functions/embedding/flows/mcp/realtime)
+// are not gated by this check. The path patterns mirror the prefixes declared in buildRoutes.
+const SCOPE_DDL_RE = /^\/v1\/postgres\/databases\/[^/]+\/schemas(?:\/|$)/;
+const SCOPE_PG_DATA_RE = /^\/v1\/postgres\/workspaces\/[^/]+\/data\/[^/]+\/schemas\/[^/]+\/tables\/[^/]+/;
+const SCOPE_MONGO_DOC_RE = /^\/v1\/mongo\/workspaces\/[^/]+\/data\/[^/]+\/collections\/[^/]+\/documents/;
+function requiredDataScope(method, pathname) {
+  if (SCOPE_DDL_RE.test(pathname)) return 'ddl:write';
+  if (SCOPE_PG_DATA_RE.test(pathname) || SCOPE_MONGO_DOC_RE.test(pathname)) {
+    if (method === 'GET') return null; // reads are not scope-gated (every key carries data:read)
+    if (method === 'POST' && /\/search$/.test(pathname)) return null; // vector search is a read
+    return 'data:write'; // POST/PATCH/PUT/DELETE writes
+  }
+  return null;
 }
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
@@ -650,12 +682,13 @@ async function runRealtimeSse(realtimeExecutor, target, c) {
       identity,
       signal: controller.signal,
       onChange: (event) => res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`),
-      onError: () => res.write('event: error\ndata: {"code":"REALTIME_STREAM_ERROR"}\n\n'),
+      // Carry the underlying message (not only the code) so a stream failure is diagnosable client-side.
+      onError: (err) => res.write(`event: error\ndata: ${JSON.stringify({ code: err?.code ?? 'REALTIME_STREAM_ERROR', message: err?.message ?? 'realtime stream error' })}\n\n`),
     });
     // The client may have already disconnected while we were connecting.
     if (controller.signal.aborted) void sub.close?.();
   } catch (err) {
-    res.write(`event: error\ndata: ${JSON.stringify({ code: err.code ?? 'REALTIME_ERROR' })}\n\n`);
+    res.write(`event: error\ndata: ${JSON.stringify({ code: err.code ?? 'REALTIME_ERROR', message: err.message ?? 'realtime subscription error' })}\n\n`);
     stop();
     res.end();
   }
@@ -843,6 +876,24 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const isKeyMgmt = url.pathname.includes('/api-keys');
       if (isKeyMgmt && identity.dbRole) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'API keys cannot manage API keys' });
+      }
+      // Key management is an admin-role operation (#624). When the caller's roles are KNOWN (verified
+      // JWT or gateway-injected x-actor-roles) and contain no admin role, deny — a non-admin (e.g.
+      // tenant_developer) cannot mint/manage API keys. Unknown/empty roles defer to the other gates so
+      // legitimate admin tokens with no role claims and the trusted-gateway path are not regressed.
+      if (!opts?.noAuth && isKeyMgmt && Array.isArray(identity.roles) && identity.roles.length > 0
+          && !identity.roles.some((r) => KEY_MGMT_ADMIN_ROLES.has(r))) {
+        return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller role may not manage API keys' });
+      }
+      // API-key scope enforcement (#624): a scoped credential may only perform operations its scopes
+      // permit (data:write for writes, ddl:write for DDL). Defense-in-depth for profiles where the gateway
+      // scope-enforcement plugin is not wired. Applies ONLY to API-key credentials (identity.dbRole
+      // present); JWT/admin/gateway-header identities are governed by roles + RLS, not data-plane scopes.
+      if (!opts?.noAuth && identity.dbRole) {
+        const requiredScope = requiredDataScope(method, url.pathname);
+        if (requiredScope && !(Array.isArray(identity.scopes) && identity.scopes.includes(requiredScope))) {
+          return sendJson(res, 403, { code: 'INSUFFICIENT_SCOPE', message: 'Credential scope does not permit this operation', requiredScope });
+        }
       }
       // SSE routes own the response (streaming); pass req/res and skip the JSON path.
       if (opts?.sse) {

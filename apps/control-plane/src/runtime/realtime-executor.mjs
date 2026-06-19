@@ -18,13 +18,42 @@ import { CollectionCatalog } from '../../../../services/mongo-cdc-bridge/src/Col
 import { ensurePublicationAndReplicaIdentity, createFreshSlot, dropSlot } from '../../../../services/mongo-cdc-bridge/src/provisionLogicalReplication.mjs'
 import { clientError } from './errors.mjs'
 
+// The realtime executor runs ordinary provisioning queries (publication lookup/creation, REPLICA
+// IDENTITY FULL sweeps, slot create/drop) over a normal pg.Pool — and SOME of those are parameterized.
+// Postgres rejects any extended-query-protocol (parameterized/prepared) message on a replication
+// connection with `08P01: extended query protocol not supported in a replication connection`. So if the
+// operator-supplied engine URL carries `replication=database` (as the live-campaign secret did), the pool
+// must NOT inherit it. Strip any replication flag — the `replication` config key AND a `replication=…`
+// query parameter on a connectionString — before building the pool. The replication CONSUMER is
+// unaffected: pg-logical-replication forces `replication: 'database'` on its own client regardless.
+export function nonReplicationConfig(config) {
+  if (!config || typeof config !== 'object') return config
+  const out = { ...config }
+  delete out.replication
+  if (typeof out.connectionString === 'string' && /[?&]replication=/.test(out.connectionString)) {
+    try {
+      const url = new URL(out.connectionString)
+      url.searchParams.delete('replication')
+      out.connectionString = url.toString()
+    } catch {
+      // Not a parseable URL — fall back to a textual strip of the replication parameter.
+      out.connectionString = out.connectionString
+        .replace(/([?&])replication=[^&]*&?/, '$1')
+        .replace(/[?&]$/, '')
+    }
+  }
+  return out
+}
+
 export function createRealtimeExecutor(options = {}) {
   const engineConnectionConfig = options.engineConnectionConfig
   if (!engineConnectionConfig) {
     throw new TypeError('createRealtimeExecutor requires engineConnectionConfig (DocumentDB engine, REPLICATION-privileged)')
   }
   const ownPool = !options.enginePool
-  const enginePool = options.enginePool ?? new pg.Pool(engineConnectionConfig)
+  const makePool = options.poolFactory ?? ((cfg) => new pg.Pool(cfg))
+  // The pool runs parameterized provisioning queries → must never be a replication connection (08P01).
+  const enginePool = options.enginePool ?? makePool(nonReplicationConfig(engineConnectionConfig))
   const publicationName = options.publicationName ?? 'falcone_cdc_pub'
   const slotName = options.slotName ?? 'falcone_rt_slot'
   const catalog = options.catalog ?? new CollectionCatalog(enginePool)
