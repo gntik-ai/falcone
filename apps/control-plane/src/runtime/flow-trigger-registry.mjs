@@ -390,6 +390,19 @@ function createScheduleGateway({ temporalClient, getTemporalClient, logger }) {
 // The registry.
 // ---------------------------------------------------------------------------------------------
 
+// The master key used to AES-256-GCM-encrypt per-trigger webhook HMAC secrets at rest. A real key
+// MUST be supplied via FLOW_TRIGGER_SECRET_KEY (or injected). When it is absent we FAIL CLOSED in
+// production — returning null so trigger-secret operations are refused — instead of silently
+// encrypting with a publicly-known constant; only a non-production profile falls back to the
+// well-known dev key so local/test runs keep working (#636).
+const DEV_TRIGGER_SECRET_KEY = 'flow-trigger-dev-master-key';
+export function resolveTriggerSecretKey() {
+  const configured = process.env.FLOW_TRIGGER_SECRET_KEY;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') return null;
+  return DEV_TRIGGER_SECRET_KEY;
+}
+
 export function createFlowTriggerRegistry({
   store = createTriggerStore(),
   // Injected Temporal client (its `.schedule` is the ScheduleClient) OR a lazy getter shared with
@@ -398,7 +411,10 @@ export function createFlowTriggerRegistry({
   getTemporalClient,
   temporalTaskQueue = 'flows-main',
   // Master key for encrypting per-trigger HMAC secrets at rest (AES-256-GCM via encryptSecret).
-  secretMasterKey = process.env.FLOW_TRIGGER_SECRET_KEY ?? 'flow-trigger-dev-master-key',
+  // Resolved fail-closed (#636): a real key MUST be supplied via FLOW_TRIGGER_SECRET_KEY in
+  // production; absent it, this is null and trigger-secret operations are refused (never a
+  // hardcoded default). A non-production profile falls back to the dev key for local/test runs.
+  secretMasterKey = resolveTriggerSecretKey(),
   // Kafka consumer factory: () => consumer with subscribe/run/stop. Injected so the registry can be
   // exercised without a live broker (tests) and so production threads the real KafkaJS consumer.
   kafkaConsumerFactory,
@@ -438,6 +454,13 @@ export function createFlowTriggerRegistry({
   // -- Webhook --------------------------------------------------------------------------------
 
   async function registerWebhookTrigger({ identity, flowId, trigger }) {
+    // Fail closed (#636): never encrypt a trigger secret with a hardcoded/absent key. In production
+    // without FLOW_TRIGGER_SECRET_KEY, refuse the operation rather than persist a secret encrypted
+    // with a publicly-known constant.
+    if (!secretMasterKey) {
+      throw Object.assign(new Error('FLOW_TRIGGER_SECRET_KEY is not configured; webhook trigger registration is refused'),
+        { statusCode: 503, code: 'TRIGGER_SECRET_KEY_UNCONFIGURED' });
+    }
     const triggerId = triggerIdFor(flowId, trigger);
     const secret = generateSigningSecret();
     const { cipher, iv } = encryptSecret(secret, secretMasterKey);
@@ -454,6 +477,9 @@ export function createFlowTriggerRegistry({
   // secret, a foreign tenant, or a bad signature all return false (fail-closed, no run started).
   async function verifyWebhook({ identity, triggerId, rawBody, signatureHeader }) {
     if (!signatureHeader) return false;
+    // Fail closed (#636): with no configured master key there is nothing to decrypt the stored
+    // secret against, so no signature can be trusted — refuse (no run started).
+    if (!secretMasterKey) return false;
     const row = await store.getSecret({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, triggerId });
     if (!row) return false;
     let secret;
