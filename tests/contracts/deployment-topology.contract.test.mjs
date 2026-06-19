@@ -30,6 +30,7 @@ test('deployment topology contract exposes the required descriptors and promotio
     'apisix',
     'keycloak',
     'postgresql',
+    'postgresqlVector',
     'documentdb',
     'ferretdb',
     'kafka',

@@ -348,6 +348,7 @@
       "apisix",
       "keycloak",
       "postgresql",
+      "postgresqlVector",
       "documentdb",
       "ferretdb",
       "kafka",
