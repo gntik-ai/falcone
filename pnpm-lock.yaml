@@ -56,6 +56,9 @@ importers:
       '@temporalio/client':
         specifier: 1.18.1
         version: 1.18.1
+      ajv:
+        specifier: 8.17.1
+        version: 8.17.1
       bson:
         specifier: ^7.2.0
         version: 7.2.0
@@ -228,6 +231,9 @@ importers:
 
   services/internal-contracts:
     dependencies:
+      ajv:
+        specifier: 8.17.1
+        version: 8.17.1
       cel-js:
         specifier: 0.5.0
         version: 0.5.0
