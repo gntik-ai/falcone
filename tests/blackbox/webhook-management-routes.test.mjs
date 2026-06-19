@@ -63,11 +63,11 @@ function memDb() {
 }
 
 // Build the ctx the control-plane server hands a local handler.
-function ctx({ method = 'GET', url, body = {}, query = {}, identity }) {
-  return { req: { method, url }, body, query, identity, pool: {} };
+function ctx({ method = 'GET', url, body = {}, query = {}, identity, params = {} }) {
+  return { req: { method, url }, body, query, identity, params, pool: {} };
 }
-const A = { sub: 'user-a', tenantId: 'tenant-a', workspaceId: 'ws-a' };
-const B = { sub: 'user-b', tenantId: 'tenant-b', workspaceId: 'ws-b' };
+const A = { sub: 'user-a', tenantId: 'tenant-a', workspaceId: 'ws-a', actorType: 'tenant_owner' };
+const B = { sub: 'user-b', tenantId: 'tenant-b', workspaceId: 'ws-b', actorType: 'tenant_owner' };
 // IP-literal HTTPS target -> validator takes the IP-blocklist path, no DNS (deterministic, offline).
 const TARGET = 'https://93.184.216.34/hook';
 
@@ -142,12 +142,58 @@ test('bbx-643-rt-06: pathname is parsed from ctx.req.url ignoring the query stri
   assert.ok(Array.isArray(res.body.items), 'query string did not break route resolution');
 });
 
-test('bbx-643-rt-07: every /v1/webhooks/* route is wired to the registered webhookManage handler', () => {
-  const wh = routes.filter((r) => r.path.startsWith('/v1/webhooks/'));
-  assert.ok(wh.length >= 11, `expected the webhook routes in the kind route table, got ${wh.length}`);
+test('bbx-643-rt-07: every webhook route (tenant- and workspace-addressed) is wired to webhookManage', () => {
+  const wh = routes.filter((r) => r.path.includes('/webhooks'));
+  assert.ok(wh.length >= 22, `expected both webhook route forms in the kind route table, got ${wh.length}`);
+  assert.ok(wh.some((r) => r.path.startsWith('/v1/webhooks/')), 'tenant-addressed form present');
+  assert.ok(wh.some((r) => r.path.startsWith('/v1/workspaces/')), 'workspace-addressed form present');
   assert.equal(typeof LOCAL_HANDLERS.webhookManage, 'function', 'webhookManage is registered in LOCAL_HANDLERS');
   for (const r of wh) {
     assert.equal(r.localHandler, 'webhookManage', `${r.method} ${r.path} dispatches to webhookManage`);
     assert.equal(r.auth, 'authenticated', `${r.method} ${r.path} requires authentication`);
   }
+});
+
+// ---- workspace-addressed form: /v1/workspaces/{workspaceId}/webhooks/... -----
+// Workspace from PATH, authorized against the caller's verified tenant. A
+// tenant_owner (no workspace_id in the JWT) CAN manage its workspace's webhooks.
+const ownedWs = (tenantId) => async (_pool, wsId) => ({ id: wsId, tenant_id: tenantId });
+
+test('bbx-643-rt-08: workspace-path create -> 201, scoped to the PATH workspace + caller tenant', async () => {
+  const db = memDb();
+  const res = await webhookManage(ctx({
+    method: 'POST', url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: A, params: { workspaceId: 'ws-a' },
+    body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+  }), { buildDb: () => db, getWorkspace: ownedWs('tenant-a') });
+  assert.equal(res.statusCode, 201);
+  const stored = db._subs.get(res.body.subscriptionId);
+  assert.equal(stored.tenant_id, 'tenant-a');
+  assert.equal(stored.workspace_id, 'ws-a', 'scoped to the workspace from the path');
+});
+
+test('bbx-643-rt-09: workspace-path on a cross-tenant workspace -> 404 (no leak, no create)', async () => {
+  const db = memDb();
+  // The workspace belongs to tenant-b; caller A (tenant-a) must not reach it.
+  const res = await webhookManage(ctx({
+    method: 'POST', url: '/v1/workspaces/ws-b/webhooks/subscriptions', identity: A, params: { workspaceId: 'ws-b' },
+    body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+  }), { buildDb: () => db, getWorkspace: ownedWs('tenant-b') });
+  assert.equal(res.statusCode, 404);
+  assert.equal(db._subs.size, 0, 'nothing was persisted');
+});
+
+test('bbx-643-rt-10: workspace-path list rewrites the path and scopes to the workspace', async () => {
+  const db = memDb();
+  const opts = { buildDb: () => db, getWorkspace: ownedWs('tenant-a') };
+  await webhookManage(ctx({ method: 'POST', url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: A, params: { workspaceId: 'ws-a' }, body: { targetUrl: TARGET, eventTypes: ['document.created'] } }), opts);
+  const list = await webhookManage(ctx({ method: 'GET', url: '/v1/workspaces/ws-a/webhooks/subscriptions?limit=10', identity: A, params: { workspaceId: 'ws-a' } }), opts);
+  assert.equal(list.statusCode, 200, 'path rewrite reached the list route (not 404)');
+  assert.equal(list.body.items.length, 1);
+});
+
+test('bbx-643-rt-11: workspace-path event-types -> 200 (workspace authorized, path rewritten)', async () => {
+  const db = memDb();
+  const res = await webhookManage(ctx({ method: 'GET', url: '/v1/workspaces/ws-a/webhooks/event-types', identity: A, params: { workspaceId: 'ws-a' } }), { buildDb: () => db, getWorkspace: ownedWs('tenant-a') });
+  assert.equal(res.statusCode, 200);
+  assert.ok(Array.isArray(res.body.eventTypes));
 });
