@@ -84,9 +84,13 @@ apply_secret in-falcone-ferretdb generic in-falcone-ferretdb \
 # --- 4. in-falcone-documentdb-replication -----------------------------------
 # `password` -> documentdb-init Job (creates role falcone_cdc_repl with this pw).
 # `realtime-url` -> control-plane REALTIME_DOCUMENTDB_URL (replication-privileged).
+# IMPORTANT: this is a NORMAL connection URL — do NOT append ?replication=database. The executor's
+# realtime pool runs parameterized provisioning queries; Postgres rejects those on a replication
+# connection (08P01). The replication CONSUMER sets replication mode on its own client (see #626 /
+# tests/e2e/stack.sh which carries the same warning).
 apply_secret in-falcone-documentdb-replication generic in-falcone-documentdb-replication \
   --from-literal=password="$REPL_PW" \
-  --from-literal=realtime-url="postgres://falcone_cdc_repl:${REPL_PW}@falcone-documentdb:5432/postgres?sslmode=disable&replication=database"
+  --from-literal=realtime-url="postgres://falcone_cdc_repl:${REPL_PW}@falcone-documentdb:5432/postgres?sslmode=disable"
 
 # --- 5. in-falcone-kafka (envFromSecrets on kafka StatefulSet) --------------
 # Single-broker KRaft config. These are STRUCTURAL (node id 0, localhost quorum),
