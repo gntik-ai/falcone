@@ -161,10 +161,12 @@ data plane is healthy.
 ## 2. Prerequisites
 
 1. **OpenShift 4.14+** with the `oc` CLI logged in:
+
    ```bash
    oc login https://api.ocp.corp.example.com:6443 -u <user>
    oc whoami
    ```
+
 2. **Privileges.**
    - *Namespace‑scoped* operator can apply everything in §4–§7 **except** the
      ClusterRole/ClusterRoleBinding (Vault Kubernetes‑auth, optional) and the SCC
@@ -173,9 +175,11 @@ data plane is healthy.
      cluster‑admin.
 3. **StorageClass.** A default RWO CSI StorageClass (`${OCP_STORAGECLASS}`) that supports
    dynamic provisioning and **arbitrary `fsGroup`** (required by `restricted-v2`). Verify:
+
    ```bash
    oc get storageclass
    ```
+
 4. **Harbor.** A reachable private Harbor with a project (`${HARBOR_PROJECT}`) and a
    **robot account** that can pull. If Harbor uses a private/enterprise CA, have the CA
    PEM ready (used by both the cluster nodes' container runtime and any in‑cluster
@@ -331,6 +335,7 @@ explicitly, so pulls work even if SA linking is skipped.
 > **Harbor CA (optional ConfigMap).** If pods need to trust Harbor's CA for any
 > in‑pod HTTPS to the registry (rare; normally node‑level trust suffices — see the
 > §2 [VERIFY]), create a ConfigMap and mount it where needed:
+>
 > ```bash
 > oc -n falcone create configmap harbor-ca --from-file=ca.crt=/path/to/harbor-ca.pem
 > ```
@@ -784,7 +789,7 @@ oc -n falcone create secret generic in-falcone-superadmin \
 > | `in-falcone-superadmin` | `password` | bootstrap Job |
 > | `in-falcone-postgresql-vector` *(opt)* | `POSTGRES_USER`, `POSTGRES_PASSWORD` | postgresql‑vector SS |
 > | `falcone-seaweedfs-db-secret` *(opt, unused in this baseline)* | `user`, `password` | seaweedfs filer (MySQL store — disabled; we use PostgreSQL) |
-
+>
 > **[VERIFY] Consistency notes carried over from the chart:**
 > - `in-falcone-storage` (control‑plane env, OpenShift overlay) and
 >   `in-falcone-seaweedfs-s3-creds` (chart) are two names for the same S3 admin
@@ -1143,6 +1148,7 @@ carry large generated payloads. Extract them from the chart render and apply as 
 | `falcone-in-falcone-gateway-policy` | `gateway-policy.json` (access matrix the gateway/tests assert) | ~1,200 lines | `helm template … -s templates/runtime-configmaps.yaml` |
 
 > To produce these three on a connected/DMZ host from this repo:
+>
 > ```bash
 > helm template falcone charts/in-falcone \
 >   -s templates/bootstrap-payload-configmap.yaml \
@@ -1152,6 +1158,7 @@ carry large generated payloads. Extract them from the chart render and apply as 
 > # then: sed -i 's/^  namespace: .*/  namespace: falcone/' (or set namespace on apply)
 > oc -n falcone apply -f falcone-large-configmaps.yaml
 > ```
+>
 > These contain no secrets (the realm references secret *names*, not values).
 
 ---
@@ -3042,10 +3049,12 @@ bootstrap Job registers the `falcone-flows` namespace + search attributes, and
 
 > **[VERIFY] Temporal PostgreSQL role.** Temporal connects as role `temporal`/`temporal`
 > (chart‑hardcoded). Create it once before the schema Job:
+>
 > ```bash
 > oc -n falcone exec sts/falcone-postgresql -- bash -lc \
 >   'PGPASSWORD=$POSTGRESQL_POSTGRES_PASSWORD psql -U postgres -c "CREATE ROLE temporal LOGIN PASSWORD '\''temporal'\'' CREATEDB;"'
 > ```
+>
 > For production, change the password and update `falcone-temporal-config` + the Job env.
 
 ```yaml
@@ -3431,7 +3440,7 @@ spec:
 Suggested file layout (one manifest set per file). Apply top‑to‑bottom; wait at each
 checkpoint. All commands assume `oc project falcone` is current.
 
-```
+```text
 manifests/
   00-namespace-rbac.yaml      # §4 (cluster-admin for the SeaweedFS ClusterRole)
   01-networkpolicies.yaml     # §4.2
@@ -3609,6 +3618,7 @@ Changes made versus the raw chart render to achieve a clean air‑gap/OpenShift 
 9. **APISIX** `APISIX_STAND_ALONE=false` to make the route bootstrap operative.
 
 > To machine‑verify your assembled files before applying:
+>
 > ```bash
 > grep -REn 'image:\s*"?(docker\.io|quay\.io|gcr\.io|ghcr\.io|registry\.k8s\.io)/' manifests/ \
 >   && echo "FOUND PUBLIC REFS — fix before applying" || echo "OK: Harbor-only"
@@ -3709,4 +3719,3 @@ Repeat the ImageStream/BuildConfig per build‑from‑source image
 ---
 
 *End of guide.*
-
