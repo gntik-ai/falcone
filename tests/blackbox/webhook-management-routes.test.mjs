@@ -1,0 +1,153 @@
+// bbx-webhook-management-routes
+//
+// Black-box coverage for change add-webhook-engine-kind-runtime (GitHub #643).
+//
+// The kind control-plane serves `/v1/webhooks/*` via a LOCAL handler
+// (`webhookManage`) that wraps the code-complete webhook-management action. These
+// tests drive that handler with the SAME ctx shape the control-plane server
+// builds (ctx.req.method/url, ctx.body, ctx.query, ctx.identity, ctx.pool) and an
+// injected in-memory db, asserting the wrapper glue: method + pathname parsing
+// from ctx.req.url, verified-identity -> tenant/workspace/actor mapping (body
+// cannot spoof tenant), status pass-through, and tenant isolation. Routing
+// reaches the action (no `NO_ROUTE`).
+//
+// Scenarios:
+//   bbx-643-rt-01: GET /v1/webhooks/event-types -> 200 with the event catalogue
+//   bbx-643-rt-02: POST /v1/webhooks/subscriptions (valid) -> 201 with subscriptionId + signingSecret, scoped to caller
+//   bbx-643-rt-03: POST past the per-workspace quota -> 409 QUOTA_EXCEEDED
+//   bbx-643-rt-04: GET list is scoped to the caller's tenant (tenant B never sees tenant A)
+//   bbx-643-rt-05: cross-tenant GET by id -> 404 (no leak)
+//   bbx-643-rt-06: pathname is parsed from ctx.req.url ignoring the query string
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// The handler lazily imports the action from ${REPO_ROOT}/services/webhook-engine/...
+// Point REPO_ROOT at this checkout so the import resolves outside the image.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+process.env.REPO_ROOT = REPO_ROOT;
+
+const { webhookManage } = await import('../../deploy/kind/control-plane/webhook-handlers.mjs');
+const { routes } = await import('../../deploy/kind/control-plane/routes.mjs');
+const { LOCAL_HANDLERS } = await import('../../deploy/kind/control-plane/b-handlers.mjs');
+
+// In-memory, multi-tenant db implementing the adapter interface the action calls.
+function memDb() {
+  const subs = new Map();
+  const secrets = [];
+  const deliveries = [];
+  return {
+    _subs: subs, _secrets: secrets,
+    async getWorkspaceSubscriptionCount(t, w) {
+      return [...subs.values()].filter((s) => s.tenant_id === t && s.workspace_id === w && !s.deleted_at).length;
+    },
+    async insertSubscription(r) { subs.set(r.id, { ...r }); },
+    async insertSecret(id, enc, t, w) {
+      secrets.push({ subscription_id: id, secret_cipher: enc.cipher, secret_iv: enc.iv, status: 'active', tenant_id: t, workspace_id: w });
+    },
+    async listSubscriptions(ctx) {
+      return [...subs.values()].filter((s) => s.tenant_id === ctx.tenantId && s.workspace_id === ctx.workspaceId && !s.deleted_at);
+    },
+    async getSubscription(id) { return subs.get(id) ?? null; },
+    async updateSubscription(id, patch) { const s = { ...subs.get(id), ...patch, updated_at: new Date().toISOString() }; subs.set(id, s); return s; },
+    async replaceSubscription(rec) { subs.set(rec.id, { ...rec }); return subs.get(rec.id); },
+    async cancelPendingDeliveries() {},
+    async rotateSecret(id, enc, grace, t, w) {
+      for (const s of secrets) if (s.subscription_id === id && s.status === 'active') { s.status = 'grace'; s.grace_expires_at = grace; }
+      secrets.push({ subscription_id: id, secret_cipher: enc.cipher, secret_iv: enc.iv, status: 'active', tenant_id: t, workspace_id: w });
+    },
+    async listDeliveries(id) { return deliveries.filter((d) => d.subscription_id === id); },
+    async getDelivery(id, did) { return deliveries.find((d) => d.subscription_id === id && d.id === did) ?? null; },
+  };
+}
+
+// Build the ctx the control-plane server hands a local handler.
+function ctx({ method = 'GET', url, body = {}, query = {}, identity }) {
+  return { req: { method, url }, body, query, identity, pool: {} };
+}
+const A = { sub: 'user-a', tenantId: 'tenant-a', workspaceId: 'ws-a' };
+const B = { sub: 'user-b', tenantId: 'tenant-b', workspaceId: 'ws-b' };
+// IP-literal HTTPS target -> validator takes the IP-blocklist path, no DNS (deterministic, offline).
+const TARGET = 'https://93.184.216.34/hook';
+
+test('bbx-643-rt-01: GET /v1/webhooks/event-types -> 200 with the event catalogue', async () => {
+  const db = memDb();
+  const res = await webhookManage(ctx({ method: 'GET', url: '/v1/webhooks/event-types', identity: A }), { buildDb: () => db });
+  assert.equal(res.statusCode, 200);
+  assert.ok(Array.isArray(res.body.eventTypes) && res.body.eventTypes.some((e) => e.id === 'document.created'));
+});
+
+test('bbx-643-rt-02: POST /v1/webhooks/subscriptions (valid) -> 201 with id + signingSecret, scoped to caller', async () => {
+  const db = memDb();
+  const res = await webhookManage(ctx({
+    method: 'POST', url: '/v1/webhooks/subscriptions', identity: A,
+    body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+  }), { buildDb: () => db });
+  assert.equal(res.statusCode, 201);
+  assert.ok(res.body.subscriptionId, 'returns a subscription id');
+  assert.ok(res.body.signingSecret, 'returns the signing secret once on create');
+  const stored = db._subs.get(res.body.subscriptionId);
+  assert.equal(stored.tenant_id, 'tenant-a');
+  assert.equal(stored.workspace_id, 'ws-a');
+  assert.equal(db._secrets[0].tenant_id, 'tenant-a', 'secret inherits tenant from subscription');
+});
+
+test('bbx-643-rt-03: POST past the per-workspace quota -> 409 QUOTA_EXCEEDED', async () => {
+  const prev = process.env.WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE;
+  process.env.WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE = '1';
+  try {
+    const db = memDb();
+    const make = () => webhookManage(ctx({
+      method: 'POST', url: '/v1/webhooks/subscriptions', identity: A,
+      body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+    }), { buildDb: () => db });
+    assert.equal((await make()).statusCode, 201);
+    const second = await make();
+    assert.equal(second.statusCode, 409);
+    assert.equal(second.body.code, 'QUOTA_EXCEEDED');
+  } finally {
+    if (prev === undefined) delete process.env.WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE;
+    else process.env.WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE = prev;
+  }
+});
+
+test('bbx-643-rt-04: GET list is scoped to the caller tenant (B never sees A)', async () => {
+  const db = memDb();
+  const opts = { buildDb: () => db };
+  await webhookManage(ctx({ method: 'POST', url: '/v1/webhooks/subscriptions', identity: A, body: { targetUrl: TARGET, eventTypes: ['document.created'] } }), opts);
+  const listB = await webhookManage(ctx({ method: 'GET', url: '/v1/webhooks/subscriptions', identity: B }), opts);
+  assert.equal(listB.statusCode, 200);
+  assert.equal(listB.body.items.length, 0, 'tenant B sees none of tenant A subscriptions');
+  const listA = await webhookManage(ctx({ method: 'GET', url: '/v1/webhooks/subscriptions', identity: A }), opts);
+  assert.equal(listA.body.items.length, 1);
+});
+
+test('bbx-643-rt-05: cross-tenant GET by id -> 404 (no leak)', async () => {
+  const db = memDb();
+  const opts = { buildDb: () => db };
+  const created = await webhookManage(ctx({ method: 'POST', url: '/v1/webhooks/subscriptions', identity: A, body: { targetUrl: TARGET, eventTypes: ['document.created'] } }), opts);
+  const id = created.body.subscriptionId;
+  const asB = await webhookManage(ctx({ method: 'GET', url: `/v1/webhooks/subscriptions/${id}`, identity: B }), opts);
+  assert.equal(asB.statusCode, 404);
+  const asA = await webhookManage(ctx({ method: 'GET', url: `/v1/webhooks/subscriptions/${id}`, identity: A }), opts);
+  assert.equal(asA.statusCode, 200);
+  assert.equal(asA.body.subscriptionId, id);
+});
+
+test('bbx-643-rt-06: pathname is parsed from ctx.req.url ignoring the query string', async () => {
+  const db = memDb();
+  const res = await webhookManage(ctx({ method: 'GET', url: '/v1/webhooks/subscriptions?cursor=abc&limit=10', identity: A }), { buildDb: () => db });
+  assert.equal(res.statusCode, 200);
+  assert.ok(Array.isArray(res.body.items), 'query string did not break route resolution');
+});
+
+test('bbx-643-rt-07: every /v1/webhooks/* route is wired to the registered webhookManage handler', () => {
+  const wh = routes.filter((r) => r.path.startsWith('/v1/webhooks/'));
+  assert.ok(wh.length >= 11, `expected the webhook routes in the kind route table, got ${wh.length}`);
+  assert.equal(typeof LOCAL_HANDLERS.webhookManage, 'function', 'webhookManage is registered in LOCAL_HANDLERS');
+  for (const r of wh) {
+    assert.equal(r.localHandler, 'webhookManage', `${r.method} ${r.path} dispatches to webhookManage`);
+    assert.equal(r.auth, 'authenticated', `${r.method} ${r.path} requires authentication`);
+  }
+});

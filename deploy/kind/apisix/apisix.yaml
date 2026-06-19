@@ -159,6 +159,17 @@ routes:
       scheme: http
       nodes:
         "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2019-webhooks"
+    uri: "/v1/webhooks/*"
+    priority: 224
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      cors: {}
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1
   - id: "2009"
     uri: "/v1/storage/*"
     priority: 231

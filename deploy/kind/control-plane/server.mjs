@@ -24,6 +24,7 @@ import { ensureSchema } from './tenant-store.mjs';
 import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
+import { applyWebhookSchema } from './webhook-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
 
@@ -379,6 +380,10 @@ runWithRetry(async (attempt) => {
   // quota overrides / boolean capabilities / scope-enforcement) so the wireable
   // governance routes' real actions resolve instead of 500'ing on 42P01 (#555).
   await applyGovernanceSchema(pool);
+  // Webhook management plane (#643): create webhook_subscriptions/_signing_secrets/
+  // _deliveries/_delivery_attempts (migrations 001+002) so /v1/webhooks/* has durable
+  // tenant-scoped storage. Idempotent; RLS (003) deferred — see webhook-schema.mjs.
+  await applyWebhookSchema(pool);
   const n = await recoverSagas(pool);
   console.log(`[control-plane] schema ready; recovered ${n} orphaned saga(s) (attempt ${attempt})`);
   return n;
