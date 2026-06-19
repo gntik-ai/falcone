@@ -9,6 +9,7 @@
 - [x] `parseConfigIdentity` (`tenant-config-identity.mjs`) gains `requireTenant` (default true → all existing tenant-scoped config actions unchanged); returns null when there is no trusted identity at all (anti-spoofing preserved).
 - [x] `tenant-config-format-versions` + `tenant-config-export-domains` call `parseConfigIdentity({requireTenant:false})` and authorize a platform operator (superadmin/sre) or the `platform:admin:config:export` scope.
 - [x] No APISIX route change required (flows/mcp routes already exist via archived #560; realtime/admin-config reach the CP via the `/v1/*` catch-all).
+- [x] Add migration 080 (`pg_capture_configs` + siblings) to the kind `GOVERNANCE_MIGRATIONS` — live verification of the identity fix surfaced a 500 `42P01` (table never bootstrapped in kind; same omission class as #595's 114). Covered by `tests/blackbox/governance-schema-bootstrap.test.mjs` (bbx-611-01).
 
 ## Verify
 - [x] Black-box suite green: `tenant-config-verify-role-claims` (anti-spoofing invariant, 13/13), `cdc-capture-verify-jwt-identity` (incl. 3 new #611 cases, 9/9); product `tenant-config-format-versions` (4/4) and `tenant-config-export-domains` (7/7) green; fixed two stale unit tests to the correct 401 semantics.

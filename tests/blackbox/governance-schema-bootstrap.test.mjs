@@ -36,7 +36,7 @@ import assert from 'node:assert/strict';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { GOVERNANCE_MIGRATIONS, applyGovernanceSchema } from '../../deploy/kind/control-plane/governance-schema.mjs';
+import { GOVERNANCE_MIGRATIONS, applyGovernanceSchema, forwardMigration } from '../../deploy/kind/control-plane/governance-schema.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
@@ -102,4 +102,29 @@ test('bbx-595-02: 114 is ordered after its prerequisites (097 function, 104 capa
   assert.ok(idx('114-') > -1, '114 is in the governance set');
   assert.ok(idx('097-') < idx('114-'), '097 (set_updated_at_timestamp) before 114');
   assert.ok(idx('104-') < idx('114-'), '104 (boolean_capability_catalog) before 114');
+});
+
+test('bbx-611-01: bootstrap creates the pg-capture tables (realtime pg-capture-list)', async () => {
+  // add-gateway-realtime-config-identity (#611): GET /v1/realtime/workspaces/{ws}/pg-captures
+  // reads pg_capture_configs; without migration 080 the read 500'd with 42P01 (undefined_table).
+  const { applied, all } = await runBootstrap();
+  assert.ok(
+    applied.some((m) => m.includes('080-pg-capture-config')),
+    'migration 080 (pg-capture) is applied at boot',
+  );
+  for (const table of ['pg_capture_configs', 'pg_capture_quotas', 'pg_capture_audit_log']) {
+    assert.match(all, new RegExp(`CREATE TABLE IF NOT EXISTS\\s+${table}\\b`), `must create ${table}`);
+  }
+});
+
+test('bbx-611-02: the forward-only applier strips the `-- down` rollback section', async () => {
+  // 080 carries a `-- down` block (DROP TABLE pg_capture_configs ...). Running the whole file
+  // would create then immediately drop the tables. The applier must run only the `-- up` portion.
+  const { all } = await runBootstrap();
+  assert.doesNotMatch(all, /DROP\s+TABLE\s+IF\s+EXISTS\s+pg_capture_configs/i, 'rollback DROP must not be executed at boot');
+  // forwardMigration() keeps forward DDL and drops everything from `-- down` onward.
+  const sample = 'CREATE TABLE IF NOT EXISTS t (id int);\n-- down\nDROP TABLE IF EXISTS t;\n';
+  assert.match(forwardMigration(sample), /CREATE TABLE IF NOT EXISTS t/);
+  assert.doesNotMatch(forwardMigration(sample), /DROP TABLE/);
+  assert.equal(forwardMigration('CREATE TABLE x();'), 'CREATE TABLE x();', 'files without `-- down` pass through unchanged');
 });

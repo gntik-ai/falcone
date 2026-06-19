@@ -46,6 +46,12 @@ GitHub issue #611 (epic G). Evidence: `audit/live-campaign/evidence-rerun/15-sec
   `platform:admin:config:export` scope. A request with **no** trusted identity at all (e.g. a forged
   Bearer JWT and nothing else) still returns null → 401 (anti-spoofing invariant preserved).
 
+- Add migration 080 (`pg_capture_configs` + `pg_capture_quotas` + `pg_capture_audit_log`) to the kind
+  governance bootstrap (`GOVERNANCE_MIGRATIONS`). Live verification of the identity fix surfaced a
+  SECOND, same-class gap: with the 401 removed, `pg-capture-list` reached its DB read and 500'd with
+  `42P01` because the kind bootstrap never created `pg_capture_configs` (migration 080 was listed in
+  `required-migrations.txt` but absent from `GOVERNANCE_MIGRATIONS` — same omission as #595's 114).
+
 No APISIX route change is required: `/v1/flows`+`/v1/mcp` gateway routes already exist (archived
 #560) and `/v1/realtime/*`/`/v1/admin/config/*` reach the control-plane via the `/v1/*` catch-all.
 
