@@ -10,7 +10,7 @@
 
 ## Verify
 - [x] Black-box suite green: `platform-mcp-http` (5/5) — initialize, tools/list, read-tool proxy + bearer forwarding, mutating-scope refusal (no upstream call), unauthenticated 401.
-- [ ] Live: an MCP client `initialize` + `tools/list` against `/v1/mcp/rpc` via the gateway on the re-stood-up kind cluster (tools/call requires a token carrying `mcp:invoke`).
+- [x] Live (2026-06-19, evidence-rerun/16): tenant_owner `POST /v1/mcp/rpc {initialize}` -> 200 (protocol 2025-11-25, serverInfo falcone-official-mcp); `{tools/list}` -> 200 with the official catalog; superadmin (no tenant) -> 401; no-auth -> 401. Routed via the gateway (`/v1/mcp/*` -> executor).
 - [x] Acceptance encoded as scenarios in the spec delta.
 
 ## Archive

@@ -13,7 +13,7 @@
 
 ## Verify
 - [x] Black-box suite green: `tenant-config-verify-role-claims` (anti-spoofing invariant, 13/13), `cdc-capture-verify-jwt-identity` (incl. 3 new #611 cases, 9/9); product `tenant-config-format-versions` (4/4) and `tenant-config-export-domains` (7/7) green; fixed two stale unit tests to the correct 401 semantics.
-- [ ] Live 2-tenant probe on the re-stood-up kind cluster: superadmin `GET /v1/admin/config/format-versions` -> 200; tenant_owner `GET /v1/realtime/workspaces/{ws}/pg-captures` -> 200; cross-tenant -> empty/denied.
+- [x] Live 2-tenant probe on the re-stood-up kind cluster (2026-06-19, evidence-rerun/16): superadmin `GET /v1/admin/config/format-versions` -> 200 (no-auth 401); tenant_owner `GET /v1/realtime/workspaces/{ws}/pg-captures` -> 200 `{items:[],total:0}`; cross-tenant -> 200 empty (tenant-scoped, no leak); no-auth -> 401.
 - [x] Acceptance encoded as scenarios in the spec delta.
 
 ## Archive

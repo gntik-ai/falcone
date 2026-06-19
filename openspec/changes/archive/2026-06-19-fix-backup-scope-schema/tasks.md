@@ -8,7 +8,7 @@
 
 ## Verify
 - [x] Black-box suite green; the bootstrap probe now creates the backup-scope tables (bbx-595-01/02 pass).
-- [x] Acceptance: backup scope returns 2xx for an authorized caller; cross-tenant stays 403 (encoded as scenarios in the spec delta; the live 200-vs-500 proof belongs to the consolidated kind run).
+- [x] Acceptance: backup scope returns 2xx for an authorized caller; cross-tenant stays 403. Live-verified (2026-06-19, evidence-rerun/16): superadmin `GET /v1/admin/backup/scope` -> 200 (matrix); acme-ops `GET /v1/tenants/{globex}/backup/scope` -> 403.
 
 ## Archive
 - [ ] `openspec validate fix-backup-scope-schema --strict`; `/opsx:archive fix-backup-scope-schema` after merge.
