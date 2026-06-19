@@ -626,27 +626,74 @@ function validateTenantPredicate(predicate, tenantId, tenantFieldPath) {
   });
 }
 
-export function applyTenantScopeToFilter({ filter = {}, tenantId, tenantFieldPath = 'tenantId' }) {
+export function applyTenantScopeToFilter({
+  filter = {},
+  tenantId,
+  tenantFieldPath = 'tenantId',
+  workspaceId,
+  workspaceFieldPath = 'workspaceId'
+}) {
   const normalizedTenantId = normalizeNonEmptyString(tenantId, 'tenantId');
   const normalizedTenantFieldPath = normalizeFieldPath(tenantFieldPath, 'tenantFieldPath');
+  // Workspace scope is OPTIONAL but injected by every data-API plan (buildMongoDataApiPlan
+  // requires a workspaceId): the document plane is scoped per workspace WITHIN the tenant, so
+  // two workspaces (project/stage) of the same tenant sharing a db+collection name no longer
+  // share documents — matching the per-workspace SQL (wsdb_*) and storage (bucket) planes
+  // (#632). When omitted, behaviour is unchanged (tenant-only) for existing callers.
+  const hasWorkspace = workspaceId !== undefined && workspaceId !== null;
+  const normalizedWorkspaceId = hasWorkspace ? normalizeNonEmptyString(workspaceId, 'workspaceId') : undefined;
+  const normalizedWorkspaceFieldPath = hasWorkspace ? normalizeFieldPath(workspaceFieldPath, 'workspaceFieldPath') : undefined;
   const normalizedFilter = normalizeMongoDataFilter(filter);
-  const tenantPredicates = collectTenantPredicates(normalizedFilter, normalizedTenantFieldPath);
 
+  const tenantPredicates = collectTenantPredicates(normalizedFilter, normalizedTenantFieldPath);
   for (const predicate of tenantPredicates) {
     validateTenantPredicate(predicate, normalizedTenantId, normalizedTenantFieldPath);
   }
 
-  const tenantFilter = {};
-  setPathValue(tenantFilter, normalizedTenantFieldPath, normalizedTenantId);
+  let workspacePredicates = [];
+  if (hasWorkspace) {
+    workspacePredicates = collectTenantPredicates(normalizedFilter, normalizedWorkspaceFieldPath);
+    for (const predicate of workspacePredicates) {
+      validateTenantPredicate(predicate, normalizedWorkspaceId, normalizedWorkspaceFieldPath);
+    }
+  }
+
+  // Both scope predicates merge into ONE leading clause object ({tenantId[, workspaceId]}),
+  // AND-ed ahead of the caller filter.
+  const scopeFilter = {};
+  setPathValue(scopeFilter, normalizedTenantFieldPath, normalizedTenantId);
+  if (hasWorkspace) setPathValue(scopeFilter, normalizedWorkspaceFieldPath, normalizedWorkspaceId);
+
+  // `fields` is the canonical list every scope consumer iterates (stamp on write, match on
+  // read, change-stream match) so a scope field can never be forgotten at a single call site.
+  const fields = [{ fieldPath: normalizedTenantFieldPath, value: normalizedTenantId }];
+  if (hasWorkspace) fields.push({ fieldPath: normalizedWorkspaceFieldPath, value: normalizedWorkspaceId });
 
   return {
     tenantScope: {
       fieldPath: normalizedTenantFieldPath,
       value: normalizedTenantId,
-      injected: tenantPredicates.length === 0
+      injected: tenantPredicates.length === 0,
+      workspace: hasWorkspace
+        ? { fieldPath: normalizedWorkspaceFieldPath, value: normalizedWorkspaceId, injected: workspacePredicates.length === 0 }
+        : undefined,
+      fields
     },
-    filter: mergeFilters(tenantFilter, normalizedFilter)
+    filter: mergeFilters(scopeFilter, normalizedFilter)
   };
+}
+
+// Re-apply the FULL composite scope (tenant + workspace) to a sub-filter from an already-built
+// tenantScope. The bulk/transaction/export paths scope per-operation filters; they MUST carry
+// the same workspace predicate as the top-level filter, so they route through here (#632).
+function rescopeFilter(filter, tenantScope) {
+  return applyTenantScopeToFilter({
+    filter,
+    tenantId: tenantScope.value,
+    tenantFieldPath: tenantScope.fieldPath,
+    workspaceId: tenantScope.workspace?.value,
+    workspaceFieldPath: tenantScope.workspace?.fieldPath
+  }).filter;
 }
 
 function normalizeWriteDocument(value, fieldName) {
@@ -661,17 +708,25 @@ function normalizeWriteDocument(value, fieldName) {
   return cloneJson(value);
 }
 
-function injectTenantIntoDocument(document, tenantScope) {
-  const currentValue = getPathValue(document, tenantScope.fieldPath);
-  if (currentValue !== undefined && currentValue !== tenantScope.value) {
-    throw new MongoDataApiError({
-      code: 'mongo_data_tenant_scope_violation',
-      status: 403,
-      message: `Document payload cannot override ${tenantScope.fieldPath}.`
-    });
-  }
+function tenantScopeFields(tenantScope) {
+  return tenantScope.fields ?? [{ fieldPath: tenantScope.fieldPath, value: tenantScope.value }];
+}
 
-  setPathValue(document, tenantScope.fieldPath, tenantScope.value);
+function injectTenantIntoDocument(document, tenantScope) {
+  // Stamp EVERY scope field (tenantId and, when scoped, workspaceId). A payload that tries to
+  // set a scope field to anything other than the caller's value is rejected (403) — a caller
+  // cannot write into another tenant's OR another workspace's scope (#632).
+  for (const { fieldPath, value } of tenantScopeFields(tenantScope)) {
+    const currentValue = getPathValue(document, fieldPath);
+    if (currentValue !== undefined && currentValue !== value) {
+      throw new MongoDataApiError({
+        code: 'mongo_data_tenant_scope_violation',
+        status: 403,
+        message: `Document payload cannot override ${fieldPath}.`
+      });
+    }
+    setPathValue(document, fieldPath, value);
+  }
   return document;
 }
 
@@ -963,13 +1018,13 @@ function normalizeBulkOperation({ operation, tenantScope, collectionMetadata, ex
       return compactDefined({ kind, document, validationContext: { candidateDocument: document, partial: false } });
     }
     case 'replaceOne': {
-      const normalizedFilter = applyTenantScopeToFilter({ filter: operation.filter, tenantId: tenantScope.value, tenantFieldPath: tenantScope.fieldPath }).filter;
+      const normalizedFilter = rescopeFilter(operation.filter, tenantScope);
       const replacement = injectTenantIntoDocument(normalizeWriteDocument(operation.replacement, `bulk.operations[${index}].replacement`), tenantScope);
       return compactDefined({ kind, filter: normalizedFilter, replacement, upsert: operation.upsert === true, validationContext: { candidateDocument: replacement, partial: false } });
     }
     case 'updateOne':
     case 'updateMany': {
-      const normalizedFilter = applyTenantScopeToFilter({ filter: operation.filter, tenantId: tenantScope.value, tenantFieldPath: tenantScope.fieldPath }).filter;
+      const normalizedFilter = rescopeFilter(operation.filter, tenantScope);
       const update = normalizeMongoDataUpdateDocument(operation.update);
       const existingDocument = operation.documentId ? existingDocumentMap.get(operation.documentId) : operation.existingDocument;
       const candidateDocument = existingDocument ? injectTenantIntoDocument(applyMongoDataUpdateDocument(existingDocument, update), tenantScope) : undefined;
@@ -977,7 +1032,7 @@ function normalizeBulkOperation({ operation, tenantScope, collectionMetadata, ex
     }
     case 'deleteOne':
     case 'deleteMany': {
-      const normalizedFilter = applyTenantScopeToFilter({ filter: operation.filter, tenantId: tenantScope.value, tenantFieldPath: tenantScope.fieldPath }).filter;
+      const normalizedFilter = rescopeFilter(operation.filter, tenantScope);
       return { kind, filter: normalizedFilter };
     }
     default:
@@ -1170,18 +1225,24 @@ function normalizeAggregationLimits(limits = {}, defaults = MONGO_DATA_DEFAULT_A
 
 function buildTenantMatchFilter(tenantScope) {
   const tenantMatch = {};
-  setPathValue(tenantMatch, tenantScope.fieldPath, tenantScope.value);
+  for (const { fieldPath, value } of tenantScopeFields(tenantScope)) {
+    setPathValue(tenantMatch, fieldPath, value);
+  }
   return tenantMatch;
 }
 
 function buildChangeStreamTenantMatch(tenantScope) {
-  return {
+  // Each scope field must match in ANY of the change-event locations (fullDocument, the
+  // before-image, or an updated-fields delta); fields are AND-ed together so a change must be
+  // in the caller's tenant AND workspace (#632).
+  const clauses = tenantScopeFields(tenantScope).map(({ fieldPath, value }) => ({
     $or: [
-      { [`fullDocument.${tenantScope.fieldPath}`]: tenantScope.value },
-      { [`fullDocumentBeforeChange.${tenantScope.fieldPath}`]: tenantScope.value },
-      { [`updateDescription.updatedFields.${tenantScope.fieldPath}`]: tenantScope.value }
+      { [`fullDocument.${fieldPath}`]: value },
+      { [`fullDocumentBeforeChange.${fieldPath}`]: value },
+      { [`updateDescription.updatedFields.${fieldPath}`]: value }
     ]
-  };
+  }));
+  return clauses.length === 1 ? clauses[0] : { $and: clauses };
 }
 
 function normalizePipelineStage(stage, { kind, stagePath, limits, state, tenantScope } = {}) {
@@ -1493,11 +1554,7 @@ function normalizeMongoExportPayload({ payload = {}, filter, projection, sort, p
   });
   const normalizedSort = normalizeMongoDataSort(sort);
   const normalizedProjection = normalizeMongoDataProjection(projection);
-  const { filter: scopedFilter } = applyTenantScopeToFilter({
-    filter,
-    tenantId: tenantScope.value,
-    tenantFieldPath: tenantScope.fieldPath
-  });
+  const scopedFilter = rescopeFilter(filter, tenantScope);
 
   return {
     format,
@@ -1583,7 +1640,7 @@ function normalizeTransactionOperation({ operation, tenantScope, collectionMetad
         kind,
         target,
         filter: mergeFilters(
-          applyTenantScopeToFilter({ filter: operation.filter, tenantId: tenantScope.value, tenantFieldPath: tenantScope.fieldPath }).filter,
+          rescopeFilter(operation.filter, tenantScope),
           operation.documentId ? { _id: target.documentId } : {}
         ),
         replacement,
@@ -1593,7 +1650,7 @@ function normalizeTransactionOperation({ operation, tenantScope, collectionMetad
     }
     case 'update': {
       const filter = mergeFilters(
-        applyTenantScopeToFilter({ filter: operation.filter, tenantId: tenantScope.value, tenantFieldPath: tenantScope.fieldPath }).filter,
+        rescopeFilter(operation.filter, tenantScope),
         operation.documentId ? { _id: target.documentId } : {}
       );
       const update = normalizeMongoDataUpdateDocument(operation.update);
@@ -1617,7 +1674,7 @@ function normalizeTransactionOperation({ operation, tenantScope, collectionMetad
         kind,
         target,
         filter: mergeFilters(
-          applyTenantScopeToFilter({ filter: operation.filter, tenantId: tenantScope.value, tenantFieldPath: tenantScope.fieldPath }).filter,
+          rescopeFilter(operation.filter, tenantScope),
           operation.documentId ? { _id: target.documentId } : {}
         ),
         collectionMetadata
@@ -2204,6 +2261,7 @@ export function buildMongoDataApiPlan({
   documentId,
   tenantId,
   tenantFieldPath = 'tenantId',
+  workspaceFieldPath = 'workspaceId',
   filter,
   projection,
   sort,
@@ -2238,7 +2296,16 @@ export function buildMongoDataApiPlan({
   const normalizedProjection = normalizeMongoDataProjection(projection);
   const cursor = parseMongoDataCursor(page.after);
   const pageSize = normalizePageSize(page.size);
-  const { tenantScope, filter: scopedFilter } = applyTenantScopeToFilter({ filter, tenantId, tenantFieldPath });
+  // Scope EVERY operation by both the verified tenantId and the workspaceId (the path
+  // workspace, already bound to the caller's credential at server.mjs) so documents are
+  // isolated per workspace within a tenant (#632).
+  const { tenantScope, filter: scopedFilter } = applyTenantScopeToFilter({
+    filter,
+    tenantId,
+    tenantFieldPath,
+    workspaceId: normalizedWorkspaceId,
+    workspaceFieldPath
+  });
   const cursorPredicate = buildMongoCursorPredicate(normalizedSort, cursor);
   const queryFilter = cursorPredicate ? mergeFilters(scopedFilter, cursorPredicate) : scopedFilter;
   const compatibility = resolveMongoDataCapabilityCompatibility({ operation, topology, bridge });
