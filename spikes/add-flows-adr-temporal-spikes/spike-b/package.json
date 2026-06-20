@@ -14,5 +14,10 @@
     "@temporalio/client": "^1.11.8",
     "@temporalio/worker": "^1.11.8",
     "@temporalio/workflow": "^1.11.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": "^7.6.3"
+    }
   }
 }
