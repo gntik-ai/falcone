@@ -92,14 +92,17 @@ test('bbx-mcp-platform-01: a platform read tool self-calls a real control-plane 
   assert.ok(!text.includes('in-falcone-control-plane'), 'platform tool must not return the executor index');
 });
 
-test('bbx-mcp-platform-02: a platform mutating tool self-calls the control-plane with its body', async () => {
+test('bbx-mcp-platform-02: a platform mutating tool self-calls the control-plane with its body; tenant from the credential context', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publish(e, 'official');
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_schema', arguments: { name: 'reporting' } } });
+  // create_workspace targets the served tenant-scoped route; {tenantId} is filled from the
+  // credential-bound server context (ten-a), NEVER from a smuggled arg.
+  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_workspace', arguments: { slug: 'reporting', tenantId: 'EVIL' } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
-  assert.equal(c.path, '/v1/schemas');
-  assert.deepEqual(c.body, { name: 'reporting' });
+  assert.equal(c.path, '/v1/tenants/ten-a/workspaces');
+  assert.ok(!c.path.includes('EVIL'));
+  assert.deepEqual(c.body, { slug: 'reporting' });
 });
 
 test('bbx-mcp-platform-03: generateFromFlows is the reused mapper (parity with mcp-workflows-tools)', () => {
