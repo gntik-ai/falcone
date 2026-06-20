@@ -16,6 +16,7 @@ import { createPostgresRealtimeExecutor } from './postgres-realtime-executor.mjs
 import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
+import { createLlmExecutor, createLlmProviderStore, createLlmUsageStore } from './llm-executor.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
@@ -97,6 +98,21 @@ const embeddingExecutor = createEmbeddingExecutor({
 // SAME metadata pool as the API-key + provider stores, so mapping configuration survives a
 // restart and is shared across all control-plane replicas. keyPool.end() in shutdown() covers it.
 const mappingStore = createEmbeddingMappingStore({ pool: keyPool });
+
+// BYOK LLM completion plane (change: add-llm-agent-flow-task / #640). Provider config + per-tenant
+// token-usage metering are Postgres-backed on the SAME metadata pool. secretResolver mirrors the
+// embedding executor: ESO/Vault mounts the resolved key as the env var named by secretRef.name, so
+// the plaintext key is never persisted and is resolved fresh per completion (key rotation is live).
+const llmProviderStore = createLlmProviderStore({ pool: keyPool });
+const llmUsageStore = createLlmUsageStore({ pool: keyPool });
+const llmExecutor = createLlmExecutor({
+  providerStore: llmProviderStore,
+  usageStore: llmUsageStore,
+  secretResolver: (secretRef) => {
+    if (secretRef?.name) return Promise.resolve(process.env[secretRef.name] ?? null);
+    return Promise.resolve(null);
+  },
+});
 
 // Mongo executor (enabled when a MONGO_URI/MONGO_HOST is configured).
 const mUri = mongoUri();
@@ -321,7 +337,7 @@ const mcpEngine = process.env.MCP_ENABLED === 'true'
 // request so that legitimate gateway-authenticated traffic continues to work while
 // unauthenticated client-supplied identity headers are rejected with 401.
 const server = createControlPlaneServer({
-  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
+  registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
   resolveWorkspaceTenant,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
   // First-party MCP dispatches tool calls against this executor's own loopback base, so its local
@@ -331,7 +347,7 @@ const server = createControlPlaneServer({
 });
 
 // Initialise all metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve()])
+Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve()])
   .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
   // Wire + START the platform-event trigger consumer AFTER the schemas exist, so the on-boot
   // subscription can read already-persisted registrations (a flow published in a prior process).

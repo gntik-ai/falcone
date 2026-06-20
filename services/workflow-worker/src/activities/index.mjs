@@ -31,6 +31,7 @@ export { functionsInvoke, functionsInvokeInputSchema, functionsInvokeOutputSchem
 export { eventsPublish, eventsPublishInputSchema, eventsPublishOutputSchema } from './events-publish.mjs';
 export { httpRequest, httpRequestInputSchema, httpRequestOutputSchema } from './http-request.mjs';
 export { emailSend, emailSendInputSchema, emailSendOutputSchema } from './email-send.mjs';
+export { llmComplete, llmCompleteInputSchema, llmCompleteOutputSchema } from './llm-complete.mjs';
 
 export { assertPayloadSize, MAX_INPUT_BYTES, MAX_OUTPUT_BYTES, serializedByteLength } from './limits.mjs';
 export { toNonRetryable, toRetryable, classifyExecutorError, isTransientNetworkError } from './errors.mjs';

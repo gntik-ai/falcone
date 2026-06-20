@@ -148,6 +148,31 @@ const DESCRIPTORS = [
       additionalProperties: false,
     },
   },
+  {
+    id: 'llm.complete',
+    label: 'LLM Complete',
+    category: 'ai',
+    inputSchema: {
+      $id: 'flows/activity/llm.complete/input',
+      type: 'object',
+      required: ['model'],
+      properties: {
+        model: { type: 'string' },
+        messages: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { role: { type: 'string' }, content: { type: 'string', 'x-falcone-expression': true } },
+          },
+        },
+        prompt: { type: 'string', 'x-falcone-expression': true },
+        system: { type: 'string', 'x-falcone-expression': true },
+        maxTokens: { type: 'integer', minimum: 1 },
+        temperature: { type: 'number', minimum: 0, maximum: 2 },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**

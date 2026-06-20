@@ -14,4 +14,5 @@ export const TASK_TYPE_NAMES = Object.freeze([
   'events.publish',
   'http.request',
   'email.send',
+  'llm.complete',
 ]);
