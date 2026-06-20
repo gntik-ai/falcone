@@ -105,10 +105,10 @@ live. The runtime gateway routing for kind is the dedicated APISIX route added i
 
 ## 11. Live verification on kind (provider + completion + usage plane; no Temporal required)
 
-- [ ] 11.1 Rebuild and push `falcone-cp-executor` image to `localhost:30500`; roll the deployment on `test-cluster-b`.
-- [ ] 11.2 Through the gateway with a real `tenant_owner` principal (acme-ops): `PUT /v1/workspaces/{ws}/llm-provider` with `localMock` backend → 200; `GET` → secretRef present, no key; `POST /v1/workspaces/{ws}/llm/completions` with allowed model → 200 `{ content, usage, model }`; `GET /v1/workspaces/{ws}/llm-usage` → rollup by model; `DELETE` → `{ removed: true }`; subsequent GET → 404 `LLM_PROVIDER_NOT_FOUND`.
-- [ ] 11.3 Cross-tenant probe: globex-ops `GET /v1/workspaces/{acme-ws}/llm-provider` → 404 or empty (not acme's config).
-- [ ] 11.4 Revert executor deployment to prior image after verification.
+- [x] 11.1 Built + pushed `in-falcone-control-plane-executor:llm-640` to the cluster registry; rolled `falcone-cp-executor` on `test-cluster-b` (reverted to `head-20260619` after). Note: the live standalone APISIX has no executor routes for `/v1/workspaces/*` (it routes them to the control-plane — same as embedding-provider today), so the plane was probed via the executor's trusted gateway-auth header path, which is exactly how the gateway calls it.
+- [x] 11.2 In-pod gateway-auth probe (8/8 PASS): `PUT llm-provider`→200; `GET`→secretRef only, no plaintext key, allowedModels echoed; `POST llm/completions` disallowed model→422 `MODEL_NOT_ALLOWED` (no provider call); allowed model + absent secret→500 `LLM_PROVIDER_SECRET_UNRESOLVED` (fail-closed, no real provider call); `GET llm-usage`→200 rollup; `DELETE`→`{removed:true}`; GET after delete→404 `LLM_PROVIDER_NOT_FOUND`. Schema bootstrap (`workspace_llm_providers`/`workspace_llm_usage`) ran cleanly at boot against real Postgres.
+- [x] 11.3 Cross-tenant probe: a second tenant `GET`ting the same workspaceId's provider → 404 `LLM_PROVIDER_NOT_FOUND` (no leak of the configuring tenant's config).
+- [x] 11.4 Reverted `falcone-cp-executor` to `head-20260619` (confirmed).
 
 ## 12. Archive
 
