@@ -18,7 +18,7 @@
 
 - [x] 4.1 New tests pass (7/7).
 - [x] 4.2 `bash tests/blackbox/run.sh` — 1004 pass / 0 fail; existing fn tests (18) unchanged; `openspec validate --strict` clean.
-- [ ] 4.3 Live kind probe: rebuild control-plane + fn-runtime images, deploy a function returning its `context` arg, invoke as a real principal; assert `tenantId`/`workspaceId`/`principal` match the verified caller and a body field does not override the context.
+- [x] 4.3 Live kind verification (test-cluster-b): rebuilt + pushed both images (control-plane + fn-runtime), rolled `falcone-control-plane` with `FN_RUNTIME_IMAGE` repointed, deployed a context-echo function as `acme-ops` (tenant_owner) and invoked it through the gateway with a spoofing body `{tenantId:'SPOOF-TENANT', principal:'SPOOF-USER', n:7}`. The function's `context` arg = `{ tenantId: <verified caller tenant>, workspaceId: <invoked ws>, principal: <verified sub>, actorType: tenant_owner, roles:[tenant_owner,…] }`; the spoof values did NOT enter `context` (stayed in `params`). Proves the `X-Falcone-*` headers survive the Knative/Kourier hop and the body cannot forge identity. Reverted both image + env and deleted the test ksvc afterward.
 
 ## 5. Archive
 
