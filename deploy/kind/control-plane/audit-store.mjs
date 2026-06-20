@@ -20,27 +20,54 @@
 //   workspace id (when present) is carried in new_state.workspaceId so the workspace
 //   read can filter without a schema change.
 
+import { randomUUID } from 'node:crypto';
+import { auditCanonical, computeRowHash } from './audit-hash.mjs';
+
 // Record a single action-audit event. Best-effort by design: auditing must NEVER
 // fail the action it describes, so callers wrap this and swallow errors.
+//
+// The row carries the TRUE `outcome` (succeeded/denied/failed/error) and is linked
+// into a per-tenant append-only HASH CHAIN (#644): within one transaction holding a
+// per-tenant advisory lock (to serialize concurrent audit writes for the tenant), we
+// read the tenant's latest row_hash as prev_hash, generate id + created_at in-app so
+// they are covered by the hash, compute row_hash, and INSERT atomically.
 export async function recordAuditEvent(db, {
-  actionType, actorId, tenantId = null, workspaceId = null,
+  actionType, actorId, tenantId = null, workspaceId = null, outcome = 'succeeded',
   previousState = null, newState = {}, correlationId = null
 } = {}) {
   const merged = workspaceId ? { ...(newState ?? {}), workspaceId } : (newState ?? {});
-  const res = await db.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,NULL,$4::jsonb,$5::jsonb,$6)
-     RETURNING id, action_type, actor_id, tenant_id, previous_state, new_state, correlation_id, created_at`,
-    [
-      String(actionType ?? 'action').slice(0, 64),
-      String(actorId ?? 'unknown'),
-      tenantId ?? null,
-      previousState == null ? null : JSON.stringify(previousState),
-      JSON.stringify(merged ?? {}),
-      correlationId ?? null
-    ]
-  );
-  return res.rows[0] ?? null;
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  const at = String(actionType ?? 'action').slice(0, 64);
+  const actor = String(actorId ?? 'unknown');
+  const tid = tenantId ?? null;
+
+  const usePooled = typeof db.connect === 'function';
+  const client = usePooled ? await db.connect() : db;
+  try {
+    await client.query('BEGIN');
+    // Serialize per-tenant chain appends so two concurrent writes can't fork it.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1)::int8)', [`audit:${tid ?? 'global'}`]);
+    const prev = await client.query(
+      'SELECT row_hash FROM plan_audit_events WHERE tenant_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1',
+      [tid]
+    );
+    const prevHash = prev.rows[0]?.row_hash ?? '';
+    const rowHash = computeRowHash(auditCanonical({ id, actionType: at, actorId: actor, tenantId: tid, outcome, createdAt, newState: merged }), prevHash);
+    const res = await client.query(
+      `INSERT INTO plan_audit_events (id, action_type, actor_id, tenant_id, plan_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash)
+       VALUES ($1,$2,$3,$4,NULL,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11)
+       RETURNING id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash`,
+      [id, at, actor, tid, previousState == null ? null : JSON.stringify(previousState), JSON.stringify(merged ?? {}), outcome, correlationId ?? null, createdAt, prevHash, rowHash]
+    );
+    await client.query('COMMIT');
+    return res.rows[0] ?? null;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    throw e;
+  } finally {
+    if (usePooled) client.release?.();
+  }
 }
 
 // Read action-audit events for a scope, NEWEST first. Always filtered by tenant_id;
@@ -60,12 +87,12 @@ export async function queryAuditEvents(db, { tenantId, workspaceId = null, limit
     // workspace id is carried in new_state.workspaceId (no dedicated column on the
     // shared table); expose it as a derived `workspace_id` for the filter.
     ? `SELECT id, action_type, actor_id, tenant_id, new_state->>'workspaceId' AS workspace_id,
-              previous_state, new_state, correlation_id, created_at
+              previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash
          FROM (SELECT *, new_state->>'workspaceId' AS workspace_id FROM plan_audit_events WHERE tenant_id = $1) e
          WHERE ${where}
          ORDER BY created_at DESC, id DESC LIMIT $${params.length}`
     : `SELECT id, action_type, actor_id, tenant_id, new_state->>'workspaceId' AS workspace_id,
-              previous_state, new_state, correlation_id, created_at
+              previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash
          FROM plan_audit_events
          WHERE ${where}
          ORDER BY created_at DESC, id DESC LIMIT $${params.length}`;
@@ -87,9 +114,13 @@ export function auditRowToRecord(row = {}) {
     resource: {},
     action: { actionId: row.action_type ?? null },
     actionType: row.action_type ?? null,
-    result: { outcome: 'succeeded' },
+    // True outcome from the stored column (#644); legacy rows (NULL) read as 'unknown'.
+    result: { outcome: row.outcome ?? 'unknown' },
     correlationId: row.correlation_id ?? null,
     origin: { originSurface: 'control_api' },
+    // Tamper-evidence: expose the per-tenant hash-chain links so a client can verify.
+    rowHash: row.row_hash ?? null,
+    prevHash: row.prev_hash ?? null,
     detail: newState
   };
 }
