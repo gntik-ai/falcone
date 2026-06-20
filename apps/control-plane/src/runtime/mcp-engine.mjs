@@ -46,7 +46,10 @@ function slug(value) {
 function draftForSource(serverId, source, resources) {
   if (source === 'official') {
     // Normalize the official catalog into the draft shape curation expects (scope → suggestedScope).
-    const tools = OFFICIAL_TOOLS.map((t) => ({
+    // Only PROXY tools are re-hostable: the in-process meta-tools (plan_project, *_mcp_config) have
+    // no method/path and the config-set tool is role-gated rather than scope-bound, so they belong to
+    // the direct /v1/mcp/rpc server only — not a hosted re-export (#642).
+    const tools = OFFICIAL_TOOLS.filter((t) => t.kind === 'proxy').map((t) => ({
       name: t.name, description: t.description, inputSchema: t.inputSchema,
       mutates: t.mutates, suggestedScope: t.scope ?? null, method: t.method, path: t.path,
     }));
@@ -157,10 +160,20 @@ export function createMcpEngine({
         return { method, path, body: { input: safeArgs } };
       }
       default: {
-        // Official/platform control-plane tools (proxied upstream). Path templates use {id} for the
-        // workspace; fill it from the credential context (NEVER trusting args.id). The mutating
-        // tools carry a small JSON body taken from the (tenant/workspace-stripped) args.
-        path = path.replace('{id}', ws);
+        // Official/platform control-plane tools (proxied upstream). The tenant + workspace come from
+        // the credential-bound server context, NEVER from args: {tenantId}→entry.tenantId,
+        // {workspaceId} (above) and {id}→ws. Any remaining named segment (e.g. {serviceAccountId},
+        // {keyId}) is a per-call resource id taken from the (tenant/workspace-stripped) args.
+        path = path.replace('{tenantId}', encodeURIComponent(entry.tenantId ?? ''))
+          .replace('{id}', ws);
+        const missing = [];
+        path = path.replace(/\{(\w+)\}/g, (_, name) => {
+          const v = safeArgs[name];
+          if (v === undefined || v === null || v === '') { missing.push(name); return ''; }
+          delete safeArgs[name];
+          return encodeURIComponent(String(v));
+        });
+        if (missing.length) return { error: `missing required argument: ${missing.join(', ')}` };
         const body = method === 'GET' || method === 'DELETE' ? undefined : safeArgs;
         return { method, path, body };
       }
