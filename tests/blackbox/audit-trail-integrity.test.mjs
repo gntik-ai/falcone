@@ -74,6 +74,19 @@ test('bbx-audit-hash-per-tenant: verifying only one tenant\'s rows is unbroken b
   assert.deepEqual(verifyAuditChain(a), { valid: true, brokenAt: null });
 });
 
+test('bbx-audit-hash-legacy-prefix: pre-migration rows (no row_hash) are skipped, the hashed suffix verifies', () => {
+  // A real read window can mix legacy rows (NULL hash) before the hashed chain.
+  const legacy = [
+    { id: 'L1', action_type: 'x', actor_id: 'u', tenant_id: 't', outcome: 'unknown', created_at: '2026-06-19T00:00:00.000Z', new_state: {}, prev_hash: null, row_hash: null },
+    { id: 'L2', action_type: 'y', actor_id: 'u', tenant_id: 't', outcome: 'unknown', created_at: '2026-06-19T00:00:01.000Z', new_state: {}, prev_hash: null, row_hash: null },
+  ];
+  const window = [...legacy, ...chain('t', 3)];
+  assert.deepEqual(verifyAuditChain(window), { valid: true, brokenAt: null }, 'legacy prefix skipped, hashed suffix valid');
+  // tampering a hashed row in the suffix is still caught (index counts from window start)
+  window[3].outcome = 'TAMPERED';
+  assert.deepEqual(verifyAuditChain(window), { valid: false, brokenAt: 3 });
+});
+
 // ---- store: recordAuditEvent writes a verifiable chain ---------------------
 
 // Minimal pool stub modelling plan_audit_events with the chain columns + a txn.

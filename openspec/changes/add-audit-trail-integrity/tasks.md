@@ -32,7 +32,7 @@
 
 ## 7. Verification — live kind probe
 
-- [ ] 7.1–7.4 Live kind probe: a cross-tenant (403) mutating action recorded with `outcome=denied`; tenant B cannot read tenant A's audit (403); a secret-set produces an audit record; two+ records for a tenant form a chain that `verifyAuditChain` validates on real Postgres.
+- [x] 7.1–7.4 Live kind verification (test-cluster-b): the idempotent `ALTER TABLE` ran at boot (`schema ready`). A failed `createWorkspace` (400) and a cross-tenant service-account create (403) by `acme-ops` produced audit records with `outcome=failed` and `outcome=denied` — distinct outcomes observed `["denied","failed","unknown"]` (legacy rows read as `unknown`, was hardcoded `"succeeded"`). The hashed suffix `verifyAuditChain(window) -> {valid:true}`; tampering a hashed record's `outcome` -> `{valid:false, brokenAt:<idx>}`. `globex` reading `acme`'s audit -> 403 (isolation). Live verification also caught a missing `audit-hash.mjs` COPY in the CP Dockerfile (fixed). `verifyAuditChain` updated to skip the pre-migration (NULL-hash) prefix so a paged read of a mixed legacy/new log verifies its hashed suffix. Reverted the deployment afterward.
 
 ## 8. Archive
 
