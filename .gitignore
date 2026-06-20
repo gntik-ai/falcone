@@ -11,11 +11,6 @@ charts/in-falcone/values/local.yaml
 .codex/
 .specify/
 specs/
-!openspec/specs/
-!openspec/specs/**
-# OpenSpec change deltas live under each change's specs/ — keep them tracked too
-!openspec/changes/**/specs/
-!openspec/changes/**/specs/**
 # E2E Playwright specs live under tests/e2e/specs/ — keep per-issue regression specs tracked
 !tests/e2e/specs/
 !tests/e2e/specs/**
@@ -46,3 +41,14 @@ sbom/
 
 # Live-campaign seeded fixtures (contain API keys / DB creds — never commit)
 tests/live-campaign/.fixtures.json
+
+# --- Local-only agent/audit tooling: kept on disk, never tracked ---
+/.claude/
+/.codex
+/.codex/
+/CLAUDE.md
+/AGENTS.md
+/openspec/
+/audit/
+/tests/live-campaign/
+/tests/live-audit/
