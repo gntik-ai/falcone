@@ -149,10 +149,21 @@ async function fnInvoke(ctx) {
   if (!r.ksvc_name) {
     run = { status: 'failure', result: { error: 'function has no Knative service (redeploy it)' }, logs: [], durationMs: 0, statusCode: 502 };
   } else {
+    // Verified caller context (#639): tenant/principal/roles from the JWT-verified
+    // ctx.identity; workspace from the resolved function row (the resource being
+    // invoked), falling back to the caller's ambient workspace. Delivered to the
+    // function as X-Falcone-* headers — never from the user-controlled body.
+    const caller = {
+      tenantId: ctx.identity?.tenantId ?? null,
+      workspaceId: r.workspace_id ?? ctx.identity?.workspaceId ?? null,
+      principal: ctx.identity?.sub ?? null,
+      actorType: ctx.identity?.actorType ?? null,
+      roles: ctx.identity?.roles ?? [],
+    };
     // Cold start: the cluster-local DNS only resolves once the ksvc is Ready.
     const ready = await waitKsvcReady(r.ksvc_name, 90000);
     run = ready
-      ? await invokeKnative(ksvcHost(r.ksvc_name), params, { timeoutMs: (r.timeout_ms || 60000) + 30000 })
+      ? await invokeKnative(ksvcHost(r.ksvc_name), params, { timeoutMs: (r.timeout_ms || 60000) + 30000, caller })
       : { status: 'failure', result: { error: 'function (Knative service) is not ready' }, logs: [], durationMs: 0, statusCode: 503 };
   }
   const activationId = `act_${randomUUID().slice(0, 12)}`;
