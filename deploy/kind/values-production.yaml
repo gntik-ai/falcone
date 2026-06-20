@@ -1,0 +1,68 @@
+# Production transport-hardening overlay (change harden-datastore-transport-tls / #645).
+#
+# Apply ON TOP of a base profile to turn on in-transit encryption to every datastore, e.g.:
+#   helm upgrade --install in-falcone charts/in-falcone \
+#     -f deploy/kind/values-kind.yaml -f deploy/kind/values-production.yaml
+#
+# How it works (additive, no list-restatement): the umbrella's global.transportSecurity map
+# deep-merges across -f files. The component-wrapper template APPENDS global.transportSecurity.env
+# to every component with `transportSecurityClient: true` (control-plane, executor, worker) and
+# mounts `caSecretName` read-only at `caMountPath`. Because the TLS env is appended LAST, the
+# https endpoint entries below override any http defaults a base profile set in the component env
+# (Kubernetes uses the last occurrence of a duplicated env var name).
+#
+# PREREQUISITE: create the CA secret the datastore server certs chain to, e.g.
+#   kubectl -n <ns> create secret generic falcone-transport-ca --from-file=ca.crt=ca.crt
+# (cert-manager / your PKI provisions the server certs; this chart does not mint them.)
+
+global:
+  transportSecurity:
+    enabled: true
+    caSecretName: falcone-transport-ca
+    caMountPath: /etc/falcone/tls
+    env:
+      # Postgres: verify the full chain + hostname against the mounted CA.
+      - name: PGSSLMODE
+        value: verify-full
+      - name: PGSSLROOTCERT
+        value: /etc/falcone/tls/ca.crt
+      # Document store (MongoDB wire): TLS with CA verification.
+      - name: MONGO_TLS
+        value: "true"
+      - name: MONGO_TLS_CA_FILE
+        value: /etc/falcone/tls/ca.crt
+      # Kafka: TLS against the mounted CA.
+      - name: KAFKA_SSL
+        value: "true"
+      - name: KAFKA_SSL_CA_FILE
+        value: /etc/falcone/tls/ca.crt
+      # Node's outbound https (Keycloak JWKS, S3) trusts the mounted CA.
+      - name: NODE_EXTRA_CA_CERTS
+        value: /etc/falcone/tls/ca.crt
+      # https endpoints (override any http default from the base profile — appended last wins).
+      - name: KEYCLOAK_JWKS_URL
+        value: https://falcone-keycloak:8443/realms/in-falcone-platform/protocol/openid-connect/certs
+      - name: STORAGE_S3_ENDPOINT
+        value: https://falcone-seaweedfs-s3:8333
+
+# Opt the application runtimes into the TLS env + CA mount.
+controlPlane:
+  transportSecurityClient: true
+controlPlaneExecutor:
+  enabled: true
+  transportSecurityClient: true
+workflowWorker:
+  enabled: true
+  transportSecurityClient: true
+
+# Datastore-side TLS chart toggles (already supported by the chart/subcharts).
+ferretdb:
+  tls:
+    enabled: true
+seaweedfs:
+  global:
+    seaweedfs:
+      enableSecurity: true
+seaweedfsTls:
+  bootstrap:
+    enabled: true

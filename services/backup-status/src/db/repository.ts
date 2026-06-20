@@ -54,7 +54,13 @@ function getClient(): DbClient {
   // Dynamic import pattern for pg — avoids hard dependency at module level
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pool } = require('pg') as typeof import('pg')
-  const pool = new Pool({ connectionString: process.env.DB_URL })
+  // Shared TLS resolver (harden-datastore-transport-tls / #645): merges an `ssl` option from
+  // PGSSLMODE/PGSSLROOTCERT, leaving the plaintext default unchanged.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { withPostgresSsl } = require('../../../internal-contracts/src/transport-security.mjs') as {
+    withPostgresSsl: (config: Record<string, unknown>) => Record<string, unknown>
+  }
+  const pool = new Pool(withPostgresSsl({ connectionString: process.env.DB_URL }))
   _client = pool
   return _client
 }

@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto'
 import { Kafka, logLevel } from 'kafkajs'
 
 import { clientError } from './errors.mjs'
+import { resolveKafkaSecurity } from '../../../../services/internal-contracts/src/transport-security.mjs'
 
 const NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,200}$/
 
@@ -25,7 +26,7 @@ const toLogical = (physical, workspaceId) => physical.slice(workspacePrefix(work
 export function createEventsExecutor(options = {}) {
   const brokers = (options.brokers ?? '').split(',').map((b) => b.trim()).filter(Boolean)
   if (brokers.length === 0) throw new TypeError('createEventsExecutor requires brokers')
-  const kafka = new Kafka({ clientId: 'in-falcone-control-plane', brokers, logLevel: logLevel.NOTHING })
+  const kafka = new Kafka({ clientId: 'in-falcone-control-plane', brokers, logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() })
   let producerP = null
   let adminP = null
 

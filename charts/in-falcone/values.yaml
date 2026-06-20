@@ -20,6 +20,20 @@ global:
     seccompProfile:
       type: RuntimeDefault
     fsGroupChangePolicy: OnRootMismatch
+  # In-transit encryption to the datastores (change harden-datastore-transport-tls / #645).
+  # OFF by default — the dev/kind profile stays plaintext and chart renders are unchanged.
+  # Turn on via a production overlay (deploy/kind/values-production.yaml): the `env` list below
+  # is appended to every component with `transportSecurityClient: true` (control-plane, executor,
+  # workflow-worker), and when `caSecretName` is set its CA bundle is mounted read-only into those
+  # pods at `caMountPath`. The application honors PGSSLMODE/MONGO_TLS/KAFKA_SSL from that env.
+  transportSecurity:
+    enabled: false
+    # Secret (release namespace) holding the CA bundle that verifies the datastore server certs.
+    caSecretName: ""
+    # Directory the CA secret is mounted at; point the *_CA_FILE/PGSSLROOTCERT env at a file under it.
+    caMountPath: /etc/falcone/tls
+    # Env appended to opted-in components (e.g. PGSSLMODE, MONGO_TLS, KAFKA_SSL, NODE_EXTRA_CA_CERTS).
+    env: []
 publicSurface:
   routePrefixes:
     controlPlane: /control-plane

@@ -74,5 +74,9 @@ tolerations: []
 affinity: {}
 extraVolumes: []
 extraVolumeMounts: []
+# Opt this component into the umbrella's global.transportSecurity injection (TLS env + CA mount).
+# Only the app runtimes (control-plane, executor, workflow-worker) set this true in a production
+# overlay; datastores and everything else leave it false so renders are unchanged.
+transportSecurityClient: false
 config:
   inline: {}
