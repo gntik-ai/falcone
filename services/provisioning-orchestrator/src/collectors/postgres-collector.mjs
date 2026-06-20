@@ -5,6 +5,7 @@
  */
 
 import { redactSensitiveFields } from './types.mjs';
+import { withPostgresSsl } from '../../../internal-contracts/src/transport-security.mjs';
 
 const DOMAIN_KEY = 'postgres_metadata';
 
@@ -28,7 +29,7 @@ export async function collect(tenantId, options = {}) {
     if (!pool) {
       const pg = await import('pg');
       const Pool = pg.default?.Pool ?? pg.Pool;
-      pool = new Pool({ connectionString: databaseUrl, max: 2 });
+      pool = new Pool(withPostgresSsl({ connectionString: databaseUrl, max: 2 }));
       shouldEnd = true;
     }
 

@@ -9,6 +9,7 @@
 import pg from 'pg';
 import * as store from './tenant-store.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
+import { withPostgresSsl } from './transport-security.mjs';
 
 const { Client } = pg;
 const ok = (statusCode, body) => ({ statusCode, body });
@@ -34,11 +35,11 @@ async function assertDbScope(ctx) {
 }
 
 async function withDb(database, fn) {
-  const c = new Client({
+  const c = new Client(withPostgresSsl({
     host: process.env.PGHOST, port: Number(process.env.PGPORT || 5432),
     user: process.env.PGUSER, password: process.env.PGPASSWORD, database,
     connectionTimeoutMillis: 5000, statement_timeout: 10000
-  });
+  }));
   await c.connect();
   try { return await fn(c); } finally { await c.end().catch(() => {}); }
 }

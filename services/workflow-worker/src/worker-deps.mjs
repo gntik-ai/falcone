@@ -76,11 +76,13 @@ export async function wireActivityDeps(opts = {}) {
       { createWorkspaceDsnResolver },
       { createLlmExecutor, createLlmProviderStore, createLlmUsageStore },
       pgModule,
+      { withPostgresSsl },
     ] = await Promise.all([
       dynamicImport('../../../apps/control-plane/src/runtime/connection-registry.mjs'),
       dynamicImport('../../../apps/control-plane/src/runtime/workspace-dsn-resolver.mjs'),
       dynamicImport('../../../apps/control-plane/src/runtime/llm-executor.mjs'),
       dynamicImport('pg'),
+      dynamicImport('../../../services/internal-contracts/src/transport-security.mjs'),
     ]);
 
     const dsn = buildDataDsn(process.env);
@@ -88,7 +90,7 @@ export async function wireActivityDeps(opts = {}) {
     // Uses the same credential/host as the data-plane DSN — no separate admin pool needed
     // for the worker (it only reads routing records, never writes schema).
     const pg = pgModule.default ?? pgModule;
-    keyPool = new pg.Pool({ connectionString: dsn, max: 2 });
+    keyPool = new pg.Pool(withPostgresSsl({ connectionString: dsn, max: 2 }));
     const resolveConnection = createWorkspaceDsnResolver({ pool: keyPool, baseDsn: dsn });
     registry = createConnectionRegistry({ resolveConnection });
 

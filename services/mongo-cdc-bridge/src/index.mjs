@@ -8,6 +8,7 @@ import { ChangeStreamManager } from './ChangeStreamManager.mjs';
 import { CollectionCatalog } from './CollectionCatalog.mjs';
 import { MetricsCollector } from './MetricsCollector.mjs';
 import { HealthServer } from './HealthServer.mjs';
+import { withPostgresSsl, resolveKafkaSecurity } from '../../internal-contracts/src/transport-security.mjs';
 const { Pool } = pg;
 
 if (!process.env.MONGO_CDC_PG_CONNECTION_STRING) throw new Error('MONGO_CDC_PG_CONNECTION_STRING_REQUIRED');
@@ -17,10 +18,10 @@ if (!process.env.MONGO_CDC_KAFKA_BROKERS) throw new Error('MONGO_CDC_KAFKA_BROKE
 // (distinct from falcone_app) — provisioned by the chart (#460 task 2.4).
 if (!process.env.MONGO_CDC_DOCUMENTDB_URL) throw new Error('MONGO_CDC_DOCUMENTDB_URL_REQUIRED');
 
-const pool = new Pool({ connectionString: process.env.MONGO_CDC_PG_CONNECTION_STRING });
-const enginePool = new Pool({ connectionString: process.env.MONGO_CDC_DOCUMENTDB_URL });
-const engineConnectionConfig = { connectionString: process.env.MONGO_CDC_DOCUMENTDB_URL };
-const kafka = new Kafka({ clientId: process.env.MONGO_CDC_KAFKA_CLIENT_ID ?? 'mongo-cdc-bridge', brokers: process.env.MONGO_CDC_KAFKA_BROKERS.split(',').filter(Boolean) });
+const pool = new Pool(withPostgresSsl({ connectionString: process.env.MONGO_CDC_PG_CONNECTION_STRING }));
+const enginePool = new Pool(withPostgresSsl({ connectionString: process.env.MONGO_CDC_DOCUMENTDB_URL }));
+const engineConnectionConfig = withPostgresSsl({ connectionString: process.env.MONGO_CDC_DOCUMENTDB_URL });
+const kafka = new Kafka({ clientId: process.env.MONGO_CDC_KAFKA_CLIENT_ID ?? 'mongo-cdc-bridge', brokers: process.env.MONGO_CDC_KAFKA_BROKERS.split(',').filter(Boolean), ...resolveKafkaSecurity() });
 const metricsCollector = new MetricsCollector();
 const kafkaPublisher = new KafkaChangePublisher({ kafka, metricsCollector });
 await kafkaPublisher.connect();

@@ -9,6 +9,7 @@
 import { MongoClient } from 'mongodb';
 import * as store from './tenant-store.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
+import { resolveMongoTls } from './transport-security.mjs';
 
 const HOST = process.env.MONGO_HOST || 'falcone-ferretdb:27017';
 const USER = process.env.MONGO_USER || 'falcone';
@@ -23,7 +24,7 @@ const err = (statusCode, code, message) => ({ statusCode, body: { code, message 
 let clientPromise = null;
 function client() {
   if (!clientPromise) {
-    clientPromise = new MongoClient(URI, { serverSelectionTimeoutMS: 5000 }).connect()
+    clientPromise = new MongoClient(URI, { serverSelectionTimeoutMS: 5000, ...resolveMongoTls() }).connect()
       .catch((e) => { clientPromise = null; throw e; });
   }
   return clientPromise;
