@@ -10,6 +10,7 @@
 import { Client } from 'pg';
 
 import { processCycleCompletion, createBillingAdapter } from './emitter.mjs';
+import { withPostgresSsl, resolveKafkaSecurity } from '../../internal-contracts/src/transport-security.mjs';
 
 const brokers = (process.env.KAFKA_BROKERS ?? '').split(',').filter(Boolean);
 const cycleTopic = process.env.METERING_CYCLE_TOPIC ?? 'console.metering.cycle.completed';
@@ -27,10 +28,10 @@ if (!databaseUrl) {
 }
 
 const { Kafka, logLevel } = await import('kafkajs');
-const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING, retry: { retries: 5, initialRetryTime: 300 } });
+const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING, retry: { retries: 5, initialRetryTime: 300 }, ...resolveKafkaSecurity() });
 const producer = kafka.producer();
 const consumer = kafka.consumer({ groupId: consumerGroup });
-const db = new Client({ connectionString: databaseUrl });
+const db = new Client(withPostgresSsl({ connectionString: databaseUrl }));
 
 const billingAdapter = createBillingAdapter({
   type: process.env.BILLING_ADAPTER_TYPE,

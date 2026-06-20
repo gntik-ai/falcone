@@ -27,6 +27,7 @@ import { applyGovernanceSchema } from './governance-schema.mjs';
 import { applyWebhookSchema } from './webhook-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
+import { withPostgresSsl } from './transport-security.mjs';
 
 const { Pool } = pg;
 
@@ -41,7 +42,9 @@ const ISSUER = process.env.KEYCLOAK_ISSUER || null;   // optional exact-match ch
 const AUDIENCE = process.env.KEYCLOAK_AUDIENCE || null;
 const ROUTE_MAP_FILE = process.env.ROUTE_MAP_FILE || null; // optional JSON merged over seedRoutes
 
-const pool = DB_URL ? new Pool({ connectionString: DB_URL, max: 12 }) : new Pool({ max: 12 });
+const pool = DB_URL
+  ? new Pool(withPostgresSsl({ connectionString: DB_URL, max: 12 }))
+  : new Pool(withPostgresSsl({ max: 12 }));
 // Multi-realm JWT verifier (parity with apps/control-plane/src/runtime/jwt-verify.mjs, #622): trusts
 // tokens from the platform realm AND from any per-tenant realm under the same Keycloak base (derived
 // from JWKS_URL/ISSUER), fetching each realm's JWKS on demand. For a tenant-realm token the tenant id

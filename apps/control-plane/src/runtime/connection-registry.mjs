@@ -11,6 +11,7 @@
 // `resolveConnection(workspaceId)` is injected (the DSN source is the data-plane
 // provisioner); it returns { dsn, adminDsn? }. Pools are keyed by DSN and reused.
 import pg from 'pg';
+import { withPostgresSsl } from '../../../../services/internal-contracts/src/transport-security.mjs';
 
 const { Pool } = pg;
 
@@ -28,7 +29,7 @@ export function createConnectionRegistry(options = {}) {
   function poolFor(dsn) {
     let pool = pools.get(dsn);
     if (!pool) {
-      pool = new Pool({ connectionString: dsn, max });
+      pool = new Pool(withPostgresSsl({ connectionString: dsn, max }));
       pools.set(dsn, pool);
     }
     return pool;

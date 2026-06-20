@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import pg from 'pg';
 
 import { clientError } from './errors.mjs';
+import { withPostgresSsl } from '../../../../services/internal-contracts/src/transport-security.mjs';
 
 const { Client } = pg;
 
@@ -71,7 +72,7 @@ export function createPostgresRealtimeExecutor(options = {}) {
     const { dsn, adminDsn } = await resolve(workspaceId);
 
     // 1. Ensure the capture trigger exists (admin connection; one-shot, idempotent).
-    const admin = new Client({ connectionString: adminDsn ?? dsn });
+    const admin = new Client(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
     await admin.connect();
     try {
       for (const sql of ensureCaptureSql(schemaName, tableName)) await admin.query(sql);
@@ -81,7 +82,7 @@ export function createPostgresRealtimeExecutor(options = {}) {
 
     // 2. Dedicated LISTEN connection on the tenant-scoped channel.
     const channel = channelFor(schemaName, tableName, tenantId);
-    const listener = new Client({ connectionString: adminDsn ?? dsn });
+    const listener = new Client(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
     await listener.connect();
     open.add(listener);
 
