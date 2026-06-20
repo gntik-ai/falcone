@@ -126,7 +126,8 @@ test('bbx-mcp-call-07: official create_workspace self-calls the real control-pla
   await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_workspace', arguments: { slug: 'new-ws' } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
-  assert.equal(c.path, '/v1/workspaces');
+  // The served route is tenant-scoped (#642 retarget); {tenantId} is filled from the credential.
+  assert.equal(c.path, '/v1/tenants/ten-a/workspaces');
   assert.deepEqual(c.body, { slug: 'new-ws' });
 });
 
