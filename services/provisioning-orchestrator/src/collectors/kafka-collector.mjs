@@ -5,6 +5,7 @@
  */
 
 import { redactSensitiveFields } from './types.mjs';
+import { resolveKafkaSecurity } from '../../../internal-contracts/src/transport-security.mjs';
 
 const DOMAIN_KEY = 'kafka';
 
@@ -30,6 +31,10 @@ export async function collect(tenantId, options = {}) {
       const { Kafka } = await import('kafkajs');
       const kafka = new Kafka({
         brokers: brokers.split(','),
+        // Shared transport security (TLS + standard KAFKA_SASL_* envs); the legacy
+        // CONFIG_EXPORT_* SASL below still takes precedence when set, so existing behavior
+        // is preserved (harden-datastore-transport-tls / #645).
+        ...resolveKafkaSecurity(),
         ...(process.env.CONFIG_EXPORT_KAFKA_ADMIN_SASL_USERNAME ? {
           sasl: {
             mechanism: 'plain',

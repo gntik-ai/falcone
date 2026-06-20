@@ -5,6 +5,7 @@
  */
 
 import { redactSensitiveFields } from './types.mjs';
+import { resolveMongoTls } from '../../../internal-contracts/src/transport-security.mjs';
 
 const DOMAIN_KEY = 'mongo_metadata';
 
@@ -33,7 +34,7 @@ export async function collect(tenantId, options = {}) {
     if (!client) {
       const mongodb = await import('mongodb');
       const MongoClient = mongodb.default?.MongoClient ?? mongodb.MongoClient;
-      client = new MongoClient(mongoUri);
+      client = new MongoClient(mongoUri, resolveMongoTls());
       await client.connect();
       shouldClose = true;
     }

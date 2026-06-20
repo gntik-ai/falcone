@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
+import { resolveKafkaSecurity } from './transport-security.mjs';
 import { callerTenantScope } from './tenant-scope.mjs';
 
 const BROKERS = (process.env.KAFKA_BROKERS || 'falcone-kafka:9092').split(',').map((s) => s.trim());
@@ -32,7 +33,7 @@ export function physicalTopicName(workspaceId, topicName) {
 
 let kafka = null;
 function getKafka() {
-  if (!kafka) kafka = new Kafka({ clientId: 'in-falcone-console', brokers: BROKERS, logLevel: logLevel.NOTHING, retry: { retries: 3 } });
+  if (!kafka) kafka = new Kafka({ clientId: 'in-falcone-console', brokers: BROKERS, logLevel: logLevel.NOTHING, retry: { retries: 3 }, ...resolveKafkaSecurity() });
   return kafka;
 }
 let adminP = null, producerP = null;
