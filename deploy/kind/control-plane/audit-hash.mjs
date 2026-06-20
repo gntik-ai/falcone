@@ -52,18 +52,24 @@ const ph = (row) => row.prev_hash ?? row.prevHash ?? '';
 
 /**
  * Verify a per-tenant chain of audit rows in ASCENDING (oldest-first) order.
- * Checks each row's prev_hash links to the previous row's row_hash (genesis '')
- * AND that row_hash re-derives from the row's content. Returns the index of the
- * first broken row, or { valid: true, brokenAt: null }.
+ * For each row: (content) `row_hash` must re-derive from the row's content and its
+ * stored `prev_hash`; (link) every row after the first in the window must carry a
+ * `prev_hash` equal to the previous row's `row_hash`. This works on a contiguous
+ * WINDOW (a paged read need not start at genesis); to additionally assert a full
+ * log starts at the beginning, check `rows[0].prev_hash === ''` separately.
+ * Returns the index of the first broken row, or `{ valid: true, brokenAt: null }`.
  */
 export function verifyAuditChain(rowsAscending = []) {
-  let expectedPrev = '';
-  for (let i = 0; i < rowsAscending.length; i++) {
+  // Skip the pre-migration prefix: rows written before the hash chain existed have
+  // no row_hash. Verification covers the hashed suffix (all post-migration rows for
+  // a tenant are newer than any legacy row, so the un-hashed rows are a leading run).
+  let start = 0;
+  while (start < rowsAscending.length && !rh(rowsAscending[start])) start++;
+  for (let i = start; i < rowsAscending.length; i++) {
     const row = rowsAscending[i];
-    if (ph(row) !== expectedPrev) return { valid: false, brokenAt: i };
     const expectedHash = computeRowHash(auditCanonical(row), ph(row));
     if (expectedHash !== rh(row)) return { valid: false, brokenAt: i };
-    expectedPrev = rh(row);
+    if (i > start && ph(row) !== rh(rowsAscending[i - 1])) return { valid: false, brokenAt: i };
   }
   return { valid: true, brokenAt: null };
 }
