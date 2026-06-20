@@ -38,10 +38,15 @@
 - [x] 7.1 Updated `mcp-official-server.test.mjs`, `mcp-tool-call-execution.test.mjs`, `mcp-workflow-platform-binding.test.mjs` for the retargeted catalog.
 - [x] 7.2 `bash tests/blackbox/run.sh` → 1039 pass / 0 fail; `apps/control-plane` unit → 84 + 27 MCP + 11 authoring/config pass; `openspec validate add-control-mcp-completeness --strict` clean.
 
-## 8. Verification — live kind probe
+## 8. Verification — live kind probe (test-cluster-b, 2026-06-20)
 
-- [ ] 8.1 Deploy to test-cluster-b; call `POST /v1/mcp/rpc` `tools/call` for `list_workspaces` with a tenant-owner token → tool content (not `-32001`/404); `plan_project` → ordered plan; `set_mcp_config` non-superadmin → error.
-- [ ] 8.2 Revert the deployment after verification.
+- [x] 8.1 Deployed the cp-executor (`mcp642-20260620`) and called `POST /v1/mcp/rpc` as a `tenant_owner` whose token carried `scope:"openid profile"` (NO `mcp:invoke`) — the exact `-32001` condition:
+  - `tools/list` → **36 tools** (was 9), incl. `plan_project` + `set_mcp_config`.
+  - `list_workspaces` → real own-tenant workspaces (tenant `c58ee69d…`), NOT `-32001`/404 — base-scope auto-grant + retargeted route proven.
+  - `get_tenant` → tenant `acme` — `{tenantId}` substituted from the credential reaches a real route.
+  - `plan_project` → ordered plan `create_workspace → provision_database → register_function`.
+  - `set_mcp_config` (tenant_owner) → `-32002` "requires a platform superadmin role"; `create_workspace` without its scope → `-32002` (read-first preserved).
+- [x] 8.2 Reverted the cp-executor to `head-20260619`; rollout complete; pod healthy; port-forwards stopped.
 
 ## 9. Archive
 
