@@ -9,6 +9,7 @@
 import { MongoClient, ObjectId } from 'mongodb'
 
 import { buildMongoDataApiPlan, encodeMongoDataCursor } from '../../../../services/adapters/src/mongodb-data-api.mjs'
+import { resolveMongoTls } from '../../../../services/internal-contracts/src/transport-security.mjs'
 import { clientError } from './errors.mjs'
 
 const OBJECT_ID_HEX = /^[0-9a-fA-F]{24}$/
@@ -55,7 +56,7 @@ export function createMongoExecutor(options = {}) {
   async function clientFor(uri) {
     let client = clients.get(uri)
     if (!client) {
-      client = new MongoClient(uri)
+      client = new MongoClient(uri, resolveMongoTls())
       await client.connect()
       clients.set(uri, client)
     }

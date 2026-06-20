@@ -26,6 +26,13 @@ export const FLOW_DEFINITION_MAPPING_URL = new URL('./flow-definition-mapping.js
 export { default as flowDefinitionSchema } from './flow-definition.json' with { type: 'json' };
 export { default as flowDefinitionMapping } from './flow-definition-mapping.json' with { type: 'json' };
 export {
+  resolvePostgresSsl,
+  withPostgresSsl,
+  resolveMongoTls,
+  withMongoTls,
+  resolveKafkaSecurity
+} from './transport-security.mjs';
+export {
   FLOW_VALIDATION_ERROR_CODES,
   validateFlowDefinition
 } from './flow-definition-validator.mjs';

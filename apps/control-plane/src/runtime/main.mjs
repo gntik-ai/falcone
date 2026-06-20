@@ -23,6 +23,7 @@ import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mj
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier } from './jwt-verify.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
+import { withPostgresSsl, resolveKafkaSecurity } from '../../../../services/internal-contracts/src/transport-security.mjs';
 // Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
 // Feeds the flows validate/publish endpoints' FLW-E006 check so a flow definition that
 // references an unknown taskType is rejected (422 FLOW_VALIDATION_FAILED). The full activity
@@ -60,7 +61,7 @@ const dsn = dataDsn();
 // Control-plane metadata pool (workspace_databases registry, api keys, embedding config, ...).
 // Defaults to the data DSN when CONTROL_DB_URL is unset (the kind deploy shares in_falcone).
 // Defined here (ahead of the registry) because per-workspace DSN routing reads the registry.
-const keyPool = new Pool({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 });
+const keyPool = new Pool(withPostgresSsl({ connectionString: process.env.CONTROL_DB_URL ?? dsn, max: 4 }));
 
 // Route each data-plane connection to the requesting workspace's own provisioned database
 // (fix-workspace-db-provisioning-saga, #502); falls back to the shared DSN when a workspace has
@@ -271,7 +272,7 @@ async function bootFlowTriggers() {
     kafkaConsumerFactory: process.env.KAFKA_BROKERS
       ? async () => {
           const { Kafka, logLevel } = await import('kafkajs');
-          const kafka = new Kafka({ clientId: 'flows-trigger-consumer', brokers: process.env.KAFKA_BROKERS.split(',').map((b) => b.trim()).filter(Boolean), logLevel: logLevel.NOTHING });
+          const kafka = new Kafka({ clientId: 'flows-trigger-consumer', brokers: process.env.KAFKA_BROKERS.split(',').map((b) => b.trim()).filter(Boolean), logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() });
           const consumer = kafka.consumer({ groupId: process.env.FLOW_TRIGGER_CONSUMER_GROUP ?? 'flows-trigger-consumer' });
           await consumer.connect();
           return {
