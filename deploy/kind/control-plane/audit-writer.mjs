@@ -33,8 +33,22 @@ const AUDITABLE_LOCAL_HANDLERS = {
   iamCreateUser: 'iam.user.create', iamDeleteUser: 'iam.user.delete', iamSetUserStatus: 'iam.user.status',
   iamCreateRole: 'iam.role.create', iamCreateGroup: 'iam.group.create',
   iamAssignUserRoles: 'iam.user.role-assign', iamRemoveUserRoles: 'iam.user.role-remove',
-  iamAddUserToGroup: 'iam.user.group-add', iamRemoveUserFromGroup: 'iam.user.group-remove'
+  iamAddUserToGroup: 'iam.user.group-add', iamRemoveUserFromGroup: 'iam.user.group-remove',
+  // Secret-access (#644): writes AND reads are security-relevant and audited (the
+  // handlers are authenticated and carry ctx.identity + ctx.params.workspaceId).
+  secretSet: 'workspace.secret.set', secretGet: 'workspace.secret.get',
+  secretList: 'workspace.secret.list', secretDelete: 'workspace.secret.delete'
 };
+
+// Map an HTTP status to the audited outcome (#644): the TRUE result of the action,
+// recorded at write time (was hardcoded 'succeeded' at read time).
+export function outcomeFromStatus(statusCode) {
+  const s = Number(statusCode ?? 200);
+  if (s < 400) return 'succeeded';
+  if (s === 403) return 'denied';
+  if (s < 500) return 'failed';
+  return 'error';
+}
 
 // Resolve the OWNING tenant id of an action from the verified identity + path scope —
 // never from the request body. The path tenantId (superadmin acting on a tenant) wins;
@@ -54,19 +68,21 @@ function resolveScope(route, ctx, result) {
   return { tenantId, workspaceId };
 }
 
-// Build the audit descriptor a successfully-completed mutating local route produces, or
-// null when the route is non-auditable (a read) or the action did not succeed (>=400).
+// Build the audit descriptor an auditable local route produces, or null when the
+// route is non-auditable (a read not in the auditable set) or cannot be attributed
+// to a tenant. The TRUE outcome (succeeded/denied/failed/error) is derived from the
+// status — failures and denials ARE recorded now (#644), distinguished by outcome.
 // Returned shape is the recordAuditEvent() input (sans correlationId, added by the caller).
 export function auditEventForRoute(route, ctx, result) {
   if (!route?.localHandler) return null;
   const actionType = AUDITABLE_LOCAL_HANDLERS[route.localHandler];
   if (!actionType) return null;
   const status = result?.statusCode ?? 200;
-  if (status >= 400) return null; // only successful mutations are audited
   const { tenantId, workspaceId } = resolveScope(route, ctx, result);
   if (!tenantId) return null; // never record an action we cannot attribute to a tenant
   return {
     actionType, actorId: ctx.identity?.sub ?? 'unknown', tenantId, workspaceId,
+    outcome: outcomeFromStatus(status),
     newState: { method: route.method, path: route.path, status }
   };
 }
