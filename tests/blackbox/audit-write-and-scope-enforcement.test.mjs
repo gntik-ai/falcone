@@ -43,17 +43,25 @@ function memPool() {
   const denials = [];
   const query = async (sql, params = []) => {
     const s = sql.replace(/\s+/g, ' ');
+    // #644: recordAuditEvent now runs in a per-tenant transaction (advisory lock +
+    // prev-hash read + chained INSERT). The stub honours those statements.
+    if (/^\s*(BEGIN|COMMIT|ROLLBACK)/i.test(s) || s.includes('pg_advisory_xact_lock')) return { rows: [] };
+    if (s.includes('SELECT row_hash FROM plan_audit_events')) {
+      const tenantId = params[0];
+      const rows = audit.filter((r) => r.tenant_id === tenantId);
+      const last = rows[rows.length - 1];
+      return { rows: last ? [{ row_hash: last.row_hash }] : [] };
+    }
     if (s.includes('INSERT INTO plan_audit_events')) {
-      // real INSERT params: [action_type, actor_id, tenant_id, previous_state, new_state, correlation_id]
-      // (plan_id is the literal NULL in the SQL, not a param; workspaceId is carried in new_state).
-      const [action_type, actor_id, tenant_id, previous_state, new_state, correlation_id] = params;
+      // #644 INSERT params: [id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash]
+      const [id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash] = params;
       const parsedNew = new_state ? JSON.parse(new_state) : {};
       const row = {
-        id: `evt-${audit.length + 1}`, action_type, actor_id, tenant_id,
+        id, action_type, actor_id, tenant_id,
         workspace_id: parsedNew.workspaceId ?? null,
         previous_state: previous_state ? JSON.parse(previous_state) : null,
-        new_state: parsedNew, correlation_id: correlation_id ?? null,
-        created_at: new Date(Date.now() + audit.length).toISOString()
+        new_state: parsedNew, outcome, correlation_id: correlation_id ?? null,
+        created_at, prev_hash, row_hash
       };
       audit.push(row);
       return { rows: [row] };
@@ -163,13 +171,14 @@ test('bbx-audit-write-04: the dispatch-level writer records a mutating local act
   );
   assert.equal(none, null, 'read routes must not produce audit records');
 
-  // a FAILED mutation (>=400) is not recorded as a success audit event
+  // a FAILED mutation (>=400) IS now recorded (#644), distinguished by outcome — not dropped.
   const failed = auditEventForRoute(
-    { method: 'POST', path: '/v1/tenants', localHandler: 'createTenant' },
-    { params: {}, identity: IDENTITY_SA, body: {} },
+    { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser' },
+    { params: { tenantId: TENANT_A }, identity: IDENTITY_A, body: {} },
     { statusCode: 400, body: { code: 'VALIDATION_ERROR' } }
   );
-  assert.equal(failed, null, 'failed mutations must not produce success audit records');
+  assert.ok(failed, 'failed mutations are now audited (#644)');
+  assert.equal(failed.outcome, 'failed', 'recorded with outcome=failed, not silently dropped');
 });
 
 test('bbx-audit-write-05: a recorded scope-enforcement denial is returned by the scope-enforcement audit query (no 500)', async () => {
