@@ -70,6 +70,12 @@ export const routes = [
   // POST /v1/tenants/{tenantId}/purge — drops the wsdb_* DB, deletes the bucket(s)/topic(s), and
   // removes the workspace + its service-account/api-key rows. Was NO_ROUTE (only tenant purge cascaded).
   { method: 'DELETE', path: '/v1/workspaces/{workspaceId}', localHandler: 'deleteWorkspace', auth: 'authenticated' },
+  // Environment promotion (#641, completes #503/#502): promote a source workspace's promotable
+  // definition (its registered functions) into a target workspace in a DIFFERENT environment of the
+  // same tenant. Copies the function registry only — never secrets/credentials/service-accounts
+  // (stage-scoped) and never the source. Handler authorizes own-tenant on BOTH ends (404 on a
+  // cross-tenant/missing source or target — no existence leak).
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/promotions', localHandler: 'promoteWorkspace', auth: 'authenticated' },
 
   // ---- domain B: service accounts + credentials (LOCAL) --------------------
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts', localHandler: 'createServiceAccount', auth: 'authenticated' },

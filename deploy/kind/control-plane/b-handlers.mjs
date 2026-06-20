@@ -393,6 +393,72 @@ async function getWorkspace(ctx) {
   return ok(200, { workspace: workspaceOut(ws), ...workspaceOut(ws) });
 }
 
+// POST /v1/workspaces/{workspaceId}/promotions — promote a source workspace's promotable
+// definition into a target workspace that lives in a DIFFERENT environment of the SAME tenant
+// (first-class environment promotion, #641; completes #503/#502). Promotion copies the FUNCTION
+// REGISTRY only and NEVER carries secrets, credentials, or service accounts — those are stage-scoped
+// by design, so a dev secret can never leak into prod. The source is read-only (never mutated), and
+// a function whose name already exists in the target is skipped (promotion never overwrites the
+// target), so the operation is safely repeatable. ISOLATION (cardinal rule): resolve-then-gate BOTH
+// the source and the target — a missing OR cross-tenant workspace is 404 (no existence leak),
+// mirroring deleteWorkspace; a target in another tenant can never be a promotion sink.
+async function promoteWorkspace(ctx) {
+  const { params, body, identity, pool } = ctx;
+  const source = await store.getWorkspace(pool, params.workspaceId);
+  if (!source || !canManageTenantId(identity, source.tenant_id)) {
+    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
+  }
+  const targetEnvironment = String(body.targetEnvironment ?? '').toLowerCase();
+  if (!ENVIRONMENT_CATALOG.includes(targetEnvironment)) {
+    return err(400, 'INVALID_ENVIRONMENT', `targetEnvironment must be one of: ${ENVIRONMENT_CATALOG.join(', ')}`);
+  }
+  const sourceEnvironment = source.environment ?? 'dev';
+  if (targetEnvironment === sourceEnvironment) {
+    return err(400, 'SAME_ENVIRONMENT', `source and target are both in '${targetEnvironment}'; promote across environments`);
+  }
+  if (!body.targetWorkspaceId) {
+    return err(400, 'VALIDATION_ERROR', 'targetWorkspaceId is required');
+  }
+  const target = await store.getWorkspace(pool, body.targetWorkspaceId);
+  // Resolve-then-gate the target: missing, cross-tenant, or a different tenant than the source is
+  // 404 (no existence leak). A foreign tenant can never probe or receive a promotion.
+  if (!target || !canManageTenantId(identity, target.tenant_id) || target.tenant_id !== source.tenant_id) {
+    return err(404, 'TARGET_WORKSPACE_NOT_FOUND', `target workspace ${body.targetWorkspaceId} not found`);
+  }
+  if (target.id === source.id) {
+    return err(400, 'SAME_WORKSPACE', 'source and target workspace are the same');
+  }
+  if ((target.environment ?? 'dev') !== targetEnvironment) {
+    return err(409, 'ENVIRONMENT_MISMATCH', `target workspace is in '${target.environment ?? 'dev'}', not '${targetEnvironment}'`);
+  }
+  // Copy the source's promotable artifacts (the function registry) into the target. The source is
+  // read-only here; we only INSERT into the target. A name already present in the target is skipped.
+  const srcFns = await store.listFunctions(pool, source.id);
+  const promoted = [];
+  const skipped = [];
+  for (const fn of srcFns.items) {
+    if (await store.functionNameTaken(pool, target.id, fn.name)) {
+      skipped.push({ name: fn.name, reason: 'already_exists_in_target' });
+      continue;
+    }
+    await store.insertFunction(pool, {
+      id: randomUUID(), workspaceId: target.id, tenantId: target.tenant_id, name: fn.name,
+      runtime: fn.runtime, handler: fn.handler, sourceRef: fn.source_ref, createdBy: identity.sub });
+    promoted.push(fn.name);
+  }
+  return ok(200, {
+    promotion: {
+      sourceWorkspaceId: source.id, sourceEnvironment,
+      targetWorkspaceId: target.id, targetEnvironment,
+      promoted: { functions: promoted },
+      skipped: { functions: skipped },
+      // Stage-scoped by design (#502/#503): each environment keeps its OWN secrets, credentials, and
+      // service accounts, and its own isolated database — promotion NEVER copies them.
+      notCopied: ['secrets', 'credentials', 'service-accounts', 'database-data'],
+    },
+  });
+}
+
 // DELETE /v1/workspaces/{workspaceId} — single-workspace cascading teardown
 // (add-deploy-completeness-cluster, #562). Tears down EVERYTHING the workspace owns, scoped to the
 // owning tenant — the per-workspace counterpart of purgeTenant. ISOLATION (cardinal rule): resolve
@@ -984,7 +1050,7 @@ export const LOCAL_HANDLERS = {
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
   recordScopeEnforcementDenial,
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
-  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, deleteWorkspace,
+  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, promoteWorkspace, deleteWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
