@@ -52,10 +52,15 @@ COPY apps/control-plane/src/runtime/connection-registry.mjs \
      apps/control-plane/src/runtime/postgres-data-executor.mjs \
      apps/control-plane/src/runtime/workspace-dsn-resolver.mjs \
      apps/control-plane/src/runtime/errors.mjs \
+     apps/control-plane/src/runtime/llm-executor.mjs \
      /app/apps/control-plane/src/runtime/
 COPY services/adapters/src/postgresql-data-api.mjs \
      services/adapters/src/postgresql-governance-admin.mjs \
      /app/services/adapters/src/
+# worker-deps.mjs also imports internal-contracts transport-security (#645) and the BYOK
+# llm executor (#640) at boot — both must be present or the worker crash-loops.
+COPY services/internal-contracts/src/transport-security.mjs \
+     /app/services/internal-contracts/src/
 
 ENV NODE_ENV=production \
     TEMPORAL_ADDRESS=temporal-frontend:7233 \
