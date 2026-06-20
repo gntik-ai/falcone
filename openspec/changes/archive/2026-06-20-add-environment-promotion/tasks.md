@@ -13,3 +13,4 @@
 
 - [x] 3.1 Run the new tests (black-box 8/8 + real-Postgres 2/2) — green.
 - [x] 3.2 Run `bash tests/blackbox/run.sh` — 1062/1062 pass, no regressions (additive route/handler). CI quality suites also green: `tests/unit` 707 pass, `tests/contracts` 235 pass (skips are pre-existing env-gated).
+- [x] 3.3 **LIVE on test-cluster-b** (kind control-plane `promote-641`, then reverted to `head-20260619`): real JWT (acme-ops, tenant_owner) through the gateway — registered a function in `cap10-dev` (dev), promoted dev → `app-prod` (prod): the function appears in prod with `runtime`/`sourceRef` carried, `notCopied` = secrets/credentials/service-accounts/database-data, the dev source is unchanged, a re-run skips it; negatives reject: same-environment → 400 `SAME_ENVIRONMENT`, target env mismatch → 409 `ENVIRONMENT_MISMATCH`, unknown target → 404 `TARGET_WORKSPACE_NOT_FOUND` (no existence leak). 8/8 probes pass.
