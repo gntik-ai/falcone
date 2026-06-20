@@ -68,15 +68,18 @@ export async function wireActivityDeps(opts = {}) {
 
   let registry = opts.registry;
   let keyPool;
+  let executeLlmComplete;
 
   if (!registry) {
     const [
       { createConnectionRegistry },
       { createWorkspaceDsnResolver },
+      { createLlmExecutor, createLlmProviderStore, createLlmUsageStore },
       pgModule,
     ] = await Promise.all([
       dynamicImport('../../../apps/control-plane/src/runtime/connection-registry.mjs'),
       dynamicImport('../../../apps/control-plane/src/runtime/workspace-dsn-resolver.mjs'),
+      dynamicImport('../../../apps/control-plane/src/runtime/llm-executor.mjs'),
       dynamicImport('pg'),
     ]);
 
@@ -88,9 +91,20 @@ export async function wireActivityDeps(opts = {}) {
     keyPool = new pg.Pool({ connectionString: dsn, max: 2 });
     const resolveConnection = createWorkspaceDsnResolver({ pool: keyPool, baseDsn: dsn });
     registry = createConnectionRegistry({ resolveConnection });
+
+    // BYOK LLM completion executor for the llm.complete activity (change #640). Binds the provider
+    // config + usage stores to the worker pool and resolves the provider key per request from the
+    // env var named by secretRef.name (ESO/Vault-mounted) — mirrors the control-plane executor. The
+    // control-plane owns DDL for these tables; the worker only reads config + appends usage.
+    const llmExecutor = createLlmExecutor({
+      providerStore: createLlmProviderStore({ pool: keyPool }),
+      usageStore: createLlmUsageStore({ pool: keyPool }),
+      secretResolver: (secretRef) => (secretRef?.name ? Promise.resolve(process.env[secretRef.name] ?? null) : Promise.resolve(null)),
+    });
+    executeLlmComplete = (req = {}) => llmExecutor.complete(req.workspaceId, req);
   }
 
-  const deps = { executePostgresData, pgRegistry: registry };
+  const deps = { executePostgresData, pgRegistry: registry, ...(executeLlmComplete ? { executeLlmComplete } : {}) };
 
   return {
     deps,

@@ -18,6 +18,7 @@ import { functionsInvoke, functionsInvokeInputSchema, functionsInvokeOutputSchem
 import { eventsPublish, eventsPublishInputSchema, eventsPublishOutputSchema } from './events-publish.mjs';
 import { httpRequest, httpRequestInputSchema, httpRequestOutputSchema } from './http-request.mjs';
 import { emailSend, emailSendInputSchema, emailSendOutputSchema } from './email-send.mjs';
+import { llmComplete, llmCompleteInputSchema, llmCompleteOutputSchema } from './llm-complete.mjs';
 
 // Register once at module load. Each entry carries the activity plus its input/output
 // JSON Schemas (the palette/docs contract). Names MUST equal catalog-names.mjs.
@@ -28,6 +29,7 @@ registerActivity('functions.invoke', { activity: functionsInvoke, inputSchema: f
 registerActivity('events.publish', { activity: eventsPublish, inputSchema: eventsPublishInputSchema, outputSchema: eventsPublishOutputSchema });
 registerActivity('http.request', { activity: httpRequest, inputSchema: httpRequestInputSchema, outputSchema: httpRequestOutputSchema });
 registerActivity('email.send', { activity: emailSend, inputSchema: emailSendInputSchema, outputSchema: emailSendOutputSchema });
+registerActivity('llm.complete', { activity: llmComplete, inputSchema: llmCompleteInputSchema, outputSchema: llmCompleteOutputSchema });
 
 // Self-check: the registered names MUST equal the Temporal-free canonical list the
 // control-plane validate endpoint consumes. A mismatch is a load-time bug.
