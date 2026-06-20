@@ -324,6 +324,9 @@ const server = createControlPlaneServer({
   registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
   resolveWorkspaceTenant,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
+  // First-party MCP dispatches tool calls against this executor's own loopback base, so its local
+  // routes + the control-plane fallthrough reach every management family (#642).
+  mcpSelfBaseUrl: process.env.MCP_SELF_BASE_URL ?? `http://127.0.0.1:${PORT}`,
   gatewaySharedSecret: process.env.GATEWAY_SHARED_SECRET || undefined,
 });
 

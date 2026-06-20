@@ -13,6 +13,12 @@ import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from 
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 import { handleMcpMessage } from '../mcp-official-server.mjs';
+import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
+import { mcpConfigStore } from '../mcp-config.mjs';
+
+// Roles that may change the first-party MCP configuration AND always retain base-scope access so a
+// disabled server can be re-enabled (must match SUPERADMIN_ROLES in mcp-official-server.mjs).
+const MCP_SUPERADMIN_ROLES = new Set(['superadmin', 'platform_admin']);
 
 const META_QUERY_KEYS = new Set(['select', 'order', 'page[size]', 'page[after]', 'countMode']);
 
@@ -266,7 +272,7 @@ function requiredDataScope(method, pathname) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
@@ -526,29 +532,40 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         runMcp(mcpEngine, { operation: 'list_audit', identity: c.identity, workspaceId: c.identity.workspaceId, serverId: s }, 200)],
     ] : []),
 
-    // ---- Platform (first-party) MCP server — JSON-RPC over HTTP (add-platform-mcp-http-route) ----
+    // ---- Platform (first-party) MCP server — JSON-RPC over HTTP (add-platform-mcp-http-route;
+    //      completeness add-control-mcp-completeness, #642) ----
     // A single Streamable-HTTP JSON-RPC endpoint that exposes the official Falcone management tools
-    // (mcp-official-catalog.mjs) so an MCP client can manage projects/resources. Registered only
-    // when a control-plane upstream is configured (the tool calls proxy there). The tenant is
-    // credential-derived (resolveIdentity) — NEVER from tool arguments; tool scope-gating
-    // (BASE_SCOPE `mcp:invoke` + per-tool mutating scopes) is enforced by handleMcpMessage from the
-    // verified token scopes. Distinct from the workspace MCP-hosting routes (/v1/mcp/workspaces/...).
+    // (mcp-official-catalog.mjs) so an MCP client can manage projects/resources. Registered only when
+    // a control-plane upstream is configured (so the executor can fall through to it). Tool calls are
+    // dispatched against THIS executor's own loopback base (`mcpSelfBaseUrl`): routes the executor
+    // serves (api-keys, embedding, flows, mcp-hosting) are handled locally and everything else falls
+    // through to the control-plane (server.mjs:proxyRequest) — so EVERY management family is reachable
+    // through one path. The tenant is credential-derived (resolveIdentity) — NEVER from tool
+    // arguments. Distinct from the workspace MCP-hosting routes (/v1/mcp/workspaces/...).
     ...(controlPlaneUpstream ? [
-      ['POST', /^\/v1\/mcp\/rpc$/, (_groups, c) => runPlatformMcp(c, controlPlaneUpstream)],
+      ['POST', /^\/v1\/mcp\/rpc$/, (_groups, c) => runPlatformMcp(c, mcpSelfBaseUrl ?? controlPlaneUpstream, mcpConfig ?? mcpConfigStore)],
     ] : []),
   ];
 }
 
-// Platform MCP JSON-RPC dispatcher: hand the request message to the first-party MCP handler with
-// a control-plane client bound to the caller's own credential, so every tool call the MCP makes is
-// authorized + tenant-scoped exactly as if the caller had hit the API directly. Scopes come from the
-// verified identity; the bearer token is forwarded to the control-plane (the only auth it accepts).
+// Platform MCP JSON-RPC dispatcher: hand the request message to the first-party MCP handler with a
+// control-plane client bound to the caller's own credential, so every tool call the MCP makes is
+// authorized + tenant-scoped exactly as if the caller had hit the API directly. The bearer token is
+// forwarded so the served route re-verifies the same identity.
+//
+// Scopes: the verified identity's scopes plus an auto-granted BASE_SCOPE — reaching this endpoint
+// means the caller is an authenticated principal, so the base "may use the MCP server" scope is
+// granted when the server is enabled (or always for a superadmin, so a disabled server can be
+// re-enabled). Mutating tools still require their explicit mcp:falcone:* scope from the token.
 // Always 200 at the HTTP layer — JSON-RPC carries success/errors in the response envelope.
-async function runPlatformMcp(c, upstream) {
-  const grantedScopes = Array.isArray(c.identity?.scopes) ? c.identity.scopes : [];
+async function runPlatformMcp(c, upstream, config) {
+  const scopes = new Set(Array.isArray(c.identity?.scopes) ? c.identity.scopes : []);
+  const roles = Array.isArray(c.identity?.roles) ? c.identity.roles : [];
+  const isSuperadmin = roles.some((r) => MCP_SUPERADMIN_ROLES.has(r));
+  if (config.isServerEnabled() || isSuperadmin) scopes.add(BASE_SCOPE);
   const callFalcone = async (method, path, body) => {
-    // SSRF-safe: `upstream` host/port are fixed; `path` is a first-party catalog constant
-    // (only the {id} segment is arg-derived, encodeURIComponent'd in the handler).
+    // SSRF-safe: `upstream` host/port are fixed (this executor's loopback / the control-plane); the
+    // path is a first-party catalog template, encodeURIComponent'd per segment in the handler.
     const target = new URL(path, upstream);
     const resp = await fetch(target, {
       method,
@@ -562,10 +579,12 @@ async function runPlatformMcp(c, upstream) {
     let parsed;
     try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
     // Surface the upstream status alongside the body so the MCP tool result is self-describing
-    // (a 401/403/404 from the control-plane reaches the MCP client as content, not a 500).
+    // (a 401/403/404 from the served route reaches the MCP client as content, not a 500).
     return resp.ok ? parsed : { error: { status: resp.status, body: parsed } };
   };
-  const result = await handleMcpMessage(c.body, { grantedScopes, callFalcone });
+  const result = await handleMcpMessage(c.body, {
+    grantedScopes: [...scopes], roles, tenantId: c.identity?.tenantId, callFalcone, config,
+  });
   return { status: 200, body: result };
 }
 
@@ -807,12 +826,15 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream);
+  // The first-party MCP dispatches tool calls against this executor's own loopback base (so its
+  // local routes + the control-plane fallthrough reach every family). Validate it once (SSRF).
+  const mcpSelf = mcpSelfBaseUrl ? new URL(mcpSelfBaseUrl).toString() : undefined;
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelf, mcpConfig);
 
   return http.createServer(async (req, res) => {
     const method = (req.method ?? 'GET').toUpperCase();
