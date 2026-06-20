@@ -489,6 +489,34 @@ routes:
       scheme: http
       nodes:
         "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
+  # ---- BYOK LLM completion plane (workspace-scoped) -> executor ----
+  # add-llm-agent-flow-task (#640): the LLM provider config + completion + usage subpaths are served
+  # by the EXECUTOR (server.mjs registers /v1/workspaces/{ws}/llm-provider, /llm/completions,
+  # /llm-usage), NOT the control-plane. Without this route they fall through to 2003 -> control-plane,
+  # which has no LLM handler, and return 404 NO_ROUTE. Same auth model as 2003-embedding: APISIX
+  # forwards the Bearer JWT and the executor verifies it; SECURITY (#488) strip client-supplied
+  # identity headers and inject x-gateway-auth so the executor trusts the request.
+  - id: "2003-llm"
+    uri: "/v1/workspaces/*"
+    priority: 338
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["uri", "~~", "^/v1/workspaces/[^/]+/(llm-provider|llm/completions|llm-usage)"]
+    plugins:
+      cors: {}
+      proxy-rewrite:
+        headers:
+          set:
+            x-tenant-id: ""
+            x-workspace-id: ""
+            x-auth-subject: ""
+            x-actor-roles: ""
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-cp-executor.falcone.svc.cluster.local:8080": 1
   # ---- Flows engine (definitions + executions) -> executor ----
   # add-apisix-flows-mcp-routes (#560): the flows control surface is served by the EXECUTOR
   # (server.mjs registers /v1/flows/workspaces/{ws}/flows + .../task-types), NOT the control-plane.

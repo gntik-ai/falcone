@@ -272,11 +272,17 @@ function requiredDataScope(method, pathname) {
 
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
   const emb = '^/v1/workspaces/([^/]+)/embedding-provider';
+  // BYOK LLM completion plane (change: add-llm-agent-flow-task / #640) — sibling of the
+  // embedding-provider config under the same workspace prefix. Served by THIS executor (the
+  // dedicated APISIX route forwards these subpaths here, like 2003-embedding).
+  const llmp = '^/v1/workspaces/([^/]+)/llm-provider';
+  const llmc = '^/v1/workspaces/([^/]+)/llm/completions';
+  const llmu = '^/v1/workspaces/([^/]+)/llm-usage';
   const mdoc = '^/v1/mongo/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/documents';
   const evt = '^/v1/events/workspaces/([^/]+)/topics';
   const fn = '^/v1/functions/workspaces/([^/]+)/actions';
@@ -410,6 +416,22 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runEmbeddingProvider(embeddingExecutor, 'get', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
     ['DELETE', new RegExp(`${emb}$`), ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+
+    // ---- BYOK LLM provider config + completion + usage (workspace-scoped) — change #640 ----
+    // The verified identity's tenantId is injected so the store keys the record by
+    // (tenant_id, workspace_id) and usage is metered per tenant — never trusting a body tenantId.
+    ['PUT', new RegExp(`${llmp}$`), ([w], c) =>
+      runLlmProvider(llmExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
+    ['GET', new RegExp(`${llmp}$`), ([w], c) =>
+      runLlmProvider(llmExecutor, 'get', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+    ['DELETE', new RegExp(`${llmp}$`), ([w], c) =>
+      runLlmProvider(llmExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+    ['GET', new RegExp(`${llmu}$`), ([w], c) =>
+      runLlmUsage(llmExecutor, { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+    // The completion route OWNS the response so it can stream SSE when `stream:true` and otherwise
+    // write a single JSON body. { sse: true } routes the dispatcher to pass (req,res) to the handler.
+    ['POST', new RegExp(`${llmc}$`), ([w], c) =>
+      runLlmComplete(llmExecutor, { workspaceId: w, tenantId: c.identity.tenantId }, c), { sse: true }],
 
     // ---- Per-collection embedding mapping (table-scoped): set / get / remove (structural
     // admin). The verified identity's tenantId is injected so the Postgres-backed store keys
@@ -779,6 +801,87 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
   return { status: successStatus, body: result };
 }
 
+// BYOK LLM provider config plane (change: add-llm-agent-flow-task / #640). Mirrors
+// runEmbeddingProvider: tenantId from the verified identity (never the body), GET returns the
+// stored record (which carries a `secretRef` ONLY — the plaintext key is never persisted).
+async function runLlmProvider(llmExecutor, action, params, successStatus) {
+  if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
+  if (action === 'set') {
+    const result = await llmExecutor.setProvider(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
+    return { status: successStatus, body: result };
+  }
+  if (action === 'get') {
+    const record = await llmExecutor.getProvider(params.workspaceId, params.tenantId);
+    if (!record) throw Object.assign(new Error('No LLM provider configured for this workspace'), { statusCode: 404, code: 'LLM_PROVIDER_NOT_FOUND' });
+    return { status: successStatus, body: record };
+  }
+  const result = await llmExecutor.removeProvider(params.workspaceId, params.tenantId);
+  return { status: successStatus, body: result };
+}
+
+// Token-usage rollup, scoped to the verified identity's tenantId so a workspaceId shared across
+// tenants reports THIS tenant's usage only (no cross-tenant aggregation).
+async function runLlmUsage(llmExecutor, params, successStatus) {
+  if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
+  const rollup = await llmExecutor.getUsage(params.workspaceId, { tenantId: params.tenantId });
+  return { status: successStatus, body: rollup };
+}
+
+// LLM chat completion. This is an `{ sse: true }` route, so the handler OWNS the response: it
+// reads the JSON body itself, then either streams SSE frames (`stream: true`) or writes a single
+// JSON body. Errors raised BEFORE the first byte (no provider / disallowed model / unresolved
+// secret) surface as HTTP error envelopes; once the stream is open, a late error is emitted as a
+// terminal SSE `error` frame (headers are already sent).
+async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
+  const { req, res } = c;
+  if (!llmExecutor) {
+    return sendJson(res, 501, { code: 'LLM_DISABLED', message: 'LLM provider is not enabled' });
+  }
+  let body;
+  try { body = await readJsonBody(req); } catch { body = {}; }
+  const request = {
+    tenantId,
+    model: body.model,
+    messages: body.messages,
+    prompt: body.prompt,
+    system: body.system,
+    maxTokens: body.maxTokens,
+    temperature: body.temperature,
+  };
+
+  if (!body.stream) {
+    // Non-streaming: a thrown clientError propagates to the dispatcher's catch (headers not yet
+    // sent) and becomes a JSON error envelope with the right status + code.
+    const result = await llmExecutor.complete(workspaceId, request);
+    return sendJson(res, 200, result);
+  }
+
+  // Streaming: prime the generator so a pre-stream error surfaces as an HTTP status BEFORE any
+  // SSE header is written (mirrors the flow-monitoring SSE handler's ensureStarted discipline).
+  const iter = llmExecutor.completeStream(workspaceId, request)[Symbol.asyncIterator]();
+  let current;
+  try {
+    current = await iter.next();
+  } catch (err) {
+    const statusCode = err.statusCode ?? 500;
+    return sendJson(res, statusCode, { code: err.code ?? 'LLM_PROVIDER_ERROR', message: statusCode >= 500 ? 'Internal server error' : err.message });
+  }
+  res.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no',
+  });
+  try {
+    for (; !current.done; current = await iter.next()) {
+      res.write(`data: ${JSON.stringify(current.value)}\n\n`);
+    }
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ type: 'error', code: err.code ?? 'LLM_PROVIDER_ERROR' })}\n\n`);
+  }
+  res.end();
+}
+
 function requireMappingStore(mappingStore) {
   if (!mappingStore) throw Object.assign(new Error('Embedding mapping is not enabled'), { statusCode: 501, code: 'MAPPING_STORE_DISABLED' });
   return mappingStore;
@@ -826,7 +929,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
@@ -834,7 +937,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
   // The first-party MCP dispatches tool calls against this executor's own loopback base (so its
   // local routes + the control-plane fallthrough reach every family). Validate it once (SSRF).
   const mcpSelf = mcpSelfBaseUrl ? new URL(mcpSelfBaseUrl).toString() : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelf, mcpConfig);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelf, mcpConfig);
 
   return http.createServer(async (req, res) => {
     const method = (req.method ?? 'GET').toUpperCase();

@@ -26,7 +26,7 @@ import {
 import { classifyExecutorError } from '../../services/workflow-worker/src/activities/errors.mjs';
 import { MAX_INPUT_BYTES } from '../../services/workflow-worker/src/activities/limits.mjs';
 
-const EXPECTED = ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send'];
+const EXPECTED = ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send', 'llm.complete'];
 
 test('bbx-flows-act-reg-01: seven canonical task types registered with schemas', () => {
   const names = taskTypeNames().sort();
