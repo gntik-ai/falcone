@@ -121,11 +121,11 @@ test('resolveActivity: unknown task type → non-retryable UNKNOWN_TASK_TYPE', (
   }
 });
 
-test('registry: all six+stub task types registered', () => {
-  for (const n of ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send']) {
+test('registry: all first-party task types registered', () => {
+  for (const n of ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send', 'llm.complete']) {
     assert.ok(hasTaskType(n), `${n} must be registered`);
   }
-  assert.equal(taskTypeNames().length, 7);
+  assert.equal(taskTypeNames().length, 8);
 });
 
 test('registerActivity: duplicate name throws', () => {
