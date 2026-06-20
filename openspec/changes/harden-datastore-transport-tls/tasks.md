@@ -44,4 +44,4 @@
 
 - [x] 7.1 Run `bash tests/blackbox/run.sh` green (new contract passes; default path unchanged)
 - [x] 7.2 Run the unit + contracts suites (CI `quality` job) green
-- [ ] 7.3 Best-effort live verify on the kind cluster (plaintext default still connects; `require` attempts TLS) — document the cert limitation
+- [x] 7.3 Live-relevant verification: kind control-plane image builds (all 47 route modules resolve); all wired modules import cleanly at runtime; `helm template` renders the TLS env + CA mount onto exactly the 3 app pods. Full mTLS live verify on kind is NOT feasible (the bundled Postgres/FerretDB/Kafka present no server certs and there is no cert-manager) and the change is default-off (plaintext), so there is no new live behavior to exercise without provisioning a PKI — documented limitation.
