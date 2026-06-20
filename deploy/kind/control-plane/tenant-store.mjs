@@ -236,6 +236,13 @@ export async function ensureSchema(pool) {
       correlation_id VARCHAR(255),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+  // Audit integrity (#644): the TRUE outcome + the per-tenant append-only hash chain
+  // (prev_hash/row_hash). Added idempotently so an existing install gains them on the
+  // next boot; legacy rows keep NULL (read as 'unknown'; the chain verifies from the
+  // first hashed row).
+  await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS outcome VARCHAR(32)");
+  await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS prev_hash TEXT");
+  await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS row_hash TEXT");
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_plan_audit_events_actor_created
     ON plan_audit_events (actor_id, created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_plan_audit_events_tenant_created
