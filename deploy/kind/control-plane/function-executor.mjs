@@ -133,14 +133,35 @@ export async function waitKsvcReady(name, timeoutMs = 90000) {
   return false;
 }
 
+// Build the POST headers for a function invocation. The VERIFIED caller context
+// (from the control-plane JWT identity, never the request body) is injected as
+// X-Falcone-* headers so the fn-runtime can expose it to user code out-of-band
+// from the user-controlled params. Absent/empty fields are omitted (not sent
+// blank); no `caller` -> only the content headers (unchanged behaviour). Exported
+// as the deterministic unit-test seam (invokeKnative itself opens a real socket).
+export function buildInvokeHeaders(payload, caller = null) {
+  const headers = { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) };
+  if (caller) {
+    const set = (name, value) => { if (typeof value === 'string' && value.length) headers[name] = value; };
+    set('x-falcone-tenant-id', caller.tenantId);
+    set('x-falcone-workspace-id', caller.workspaceId);
+    set('x-falcone-principal', caller.principal);
+    set('x-falcone-actor-type', caller.actorType);
+    const roles = Array.isArray(caller.roles) ? caller.roles.filter(Boolean) : [];
+    if (roles.length) headers['x-falcone-roles'] = roles.join(',');
+  }
+  return headers;
+}
+
 // Invoke a function over its ksvc cluster-internal URL (Knative scales from zero).
-export function invokeKnative(host, params, { timeoutMs = 60000 } = {}) {
+// `caller` (verified identity) is delivered to the runtime as X-Falcone-* headers.
+export function invokeKnative(host, params, { timeoutMs = 60000, caller = null } = {}) {
   return new Promise((resolve) => {
     const started = Date.now();
     const payload = JSON.stringify(params ?? {});
     const req = http.request({
       host, port: 80, path: '/', method: 'POST',
-      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }, timeout: timeoutMs
+      headers: buildInvokeHeaders(payload, caller), timeout: timeoutMs
     }, (res) => {
       let buf = ''; res.on('data', (c) => { buf += c; });
       res.on('end', () => {
