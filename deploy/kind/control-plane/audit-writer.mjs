@@ -22,6 +22,7 @@ const AUDITABLE_LOCAL_HANDLERS = {
   setAuthConfig: 'tenant.auth-config.update', setSocialProvider: 'tenant.social-provider.upsert',
   deleteSocialProvider: 'tenant.social-provider.delete',
   createWorkspace: 'workspace.create',
+  promoteWorkspace: 'workspace.promote',
   createServiceAccount: 'workspace.service-account.create',
   issueCredential: 'workspace.service-account.credential.issue',
   rotateCredential: 'workspace.service-account.credential.rotate',
