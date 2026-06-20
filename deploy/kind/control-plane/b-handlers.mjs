@@ -16,6 +16,7 @@ import { MONGO_HANDLERS } from './mongo-handlers.mjs';
 import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
+import { WEBHOOK_HANDLERS } from './webhook-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
 import { recordScopeDenial, recordQuotaEnforcement } from './audit-writer.mjs';
 
@@ -997,6 +998,7 @@ export const LOCAL_HANDLERS = {
   ...PG_HANDLERS,
   ...KAFKA_HANDLERS,
   ...FN_HANDLERS,
+  ...WEBHOOK_HANDLERS,
   ...AUTH_HANDLERS
 };
 
