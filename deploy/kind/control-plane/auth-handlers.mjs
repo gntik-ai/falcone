@@ -56,12 +56,25 @@ function sessionFromTokenResponse(data, sessionId) {
   };
 }
 
-async function kcToken(form) {
-  const res = await fetch(`${KC_BASE}/realms/${encodeURIComponent(REALM)}/protocol/openid-connect/token`, {
+async function kcToken(form, fetchImpl = fetch) {
+  const res = await fetchImpl(`${KC_BASE}/realms/${encodeURIComponent(REALM)}/protocol/openid-connect/token`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form)
   });
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
+}
+
+// Revoke a refresh token AND end the corresponding Keycloak SSO session.
+// `in-falcone-console` is a PUBLIC client, so no client_secret is sent. Keycloak
+// returns 204 on success; the revoked refresh token then yields invalid_grant on
+// any later refresh. Mirrors kcToken's structure; the fetch impl is injectable so
+// tests can fake Keycloak without a live server.
+async function kcLogout(refreshToken, fetchImpl = fetch) {
+  const res = await fetchImpl(`${KC_BASE}/realms/${encodeURIComponent(REALM)}/protocol/openid-connect/logout`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: CLIENT, refresh_token: refreshToken })
+  });
+  return { ok: res.ok, status: res.status };
 }
 
 // POST /v1/auth/login-sessions  (PUBLIC) — ROPC login.
@@ -80,15 +93,29 @@ async function login(ctx) {
 async function refresh(ctx) {
   const { body, params } = ctx;
   if (!body.refreshToken) return errBody(400, 'VALIDATION_ERROR', 'refreshToken is required');
-  const r = await kcToken({ grant_type: 'refresh_token', client_id: CLIENT, refresh_token: body.refreshToken });
+  const r = await kcToken({ grant_type: 'refresh_token', client_id: CLIENT, refresh_token: body.refreshToken }, ctx._fetch ?? fetch);
   if (!r.ok) return errBody(401, 'REFRESH_FAILED', r.data.error_description || 'refresh failed');
   return ok(200, sessionFromTokenResponse(r.data, params.sessionId || randomId()));
 }
 
 // DELETE /v1/auth/login-sessions/{sessionId}  (authenticated) — logout.
+// The SPA sends the session's refresh token in the request body; we revoke it at
+// Keycloak and end the SSO session so no further access tokens can be minted from
+// this session (the bare accept was a no-op: the refresh token kept working — #667).
 async function logout(ctx) {
-  // Best-effort: Keycloak logout needs the refresh token; the SPA only sends the
-  // access token here, so we accept the termination (the token expires shortly).
+  const refreshToken = ctx.body?.refreshToken;
+  if (refreshToken) {
+    // Best-effort for the RESPONSE (always return accepted; never leak Keycloak
+    // error detail), but the revoke MUST be attempted when a token is supplied.
+    try {
+      await kcLogout(refreshToken, ctx._fetch ?? fetch);
+    } catch (e) {
+      // Network/Keycloak failure: log server-side, still accept locally. The token
+      // remains valid until expiry in this degraded case, but we do not 500.
+      console.error('[control-plane] logout: Keycloak refresh-token revoke failed:', e?.message ?? e);
+    }
+  }
+  // Tolerant of older clients that omit the refresh token (no 500): accept locally.
   return ok(200, { sessionId: ctx.params.sessionId, status: 'accepted', acceptedAt: new Date().toISOString() });
 }
 

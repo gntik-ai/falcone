@@ -12842,6 +12842,17 @@
             "$ref": "#/components/parameters/sessionId"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "description": "Optional logout payload. When the session's refresh token is supplied, the control plane revokes it and ends the corresponding Keycloak SSO session so no further access tokens can be minted from that session. Omitting it keeps backward compatibility with older clients (the termination is still accepted).",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleSessionTerminationRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "description": "The session termination was accepted.",
@@ -64215,6 +64226,18 @@
           "refreshToken": {
             "type": "string",
             "minLength": 16
+          }
+        }
+      },
+      "ConsoleSessionTerminationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Optional body for console logout (DELETE /v1/auth/login-sessions/{sessionId}). Carries the session's refresh token so the control plane can revoke it at the identity provider and end the corresponding Keycloak SSO session, preventing any further access tokens from being minted from this session.",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 16,
+            "description": "The refresh token issued for this session. When present, it is revoked and the Keycloak SSO session is ended on logout."
           }
         }
       },

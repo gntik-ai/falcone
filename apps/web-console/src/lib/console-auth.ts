@@ -112,6 +112,10 @@ export interface ConsoleSignupRegistration {
   }
 }
 
+export interface ConsoleSessionTerminationRequest {
+  refreshToken: string
+}
+
 export interface ConsoleSessionTerminationAccepted {
   sessionId: string
   status: 'accepted'
@@ -158,10 +162,14 @@ export async function refreshConsoleLoginSession(
 export async function terminateConsoleLoginSession(
   sessionId: string,
   accessToken: string,
+  refreshToken: string,
   signal?: AbortSignal
 ): Promise<ConsoleSessionTerminationAccepted> {
   return requestJson<ConsoleSessionTerminationAccepted>(`/v1/auth/login-sessions/${encodeURIComponent(sessionId)}`, {
     method: 'DELETE',
+    // Carry the refresh token so the control plane can revoke it at Keycloak and
+    // end the SSO session; without it logout was a no-op (#667).
+    body: { refreshToken } satisfies ConsoleSessionTerminationRequest,
     idempotent: true,
     headers: {
       Authorization: `Bearer ${accessToken}`

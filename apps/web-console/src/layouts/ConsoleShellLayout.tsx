@@ -268,7 +268,11 @@ export function ConsoleShellLayout() {
 
     try {
       if (session?.sessionId && session.tokenSet?.accessToken) {
-        await terminateConsoleLoginSession(session.sessionId, session.tokenSet.accessToken)
+        await terminateConsoleLoginSession(
+          session.sessionId,
+          session.tokenSet.accessToken,
+          session.tokenSet.refreshToken
+        )
       }
     } catch {
       // El cierre local sigue ocurriendo aunque la invalidación remota degrade.
