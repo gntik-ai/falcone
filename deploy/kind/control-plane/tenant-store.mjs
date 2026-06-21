@@ -96,6 +96,31 @@ export async function ensureSchema(pool) {
       created_by TEXT
     )`);
   await pool.query("ALTER TABLE workspace_databases ADD COLUMN IF NOT EXISTS environment TEXT");
+  // ---- data plane: FerretDB (mongo) databases provisioned for a workspace ---
+  // The document store is ONE shared FerretDB cluster keyed only by a `tenantId`
+  // document field — its db/collection NAMES are caller-supplied and SHARED across
+  // tenants (fix-tenant-purge-ferretdb-cascade, #682). This registry exists ONLY so
+  // tenant-purge / workspace-delete can DISCOVER a tenant's provisioned mongo
+  // databases for an isolation-safe teardown (delete this tenant's documents by
+  // tenantId, drop the db only when empty across ALL tenants). It MUST be its OWN
+  // table — NOT workspace_databases, whose `database_name` is globally UNIQUE and
+  // feeds the Postgres dropWorkspaceDatabase/getWorkspaceDatabase/databaseWorkspaceMap
+  // consumers; mongo db names are shared across tenants and would collide there +
+  // corrupt those Postgres consumers. The key is per-workspace, NOT global
+  // (UNIQUE (workspace_id, database_name)), so the SAME db name provisioned by two
+  // tenants/workspaces records two distinct rows (idempotent re-provision in one
+  // workspace is a no-op via ON CONFLICT DO NOTHING).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS workspace_mongo_databases (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      workspace_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      database_name TEXT NOT NULL,
+      collections JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by TEXT,
+      UNIQUE (workspace_id, database_name)
+    )`);
   // ---- data plane: object-store buckets mapped to a workspace -------------
   // CANONICAL tenant-to-bucket mapping (bucket-per-workspace). This table is the
   // single source of truth for storage reconciliation (add-seaweedfs-bucket-
@@ -396,6 +421,45 @@ export async function deleteWorkspaceDatabaseRecord(pool, id) {
   await pool.query('DELETE FROM workspace_databases WHERE id=$1', [id]);
 }
 
+// ---- workspace mongo (FerretDB) databases ----------------------------------
+// Record a workspace's provisioned FerretDB database so purge/delete can discover
+// it for an isolation-safe teardown (fix-tenant-purge-ferretdb-cascade, #682).
+// Idempotent: a same-workspace re-provision of the same db name is a no-op (ON
+// CONFLICT DO NOTHING), returning the existing row. NEVER reassigns the owner —
+// the (workspace_id, database_name) conflict is always a same-workspace re-provision
+// (mongo db names are shared across tenants, but the workspace id is globally unique).
+export async function insertMongoDatabase(pool, { workspaceId, tenantId, databaseName, collections, createdBy }) {
+  const cols = JSON.stringify(Array.isArray(collections) ? collections : []);
+  const { rows } = await pool.query(
+    `INSERT INTO workspace_mongo_databases (workspace_id, tenant_id, database_name, collections, created_by)
+     VALUES ($1,$2,$3,$4::jsonb,$5)
+     ON CONFLICT (workspace_id, database_name) DO NOTHING
+     RETURNING id, workspace_id, tenant_id, database_name, collections, created_at, created_by`,
+    [workspaceId, tenantId, databaseName, cols, createdBy ?? null]);
+  if (rows[0]) return rows[0];
+  // Conflict: the row already exists for this (workspace, db) — return it so the
+  // caller still observes the recorded database (re-provision stays idempotent).
+  const { rows: existing } = await pool.query(
+    `SELECT id, workspace_id, tenant_id, database_name, collections, created_at, created_by
+       FROM workspace_mongo_databases WHERE workspace_id=$1 AND database_name=$2 LIMIT 1`,
+    [workspaceId, databaseName]);
+  return existing[0] ?? null;
+}
+// Distinct FerretDB database names a tenant has provisioned (across all its workspaces).
+// De-duplicated: the same db name may be recorded under several workspaces of the tenant,
+// but the teardown only needs to delete the tenant's documents from each db once.
+export async function collectTenantMongoDatabases(pool, tenantId) {
+  const { rows } = await pool.query(
+    'SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE tenant_id=$1', [tenantId]);
+  return rows.map((r) => r.database_name);
+}
+// FerretDB database names recorded for a single workspace (workspace-delete teardown).
+export async function collectWorkspaceMongoDatabases(pool, workspaceId) {
+  const { rows } = await pool.query(
+    'SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE workspace_id=$1', [workspaceId]);
+  return rows.map((r) => r.database_name);
+}
+
 // ---- workspace buckets (object store mapping) ------------------------------
 export async function insertBucket(pool, { workspaceId, tenantId, bucketName, region }) {
   // ON CONFLICT must NEVER reassign workspace_id/tenant_id: the previous
@@ -642,6 +706,9 @@ export async function markTenantDeleted(pool, id) {
 export async function purgeWorkspace(pool, workspaceId) {
   const collect = async (sql) => { try { return (await pool.query(sql, [workspaceId])).rows; } catch { return []; } };
   const databases = (await collect('SELECT database_name FROM workspace_databases WHERE workspace_id=$1')).map((r) => r.database_name);
+  // FerretDB (mongo) databases recorded for this workspace — collected for an
+  // isolation-safe document teardown (fix-tenant-purge-ferretdb-cascade, #682).
+  const mongoDatabases = (await collect('SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE workspace_id=$1')).map((r) => r.database_name);
   const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE workspace_id=$1')).map((r) => r.bucket_name);
   const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE workspace_id=$1')).map((r) => r.physical_topic_name);
   const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE workspace_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
@@ -649,11 +716,12 @@ export async function purgeWorkspace(pool, workspaceId) {
   const del = async (sql, params) => { try { await pool.query(sql, params); } catch (e) { if (e.code !== '42P01') throw e; } }; // ignore undefined_table
   // Child rows first (every workspace-owned table is keyed by workspace_id), then the workspace.
   for (const t of ['fn_activations', 'fn_actions', 'workspace_functions', 'workspace_topics',
-                   'workspace_buckets', 'workspace_databases', 'workspace_api_keys', 'service_accounts']) {
+                   'workspace_buckets', 'workspace_databases', 'workspace_mongo_databases',
+                   'workspace_api_keys', 'service_accounts']) {
     await del(`DELETE FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
   }
   await del('DELETE FROM workspaces WHERE id = $1', [workspaceId]);
-  return { databases, buckets, topics, ksvcs, workspaceId };
+  return { databases, mongoDatabases, buckets, topics, ksvcs, workspaceId };
 }
 
 // Cascading purge of every row a tenant owns (add-tenant-delete-purge-cascade, #501). Collects
@@ -664,6 +732,9 @@ export async function purgeWorkspace(pool, workspaceId) {
 export async function purgeTenant(pool, tenantId) {
   const collect = async (sql) => { try { return (await pool.query(sql, [tenantId])).rows; } catch { return []; } };
   const databases = (await collect('SELECT database_name FROM workspace_databases WHERE tenant_id=$1')).map((r) => r.database_name);
+  // FerretDB (mongo) databases recorded for this tenant — collected (de-duplicated)
+  // for an isolation-safe document teardown (fix-tenant-purge-ferretdb-cascade, #682).
+  const mongoDatabases = (await collect('SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE tenant_id=$1')).map((r) => r.database_name);
   const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE tenant_id=$1')).map((r) => r.bucket_name);
   const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE tenant_id=$1')).map((r) => r.physical_topic_name);
   const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE tenant_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
@@ -673,12 +744,12 @@ export async function purgeTenant(pool, tenantId) {
   // fn_activations has no tenant_id — scope by the tenant's workspaces.
   if (workspaceIds.length) await del('DELETE FROM fn_activations WHERE workspace_id = ANY($1)', [workspaceIds]);
   for (const t of ['fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
-                   'workspace_databases', 'workspace_api_keys', 'service_accounts',
+                   'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
                    'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
                    'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements']) {
     await del(`DELETE FROM ${t} WHERE tenant_id = $1`, [tenantId]);
   }
   await del('DELETE FROM workspaces WHERE tenant_id = $1', [tenantId]);
   await del('DELETE FROM tenants WHERE id = $1', [tenantId]);
-  return { databases, buckets, topics, ksvcs, workspaceIds };
+  return { databases, mongoDatabases, buckets, topics, ksvcs, workspaceIds };
 }

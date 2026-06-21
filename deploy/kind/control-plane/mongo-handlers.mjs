@@ -32,6 +32,9 @@ function client() {
 // Resolve the FerretDB client. ctx.mongoClient is an injection point for tests
 // (the handlers otherwise share the singleton connection above).
 const mc = async (ctx) => ctx?.mongoClient ?? client();
+// Shared singleton client accessor for callers outside this module (e.g. the
+// purge/delete teardown in b-handlers resolves a default client through this).
+export const mongoClient = () => client();
 
 // FerretDB is ONE shared cluster keyed only by a `tenantId` field per document
 // (db/collection names are caller-supplied and shared across tenants), so a
@@ -213,10 +216,72 @@ async function mongoProvision(ctx) {
     for (const col of collections) {
       try { await c.db(name).createCollection(String(col)); } catch (e) { if (!/already exists/i.test(String(e.message))) throw e; }
     }
+    // Record the provisioned database so tenant-purge / workspace-delete can DISCOVER
+    // it for an isolation-safe teardown (fix-tenant-purge-ferretdb-cascade, #682).
+    // BEST-EFFORT and idempotent: a registry hiccup (or a benign re-provision conflict)
+    // must NEVER fail provisioning — the FerretDB db/collections were already created.
+    if (ctx.pool && ws?.id && ws?.tenant_id) {
+      try {
+        await store.insertMongoDatabase(ctx.pool, {
+          workspaceId: ws.id, tenantId: ws.tenant_id, databaseName: name,
+          collections, createdBy: ctx.identity?.sub ?? null });
+      } catch { /* registry is for teardown discovery only; never block provisioning */ }
+    }
     return ok(201, { databaseId: name, database: { databaseName: name }, engine: 'mongodb', workspaceId: ws?.id ?? null, collections });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_PROVISION_FAILED', String(e.message ?? e));
   }
+}
+
+// Isolation-safe FerretDB teardown for tenant-purge / workspace-delete
+// (fix-tenant-purge-ferretdb-cascade, #682). The document store is ONE shared cluster
+// keyed only by a `tenantId` document field — db/collection NAMES are caller-supplied
+// and SHARED across tenants — so this MUST NOT blindly dropDatabase(name): another
+// tenant may hold documents in a same-named shared db (a naïve drop = cross-tenant
+// data loss, a NEW Critical bug). For each recorded database it therefore:
+//   1. deletes ONLY this tenant's documents (deleteMany { tenantId }) from every
+//      non-system collection, then
+//   2. drops the database physically IFF it now holds ZERO documents from ANY tenant
+//      across its non-system collections; otherwise the db is RETAINED (another
+//      tenant still owns data there) and only this tenant's documents were removed.
+// `system.*` collections are excluded from the emptiness check (a provisioned-but-empty
+// db carries a `system.dbSentinel` marker); dropDatabase() removes the sentinel.
+// Best-effort per database (a failure on one db never aborts the rest, nor the purge).
+// The client is injected by the caller (mirrors the ctx.mongoClient seam) so the
+// teardown is unit-testable with a fake client.
+const isSystemCollection = (n) => SYSTEM_DBS.has(n) || String(n).startsWith('system.');
+export async function mongoTeardown({ client, tenantId, databaseNames }) {
+  const dropped = [];
+  const retained = [];
+  const errors = [];
+  for (const name of (databaseNames ?? []).filter(Boolean)) {
+    try {
+      const db = client.db(name);
+      const cols = (await db.listCollections().toArray())
+        .filter((x) => x.type === 'collection' && !isSystemCollection(x.name));
+      // 1. Delete THIS tenant's documents from every non-system collection.
+      for (const x of cols) {
+        await db.collection(x.name).deleteMany({ tenantId });
+      }
+      // 2. Drop the db only if no other tenant's documents remain anywhere in it.
+      let remaining = 0;
+      for (const x of cols) {
+        remaining += await db.collection(x.name).countDocuments({});
+        if (remaining > 0) break;
+      }
+      if (remaining === 0) {
+        await db.dropDatabase();
+        dropped.push(name);
+      } else {
+        // Another tenant still has data in this shared db — retain it (we removed
+        // only the purged tenant's documents). NEVER drop (cross-tenant safety).
+        retained.push(name);
+      }
+    } catch (e) {
+      errors.push({ database: name, error: String(e?.message ?? e) });
+    }
+  }
+  return { dropped, retained, errors };
 }
 
 export const MONGO_HANDLERS = {
