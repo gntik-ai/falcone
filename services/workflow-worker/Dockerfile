@@ -42,20 +42,45 @@ COPY --from=build /app/services/workflow-worker/dist ./dist
 # webhook-subscription.mjs itself imports from event-catalogue.mjs in the same directory.
 COPY services/webhook-engine/src /app/services/webhook-engine/src
 
-# worker-deps.mjs (fix-flows-worker-db-activity-wiring / #563) dynamically imports the
-# postgres executor (apps/control-plane/src/runtime/) and its plan-builder adapter
-# (services/adapters/src/). These paths must be reachable relative to dist/worker.js:
-#   dist/worker.js  →  ../../../apps/control-plane/src/runtime/*.mjs   ✓
+# worker-deps.mjs::wireActivityDeps (fix-flows-worker-db-activity-wiring / #563, extended
+# by the llm.complete activity #640 and the BYOK confinement #659) dynamically imports a
+# set of apps/control-plane runtime modules + the internal-contracts transport-security
+# helper at boot. Every one of those modules must be reachable relative to dist/worker.js
+# (which dynamic-imports dist/worker-deps.mjs, whose ../../../... specifiers resolve from
+# /app/services/workflow-worker/dist → repo root maps to /app):
+#   dist/worker-deps.mjs → ../../../apps/control-plane/src/runtime/*.mjs              ✓
+#     postgres-data-executor.mjs                                                       (data activity)
+#     connection-registry.mjs, workspace-dsn-resolver.mjs                             (workspace DSN routing)
+#     llm-executor.mjs        (#640 llm.complete activity)                            ← was missing → #660
+#     byok-provider-guard.mjs (#659 BYOK secret/SSRF confinement, imported by         ← was missing → #660
+#                              llm-executor.mjs and pulled in by worker-deps.mjs)
 #   apps/control-plane/src/runtime/postgres-data-executor.mjs imports:
-#       ../../../../services/adapters/src/postgresql-data-api.mjs     ✓
+#       ../../../../services/adapters/src/postgresql-data-api.mjs                      ✓
+#   dist/worker-deps.mjs → ../../../services/internal-contracts/src/
+#       transport-security.mjs  (#645 withPostgresSsl)                                 ← was missing → #660
+# A missing module here is a runtime ERR_MODULE_NOT_FOUND crash-loop (#660); the
+# resolution guard below turns any future omission into a build failure instead.
 COPY apps/control-plane/src/runtime/connection-registry.mjs \
      apps/control-plane/src/runtime/postgres-data-executor.mjs \
      apps/control-plane/src/runtime/workspace-dsn-resolver.mjs \
+     apps/control-plane/src/runtime/llm-executor.mjs \
+     apps/control-plane/src/runtime/byok-provider-guard.mjs \
      apps/control-plane/src/runtime/errors.mjs \
      /app/apps/control-plane/src/runtime/
 COPY services/adapters/src/postgresql-data-api.mjs \
      services/adapters/src/postgresql-governance-admin.mjs \
      /app/services/adapters/src/
+COPY services/internal-contracts/src/transport-security.mjs \
+     /app/services/internal-contracts/src/
+
+# Build-time module-completeness guard (#660; mirrors the route-module check in
+# deploy/kind/control-plane/Dockerfile for fix-scheduling-handler-dockerfile). The COPY
+# allow-list above has drifted from worker-deps.mjs::wireActivityDeps three times (#640,
+# #645, #659), each time crash-looping the worker at boot with ERR_MODULE_NOT_FOUND.
+# This step parses the SHIPPED dist/worker-deps.mjs for every relative `.mjs` specifier it
+# dynamicImport()s, resolves each against the dist dir exactly as Node will at runtime, and
+# fails the build if any are absent — converting a runtime crash-loop into a build error.
+RUN node --input-type=module -e "import { readFileSync, existsSync } from 'node:fs'; import { resolve, dirname } from 'node:path'; const distDir = '/app/services/workflow-worker/dist'; const src = readFileSync(resolve(distDir, 'worker-deps.mjs'), 'utf8'); const specs = [...src.matchAll(/dynamicImport\(\s*[\x27\x22]([^\x27\x22]+)[\x27\x22]/g)].map((m) => m[1]).filter((s) => s.startsWith('.') && s.endsWith('.mjs')); const missing = specs.filter((s) => !existsSync(resolve(distDir, s))); if (missing.length) { console.error('[worker-image-guard] worker-deps.mjs dynamic-imports modules not copied into the image (#660): ' + missing.join(', ')); process.exit(1); } console.log('[worker-image-guard] OK: ' + specs.length + ' dynamic-imported runtime module(s) present');"
 
 ENV NODE_ENV=production \
     TEMPORAL_ADDRESS=temporal-frontend:7233 \
