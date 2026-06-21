@@ -19,8 +19,8 @@
 //     LSN to keep the connection alive without advancing the cursor past unpersisted data.
 //
 // Emits:
-//   'change' → { lsn, operationType, database, collection, collectionId, tenantId, documentId,
-//                fullDocument, fullDocumentBeforeChange }
+//   'change' → { lsn, operationType, database, collection, collectionId, tenantId, workspaceId,
+//                documentId, fullDocument, fullDocumentBeforeChange }
 //   'error'  → Error (connection / decode failures; the client keeps retrying unless stopped)
 //
 // For consumers that need strict ordering + backpressure (the CDC bridge must publish + persist +
@@ -167,6 +167,7 @@ export class WalReplicationClient extends EventEmitter {
       collection: collection.collectionName,
       collectionId: decoded.collectionId,
       tenantId: decoded.tenantId,
+      workspaceId: decoded.workspaceId,
       documentId: decoded.documentId,
       fullDocument: decoded.fullDocument,
       fullDocumentBeforeChange: decoded.fullDocumentBeforeChange

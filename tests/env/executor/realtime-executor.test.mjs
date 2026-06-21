@@ -92,6 +92,44 @@ test('a tenant-scoped WAL subscription delivers the caller tenant changes and NO
   assert.equal(del.document?.tenantId, TEN_A, 'delete carries the prior tenant-A document')
 })
 
+test('two workspaces of the SAME tenant sharing db+collection do not cross-receive changes (#688)', async () => {
+  // Same tenant, same database, same collection name — only the workspaceId differs. A change
+  // written in workspace B must NOT reach workspace A's subscriber (and vice-versa).
+  const WS_1 = 'ws_rt_same_1'
+  const WS_2 = 'ws_rt_same_2'
+  const eventsW1 = []
+  const eventsW2 = []
+  const c1 = new AbortController()
+  const c2 = new AbortController()
+  const sub1 = await realtime.subscribe({
+    workspaceId: WS_1, databaseName: DB, collectionName: COLL,
+    identity: { tenantId: TEN_A, workspaceId: WS_1 }, signal: c1.signal,
+    onChange: (e) => eventsW1.push(e)
+  })
+  const sub2 = await realtime.subscribe({
+    workspaceId: WS_2, databaseName: DB, collectionName: COLL,
+    identity: { tenantId: TEN_A, workspaceId: WS_2 }, signal: c2.signal,
+    onChange: (e) => eventsW2.push(e)
+  })
+  await delay(600)
+
+  // One write in each workspace (same tenant, same db+collection).
+  await dataExec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_A, workspaceId: WS_1 }, operation: 'insert', payload: { document: { _id: 'rt-w1', body: 'w-one' } } })
+  await dataExec.executeMongoData({ databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_A, workspaceId: WS_2 }, operation: 'insert', payload: { document: { _id: 'rt-w2', body: 'w-two' } } })
+
+  const deadline = Date.now() + 8000
+  while (Date.now() < deadline && !(eventsW1.some((e) => e.documentId === 'rt-w1') && eventsW2.some((e) => e.documentId === 'rt-w2'))) await delay(150)
+  c1.abort(); c2.abort()
+  await sub1.close(); await sub2.close()
+
+  const ids1 = eventsW1.map((e) => e.documentId)
+  const ids2 = eventsW2.map((e) => e.documentId)
+  assert.ok(ids1.includes('rt-w1'), 'workspace 1 subscriber receives its own change')
+  assert.ok(!ids1.includes('rt-w2'), 'workspace 1 subscriber does NOT receive workspace 2 change')
+  assert.ok(ids2.includes('rt-w2'), 'workspace 2 subscriber receives its own change')
+  assert.ok(!ids2.includes('rt-w1'), 'workspace 2 subscriber does NOT receive workspace 1 change')
+})
+
 test('subscribe without tenant identity → 401', async () => {
   await assert.rejects(
     () => realtime.subscribe({ workspaceId: WS_A, databaseName: DB, collectionName: COLL, identity: {}, onChange() {} }),
