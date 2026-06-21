@@ -553,6 +553,10 @@ async function saForCredential(ctx) {
 async function issueCredential(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
   const r = await saForCredential(ctx); if (r.error) return r.error;
+  // A revoked SA's Keycloak client is disabled (fix-sa-credential-revocation-invalidate-tokens, #684),
+  // so any secret returned here could never obtain a token (client_credentials → 401 invalid_client).
+  // Reject explicitly instead of returning a misleading 201 carrying an unusable secret (#685).
+  if (r.sa.status === 'revoked') return err(409, 'CREDENTIAL_REVOKED', 'service account credential is revoked; re-create the service account to issue a new credential');
   const secret = await kc.getClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
   return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
     clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${kc.base}/realms/${r.sa.iam_realm}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
@@ -565,6 +569,10 @@ async function issueCredential(ctx) {
 async function rotateCredential(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin; const st = ctx.store ?? store;
   const r = await saForCredential(ctx); if (r.error) return r.error;
+  // Rotating a revoked SA is meaningless: its client is disabled, so the regenerated secret is unusable.
+  // Reject with the same explicit conflict as issuance instead of a misleading 201 (#685). Re-revoking a
+  // revoked SA stays idempotent because this guard lives ONLY in issue/rotate, not in revokeCredential.
+  if (r.sa.status === 'revoked') return err(409, 'CREDENTIAL_REVOKED', 'service account credential is revoked; re-create the service account to issue a new credential');
   const secret = await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
   await st.markServiceAccountCredentialsInvalidated(ctx.pool, r.sa.id);
   return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
