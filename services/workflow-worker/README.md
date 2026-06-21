@@ -100,13 +100,24 @@ resource theft. Asserted by `tests/blackbox/flow-activity-workspace-binding.test
 | `task`      | `executeActivity('executeTask', { activityId, retry, ... })` |
 | `branch`    | `evaluateExpression` activity per arm; route first truthy / default |
 | `wait`      | `sleep(<ISO-8601 duration>)` durable timer                   |
-| `approval`  | `setHandler(approvalSignal)`; race signal vs `sleep(timeout)`|
+| `approval`  | `setHandler(approvalSignal)`; `condition(signalReceived, timeout)` (no-timeout: `condition(signalReceived)`) |
 | `sub-flow`  | `executeChild(DslInterpreterWorkflow)` inside a `CancellationScope` |
 
 Per-task `retryPolicy` is mapped verbatim (`src/shared/mapping.ts`):
 `maxAttempts → maximumAttempts`, `backoffCoefficient`, `initialInterval`,
 `maximumInterval`, `nonRetryableErrors → nonRetryableErrorTypes`, and the
 `timeouts.*` fields → the matching `ActivityOptions.*Timeout`.
+
+### Approval node cancellation semantics
+
+An `approval` node parks the run until the `flowApproval` signal arrives or the optional
+`timeout` elapses. Cancelling the execution while it is parked on an approval node terminates
+the run as **`Cancelled`** — it is never reinterpreted as a timeout. The timed wait uses
+Temporal's built-in `condition(predicate, timeout)`, which manages the durable timer and lets an
+external `CancelledFailure` propagate; the interpreter records **no** fabricated approval outcome
+for a cancelled node (i.e. it does not write `{approved:false, timedOut:true}`). Legitimate
+outcomes are unchanged: a real timeout records `{approved:false, timedOut:true}` and completes,
+and an approval signal records `{approved, timedOut:false}` and completes.
 
 ## Determinism
 
