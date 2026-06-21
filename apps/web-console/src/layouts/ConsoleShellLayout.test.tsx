@@ -343,9 +343,13 @@ describe('ConsoleShellLayout', () => {
     const requestInit = logoutCall?.[1]
     const headers = requestInit?.headers as Headers
 
+    expect(requestInit?.method).toBe('DELETE')
     expect(headers.get('Authorization')).toBe('Bearer access-token-1234567890')
     expect(headers.get('X-API-Version')).toBe('2026-03-26')
     expect(headers.get('Idempotency-Key')).toMatch(/^idem_/)
+    // #667: logout must carry the session refresh token so the control plane can
+    // revoke it at Keycloak and end the SSO session (otherwise logout is a no-op).
+    expect(requestInit?.body).toBe(JSON.stringify({ refreshToken: 'refresh-token-1234567890' }))
   })
 })
 
