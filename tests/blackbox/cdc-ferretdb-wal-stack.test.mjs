@@ -155,7 +155,8 @@ test('bbx-cdc-wal-05: WalBsonDecoder maps insert/update/delete tuples incl. the 
   const HEX_N9 = 'BSONHEX29000000025f696400030000006431000274656e616e7449640003000000743100106e000900000000'; // {_id:'d1',tenantId:'t1',n:9}
 
   const ins = decodeWalMessage({ tag: 'insert', relation: rel('documents_2'), new: { document: HEX_N5 } });
-  assert.deepEqual(ins, { walOp: 'insert', collectionId: 2, documentId: 'd1', tenantId: 't1', fullDocument: { _id: 'd1', tenantId: 't1', n: 5 }, fullDocumentBeforeChange: null });
+  // workspaceId is part of the decoded record (#688); this fixture doc has none → null.
+  assert.deepEqual(ins, { walOp: 'insert', collectionId: 2, documentId: 'd1', tenantId: 't1', workspaceId: null, fullDocument: { _id: 'd1', tenantId: 't1', n: 5 }, fullDocumentBeforeChange: null });
 
   const upd = decodeWalMessage({ tag: 'update', relation: rel('documents_2'), old: { document: HEX_N5 }, new: { document: HEX_N9 } });
   assert.equal(upd.walOp, 'update');
