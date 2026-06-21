@@ -45,8 +45,14 @@ it), `b-handlers.mjs` (tenant + user lifecycle), `auth-handlers.mjs` (console
 login). Proven end-to-end through the gateway with a real superadmin JWT:
 
 - `POST /v1/tenants` → creates a Keycloak realm + the 11 standard realm roles +
+  a public `<slug>-app` client (ROPC + auth-code, an un-forgeable `tenant_id` claim) +
   an owner user + a DB record (+ optional plan assignment); compensating cleanup
-  on failure. `GET /v1/tenants`, `GET /v1/tenants/{id}`.
+  on failure. `GET /v1/tenants`, `GET /v1/tenants/{id}`. The `<slug>-app` client's
+  redirect-URI / web-origin allow-list is NON-wildcard and deployment-configured via
+  `TENANT_APP_REDIRECT_URIS` / `TENANT_APP_WEB_ORIGINS` (comma-separated; `+` web-origin =
+  "origins of the registered redirect URIs"), and PKCE (`S256`) is enabled — so the
+  authorization endpoint rejects a foreign `redirect_uri` (auth-code interception hardening,
+  #670). A wildcard (`*`) entry is ignored; when unset the defaults are still non-wildcard.
 - `POST /v1/tenants/{id}/users` (create user in the tenant realm + assign realm
   roles), `GET /v1/tenants/{id}/users`.
 - `POST /v1/tenants/{id}/workspaces` (workspace record), `GET /v1/workspaces`,
