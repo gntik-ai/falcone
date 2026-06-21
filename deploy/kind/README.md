@@ -63,7 +63,11 @@ login). Proven end-to-end through the gateway with a real superadmin JWT:
   (the client secret). Verified: the issued credential authenticates via
   `grant_type=client_credentials` against Keycloak (→ 200, a real machine token).
 - `POST /v1/auth/login-sessions` (ROPC login → the SPA's ConsoleLoginSession),
-  `.../refresh`, `DELETE .../{id}` (logout), `GET /v1/auth/signups/policy`.
+  `.../refresh`, `DELETE .../{id}` (logout), `GET /v1/auth/signups/policy`,
+  `POST /v1/auth/signups` (self-service registration). The signup minimum password length
+  is `CONSOLE_SIGNUP_PASSWORD_MIN_LENGTH` (default `8`); it is BOTH advertised by the policy
+  endpoint AND enforced by signup (sub-minimum → 400, no user created), and fails closed to
+  `8` if unset/invalid — it can never disable enforcement (#669).
 
 Full lifecycle verified: create tenant → create+activate plan → assign plan →
 set resource limit → create user → the tenant's effective entitlements reflect
