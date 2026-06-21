@@ -21,7 +21,8 @@ import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
-import { createJwtVerifier } from './jwt-verify.mjs';
+import { createJwtVerifier, deriveRealmTopology } from './jwt-verify.mjs';
+import { createSaRevocationCheck } from './sa-revocation.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
 import { withPostgresSsl, resolveKafkaSecurity } from '../../../../services/internal-contracts/src/transport-security.mjs';
 // Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
@@ -172,10 +173,33 @@ const functionsExecutor = process.env.FN_BACKEND === 'off' ? undefined : createF
 // Bearer-JWT verifier (Keycloak/OIDC). Enabled when KEYCLOAK_JWKS_URL is set; lets the
 // executor authenticate admin/user requests directly (e.g. API-key issuance) without the
 // gateway injecting x-tenant-id. Unset → the executor trusts gateway-injected identity headers.
+// Service-account revocation/rotation propagation (fix-sa-credential-revocation-invalidate-tokens,
+// #684), parity with the kind control-plane. After offline JWT validation, reject any service-account
+// access token whose credential was revoked or rotated. The check reads the `service_accounts` table
+// on keyPool (the same `in_falcone` platform DB the kind CP owns the table in) and caches per-client-
+// id lookups for SA_REVOCATION_CACHE_MS — also the propagation-window upper bound (default 10000 →
+// ≤10s; 0 = immediate). Non-SA (user/owner) tokens never reach the DB (pre-filtered on `sa-` prefix).
+// Env parse that treats unset/blank as "use the default" (Number('') === 0 would silently disable the
+// cache); only an explicit finite number overrides.
+const saNumEnv = (v, dflt) => (v == null || v === '' || !Number.isFinite(Number(v)) ? dflt : Number(v));
+const saRevocationCacheMs = saNumEnv(process.env.SA_REVOCATION_CACHE_MS, 10_000);
+const saRevocationSkewSec = saNumEnv(process.env.SA_REVOCATION_SKEW_SEC, 1);
+// Same Keycloak realm topology the verifier derives — used to scope the revocation lookup by the
+// realm (== tenant id) from the verified issuer, so a non-globally-unique SA client id cannot resolve
+// another tenant's row.
+const { realmsBase: saRealmsBase, platformRealm: saPlatformRealm } =
+  deriveRealmTopology(process.env.KEYCLOAK_ISSUER, process.env.KEYCLOAK_JWKS_URL);
 const jwtVerifier = createJwtVerifier({
   jwksUrl: process.env.KEYCLOAK_JWKS_URL,
   issuer: process.env.KEYCLOAK_ISSUER,
   audience: process.env.KEYCLOAK_AUDIENCE,
+  revocationCheck: createSaRevocationCheck({
+    pool: keyPool,
+    realmsBase: saRealmsBase,
+    platformRealm: saPlatformRealm,
+    cacheMs: saRevocationCacheMs,
+    skewSec: saRevocationSkewSec,
+  }),
 });
 
 // Flow executor (Temporal-backed flows API). Enabled ONLY when TEMPORAL_ADDRESS is configured;

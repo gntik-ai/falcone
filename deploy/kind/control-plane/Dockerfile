@@ -16,7 +16,7 @@ RUN npm install --omit=dev --no-audit --no-fund \
 
 # Server source + domain-B modules + the verified runtime route table.
 COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
-     deploy/kind/control-plane/jwt-verify.mjs \
+     deploy/kind/control-plane/jwt-verify.mjs deploy/kind/control-plane/sa-revocation.mjs \
      deploy/kind/control-plane/kc-admin.mjs deploy/kind/control-plane/tenant-store.mjs \
      deploy/kind/control-plane/b-handlers.mjs deploy/kind/control-plane/auth-handlers.mjs \
      deploy/kind/control-plane/saga.mjs deploy/kind/control-plane/dataplane.mjs \
