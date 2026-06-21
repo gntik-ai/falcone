@@ -197,9 +197,18 @@ async function mongoDocuments(ctx) {
   const limit = Number(ctx.query['page[size]'] ?? 20) || 20;
   const skip = ctx.query['page[after]'] ? Number(ctx.query['page[after]']) || 0 : 0;
   const c = await mc(ctx);
-  // Documents are isolated ONLY by the `tenantId` field (one shared FerretDB
-  // cluster) — scope every read to the workspace's owning tenant (P0 ISO-MONGO).
-  const docs = await c.db(db).collection(col).find({ tenantId: ws.tenant_id }).skip(skip).limit(limit).toArray();
+  // This route is WORKSPACE-addressed (/v1/mongo/workspaces/{workspaceId}/...), and the
+  // document plane is scoped per workspace WITHIN the tenant: the data-API write path stamps
+  // BOTH `tenantId` AND `workspaceId` on every document (services/adapters mongodb-data-api
+  // applyTenantScopeToFilter, #632). Scoping by tenantId ALONE would leak a sibling
+  // workspace's (and stage's) documents to this workspace's browser (#661, the console tail of
+  // #632). Filter by BOTH — using `ws.id`, the canonical workspace UUID the documents carry,
+  // not the raw path param (which getWorkspace also resolves from a slug). Documents predating
+  // the workspace stamping (no `workspaceId` field) are correctly excluded: an unattributable
+  // doc cannot be shown as belonging to a workspace (matches the canonical adapter).
+  const docs = await c.db(db).collection(col)
+    .find({ tenantId: ws.tenant_id, workspaceId: ws.id })
+    .skip(skip).limit(limit).toArray();
   const hasMore = docs.length === limit;
   return ok(200, { items: docs.map(jsonSafe), page: { after: hasMore ? String(skip + docs.length) : null, size: docs.length } });
 }
