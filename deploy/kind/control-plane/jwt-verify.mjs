@@ -40,6 +40,11 @@ export function deriveRealmTopology(issuer, jwksUrl) {
 // Returns a verifier { verify(token) -> { payload, trust } }. `trust` is
 // { kind: 'platform'|'tenant'|'legacy', realm? } where `realm` (the verified tenant id) is set only
 // for tenant-realm tokens.
+// `revocationCheck` (fix-sa-credential-revocation-invalidate-tokens, #684): an OPTIONAL async hook
+// `(claims) => boolean` run AFTER all offline validation passes. Returning true rejects the token
+// (its underlying credential was revoked/rotated). Default undefined = no-op → fully back-compatible
+// (offline-only verification, every existing test unchanged). It is the verifier's only statefulness
+// and only fires for service-account tokens (the hook itself pre-filters non-SA tokens, no DB hit).
 export function createMultiRealmVerifier({
   jwksUrl,
   issuer = null,
@@ -48,6 +53,7 @@ export function createMultiRealmVerifier({
   clockToleranceSec = 60,
   cacheMs = 300_000,
   allowTenantRealms = true,
+  revocationCheck = undefined,
   now = () => Date.now(),
 } = {}) {
   const { realmsBase, platformRealm } = deriveRealmTopology(issuer, jwksUrl);
@@ -126,6 +132,10 @@ export function createMultiRealmVerifier({
         const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
         if (!aud.includes(audience)) throw new Error('audience mismatch');
       }
+      // Stateful revocation/rotation cutoff: offline validation cannot see that a service-account
+      // credential was revoked or rotated. The injected hook (DB-backed, SA-only) decides; a true
+      // result rejects the otherwise-valid token. Non-SA tokens are skipped inside the hook.
+      if (revocationCheck && await revocationCheck(claims)) throw new Error('credential revoked');
       return { payload: claims, trust };
     },
   };

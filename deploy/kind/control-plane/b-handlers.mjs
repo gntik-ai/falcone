@@ -502,10 +502,11 @@ async function deleteWorkspace(ctx) {
 
 // ---- service accounts (= confidential Keycloak client in the tenant realm) --
 async function resolveWorkspaceForManage(ctx) {
-  const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
+  const st = ctx.store ?? store;
+  const ws = await st.getWorkspace(ctx.pool, ctx.params.workspaceId);
   if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   if (!canManageTenantId(ctx.identity, ws.tenant_id)) return { error: err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin') };
-  const tenant = await store.getTenant(ctx.pool, ws.tenant_id);
+  const tenant = await st.getTenant(ctx.pool, ws.tenant_id);
   if (!tenant?.iam_realm) return { error: err(409, 'NO_REALM', 'tenant has no IAM realm') };
   return { ws, realm: tenant.iam_realm };
 }
@@ -542,31 +543,45 @@ async function listServiceAccountsHandler(ctx) {
   return ok(200, await store.listServiceAccounts(ctx.pool, r.ws.id));
 }
 async function saForCredential(ctx) {
+  const st = ctx.store ?? store;
   const r = await resolveWorkspaceForManage(ctx); if (r.error) return { error: r.error };
-  const sa = await store.getServiceAccount(ctx.pool, ctx.params.serviceAccountId);
+  const sa = await st.getServiceAccount(ctx.pool, ctx.params.serviceAccountId);
   if (!sa || sa.workspace_id !== r.ws.id) return { error: err(404, 'SA_NOT_FOUND', 'service account not found') };
   return { sa };
 }
 // POST /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance
 async function issueCredential(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin;
   const r = await saForCredential(ctx); if (r.error) return r.error;
-  const secret = await kcAdmin.getClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
+  const secret = await kc.getClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
   return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
-    clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${kcAdmin.base}/realms/${r.sa.iam_realm}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
+    clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${kc.base}/realms/${r.sa.iam_realm}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
 }
 // POST .../credential-rotations
+// Rotating the secret blocks NEW client_credentials grants with the old secret. To also cut off
+// access tokens already minted from the pre-rotation secret (fix-sa-credential-revocation-invalidate-
+// tokens, #684), stamp the SA's revocation cutoff so the auth path's not-before check rejects them
+// within the bounded propagation window. Previously this handler touched NO DB row.
 async function rotateCredential(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin; const st = ctx.store ?? store;
   const r = await saForCredential(ctx); if (r.error) return r.error;
-  const secret = await kcAdmin.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
+  const secret = await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
+  await st.markServiceAccountCredentialsInvalidated(ctx.pool, r.sa.id);
   return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
     clientId: r.sa.kc_client_id, clientSecret: secret, rotatedAt: new Date().toISOString() });
 }
 // POST .../credential-revocations
+// In addition to disabling the Keycloak client + regenerating its secret + flipping PG status, stamp
+// the revocation cutoff (fix-sa-credential-revocation-invalidate-tokens, #684) so already-issued
+// access tokens (which offline JWT verification would otherwise accept until their natural expiry)
+// are rejected by the auth path's not-before check within the bounded propagation window.
 async function revokeCredential(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin; const st = ctx.store ?? store;
   const r = await saForCredential(ctx); if (r.error) return r.error;
-  await kcAdmin.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid); // invalidate the old secret
-  await kcAdmin.setClientEnabled(r.sa.iam_realm, r.sa.kc_client_uuid, false);
-  await store.setServiceAccountStatus(ctx.pool, r.sa.id, 'revoked');
+  await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid); // invalidate the old secret
+  await kc.setClientEnabled(r.sa.iam_realm, r.sa.kc_client_uuid, false);
+  await st.setServiceAccountStatus(ctx.pool, r.sa.id, 'revoked');
+  await st.markServiceAccountCredentialsInvalidated(ctx.pool, r.sa.id);
   return ok(200, { serviceAccountId: r.sa.id, status: 'revoked', revokedAt: new Date().toISOString() });
 }
 
