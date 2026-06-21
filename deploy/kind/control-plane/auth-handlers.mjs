@@ -11,6 +11,15 @@ const KC_BASE = (process.env.KEYCLOAK_BASE_URL || 'http://falcone-keycloak:8080'
 const REALM = process.env.CONSOLE_AUTH_REALM || 'in-falcone-platform';
 const CLIENT = process.env.CONSOLE_AUTH_CLIENT_ID || 'in-falcone-console';
 const SELF_SERVICE = (process.env.CONSOLE_SIGNUP_SELF_SERVICE ?? 'true') === 'true';
+// Self-service signup minimum password length. Single source of truth for the
+// value advertised by signupPolicy AND enforced by signup (no drift, #669).
+// Fail-closed to 8 on missing/invalid config: if CONSOLE_SIGNUP_PASSWORD_MIN_LENGTH
+// is unset or garbage, Number(...) is NaN and `length < NaN` is always false, which
+// would silently DISABLE enforcement (fail-open) — so we fall back to 8, never NaN.
+const SIGNUP_PASSWORD_MIN_LENGTH = (() => {
+  const n = Number(process.env.CONSOLE_SIGNUP_PASSWORD_MIN_LENGTH);
+  return Number.isInteger(n) && n > 0 ? n : 8;
+})();
 const ok = (statusCode, body) => ({ statusCode, body });
 const errBody = (statusCode, code, message) => ({ statusCode, body: { code, message, statusView: 'login' } });
 
@@ -125,7 +134,7 @@ async function signupPolicy() {
     selfServiceEnabled: SELF_SERVICE,
     mode: SELF_SERVICE ? 'self_service' : 'invitation',
     statusView: 'signup',
-    passwordPolicy: { minLength: 8 },
+    passwordPolicy: { minLength: SIGNUP_PASSWORD_MIN_LENGTH },
     message: SELF_SERVICE ? 'Self-service signup is enabled.' : 'Signup is invitation-only in this deployment.'
   });
 }
@@ -143,6 +152,13 @@ async function signup(ctx) {
   if (!SELF_SERVICE) return errBody(403, 'SIGNUP_DISABLED', 'Self-service signup is disabled');
   const username = body.username ?? body.primaryEmail;
   if (!username || !body.password) return errBody(400, 'VALIDATION_ERROR', 'username and password are required');
+  // Enforce the advertised minimum password length BEFORE the tenant lookup /
+  // kc.createUser, so a sub-minimum password creates NO Keycloak user and NO DB
+  // side effect. The advertised value (signupPolicy) and this enforced value share
+  // SIGNUP_PASSWORD_MIN_LENGTH, so they cannot drift (#669).
+  if (String(body.password).length < SIGNUP_PASSWORD_MIN_LENGTH) {
+    return errBody(400, 'VALIDATION_ERROR', `password must be at least ${SIGNUP_PASSWORD_MIN_LENGTH} characters`);
+  }
   if (!body.tenantId) return errBody(400, 'VALIDATION_ERROR', 'tenantId is required');
 
   // Resolve the tenant and obtain its iam_realm (realm-per-tenant model).
