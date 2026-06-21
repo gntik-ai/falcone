@@ -48,7 +48,7 @@ export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
 // Derive the Keycloak realms base (".../realms/") and the platform realm name from whichever of
 // the issuer or the JWKS certs URL is shaped like a Keycloak realm endpoint. Returns nulls when
 // neither is realm-shaped (legacy single-key mode, e.g. a bare JWKS URL).
-function deriveRealmTopology(issuer, jwksUrl) {
+export function deriveRealmTopology(issuer, jwksUrl) {
   const fromIssuer = typeof issuer === 'string' && /^(.*\/realms\/)([^/]+)$/.exec(issuer);
   if (fromIssuer) return { realmsBase: fromIssuer[1], platformRealm: fromIssuer[2] };
   const fromJwks = typeof jwksUrl === 'string'
@@ -59,6 +59,11 @@ function deriveRealmTopology(issuer, jwksUrl) {
 
 // Returns a verifier { verify(token, pathWorkspaceId) -> identity } or undefined when no
 // jwksUrl is configured (the executor then falls back to gateway-injected identity headers).
+// `revocationCheck` (fix-sa-credential-revocation-invalidate-tokens, #684): an OPTIONAL async hook
+// `(claims) => boolean` run AFTER all offline validation passes. Returning true rejects the token
+// (its underlying credential was revoked/rotated). Default undefined = no-op → fully back-compatible
+// (offline-only verification, every existing test unchanged). It is the verifier's only statefulness
+// and only fires for service-account tokens (the hook itself pre-filters non-SA tokens, no DB hit).
 export function createJwtVerifier({
   jwksUrl,
   issuer,
@@ -67,6 +72,7 @@ export function createJwtVerifier({
   clockToleranceSec = 60,
   cacheMs = 300_000,
   allowTenantRealms = true,
+  revocationCheck = undefined,
   now = () => Date.now(),
 } = {}) {
   if (!jwksUrl) return undefined;
@@ -144,6 +150,11 @@ export function createJwtVerifier({
         const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
         if (!aud.includes(audience)) throw new Error('audience mismatch');
       }
+      // Stateful revocation/rotation cutoff (parity with deploy/kind/control-plane/jwt-verify.mjs):
+      // offline validation cannot see a revoked/rotated SA credential. The injected hook (DB-backed,
+      // SA-only) decides; a true result rejects the otherwise-valid token. Non-SA tokens are skipped
+      // inside the hook (no DB hit), so user/owner authentication is unaffected.
+      if (revocationCheck && await revocationCheck(claims)) throw new Error('credential revoked');
 
       const identity = deriveIdentityFromClaims(claims, pathWorkspaceId);
       // For a tenant realm the tenant id IS the realm name, taken from the verified issuer — it

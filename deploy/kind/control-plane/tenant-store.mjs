@@ -53,6 +53,32 @@ export async function ensureSchema(pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_by TEXT
     )`);
+  // Revocation propagation cutoff (fix-sa-credential-revocation-invalidate-tokens, #684):
+  // a "not-before" watermark for the SA's already-issued access tokens. Set to NOW() when the
+  // credential is revoked OR its secret is rotated; the auth path then rejects any presented SA
+  // token whose `iat` predates this watermark (bounded by a short cache TTL). Additive backfill
+  // on pre-existing tables (mirrors the `environment` column precedent above).
+  await pool.query('ALTER TABLE service_accounts ADD COLUMN IF NOT EXISTS credentials_invalidated_at TIMESTAMPTZ');
+  // The auth-path revocation check resolves the SA by (iam_realm, kc_client_id) — the client id alone
+  // is NOT globally unique (`sa-<ws-slug>-<name>` collides across tenants since the workspace slug is
+  // only UNIQUE per tenant), so it must be scoped by the realm to avoid resolving another tenant's row
+  // (a cross-tenant breach). Index that composite pair so the per-request check is a single-row index
+  // probe, not a sequential scan. Defense-in-depth: make it UNIQUE — within a realm the client id is
+  // already unique (createServiceAccount 409s on a per-realm findClient), so this codifies the
+  // invariant. On a pre-existing table that somehow holds a legacy duplicate, a UNIQUE index would
+  // throw at boot and crash the control-plane, so we fall back to a NON-unique composite index there
+  // (the auth read's ORDER BY created_at DESC LIMIT 1 stays a safe backstop either way).
+  try {
+    await pool.query(
+      'CREATE UNIQUE INDEX IF NOT EXISTS service_accounts_realm_client_id_uidx ON service_accounts (iam_realm, kc_client_id)');
+  } catch (e) {
+    if (e?.code === '23505') {
+      await pool.query(
+        'CREATE INDEX IF NOT EXISTS service_accounts_realm_client_id_idx ON service_accounts (iam_realm, kc_client_id)');
+    } else {
+      throw e;
+    }
+  }
   // ---- data plane: one provisioned database per workspace ------------------
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workspace_databases (
@@ -529,6 +555,29 @@ export async function listServiceAccounts(pool, workspaceId) {
 }
 export async function setServiceAccountStatus(pool, id, status) {
   await pool.query('UPDATE service_accounts SET status=$2 WHERE id=$1', [id, status]);
+}
+// Stamp the revocation-propagation cutoff for a SA (fix-sa-credential-revocation-invalidate-tokens,
+// #684). Called on credential revoke AND rotate so every access token minted before NOW() is then
+// rejected by the auth path's not-before check. NOW() is the database clock — the same source the
+// cutoff is compared against, so it is independent of any control-plane replica's wall clock.
+export async function markServiceAccountCredentialsInvalidated(pool, id) {
+  await pool.query('UPDATE service_accounts SET credentials_invalidated_at = NOW() WHERE id = $1', [id]);
+}
+// Auth-path read for the SA revocation check (fix-sa-credential-revocation-invalidate-tokens, #684):
+// resolve a SA by its Keycloak client id (the token's `azp`) AND its realm (== tenant id, taken from
+// the verified token issuer) to its revocation-relevant state. Returns { status,
+// credentials_invalidated_at } or null when no such SA exists (e.g. a non-SA token, or an unknown
+// client). kc_client_id is NOT globally unique — `sa-<ws-slug>-<name>` collides across tenants because
+// the workspace slug is only `UNIQUE (tenant_id, slug)` — so the realm scope is REQUIRED to avoid
+// resolving another tenant's same-named SA (a cross-tenant breach + a way to defeat the check). The
+// (iam_realm, kc_client_id) pair IS unique (createServiceAccount 409s on a per-realm findClient);
+// LIMIT 1 is a defensive backstop for any legacy duplicate.
+export async function getServiceAccountAuthStateByClientId(pool, kcClientId, realm) {
+  const { rows } = await pool.query(
+    `SELECT status, credentials_invalidated_at
+       FROM service_accounts WHERE kc_client_id = $1 AND iam_realm = $2
+      ORDER BY created_at DESC LIMIT 1`, [kcClientId, realm]);
+  return rows[0] ?? null;
 }
 
 export async function slugTaken(pool, slug) {
