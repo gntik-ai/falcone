@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ConsoleCredentialStatusBadge } from '@/components/console/ConsoleCredentialStatusBadge'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import {
+  consoleServiceAccountsErrorMessage,
   createServiceAccount,
   issueServiceAccountCredential,
   revokeServiceAccountCredential,
@@ -23,6 +24,7 @@ export function ConsoleServiceAccountsPage() {
   const { accounts, loading, error, reload, knownIds } = useConsoleServiceAccounts(activeWorkspaceId)
   const [displayName, setDisplayName] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [errorFeedback, setErrorFeedback] = useState<string | null>(null)
   const [issuedCredential, setIssuedCredential] = useState<ConsoleIssuedCredential | null>(null)
   const destructiveOp = useDestructiveOp()
   const session = readConsoleShellSession()
@@ -53,9 +55,17 @@ export function ConsoleServiceAccountsPage() {
   }
 
   async function handleIssue(serviceAccountId: string) {
-    const credential = await issueServiceAccountCredential(workspaceId, serviceAccountId, { requestedByUserId: principalUserId })
-    setIssuedCredential(credential)
-    reload()
+    setErrorFeedback(null)
+    try {
+      const credential = await issueServiceAccountCredential(workspaceId, serviceAccountId, { requestedByUserId: principalUserId })
+      setIssuedCredential(credential)
+      reload()
+    } catch (rawError) {
+      // The control plane rejects issuing a credential for a revoked service account (409
+      // CREDENTIAL_REVOKED). requestConsoleSessionJson throws on any non-2xx, so surface the failure
+      // instead of leaving the rejection silent.
+      setErrorFeedback(consoleServiceAccountsErrorMessage(rawError))
+    }
   }
 
   async function handleRevoke(serviceAccountId: string) {
@@ -78,9 +88,15 @@ export function ConsoleServiceAccountsPage() {
   }
 
   async function handleRotate(serviceAccountId: string) {
-    const credential = await rotateServiceAccountCredential(workspaceId, serviceAccountId, { reason: 'Console rotate' })
-    setIssuedCredential(credential)
-    reload()
+    setErrorFeedback(null)
+    try {
+      const credential = await rotateServiceAccountCredential(workspaceId, serviceAccountId, { reason: 'Console rotate' })
+      setIssuedCredential(credential)
+      reload()
+    } catch (rawError) {
+      // Rotation of a revoked service account is rejected with 409 CREDENTIAL_REVOKED; surface it.
+      setErrorFeedback(consoleServiceAccountsErrorMessage(rawError))
+    }
   }
 
   return (
@@ -98,6 +114,7 @@ export function ConsoleServiceAccountsPage() {
           <Button type="button" onClick={() => void handleCreate()} disabled={writesBlocked || !displayName.trim()}>Crear</Button>
         </div>
         {feedback ? <p className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
+        {errorFeedback ? <p role="alert" className="mt-3 text-sm text-red-700">{errorFeedback}</p> : null}
       </section>
 
       {loading ? <ConsolePageState kind="loading" title="Cargando service accounts" description="Rehidratando las fichas conocidas del workspace." /> : null}
@@ -118,7 +135,12 @@ export function ConsoleServiceAccountsPage() {
               </tr>
             </thead>
             <tbody>
-              {accounts.map((account) => (
+              {accounts.map((account) => {
+                // A revoked credential cannot be re-issued or rotated (the control plane rejects it with
+                // 409 CREDENTIAL_REVOKED); reflect that in the UI by disabling those actions. Revocar stays
+                // available so re-revoking remains an idempotent no-op.
+                const credentialRevoked = account.credentialStatus?.state === 'revoked' || account.accessProjection?.credentialState === 'revoked'
+                return (
                 <tr key={account.serviceAccountId} className="border-b border-border/60">
                   <td className="px-4 py-3">{account.displayName ?? account.serviceAccountId}</td>
                   <td className="px-4 py-3">{account.accessProjection?.clientState ?? account.desiredState ?? 'unknown'}</td>
@@ -127,13 +149,14 @@ export function ConsoleServiceAccountsPage() {
                   <td className="px-4 py-3">{account.expiresAt ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => void handleIssue(account.serviceAccountId)}>Emitir</Button>
+                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleIssue(account.serviceAccountId)}>Emitir</Button>
                       <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => openRevokeDialog(account)}>Revocar</Button>
-                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => void handleRotate(account.serviceAccountId)}>Rotar</Button>
+                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleRotate(account.serviceAccountId)}>Rotar</Button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
