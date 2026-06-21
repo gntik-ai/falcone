@@ -222,7 +222,14 @@ this control-plane serves. To make the shell usable end-to-end:
   (added to the image; `MONGO_*` env via secretKeyRef). Endpoints: list databases
   (system dbs hidden, real `db.stats()`), collections (real counts/sizes/validation),
   collection detail, indexes, views, and documents (skip/limit cursor, BSON made
-  JSON-safe — ObjectId→hex, Date→ISO). `POST /v1/workspaces/{id}/databases` is an
+  JSON-safe — ObjectId→hex, Date→ISO). The **documents** view is workspace-addressed
+  (`/v1/mongo/workspaces/{workspaceId}/data/{db}/collections/{col}/documents`) and is scoped
+  per **workspace within the tenant** (#661): the find filters by BOTH the owning `tenantId`
+  AND the addressed workspace's canonical UUID (matching the data-API write path, which stamps
+  both), so browsing one workspace never returns a sibling workspace's (or stage's) documents of
+  the same tenant — and a cross-tenant workspace is a 404. The list/collection/index/view
+  endpoints are NOT workspace-addressed (no `{workspaceId}` in their routes) and stay
+  tenant-scoped. `POST /v1/workspaces/{id}/databases` is an
   engine-dispatched provisioner (`postgresql`|`mongodb`) — the SPA's
   ProvisionDatabaseWizard target. A `mongodb` provision also records a
   `workspace_mongo_databases` registry row (idempotent) so tenant-purge / workspace-delete can
