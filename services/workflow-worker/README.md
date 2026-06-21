@@ -65,6 +65,32 @@ The interpreter NEVER invokes a task activity without a `TenantContext` (BaaS is
 rule). This change ships only the stub `executeTask`; the real catalog replaces the body
 while keeping the envelope stable.
 
+### Workspace binding — the execution-token workspace is authoritative (#663)
+
+Every first-party activity that touches a workspace-scoped surface — `llm.complete`
+(BYOK provider/key/metering), `db.query` (RLS-scoped data), `events.publish`
+(`evt.<workspaceId>.<topic>`), `functions.invoke` (function lookup) — executes against
+the workspace the **per-execution token is bound to**: `TenantContext.workspaceId`,
+which `src/activities/catalog.mjs::dispatchTask` validates against the execution token
+(`assertExecutionToken`) **before** any registered activity runs.
+
+`params.workspaceId` (the flow author's task `input`, i.e. `node.input`) is **never** a
+legitimate way to choose the workspace. The shared resolver
+`src/activities/workspace-binding.mjs::resolveActivityWorkspaceId(params, tenant)`
+enforces this for all four activities:
+
+- when the token workspace is present (production), it is used; a `params.workspaceId`
+  that **differs** from it is rejected with a **non-retryable `FORBIDDEN`**
+  (`"task input may not override the execution workspace"`). A `params.workspaceId` equal
+  to the token workspace is a harmless no-op.
+- when no token-bound workspace is present (the legacy interpreter graph-walk harness with
+  execution-token enforcement disabled), it falls back to `params.workspaceId`.
+
+Without this, a flow author who controls a task node's `input` could inject
+`workspaceId: <sibling-workspace-B>` (same tenant) and make the task run against
+workspace B's provider/key/quota/data while authenticated as workspace A — cross-workspace
+resource theft. Asserted by `tests/blackbox/flow-activity-workspace-binding.test.mjs`.
+
 ## DSL → Temporal mapping (flow-definition-mapping.json)
 
 | DSL node    | Temporal primitive                                           |
