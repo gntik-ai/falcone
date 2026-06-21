@@ -69,20 +69,88 @@ function normalizeNumericIPv4(host) {
 
 /**
  * Check whether a canonical dotted-quad IPv4 string falls in a blocked range.
- * Ranges: 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16,
- *         172.16.0.0/12, 192.168.0.0/16.
+ * Ranges: 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10 (RFC 6598 CGNAT),
+ *         127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12,
+ *         192.168.0.0/16, 198.18.0.0/15 (RFC 2544 benchmarking).
  */
 function isBlockedIPv4(dotted) {
   const parts = dotted.split('.').map(Number);
   const a = parts[0], b = parts[1];
   if (a === 0) return true;               // 0.0.0.0/8
   if (a === 10) return true;              // 10.0.0.0/8
+  if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 (RFC 6598 CGNAT)
   if (a === 127) return true;             // 127.0.0.0/8
   if (a === 169 && b === 254) return true; // 169.254.0.0/16
   if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
   if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 (RFC 2544 benchmarking)
   return false;
 }
+
+/**
+ * Expand a validated IPv6 string (as accepted by net.isIP === 6) to its 16
+ * constituent bytes. Handles `::` zero-compression and a trailing embedded
+ * dotted-quad IPv4 (e.g. `::ffff:10.0.0.1`, `64:ff9b::10.0.0.1`). Returns a
+ * 16-element array of byte values, or null if the literal cannot be expanded.
+ *
+ * Only call this on a string already confirmed to be IPv6 by net.isIP; the
+ * parsing below is intentionally narrow (it trusts that prior validation).
+ */
+function expandIPv6ToBytes(h) {
+  let head = h;
+  const embeddedV4Bytes = [];
+
+  // Trailing embedded dotted-quad IPv4 (the last 32 bits written as a.b.c.d).
+  const lastColon = head.lastIndexOf(':');
+  const tail = lastColon === -1 ? head : head.slice(lastColon + 1);
+  if (tail.includes('.')) {
+    const quad = tail.split('.');
+    if (quad.length !== 4) return null;
+    for (const part of quad) {
+      if (!/^\d+$/.test(part)) return null;
+      const n = Number(part);
+      if (n > 255) return null;
+      embeddedV4Bytes.push(n);
+    }
+    // Replace the dotted tail with its two equivalent hextets so the rest of
+    // the literal can be parsed uniformly as colon-separated 16-bit groups.
+    const hi = (embeddedV4Bytes[0] << 8) | embeddedV4Bytes[1];
+    const lo = (embeddedV4Bytes[2] << 8) | embeddedV4Bytes[3];
+    head = `${head.slice(0, lastColon)}:${hi.toString(16)}:${lo.toString(16)}`;
+  }
+
+  // Split on the `::` zero-run (at most one is allowed in a valid literal).
+  const doubleColonParts = head.split('::');
+  if (doubleColonParts.length > 2) return null;
+
+  const toGroups = (segment) =>
+    segment === '' ? [] : segment.split(':').map((g) => {
+      if (!/^[0-9a-f]{1,4}$/.test(g)) return NaN;
+      return parseInt(g, 16);
+    });
+
+  let groups;
+  if (doubleColonParts.length === 2) {
+    const left = toGroups(doubleColonParts[0]);
+    const right = toGroups(doubleColonParts[1]);
+    const missing = 8 - (left.length + right.length);
+    if (missing < 0) return null;
+    groups = [...left, ...Array(missing).fill(0), ...right];
+  } else {
+    groups = toGroups(head);
+  }
+  if (groups.length !== 8 || groups.some((g) => Number.isNaN(g))) return null;
+
+  const bytes = [];
+  for (const g of groups) {
+    bytes.push((g >> 8) & 0xFF, g & 0xFF);
+  }
+  return bytes;
+}
+
+// NAT64 well-known prefix 64:ff9b::/96 — the first 12 bytes are fixed and the
+// last 4 bytes carry the embedded IPv4 address (RFC 6052).
+const NAT64_PREFIX = [0x00, 0x64, 0xff, 0x9b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
 /**
  * Check whether a single IP string (IPv4 or IPv6, canonical form) is blocked.
@@ -96,17 +164,21 @@ export function isBlockedIp(ip) {
     if (h === '::' || h === '::0' || h === '0:0:0:0:0:0:0:0') return true; // unspecified
     if (h === '::1') return true; // loopback
 
-    // IPv4-mapped: ::ffff:a.b.c.d
-    const mappedDotted = h.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mappedDotted) return isBlockedIPv4(mappedDotted[1]);
-
-    // IPv4-mapped hex: ::ffff:aabb:ccdd
-    const mappedHex = h.match(/^::ffff:([0-9a-f]+):([0-9a-f]+)$/);
-    if (mappedHex) {
-      const hi = parseInt(mappedHex[1], 16);
-      const lo = parseInt(mappedHex[2], 16);
-      const dotted = `${(hi >> 8) & 0xFF}.${hi & 0xFF}.${(lo >> 8) & 0xFF}.${lo & 0xFF}`;
-      return isBlockedIPv4(dotted);
+    const bytes = expandIPv6ToBytes(h);
+    if (bytes) {
+      // IPv4-mapped ::ffff:0:0/96 — block via the embedded IPv4.
+      const isMapped = bytes.slice(0, 10).every((x) => x === 0) &&
+        bytes[10] === 0xFF && bytes[11] === 0xFF;
+      if (isMapped) {
+        const dotted = `${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`;
+        return isBlockedIPv4(dotted);
+      }
+      // NAT64 64:ff9b::/96 — screen the embedded IPv4 (last 32 bits).
+      const isNat64 = NAT64_PREFIX.every((x, i) => bytes[i] === x);
+      if (isNat64) {
+        const dotted = `${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`;
+        return isBlockedIPv4(dotted);
+      }
     }
 
     // fc00::/7 (ULA: fc and fd prefixes)
