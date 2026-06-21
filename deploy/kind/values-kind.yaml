@@ -147,6 +147,14 @@ controlPlane:
         secretKeyRef:
           name: in-falcone-keycloak-admin
           key: password
+    # Per-tenant OIDC app-client redirect allow-list (#670). Each provisioned tenant realm gets a
+    # public `<slug>-app` client; its redirect_uri/web-origin allow-list MUST NOT be a wildcard, or
+    # the authorization endpoint would accept an arbitrary attacker-controlled redirect_uri
+    # (auth-code interception). These comma-separated allow-lists are applied to new app clients
+    # (PKCE S256 is always enabled). `+` web-origin = "origins of the registered redirect URIs"
+    # (a Keycloak idiom, explicitly NOT `*`).
+    - { name: TENANT_APP_REDIRECT_URIS, value: "https://app.dev.in-falcone.example.com/*,http://localhost:8088/*" }
+    - { name: TENANT_APP_WEB_ORIGINS, value: "+" }
     # Object storage: provider-neutral S3 endpoint + credentials (no plaintext).
     # STORAGE_S3_* are authoritative, pointed at the SeaweedFS S3 gateway (port 8333,
     # path-style). SeaweedFS replaced MinIO (ADR-13). NOTE: the in-falcone-storage
