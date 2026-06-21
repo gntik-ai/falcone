@@ -27,6 +27,32 @@ const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 const nowIso = () => new Date().toISOString();
 
+// Map an S3-backend failure thrown by `s3()` to a CLEAN, tenant-facing error — never echoing
+// the raw backend payload. The thrown error embeds the literal backend body and the INTERNAL
+// physical bucket path in `e.message` (`s3 <METHOD> <path> -> <status>: <xml…>`) and the full
+// raw text in `e.body`; surfacing either to the caller leaks SeaweedFS internals (the S3 XML
+// `NoSuchKey`/`<Resource>`/`<RequestId>` and the `ws-<hash>-…` physical bucket name) — #675.
+//
+// For object I/O the bucket-ownership gate (denyUnlessBucketOwner / the inline registry check)
+// ALWAYS runs BEFORE the S3 call, so a 404 here is unambiguously a MISSING OBJECT (NoSuchKey)
+// on a bucket the caller owns — mapped to the canonical `404 OBJECT_NOT_FOUND` with the exact
+// stable message from services/adapters/src/storage-error-taxonomy.mjs (duplicated inline
+// because this kind-runtime image cannot import the services package). Any other backend
+// failure keeps the operation-specific failure code but with a generic message — the upstream
+// detail is logged server-side (operators only), never returned. `fallbackCode` is e.g.
+// 'STORAGE_GET_FAILED' / 'STORAGE_HEAD_FAILED'.
+function storageFailure(e, fallbackCode) {
+  // 404 from the backend, after the ownership gate has passed → the object does not exist.
+  if (e?.statusCode === 404) {
+    console.error(`[storage] backend 404 mapped to OBJECT_NOT_FOUND: ${String(e?.message ?? e)}`);
+    return err(404, 'OBJECT_NOT_FOUND', 'The requested storage object was not found.');
+  }
+  // Any other backend failure: preserve a sane status but NEVER echo the raw payload/path.
+  const status = e?.statusCode && e.statusCode < 500 ? e.statusCode : 502;
+  console.error(`[storage] backend failure (${fallbackCode}, status ${status}): ${String(e?.message ?? e)}`);
+  return err(status, fallbackCode, 'Storage backend request failed.');
+}
+
 const sha256hex = (data) => crypto.createHash('sha256').update(data).digest('hex');
 const hmac = (key, data) => crypto.createHmac('sha256', key).update(data).digest();
 
@@ -261,7 +287,7 @@ async function storageGetObject(ctx) {
   try {
     const o = await getObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, content: o.content, contentBase64: o.bytes.toString('base64'), encoding: 'base64', contentType: o.contentType, sizeBytes: o.sizeBytes });
-  } catch (e) { return err(e.statusCode === 404 ? 404 : 502, 'STORAGE_GET_FAILED', String(e.message ?? e)); }
+  } catch (e) { return storageFailure(e, 'STORAGE_GET_FAILED'); }
 }
 async function storageDeleteObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
@@ -327,7 +353,7 @@ async function storageObjectMetadata(ctx) {
     return ok(200, { objectKey: key, bucketName: bucket, contentType: meta.contentType,
       sizeBytes: meta.size, etag: meta.etag, timestamps: { lastModifiedAt: meta.lastModified } });
   } catch (e) {
-    return err(e.statusCode === 404 ? 404 : 502, 'STORAGE_HEAD_FAILED', String(e.message ?? e));
+    return storageFailure(e, 'STORAGE_HEAD_FAILED');
   }
 }
 async function storageWorkspaceUsage(ctx) {
