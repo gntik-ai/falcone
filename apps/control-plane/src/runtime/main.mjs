@@ -17,6 +17,7 @@ import { createEventsExecutor } from './events-executor.mjs';
 import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createLlmExecutor, createLlmProviderStore, createLlmUsageStore } from './llm-executor.mjs';
+import { parseAllowedSecretPrefixes } from './byok-provider-guard.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
@@ -82,18 +83,23 @@ const pgRealtimeExecutor = createPostgresRealtimeExecutor({ resolveConnection })
 // API-key store on the control-plane metadata DB (keyPool defined above for DSN routing).
 const apiKeyStore = createApiKeyStore({ pool: keyPool });
 
+// BYOK provider secret confinement (#659). The resolved secret is read ONLY from an env var
+// whose name carries an operator-controlled reserved prefix (BYOK_SECRET_ALLOWED_PREFIXES,
+// default `BYOK_`), and the provider endpoint is validated against an SSRF guard — both at
+// config-deploy time and at request time. Parsed once and passed into BOTH BYOK executors so
+// each defaults its own confined secretResolver and the deploy-time validation is active.
+const byokSecretPrefixes = parseAllowedSecretPrefixes(process.env);
+
 // Embedding-provider executor (in-platform embedding for KNN queryText). The provider
 // store is Postgres-backed on the SAME metadata pool as the API-key store, so provider
 // configuration survives a restart and is shared across all control-plane replicas.
-// secretResolver bridges a stored secretRef to the actual key value: ESO/Vault mounts the
-// resolved secret as an env var named by secretRef.name (no plaintext is ever persisted).
+// The executor DEFAULTS a confined secretResolver from byokSecretPrefixes: ESO/Vault mounts the
+// resolved key as an env var named by secretRef.name, but ONLY an allow-listed name is ever read
+// (no plaintext is persisted; a non-allow-listed name fails closed).
 const embeddingStore = createEmbeddingProviderStore({ pool: keyPool });
 const embeddingExecutor = createEmbeddingExecutor({
   store: embeddingStore,
-  secretResolver: (secretRef) => {
-    if (secretRef?.name) return Promise.resolve(process.env[secretRef.name] ?? null);
-    return Promise.resolve(null);
-  },
+  secretPrefixes: byokSecretPrefixes,
 });
 
 // Per-collection embedding mapping store (write-time auto-embedding). Postgres-backed on the
@@ -102,18 +108,16 @@ const embeddingExecutor = createEmbeddingExecutor({
 const mappingStore = createEmbeddingMappingStore({ pool: keyPool });
 
 // BYOK LLM completion plane (change: add-llm-agent-flow-task / #640). Provider config + per-tenant
-// token-usage metering are Postgres-backed on the SAME metadata pool. secretResolver mirrors the
-// embedding executor: ESO/Vault mounts the resolved key as the env var named by secretRef.name, so
-// the plaintext key is never persisted and is resolved fresh per completion (key rotation is live).
+// token-usage metering are Postgres-backed on the SAME metadata pool. The executor DEFAULTS a
+// confined secretResolver from byokSecretPrefixes (mirrors the embedding executor): the resolved
+// key is read fresh per completion (rotation is live) but ONLY from an allow-listed env-var name,
+// and the endpoint is SSRF-validated at config-deploy + request time (#659).
 const llmProviderStore = createLlmProviderStore({ pool: keyPool });
 const llmUsageStore = createLlmUsageStore({ pool: keyPool });
 const llmExecutor = createLlmExecutor({
   providerStore: llmProviderStore,
   usageStore: llmUsageStore,
-  secretResolver: (secretRef) => {
-    if (secretRef?.name) return Promise.resolve(process.env[secretRef.name] ?? null);
-    return Promise.resolve(null);
-  },
+  secretPrefixes: byokSecretPrefixes,
 });
 
 // Mongo executor (enabled when a MONGO_URI/MONGO_HOST is configured).

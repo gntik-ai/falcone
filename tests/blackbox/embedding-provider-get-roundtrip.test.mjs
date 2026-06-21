@@ -41,14 +41,14 @@ test('bbx-emb-get-01: GET round-trips a PUT and returns only a secretRef (never 
   await withServer(embeddingExecutor, async (baseUrl) => {
     const put = await fetch(`${baseUrl}${path()}`, {
       method: 'PUT', headers: authHeaders,
-      body: JSON.stringify({ providerType: 'openai', model: 'text-embedding-3-small', secretRef: { name: 'K' }, apiKey: FAKE_KEY }),
+      body: JSON.stringify({ providerType: 'openai', model: 'text-embedding-3-small', secretRef: { name: 'BYOK_K' }, apiKey: FAKE_KEY }),
     });
     assert.equal(put.status, 200, await put.text());
     const get = await fetch(`${baseUrl}${path()}`, { method: 'GET', headers: authHeaders });
     assert.equal(get.status, 200, 'GET reaches the handler (not 404 NO_ROUTE)');
     const body = await get.json();
     assert.equal(body.providerType, 'openai');
-    assert.deepEqual(body.secretRef, { name: 'K' });
+    assert.deepEqual(body.secretRef, { name: 'BYOK_K' });
     assert.ok(!('apiKey' in body) && !('secret' in body), 'GET never returns the plaintext key');
     assert.ok(!JSON.stringify(body).includes(FAKE_KEY), 'plaintext never echoed back');
   });
