@@ -58,7 +58,12 @@ export function createRealtimeExecutor(options = {}) {
   const slotName = options.slotName ?? 'falcone_rt_slot'
   const catalog = options.catalog ?? new CollectionCatalog(enginePool)
 
-  const subscribers = new Set() // { tenantId, database, collection, onChange, onError }
+  // The WAL replication client is constructed lazily on first subscribe; injectable for unit tests
+  // (mirrors the poolFactory/enginePool/catalog seams) so the workspace-scoped dispatch can be
+  // driven with a synthetic 'change' emission without a live engine (#688).
+  const makeClient = options.clientFactory ?? ((opts) => new WalReplicationClient(opts))
+
+  const subscribers = new Set() // { tenantId, workspaceId, database, collection, onChange, onError }
   let client = null
   let starting = null
 
@@ -69,6 +74,10 @@ export function createRealtimeExecutor(options = {}) {
   function dispatch(record) {
     for (const sub of subscribers) {
       if (record.tenantId !== sub.tenantId) continue
+      // #688: the document plane is scoped per workspace WITHIN the tenant (the data-API adapter
+      // stamps both tenantId and workspaceId on every write), so two workspaces of the same tenant
+      // sharing a db+collection name must NOT cross-receive changes. Filter on workspaceId too.
+      if (record.workspaceId !== sub.workspaceId) continue
       if (record.database !== sub.database || record.collection !== sub.collection) continue
       sub.onChange?.({
         type: mapType(record.operationType),
@@ -85,7 +94,7 @@ export function createRealtimeExecutor(options = {}) {
       starting = (async () => {
         await ensurePublicationAndReplicaIdentity(enginePool, publicationName)
         await createFreshSlot(enginePool, slotName)
-        const c = new WalReplicationClient({ connectionConfig: engineConnectionConfig, slotName, publicationName, catalog, autoAck: true })
+        const c = makeClient({ connectionConfig: engineConnectionConfig, slotName, publicationName, catalog, autoAck: true })
         c.on('change', dispatch)
         c.on('error', (err) => { for (const sub of subscribers) sub.onError?.(err) })
         await c.start()
@@ -106,7 +115,7 @@ export function createRealtimeExecutor(options = {}) {
 
     await ensureStarted()
 
-    const sub = { tenantId, database: params.databaseName, collection: params.collectionName, onChange: params.onChange, onError: params.onError }
+    const sub = { tenantId, workspaceId, database: params.databaseName, collection: params.collectionName, onChange: params.onChange, onError: params.onError }
     subscribers.add(sub)
 
     let closed = false

@@ -1385,6 +1385,18 @@ spec:
 Run **after** the engine is Ready (creates the `documentdb` extension and the CDC
 publication/role). Idempotent.
 
+This Job runs `provision-logical-replication.sql` as the engine **superuser** (`PGUSER=postgres`),
+which is the owner‑privileged role responsible for setting `REPLICA IDENTITY FULL` on every
+`documentdb_data.documents_*` table — both the existing tables (step 4) and any created later (the
+`falcone_documents_ri_full` event trigger, step 5). The live realtime CDC consumer role
+`falcone_cdc_repl` is a non‑owner `LOGIN REPLICATION` role and does **not** own those tables (the
+DocumentDB extension owns them as `documentdb_admin_role`). The realtime executor therefore does not
+depend on owning the tables: on first subscribe it **skips** the `ALTER … REPLICA IDENTITY FULL`
+for tables already FULL and **tolerates** a `42501 (must be owner)` for any not‑yet‑FULL table
+rather than aborting the WAL consumer — that ALTER is this Job's responsibility. Realtime delivery
+is scoped per **tenant and workspace** (two workspaces of one tenant sharing a database+collection
+name do not cross‑receive change events).
+
 ```yaml
 apiVersion: batch/v1
 kind: Job

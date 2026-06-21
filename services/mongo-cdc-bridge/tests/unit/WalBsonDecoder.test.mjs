@@ -81,6 +81,25 @@ test('decodeWalMessage maps a DELETE to the pre-image only (tenant-scopable)', (
   assert.deepEqual(out.fullDocumentBeforeChange, before)
 })
 
+test('decodeWalMessage extracts workspaceId from the document image (#688)', () => {
+  const doc = { _id: 'doc-1', tenantId: 'ten_a', workspaceId: 'ws_a', body: 'alpha' }
+  const out = decodeWalMessage({ tag: 'insert', relation: relation('documents_2'), new: { document: bsonhex(doc) } })
+  assert.equal(out.workspaceId, 'ws_a', 'workspaceId is read off the image like tenantId')
+  assert.equal(out.tenantId, 'ten_a')
+})
+
+test('decodeWalMessage reads workspaceId from the DELETE pre-image (#688)', () => {
+  const before = { _id: 'doc-1', tenantId: 'ten_a', workspaceId: 'ws_a' }
+  const out = decodeWalMessage({ tag: 'delete', relation: relation('documents_2'), old: { document: bsonhex(before) } })
+  assert.equal(out.workspaceId, 'ws_a', 'delete carries workspaceId from the pre-image (tenant+workspace-scopable)')
+})
+
+test('decodeWalMessage yields workspaceId=null when the document has no workspaceId (#688)', () => {
+  const doc = { _id: 'doc-1', tenantId: 'ten_a' } // legacy / unscoped write
+  const out = decodeWalMessage({ tag: 'insert', relation: relation('documents_2'), new: { document: bsonhex(doc) } })
+  assert.equal(out.workspaceId, null, 'absence of workspaceId yields null, not undefined')
+})
+
 test('decodeWalMessage ignores non-documents relations and non-DML tags', () => {
   assert.equal(decodeWalMessage({ tag: 'insert', relation: relation('retry_2'), new: { document: bsonhex({ _id: 'x' }) } }), null)
   assert.equal(decodeWalMessage({ tag: 'begin' }), null)

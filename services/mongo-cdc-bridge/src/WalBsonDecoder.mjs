@@ -50,10 +50,14 @@ export function parseDocumentsCollectionId(relationName) {
 // `new`/`old` are decoded tuples keyed by column name; the `document`/`object_id` columns arrive
 // as `BSONHEX<hex>` strings.
 //
-// Output: { walOp, collectionId, documentId, tenantId, fullDocument, fullDocumentBeforeChange }
+// Output: { walOp, collectionId, documentId, tenantId, workspaceId, fullDocument, fullDocumentBeforeChange }
 //   walOp is the raw WAL operation ('insert'|'update'|'delete'); each consumer maps it to its own
 //   surface operationType (e.g. realtime/CDC treat a WAL UPDATE as a full-document 'replace',
 //   since logical replication cannot distinguish $set updates from replacements).
+//   tenantId/workspaceId are read off the document image (the data-API adapter stamps BOTH on every
+//   write — services/adapters/src/mongodb-data-api.mjs::injectTenantIntoDocument); workspaceId lets
+//   the realtime consumer scope per workspace so two workspaces of one tenant sharing a
+//   db+collection name do not cross-receive changes (#688).
 export function decodeWalMessage(log) {
   if (!log || (log.tag !== 'insert' && log.tag !== 'update' && log.tag !== 'delete')) return null
   const relation = log.relation
@@ -69,6 +73,7 @@ export function decodeWalMessage(log) {
     collectionId,
     documentId: image?._id ?? null,
     tenantId: image?.tenantId ?? null,
+    workspaceId: image?.workspaceId ?? null,
     fullDocument,
     fullDocumentBeforeChange
   }
