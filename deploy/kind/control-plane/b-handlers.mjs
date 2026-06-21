@@ -12,7 +12,7 @@ import { deleteBucket } from './storage-handlers.mjs';
 import { deleteTopics } from './kafka-handlers.mjs';
 import { METRICS_HANDLERS } from './metrics-handlers.mjs';
 import { STORAGE_HANDLERS } from './storage-handlers.mjs';
-import { MONGO_HANDLERS } from './mongo-handlers.mjs';
+import { MONGO_HANDLERS, mongoTeardown, mongoClient } from './mongo-handlers.mjs';
 import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
@@ -276,6 +276,11 @@ async function purgeTenant(ctx) {
   for (const b of phys.buckets) { try { await deleteBucket(b); bucketsDeleted.push(b); } catch { /* best-effort */ } }
   let topicsDeleted = [];
   try { await deleteTopics(phys.topics); topicsDeleted = phys.topics; } catch { /* best-effort */ }
+  // 5. Isolation-safe FerretDB document teardown (fix-tenant-purge-ferretdb-cascade, #682):
+  //    delete THIS tenant's documents (by tenantId) from each recorded mongo db and drop a
+  //    db only when it is empty across ALL tenants (a same-named shared db with another
+  //    tenant's data is RETAINED). Best-effort — never aborts the purge (rows already removed).
+  const mongo = await tearDownMongo(ctx, tenant.id, phys.mongoDatabases);
 
   return ok(200, {
     tenantId: tenant.id, purged: true,
@@ -283,10 +288,30 @@ async function purgeTenant(ctx) {
       workspaces: phys.workspaceIds.length,
       databases: databasesDropped, realm: realmDeleted ? realm : null,
       buckets: bucketsDeleted, topics: topicsDeleted,
+      // FerretDB databases physically dropped (empty across all tenants); `mongoDatabasesRetained`
+      // are same-named shared dbs kept because another tenant still has data (only this tenant's
+      // documents were removed).
+      mongoDatabases: mongo.dropped, mongoDatabasesRetained: mongo.retained,
     },
     // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
     residual: { knativeServices: phys.ksvcs },
   });
+}
+
+// Run the isolation-safe FerretDB teardown for a purge/delete, best-effort. The mongo
+// client + teardown fn are injectable via ctx (mirrors deleteWorkspace's ctx.* seams and
+// mongo-handlers' ctx.mongoClient) so the cascade is testable with a fake client. A failure
+// here NEVER aborts the caller — it returns empty results and the caller proceeds.
+async function tearDownMongo(ctx, tenantId, databaseNames) {
+  const names = (databaseNames ?? []).filter(Boolean);
+  if (!names.length) return { dropped: [], retained: [], errors: [] };
+  const teardown = ctx.mongoTeardown ?? mongoTeardown;
+  try {
+    const client = ctx.mongoClient ?? await mongoClient();
+    return await teardown({ client, tenantId, databaseNames: names });
+  } catch (e) {
+    return { dropped: [], retained: [], errors: [{ error: String(e?.message ?? e) }] };
+  }
 }
 
 // First-class environment catalog (#503). The set of runtime environments a workspace may belong
@@ -491,10 +516,18 @@ async function deleteWorkspace(ctx) {
   for (const b of phys.buckets) { try { await delBucket(b); bucketsDeleted.push(b); } catch { /* best-effort */ } }
   let topicsDeleted = [];
   try { await delTopics(phys.topics); topicsDeleted = phys.topics; } catch { /* best-effort */ }
+  // 4. Isolation-safe FerretDB document teardown for the workspace's recorded mongo db(s)
+  //    (fix-tenant-purge-ferretdb-cascade, #682): scope by the workspace's owning tenant,
+  //    delete only that tenant's documents, and drop a db only when empty across ALL tenants
+  //    (a shared db with another tenant's data is retained). Best-effort.
+  const mongo = await tearDownMongo(ctx, ws.tenant_id, phys.mongoDatabases);
 
   return ok(200, {
     workspaceId: ws.id, tenantId: ws.tenant_id, deleted: true,
-    removed: { databases: databasesDropped, buckets: bucketsDeleted, topics: topicsDeleted },
+    removed: {
+      databases: databasesDropped, buckets: bucketsDeleted, topics: topicsDeleted,
+      mongoDatabases: mongo.dropped, mongoDatabasesRetained: mongo.retained,
+    },
     // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
     residual: { knativeServices: phys.ksvcs },
   });
