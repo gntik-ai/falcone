@@ -225,6 +225,14 @@ this control-plane serves. To make the shell usable end-to-end:
   shows the bucket, usage **2.1 KB / 3 objects**, and the object list
   (`readme.txt`, `config/app.json`, `images/logo.bin`) + connection snippets.
   `ConsoleStoragePage` was lazy (React #426) → eager import.
+  Reading or downloading a **missing object** in a bucket the tenant owns returns a clean,
+  structured **`404 OBJECT_NOT_FOUND`** (`{"code":"OBJECT_NOT_FOUND","message":"The requested
+  storage object was not found."}`) for both `GET …/objects/{key}` and
+  `GET …/objects/{key}/metadata` — it never echoes the SeaweedFS backend's raw S3 error payload
+  (the `NoSuchKey` XML, `RequestId`, S3 resource path, or the internal physical bucket name
+  `ws-<hash>-…`). Any other backend failure returns the operation's stable failure code
+  (`STORAGE_GET_FAILED` / `STORAGE_HEAD_FAILED`) with a generic message; the upstream detail is
+  written to the control-plane log only, never to the response (#675).
 - The repo's **Service Accounts** page (`/console/service-accounts`) is wired: it
   calls the SA endpoints I already had, but expected camelCase shapes — the
   control-plane now returns `serviceAccountId` on create, the full
