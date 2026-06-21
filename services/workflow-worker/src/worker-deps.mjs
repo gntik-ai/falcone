@@ -75,12 +75,14 @@ export async function wireActivityDeps(opts = {}) {
       { createConnectionRegistry },
       { createWorkspaceDsnResolver },
       { createLlmExecutor, createLlmProviderStore, createLlmUsageStore },
+      { parseAllowedSecretPrefixes },
       pgModule,
       { withPostgresSsl },
     ] = await Promise.all([
       dynamicImport('../../../apps/control-plane/src/runtime/connection-registry.mjs'),
       dynamicImport('../../../apps/control-plane/src/runtime/workspace-dsn-resolver.mjs'),
       dynamicImport('../../../apps/control-plane/src/runtime/llm-executor.mjs'),
+      dynamicImport('../../../apps/control-plane/src/runtime/byok-provider-guard.mjs'),
       dynamicImport('pg'),
       dynamicImport('../../../services/internal-contracts/src/transport-security.mjs'),
     ]);
@@ -95,13 +97,17 @@ export async function wireActivityDeps(opts = {}) {
     registry = createConnectionRegistry({ resolveConnection });
 
     // BYOK LLM completion executor for the llm.complete activity (change #640). Binds the provider
-    // config + usage stores to the worker pool and resolves the provider key per request from the
-    // env var named by secretRef.name (ESO/Vault-mounted) — mirrors the control-plane executor. The
+    // config + usage stores to the worker pool — mirrors the control-plane executor. The
     // control-plane owns DDL for these tables; the worker only reads config + appends usage.
+    //
+    // BYOK confinement (#659): pass the reserved secret-name allow-list so the executor DEFAULTS a
+    // CONFINED secretResolver (the resolved key is read ONLY from an allow-listed env var, never an
+    // arbitrary caller-named one) and inherits the endpoint SSRF guard. A flow `llm.complete`
+    // against a malicious pre-existing provider row therefore fails closed.
     const llmExecutor = createLlmExecutor({
       providerStore: createLlmProviderStore({ pool: keyPool }),
       usageStore: createLlmUsageStore({ pool: keyPool }),
-      secretResolver: (secretRef) => (secretRef?.name ? Promise.resolve(process.env[secretRef.name] ?? null) : Promise.resolve(null)),
+      secretPrefixes: parseAllowedSecretPrefixes(process.env),
     });
     executeLlmComplete = (req = {}) => llmExecutor.complete(req.workspaceId, req);
   }

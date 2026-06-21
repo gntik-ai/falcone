@@ -158,7 +158,7 @@ async function readEmbedding(id) {
 // Configure a provider for a workspace (mock backend, dimension 8) on the shared store.
 async function configureProvider(emb, tenantId, workspaceId) {
   await emb.store.deployProvider(workspaceId, {
-    tenantId, providerType: 'mock', model: `mock-${DIM}`, secretRef: { name: 'K' },
+    tenantId, providerType: 'mock', model: `mock-${DIM}`, secretRef: { name: 'BYOK_K' },
   });
 }
 
@@ -301,7 +301,7 @@ test('auto-emb-07: dimension mismatch → 422 EMBEDDING_DIMENSION_MISMATCH, no r
     store: createEmbeddingProviderStore({ pool: mappingPool }),
     backendFactory: () => localMockEmbeddingBackend({ dimension: 4 }),
   });
-  await emb.store.deployProvider(WS_A, { tenantId: TEN_A, providerType: 'mock', model: 'mock-4', secretRef: { name: 'K' } });
+  await emb.store.deployProvider(WS_A, { tenantId: TEN_A, providerType: 'mock', model: 'mock-4', secretRef: { name: 'BYOK_K' } });
   await mappingStore.deployMapping(WS_A, {
     tenantId: TEN_A, schemaName: 'public', tableName: 'docs', sourceColumn: 'body', targetColumn: 'embedding',
   });
@@ -317,7 +317,7 @@ test('auto-emb-07: dimension mismatch → 422 EMBEDDING_DIMENSION_MISMATCH, no r
   assert.equal(after.rows[0].n, before.rows[0].n, 'no row written on dimension mismatch');
 
   // Re-configure the dimension-8 provider so later tests sharing WS_A still pass.
-  await emb.store.deployProvider(WS_A, { tenantId: TEN_A, providerType: 'mock', model: `mock-${DIM}`, secretRef: { name: 'K' } });
+  await emb.store.deployProvider(WS_A, { tenantId: TEN_A, providerType: 'mock', model: `mock-${DIM}`, secretRef: { name: 'BYOK_K' } });
 });
 
 // auto-emb-08: cross-tenant — tenant B insert does NOT apply tenant A's mapping.
