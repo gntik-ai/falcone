@@ -8,12 +8,16 @@
 // the executor is `undefined` and no flows routes are registered (the rest of the
 // control-plane runs unchanged).
 //
-// Tenant isolation is structural: every Temporal workflow ID is
-//   `{tenantId}:{workspaceId}:{flowId}:{runUuid}`
-// generated server-side (clients NEVER supply it). Before any Temporal command targeting an
-// existing run, the executor verifies the workflow-ID prefix matches the caller's
-// `{identity.tenantId}:` — a foreign prefix is treated as not-found (404) or forbidden (403)
-// without touching Temporal. The visibility list query always injects
+// Tenant isolation is structural: every Temporal workflow ID is generated server-side (clients
+// NEVER supply it) and leads with `{tenantId}:{workspaceId}:`. There are two shapes:
+//   - manual / trigger-override runs: `{tenantId}:{workspaceId}:{flowId}:{runUuid}` (buildWorkflowId)
+//   - schedule-fired (cron) runs:     `{tenantId}:{workspaceId}:{flowId}-workflow-{ISO8601}`
+//     (Temporal auto-names a scheduled run `{scheduleId}-workflow-{ISO}`; our scheduleId is
+//     `{tenantId}:{workspaceId}:{flowId}` — see flow-trigger-registry). parseWorkflowId handles
+//     BOTH (the ISO timestamp's colons require marker-based, not split-based, parsing — #681).
+// Before any Temporal command targeting an existing run, the executor verifies the workflow-ID
+// prefix matches the caller's `{identity.tenantId}:` — a foreign prefix is treated as not-found
+// (404) or forbidden (403) without touching Temporal. The visibility list query always injects
 // `tenantId='<identity.tenantId>'` as a non-overridable filter.
 //
 // Definitions/versions live in Postgres (createFlowStore with a pool) with RLS, or in an
@@ -76,15 +80,64 @@ export function buildWorkflowId(tenantId, workspaceId, flowId, runUuid = randomU
   return [tenantId, workspaceId, flowId, runUuid].join(WORKFLOW_ID_SEPARATOR);
 }
 
-// Parse `{tenantId}:{workspaceId}:{flowId}:{runUuid}` back into its parts. Returns null when
-// the shape is wrong (defensive: never throw on a malformed external id).
+// Literal marker Temporal appends to a SCHEDULE-fired workflow id. A schedule's auto-named run is
+// `{scheduleId}-workflow-{ISO8601}` and our scheduleId is `{tenantId}:{workspaceId}:{flowId}`
+// (flow-trigger-registry::scheduleIdFor; upsertSchedule sets no explicit workflowId). UUIDs can
+// never contain the substring "workflow", so this marker unambiguously identifies a cron-fired id.
+const SCHEDULE_WORKFLOW_MARKER = '-workflow-';
+
+// Parse a Temporal workflow id back into { tenantId, workspaceId, flowId, runUuid }. Returns null
+// when the shape is wrong (defensive: never throw on a malformed external id).
+//
+// TWO id shapes must both parse, because the colon separator collides with the colons inside an
+// ISO8601 timestamp:
+//   1. MANUAL / trigger-override runs (buildWorkflowId): `{tenantId}:{workspaceId}:{flowId}:{runUuid}`
+//      — tenantId, workspaceId and runUuid are UUIDs (no colons), so a plain colon split works.
+//   2. SCHEDULE-FIRED (cron) runs: Temporal auto-names them `{scheduleId}-workflow-{ISO8601}` where
+//      scheduleId = `{tenantId}:{workspaceId}:{flowId}`, e.g.
+//      `T:W:F-workflow-2026-06-21T11:06:00Z`. The ISO timestamp's `:`s mean a naive split would
+//      mangle the flowId into `F-workflow-2026-06-21T11` and break the OWNER's ownership check
+//      (assertOwnedWorkflowId) — surfacing as 404 on get and 403 on cancel/retry of one's OWN run
+//      (#681). We therefore take tenantId/workspaceId as the first two colon segments and parse the
+//      remainder by the unambiguous `-workflow-` marker rather than by colons.
+//
+// The return field names are a stable contract: listExecutions / hasActiveExecutions /
+// flow-monitoring-executor read `.tenantId`/`.workspaceId`; assertOwnedWorkflowId additionally
+// reads `.flowId`. Existing fields are never removed or renamed.
 export function parseWorkflowId(workflowId) {
   if (typeof workflowId !== 'string') return null;
   const parts = workflowId.split(WORKFLOW_ID_SEPARATOR);
-  if (parts.length < 4) return null;
-  const [tenantId, workspaceId, flowId, ...rest] = parts;
-  if (!tenantId || !workspaceId || !flowId || rest.length === 0) return null;
-  return { tenantId, workspaceId, flowId, runUuid: rest.join(WORKFLOW_ID_SEPARATOR) };
+  // Need at least tenantId + workspaceId + a non-empty remainder (flowId[:runUuid] or
+  // flowId-workflow-<ISO8601>). The remainder may itself contain colons (the ISO timestamp).
+  if (parts.length < 3) return null;
+  const tenantId = parts[0];
+  const workspaceId = parts[1];
+  const remainder = parts.slice(2).join(WORKFLOW_ID_SEPARATOR);
+  if (!tenantId || !workspaceId || !remainder) return null;
+
+  // Shape 2: schedule-fired. The `-workflow-` marker can never appear inside a UUID flowId, so its
+  // presence unambiguously identifies a cron-fired id and its first occurrence cleanly separates
+  // the flowId from Temporal's `workflow-{ISO8601}` segment.
+  const markerIdx = remainder.indexOf(SCHEDULE_WORKFLOW_MARKER);
+  if (markerIdx !== -1) {
+    // A marker at index 0 means an empty flowId — reject rather than fall through to the manual
+    // parse (which would otherwise mistake `-workflow-...` for a `{flowId}:{runUuid}` pair).
+    if (markerIdx === 0) return null;
+    const flowId = remainder.slice(0, markerIdx);
+    // runUuid is the `workflow-{ISO8601}` segment (drop only the leading hyphen of the marker).
+    const runUuid = remainder.slice(markerIdx + 1);
+    if (!flowId || !runUuid) return null;
+    return { tenantId, workspaceId, flowId, runUuid };
+  }
+
+  // Shape 1: manual / override — `{flowId}:{runUuid}`. flowId is up to the first colon; runUuid is
+  // the rest (a UUID, but join defensively in case a future runUuid form carries colons).
+  const sepIdx = remainder.indexOf(WORKFLOW_ID_SEPARATOR);
+  if (sepIdx <= 0) return null; // no runUuid, or empty flowId
+  const flowId = remainder.slice(0, sepIdx);
+  const runUuid = remainder.slice(sepIdx + 1);
+  if (!flowId || !runUuid) return null;
+  return { tenantId, workspaceId, flowId, runUuid };
 }
 
 // Strip every `tenantId`/`workspaceId` clause from a client-supplied Temporal visibility query so
