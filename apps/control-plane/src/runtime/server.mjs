@@ -785,8 +785,14 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
   if (!embeddingExecutor) throw Object.assign(new Error('Embedding provider is not enabled'), { statusCode: 501, code: 'EMBEDDING_DISABLED' });
   if (action === 'set') {
     // The tenantId comes from the verified identity (never the body); the store keys the
-    // record by (tenant_id, workspace_id). deployProvider strips any plaintext apiKey/secret.
-    const result = await embeddingExecutor.store.deployProvider(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
+    // record by (tenant_id, workspace_id). The executor's GUARDED deployProvider confines the
+    // secretRef to the reserved-prefix allow-list + SSRF-validates the endpoint BEFORE persisting
+    // (#659), then the store strips any plaintext apiKey/secret. Falls back to store.deployProvider
+    // only for a legacy executor that predates the guarded method.
+    const deploy = embeddingExecutor.deployProvider
+      ? embeddingExecutor.deployProvider.bind(embeddingExecutor)
+      : embeddingExecutor.store.deployProvider.bind(embeddingExecutor.store);
+    const result = await deploy(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
     return { status: successStatus, body: result };
   }
   if (action === 'get') {

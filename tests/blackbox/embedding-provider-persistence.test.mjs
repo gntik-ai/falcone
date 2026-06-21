@@ -71,7 +71,7 @@ test('bbx-emb-persist-01: PUT embedding-provider returns 200 and stores only a s
       body: JSON.stringify({
         providerType: 'openai',
         model: 'text-embedding-3-small',
-        secretRef: { name: 'WS_EMBEDDING_KEY' },
+        secretRef: { name: 'BYOK_WS_EMBEDDING_KEY' }, // reserved-prefix name (#659 confinement)
         apiKey: FAKE_KEY, // a caller (mis)passing plaintext — MUST be stripped
       }),
     });
@@ -79,7 +79,7 @@ test('bbx-emb-persist-01: PUT embedding-provider returns 200 and stores only a s
     const body = await res.json();
     assert.notEqual(body.code, 'EMBEDDING_DISABLED');
     assert.equal(body.providerType, 'openai');
-    assert.deepEqual(body.secretRef, { name: 'WS_EMBEDDING_KEY' });
+    assert.deepEqual(body.secretRef, { name: 'BYOK_WS_EMBEDDING_KEY' });
     assert.ok(!('apiKey' in body) && !('secret' in body), 'no plaintext key in the response');
     assert.ok(!JSON.stringify(body).includes(FAKE_KEY), 'plaintext never echoed back');
   });
@@ -91,13 +91,13 @@ test('bbx-emb-persist-02: replacing a provider via the route returns the re-inde
   await withServer({ embeddingExecutor }, async (baseUrl) => {
     const first = await fetch(`${baseUrl}${embPath()}`, {
       method: 'PUT', headers: authHeaders,
-      body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'K1' } }),
+      body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_K1' } }),
     });
     assert.equal((await first.json()).warning, undefined, 'first deploy has no warning');
 
     const second = await fetch(`${baseUrl}${embPath()}`, {
       method: 'PUT', headers: authHeaders,
-      body: JSON.stringify({ providerType: 'cohere', model: 'embed-english-v3', secretRef: { name: 'K2' } }),
+      body: JSON.stringify({ providerType: 'cohere', model: 'embed-english-v3', secretRef: { name: 'BYOK_K2' } }),
     });
     const body = await second.json();
     assert.equal(second.status, 200);
@@ -112,7 +112,7 @@ test('bbx-emb-persist-03: DELETE embedding-provider returns 200 removed:true whe
   await withServer({ embeddingExecutor }, async (baseUrl) => {
     await fetch(`${baseUrl}${embPath()}`, {
       method: 'PUT', headers: authHeaders,
-      body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'K' } }),
+      body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_K' } }),
     });
     const del = await fetch(`${baseUrl}${embPath()}`, { method: 'DELETE', headers: authHeaders });
     assert.equal(del.status, 200);
@@ -126,7 +126,7 @@ test('bbx-emb-persist-04: routes return 501 EMBEDDING_DISABLED when the executor
   await withServer({ embeddingExecutor: undefined }, async (baseUrl) => {
     const put = await fetch(`${baseUrl}${embPath()}`, {
       method: 'PUT', headers: authHeaders,
-      body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'K' } }),
+      body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_K' } }),
     });
     assert.equal(put.status, 501);
     assert.equal((await put.json()).code, 'EMBEDDING_DISABLED');
@@ -144,7 +144,7 @@ test('bbx-emb-persist-05: embedForWorkspace returns a vector when a provider is 
     store: createEmbeddingProviderStore(),
     backendFactory: () => localMockEmbeddingBackend({ dimension: 3 }),
   });
-  await embeddingExecutor.store.deployProvider(WS, { providerType: 'mock', model: 'mock-3', secretRef: { name: 'K' } });
+  await embeddingExecutor.store.deployProvider(WS, { providerType: 'mock', model: 'mock-3', secretRef: { name: 'BYOK_K' } });
   const vec = await embeddingExecutor.embedForWorkspace(WS, 'semantic query', { expectedDimension: 3 });
   assert.equal(vec.length, 3);
   assert.ok(vec.every((n) => typeof n === 'number'));
