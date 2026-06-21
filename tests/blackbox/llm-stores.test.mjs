@@ -12,8 +12,8 @@ const WS = 'ws_shared';
 
 test('bbx-llm-store-01: provider store strips plaintext keys and isolates by tenant', async () => {
   const store = createLlmProviderStore();
-  await store.deployProvider(WS, { tenantId: 'a', providerType: 'openai', allowedModels: ['m1'], secretRef: { name: 'K' }, apiKey: 'leak', secret: 'leak2' });
-  await store.deployProvider(WS, { tenantId: 'b', providerType: 'anthropic', allowedModels: ['m2'], secretRef: { name: 'K2' } });
+  await store.deployProvider(WS, { tenantId: 'a', providerType: 'openai', allowedModels: ['m1'], secretRef: { name: 'BYOK_K' }, apiKey: 'leak', secret: 'leak2' });
+  await store.deployProvider(WS, { tenantId: 'b', providerType: 'anthropic', allowedModels: ['m2'], secretRef: { name: 'BYOK_K2' } });
 
   const a = await store.getProvider(WS, 'a');
   assert.equal(a.providerType, 'openai');

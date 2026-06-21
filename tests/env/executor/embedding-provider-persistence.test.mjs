@@ -71,7 +71,7 @@ test('emb-persist-01: deployProvider on S1 inserts a persisted row', async () =>
     model: 'text-embedding-3-small',
     endpoint: 'https://embeddings.example.test/v1/embeddings',
     dimension: 1536,
-    secretRef: { name: 'WS1_EMBEDDING_KEY' },
+    secretRef: { name: 'BYOK_WS1_EMBEDDING_KEY' },
   });
   const res = await pool.query(
     'SELECT tenant_id, workspace_id, provider_type, model, dimension FROM workspace_embedding_providers WHERE workspace_id = $1',
@@ -94,7 +94,7 @@ test('emb-persist-02: a fresh store S2 on the same pool reads the row written by
   assert.equal(got.model, 'text-embedding-3-small');
   assert.equal(got.endpoint, 'https://embeddings.example.test/v1/embeddings');
   assert.equal(Number(got.dimension), 1536);
-  assert.deepEqual(got.secretRef, { name: 'WS1_EMBEDDING_KEY' });
+  assert.deepEqual(got.secretRef, { name: 'BYOK_WS1_EMBEDDING_KEY' });
 });
 
 // emb-persist-04: replacing an existing provider (second deployProvider) returns a warning.
@@ -104,14 +104,14 @@ test('emb-persist-04: replacing an existing provider returns a re-index warning'
     tenantId: TEN_A,
     providerType: 'cohere',
     model: 'embed-english-v3',
-    secretRef: { name: 'WS1_EMBEDDING_KEY_2' },
+    secretRef: { name: 'BYOK_WS1_EMBEDDING_KEY_2' },
   });
   assert.ok(res.warning, 'replacement surfaces a warning');
   assert.match(res.warning, /re-?index|existing|previous/i);
 
   // First-time deploy on a brand-new workspace must NOT warn.
   const first = await s1.deployProvider('ws_emb_fresh', {
-    tenantId: TEN_A, providerType: 'openai', model: 'm', secretRef: { name: 'FRESH_KEY' },
+    tenantId: TEN_A, providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_FRESH_KEY' },
   });
   assert.ok(!first.warning, 'first deploy has no warning');
 });
@@ -123,7 +123,7 @@ test('emb-persist-05: secret_ref persists only the secretRef — no plaintext ap
     tenantId: TEN_A,
     providerType: 'openai',
     model: 'm',
-    secretRef: { name: 'WS_SECRET_KEY' },
+    secretRef: { name: 'BYOK_WS_SECRET_KEY' },
     apiKey: FAKE_KEY, // a caller (mis)passing plaintext — MUST be stripped
     secret: FAKE_KEY,
   });
@@ -132,14 +132,14 @@ test('emb-persist-05: secret_ref persists only the secretRef — no plaintext ap
     ['ws_emb_secret'],
   );
   const stored = res.rows[0].secret_ref;
-  assert.deepEqual(stored, { name: 'WS_SECRET_KEY' }, 'only the secretRef is stored');
+  assert.deepEqual(stored, { name: 'BYOK_WS_SECRET_KEY' }, 'only the secretRef is stored');
   const raw = JSON.stringify(res.rows[0]);
   assert.ok(!raw.includes(FAKE_KEY), 'no plaintext key anywhere in the persisted row');
 
   // A subsequent read through the store also never exposes a plaintext key field.
   const got = await s1.getProvider('ws_emb_secret');
   assert.ok(!('apiKey' in got) && !('secret' in got), 'read exposes only a secretRef');
-  assert.deepEqual(got.secretRef, { name: 'WS_SECRET_KEY' });
+  assert.deepEqual(got.secretRef, { name: 'BYOK_WS_SECRET_KEY' });
 });
 
 // emb-persist-06: two workspaces under different tenant_id values are stored independently
@@ -147,8 +147,8 @@ test('emb-persist-05: secret_ref persists only the secretRef — no plaintext ap
 test('emb-persist-06: rows are keyed by (tenant_id, workspace_id) — no cross-tenant leakage', async () => {
   const store = createEmbeddingProviderStore({ pool });
   const SHARED_WS = 'ws_emb_shared';
-  await store.deployProvider(SHARED_WS, { tenantId: TEN_A, providerType: 'openai', model: 'model-a', secretRef: { name: 'A_KEY' } });
-  await store.deployProvider(SHARED_WS, { tenantId: TEN_B, providerType: 'cohere', model: 'model-b', secretRef: { name: 'B_KEY' } });
+  await store.deployProvider(SHARED_WS, { tenantId: TEN_A, providerType: 'openai', model: 'model-a', secretRef: { name: 'BYOK_A_KEY' } });
+  await store.deployProvider(SHARED_WS, { tenantId: TEN_B, providerType: 'cohere', model: 'model-b', secretRef: { name: 'BYOK_B_KEY' } });
 
   const rows = await pool.query(
     'SELECT tenant_id, model FROM workspace_embedding_providers WHERE workspace_id = $1 ORDER BY tenant_id',

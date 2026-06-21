@@ -7,7 +7,19 @@
 // the API key is NEVER stored in plaintext — only a `secretRef` is persisted, and the
 // HTTP backend resolves the secret at request time (no caching) so key rotation is
 // picked up immediately (mirrors config.secretRefs + Vault/ESO used elsewhere).
+//
+// BYOK confinement (fix-byok-secretref-endpoint-confinement / #659): mirrors the LLM executor —
+// the secretRef name is confined to a reserved prefix allow-list and the endpoint is validated
+// against an SSRF guard, both at config-deploy time (reject 400, no DB write) AND at request time
+// (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is confined.
 import { clientError } from './errors.mjs';
+import {
+  assertSecretRefAllowed,
+  assertEndpointAllowed,
+  isAllowedSecretName,
+  createConfinedSecretResolver,
+  parseAllowedSecretPrefixes,
+} from './byok-provider-guard.mjs';
 
 // Deterministic mock backend: produces a stable pseudo-vector of the requested dimension
 // from the input text. Used by tests and local dev (no external provider call).
@@ -429,8 +441,42 @@ function createPostgresMappingStore(pool) {
 // secretResolver(secretRef) bridges to Vault/ESO; in tests a mock backend is injected.
 export function createEmbeddingExecutor(options = {}) {
   const store = options.store ?? createEmbeddingProviderStore();
-  const secretResolver = options.secretResolver; // async (secretRef) -> string
   const backendFactory = options.backendFactory; // (config, resolveSecret) -> backend (test seam)
+
+  // BYOK confinement config (#659). Mirrors the LLM executor: `prefixes` is the reserved
+  // secret-name allow-list; `guardEnv` backs the confined resolver + endpoint host allow-list
+  // (injectable in tests); `endpointResolver` is the injectable DNS resolver for the SSRF guard.
+  const guardEnv = options.guardEnv ?? process.env;
+  const prefixes = options.secretPrefixes ?? parseAllowedSecretPrefixes(guardEnv);
+  const endpointResolver = options.endpointResolver; // (hostname) -> Promise<string[]> (test seam)
+  const enforceEndpointGuard = options.enforceEndpointGuard !== false;
+  // DEFAULT to a confined resolver so a non-allow-listed env var is NEVER read; an explicit
+  // resolver (tests) is still honored but additionally gated by isAllowedSecretName below.
+  const secretResolver = options.secretResolver ?? createConfinedSecretResolver({ env: guardEnv, prefixes });
+
+  const endpointGuardOpts = { env: guardEnv, ...(endpointResolver ? { resolver: endpointResolver } : {}) };
+  // Validate a configured endpoint; a nullish endpoint is a no-op (a mock/local backend makes no
+  // outbound call, so there is no SSRF surface to guard — the SSRF risk is only the dialed URL).
+  async function assertEndpoint(endpoint) {
+    if (enforceEndpointGuard && endpoint != null && endpoint !== '') await assertEndpointAllowed(endpoint, endpointGuardOpts);
+  }
+
+  // Confine the resolved secret to an allow-listed name (#659): re-checked at request time so a
+  // pre-existing malicious row can never resolve an arbitrary env var. A name-less secretRef
+  // (e.g. a {vaultPath} form) is passed through to the injected resolver unchanged.
+  function confinedResolveSecret(secretRef) {
+    if (!secretResolver) return undefined;
+    if (secretRef?.name !== undefined && !isAllowedSecretName(secretRef.name, prefixes)) return null;
+    return secretResolver(secretRef);
+  }
+
+  // Config-deploy: confine the secretRef + SSRF-validate the endpoint BEFORE persisting, so a
+  // rejected config (400) writes NO row. The store still strips any mis-passed plaintext key.
+  async function deployProvider(workspaceId, config = {}) {
+    assertSecretRefAllowed(config.secretRef, prefixes);
+    if (config.endpoint !== undefined) await assertEndpoint(config.endpoint);
+    return store.deployProvider(workspaceId, config);
+  }
 
   // tenantId is optional: the Postgres-backed store scopes the provider read to
   // (tenant_id, workspace_id) when it is supplied, so two tenants that happen to share a
@@ -441,14 +487,18 @@ export function createEmbeddingExecutor(options = {}) {
     if (!config) {
       throw clientError('No embedding provider configured for this workspace', 422, 'EMBEDDING_PROVIDER_MISSING');
     }
+    const endpoint = config.endpoint ?? options.defaultEndpoint;
+    // Re-validate the endpoint just before building the backend (DNS-rebinding defense +
+    // fail-closed for any malicious row persisted before this guard shipped).
+    await assertEndpoint(endpoint);
     if (backendFactory) {
-      return backendFactory(config, () => (secretResolver ? secretResolver(config.secretRef) : undefined));
+      return backendFactory(config, () => confinedResolveSecret(config.secretRef));
     }
     return httpEmbeddingBackend({
       providerType: config.providerType,
       model: config.model,
-      endpoint: config.endpoint ?? options.defaultEndpoint,
-      resolveSecret: () => (secretResolver ? secretResolver(config.secretRef) : undefined)
+      endpoint,
+      resolveSecret: () => confinedResolveSecret(config.secretRef)
     });
   }
 
@@ -470,5 +520,9 @@ export function createEmbeddingExecutor(options = {}) {
     return vector;
   }
 
-  return { store, resolveBackend, embedForWorkspace };
+  // `deployProvider` is the GUARDED config-deploy entrypoint the HTTP route uses (confines the
+  // secretRef + SSRF-validates the endpoint before persisting). `store` remains exposed for
+  // read/remove and for the direct-store test seam, but writes via the route go through
+  // deployProvider so the guard is always in force (#659).
+  return { store, deployProvider, resolveBackend, embedForWorkspace };
 }

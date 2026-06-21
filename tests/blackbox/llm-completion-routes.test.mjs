@@ -23,12 +23,20 @@ function makeRegistry() {
   return createConnectionRegistry({ resolveConnection: () => ({ dsn: 'postgres://unused/none' }) });
 }
 
+// BYOK confinement (#659): the executor now confines the secretRef name to a reserved prefix
+// (default `BYOK_`) and SSRF-validates the endpoint at deploy + request time. The provider config
+// below uses a `BYOK_`-prefixed name; the injected resolver (gated by the allow-list) returns the
+// stub key, and an injected DNS resolver maps the example endpoint host to a public IP so the SSRF
+// guard passes deterministically/offline.
+const PUBLIC_RESOLVER = async () => ['93.184.216.34']; // example.test → public IP (offline determinism)
+
 function makeExecutor({ secretResolver = () => FAKE_KEY } = {}) {
   return createLlmExecutor({
     providerStore: createLlmProviderStore(),
     usageStore: createLlmUsageStore(),
     secretResolver,
     backendFactory: () => localMockLlmBackend(),
+    endpointResolver: PUBLIC_RESOLVER,
   });
 }
 
@@ -52,7 +60,7 @@ const PROVIDER = {
   endpoint: 'https://api.example.test/v1/chat/completions',
   allowedModels: ['gpt-allowed'],
   defaultModel: 'gpt-allowed',
-  secretRef: { name: 'LLM_KEY' },
+  secretRef: { name: 'BYOK_LLM_KEY' }, // reserved-prefix name (#659 confinement)
 };
 
 async function putProvider(baseUrl, tenant, body = PROVIDER) {
@@ -69,7 +77,7 @@ test('bbx-llm-01: provider PUT→GET round-trips and never returns the plaintext
     const body = await get.json();
     assert.equal(body.providerType, 'openai');
     assert.deepEqual(body.allowedModels, ['gpt-allowed']);
-    assert.deepEqual(body.secretRef, { name: 'LLM_KEY' });
+    assert.deepEqual(body.secretRef, { name: 'BYOK_LLM_KEY' });
     assert.ok(!('apiKey' in body) && !('secret' in body), 'GET never returns a plaintext key');
     assert.ok(!JSON.stringify(body).includes(FAKE_KEY), 'plaintext is never echoed back');
   });
