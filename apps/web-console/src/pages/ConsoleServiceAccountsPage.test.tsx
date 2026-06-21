@@ -18,7 +18,14 @@ vi.mock('@/lib/console-service-accounts', () => ({
   createServiceAccount: (...args: unknown[]) => mockCreateServiceAccount(...args),
   issueServiceAccountCredential: (...args: unknown[]) => mockIssueServiceAccountCredential(...args),
   revokeServiceAccountCredential: (...args: unknown[]) => mockRevokeServiceAccountCredential(...args),
-  rotateServiceAccountCredential: (...args: unknown[]) => mockRotateServiceAccountCredential(...args)
+  rotateServiceAccountCredential: (...args: unknown[]) => mockRotateServiceAccountCredential(...args),
+  // Mirror the real helper closely enough for the page: 403 → fixed copy, otherwise the Error message.
+  consoleServiceAccountsErrorMessage: (error: unknown) => {
+    const status = typeof error === 'object' && error && 'status' in error ? (error as { status?: number }).status : undefined
+    if (status === 403) return 'Acceso denegado para gestionar service accounts.'
+    if (error instanceof Error && error.message) return error.message
+    return 'No se pudo completar la operación.'
+  }
 }))
 vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
 
@@ -87,5 +94,33 @@ describe('ConsoleServiceAccountsPage', () => {
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
     render(<ConsoleServiceAccountsPage />)
     expect(screen.getByRole('button', { name: /emitir/i })).toBeDisabled()
+  })
+
+  it('deshabilita emitir y rotar para una credencial revocada', () => {
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'revoked' }, accessProjection: { effectiveAccess: 'denied', clientState: 'disabled', credentialState: 'revoked' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    render(<ConsoleServiceAccountsPage />)
+    // Re-issuing or rotating a revoked credential is rejected by the control plane (409 CREDENTIAL_REVOKED);
+    // the UI must not offer those actions. Revocar stays enabled (idempotent).
+    expect(screen.getByRole('button', { name: /emitir/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /rotar/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /revocar/i })).toBeEnabled()
+  })
+
+  it('muestra feedback de error cuando emitir es rechazado (credencial revocada)', async () => {
+    const user = userEvent.setup()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    // Credential not yet reflected as revoked in this browser's index, so the button is enabled and the
+    // click reaches the control plane, which rejects it. The page must surface the failure, not crash or
+    // swallow it.
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    mockIssueServiceAccountCredential.mockRejectedValue(Object.assign(new Error('service account credential is revoked'), { status: 409 }))
+    render(<ConsoleServiceAccountsPage />)
+
+    await user.click(screen.getByRole('button', { name: /emitir/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/revoked/i)
+    // No success dialog opened.
+    expect(screen.queryByRole('dialog', { name: /credencial emitida/i })).not.toBeInTheDocument()
   })
 })
