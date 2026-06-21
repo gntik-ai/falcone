@@ -20,7 +20,7 @@
  *   task        -> executeActivity('executeTask', {activityId, retry, timeouts})
  *   branch      -> evaluateExpression activity per arm; route to first truthy arm / default
  *   wait        -> sleep(ISO-8601 duration)  (durable timer)
- *   approval    -> setHandler(signal); race signal receipt vs sleep(timeout)
+ *   approval    -> setHandler(signal); condition(signalReceived, timeout) (cancel-safe wait)
  *   sub-flow    -> executeChild(DslInterpreterWorkflow) inside a CancellationScope
  */
 import {
@@ -251,15 +251,18 @@ export async function DslInterpreterWorkflow(input: WorkflowInput): Promise<Work
     const isResolved = () => pendingApprovals.has(key) || pendingApprovals.has('__any__');
 
     if (node.timeout) {
-      // Race the signal against the timeout inside a cancellation scope so the loser timer
-      // is cancelled deterministically.
-      const timedOut = await CancellationScope.cancellable(async () => {
-        const signalled = condition(isResolved).then(() => false);
-        const timer = sleep(asDuration(node.timeout as string)).then(() => true);
-        const result = await Promise.race([signalled, timer]);
-        CancellationScope.current().cancel();
-        return result;
-      }).catch(() => isResolved() ? false : true);
+      // `condition(predicate, timeout)` is Temporal's built-in timed wait: it resolves
+      // `true` when the approval signal arrives and `false` when the timeout fires, and it
+      // manages + cleans up the durable timer itself (deterministic on replay). Crucially —
+      // unlike a hand-rolled `CancellationScope.cancellable(...).catch(...)` race — it does
+      // NOT swallow an EXTERNAL workflow cancellation: an operator `cancel()` that arrives
+      // while parked here throws `CancelledFailure`, which propagates so the run ends
+      // `Canceled`. We therefore never fabricate a `{timedOut:true}` approval outcome for a
+      // cancellation (#678). The state-record below is byte-identical to before for the two
+      // legitimate outcomes (signal → `{approved, timedOut:false}`; timeout → `{approved:false,
+      // timedOut:true}`); only the cancellation case changes.
+      const resolved = await condition(isResolved, asDuration(node.timeout as string));
+      const timedOut = !resolved;
       const payload = pendingApprovals.get(key) ?? pendingApprovals.get('__any__');
       state = {
         ...state,
