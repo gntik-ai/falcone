@@ -7,8 +7,15 @@
 // empty `messages` array fails NON-retryably BEFORE any Kafka call (no point retrying a
 // deterministic input error); a broker error from the executor (502 KAFKA_ERROR) is
 // retryable.
+//
+// Workspace binding (security, #663): the workspace whose topic namespace is published to is the
+// execution-token-bound `tenant.workspaceId` (validated by catalog.mjs::dispatchTask). A
+// `workspaceId` smuggled in via the task `input` may NOT override it — a value differing from the
+// token workspace fails closed (non-retryable FORBIDDEN) so a flow author cannot publish into a
+// sibling workspace's topics. See workspace-binding.mjs.
 import { assertPayloadSize } from './limits.mjs';
 import { toNonRetryable, toRetryable, classifyExecutorError } from './errors.mjs';
+import { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 
 /**
  * @param {{ params: object, tenant: object, credential?: object }} input
@@ -22,7 +29,7 @@ export async function eventsPublish(input, deps = {}) {
   const tenant = input.tenant ?? {};
   const credential = input.credential ?? {};
   if (!tenant.tenantId) throw toNonRetryable('UNAUTHENTICATED', 'events.publish requires a tenant context');
-  const workspaceId = params.workspaceId ?? tenant.workspaceId;
+  const workspaceId = resolveActivityWorkspaceId(params, tenant);
   if (!workspaceId) throw toNonRetryable('UNAUTHENTICATED', 'events.publish requires a workspaceId');
   if (!params.topic) throw toNonRetryable('VALIDATION_ERROR', 'events.publish requires a topic');
 

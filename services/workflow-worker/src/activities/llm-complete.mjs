@@ -6,12 +6,19 @@
 // activity carries the workspace-scoped execution context so the completion + metering are
 // tenant-isolated. Mirrors functions-invoke.mjs: a thin activity over an injected executor.
 //
+// Workspace binding (security, #663): the workspace is the execution-token-bound
+// `tenant.workspaceId` (validated by catalog.mjs::dispatchTask). A `workspaceId` smuggled in via
+// the task `input` may NOT override it — a value differing from the token workspace fails closed
+// (non-retryable FORBIDDEN) so a flow author cannot redirect the BYOK provider/key/metering to a
+// sibling workspace (cross-workspace resource theft). See workspace-binding.mjs.
+//
 // Error mapping (via classifyExecutorError): a disallowed model surfaces from the executor as a
 // 422 `MODEL_NOT_ALLOWED` → non-retryable; a missing provider (422 `LLM_PROVIDER_MISSING`) and an
 // unresolved secret (500 `LLM_PROVIDER_SECRET_UNRESOLVED`) are likewise non-retryable; transient
 // provider 5xx/429 are retryable.
 import { assertPayloadSize, MAX_OUTPUT_BYTES } from './limits.mjs';
 import { toNonRetryable, classifyExecutorError } from './errors.mjs';
+import { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 
 /**
  * @param {{ params: object, tenant: object, credential?: object }} input
@@ -24,7 +31,7 @@ export async function llmComplete(input, deps = {}) {
   const params = input.params ?? {};
   const tenant = input.tenant ?? {};
   if (!tenant.tenantId) throw toNonRetryable('UNAUTHENTICATED', 'llm.complete requires a tenant context');
-  const workspaceId = params.workspaceId ?? tenant.workspaceId;
+  const workspaceId = resolveActivityWorkspaceId(params, tenant);
   if (!workspaceId) throw toNonRetryable('UNAUTHENTICATED', 'llm.complete requires a workspaceId');
   if (!params.model) throw toNonRetryable('VALIDATION_ERROR', 'llm.complete requires a model');
 
