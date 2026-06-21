@@ -5,6 +5,12 @@
 // activity carries the workspace-scoped credential; the executor scopes the function lookup
 // to the credential's workspace, so cross-workspace invocation is impossible.
 //
+// Workspace binding (security, #663): the workspace the function lookup is scoped to is the
+// execution-token-bound `tenant.workspaceId` (validated by catalog.mjs::dispatchTask). A
+// `workspaceId` smuggled in via the task `input` may NOT override it — a value differing from the
+// token workspace fails closed (non-retryable FORBIDDEN) so a flow author cannot invoke a sibling
+// workspace's function. See workspace-binding.mjs.
+//
 // The functions executor returns a structured result instead of throwing for execution
 // outcomes:
 //   - unknown function  → throws clientError 404 FUNCTION_NOT_FOUND   → non-retryable
@@ -13,6 +19,7 @@
 //   - success           → returns { status: 'success', result }       → success envelope
 import { assertPayloadSize, MAX_OUTPUT_BYTES } from './limits.mjs';
 import { toNonRetryable, toRetryable, classifyExecutorError } from './errors.mjs';
+import { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 
 const FN_CODE_OVERRIDES = {
   FUNCTION_NOT_FOUND: 'FUNCTION_NOT_FOUND',
@@ -30,7 +37,7 @@ export async function functionsInvoke(input, deps = {}) {
   const tenant = input.tenant ?? {};
   const credential = input.credential ?? {};
   if (!tenant.tenantId) throw toNonRetryable('UNAUTHENTICATED', 'functions.invoke requires a tenant context');
-  const workspaceId = params.workspaceId ?? tenant.workspaceId;
+  const workspaceId = resolveActivityWorkspaceId(params, tenant);
   if (!workspaceId) throw toNonRetryable('UNAUTHENTICATED', 'functions.invoke requires a workspaceId');
 
   const name = params.actionId ?? params.name;
