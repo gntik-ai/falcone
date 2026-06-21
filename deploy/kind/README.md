@@ -68,6 +68,21 @@ login). Proven end-to-end through the gateway with a real superadmin JWT:
   is `CONSOLE_SIGNUP_PASSWORD_MIN_LENGTH` (default `8`); it is BOTH advertised by the policy
   endpoint AND enforced by signup (sub-minimum → 400, no user created), and fails closed to
   `8` if unset/invalid — it can never disable enforcement (#669).
+- **Offboarding (cascade).** `DELETE /v1/tenants/{id}` soft-deletes (reversible);
+  `POST /v1/tenants/{id}/purge` is the hard cascade that removes EVERY resource the tenant
+  owns — workspaces, per-workspace `wsdb_*` Postgres databases, the Keycloak realm, buckets,
+  topics, registry rows, async-op rows — and `DELETE /v1/workspaces/{id}` is the per-workspace
+  counterpart. The purge/delete response reports what was torn down under `removed`. **The
+  FerretDB document store cascades too (#682):** a mongo database provisioned via
+  `POST /v1/workspaces/{id}/databases {engine:"mongodb"}` is recorded in
+  `workspace_mongo_databases`, and on purge/delete the tenant's documents are deleted **by
+  `{tenantId}`** across that db's collections. Because FerretDB is ONE shared cluster keyed
+  only by a `tenantId` document field (db/collection names are caller-supplied and shared
+  across tenants), a database is physically `dropDatabase()`-ed **only when it is empty across
+  ALL tenants** — a same-named db that still holds another tenant's documents is **retained**
+  (only the purged tenant's docs are removed; the drop is reported under
+  `removed.mongoDatabases`, retained dbs under `removed.mongoDatabasesRetained`). A naïve
+  drop-by-name would be cross-tenant data loss, so it is deliberately avoided.
 
 Full lifecycle verified: create tenant → create+activate plan → assign plan →
 set resource limit → create user → the tenant's effective entitlements reflect
@@ -209,7 +224,10 @@ this control-plane serves. To make the shell usable end-to-end:
   collection detail, indexes, views, and documents (skip/limit cursor, BSON made
   JSON-safe — ObjectId→hex, Date→ISO). `POST /v1/workspaces/{id}/databases` is an
   engine-dispatched provisioner (`postgresql`|`mongodb`) — the SPA's
-  ProvisionDatabaseWizard target. Verified: provisioned `wsdemo` + 2 collections,
+  ProvisionDatabaseWizard target. A `mongodb` provision also records a
+  `workspace_mongo_databases` registry row (idempotent) so tenant-purge / workspace-delete can
+  discover and tear down the document data isolation-safely (#682; see the Offboarding note
+  above). Verified: provisioned `wsdemo` + 2 collections,
   seeded 3 users / 2 orders / a `email_unique` index → the page shows the database
   (350 B / 2 collections / 3 indexes), collection counts, indexes, and the documents.
   `ConsoleMongoPage` was lazy (React #426) → eager import.
