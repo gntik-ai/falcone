@@ -17,10 +17,12 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { createMultiRealmVerifier } from './jwt-verify.mjs';
+import { createMultiRealmVerifier, deriveRealmTopology } from './jwt-verify.mjs';
 import { routes as seedRoutes } from './routes.mjs';
 import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import { ensureSchema } from './tenant-store.mjs';
+import * as tenantStore from './tenant-store.mjs';
+import { createSaRevocationCheck } from './sa-revocation.mjs';
 import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
@@ -50,11 +52,37 @@ const pool = DB_URL
 // from JWKS_URL/ISSUER), fetching each realm's JWKS on demand. For a tenant-realm token the tenant id
 // comes from the cryptographically-verified issuer (the realm name), not a forgeable claim.
 const ALLOW_TENANT_REALMS = process.env.KEYCLOAK_ALLOW_TENANT_REALMS !== '0';
+// Service-account revocation/rotation propagation (fix-sa-credential-revocation-invalidate-tokens,
+// #684). After offline JWT validation, reject any service-account access token whose credential has
+// been revoked (service_accounts.status='revoked') or rotated (its `iat` predates
+// credentials_invalidated_at). The lookup is SCOPED by the realm (== tenant id) derived from the
+// verified issuer — the SA client id is not globally unique — using the SAME Keycloak topology the
+// verifier derives (deriveRealmTopology). Per-(realm,client-id) lookups are cached for
+// SA_REVOCATION_CACHE_MS, also the upper bound on the propagation window (default 10000 → ≤10s; 0 = no
+// cache = immediate). Non-SA (user/owner) tokens never reach the DB — pre-filtered on the `sa-` prefix.
+const { realmsBase: SA_REALMS_BASE, platformRealm: SA_PLATFORM_REALM } = deriveRealmTopology(ISSUER, JWKS_URL);
+// Env parse that treats unset/blank as "use the default" (Number('') === 0 would silently disable the
+// cache); only an explicit finite number overrides.
+const numEnv = (v, dflt) => (v == null || v === '' || !Number.isFinite(Number(v)) ? dflt : Number(v));
+const SA_REVOCATION_CACHE_MS = numEnv(process.env.SA_REVOCATION_CACHE_MS, 10_000);
+// Small clock-skew allowance (seconds) for the rotate watermark — distinct from the JWT exp/nbf clock
+// tolerance. Keep it ≤1 so the natural mint→rotate→probe flow (gap ≥2s) always rejects a pre-rotation
+// token; see docs (a same-second-as-rotation token is an inherent <1s blind spot of second-grained iat).
+const SA_REVOCATION_SKEW_SEC = numEnv(process.env.SA_REVOCATION_SKEW_SEC, 1);
+const saRevocationCheck = createSaRevocationCheck({
+  pool,
+  store: tenantStore,
+  realmsBase: SA_REALMS_BASE,
+  platformRealm: SA_PLATFORM_REALM,
+  cacheMs: SA_REVOCATION_CACHE_MS,
+  skewSec: SA_REVOCATION_SKEW_SEC,
+});
 const jwtVerifier = createMultiRealmVerifier({
   jwksUrl: JWKS_URL,
   issuer: ISSUER,
   audience: AUDIENCE,
   allowTenantRealms: ALLOW_TENANT_REALMS,
+  revocationCheck: saRevocationCheck,
 });
 
 // ---- route table -----------------------------------------------------------
