@@ -11,6 +11,26 @@ const BASE = (process.env.KEYCLOAK_BASE_URL || 'http://falcone-keycloak:8080').r
 const ADMIN_USER = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.KEYCLOAK_ADMIN_PASSWORD || '';
 
+// Deployment-configured redirect-URI / web-origin allow-list for per-tenant public app clients
+// (#670). NEVER a wildcard: a `['*']` allow-list makes the authorization endpoint accept an
+// arbitrary attacker-controlled `redirect_uri` (auth-code interception). Parse a comma-separated
+// env list and drop any wildcard entry; fall back to a NON-wildcard placeholder when unset.
+//   - TENANT_APP_REDIRECT_URIS: e.g. "https://app.dev.example.com/*,http://localhost:8088/*"
+//   - TENANT_APP_WEB_ORIGINS:   e.g. "+"  (Keycloak idiom for "the registered redirect URIs'
+//     origins" — explicitly NOT `*`).
+export function parseAllowList(raw, fallback) {
+  const items = String(raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => s !== '*'); // a wildcard is never an acceptable allow-list entry
+  return items.length > 0 ? items : fallback;
+}
+// Non-wildcard fallbacks (repo convention placeholder host). `+` web-origin = "origins of the
+// registered redirect URIs", which is NOT `*`.
+const DEFAULT_APP_REDIRECT_URIS = parseAllowList(process.env.TENANT_APP_REDIRECT_URIS, ['https://app.in-falcone.example.com/*']);
+const DEFAULT_APP_WEB_ORIGINS = parseAllowList(process.env.TENANT_APP_WEB_ORIGINS, ['+']);
+
 let cachedToken = null; // { token, exp }
 async function adminToken() {
   const now = Math.floor(Date.now() / 1000);
@@ -212,11 +232,20 @@ export const kcAdmin = {
   // Per-tenant app client in the tenant realm (fix-tenant-realm-token-issuance, A3): a public
   // client with the password (ROPC) + standard flows enabled, so tenant owners/users in the realm
   // can actually obtain tokens. Returns the client UUID (idempotent on clientId).
-  async createPublicAppClient(realm, { clientId, name, redirectUris = ['*'], webOrigins = ['*'] }) {
+  //
+  // SECURITY (#670): the redirect-URI / web-origin allow-list MUST NOT default to a wildcard
+  // (`['*']`). A wildcard makes the authorization-code endpoint accept any attacker-controlled
+  // `redirect_uri`, a classic auth-code interception vector. The defaults come from the
+  // deployment-configured allow-list (TENANT_APP_REDIRECT_URIS / TENANT_APP_WEB_ORIGINS); a
+  // caller may still pass explicit `redirectUris`/`webOrigins` to override. PKCE (S256) is always
+  // enabled for the public client to harden the auth-code flow; ROPC (directAccessGrants) is
+  // unaffected by PKCE and keeps working.
+  async createPublicAppClient(realm, { clientId, name, redirectUris = DEFAULT_APP_REDIRECT_URIS, webOrigins = DEFAULT_APP_WEB_ORIGINS }) {
     const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/clients`, {
       clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect',
       publicClient: true, standardFlowEnabled: true, directAccessGrantsEnabled: true, serviceAccountsEnabled: false,
-      redirectUris, webOrigins, attributes: { 'in-falcone.kind': 'tenant-app' }
+      redirectUris, webOrigins,
+      attributes: { 'in-falcone.kind': 'tenant-app', 'pkce.code.challenge.method': 'S256' }
     });
     let uuid = created.id;
     if (!uuid) { const c = await this.findClient(realm, clientId); uuid = c?.id; }
