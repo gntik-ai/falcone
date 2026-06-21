@@ -33,6 +33,7 @@ export { httpRequest, httpRequestInputSchema, httpRequestOutputSchema } from './
 export { emailSend, emailSendInputSchema, emailSendOutputSchema } from './email-send.mjs';
 export { llmComplete, llmCompleteInputSchema, llmCompleteOutputSchema } from './llm-complete.mjs';
 
+export { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 export { assertPayloadSize, MAX_INPUT_BYTES, MAX_OUTPUT_BYTES, serializedByteLength } from './limits.mjs';
 export { toNonRetryable, toRetryable, classifyExecutorError, isTransientNetworkError } from './errors.mjs';
 export { resolveSsrfSafe } from './ssrf.mjs';

@@ -7,12 +7,19 @@
 // TenantContext envelope) into the executor `identity` with `dbRole = "falcone_service"`,
 // so Postgres RLS / Mongo workspace scoping restricts the query to the tenant's own rows.
 //
+// Workspace binding (security, #663): the workspace scoping the query is the
+// execution-token-bound `tenant.workspaceId` (validated by catalog.mjs::dispatchTask). A
+// `workspaceId` smuggled in via the task `input` may NOT override it — a value differing from the
+// token workspace fails closed (non-retryable FORBIDDEN) so a flow author cannot read/write a
+// sibling workspace's data. See workspace-binding.mjs.
+//
 // Deps (injected by the catalog dispatch / tests):
 //   - executePostgresData(registry, params)  from postgres-data-executor.mjs
 //   - executeMongoData(params)               from mongo-data-executor.mjs
 //   - pgRegistry                             the workspace-client registry for Postgres
 import { assertPayloadSize, MAX_OUTPUT_BYTES } from './limits.mjs';
 import { toNonRetryable, classifyExecutorError } from './errors.mjs';
+import { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 
 const SERVICE_DB_ROLE = 'falcone_service';
 
@@ -40,7 +47,7 @@ export async function dbQuery(input, deps = {}) {
   if (!tenant.tenantId) {
     throw toNonRetryable('UNAUTHENTICATED', 'db.query requires a tenant context');
   }
-  const workspaceId = params.workspaceId ?? tenant.workspaceId;
+  const workspaceId = resolveActivityWorkspaceId(params, tenant);
   if (!workspaceId) {
     throw toNonRetryable('UNAUTHENTICATED', 'db.query requires a workspaceId');
   }

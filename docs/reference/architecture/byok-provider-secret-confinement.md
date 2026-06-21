@@ -61,6 +61,23 @@ To onboard a BYOK key, mount it under a `BYOK_`-prefixed env var (e.g. `BYOK_OPE
 > A `secretRef` with no `name` (e.g. a `{ "vaultPath": "…" }` form handled by a different resolver)
 > is not an env-var lookup and is left to that resolver's own fail-closed handling.
 
+## Flow `llm.complete` binds to the execution-token workspace (#663)
+
+The BYOK provider/key is resolved per `(tenant_id, workspace_id)`, so *which workspace* a
+completion runs as decides which key, model allow-list, endpoint, and token-usage meter apply.
+When the completion is driven by a flow's `llm.complete` task
+(`services/workflow-worker/src/activities/llm-complete.mjs`), the workspace is taken from the
+**per-execution token** (`TenantContext.workspaceId`, validated by the worker's
+`catalog.mjs::dispatchTask` before the activity runs) — **not** from the flow author's task input.
+
+A `workspaceId` placed inside the task `input` may not override the execution workspace: if it
+differs from the token workspace the activity fails closed with a non-retryable **`FORBIDDEN`**
+(`"task input may not override the execution workspace"`). This prevents a flow author in workspace
+A from injecting `workspaceId: <sibling-workspace-B>` to spend workspace B's BYOK key/quota — the
+workflow-side analog of the request body never being trusted for `tenantId`. The same binding
+applies to the other workspace-scoped flow activities (`db.query`, `events.publish`,
+`functions.invoke`); see `services/workflow-worker/README.md` ("Workspace binding").
+
 ## Endpoint SSRF policy
 
 The provider `endpoint` is validated both at config time (reject **HTTP 400
