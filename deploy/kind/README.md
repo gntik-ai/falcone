@@ -35,6 +35,17 @@ Operational families (A): **plans** (catalog, limits, lifecycle), **quotas**
 validate), **async-ops query**, **scheduling**. Superadmin works fully;
 tenant-scoped routes additionally need a JWT carrying `tenant_id`/`workspace_id`.
 
+Request-body validation (error semantics): a JSON request body must be a JSON
+**object**. A malformed body is rejected at the parse seam with a structured
+`400` BEFORE handler dispatch, uniformly across every mutating route — never a
+`500`: unparseable bytes → `400 {"code":"INVALID_JSON"}`; a body that parses to a
+non-object (`null`, an array, or a scalar like `false`/`42`/`"x"`) →
+`400 {"code":"VALIDATION_ERROR","message":"Request body must be a JSON object"}`
+(#666). An empty body is the no-payload case (dispatched as `{}`); an empty
+object `{}` is passed through so the handler applies its own field-level
+validation (e.g. `400 VALIDATION_ERROR` for a missing required field). A
+non-JSON content type (object uploads) is never parsed as JSON.
+
 ## Domain (B) — tenant lifecycle, users, console login (BUILT)
 
 The repo only stubs these (`apps/control-plane/src/workflows/wf-con-002.mjs`:
