@@ -8,7 +8,7 @@
 // usage is workspace-scoped.
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { issueWorkspaceIdentity } from './seaweedfs-identity.mjs';
+import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, workspaceIdentityName } from './seaweedfs-identity.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
 // or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
@@ -407,23 +407,29 @@ async function storageProvisionBucket(ctx) {
   try {
     await createBucket(bucket);
     const rec = await store.insertBucket(ctx.pool, { workspaceId: ws.id, tenantId: ws.tenant_id, bucketName: bucket, region: REGION });
-    // Issue a per-workspace SeaweedFS identity scoped to ONLY this bucket (#553), so the
-    // tenant gets a credential that can't reach any other tenant's bucket — instead of
-    // sharing the broad admin/master key. Best-effort: a failure here must not fail the
-    // provision (the bucket is still usable via the tenant-gated REST API); the credential
-    // can be re-issued. Enabled by DEFAULT (filer-mode) — see tenantIdentitiesEnabled:
-    // gating only on STORAGE_TENANT_IDENTITIES=1 meant a values overlay that REPLACED the
-    // control-plane env list silently dropped the flag, so every provision returned
-    // storageCredential:null and a single shared admin cred served all tenants (P1
-    // tenant-isolation, live 2026-06-18). It can still be turned off explicitly (='0').
+    // Issue a per-BUCKET SeaweedFS identity scoped to ONLY this bucket (#553, #673), so
+    // the tenant gets a credential that can't reach ANY other bucket — not another
+    // tenant's bucket AND not a sibling bucket in the same workspace — instead of sharing
+    // the broad admin/master key. Keyed on the (globally-unique, workspace-embedding)
+    // physical bucket name; the issuer does delete-then-apply so a re-provision is a clean
+    // rotate (exactly one active key, no accumulation) — fixing #673, where a single
+    // per-workspace identity accumulated a grant + a new key for EVERY bucket so a cred
+    // "scoped to bucket A" could list buckets B/C in the same workspace. Best-effort: a
+    // failure here must not fail the provision (the bucket is still usable via the
+    // tenant-gated REST API); the credential can be re-issued via the rotate endpoint.
+    // Enabled by DEFAULT (filer-mode) — see tenantIdentitiesEnabled: gating only on
+    // STORAGE_TENANT_IDENTITIES=1 meant a values overlay that REPLACED the control-plane
+    // env list silently dropped the flag, so every provision returned storageCredential:
+    // null and a single shared admin cred served all tenants (P1 tenant-isolation, live
+    // 2026-06-18). It can still be turned off explicitly (='0').
     let storageCredential = null;
     if (tenantIdentitiesEnabled()) {
       try {
-        const issued = await issueWorkspaceIdentity({ workspaceId: ws.id, bucket });
+        const issued = await issueBucketIdentity({ bucket, workspaceId: ws.id });
         // Return the one-time secret to the caller; never persist the plaintext secret.
         storageCredential = { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions };
       } catch (e) {
-        console.error('[storage] per-workspace identity issuance failed (bucket provisioned without a scoped credential):', e?.message ?? e);
+        console.error('[storage] per-bucket identity issuance failed (bucket provisioned without a scoped credential):', e?.message ?? e);
       }
     }
     return ok(201, { bucket: { resourceId: bucket, bucketName: bucket, workspaceId: ws.id, tenantId: ws.tenant_id, region: REGION, status: 'active' }, record: rec, storageCredential });
@@ -432,7 +438,82 @@ async function storageProvisionBucket(ctx) {
   }
 }
 
+// POST /v1/storage/buckets/{bucketId}/credentials — ROTATE the bucket's storage
+// credential (#673). Re-issues the per-bucket identity (delete-then-apply), so the
+// PRIOR access key for this bucket no longer authenticates and a single fresh key
+// scoped to ONLY this bucket is returned. Bucket-keyed (not product credentialId-keyed)
+// to match the existing kind storage routes; the response is the same `storageCredential`
+// shape `storageProvisionBucket` returns. Ownership-gated exactly like object I/O.
+async function storageRotateCredential(ctx) {
+  const bucket = ctx.params.bucketId;
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  // The bucket must exist in the registry (a superadmin bypasses the owner check above,
+  // so confirm existence here rather than leaking a 404 vs 200 distinction by ownership).
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  if (!tenantIdentitiesEnabled()) {
+    return err(409, 'STORAGE_IDENTITIES_DISABLED', 'per-bucket storage identities are disabled (STORAGE_TENANT_IDENTITIES=0)');
+  }
+  try {
+    // ctx.seaweedClient is an OPTIONAL test seam (the in-pod default is the real k8s
+    // client inside seaweedfs-identity.mjs); production passes nothing → real client.
+    const clientOpt = ctx.seaweedClient ? { client: ctx.seaweedClient } : {};
+    const issued = await issueBucketIdentity({ bucket, workspaceId: rec.workspace_id, ...clientOpt });
+    // ALSO delete the LEGACY per-workspace identity for this bucket's workspace (#673): a
+    // pre-fix `falcone-ws-<wsId>` identity still accumulated a grant for this bucket, so
+    // unless we remove it the rotated per-bucket key would NOT be the only key reaching the
+    // bucket. The startup migration sweeps these too; doing it here makes a single rotate
+    // between deploys immediately invalidate every key that can reach the bucket. Best-effort
+    // — the per-bucket re-issue above is the primary action; a failure here must not fail the
+    // rotate (and a missing legacy identity is a clean no-op).
+    await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
+    return ok(200, { storageCredential: { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions } });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_ROTATE_FAILED', String(e.message ?? e));
+  }
+}
+
+// Best-effort delete of the legacy per-WORKSPACE identity (`falcone-ws-<wsId>`) on
+// rotate/revoke (#673). The per-bucket action is the primary fix; this also removes the
+// over-granted legacy identity so it can no longer reach the bucket. Never throws (a
+// missing identity or a transient Job-post failure must not fail the caller's operation);
+// only logs. Skips when there is no workspace id.
+async function revokeLegacyWorkspaceIdentity(workspaceId, seaweedClient) {
+  if (!workspaceId) return;
+  try {
+    const identityName = workspaceIdentityName(workspaceId);
+    await revokeIdentityByName({ identityName, jobPrefix: 'wsrm', ...(seaweedClient ? { client: seaweedClient } : {}) });
+  } catch (e) {
+    console.error(`[storage] best-effort legacy per-workspace identity delete failed (workspace ${workspaceId}):`, e?.message ?? e);
+  }
+}
+
+// DELETE /v1/storage/buckets/{bucketId}/credentials — REVOKE the bucket's storage
+// credential (#673). Deletes the per-bucket SeaweedFS identity (and all its keys) so the
+// prior access key is rejected. Idempotent (revoking when no identity exists still
+// succeeds). Ownership-gated exactly like object I/O.
+async function storageRevokeCredential(ctx) {
+  const bucket = ctx.params.bucketId;
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  try {
+    // ctx.seaweedClient is an OPTIONAL test seam (see storageRotateCredential).
+    await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
+    // ALSO delete the LEGACY per-workspace identity (`falcone-ws-<wsId>`) for this bucket's
+    // workspace (#673): a pre-fix shared identity also held a grant for this bucket, so a
+    // revoke that only deleted the per-bucket identity would leave that legacy key still
+    // able to reach the (deterministically-named, possibly re-created) bucket. Best-effort
+    // — the per-bucket delete above is the primary; a missing legacy identity is a no-op.
+    await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
+    return ok(200, { bucket, revoked: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_REVOKE_FAILED', String(e.message ?? e));
+  }
+}
+
 export const STORAGE_HANDLERS = {
   storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
-  storagePutObject, storageGetObject, storageDeleteObject
+  storagePutObject, storageGetObject, storageDeleteObject,
+  storageRotateCredential, storageRevokeCredential
 };

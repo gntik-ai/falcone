@@ -27,6 +27,8 @@ import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
 import { applyWebhookSchema } from './webhook-schema.mjs';
+import { tenantIdentitiesEnabled } from './storage-handlers.mjs';
+import { cleanupLegacyWorkspaceIdentities } from './seaweedfs-identity.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
@@ -429,6 +431,26 @@ runWithRetry(async (attempt) => {
   console.error('[control-plane] schema/recovery permanently failed; exiting for restart:', e?.message ?? e);
   process.exit(1);
 });
+// One-shot forward migration for #673: invalidate ALL legacy per-WORKSPACE SeaweedFS
+// identities (`falcone-ws-*`). Pre-fix, one identity per workspace accumulated a grant +
+// a fresh key for every bucket, so any of its keys reached every (current or RE-CREATED)
+// bucket in the workspace — and orphaned legacy identities (workspace/buckets deleted)
+// still authenticated against a re-created, deterministically-named bucket. Switching the
+// issuer to per-bucket identities is forward-only and does NOT remove those live legacy
+// keys; this cleanup does. It is BEST-EFFORT and NON-FATAL: it never blocks or crashes
+// boot (independent of the DB schema retry above), is idempotent (a no-op once the legacy
+// identities are gone, so running at every boot is harmless), and skips cleanly when not
+// in-cluster (local/test runs have no SA token to post the Job). Gated on the same flag
+// as per-bucket issuance — if identities are disabled there is nothing to migrate.
+if (tenantIdentitiesEnabled()) {
+  cleanupLegacyWorkspaceIdentities()
+    .then((r) => {
+      if (r.posted) console.log(`[control-plane] #673 legacy per-workspace identity cleanup Job posted: ${r.jobName}`);
+      else if (r.skipped) console.log(`[control-plane] #673 legacy identity cleanup skipped (${r.skipped})`);
+      else if (r.error) console.warn(`[control-plane] #673 legacy identity cleanup could not post a Job (non-fatal): ${r.error}`);
+    })
+    .catch((e) => console.warn('[control-plane] #673 legacy identity cleanup unexpected error (non-fatal):', e?.message ?? e));
+}
 if (ROUTE_MAP_FILE) {
   readFile(ROUTE_MAP_FILE, 'utf8').then((txt) => {
     try { const extra = JSON.parse(txt); loadRoutes(Array.isArray(extra) ? extra : []); console.log(`[control-plane] loaded ${ROUTES.length} routes (seed + ${ROUTE_MAP_FILE})`); }
