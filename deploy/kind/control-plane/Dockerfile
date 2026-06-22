@@ -24,6 +24,7 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
      deploy/kind/control-plane/governance-schema.mjs deploy/kind/control-plane/workspace-quota.mjs \
      deploy/kind/control-plane/metrics-handlers.mjs deploy/kind/control-plane/metrics-registry.mjs \
      deploy/kind/control-plane/storage-handlers.mjs deploy/kind/control-plane/seaweedfs-identity.mjs \
+     deploy/kind/control-plane/storage-quota.mjs \
      deploy/kind/control-plane/mongo-handlers.mjs deploy/kind/control-plane/pg-handlers.mjs \
      deploy/kind/control-plane/kafka-handlers.mjs \
      deploy/kind/control-plane/fn-handlers.mjs deploy/kind/control-plane/function-executor.mjs \
