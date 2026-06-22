@@ -30,6 +30,7 @@ import { applyWebhookSchema } from './webhook-schema.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
+import { normalizeJsonBody } from './request-body.mjs';
 
 const { Pool } = pg;
 
@@ -319,7 +320,13 @@ const server = http.createServer(async (req, res) => {
     let rawBodyIsBinary = false;
     if (rawBody.length) {
       if (isJsonBody) {
-        try { body = JSON.parse(rawBody.toString('utf8')); } catch { return sendJson(res, 400, { code: 'INVALID_JSON', message: 'Body is not valid JSON' }); }
+        // Parse + validate the JSON body in one place: unparseable bytes -> 400 INVALID_JSON,
+        // a body that parses to a non-object (null, array, scalar) -> 400 VALIDATION_ERROR.
+        // Rejecting here, before handler dispatch, keeps a malformed body from reaching a
+        // handler that derefs body.<field> and throwing an opaque 500 (#666).
+        const parsedBody = normalizeJsonBody(rawBody);
+        if (!parsedBody.ok) return sendJson(res, parsedBody.statusCode, parsedBody.error);
+        body = parsedBody.body;
       } else {
         rawBodyIsBinary = true;
       }
