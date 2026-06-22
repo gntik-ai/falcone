@@ -897,12 +897,29 @@ export function createFlowExecutor({
     };
   }
 
+  // Temporal raises a WorkflowNotFoundError for BOTH a run that never existed AND one that has
+  // already closed ("workflow execution already completed"). Detect by error NAME (the @temporalio
+  // /client class is loaded dynamically in main.mjs, never statically here — the executor module
+  // also boots in the no-Temporal in-memory black-box mode). `code === 5` is the gRPC NOT_FOUND
+  // status, kept as a defensive fallback. Without this mapping the raw error has no `.statusCode`
+  // and the central catch in server.mjs surfaces it as a 500 CONTROL_PLANE_ERROR (#677).
+  function isWorkflowNotFound(err) {
+    return err?.name === 'WorkflowNotFoundError' || err?.code === 5;
+  }
+
   async function cancelExecution({ identity, flowId, executionId }) {
     // Mutating run path: a foreign prefix is 403 (spec scenario), not 404.
     assertOwnedWorkflowId(executionId, identity, { workspaceId: identity.workspaceId, flowId, forbid: true });
     const client = await temporal.getClient();
     const handle = client.workflow.getHandle(executionId);
-    await handle.cancel();
+    try {
+      await handle.cancel();
+    } catch (err) {
+      // A missing or already-closed run is a client error (404), not a 500 — mirrors getExecution.
+      // Any OTHER error (e.g. TEMPORAL_UNAVAILABLE) is re-thrown unchanged so it still surfaces 500.
+      if (isWorkflowNotFound(err)) throw clientError('Execution not found', 404, 'EXECUTION_NOT_FOUND');
+      throw err;
+    }
     await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_CANCELLED, { identity, flowId, executionId });
     return { executionId, workflowId: executionId, status: 'Cancelling' };
   }
@@ -968,11 +985,19 @@ export function createFlowExecutor({
     // signalName (an approval node id or the human-approval alias) is carried in the payload's
     // nodeId so the interpreter routes it to the right approval node.
     const nodeId = signalName === HUMAN_APPROVAL_ALIAS ? (payload?.nodeId ?? undefined) : signalName;
-    await source.signal(APPROVAL_SIGNAL, {
-      approved: payload?.approved ?? true,
-      actor: payload?.actor ?? identity.actorId,
-      ...(nodeId ? { nodeId } : {}),
-    });
+    try {
+      await source.signal(APPROVAL_SIGNAL, {
+        approved: payload?.approved ?? true,
+        actor: payload?.actor ?? identity.actorId,
+        ...(nodeId ? { nodeId } : {}),
+      });
+    } catch (err) {
+      // describe() above succeeds for a terminal run, but signalling a closed (or vanished) run
+      // raises WorkflowNotFoundError → that is a "not running" client error (409), not a 500. Any
+      // OTHER error is re-thrown unchanged so genuine infra failures still surface as 500.
+      if (isWorkflowNotFound(err)) throw clientError('Execution is not running', 409, 'EXECUTION_NOT_RUNNING');
+      throw err;
+    }
     await emitAudit(FLOW_AUDIT_EVENT_TYPES.SIGNAL_SENT, { identity, flowId, flowVersion: version, executionId });
     return { executionId, workflowId: executionId, signal: signalName, delivered: true };
   }
