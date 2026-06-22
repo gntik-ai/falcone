@@ -642,6 +642,29 @@ async function revokeCredential(ctx) {
   await st.markServiceAccountCredentialsInvalidated(ctx.pool, r.sa.id);
   return ok(200, { serviceAccountId: r.sa.id, status: 'revoked', revokedAt: new Date().toISOString() });
 }
+// DELETE /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}
+// Fully removes a service account (#687): revoke/rotate leave the Keycloak client AND the PG row
+// behind (the client is merely disabled, status flipped to 'revoked'), so revoked/unused SAs
+// accumulate forever in both stores. DELETE removes BOTH — the KC confidential client and the PG
+// row — so the SA disappears from list results. saForCredential() reuses resolveWorkspaceForManage
+// (→ 403 cross-tenant via canManageTenantId, 409 NO_REALM) AND returns 404 SA_NOT_FOUND for a
+// missing/foreign SA, so a 2nd DELETE (or any GET) on the now-removed SA is idempotently 404. Works
+// for an active OR a revoked SA. kcAdmin.deleteClient is 404-tolerant, so a KC client already gone
+// (e.g. deleted out of band) still lets the PG row be removed.
+async function deleteServiceAccount(ctx) {
+  const kc = ctx.kcAdmin ?? kcAdmin; const st = ctx.store ?? store;
+  const r = await saForCredential(ctx); if (r.error) return r.error;
+  try {
+    await kc.deleteClient(r.sa.iam_realm, r.sa.kc_client_uuid);
+  } catch (e) {
+    // deleteClient already swallows 404 (idempotent); any other KC failure is a downstream error —
+    // surface it as a 502 (mirrors createServiceAccount) WITHOUT removing the PG row, so the caller
+    // can retry rather than orphan a still-present Keycloak client.
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'DELETE_SA_FAILED', String(e.message ?? e));
+  }
+  await st.deleteServiceAccount(ctx.pool, r.sa.id);
+  return ok(200, { serviceAccountId: r.sa.id, deleted: true, deletedAt: new Date().toISOString() });
+}
 
 // ---- fine-grained IAM (platform admin; realmId in the path) ----------------
 // Items carry BOTH the IAM Access page's fields (id/name) AND the Members page's
@@ -1125,7 +1148,7 @@ export const LOCAL_HANDLERS = {
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, promoteWorkspace, deleteWorkspace,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
-  issueCredential, rotateCredential, revokeCredential,
+  issueCredential, rotateCredential, revokeCredential, deleteServiceAccount,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
   iamListUsers, iamGetUser, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamGetRole, iamDeleteRole, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
   iamListRealms, iamGetRealm, iamUpdateRealm,

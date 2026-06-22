@@ -134,6 +134,24 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.components.schemas.RouteCatalogResponse);
 });
 
+test('control-plane contract advertises DELETE on the service-account-by-id path (#687)', async () => {
+  const document = await SwaggerParser.validate(OPENAPI_PATH);
+  const saById = document.paths['/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}'];
+  assert.ok(saById.delete, 'the SA-by-id path now exposes a DELETE operation');
+  const del = saById.delete;
+  assert.equal(del.operationId, 'deleteServiceAccount');
+  assert.equal(del['x-family'], 'workspaces');
+  assert.equal(del['x-resource-type'], 'service_account');
+  assert.equal(del.security?.[0]?.bearerAuth?.length ?? 0, 0, 'requires bearer auth (authenticated)');
+  // Full success + authz + gateway-hardening response coverage (413 required for body methods).
+  for (const status of ['200', '400', '403', '404', '413', '429', '431', '504', 'default']) {
+    assert.ok(del.responses[status], `DELETE advertises a ${status} response`);
+  }
+  // The 200 envelope is the deleted-resource shape the handler returns.
+  const okSchema = del.responses['200'].content['application/json'].schema;
+  assert.deepEqual(okSchema.required.sort(), ['deleted', 'deletedAt', 'serviceAccountId']);
+});
+
 test('control-plane contract enforces versioning, authorization, family metadata, idempotent mutation expectations, and gateway hardening responses', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
   const accessCheck = document.paths['/v1/auth/access-checks'].post;

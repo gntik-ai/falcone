@@ -620,6 +620,12 @@ export async function listServiceAccounts(pool, workspaceId) {
 export async function setServiceAccountStatus(pool, id, status) {
   await pool.query('UPDATE service_accounts SET status=$2 WHERE id=$1', [id, status]);
 }
+// Granular service-account delete (#687): remove the persistence row by id. The caller
+// (b-handlers.mjs::deleteServiceAccount) has already authorized own-tenant + resolved the row by
+// (id, workspace_id), so this is a plain delete-by-id; idempotent (a missing id deletes 0 rows).
+export async function deleteServiceAccount(pool, id) {
+  await pool.query('DELETE FROM service_accounts WHERE id = $1', [id]);
+}
 // Stamp the revocation-propagation cutoff for a SA (fix-sa-credential-revocation-invalidate-tokens,
 // #684). Called on credential revoke AND rotate so every access token minted before NOW() is then
 // rejected by the auth path's not-before check. NOW() is the database clock — the same source the
