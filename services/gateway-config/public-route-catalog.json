@@ -253,6 +253,31 @@
     "privilege_domain": "structural_admin"
   },
   {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/schedules",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/pause",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/resume",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/trigger",
+    "privilege_domain": "structural_admin"
+  },
+  {
     "method": "POST",
     "path": "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions",
     "privilege_domain": "data_access"
