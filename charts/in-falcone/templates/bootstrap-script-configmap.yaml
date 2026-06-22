@@ -181,6 +181,38 @@ data:
       log "relaxed Keycloak user profile (email/firstName/lastName optional)"
     }
 
+    # Enable Keycloak brute-force detection on the platform realm (#668). Keycloak defaults
+    # `bruteForceProtected` to FALSE, so the realm accepts unlimited wrong-password attempts (no
+    # lockout, attack-detection not even counting) — a brute-force / credential-stuffing exposure
+    # for the console/superadmin login. The realm-create payload already carries these fields, but
+    # ensure_keycloak_realm SKIPS create-or-update once the realm exists, so a payload-only change
+    # would NOT retrofit an already-provisioned platform realm. This idempotent PUT applies the
+    # brute-force settings to the realm regardless of whether it pre-existed (KC's realm PUT merges
+    # the provided partial rep, leaving clients/roles/user-profile untouched). Idempotent (PUT).
+    # Skipped when no payload is provided.
+    ensure_keycloak_brute_force() {
+      local token="$1"
+      local status
+      if [ ! -f "$PAYLOAD_DIR/brute-force.json" ]; then
+        log "no Keycloak brute-force payload; leaving the realm default in place"
+        return 0
+      fi
+      status="$(curl -sS -o /tmp/keycloak-brute-force -w '%{http_code}' \
+        -X PUT \
+        -H "Authorization: Bearer $token" \
+        -H 'Content-Type: application/json' \
+        --data @"$PAYLOAD_DIR/brute-force.json" \
+        "$KEYCLOAK_BASE_URL/admin/realms/$KEYCLOAK_REALM_ID")"
+
+      if [ "$status" != "200" ] && [ "$status" != "204" ]; then
+        cat /tmp/keycloak-brute-force >&2 || true
+        echo "[bootstrap] failed to enable Keycloak brute-force detection; status=$status" >&2
+        exit 1
+      fi
+
+      log "enabled Keycloak brute-force detection on realm $KEYCLOAK_REALM_ID"
+    }
+
     ensure_keycloak_role_from_file() {
       local token="$1"
       local role_name="$2"
@@ -444,6 +476,7 @@ data:
 
       ensure_keycloak_realm "$token"
       ensure_keycloak_user_profile "$token"
+      ensure_keycloak_brute_force "$token"
 
       for role_file in "$PAYLOAD_DIR"/role-*.json; do
         [ -e "$role_file" ] || continue
