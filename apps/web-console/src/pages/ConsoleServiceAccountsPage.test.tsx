@@ -10,6 +10,7 @@ const mockCreateServiceAccount = vi.fn()
 const mockIssueServiceAccountCredential = vi.fn()
 const mockRevokeServiceAccountCredential = vi.fn()
 const mockRotateServiceAccountCredential = vi.fn()
+const mockDeleteServiceAccount = vi.fn()
 const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => mockUseConsoleContext() }))
@@ -19,6 +20,7 @@ vi.mock('@/lib/console-service-accounts', () => ({
   issueServiceAccountCredential: (...args: unknown[]) => mockIssueServiceAccountCredential(...args),
   revokeServiceAccountCredential: (...args: unknown[]) => mockRevokeServiceAccountCredential(...args),
   rotateServiceAccountCredential: (...args: unknown[]) => mockRotateServiceAccountCredential(...args),
+  deleteServiceAccount: (...args: unknown[]) => mockDeleteServiceAccount(...args),
   // Mirror the real helper closely enough for the page: 403 → fixed copy, otherwise the Error message.
   consoleServiceAccountsErrorMessage: (error: unknown) => {
     const status = typeof error === 'object' && error && 'status' in error ? (error as { status?: number }).status : undefined
@@ -42,6 +44,7 @@ describe('ConsoleServiceAccountsPage', () => {
     mockIssueServiceAccountCredential.mockReset()
     mockRevokeServiceAccountCredential.mockReset()
     mockRotateServiceAccountCredential.mockReset()
+    mockDeleteServiceAccount.mockReset()
   })
 
   it('muestra bloqueo sin workspace', () => {
@@ -87,6 +90,44 @@ describe('ConsoleServiceAccountsPage', () => {
       expect(mockRevokeServiceAccountCredential).toHaveBeenCalledWith('wrk_1', 'sa_1', { reason: 'Console revoke' })
       expect(reload).toHaveBeenCalled()
     })
+  })
+
+  it('abre confirmación CRITICAL al eliminar una service account y llama al SDK (#687)', async () => {
+    const user = userEvent.setup()
+    const reload = vi.fn()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload, knownIds: ['sa_1'] })
+    mockDeleteServiceAccount.mockResolvedValue(undefined)
+    render(<ConsoleServiceAccountsPage />)
+
+    // The row's destructive "Eliminar" button opens the CRITICAL confirmation dialog.
+    await user.click(screen.getByRole('button', { name: /eliminar/i }))
+    const dialog = screen.getByRole('alertdialog')
+    expect(dialog).toHaveTextContent(/eliminar service account/i)
+    expect(dialog).toHaveTextContent(/ops sa/i)
+    expect(dialog).toHaveTextContent(/esta operación es irreversible/i)
+
+    // CRITICAL ops require typing the exact resource name before the dialog's confirm enables.
+    // The dialog's confirmation input carries the resource name as its placeholder.
+    await user.type(screen.getByPlaceholderText('Ops SA'), 'Ops SA')
+    // The footer confirm button (also labelled "Eliminar") is the last match.
+    const confirmButtons = screen.getAllByRole('button', { name: /eliminar/i })
+    await user.click(confirmButtons[confirmButtons.length - 1])
+
+    await waitFor(() => {
+      expect(mockDeleteServiceAccount).toHaveBeenCalledWith('wrk_1', 'sa_1')
+      expect(reload).toHaveBeenCalled()
+    })
+  })
+
+  it('permite eliminar incluso una service account con credencial revocada (#687)', () => {
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'revoked' }, accessProjection: { effectiveAccess: 'denied', clientState: 'disabled', credentialState: 'revoked' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    render(<ConsoleServiceAccountsPage />)
+    // Unlike emit/rotate, delete is NOT gated by credentialRevoked — a revoked SA is exactly what
+    // a caller wants to delete so it stops accumulating.
+    expect(screen.getByRole('button', { name: /eliminar/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /emitir/i })).toBeDisabled()
   })
 
   it('deshabilita acciones con tenant inactivo', () => {

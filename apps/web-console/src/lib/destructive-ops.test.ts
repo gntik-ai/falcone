@@ -65,7 +65,9 @@ describe('destructive-ops', () => {
     expect(DESTRUCTIVE_OP_LEVELS).toEqual({
       'soft-delete-application': 'WARNING',
       'detach-provider': 'WARNING',
-      'revoke-service-account-credential': 'WARNING'
+      'revoke-service-account-credential': 'WARNING',
+      // Deleting a service account removes its Keycloak client AND its persistence row permanently (#687).
+      'delete-service-account': 'CRITICAL'
     })
   })
 })

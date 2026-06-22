@@ -84,6 +84,12 @@ export const routes = [
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance', localHandler: 'issueCredential', auth: 'authenticated' },
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations', localHandler: 'rotateCredential', auth: 'authenticated' },
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations', localHandler: 'revokeCredential', auth: 'authenticated' },
+  // Granular service-account delete (#687): revoke only DISABLES the KC client + flips PG
+  // status='revoked' (the row + client persist forever, so revoked SAs accumulate in both stores).
+  // DELETE fully removes the service account — its Keycloak client AND its PG row — so they no longer
+  // accumulate and the SA disappears from list results. Was NO_ROUTE (404). Idempotent: a 2nd DELETE
+  // (or a GET) on the removed SA → 404 SA_NOT_FOUND. Works for an active OR a revoked SA.
+  { method: 'DELETE', path: '/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}', localHandler: 'deleteServiceAccount', auth: 'authenticated' },
 
   // ---- domain B: workspace data plane (DB provisioning + function registry) --
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/database', localHandler: 'provisionDatabase', auth: 'authenticated' },

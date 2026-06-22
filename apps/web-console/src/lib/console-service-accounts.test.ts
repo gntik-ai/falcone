@@ -3,8 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createServiceAccount,
+  deleteServiceAccount,
+  forgetKnownServiceAccountId,
   issueServiceAccountCredential,
   normalizeServiceAccount,
+  readKnownServiceAccountIds,
   revokeServiceAccountCredential,
   rotateServiceAccountCredential,
   useConsoleServiceAccounts
@@ -45,5 +48,21 @@ describe('console-service-accounts', () => {
     mockRequestConsoleSessionJson.mockResolvedValue({ serviceAccountId: 'sa_1', displayName: 'Ops SA' })
     const { result } = renderHook(() => useConsoleServiceAccounts('wrk_1'))
     await waitFor(() => expect(result.current.accounts[0]?.serviceAccountId).toBe('sa_1'))
+  })
+
+  it('elimina una service account vía DELETE y la quita del índice local (#687)', async () => {
+    window.sessionStorage.setItem('in-falcone.console-service-account-index:wrk_1', JSON.stringify(['sa_1', 'sa_2']))
+    mockRequestConsoleSessionJson.mockResolvedValueOnce({ serviceAccountId: 'sa_1', deleted: true })
+    await deleteServiceAccount('wrk_1', 'sa_1')
+    // Issues a DELETE on the SA-by-id route (idempotent).
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/workspaces/wrk_1/service-accounts/sa_1', { method: 'DELETE', idempotent: true })
+    // Drops the deleted SA from the local index so it disappears from list results; the other stays.
+    expect(readKnownServiceAccountIds('wrk_1')).toEqual(['sa_2'])
+  })
+
+  it('forgetKnownServiceAccountId es un no-op para un id desconocido', () => {
+    window.sessionStorage.setItem('in-falcone.console-service-account-index:wrk_1', JSON.stringify(['sa_1']))
+    forgetKnownServiceAccountId('wrk_1', 'sa_missing')
+    expect(readKnownServiceAccountIds('wrk_1')).toEqual(['sa_1'])
   })
 })
