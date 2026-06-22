@@ -99,30 +99,36 @@ function serviceAccountOut(sa) {
 //   (+ optional plan assignment). Best-effort compensation on failure.
 async function createTenant(ctx) {
   const { body, identity, pool } = ctx;
+  // Dependency seam (same idiom as issueCredential/rotateCredential below): tests inject
+  // store/kcAdmin/startSaga via ctx; production never sets them (server.mjs builds ctx without
+  // these keys), so the live path uses the module singletons unchanged.
+  const st = ctx.store ?? store;
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const beginSaga = ctx.startSaga ?? startSaga;
   const displayName = body.displayName ?? body.name;
   if (!displayName) return err(400, 'VALIDATION_ERROR', 'displayName is required');
   const slug = slugify(body.slug ?? displayName);
   if (!slug) return err(400, 'VALIDATION_ERROR', 'a valid slug could not be derived');
-  if (await store.slugTaken(pool, slug)) return err(409, 'SLUG_TAKEN', `tenant slug '${slug}' already exists`);
+  if (await st.slugTaken(pool, slug)) return err(409, 'SLUG_TAKEN', `tenant slug '${slug}' already exists`);
 
   const tenantId = randomUUID();
   const realm = tenantId; // realm name == tenantId (Falcone tenancy model)
-  if (await kcAdmin.realmExists(realm)) return err(409, 'REALM_EXISTS', `realm ${realm} already exists`);
+  if (await kc.realmExists(realm)) return err(409, 'REALM_EXISTS', `realm ${realm} already exists`);
 
   // Durable saga: each forward step records a serializable compensation in
   // Postgres, so a crash mid-provision is rolled back (here on failure, or by
   // recoverSagas() on the next startup) — no orphaned realm / DB row.
-  const saga = await startSaga(pool, 'createTenant', { tenantId, slug, displayName }, {
+  const saga = await beginSaga(pool, 'createTenant', { tenantId, slug, displayName }, {
     tenantId, actorId: identity.sub, actorType: identity.actorType ?? 'superadmin',
     correlationId: ctx.callerContext?.correlationId, operationType: 'tenant.create'
   });
   try {
     await saga.step('createRealm',
-      () => kcAdmin.createRealm({ realm, displayName }),
+      () => kc.createRealm({ realm, displayName }),
       { type: 'kc.deleteRealm', args: { realm } });
     // Roles live inside the realm; deleting the realm (above) compensates them.
     await saga.step('createRealmRoles',
-      async () => { for (const role of TENANT_REALM_ROLES) await kcAdmin.createRealmRole(realm, role); });
+      async () => { for (const role of TENANT_REALM_ROLES) await kc.createRealmRole(realm, role); });
 
     // Tenant-realm app client + un-forgeable tenant_id claim (fix-tenant-realm-token-issuance, A3).
     // Without a client the tenant realm cannot issue tokens at all; the hardcoded tenant_id mapper
@@ -131,8 +137,8 @@ async function createTenant(ctx) {
     // compensation: the client lives in the realm, which createRealm's compensation deletes.)
     await saga.step('createTenantAppClient',
       async () => {
-        const clientUuid = await kcAdmin.createPublicAppClient(realm, { clientId: `${slug}-app`, name: `${displayName} App` });
-        await kcAdmin.addHardcodedClaimMapper(realm, clientUuid, { name: 'tenant_id', claimName: 'tenant_id', claimValue: tenantId });
+        const clientUuid = await kc.createPublicAppClient(realm, { clientId: `${slug}-app`, name: `${displayName} App` });
+        await kc.addHardcodedClaimMapper(realm, clientUuid, { name: 'tenant_id', claimName: 'tenant_id', claimValue: tenantId });
       });
 
     let owner = null;
@@ -140,19 +146,19 @@ async function createTenant(ctx) {
       const username = body.ownerUsername ?? body.ownerEmail;
       const userId = await saga.step('createOwnerUser',
         async () => {
-          const id = await kcAdmin.createUser(realm, {
+          const id = await kc.createUser(realm, {
             username, email: body.ownerEmail ?? null,
             firstName: body.ownerFirstName ?? 'Tenant', lastName: body.ownerLastName ?? 'Owner',
             password: body.ownerPassword ?? null, temporary: !body.ownerPassword
           });
-          await kcAdmin.assignRealmRoles(realm, id, ['tenant_owner']);
+          await kc.assignRealmRoles(realm, id, ['tenant_owner']);
           return id;
         });
       owner = { id: userId, username };
     }
 
     const record = await saga.step('insertTenant',
-      () => store.insertTenant(pool, { id: tenantId, slug, displayName, iamRealm: realm, createdBy: identity.sub }),
+      () => st.insertTenant(pool, { id: tenantId, slug, displayName, iamRealm: realm, createdBy: identity.sub }),
       { type: 'store.deleteTenant', args: { id: tenantId } });
 
     // Optional: assign a plan immediately (reuses the REAL plan-assign action). BEST-EFFORT —
@@ -167,7 +173,18 @@ async function createTenant(ctx) {
     await saga.complete({ tenantId, realm });
     return ok(201, { tenant: tenantOut(record), ...tenantOut(record), iamRealm: realm, owner, planAssignment, sagaId: saga.runId });
   } catch (e) {
-    await saga.fail(e); // durable: replays recorded compensations newest-first
+    await saga.fail(e); // durable: replays recorded compensations newest-first (loser's realm/client/owner roll back)
+    // Concurrent same-slug create (#665, the tenant twin of the workspace fix #634): the slugTaken
+    // pre-check above is a TOCTOU read — two racers both pass it, then the UNIQUE constraint
+    // tenants_slug_key (the real atomicity guarantee) makes the loser's insertTenant throw SQLSTATE
+    // 23505. Map it to the SAME clean 409 SLUG_TAKEN the sequential pre-check emits — so the race and
+    // a sequential collision are indistinguishable to clients — instead of leaking the raw PG
+    // constraint text as a 502. Keyed on the named constraint (slug is the ONLY unique column the
+    // tenants insert can violate: id/tenant_id are randomUUID, iam_realm is not UNIQUE), with a bare
+    // 23505 fallback when the driver omits .constraint, so an unrelated future 23505 still 502s.
+    if (e?.code === '23505' && (e?.constraint === 'tenants_slug_key' || !e?.constraint)) {
+      return err(409, 'SLUG_TAKEN', `tenant slug '${slug}' already exists`);
+    }
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'CREATE_TENANT_FAILED', String(e.message ?? e));
   }
 }
