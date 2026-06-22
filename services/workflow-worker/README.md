@@ -119,6 +119,37 @@ for a cancelled node (i.e. it does not write `{approved:false, timedOut:true}`).
 outcomes are unchanged: a real timeout records `{approved:false, timedOut:true}` and completes,
 and an approval signal records `{approved, timedOut:false}` and completes.
 
+### Sub-flow node — load-by-reference resolution
+
+A `sub-flow` node runs the **real referenced child flow**. The parent starts the child as a
+Temporal child workflow BY REFERENCE (`executeChild(DslInterpreterWorkflow, { flowId,
+version, tenant, … })`), and the child resolves its own definition via the `loadFlowDefinition`
+activity. That activity loads the **actual published version** from the control-plane Postgres
+`flow_versions` table (`tenant_id, workspace_id, flow_id, version, definition_json`), scoped to
+the **parent's tenant and workspace** (`TenantContext.tenantId` / `workspaceId`). It does **not**
+substitute a placeholder.
+
+- The store read is wired by `worker-deps.mjs::createFlowDefinitionLoader` (the
+  `deps.loadFlowDefinition` dependency that `wireActivityDeps()` injects), bound to the worker's
+  Postgres pool. `flow_versions` enforces **FORCE row-level security** keyed on the session GUCs
+  `app.tenant_id` / `app.workspace_id`, and the worker connects as the non-`BYPASSRLS`
+  `falcone_app` role — so the reader sets both GUCs inside a transaction (transaction-scoped
+  `set_config(..., true)`) before the SELECT, which is ALSO explicitly predicate-scoped by
+  tenant/workspace/flow/version (defense in depth). A cross-tenant or foreign-workspace
+  reference therefore resolves to no row.
+- An **unresolvable reference fails the parent** — it never silently completes a placeholder.
+  The activity raises a non-retryable failure that `executeChild` propagates to the parent:
+  - missing/foreign-scope `flowId`+`version` → `FlowDefinitionNotFound`;
+  - a `version` that is not a positive integer → `InvalidFlowVersion`;
+  - a stored definition with no nodes → `InvalidFlowDefinition`;
+  - the loader dependency not wired into the worker → `CAPABILITY_UNAVAILABLE`.
+- Version pinning is preserved across the boundary: the child loads + pins its own definition at
+  child-workflow start, recorded in history (replay-deterministic). Top-level executions are
+  unaffected — they carry the definition INLINE and never call `loadFlowDefinition`.
+
+Asserted by `tests/env/workflow-worker/subflow-load-referenced-definition.test.mjs` (real-stack,
+live Temporal + Postgres) and `tests/blackbox/flows-subflow-load-referenced-definition.test.mjs`.
+
 ## Determinism
 
 All workflow code (`src/workflows/**`, plus the pure helpers it imports from

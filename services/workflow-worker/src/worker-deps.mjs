@@ -48,6 +48,67 @@ export function buildDataDsn(env = process.env) {
 }
 
 /**
+ * Build the `loadFlowDefinition` activity dependency: the load-by-reference resolver used by
+ * the `sub-flow` DSL node (`DslInterpreterWorkflow.runSubFlow` → child `executeChild` with a
+ * reference input → child resolves the definition via this dependency). Reads the IMMUTABLE
+ * published snapshot from `flow_versions` (charts/in-falcone/bootstrap/migrations/
+ * 20260612-003-flow-definitions-and-versions.sql), scoped to the parent's tenant + workspace.
+ *
+ * SELF-CONTAINED on purpose: it uses ONLY the `pg` pool (no createFlowStore import — that
+ * static-imports the DSL validators which are NOT in the worker image, so importing it would
+ * crash the worker at boot with ERR_MODULE_NOT_FOUND, the #660 class; the Dockerfile drift
+ * guard only checks worker-deps.mjs dynamic imports, not transitive static imports). Keeping
+ * the reader inline means NO new dynamic import and NO Dockerfile COPY change.
+ *
+ * RLS (CRITICAL): `flow_versions` has FORCE ROW LEVEL SECURITY with a policy keyed on the
+ * session GUCs `app.tenant_id` / `app.workspace_id` (20260612-004-flow-rls.sql). The worker
+ * connects as `falcone_app` (non-BYPASSRLS), so a plain SELECT returns ZERO rows. The reader
+ * therefore opens a transaction and sets both GUCs with `set_config(..., true)` (transaction-
+ * scoped, mirroring connection-registry.mjs::applyRlsContext) BEFORE the SELECT. The explicit
+ * `WHERE tenant_id=$1 AND workspace_id=$2 AND flow_id=$3 AND version=$4` predicates ALSO scope
+ * the row (defense-in-depth preserved): a cross-tenant / foreign-workspace / missing reference
+ * yields zero rows → null → the activity fails the parent (it never substitutes a placeholder).
+ *
+ * @param {{ pool: import('pg').Pool }} args
+ * @returns {(input: { tenantId: string, workspaceId?: string, flowId: string, version: number })
+ *           => Promise<unknown|null>} the published `definition_json`, or null when unresolvable.
+ */
+export function createFlowDefinitionLoader({ pool }) {
+  if (!pool || typeof pool.connect !== 'function') {
+    throw new TypeError('createFlowDefinitionLoader requires a pg Pool');
+  }
+  return async function loadFlowDefinition({ tenantId, workspaceId, flowId, version }) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Establish the RLS context (transaction-scoped) so FORCE RLS returns this tenant's rows.
+      await client.query('SELECT set_config($1, $2, true)', ['app.tenant_id', String(tenantId)]);
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.workspace_id',
+        String(workspaceId ?? ''),
+      ]);
+      const result = await client.query(
+        `SELECT definition_json
+           FROM flow_versions
+          WHERE tenant_id = $1 AND workspace_id = $2 AND flow_id = $3 AND version = $4`,
+        [String(tenantId), String(workspaceId ?? ''), String(flowId), version],
+      );
+      await client.query('COMMIT');
+      return result.rows[0]?.definition_json ?? null;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* surface the original error */
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+}
+
+/**
  * Build the activity dependency object for the workflow-worker.
  *
  * When `opts.registry` is provided (test / pre-constructed path) no real DB connection
@@ -55,7 +116,7 @@ export function buildDataDsn(env = process.env) {
  * connection registry are created from the process environment.
  *
  * Returns `{ deps, close }`:
- *   deps   — { executePostgresData, pgRegistry }  to pass to activities.setActivityDeps()
+ *   deps   — { executePostgresData, pgRegistry, loadFlowDefinition }  → activities.setActivityDeps()
  *   close  — async teardown: drains pools on SIGTERM
  *
  * @param {{ registry?: object }} [opts]
@@ -69,6 +130,7 @@ export async function wireActivityDeps(opts = {}) {
   let registry = opts.registry;
   let keyPool;
   let executeLlmComplete;
+  let loadFlowDefinition;
 
   if (!registry) {
     const [
@@ -110,9 +172,21 @@ export async function wireActivityDeps(opts = {}) {
       secretPrefixes: parseAllowedSecretPrefixes(process.env),
     });
     executeLlmComplete = (req = {}) => llmExecutor.complete(req.workspaceId, req);
+
+    // Load-by-reference resolver for the sub-flow node (#679). Bound to the same worker pool
+    // (falcone_app on kind); the reader sets the RLS GUCs per transaction so the FORCE-RLS
+    // flow_versions SELECT returns the parent tenant's published child definition. On kind the
+    // worker's DSN already reaches the shared `in_falcone` control DB where flow_versions lives,
+    // so no separate control-DB pool is needed.
+    loadFlowDefinition = createFlowDefinitionLoader({ pool: keyPool });
   }
 
-  const deps = { executePostgresData, pgRegistry: registry, ...(executeLlmComplete ? { executeLlmComplete } : {}) };
+  const deps = {
+    executePostgresData,
+    pgRegistry: registry,
+    ...(executeLlmComplete ? { executeLlmComplete } : {}),
+    ...(loadFlowDefinition ? { loadFlowDefinition } : {}),
+  };
 
   return {
     deps,
