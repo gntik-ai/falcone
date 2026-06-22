@@ -255,13 +255,21 @@ const KEY_MGMT_ADMIN_ROLES = new Set(['tenant_owner', 'tenant_admin', 'workspace
 // vocabulary (api-keys.mjs SCOPES_BY_TYPE): data:write gates data writes, ddl:write gates DDL. These are
 // the privilege-escalation paths the bug exposed (a data:read key could write / run DDL). Reads are the
 // baseline capability every key carries (data:read) and are not gated here; the POST-but-read vector
-// search route is likewise a read. Routes not covered (events/functions/embedding/flows/mcp/realtime)
-// are not gated by this check. The path patterns mirror the prefixes declared in buildRoutes.
+// search route is likewise a read. The billable BYOK LLM completion route
+// (POST /llm/completions, #640) is also scope-gated here (#662): it spends the workspace's BYOK
+// quota, so it requires data:write (the existing billable-write scope) — a data:read-only or
+// scopeless/anon key is denied 403 before provider resolution. It is gated by an exact
+// `/llm/completions` match so the hyphenated config/usage routes (/llm-provider, /llm-usage) are
+// untouched. Routes not covered (events/functions/embedding/flows/mcp/realtime) are not gated by
+// this check. The path patterns mirror the prefixes declared in buildRoutes.
 const SCOPE_DDL_RE = /^\/v1\/postgres\/databases\/[^/]+\/schemas(?:\/|$)/;
 const SCOPE_PG_DATA_RE = /^\/v1\/postgres\/workspaces\/[^/]+\/data\/[^/]+\/schemas\/[^/]+\/tables\/[^/]+/;
 const SCOPE_MONGO_DOC_RE = /^\/v1\/mongo\/workspaces\/[^/]+\/data\/[^/]+\/collections\/[^/]+\/documents/;
+// Matches ONLY the completion route — NOT /llm-provider or /llm-usage (hyphenated config/usage).
+const SCOPE_LLM_COMPLETIONS_RE = /^\/v1\/workspaces\/[^/]+\/llm\/completions(?:\/|$)/;
 function requiredDataScope(method, pathname) {
   if (SCOPE_DDL_RE.test(pathname)) return 'ddl:write';
+  if (SCOPE_LLM_COMPLETIONS_RE.test(pathname)) return 'data:write'; // billable BYOK completion (#662)
   if (SCOPE_PG_DATA_RE.test(pathname) || SCOPE_MONGO_DOC_RE.test(pathname)) {
     if (method === 'GET') return null; // reads are not scope-gated (every key carries data:read)
     if (method === 'POST' && /\/search$/.test(pathname)) return null; // vector search is a read
