@@ -33,6 +33,7 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
      deploy/kind/control-plane/audit-store.mjs deploy/kind/control-plane/audit-writer.mjs \
      deploy/kind/control-plane/audit-hash.mjs \
      deploy/kind/control-plane/transport-security.mjs \
+     deploy/kind/control-plane/request-body.mjs \
      deploy/kind/control-plane/route-map.runtime.json ./
 
 # Backend action modules consumed at runtime (resolved under /repo). Copy the
