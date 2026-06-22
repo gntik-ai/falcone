@@ -352,7 +352,18 @@ const server = http.createServer(async (req, res) => {
       // Enforcement audit (#594): a 403 from a local handler (e.g. cross-tenant access) is
       // recorded as a scope-enforcement denial so the table is not silently empty.
       void recordRouteDenial(pool, route, ctx, result, correlationId);
-      return sendJson(res, result?.statusCode ?? 200, result?.body ?? null);
+      // Forward any response headers a local handler chose to set (e.g. Content-Range /
+      // Accept-Ranges for a 206 partial read — #676). Mirrors the OW-proxied path below;
+      // skip content-type/content-length (sendJson owns those). Backward-safe: existing
+      // handlers don't set `.headers`, so this is a no-op for them.
+      const localRespHeaders = {};
+      for (const [k, v] of Object.entries(result?.headers ?? {})) {
+        if (v == null) continue;
+        const lk = k.toLowerCase();
+        if (lk === 'content-type' || lk === 'content-length') continue;
+        localRespHeaders[k] = String(v);
+      }
+      return sendJson(res, result?.statusCode ?? 200, result?.body ?? null, localRespHeaders);
     }
 
     // Inject the TRUSTED identity headers derived from the verified JWT, having

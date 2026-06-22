@@ -26310,6 +26310,426 @@
         "application/json"
       ],
       "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "storage"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "storage",
+      "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "initiateStorageMultipartUpload",
+      "path": "/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "bucket_object",
+      "scope": "workspace",
+      "summary": "Initiate a multipart/resumable upload for a large storage object",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Storage"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "storage"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "storage",
+      "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "DELETE",
+      "operationId": "abortStorageMultipartUpload",
+      "path": "/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart/{uploadId}",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "bucket_object",
+      "scope": "workspace",
+      "summary": "Abort an in-progress multipart upload and clean up its uploaded parts",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Storage"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "storage"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "storage",
+      "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "completeStorageMultipartUpload",
+      "path": "/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart/{uploadId}/complete",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "bucket_object",
+      "scope": "workspace",
+      "summary": "Complete a multipart upload, assembling the object from its uploaded parts",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Storage"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "storage"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "storage",
+      "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "PUT",
+      "operationId": "uploadStorageMultipartPart",
+      "path": "/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart/{uploadId}/parts/{partNumber}",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "bucket_object",
+      "scope": "workspace",
+      "summary": "Upload one part of an in-progress multipart upload",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Storage"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "storage"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "storage",
+      "familyTitle": "Storage",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "bearer_oidc",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "provisioning",
+      "gatewayRequestValidationProfile": "provisioning",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "data-control",
+      "gatewayTimeoutProfile": "provisioning",
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1048576,
+      "method": "POST",
+      "operationId": "presignStorageObject",
+      "path": "/v1/storage/buckets/{resourceId}/objects/{objectKey}/presign",
+      "planCapabilityAnyOf": [
+        "data.storage.bucket"
+      ],
+      "qosBurst": 30,
+      "rateLimitClass": "data-control",
+      "requiredHeaders": [
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id"
+      ],
+      "requiredPlanFlags": [],
+      "resourceType": "bucket_object",
+      "scope": "workspace",
+      "summary": "Issue a time-limited, scope-limited presigned URL for one storage object operation",
+      "supportsIdempotencyKey": true,
+      "tags": [
+        "Storage"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
         "tenant_admin",
         "tenant_owner",
         "platform_team"

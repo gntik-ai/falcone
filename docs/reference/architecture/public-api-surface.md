@@ -465,6 +465,11 @@ Workspace-scoped object storage discovery, bucket control, and presign-safe surf
 | GET | `/v1/storage/buckets/{resourceId}/objects/{objectKey}` | workspace | bucket_object | Download one object from a workspace-scoped storage bucket |
 | PUT | `/v1/storage/buckets/{resourceId}/objects/{objectKey}` | workspace | bucket_object | Upload or replace one object inside a workspace-scoped storage bucket |
 | GET | `/v1/storage/buckets/{resourceId}/objects/{objectKey}/metadata` | workspace | bucket_object | Fetch metadata for one object in a workspace-scoped storage bucket |
+| POST | `/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart` | workspace | bucket_object | Initiate a multipart/resumable upload for a large storage object |
+| DELETE | `/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart/{uploadId}` | workspace | bucket_object | Abort an in-progress multipart upload and clean up its uploaded parts |
+| POST | `/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart/{uploadId}/complete` | workspace | bucket_object | Complete a multipart upload, assembling the object from its uploaded parts |
+| PUT | `/v1/storage/buckets/{resourceId}/objects/{objectKey}/multipart/{uploadId}/parts/{partNumber}` | workspace | bucket_object | Upload one part of an in-progress multipart upload |
+| POST | `/v1/storage/buckets/{resourceId}/objects/{objectKey}/presign` | workspace | bucket_object | Issue a time-limited, scope-limited presigned URL for one storage object operation |
 | GET | `/v1/storage/credentials/rotation-policy` | tenant | storage_credential | Read the tenant storage programmatic-credential rotation policy |
 | PUT | `/v1/storage/credentials/rotation-policy` | tenant | storage_credential | Set the tenant storage programmatic-credential rotation policy |
 | GET | `/v1/storage/tenants/{tenantId}/usage` | tenant | storage_usage_snapshot | Fetch one tenant-scoped storage usage snapshot aggregated across workspaces |
