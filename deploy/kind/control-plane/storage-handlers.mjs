@@ -9,6 +9,7 @@
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, workspaceIdentityName } from './seaweedfs-identity.mjs';
+import { checkBucketQuota, checkByteQuota, usageLimits, dimensionStatus, STORAGE_QUOTA_EXCEEDED } from './storage-quota.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
 // or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
@@ -272,10 +273,40 @@ export function resolveObjectBody(ctx) {
     : Buffer.from(String(env.content ?? ''), 'utf8');
   return { bytes, contentType };
 }
+// Sum the CURRENT stored bytes across every bucket of the workspace that owns `bucket`
+// (#674 byte-quota admission). Mirrors storageWorkspaceUsage's per-bucket listObjects scan;
+// scoped strictly to the owning workspace (no cross-tenant read). Used only when a byte
+// limit is configured, so the upload hot-path pays this cost only on opt-in.
+async function workspaceCurrentBytes(ctx, bucket) {
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return 0;
+  const mapped = await store.listBucketsForWorkspace(ctx.pool, rec.workspace_id);
+  let total = 0;
+  for (const row of mapped) {
+    try {
+      const { objects } = await listObjects(row.bucket_name, { maxKeys: 1000 });
+      total += objects.reduce((s, o) => s + o.size, 0);
+    } catch { /* a transient per-bucket list failure must not falsely block an upload */ }
+  }
+  return total;
+}
 async function storagePutObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
   const { bytes, contentType } = resolveObjectBody(ctx);
+  // Per-workspace total-bytes quota admission (#674). Enforced ONLY when STORAGE_MAX_BYTES is
+  // configured (default unlimited) — usageLimits().maxBytes == null short-circuits BEFORE any
+  // usage scan, so the upload hot-path is unchanged unless an operator opts in. The body is
+  // already buffered (bytes.length), so the incoming size is known at the CP layer. Fails OPEN
+  // if the quota model is unavailable.
+  if (usageLimits().maxBytes != null) {
+    const currentBytes = await workspaceCurrentBytes(ctx, bucket);
+    const byteDecision = checkByteQuota(currentBytes, bytes.length, {});
+    if (!byteDecision.allowed) {
+      return err(409, STORAGE_QUOTA_EXCEEDED,
+        `storage byte quota would be exceeded for this workspace: ${currentBytes + bytes.length}/${byteDecision.limit} bytes`);
+    }
+  }
   try {
     await putObject(bucket, key, bytes, contentType);
     return ok(201, { objectKey: key, bucketName: bucket, sizeBytes: bytes.length, contentType });
@@ -377,11 +408,21 @@ async function storageWorkspaceUsage(ctx) {
         largestObjectSizeBytes: objects.reduce((mx, o) => Math.max(mx, o.size), 0) });
     } catch { bucketEntries.push({ bucketId: row.bucket_name, totalBytes: 0, objectCount: 0, largestObjectSizeBytes: 0 }); }
   }
-  const dim = (used) => ({ used, limit: null, remaining: null, utilizationPercent: null });
+  // Report the EFFECTIVE per-workspace limit + remaining capacity per dimension (#674): the
+  // bucket-count limit always applies (default 8), and the byte limit applies to totalBytes/
+  // objectSizeBytes only when STORAGE_MAX_BYTES is configured (otherwise null = unlimited).
+  // dimensionStatus fills remaining = max(limit-used,0) and utilizationPercent = round(used/
+  // limit*100), or leaves them null when the dimension is unlimited (so the API never reports
+  // a perpetual null when a limit is set). objectCount has no configured limit → unlimited.
+  const { maxBuckets, maxBytes } = usageLimits();
   return ok(200, {
     collectionMethod: 'live', collectionStatus: 'complete', snapshotAt: nowIso(), cacheSnapshotAt: null,
-    dimensions: { totalBytes: { dimension: 'totalBytes', ...dim(totalBytes) }, bucketCount: { dimension: 'bucketCount', ...dim(mapped.length) },
-      objectCount: { dimension: 'objectCount', ...dim(objectCount) }, objectSizeBytes: { dimension: 'objectSizeBytes', ...dim(totalBytes) } },
+    dimensions: {
+      totalBytes: { dimension: 'totalBytes', ...dimensionStatus(totalBytes, maxBytes) },
+      bucketCount: { dimension: 'bucketCount', ...dimensionStatus(mapped.length, maxBuckets) },
+      objectCount: { dimension: 'objectCount', ...dimensionStatus(objectCount, null) },
+      objectSizeBytes: { dimension: 'objectSizeBytes', ...dimensionStatus(totalBytes, maxBytes) }
+    },
     buckets: bucketEntries
   });
 }
@@ -393,6 +434,17 @@ async function storageProvisionBucket(ctx) {
   // Ownership check: only superadmin/internal or the workspace-owning tenant may provision.
   if (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  }
+  // Per-workspace bucket-count quota admission (#674). Count THIS workspace's buckets (the
+  // same tenant-scoped read the usage handler uses) and deny a provision that would exceed
+  // the effective limit (STORAGE_MAX_BUCKETS, default 8). Runs AFTER the ownership 404 gate
+  // so a non-owner still gets 404 (no existence leak), and BEFORE any backend call so no
+  // physical bucket is created on a denial. Fails OPEN if the quota model is unavailable.
+  const existingBuckets = await store.listBucketsForWorkspace(ctx.pool, ws.id);
+  const bucketDecision = checkBucketQuota(existingBuckets.length, {});
+  if (!bucketDecision.allowed) {
+    return err(409, STORAGE_QUOTA_EXCEEDED,
+      `storage bucket quota reached for this workspace: ${existingBuckets.length}/${bucketDecision.limit}`);
   }
   // DNS-safe, workspace-id-scoped bucket name. deriveBucketName embeds a stable hash
   // of the globally-unique workspace id so two same-slug workspaces across tenants
