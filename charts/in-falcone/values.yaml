@@ -322,8 +322,7 @@ bootstrap:
           waitIncrementSeconds: 60     # lockout grows by this much per failure over the factor
           minimumQuickLoginWaitSeconds: 60
           quickLoginCheckMilliSeconds: 1000
-          maxDeltaTimeSeconds: 43200   # window over which failures are counted (12 h)
-          failureResetTimeSeconds: 43200
+          maxDeltaTimeSeconds: 43200   # window over which failures are counted (12 h) AND after which the failure count resets
           permanentLockout: false      # temporary lockout only; account auto-recovers
       # Keycloak 26 declarative user profile. The default profile marks email/firstName/lastName
       # REQUIRED for role "user"; a user provisioned via the admin API without those (or any

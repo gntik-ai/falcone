@@ -49,7 +49,6 @@ const DEFAULT_APP_WEB_ORIGINS = parseAllowList(process.env.TENANT_APP_WEB_ORIGIN
 //   - REALM_BRUTE_FORCE_QUICK_LOGIN_WAIT_SECONDS      (int, default 60)
 //   - REALM_BRUTE_FORCE_QUICK_LOGIN_CHECK_MS          (int, default 1000)
 //   - REALM_BRUTE_FORCE_MAX_DELTA_SECONDS             (int, default 43200)
-//   - REALM_BRUTE_FORCE_FAILURE_RESET_SECONDS         (int, default 43200)
 function parseBool(raw, fallback) {
   if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
   const v = String(raw).trim().toLowerCase();
@@ -75,7 +74,6 @@ export function bruteForceRealmConfig(env = process.env) {
     minimumQuickLoginWaitSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_QUICK_LOGIN_WAIT_SECONDS, 60),
     quickLoginCheckMilliSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_QUICK_LOGIN_CHECK_MS, 1000),
     maxDeltaTimeSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_MAX_DELTA_SECONDS, 43200),
-    failureResetTimeSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_FAILURE_RESET_SECONDS, 43200),
     permanentLockout: parseBool(env.REALM_BRUTE_FORCE_PERMANENT_LOCKOUT, false),
   };
 }

@@ -23,8 +23,7 @@ Each provisioned realm carries the following Keycloak `RealmRepresentation` brut
 | `waitIncrementSeconds` | `60` | How much the lockout grows per failure beyond the factor. |
 | `minimumQuickLoginWaitSeconds` | `60` | Lockout applied for rapid repeated logins. |
 | `quickLoginCheckMilliSeconds` | `1000` | Window that defines a "quick" (too-fast) login. |
-| `maxDeltaTimeSeconds` | `43200` | Window over which failures are counted (12 hours). |
-| `failureResetTimeSeconds` | `43200` | After this idle period the failure count resets. |
+| `maxDeltaTimeSeconds` | `43200` | Window over which failures are counted (12 hours); after this idle period the failure count resets. |
 | `permanentLockout` | `false` | When false, a locked account auto-recovers after the wait window; when true, it stays disabled until an administrator re-enables it. |
 
 The `failureFactor` default is deliberately **10** — stricter than Keycloak's own default of 30
@@ -51,7 +50,6 @@ recognised false (`false`/`0`/`no`/`off`).
 | `REALM_BRUTE_FORCE_QUICK_LOGIN_WAIT_SECONDS` | `60` | `minimumQuickLoginWaitSeconds` |
 | `REALM_BRUTE_FORCE_QUICK_LOGIN_CHECK_MS` | `1000` | `quickLoginCheckMilliSeconds` |
 | `REALM_BRUTE_FORCE_MAX_DELTA_SECONDS` | `43200` | `maxDeltaTimeSeconds` |
-| `REALM_BRUTE_FORCE_FAILURE_RESET_SECONDS` | `43200` | `failureResetTimeSeconds` |
 
 The kind profile sets the primary knobs in `deploy/kind/values-kind.yaml` (the control-plane `env:`
 list).
