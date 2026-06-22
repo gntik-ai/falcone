@@ -6658,6 +6658,9 @@
             "$ref": "#/components/parameters/XCorrelationId"
           },
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/WorkspaceId"
           },
           {
