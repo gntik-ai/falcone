@@ -31543,8 +31543,8 @@
       "gatewayRetryProfile": "mutations",
       "gatewayRouteClass": "control",
       "gatewayTimeoutProfile": "control_plane",
-      "idempotencyReplayHeader": null,
-      "idempotencyTtlSeconds": null,
+      "idempotencyReplayHeader": "X-Idempotency-Replayed",
+      "idempotencyTtlSeconds": 86400,
       "internalRequestMode": "validated_attestation",
       "maxRequestBodyBytes": 262144,
       "method": "DELETE",
@@ -31554,6 +31554,7 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
+        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31561,7 +31562,7 @@
       "resourceType": "service_account",
       "scope": "workspace",
       "summary": "Delete a service account and its Keycloak client",
-      "supportsIdempotencyKey": false,
+      "supportsIdempotencyKey": true,
       "tags": [
         "Workspaces",
         "ServiceAccounts"
