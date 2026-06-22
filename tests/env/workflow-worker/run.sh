@@ -38,4 +38,5 @@ node --test \
   "$HERE"/worker-kill-resume.test.mjs \
   "$HERE"/version-pinning.test.mjs \
   "$HERE"/approval-cancel.test.mjs \
+  "$HERE"/subflow-load-referenced-definition.test.mjs \
   "$HERE"/replay.test.mjs

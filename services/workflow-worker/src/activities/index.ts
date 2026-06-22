@@ -88,18 +88,83 @@ export async function evaluateExpression(input: EvaluateExpressionInput): Promis
 }
 
 /**
- * Load-by-reference resolver (design.md D2). Real impl (fetch from the flow store,
- * scoped by tenant) is #360/#361; the stub returns a fixed minimal definition so the
- * load-by-reference path is exercisable end-to-end. The result is recorded in Temporal
- * history, which is what makes the reference path replay-deterministic.
+ * Load-by-reference resolver (design.md D2): resolve a flow REFERENCE (`flowId` + `version`)
+ * to its actual PUBLISHED definition, scoped to the caller's tenant + workspace, and return
+ * it. This is the seam the `sub-flow` DSL node depends on: `DslInterpreterWorkflow.runSubFlow`
+ * starts the child by reference, and the child resolves its definition here (#679). The result
+ * is recorded in Temporal history, which is what makes the reference path replay-deterministic.
+ *
+ * The actual store read is the injected `activityDeps.loadFlowDefinition` dependency
+ * (worker-deps.mjs::createFlowDefinitionLoader), which reads the immutable `flow_versions`
+ * snapshot under the tenant's RLS context. Scoping uses `input.tenant` (the TenantContext) —
+ * NOT any caller-supplied scope — so a cross-tenant / foreign-workspace reference resolves to
+ * no row and FAILS the run (tenant isolation preserved). An unresolvable reference NEVER
+ * substitutes a placeholder definition (the prior stub did, which silently completed the
+ * parent on a fabricated `noop` child — the #679 defect).
  */
 export async function loadFlowDefinition(input: LoadFlowDefinitionInput): Promise<FlowDefinition> {
-  return {
-    apiVersion: 'v1.0',
-    name: `${input.flowId}@${input.version}`,
-    description: 'stub definition (real resolver: add-flows-activity-catalog #360)',
-    nodes: [
-      { id: 'loaded-step', type: 'task', taskType: 'noop' },
-    ],
-  };
+  const loader = activityDeps.loadFlowDefinition as
+    | ((args: {
+        tenantId: string;
+        workspaceId?: string;
+        flowId: string;
+        version: number;
+      }) => Promise<unknown>)
+    | undefined;
+  if (typeof loader !== 'function') {
+    // Never fall back to a placeholder: an unwired loader is an operational fault, not a
+    // resolvable flow. Failing non-retryably surfaces it instead of silently running a noop.
+    throw ApplicationFailure.nonRetryable(
+      'flow definition loader not wired',
+      'CAPABILITY_UNAVAILABLE',
+    );
+  }
+
+  const tenantId = input.tenant?.tenantId;
+  if (!tenantId) {
+    throw ApplicationFailure.nonRetryable(
+      'loadFlowDefinition invoked without a tenant context',
+      'UNAUTHENTICATED',
+    );
+  }
+
+  // flow_versions.version is an INTEGER column; coerce + validate so a malformed reference
+  // fails fast rather than silently matching no row (or worse, a NaN parameter).
+  const version = Number(input.version);
+  if (!Number.isInteger(version) || version <= 0) {
+    throw ApplicationFailure.nonRetryable(
+      `referenced flow version '${input.version}' is not a positive integer`,
+      'InvalidFlowVersion',
+      input.flowId,
+    );
+  }
+
+  const definition = (await loader({
+    tenantId,
+    workspaceId: input.tenant?.workspaceId,
+    flowId: input.flowId,
+    version,
+  })) as FlowDefinition | null | undefined;
+
+  if (definition == null) {
+    // Scenario B: missing / foreign-scope reference → fail the parent (executeChild propagates
+    // the child failure), NOT a silent placeholder completion.
+    throw ApplicationFailure.nonRetryable(
+      `referenced flow ${input.flowId}@${version} not found in this workspace`,
+      'FlowDefinitionNotFound',
+      input.flowId,
+    );
+  }
+
+  // Minimal shape check (full validation is the API's job): the interpreter needs a non-empty
+  // node graph to walk. A stored row with no nodes is a corrupt/unrunnable definition.
+  if (!Array.isArray((definition as FlowDefinition).nodes) || (definition as FlowDefinition).nodes.length === 0) {
+    throw ApplicationFailure.nonRetryable(
+      `referenced flow ${input.flowId}@${version} has no nodes`,
+      'InvalidFlowDefinition',
+      input.flowId,
+    );
+  }
+
+  return definition as FlowDefinition;
 }
