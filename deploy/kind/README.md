@@ -284,6 +284,27 @@ this control-plane serves. To make the shell usable end-to-end:
   `ws-<hash>-…`). Any other backend failure returns the operation's stable failure code
   (`STORAGE_GET_FAILED` / `STORAGE_HEAD_FAILED`) with a generic message; the upstream detail is
   written to the control-plane log only, never to the response (#675).
+- **Per-bucket scoped storage credentials (#673).** Provisioning a bucket
+  (`POST …/workspaces/{id}/buckets`) issues a SeaweedFS S3 identity scoped to **exactly that one
+  bucket** — keyed on the physical bucket name (`seaweedfs-identity.mjs::bucketIdentityName` →
+  `falcone-s3-<hash>`), not on the workspace. The seed Job does **delete-then-apply**, so a
+  re-provision is a clean rotate (exactly one active key per bucket; grants/keys never
+  accumulate). The returned `storageCredential` (`identityName`/`accessKey`/`secretKey`/`bucket`/
+  `actions`) authenticates against the gateway for ITS bucket only and is `AccessDenied` (403) on
+  every other bucket — including a sibling bucket in the same workspace, not just another
+  tenant's bucket. (Previously one per-workspace identity accumulated a grant for every bucket in
+  the workspace, so a credential "scoped to bucket A" could read sibling buckets B/C.) Two
+  kind-only, ownership-gated (non-owner → `404`, superadmin bypass) credential endpoints manage
+  the lifecycle:
+  - `POST   /v1/storage/buckets/{bucketId}/credentials` — **rotate**: re-issues the bucket's
+    identity (delete-then-apply) and returns a fresh `storageCredential`; the prior access key no
+    longer authenticates.
+  - `DELETE /v1/storage/buckets/{bucketId}/credentials` — **revoke**: deletes the bucket's
+    identity and all its keys (`{ revoked: true }`); the prior access key is rejected.
+  These routes are not in the public route catalog (which carries only storage object routes), so
+  there is no SDK/OpenAPI change. Per-bucket identity issuance is on by default and can be
+  disabled with `STORAGE_TENANT_IDENTITIES=0` (then rotate returns `409
+  STORAGE_IDENTITIES_DISABLED`).
 - The repo's **Service Accounts** page (`/console/service-accounts`) is wired: it
   calls the SA endpoints I already had, but expected camelCase shapes — the
   control-plane now returns `serviceAccountId` on create, the full

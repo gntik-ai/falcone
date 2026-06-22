@@ -177,6 +177,11 @@ export const routes = [
   { method: 'PUT',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storagePutObject', auth: 'authenticated' },
   { method: 'GET',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storageGetObject', auth: 'authenticated' },
   { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storageDeleteObject', auth: 'authenticated' },
+  // Per-bucket storage credential rotate/revoke (#673). Bucket-keyed (consistent with the
+  // object routes above); kind-only, NOT in the public route catalog (which carries only
+  // storage OBJECT routes), so there is no SDK codegen drift. Ownership-gated like object I/O.
+  { method: 'POST',   path: '/v1/storage/buckets/{bucketId}/credentials', localHandler: 'storageRotateCredential', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}/credentials', localHandler: 'storageRevokeCredential', auth: 'authenticated' },
 
   // ---- domain B: Functions (REAL execution via ephemeral k8s Jobs) ----------
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/inventory', localHandler: 'fnInventory', auth: 'authenticated' },
