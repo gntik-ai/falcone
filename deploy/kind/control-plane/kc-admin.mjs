@@ -31,6 +31,54 @@ export function parseAllowList(raw, fallback) {
 const DEFAULT_APP_REDIRECT_URIS = parseAllowList(process.env.TENANT_APP_REDIRECT_URIS, ['https://app.in-falcone.example.com/*']);
 const DEFAULT_APP_WEB_ORIGINS = parseAllowList(process.env.TENANT_APP_WEB_ORIGINS, ['+']);
 
+// Keycloak brute-force detection for provisioned tenant realms (#668). Keycloak defaults
+// `bruteForceProtected` to FALSE, so without this every provisioned realm accepts unlimited
+// wrong-password attempts (no lockout, attack-detection not even counting) — a brute-force /
+// credential-stuffing exposure on every tenant. We turn detection ON by default and stamp sane,
+// env-overridable thresholds onto the realm representation at create time (mirrors the #670
+// module-level env pattern: parse once at load into DEFAULT_* consts). The `failureFactor`
+// default is deliberately 10 (Keycloak's own default of 30 is too weak) — meaningful protection
+// while still typo-tolerant.
+//
+// Env knobs (all optional; safe defaults applied when unset):
+//   - REALM_BRUTE_FORCE_PROTECTED            (bool, default true)  — master on/off switch
+//   - REALM_BRUTE_FORCE_FAILURE_FACTOR       (int,  default 10)    — failures before lockout
+//   - REALM_BRUTE_FORCE_MAX_WAIT_SECONDS     (int,  default 900)   — max temporary lockout window
+//   - REALM_BRUTE_FORCE_PERMANENT_LOCKOUT    (bool, default false) — disable the account permanently
+//   - REALM_BRUTE_FORCE_WAIT_INCREMENT_SECONDS        (int, default 60)
+//   - REALM_BRUTE_FORCE_QUICK_LOGIN_WAIT_SECONDS      (int, default 60)
+//   - REALM_BRUTE_FORCE_QUICK_LOGIN_CHECK_MS          (int, default 1000)
+//   - REALM_BRUTE_FORCE_MAX_DELTA_SECONDS             (int, default 43200)
+function parseBool(raw, fallback) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const v = String(raw).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(v)) return true;
+  if (['false', '0', 'no', 'off'].includes(v)) return false;
+  return fallback;
+}
+function parseIntEnv(raw, fallback) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const n = Number.parseInt(String(raw).trim(), 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+// Build the Keycloak RealmRepresentation brute-force fields from env (or an explicit override),
+// applying the documented defaults. Returns a plain object ready to spread into a realm rep / PUT.
+// Exported so the unit test can assert the env-resolution contract directly (mirrors how #670
+// exports `parseAllowList`).
+export function bruteForceRealmConfig(env = process.env) {
+  return {
+    bruteForceProtected: parseBool(env.REALM_BRUTE_FORCE_PROTECTED, true),
+    failureFactor: parseIntEnv(env.REALM_BRUTE_FORCE_FAILURE_FACTOR, 10),
+    maxFailureWaitSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_MAX_WAIT_SECONDS, 900),
+    waitIncrementSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_WAIT_INCREMENT_SECONDS, 60),
+    minimumQuickLoginWaitSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_QUICK_LOGIN_WAIT_SECONDS, 60),
+    quickLoginCheckMilliSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_QUICK_LOGIN_CHECK_MS, 1000),
+    maxDeltaTimeSeconds: parseIntEnv(env.REALM_BRUTE_FORCE_MAX_DELTA_SECONDS, 43200),
+    permanentLockout: parseBool(env.REALM_BRUTE_FORCE_PERMANENT_LOCKOUT, false),
+  };
+}
+const DEFAULT_BRUTE_FORCE = bruteForceRealmConfig(process.env);
+
 let cachedToken = null; // { token, exp }
 async function adminToken() {
   const now = Math.floor(Date.now() / 1000);
@@ -76,6 +124,10 @@ export const kcAdmin = {
       realm, displayName: displayName ?? realm, enabled,
       loginWithEmailAllowed: true, registrationAllowed: false, rememberMe: true,
       resetPasswordAllowed: true, verifyEmail: false,
+      // Brute-force detection ON by default with env-overridable thresholds (#668). Without this,
+      // Keycloak defaults `bruteForceProtected:false` and the realm accepts unlimited wrong-password
+      // attempts (no lockout). Spreading the resolved config keeps the realm rep self-contained.
+      ...DEFAULT_BRUTE_FORCE,
       attributes: { 'in-falcone.realm-type': 'tenant', 'in-falcone.control-plane.platform-realm': 'in-falcone-platform' }
     });
     // Keycloak 26's declarative user profile requires email/firstName/lastName for role "user",

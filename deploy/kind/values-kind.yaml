@@ -155,6 +155,16 @@ controlPlane:
     # (a Keycloak idiom, explicitly NOT `*`).
     - { name: TENANT_APP_REDIRECT_URIS, value: "https://app.dev.in-falcone.example.com/*,http://localhost:8088/*" }
     - { name: TENANT_APP_WEB_ORIGINS, value: "+" }
+    # Per-tenant realm brute-force detection (#668). Keycloak defaults `bruteForceProtected:false`,
+    # so without these every provisioned tenant realm accepts unlimited wrong-password attempts (no
+    # lockout, attack-detection not even counting) — a brute-force / credential-stuffing exposure.
+    # The control-plane stamps these onto each realm at create time. Detection is ON by default;
+    # failureFactor=10 (KC's default 30 is too weak) locks an account after 10 consecutive failures
+    # for up to maxFailureWaitSeconds. permanentLockout stays false (temporary lockout only).
+    - { name: REALM_BRUTE_FORCE_PROTECTED, value: "true" }
+    - { name: REALM_BRUTE_FORCE_FAILURE_FACTOR, value: "10" }
+    - { name: REALM_BRUTE_FORCE_MAX_WAIT_SECONDS, value: "900" }
+    - { name: REALM_BRUTE_FORCE_PERMANENT_LOCKOUT, value: "false" }
     # Object storage: provider-neutral S3 endpoint + credentials (no plaintext).
     # STORAGE_S3_* are authoritative, pointed at the SeaweedFS S3 gateway (port 8333,
     # path-style). SeaweedFS replaced MinIO (ADR-13). NOTE: the in-falcone-storage

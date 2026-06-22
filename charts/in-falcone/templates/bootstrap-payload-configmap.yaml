@@ -1,4 +1,13 @@
 {{- if .Values.bootstrap.enabled }}
+{{- /* Brute-force detection (#668): `realm.bruteForce` is authored as a nested sub-block (so it can
+       carry comments + a single source of truth), but Keycloak's RealmRepresentation expects the
+       fields at the TOP level. Build the realm-create payload by lifting the bruteForce fields onto
+       the realm dict and dropping the nested key, then render. Also emit a standalone partial realm
+       rep `brute-force.json` for the idempotent ensure step (which retrofits an already-created
+       realm). */ -}}
+{{- $realm := omit .Values.bootstrap.oneShot.keycloak.realm "bruteForce" -}}
+{{- $bruteForce := .Values.bootstrap.oneShot.keycloak.realm.bruteForce | default dict -}}
+{{- $realmPayload := merge (deepCopy $realm) $bruteForce -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -13,7 +22,15 @@ metadata:
     in-falcone.io/bootstrap-one-shot-hash: {{ include "in-falcone.bootstrapOneShotHash" . | quote }}
 data:
   realm.json: |
-{{ toPrettyJson .Values.bootstrap.oneShot.keycloak.realm | nindent 4 }}
+{{ toPrettyJson $realmPayload | nindent 4 }}
+{{- /* Minimal partial RealmRepresentation (#668): `realm` is required so KC resolves the target;
+       the remaining fields are the brute-force knobs. KC's realm PUT merges provided fields, so the
+       idempotent ensure step retrofits brute-force onto an existing realm without disturbing its
+       clients/roles/user-profile. */}}
+{{- if $bruteForce }}
+  brute-force.json: |
+{{ toPrettyJson (merge (dict "realm" $realm.realm) $bruteForce) | nindent 4 }}
+{{- end }}
 {{- if .Values.bootstrap.oneShot.keycloak.userProfile }}
   user-profile.json: |
 {{ toPrettyJson .Values.bootstrap.oneShot.keycloak.userProfile | nindent 4 }}

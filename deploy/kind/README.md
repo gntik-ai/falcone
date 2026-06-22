@@ -79,6 +79,15 @@ login). Proven end-to-end through the gateway with a real superadmin JWT:
   "origins of the registered redirect URIs"), and PKCE (`S256`) is enabled — so the
   authorization endpoint rejects a foreign `redirect_uri` (auth-code interception hardening,
   #670). A wildcard (`*`) entry is ignored; when unset the defaults are still non-wildcard.
+  Every provisioned realm also has Keycloak **brute-force detection** ON (`bruteForceProtected`),
+  so repeated wrong-password attempts for a user are throttled / temporarily locked instead of
+  unlimited (#668). Keycloak defaults this OFF; the control-plane stamps it on at realm-create
+  with env-configurable thresholds: `REALM_BRUTE_FORCE_PROTECTED` (default `true`),
+  `REALM_BRUTE_FORCE_FAILURE_FACTOR` (default `10` — stricter than Keycloak's default 30),
+  `REALM_BRUTE_FORCE_MAX_WAIT_SECONDS` (default `900`, the temporary lockout window), and
+  `REALM_BRUTE_FORCE_PERMANENT_LOCKOUT` (default `false`, so a locked account auto-recovers). A
+  malformed value falls back to its default; protection is disabled only by an explicit `false`.
+  See `docs/reference/architecture/realm-brute-force-protection.md`.
 - `POST /v1/tenants/{id}/users` (create user in the tenant realm + assign realm
   roles), `GET /v1/tenants/{id}/users`.
 - `POST /v1/tenants/{id}/workspaces` (workspace record), `GET /v1/workspaces`,

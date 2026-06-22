@@ -304,6 +304,26 @@ bootstrap:
           rememberMe: true
           verifyEmail: true
           resetPasswordAllowed: true
+        # Keycloak brute-force detection for the platform realm (#668). Keycloak defaults
+        # `bruteForceProtected` to FALSE, so a fresh realm accepts unlimited wrong-password attempts
+        # (no lockout, attack-detection not even counting) — a brute-force / credential-stuffing
+        # exposure for the console/superadmin login. These fields are merged into the realm-create
+        # payload (so a NEW install creates the realm protected) AND PUT idempotently onto the realm
+        # by the bootstrap `ensure_keycloak_brute_force` step (so an EXISTING platform realm is
+        # retrofitted on upgrade — realm-create is skipped once the realm exists).
+        # `bruteForceProtected` is the master switch; the thresholds below are inert while it is
+        # false. failureFactor=10 is deliberately stricter than Keycloak's default 30 (still
+        # typo-tolerant); permanentLockout stays false so a locked account recovers after
+        # maxFailureWaitSeconds rather than needing an admin reset.
+        bruteForce:
+          bruteForceProtected: true
+          failureFactor: 10            # consecutive failures before lockout
+          maxFailureWaitSeconds: 900   # max temporary lockout window (15 min)
+          waitIncrementSeconds: 60     # lockout grows by this much per failure over the factor
+          minimumQuickLoginWaitSeconds: 60
+          quickLoginCheckMilliSeconds: 1000
+          maxDeltaTimeSeconds: 43200   # window over which failures are counted (12 h) AND after which the failure count resets
+          permanentLockout: false      # temporary lockout only; account auto-recovers
       # Keycloak 26 declarative user profile. The default profile marks email/firstName/lastName
       # REQUIRED for role "user"; a user provisioned via the admin API without those (or any
       # programmatically-created platform principal) then fails Direct Access Grant (ROPC) with
