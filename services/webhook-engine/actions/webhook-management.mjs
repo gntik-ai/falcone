@@ -8,6 +8,16 @@ function ok(statusCode, body) { return { statusCode, body }; }
 function noContent() { return { statusCode: 204, body: null }; }
 function error(statusCode, code, message) { return { statusCode, body: { code, message } }; }
 
+// Subscription and delivery ids are Postgres `uuid` columns. A path id that is
+// not a well-formed UUID would reach `WHERE id = $1` and make Postgres raise
+// SQLSTATE 22P02 (`invalid input syntax for type uuid`), which — with no
+// try/catch on the by-id read path — bubbles to the control-plane central catch
+// as a generic 500. Reject a malformed id up front so it is treated exactly like
+// a nonexistent id (404), never a 500, and never reaches the db. Same predicate
+// idiom as deploy/kind/control-plane/b-handlers.mjs::isPlanUuid.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(id) { return UUID_RE.test(String(id ?? '')); }
+
 /**
  * App-layer consistency guard: a signing-secret record (or its parent
  * subscription) must carry a non-empty tenant_id/workspace_id before any secret
@@ -56,6 +66,14 @@ function responseSubscription(row) {
 }
 
 async function requireSubscription(db, ctx, id) {
+  // A non-UUID id can never match a `uuid` primary key; short-circuit to the
+  // not-found path (the caller maps a null result to 404) so the malformed value
+  // never reaches `db.getSubscription` and cannot raise a 22P02-induced 500. A
+  // malformed id is thus indistinguishable from a nonexistent-but-valid one and
+  // from a cross-tenant one — consistent with the existing no-existence-disclosure
+  // design (no new malformed-vs-absent oracle). Covers every by-id route
+  // (GET/PATCH/DELETE/pause/resume/rotate-secret/deliveries) at this chokepoint.
+  if (!isUuid(id)) return null;
   const row = await db.getSubscription(id);
   if (!row || row.tenant_id !== ctx.tenantId || row.workspace_id !== ctx.workspaceId || row.deleted_at) return null;
   return row;
@@ -165,6 +183,10 @@ export async function main(params) {
   }
 
   if (method === 'GET' && parts[2] === 'deliveries' && parts.length === 4) {
+    // `webhook_deliveries.id` is a uuid column too; a malformed deliveryId would
+    // raise 22P02 in `db.getDelivery` (`... AND id = $2`). Treat it as not found,
+    // matching the existing nonexistent-delivery 404, before touching the db.
+    if (!isUuid(parts[3])) return error(404, 'NOT_FOUND', 'Delivery not found');
     const delivery = await db.getDelivery(subscription.id, parts[3]);
     if (!delivery) return error(404, 'NOT_FOUND', 'Delivery not found');
     return ok(200, delivery);

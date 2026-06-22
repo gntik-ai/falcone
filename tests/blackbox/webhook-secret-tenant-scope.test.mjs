@@ -20,6 +20,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { main as managementMain } from '../../services/webhook-engine/actions/webhook-management.mjs';
 import { main as deliveryMain } from '../../services/webhook-engine/actions/webhook-delivery-worker.mjs';
 import { encryptSecret } from '../../services/webhook-engine/src/webhook-signing.mjs';
@@ -70,8 +71,11 @@ test('bbx-webhook-secret-scope-01: insertSecret receives the subscription tenant
 // bbx-webhook-secret-scope-02: rotate propagates tenant_id/workspace_id
 // -------------------------------------------------------------------------
 test('bbx-webhook-secret-scope-02: rotateSecret receives the subscription tenant_id and workspace_id', async () => {
+  // webhook_subscriptions.id is a UUID column (migration 001); the path id must be
+  // a valid UUID or it is now correctly rejected as 404 before the db (see #672).
+  const subscriptionId = crypto.randomUUID();
   const subscription = {
-    id: 'sub-1',
+    id: subscriptionId,
     tenant_id: 'tenant-a',
     workspace_id: 'ws-a',
     target_url: 'https://example.com/hook',
@@ -86,7 +90,7 @@ test('bbx-webhook-secret-scope-02: rotateSecret receives the subscription tenant
     db, kafka, env, auth: tenantA,
     resolver: publicResolver,
     method: 'POST',
-    path: '/v1/webhooks/subscriptions/sub-1/rotate-secret',
+    path: `/v1/webhooks/subscriptions/${subscriptionId}/rotate-secret`,
     body: { gracePeriodSeconds: 3600 }
   });
 
