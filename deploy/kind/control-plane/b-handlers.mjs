@@ -938,13 +938,25 @@ async function getDatabase(ctx) {
   return ok(200, { database: db });
 }
 // POST /v1/workspaces/{workspaceId}/database/credential-rotations — rotate creds.
+// A workspace provisioned in `dedicated_role` mode has its own login role; rotation ALTERs that
+// role's password (old credential rejected by Postgres, new one accepted) and returns the new DSN
+// (201, the resource-created convention the sibling provision/SA-rotation handlers use).
+// A workspace in `shared` mode has NO dedicated credential to rotate, so rotation cannot occur.
+// That MUST be signalled with a non-success status — a success-shaped 200 {rotated:false} misleads
+// the caller/UI into thinking a rotation happened (#686). We return 409 DB_SHARED_MODE (a state
+// conflict, matching the DB_ALREADY_PROVISIONED 409 convention) carrying the explanatory reason.
+// The dataplane stays a pure discriminated function ({rotated:true|false}); the HTTP mapping lives
+// here. Injectable via ctx for deterministic handler tests (parity with deleteWorkspace's seams).
 async function rotateDatabaseCredential(ctx) {
+  const st = ctx.store ?? store;
+  const rotate = ctx.rotateWorkspaceDatabaseCredential ?? rotateWorkspaceDatabaseCredential;
   const r = await resolveWorkspaceForManage(ctx); if (r.error) return r.error;
-  const db = await store.getWorkspaceDatabase(ctx.pool, r.ws.id);
+  const db = await st.getWorkspaceDatabase(ctx.pool, r.ws.id);
   if (!db) return err(404, 'DB_NOT_PROVISIONED', 'workspace has no database');
   try {
-    const res = await rotateWorkspaceDatabaseCredential(ctx.pool, { database: db.database_name, mode: db.mode, username: db.username });
-    return ok(res.rotated ? 201 : 200, { databaseId: db.id, ...res });
+    const res = await rotate(ctx.pool, { database: db.database_name, mode: db.mode, username: db.username });
+    if (!res.rotated) return err(409, 'DB_SHARED_MODE', res.reason ?? 'workspace database has no dedicated credential to rotate');
+    return ok(201, { databaseId: db.id, ...res });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'ROTATE_DB_FAILED', String(e.message ?? e));
   }
