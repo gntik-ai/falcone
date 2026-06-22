@@ -156,3 +156,77 @@ export async function publishFlow(
     throw toFlowApiError(rawError)
   }
 }
+
+// ---- Flow schedule management (change: add-flow-schedule-management-api / #680) -------------
+//
+// Operate in place on a flow's cron Temporal Schedule (created on publish) WITHOUT deleting the
+// flow. Endpoint shapes (verified against apps/control-plane/src/runtime/server.mjs +
+// flow-executor.mjs; tenant isolation is identity-derived, identical to the rest of the Flows API):
+//   GET    /v1/flows/workspaces/{ws}/schedules                       -> { items: FlowScheduleSummary[] }
+//   GET    /v1/flows/workspaces/{ws}/flows/{flowId}/schedule         -> FlowSchedule (404 if none)
+//   POST   /v1/flows/workspaces/{ws}/flows/{flowId}/schedule/pause   -> FlowSchedule (paused=true)
+//   POST   /v1/flows/workspaces/{ws}/flows/{flowId}/schedule/resume  -> FlowSchedule (paused=false)
+//   POST   /v1/flows/workspaces/{ws}/flows/{flowId}/schedule/trigger -> { status: 'triggered'; scheduleId }
+
+// One recent (or upcoming-derived) schedule action, trimmed to the stable fields the API exposes.
+export interface FlowScheduleRecentAction {
+  scheduledAt: string | null
+  takenAt: string | null
+  workflowId: string | null
+}
+
+// The normalized schedule resource the executor returns (stable shape — never raw Temporal internals).
+export interface FlowSchedule {
+  scheduleId: string
+  flowId?: string
+  workspaceId: string
+  paused: boolean
+  note?: string | null
+  // The schedule's cron expression(s); may be empty when Temporal only exposes structured calendars.
+  cron: string[]
+  // Upcoming scheduled fire times, ISO-8601 (empty while the schedule is paused).
+  nextActionTimes: string[]
+  recentActions?: FlowScheduleRecentAction[]
+}
+
+// The list summary is the same normalized resource (the executor reuses one normalizer).
+export type FlowScheduleSummary = FlowSchedule
+
+export interface FlowScheduleTriggerAck {
+  status: 'triggered'
+  scheduleId: string
+}
+
+export function listFlowSchedules(workspaceId: string): Promise<{ items: FlowScheduleSummary[] }> {
+  return requestConsoleSessionJson<{ items: FlowScheduleSummary[] }>(
+    `/v1/flows/workspaces/${enc(workspaceId)}/schedules`
+  )
+}
+
+export function getFlowSchedule(workspaceId: string, flowId: string): Promise<FlowSchedule> {
+  return requestConsoleSessionJson<FlowSchedule>(`${flowsBase(workspaceId)}/${enc(flowId)}/schedule`)
+}
+
+export function pauseFlowSchedule(workspaceId: string, flowId: string): Promise<FlowSchedule> {
+  return requestConsoleSessionJson<FlowSchedule>(
+    `${flowsBase(workspaceId)}/${enc(flowId)}/schedule/pause`,
+    { method: 'POST' }
+  )
+}
+
+export function resumeFlowSchedule(workspaceId: string, flowId: string): Promise<FlowSchedule> {
+  return requestConsoleSessionJson<FlowSchedule>(
+    `${flowsBase(workspaceId)}/${enc(flowId)}/schedule/resume`,
+    { method: 'POST' }
+  )
+}
+
+export function triggerFlowSchedule(
+  workspaceId: string,
+  flowId: string
+): Promise<FlowScheduleTriggerAck> {
+  return requestConsoleSessionJson<FlowScheduleTriggerAck>(
+    `${flowsBase(workspaceId)}/${enc(flowId)}/schedule/trigger`,
+    { method: 'POST' }
+  )
+}

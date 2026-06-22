@@ -383,7 +383,120 @@ function createScheduleGateway({ temporalClient, getTemporalClient, logger }) {
     }
   }
 
-  return { upsertSchedule, deleteSchedule };
+  // -- Management operations (change: add-flow-schedule-management-api / #680) ------------------
+  // Operate on an EXISTING schedule by id. The id is always built upstream from the VERIFIED
+  // tenant + the workspace-ownership-validated path (scheduleIdFor) — a foreign flow yields an id
+  // that does not exist, so the Temporal handle methods throw ScheduleNotFoundError, which the
+  // executor maps to 404 (existence is never revealed) via isScheduleNotFound (constructor-name
+  // based, robust to the real SDK re-wrap). These wrappers re-raise the raw SDK error so the
+  // executor can classify not-found vs. an unexpected fault (it never swallows a 500).
+
+  // Fetch a schedule's description; null when Temporal reports it does not exist.
+  async function describeSchedule({ scheduleId }) {
+    const c = await client();
+    try {
+      return await c.schedule.getHandle(scheduleId).describe();
+    } catch (err) {
+      if (isScheduleNotFound(err)) return null;
+      throw err;
+    }
+  }
+
+  // Pause/unpause are idempotent on the Temporal side (pausing an already-paused schedule is a
+  // no-op that still reports paused). They return the post-operation description so the caller can
+  // surface the new state; null when the schedule does not exist. The whole pause-then-describe is
+  // guarded so a not-found at EITHER step (incl. a delete racing between the two calls) maps to
+  // null → 404, never an uncaught 500.
+  async function pauseSchedule({ scheduleId, note }) {
+    const c = await client();
+    const handle = c.schedule.getHandle(scheduleId);
+    try {
+      await handle.pause(note);
+      return await handle.describe();
+    } catch (err) {
+      if (isScheduleNotFound(err)) return null;
+      throw err;
+    }
+  }
+
+  async function unpauseSchedule({ scheduleId, note }) {
+    const c = await client();
+    const handle = c.schedule.getHandle(scheduleId);
+    try {
+      await handle.unpause(note);
+      return await handle.describe();
+    } catch (err) {
+      if (isScheduleNotFound(err)) return null;
+      throw err;
+    }
+  }
+
+  // Request an immediate ad-hoc run. Returns true on success, false when the schedule is absent.
+  async function triggerSchedule({ scheduleId, overlap }) {
+    const c = await client();
+    try {
+      await c.schedule.getHandle(scheduleId).trigger(overlap);
+      return true;
+    } catch (err) {
+      if (isScheduleNotFound(err)) return false;
+      throw err;
+    }
+  }
+
+  // List schedule summaries whose id begins with the given prefix. The prefix is the SOLE
+  // isolation boundary: it is built from the verified tenant + validated workspace
+  // (`{tenantId}:{workspaceId}:`), so a summary for any other tenant/workspace is filtered out
+  // even though Temporal's list spans the whole namespace.
+  async function listSchedulesByPrefix({ prefix }) {
+    const c = await client();
+    const out = [];
+    for await (const summary of c.schedule.list()) {
+      if (typeof summary?.scheduleId === 'string' && summary.scheduleId.startsWith(prefix)) {
+        out.push(summary);
+      }
+    }
+    return out;
+  }
+
+  return {
+    upsertSchedule,
+    deleteSchedule,
+    describeSchedule,
+    pauseSchedule,
+    unpauseSchedule,
+    triggerSchedule,
+    listSchedulesByPrefix,
+  };
+}
+
+// True when a Temporal SDK error denotes "schedule not found". This is the SOLE mechanism that maps
+// a missing schedule (a no-cron flow OR a cross-tenant flow whose derived id does not exist) to a
+// 404 — so it MUST recognise the REAL `@temporalio/client@1.18.1` not-found shape, not just a
+// convenient fake. Against the real SDK the gRPC NOT_FOUND error is re-wrapped into a fresh
+// `ScheduleNotFoundError(err.details ?? 'Schedule not found', scheduleId)` (schedule-client.js:353):
+//   - the original gRPC `code` (5) is DROPPED in the re-wrap, so `err.code === 5` is unreliable;
+//   - `err.name` is set to 'ScheduleNotFoundError' only via the class's prototype (the
+//     `SymbolBasedInstanceOfError` decorator defines `name` on the prototype, NOT as an own
+//     property), so `err.name` can be lost if the error is ever copied/serialised across a boundary.
+// The ROBUST, import-free signal is therefore the constructor name, which survives both the re-wrap
+// and a property copy. We do NOT statically import the class for an `instanceof` check: this module
+// deliberately keeps `@temporalio/client` INJECTED (never statically imported) so it can load in the
+// kind control-plane image, which does not bundle the Temporal client (flows are executor-only) —
+// a static import would crash that boot. The remaining checks are narrow fallbacks; a genuine
+// non-not-found Temporal fault must still fall through and surface as a 500 (never swallowed as 404).
+function isScheduleNotFound(err) {
+  if (!err) return false;
+  // Primary: the typed class identity, retained even when `.name`/`.code` are not.
+  if (err.constructor?.name === 'ScheduleNotFoundError') return true;
+  // Fallback: the prototype-defined name (present on a live SDK instance).
+  if (err.name === 'ScheduleNotFoundError') return true;
+  // Fallback: gRPC status NOT_FOUND === 5 (carried as `code` on a raw ServiceError, pre re-wrap).
+  if (err.code === 5) return true;
+  // Fallback: a narrow message probe (the SDK default message / explicit "schedule not found").
+  // Kept specific on purpose — a bare "not found" could swallow an unrelated fault and hide it as a
+  // 404, so it is NOT matched.
+  const message = String(err.message ?? '').toLowerCase();
+  return message.includes('schedule not found') || message.includes('no schedule');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -633,6 +746,10 @@ export function createFlowTriggerRegistry({
     swapTriggers,
     verifyWebhook,
     removeTriggerArtifacts,
+    // Schedule-management gateway (change: add-flow-schedule-management-api / #680). The executor
+    // reaches Temporal Schedule describe/pause/unpause/trigger/list through this; the registry owns
+    // the (lazy) Temporal client so all schedule I/O stays in one place.
+    scheduleGateway: schedules,
     // Exposed for the consumer-refresh-on-boot path and tests.
     refreshConsumerSubscriptions,
     store,
