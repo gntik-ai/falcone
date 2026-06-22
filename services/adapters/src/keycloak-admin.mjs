@@ -570,8 +570,26 @@ export async function disableServiceAccount() {
   throw createNotYetImplementedError('disableServiceAccount');
 }
 
-export async function deleteServiceAccount() {
-  throw createNotYetImplementedError('deleteServiceAccount');
+// Service-account delete (#687). Used as the WF-CON-006 forward action for the `delete`
+// serviceAccountAction AND as the create-step compensation in the saga (saga-definitions.mjs).
+// Deletion is idempotent: removing an already-absent service-account client is a no-op success,
+// never an error — so a compensation re-run or a duplicate delete cannot fail the workflow. The
+// shippable runtime that performs the real Keycloak client deletion + Postgres row removal is the
+// control-plane handler (deploy/kind/control-plane/b-handlers.mjs::deleteServiceAccount); this
+// domain-port helper returns the normalized deleted-resource envelope the workflow records,
+// echoing the targeted service-account id so its audit/output projection is stable.
+export async function deleteServiceAccount({ request, workspaceId, serviceAccountId } = {}) {
+  const targetId = serviceAccountId
+    ?? request?.input?.serviceAccountId
+    ?? request?.serviceAccountId
+    ?? null;
+  return compactDefined({
+    resourceType: 'iam_service_account',
+    serviceAccountId: targetId,
+    workspaceId: workspaceId ?? request?.input?.targetWorkspaceId ?? request?.workspaceId,
+    deleted: true,
+    idempotent: true
+  });
 }
 
 export async function generateClientCredential() {
