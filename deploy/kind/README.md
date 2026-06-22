@@ -47,7 +47,13 @@ login). Proven end-to-end through the gateway with a real superadmin JWT:
 - `POST /v1/tenants` → creates a Keycloak realm + the 11 standard realm roles +
   a public `<slug>-app` client (ROPC + auth-code, an un-forgeable `tenant_id` claim) +
   an owner user + a DB record (+ optional plan assignment); compensating cleanup
-  on failure. `GET /v1/tenants`, `GET /v1/tenants/{id}`. The `<slug>-app` client's
+  on failure. A duplicate slug returns `409 SLUG_TAKEN` — both the sequential case (the
+  `slugTaken` pre-check) and the concurrent race: the `slug` pre-check is a TOCTOU read, so two
+  same-slug creates can both pass it, and the `tenants_slug_key` UNIQUE constraint is the real
+  guard; the loser's `23505` is mapped to the SAME `409 SLUG_TAKEN` (never a `502` leaking the raw
+  Postgres constraint text) and its partial realm/client/owner-user are rolled back by the saga
+  (#665, the tenant twin of the workspace `409 WORKSPACE_SLUG_CONFLICT` fix #634). `GET /v1/tenants`,
+  `GET /v1/tenants/{id}`. The `<slug>-app` client's
   redirect-URI / web-origin allow-list is NON-wildcard and deployment-configured via
   `TENANT_APP_REDIRECT_URIS` / `TENANT_APP_WEB_ORIGINS` (comma-separated; `+` web-origin =
   "origins of the registered redirect URIs"), and PKCE (`S256`) is enabled — so the
