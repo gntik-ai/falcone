@@ -19,7 +19,12 @@
  *  - the thresholds are configurable per deployment via env (REALM_BRUTE_FORCE_*), honored by the
  *    pure `bruteForceRealmConfig` resolver (exported, mirroring how #670 exports `parseAllowList`);
  *  - a malformed/empty env value falls back to the safe default rather than disabling protection;
- *  - the existing realm fields (login flags, realm-type attribute) are preserved.
+ *  - the existing realm fields (login flags, realm-type attribute) are preserved;
+ *  - EVERY brute-force field emitted is a REAL Keycloak RealmRepresentation field (allow-list guard,
+ *    bf-05): a hallucinated field such as `failureResetTimeSeconds` makes KC reject the ENTIRE
+ *    `POST /realms` with `400 "unable to read contents from stream"`, which broke ALL tenant
+ *    provisioning. The fake-fetch harness below returns 201 for ANY body, so it cannot catch an
+ *    invalid KC field on its own — the allow-list assertion is what closes that gap.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -144,7 +149,6 @@ test('bf-02: bruteForceRealmConfig defaults are safe and ON', () => {
     minimumQuickLoginWaitSeconds: 60,
     quickLoginCheckMilliSeconds: 1000,
     maxDeltaTimeSeconds: 43200,
-    failureResetTimeSeconds: 43200,
     permanentLockout: false,
   }, 'empty env yields the documented safe defaults with protection ON');
 });
@@ -181,4 +185,78 @@ test('bf-04: malformed env falls back to safe defaults (never disables protectio
   // Protection is only disabled by an explicit, recognised false — an intentional operator opt-out.
   assert.equal(bruteForceRealmConfig({ REALM_BRUTE_FORCE_PROTECTED: 'false' }).bruteForceProtected, false);
   assert.equal(bruteForceRealmConfig({ REALM_BRUTE_FORCE_PROTECTED: '0' }).bruteForceProtected, false);
+});
+
+// ── bf-05 ─────────────────────────────────────────────────────────────────────
+// Regression guard against re-introducing a hallucinated KC field. A previous fix emitted
+// `failureResetTimeSeconds`, which is NOT a field of Keycloak's RealmRepresentation; KC 26 rejected
+// the ENTIRE `POST /realms` with `400 {"errorMessage":"unable to read contents from stream"}`, so
+// EVERY new-tenant createRealm 400'd — tenant provisioning was completely broken.
+//
+// The fake-fetch harness in makeFakeKeycloak() returns 201 for ANY body, so it CANNOT detect an
+// invalid KC field by itself (the bf-01 test passed even while live createRealm 400'd). This guard
+// closes that gap: every brute-force-related key emitted by `bruteForceRealmConfig` AND every such
+// key in the realm representation actually POSTed by `createRealm` MUST be within the explicit
+// allow-list of REAL Keycloak RealmRepresentation brute-force fields. The test FAILS if any
+// unknown/hallucinated field (like `failureResetTimeSeconds`) appears.
+//
+// Source of truth: org.keycloak.representations.idm.RealmRepresentation (KC 26.x) — the only
+// brute-force properties it defines.
+const VALID_KC_BRUTE_FORCE_FIELDS = new Set([
+  'bruteForceProtected',
+  'permanentLockout',
+  'failureFactor',
+  'maxFailureWaitSeconds',
+  'waitIncrementSeconds',
+  'minimumQuickLoginWaitSeconds',
+  'quickLoginCheckMilliSeconds',
+  'maxDeltaTimeSeconds',
+  'maxTemporaryLockouts',
+  'bruteForceStrategy',
+]);
+
+test('bf-05: every emitted brute-force field is a REAL Keycloak RealmRepresentation field (no hallucinated key)', async () => {
+  // (a) the pure resolver only emits real KC brute-force fields.
+  const cfg = bruteForceRealmConfig({});
+  for (const key of Object.keys(cfg)) {
+    assert.ok(
+      VALID_KC_BRUTE_FORCE_FIELDS.has(key),
+      `bruteForceRealmConfig emitted "${key}", which is NOT a valid Keycloak RealmRepresentation ` +
+        `brute-force field — KC rejects the whole POST /realms with 400 "unable to read contents ` +
+        `from stream". Valid fields: ${[...VALID_KC_BRUTE_FORCE_FIELDS].join(', ')}.`,
+    );
+  }
+
+  // (b) the realm representation actually POSTed by createRealm carries no invalid brute-force key.
+  // (createRealm spreads the resolved config; assert on the real wire payload, not just the resolver.)
+  const { fetchImpl, captured } = makeFakeKeycloak();
+  globalThis.fetch = fetchImpl;
+  await kcAdmin.createRealm({ realm: REALM, displayName: 'Acme' });
+  const body = captured.realmBody;
+  assert.ok(body, 'a realm-create POST body was captured');
+
+  // Any key in the posted realm rep that is a brute-force concept (i.e. listed in our allow-list of
+  // KC's brute-force fields) is, by construction, valid; the failure mode we must catch is a key the
+  // code BELIEVES is a brute-force field but KC does not know. So assert that every key emitted by
+  // the resolver and present on the body is in the allow-list — and that the body carries no key
+  // matching a brute-force naming shape that is outside the allow-list.
+  for (const key of Object.keys(cfg)) {
+    assert.ok(
+      VALID_KC_BRUTE_FORCE_FIELDS.has(key) && key in body,
+      `createRealm posted brute-force field "${key}" which must be a valid KC field and present on the realm rep`,
+    );
+  }
+  // Defense in depth: nothing on the posted body that *looks* like a brute-force / failure / lockout
+  // knob may escape the allow-list (catches a stray hardcoded field added directly in createRealm).
+  const bruteForceShaped = /^(bruteForce|failure|lockout|maxFailure|waitIncrement|quickLogin|minimumQuickLogin|maxDelta|maxTemporary|permanentLockout)/i;
+  for (const key of Object.keys(body)) {
+    if (bruteForceShaped.test(key)) {
+      assert.ok(
+        VALID_KC_BRUTE_FORCE_FIELDS.has(key),
+        `createRealm posted "${key}", which looks like a brute-force knob but is NOT a valid Keycloak ` +
+          `RealmRepresentation field (KC would 400 the whole realm-create). Valid fields: ` +
+          `${[...VALID_KC_BRUTE_FORCE_FIELDS].join(', ')}.`,
+      );
+    }
+  }
 });
