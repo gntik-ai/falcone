@@ -37,4 +37,5 @@ node --test \
   "$HERE"/node-id-naming.test.mjs \
   "$HERE"/worker-kill-resume.test.mjs \
   "$HERE"/version-pinning.test.mjs \
+  "$HERE"/approval-cancel.test.mjs \
   "$HERE"/replay.test.mjs
