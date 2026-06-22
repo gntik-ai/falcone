@@ -8270,6 +8270,16 @@
               }
             }
           },
+          "409": {
+            "description": "The workspace is at its storage capacity quota (e.g. bucket-count limit); the provision is rejected with error code STORAGE_QUOTA_EXCEEDED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "413": {
             "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
             "content": {
@@ -50615,6 +50625,16 @@
           },
           "404": {
             "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The upload would exceed the workspace storage byte quota; the request is rejected with error code STORAGE_QUOTA_EXCEEDED.",
             "content": {
               "application/json": {
                 "schema": {
