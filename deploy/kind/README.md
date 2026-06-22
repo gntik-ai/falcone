@@ -46,6 +46,15 @@ object `{}` is passed through so the handler applies its own field-level
 validation (e.g. `400 VALIDATION_ERROR` for a missing required field). A
 non-JSON content type (object uploads) is never parsed as JSON.
 
+Path-id validation (error semantics): a resource whose id is a Postgres `uuid`
+column rejects a malformed (non-UUID) path id as a clean `404` BEFORE the id ever
+reaches a SQL query — never a `500` leaking the database type error
+`22P02 invalid input syntax for type uuid`. This covers every by-id webhook
+subscription route (`GET`/`PATCH`/`DELETE`, `…/pause`, `…/resume`,
+`…/rotate-secret`, `…/deliveries`, `…/deliveries/{deliveryId}`): a non-UUID id is
+treated identically to a nonexistent or cross-tenant id —
+`404 {"code":"NOT_FOUND"}` with no malformed-vs-absent disclosure (#672).
+
 ## Domain (B) — tenant lifecycle, users, console login (BUILT)
 
 The repo only stubs these (`apps/control-plane/src/workflows/wf-con-002.mjs`:
