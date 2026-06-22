@@ -105,8 +105,26 @@ const EMPTY_USAGE_STATE: SectionState<StorageUsageSnapshot | null> = { data: nul
 
 const STORAGE_BUCKETS_PAGE_SIZE = 100
 const STORAGE_OBJECTS_PAGE_SIZE = 50
+// Presigned URL ISSUANCE is wired (#676: POST .../objects/{key}/presign). There is still no
+// public GET inventory of previously-issued presigned URLs (they are stateless SigV4 URLs), so
+// the "inventory" flag stays false; the console offers a generate-on-demand action instead.
 const STORAGE_PRESIGNED_READ_API_AVAILABLE = false
+// Multipart upload is wired (#676), but a full chunked-upload UI is out of scope here; the public
+// surface has no multipart-session inventory endpoint, so this read flag stays false.
 const STORAGE_MULTIPART_READ_API_AVAILABLE = false
+// Default lifetime (seconds) requested for a console-generated presigned download URL. The backend
+// clamps this to the platform maximum (STORAGE_PRESIGN_MAX_TTL_SECONDS, default 3600).
+const PRESIGNED_DOWNLOAD_TTL_SECONDS = 300
+
+type StoragePresignedUrl = {
+  url: string
+  operation: string
+  bucketName: string
+  objectKey: string
+  expiresAt: string
+  ttlSeconds: number
+  ttlClamped?: boolean
+}
 
 function getApiErrorMessage(rawError: unknown, fallback: string): string {
   if (rawError && typeof rawError === 'object') {
@@ -228,6 +246,10 @@ export function ConsoleStoragePage() {
   const [selectedObjectKey, setSelectedObjectKey] = useState<string | null>(null)
   const [objectMeta, setObjectMeta] = useState<SectionState<StorageObjectMetadata | null>>(EMPTY_OBJECT_META_STATE)
   const [usage, setUsage] = useState<SectionState<StorageUsageSnapshot | null>>(EMPTY_USAGE_STATE)
+  // #676 object-I/O completeness affordances (write actions; not part of the read snapshots).
+  const [presigned, setPresigned] = useState<SectionState<StoragePresignedUrl | null>>({ data: null, loading: false, error: null })
+  const [deletingBucketId, setDeletingBucketId] = useState<string | null>(null)
+  const [bucketActionError, setBucketActionError] = useState<string | null>(null)
 
   const resetBucketDetailState = useCallback(() => {
     setBucketTab('objects')
@@ -301,6 +323,40 @@ export function ConsoleStoragePage() {
     }
   }, [])
 
+  // Generate a presigned DOWNLOAD URL for the selected object (#676). The backend returns a
+  // time-limited SigV4 URL scoped to exactly this bucket+object+operation; the TTL is clamped to
+  // the platform maximum server-side.
+  const generatePresignedDownloadUrl = useCallback(async (bucketId: string, objectKey: string) => {
+    setPresigned({ data: null, loading: true, error: null })
+    try {
+      const data = await requestConsoleSessionJson<StoragePresignedUrl>(
+        `/v1/storage/buckets/${bucketId}/objects/${encodeURIComponent(objectKey)}/presign`,
+        { method: 'POST', body: { operation: 'download', ttlSeconds: PRESIGNED_DOWNLOAD_TTL_SECONDS } }
+      )
+      setPresigned({ data, loading: false, error: null })
+    } catch (error) {
+      if (isAbortError(error)) return
+      setPresigned({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo generar la URL prefirmada.') })
+    }
+  }, [])
+
+  // Delete a SINGLE bucket the caller owns (#676). On success, refresh the bucket list and clear
+  // the selection if the deleted bucket was selected.
+  const deleteBucketAction = useCallback(async (bucketId: string, workspaceId: string) => {
+    setBucketActionError(null)
+    setDeletingBucketId(bucketId)
+    try {
+      await requestConsoleSessionJson<{ bucket: string; deleted: boolean }>(`/v1/storage/buckets/${bucketId}`, { method: 'DELETE' })
+      setSelectedBucketId((current) => (current === bucketId ? null : current))
+      await loadBuckets(workspaceId)
+      await loadUsage(workspaceId)
+    } catch (error) {
+      if (!isAbortError(error)) setBucketActionError(getApiErrorMessage(error, 'No se pudo eliminar el bucket.'))
+    } finally {
+      setDeletingBucketId(null)
+    }
+  }, [loadBuckets, loadUsage])
+
   useEffect(() => {
     setBuckets(EMPTY_BUCKETS_STATE)
     setSelectedBucketId(null)
@@ -327,6 +383,7 @@ export function ConsoleStoragePage() {
 
     setSelectedObjectKey(null)
     setObjectMeta(EMPTY_OBJECT_META_STATE)
+    setPresigned({ data: null, loading: false, error: null })
 
     const controller = new AbortController()
     void loadObjects(selectedBucketId, null, controller.signal)
@@ -415,6 +472,7 @@ export function ConsoleStoragePage() {
               </div>
             ) : null}
             {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el workspace seleccionado.</p> : null}
+            {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
             {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
@@ -424,7 +482,8 @@ export function ConsoleStoragePage() {
                       <th className="py-2 pr-3">Región</th>
                       <th className="py-2 pr-3">Estado</th>
                       <th className="py-2 pr-3">Provisioning</th>
-                      <th className="py-2">Creado</th>
+                      <th className="py-2 pr-3">Creado</th>
+                      <th className="py-2">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -448,7 +507,17 @@ export function ConsoleStoragePage() {
                           <td className="py-3 pr-3 align-top">{formatValue(bucket.region)}</td>
                           <td className="py-3 pr-3 align-top"><Badge variant={statusTone(bucket.status)}>{formatEnumLabel(bucket.status)}</Badge></td>
                           <td className="py-3 pr-3 align-top">{bucket.provisioning?.state ? <Badge variant={statusTone(bucket.provisioning.state)}>{formatEnumLabel(bucket.provisioning.state)}</Badge> : '—'}</td>
-                          <td className="py-3 align-top">{formatRelativeDate(bucket.timestamps?.createdAt)}</td>
+                          <td className="py-3 pr-3 align-top">{formatRelativeDate(bucket.timestamps?.createdAt)}</td>
+                          <td className="py-3 align-top">
+                            <Button
+                              disabled={deletingBucketId === bucket.resourceId}
+                              onClick={() => void deleteBucketAction(bucket.resourceId, bucket.workspaceId)}
+                              type="button"
+                              variant="destructive"
+                            >
+                              {deletingBucketId === bucket.resourceId ? 'Eliminando…' : 'Eliminar'}
+                            </Button>
+                          </td>
                         </tr>
                       )
                     })}
@@ -678,11 +747,45 @@ export function ConsoleStoragePage() {
                 </div>
               ) : null}
 
-              {bucketTab === 'presigned'
-                ? STORAGE_PRESIGNED_READ_API_AVAILABLE
-                  ? <p>Inventario público de presigned URLs pendiente de implementación.</p>
-                  : <UnsupportedApiState surface="presigned" />
-                : null}
+              {bucketTab === 'presigned' ? (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold">URLs prefirmadas</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Genera una URL temporal y de alcance limitado para descargar un objeto sin credenciales de Falcone. La URL
+                      queda acotada a este bucket, esta clave y la operación de descarga; el TTL se recorta al máximo de la plataforma.
+                    </p>
+                  </div>
+
+                  {!selectedObjectKey ? (
+                    <p className="text-sm text-muted-foreground">Selecciona un objeto en la pestaña «Objetos» para generar su URL de descarga.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm">Objeto seleccionado: <span className="font-medium">{selectedObjectKey}</span></p>
+                      <Button
+                        disabled={presigned.loading}
+                        onClick={() => void generatePresignedDownloadUrl(selectedBucket.resourceId, selectedObjectKey)}
+                        type="button"
+                      >
+                        {presigned.loading ? 'Generando…' : 'Generar URL de descarga prefirmada'}
+                      </Button>
+
+                      {presigned.error ? <p role="alert">{presigned.error}</p> : null}
+                      {presigned.data ? (
+                        <KeyValueGrid items={[
+                          { label: 'Operación', value: presigned.data.operation },
+                          { label: 'Bucket', value: presigned.data.bucketName },
+                          { label: 'Clave', value: presigned.data.objectKey },
+                          { label: 'Expira', value: presigned.data.expiresAt },
+                          { label: 'TTL (s)', value: presigned.data.ttlSeconds },
+                          { label: 'TTL recortado', value: presigned.data.ttlClamped ? 'sí' : 'no' },
+                          { label: 'URL', value: presigned.data.url }
+                        ]} />
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
               {bucketTab === 'multipart'
                 ? STORAGE_MULTIPART_READ_API_AVAILABLE
                   ? <p>Inventario público de sesiones multipart pendiente de implementación.</p>

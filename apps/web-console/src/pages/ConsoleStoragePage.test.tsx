@@ -279,19 +279,73 @@ describe('ConsoleStoragePage', () => {
     expect(screen.getByText(/^media-assets$/i)).toBeInTheDocument()
   })
 
-  it('muestra estados acotados para presigned y multipart al no existir GET públicos', async () => {
+  it('ofrece la generación de URLs prefirmadas y mantiene multipart acotado (#676)', async () => {
     queueHappyPath()
     const user = userEvent.setup()
 
     renderPage()
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
 
+    // Presigned tab is now an on-demand generator (issuance is wired), not an unsupported state.
     await user.click(await screen.findByRole('button', { name: /presigned urls/i }))
-    expect(await screen.findByText(/presigned urls no disponible en la api pública actual/i)).toBeInTheDocument()
-    expect(screen.getByText(/no usa endpoints no documentados/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /urls prefirmadas/i })).toBeInTheDocument()
+    // With no object selected yet, it prompts the user to pick one in the Objetos tab.
+    expect(screen.getByText(/selecciona un objeto en la pestaña/i)).toBeInTheDocument()
 
+    // Multipart still has no public inventory endpoint, so it stays in the bounded read-only state.
     await user.click(screen.getByRole('button', { name: /multipart/i }))
     expect(await screen.findByText(/multipart uploads no disponible en la api pública actual/i)).toBeInTheDocument()
+  })
+
+  it('genera una URL de descarga prefirmada para el objeto seleccionado (#676)', async () => {
+    const presignUrl = '/v1/storage/buckets/res_bucket_1/objects/media%2Fhero.png/presign'
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string; body?: unknown }) => {
+      if (url === '/v1/storage/buckets?page[size]=100') return mockBuckets()
+      if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage()
+      if (url === '/v1/storage/buckets/res_bucket_1/objects?page%5Bsize%5D=50') return mockObjects()
+      if (url === '/v1/storage/buckets/res_bucket_1/objects/media%2Fhero.png/metadata') return mockObjectMetadata()
+      if (url === presignUrl) {
+        expect(init?.method).toBe('POST')
+        expect(init?.body).toMatchObject({ operation: 'download' })
+        return {
+          url: 'http://storage.example.test/media-assets/media/hero.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=deadbeef',
+          operation: 'download', bucketName: 'media-assets', objectKey: 'media/hero.png',
+          expiresAt: '2026-03-29T06:35:00.000Z', ttlSeconds: 300, ttlClamped: false
+        }
+      }
+      throw new Error(`Unexpected URL ${url}`)
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'media-assets' }))
+    // Select an object, then switch to the presigned tab and generate.
+    await user.click(await screen.findByRole('button', { name: 'media/hero.png' }))
+    await user.click(await screen.findByRole('button', { name: /presigned urls/i }))
+    await user.click(await screen.findByRole('button', { name: /generar url de descarga prefirmada/i }))
+
+    expect(await screen.findByText(/X-Amz-Signature=deadbeef/i)).toBeInTheDocument()
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith(presignUrl, expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('elimina un bucket individual y refresca el inventario (#676)', async () => {
+    let bucketsEmptied = false
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string }) => {
+      if (url === '/v1/storage/buckets?page[size]=100') return bucketsEmptied ? { items: [], page: { size: 0 } } : mockBuckets()
+      if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage(bucketsEmptied ? { buckets: [] } : {})
+      if (url === '/v1/storage/buckets/res_bucket_1/objects?page%5Bsize%5D=50') return mockObjects()
+      if (url === '/v1/storage/buckets/res_bucket_1' && init?.method === 'DELETE') { bucketsEmptied = true; return { bucket: 'media-assets', deleted: true } }
+      throw new Error(`Unexpected URL ${url} (${init?.method ?? 'GET'})`)
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByRole('button', { name: 'media-assets' })
+    // The first row's Eliminar button targets res_bucket_1 (media-assets, owned by wrk_alpha).
+    await user.click((await screen.findAllByRole('button', { name: /^eliminar$/i }))[0])
+
+    await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/storage/buckets/res_bucket_1', expect.objectContaining({ method: 'DELETE' })))
+    expect(await screen.findByText(/no hay buckets en el workspace seleccionado/i)).toBeInTheDocument()
   })
 
   it('mantiene la página utilizable cuando falla la metadata del objeto', async () => {

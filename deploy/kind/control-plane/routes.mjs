@@ -179,10 +179,27 @@ export const routes = [
   { method: 'GET',  path: '/v1/storage/workspaces/{workspaceId}/usage', localHandler: 'storageWorkspaceUsage', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/storage/buckets/{bucketId}/objects', localHandler: 'storageListObjects', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/metadata', localHandler: 'storageObjectMetadata', auth: 'authenticated' },
+  // Per-bucket delete (#676): remove ONE bucket the caller owns (was NO_ROUTE — the only way to
+  // remove a bucket was deleting the whole workspace or purging the tenant). Ownership-gated like
+  // object I/O (non-owner → 404). Drops the physical bucket + registry row + scoped credentials.
+  { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}', localHandler: 'storageDeleteBucket', auth: 'authenticated' },
   // Object I/O — upload/download/delete a single object (#500: previously NO_ROUTE).
   { method: 'PUT',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storagePutObject', auth: 'authenticated' },
+  // GET supports HTTP Range / partial reads (#676): a `Range: bytes=...` request returns 206
+  // Partial Content with Content-Range; no Range returns the full body (200). Same path.
   { method: 'GET',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storageGetObject', auth: 'authenticated' },
   { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}', localHandler: 'storageDeleteObject', auth: 'authenticated' },
+  // Presigned/temporary URL issuance (#676): a time-limited, scope-limited SigV4 query-presigned
+  // URL for ONE object operation (download GET / upload PUT). Ownership-gated; the URL grants no
+  // cross-bucket/-tenant access. A DISTINCT sub-path (not `?presign`) — query strings are ignored.
+  { method: 'POST',   path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/presign', localHandler: 'storagePresignObject', auth: 'authenticated' },
+  // Multipart / resumable upload (#676): initiate → upload-part(s) → complete (or abort). DISTINCT
+  // sub-paths (a PUT `?uploads` is a plain PUT here). Every route re-gates bucket ownership; the
+  // uploadId is opaque/S3-managed. Complete re-applies the per-workspace byte quota (no bypass).
+  { method: 'POST',   path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart', localHandler: 'storageMultipartInitiate', auth: 'authenticated' },
+  { method: 'PUT',    path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/parts/{partNumber}', localHandler: 'storageMultipartUploadPart', auth: 'authenticated' },
+  { method: 'POST',   path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/complete', localHandler: 'storageMultipartComplete', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}', localHandler: 'storageMultipartAbort', auth: 'authenticated' },
   // Per-bucket storage credential rotate/revoke (#673). Bucket-keyed (consistent with the
   // object routes above); kind-only, NOT in the public route catalog (which carries only
   // storage OBJECT routes), so there is no SDK codegen drift. Ownership-gated like object I/O.

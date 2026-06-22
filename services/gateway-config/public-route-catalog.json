@@ -187,6 +187,36 @@
     "privilege_domain": "data_access"
   },
   {
+    "method": "DELETE",
+    "path": "/v1/storage/buckets/{bucketId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}/presign",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/parts/{partNumber}",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/complete",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}",
+    "privilege_domain": "data_access"
+  },
+  {
     "method": "POST",
     "path": "/v1/functions/{id}/invoke",
     "privilege_domain": "data_access",
