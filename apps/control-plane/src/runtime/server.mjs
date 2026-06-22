@@ -299,6 +299,10 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   // Flows: registered ONLY when a flowExecutor is injected (TEMPORAL_ADDRESS set). When absent,
   // these tuples are omitted and a flows path falls through to 404 / upstream proxy unchanged.
   const fl = '^/v1/flows/workspaces/([^/]+)/flows';
+  // Workspace-level schedule collection (change: add-flow-schedule-management-api / #680): lists
+  // the cron schedules of the workspace's flows. A sibling of /flows under the same workspace
+  // prefix; the per-flow schedule operations nest under `${fl}/{flowId}/schedule...`.
+  const fls = '^/v1/flows/workspaces/([^/]+)/schedules';
   // Task-type catalog (palette source for the console flow designer): a sibling of the
   // /flows collection under the same workspace prefix. Static first-party descriptors.
   const flt = '^/v1/flows/workspaces/([^/]+)/task-types';
@@ -506,6 +510,25 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         runFlows(flowExecutor, { operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
       ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), ([w, f, e, s], c) =>
         runFlows(flowExecutor, { operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
+
+      // ---- Flow schedule management (change: add-flow-schedule-management-api / #680) ----
+      // Operate in place on a flow's cron Temporal Schedule (created on publish): list / get /
+      // pause / resume / trigger an ad-hoc run, WITHOUT deleting the flow definition. Identity
+      // (tenant) comes ONLY from resolveIdentity; the workspaceId path segment is validated to
+      // belong to the caller's tenant by the request gate BEFORE the handler runs. The executor
+      // builds the schedule id from the verified tenant + validated workspace, so a foreign flowId
+      // resolves to a non-existent id -> 404 SCHEDULE_NOT_FOUND (no cross-tenant exposure). The
+      // list op filters Temporal's namespace-wide listing by the `{tenant}:{ws}:` id prefix.
+      ['GET', new RegExp(`${fls}$`), ([w], c) =>
+        runFlows(flowExecutor, { operation: 'list_schedules', identity: c.identity }, 200)],
+      ['GET', new RegExp(`${fl}/([^/]+)/schedule$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'get_schedule', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/schedule/pause$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'pause_schedule', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/schedule/resume$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'resume_schedule', identity: c.identity, flowId: f }, 200)],
+      ['POST', new RegExp(`${fl}/([^/]+)/schedule/trigger$`), ([w, f], c) =>
+        runFlows(flowExecutor, { operation: 'trigger_schedule', identity: c.identity, flowId: f }, 202)],
 
       // ---- Inbound webhook trigger ingestion (HMAC-authenticated) ----
       // The handler verifies the per-trigger HMAC over the RAW body BEFORE any Temporal call; an
