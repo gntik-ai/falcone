@@ -284,6 +284,49 @@ this control-plane serves. To make the shell usable end-to-end:
   `ws-<hash>-…`). Any other backend failure returns the operation's stable failure code
   (`STORAGE_GET_FAILED` / `STORAGE_HEAD_FAILED`) with a generic message; the upstream detail is
   written to the control-plane log only, never to the response (#675).
+- **Per-bucket scoped storage credentials (#673).** Provisioning a bucket
+  (`POST …/workspaces/{id}/buckets`) issues a SeaweedFS S3 identity scoped to **exactly that one
+  bucket** — keyed on the physical bucket name (`seaweedfs-identity.mjs::bucketIdentityName` →
+  `falcone-s3-<hash>`), not on the workspace. The seed Job does **delete-then-apply**, so a
+  re-provision is a clean rotate (exactly one active key per bucket; a given bucket's identity
+  never accumulates grants or keys). The returned `storageCredential`
+  (`identityName`/`accessKey`/`secretKey`/`bucket`/`actions`) authenticates against the gateway for
+  ITS bucket only and is `AccessDenied` (403) on every other bucket — including a sibling bucket in
+  the same workspace, not just another tenant's bucket. (Previously one per-workspace identity
+  accumulated a grant for every bucket in the workspace, so a credential "scoped to bucket A" could
+  read sibling buckets B/C.) Two kind-only, ownership-gated (non-owner → `404`, superadmin bypass)
+  credential endpoints manage the lifecycle:
+  - `POST   /v1/storage/buckets/{bucketId}/credentials` — **rotate**: re-issues the bucket's
+    identity (delete-then-apply) and returns a fresh `storageCredential`; the prior access key no
+    longer authenticates. Also deletes the bucket's legacy per-workspace identity (see below).
+  - `DELETE /v1/storage/buckets/{bucketId}/credentials` — **revoke**: deletes the bucket's
+    identity and all its keys (`{ revoked: true }`); the prior access key is rejected. Also deletes
+    the bucket's legacy per-workspace identity (see below).
+  These routes are not in the public route catalog (which carries only storage object routes), so
+  there is no SDK/OpenAPI change. Per-bucket identity issuance is on by default and can be
+  disabled with `STORAGE_TENANT_IDENTITIES=0` (then rotate returns `409
+  STORAGE_IDENTITIES_DISABLED`).
+
+  **Upgrade / legacy-credential migration (existing tenants).** The per-bucket switch is
+  forward-only: any credential issued BEFORE this fix used a single, over-granted per-workspace
+  identity (`falcone-ws-<workspaceId>`) that — left in place — keeps authenticating with cross-bucket
+  access after the deploy, including against a re-created, deterministically-named bucket (so a
+  bucket name "never accumulating" is true only for credentials issued under the fix). On startup the
+  control-plane therefore runs a **one-shot, best-effort, idempotent migration** that deletes EVERY
+  legacy `falcone-ws-*` identity — enumerated from the **live** SeaweedFS config (`weed shell
+  s3.configure`), so it also removes orphaned identities whose workspace/buckets were already deleted.
+  It is delete-only (no wildcard/admin grant is ever introduced), never blocks or crashes boot, and
+  no-ops once the legacy identities are gone (and when run outside the cluster). **Pre-fix
+  credentials are invalidated by this migration; affected tenants must re-provision the bucket or
+  call the rotate endpoint to obtain a new per-bucket credential.** Operators NOT redeploying the
+  control-plane can run the same delete manually for each legacy workspace identity:
+
+  ```bash
+  # delete one legacy per-workspace identity (repeat per workspaceId; list them with
+  # `printf 's3.configure\n' | weed shell -master=<seaweedfs-master>:9333`)
+  printf 's3.configure -delete -apply -user falcone-ws-<workspaceId>\n' \
+    | weed shell -master=falcone-seaweedfs-master.falcone:9333
+  ```
 - The repo's **Service Accounts** page (`/console/service-accounts`) is wired: it
   calls the SA endpoints I already had, but expected camelCase shapes — the
   control-plane now returns `serviceAccountId` on create, the full
