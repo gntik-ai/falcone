@@ -43,6 +43,11 @@ import {
   FLOW_AUDIT_EVENT_TYPES,
 } from '../../../../services/audit/src/flow-lifecycle-events.mjs';
 import { buildTaskTypeCatalog } from './flow-task-types.mjs';
+// scheduleIdFor is a pure id builder (no Temporal dependency) — the registry exports it as the
+// single source of the `{tenantId}:{workspaceId}:{flowId}` schedule-id convention. The registry
+// does NOT statically import this executor (its consumer callback is injected at runtime), so this
+// import introduces no cycle.
+import { scheduleIdFor } from './flow-trigger-registry.mjs';
 
 // Temporal workflow type + signal name registered by the interpreter worker
 // (services/workflow-worker). The worker's approval signal is `flowApproval` (one channel; the
@@ -1101,6 +1106,141 @@ export function createFlowExecutor({
     return { flowId, version: created.version, createdAt: created.createdAt, ...(triggers ? { triggers } : {}) };
   }
 
+  // -- Schedule management (change: add-flow-schedule-management-api / #680) -------------------
+  // Tenant/workspace-scoped operate-in-place surface over the per-flow Temporal Schedule created on
+  // publish. Structural isolation: every per-flow op derives the schedule id from the VERIFIED
+  // identity (tenantId) + the workspace-ownership-validated path (workspaceId) via scheduleIdFor,
+  // so a foreign flowId resolves to an id that does not exist -> Temporal NOT_FOUND -> 404 (never
+  // 500, never reveals existence). The list op filters by the same `{tenant}:{ws}:` prefix.
+
+  function requireScheduleGateway() {
+    const gateway = flowTriggerRegistry?.scheduleGateway;
+    if (!gateway) {
+      // The trigger plane (and therefore the schedule gateway) is not wired — the schedule
+      // surface is unavailable rather than producing an opaque 500.
+      throw clientError('Flow scheduling is not enabled', 501, 'FLOW_SCHEDULING_DISABLED');
+    }
+    return gateway;
+  }
+
+  // Parse a `{tenantId}:{workspaceId}:{flowId}` schedule id back into its parts. tenant/workspace
+  // ids never contain ':' (slugs); the flowId is the remainder so a ':' in a flow id is preserved.
+  function parseScheduleId(scheduleId, { tenantId, workspaceId }) {
+    const prefix = `${tenantId}:${workspaceId}:`;
+    return { flowId: scheduleId.startsWith(prefix) ? scheduleId.slice(prefix.length) : undefined };
+  }
+
+  // The cron expression(s) the user PUBLISHED for a flow, read from the authoritative stored flow
+  // definition (the latest published version's `cron` trigger declarations). This is the source of
+  // truth for `cron` in the schedule response: the real Temporal SDK COMPILES a cron expression into
+  // structured `calendars` and a describe()/list() `ScheduleSpecDescription` OMITS `cronExpressions`
+  // (always undefined in production), so reading it back from Temporal would always yield `[]`. We
+  // instead round-trip the user's own cron string from the published definition. Returns `[]` on any
+  // miss (no published version, no triggers, no cron trigger) — never throws (the caller already
+  // resolved the schedule; this is a best-effort enrichment that must not turn a 200 into a 500).
+  async function cronExpressionsForFlow({ identity, flowId }) {
+    if (!flowId) return [];
+    try {
+      const row = await store.getLatestVersion({
+        tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, includeDefinition: true,
+      });
+      const triggers = Array.isArray(row?.definition?.triggers) ? row.definition.triggers : [];
+      return triggers
+        .filter((t) => t?.kind === 'cron' && typeof t?.schedule === 'string' && t.schedule.length > 0)
+        .map((t) => t.schedule);
+    } catch (err) {
+      logger?.error?.('[flow-executor] cron lookup for schedule response failed:', err?.message ?? err);
+      return [];
+    }
+  }
+
+  // Normalise a Temporal ScheduleDescription / ScheduleSummary into a small, STABLE response shape.
+  // Never leaks raw Temporal internals (the SDK `raw` field, proto payloads, Date objects). `paused`
+  // comes from the describe/summary state; `nextActionTimes` are ISO-8601 strings; `cron` is the
+  // AUTHORITATIVE published cron expression(s) when supplied (see cronExpressionsForFlow — Temporal
+  // omits them from a describe that only carries structured calendars), falling back to any
+  // `cronExpressions` the SDK does surface, else `[]`.
+  function normalizeSchedule(schedule, { tenantId, workspaceId, flowId, cron } = {}) {
+    const scheduleId = schedule?.scheduleId ?? scheduleIdFor(tenantId, workspaceId, flowId);
+    const resolvedFlowId = flowId ?? parseScheduleId(scheduleId, { tenantId, workspaceId }).flowId;
+    const toIso = (value) => (value instanceof Date ? value.toISOString() : (typeof value === 'string' ? value : null));
+    const nextActionTimes = Array.isArray(schedule?.info?.nextActionTimes)
+      ? schedule.info.nextActionTimes.map(toIso).filter((v) => v !== null)
+      : [];
+    const recentActions = Array.isArray(schedule?.info?.recentActions)
+      ? schedule.info.recentActions.slice(-10).map((entry) => ({
+          scheduledAt: toIso(entry?.scheduledAt),
+          takenAt: toIso(entry?.takenAt),
+          workflowId: entry?.action?.workflow?.workflowId ?? null,
+        }))
+      : [];
+    // Prefer the authoritative published cron; fall back to whatever Temporal surfaced (normally none).
+    const resolvedCron = Array.isArray(cron) && cron.length > 0
+      ? [...cron]
+      : (Array.isArray(schedule?.spec?.cronExpressions) ? [...schedule.spec.cronExpressions] : []);
+    return {
+      scheduleId,
+      flowId: resolvedFlowId,
+      workspaceId,
+      paused: schedule?.state?.paused === true,
+      note: schedule?.state?.note ?? null,
+      cron: resolvedCron,
+      nextActionTimes,
+      recentActions,
+    };
+  }
+
+  async function listSchedules({ identity }) {
+    const gateway = requireScheduleGateway();
+    // The prefix is the SOLE isolation boundary — only this tenant's + this validated workspace's
+    // schedules are returned, even though Temporal's list spans the whole namespace.
+    const prefix = `${identity.tenantId}:${identity.workspaceId}:`;
+    const summaries = await gateway.listSchedulesByPrefix({ prefix });
+    // Enrich each entry with its authoritative published cron (Temporal's list summary omits it).
+    // Bounded to this one workspace's schedules; each lookup is the same tenant-scoped store read.
+    const items = await Promise.all(summaries.map(async (s) => {
+      const flowId = parseScheduleId(s?.scheduleId ?? '', { tenantId: identity.tenantId, workspaceId: identity.workspaceId }).flowId;
+      const cron = await cronExpressionsForFlow({ identity, flowId });
+      return normalizeSchedule(s, { tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, cron });
+    }));
+    return { items };
+  }
+
+  async function getSchedule({ identity, flowId }) {
+    const gateway = requireScheduleGateway();
+    const scheduleId = scheduleIdFor(identity.tenantId, identity.workspaceId, flowId);
+    const description = await gateway.describeSchedule({ scheduleId });
+    if (!description) throw clientError('Schedule not found', 404, 'SCHEDULE_NOT_FOUND');
+    const cron = await cronExpressionsForFlow({ identity, flowId });
+    return normalizeSchedule(description, { tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, cron });
+  }
+
+  async function pauseSchedule({ identity, flowId }) {
+    const gateway = requireScheduleGateway();
+    const scheduleId = scheduleIdFor(identity.tenantId, identity.workspaceId, flowId);
+    const description = await gateway.pauseSchedule({ scheduleId, note: 'Paused via Flows API' });
+    if (!description) throw clientError('Schedule not found', 404, 'SCHEDULE_NOT_FOUND');
+    const cron = await cronExpressionsForFlow({ identity, flowId });
+    return normalizeSchedule(description, { tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, cron });
+  }
+
+  async function resumeSchedule({ identity, flowId }) {
+    const gateway = requireScheduleGateway();
+    const scheduleId = scheduleIdFor(identity.tenantId, identity.workspaceId, flowId);
+    const description = await gateway.unpauseSchedule({ scheduleId, note: 'Resumed via Flows API' });
+    if (!description) throw clientError('Schedule not found', 404, 'SCHEDULE_NOT_FOUND');
+    const cron = await cronExpressionsForFlow({ identity, flowId });
+    return normalizeSchedule(description, { tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, cron });
+  }
+
+  async function triggerSchedule({ identity, flowId }) {
+    const gateway = requireScheduleGateway();
+    const scheduleId = scheduleIdFor(identity.tenantId, identity.workspaceId, flowId);
+    const triggered = await gateway.triggerSchedule({ scheduleId });
+    if (!triggered) throw clientError('Schedule not found', 404, 'SCHEDULE_NOT_FOUND');
+    return { status: 'triggered', scheduleId };
+  }
+
   // -- Dispatch -------------------------------------------------------------------------------
 
   async function executeFlows(params = {}) {
@@ -1186,6 +1326,20 @@ export function createFlowExecutor({
         return retryExecution({ identity, flowId, executionId: params.executionId });
       case 'send_signal':
         return sendSignal({ identity, flowId, executionId: params.executionId, signalName: params.signalName, payload: params.payload });
+      // Schedule management (#680). list_schedules is workspace-scoped (no flowId); the per-flow ops
+      // build the schedule id from the verified identity + validated workspace, so a foreign flow
+      // resolves to a non-existent id -> 404 SCHEDULE_NOT_FOUND (cross-tenant access is denied
+      // without revealing existence).
+      case 'list_schedules':
+        return listSchedules({ identity });
+      case 'get_schedule':
+        return getSchedule({ identity, flowId });
+      case 'pause_schedule':
+        return pauseSchedule({ identity, flowId });
+      case 'resume_schedule':
+        return resumeSchedule({ identity, flowId });
+      case 'trigger_schedule':
+        return triggerSchedule({ identity, flowId });
       default:
         throw clientError(`Unknown flows operation: ${operation}`, 400, 'UNKNOWN_OPERATION');
     }
