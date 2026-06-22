@@ -8,7 +8,7 @@
 // usage is workspace-scoped.
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { issueBucketIdentity, revokeBucketIdentity } from './seaweedfs-identity.mjs';
+import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, workspaceIdentityName } from './seaweedfs-identity.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
 // or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
@@ -457,10 +457,34 @@ async function storageRotateCredential(ctx) {
   try {
     // ctx.seaweedClient is an OPTIONAL test seam (the in-pod default is the real k8s
     // client inside seaweedfs-identity.mjs); production passes nothing → real client.
-    const issued = await issueBucketIdentity({ bucket, workspaceId: rec.workspace_id, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
+    const clientOpt = ctx.seaweedClient ? { client: ctx.seaweedClient } : {};
+    const issued = await issueBucketIdentity({ bucket, workspaceId: rec.workspace_id, ...clientOpt });
+    // ALSO delete the LEGACY per-workspace identity for this bucket's workspace (#673): a
+    // pre-fix `falcone-ws-<wsId>` identity still accumulated a grant for this bucket, so
+    // unless we remove it the rotated per-bucket key would NOT be the only key reaching the
+    // bucket. The startup migration sweeps these too; doing it here makes a single rotate
+    // between deploys immediately invalidate every key that can reach the bucket. Best-effort
+    // — the per-bucket re-issue above is the primary action; a failure here must not fail the
+    // rotate (and a missing legacy identity is a clean no-op).
+    await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
     return ok(200, { storageCredential: { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions } });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_ROTATE_FAILED', String(e.message ?? e));
+  }
+}
+
+// Best-effort delete of the legacy per-WORKSPACE identity (`falcone-ws-<wsId>`) on
+// rotate/revoke (#673). The per-bucket action is the primary fix; this also removes the
+// over-granted legacy identity so it can no longer reach the bucket. Never throws (a
+// missing identity or a transient Job-post failure must not fail the caller's operation);
+// only logs. Skips when there is no workspace id.
+async function revokeLegacyWorkspaceIdentity(workspaceId, seaweedClient) {
+  if (!workspaceId) return;
+  try {
+    const identityName = workspaceIdentityName(workspaceId);
+    await revokeIdentityByName({ identityName, jobPrefix: 'wsrm', ...(seaweedClient ? { client: seaweedClient } : {}) });
+  } catch (e) {
+    console.error(`[storage] best-effort legacy per-workspace identity delete failed (workspace ${workspaceId}):`, e?.message ?? e);
   }
 }
 
@@ -476,6 +500,12 @@ async function storageRevokeCredential(ctx) {
   try {
     // ctx.seaweedClient is an OPTIONAL test seam (see storageRotateCredential).
     await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
+    // ALSO delete the LEGACY per-workspace identity (`falcone-ws-<wsId>`) for this bucket's
+    // workspace (#673): a pre-fix shared identity also held a grant for this bucket, so a
+    // revoke that only deleted the per-bucket identity would leave that legacy key still
+    // able to reach the (deterministically-named, possibly re-created) bucket. Best-effort
+    // — the per-bucket delete above is the primary; a missing legacy identity is a no-op.
+    await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
     return ok(200, { bucket, revoked: true });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_REVOKE_FAILED', String(e.message ?? e));

@@ -30,10 +30,16 @@ import assert from 'node:assert/strict';
 
 import {
   bucketIdentityName,
+  workspaceIdentityName,
   seedJobManifest,
   revokeJobManifest,
+  legacyCleanupJobManifest,
+  cleanupLegacyWorkspaceIdentities,
   issueBucketIdentity,
   revokeBucketIdentity,
+  isInCluster,
+  LEGACY_WS_IDENTITY_PREFIX,
+  LEGACY_WS_IDENTITY_RE,
 } from '../../deploy/kind/control-plane/seaweedfs-identity.mjs';
 import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
 
@@ -230,4 +236,142 @@ test('bbx-673-12: re-issuing a bucket keeps one identity name and always delete-
   const posts = calls.filter((c) => c.method === 'POST');
   assert.equal(posts.length, 2, 'each re-issue posts its own Job');
   for (const p of posts) assert.ok(jobCmd(p.body).includes('-delete -apply -user'), 'every (re)issue deletes the prior identity first');
+});
+
+// ===========================================================================
+// Scenario "Legacy over-granted credential invalidated on upgrade" (#673) — the
+// FORWARD migration. Switching the issuer to per-bucket identities is forward-only and
+// leaves the pre-existing per-WORKSPACE identities (`falcone-ws-<wsId>`) LIVE in
+// SeaweedFS, where they keep authenticating with cross-bucket access (including against a
+// re-created, deterministically-named bucket). These tests pin the cleanup that actually
+// invalidates them on deploy.
+// ===========================================================================
+test('bbx-673-13: legacyCleanupJobManifest deletes EVERY falcone-ws-* identity via s3.configure -delete -apply (no wildcard/Admin)', () => {
+  const m = legacyCleanupJobManifest({ ns: 'falcone', name: 'ws-legacy-cleanup-x', master: 'falcone-seaweedfs-master.falcone:9333' });
+  const cmd = jobCmd(m);
+  // enumerates legacy identities from the LIVE config dump (catches orphaned ones), not the DB
+  assert.ok(cmd.includes('s3.configure') && cmd.includes('weed shell'), 'dumps the live identity config via weed shell s3.configure');
+  assert.ok(/grep -oE ['"]?falcone-ws-/.test(cmd), 'greps the legacy falcone-ws- identity names out of the dump');
+  // deletes each matched identity with the canonical delete-and-live-reload
+  assert.ok(cmd.includes('-delete -apply -user'), 'deletes each legacy identity (delete-and-reload)');
+  // it must NEVER introduce a grant: no apply-with-keys, no wildcard, no Admin
+  assert.ok(!cmd.includes('-access_key') && !cmd.includes('-secret_key'), 'cleanup carries NO key material (delete-only)');
+  assert.doesNotMatch(cmd, /-buckets\s+\*/, 'no wildcard bucket grant introduced');
+  assert.doesNotMatch(cmd, /-actions[^|]*Admin/, 'no Admin grant introduced');
+  // targets ONLY the legacy prefix — the new per-bucket identities (falcone-s3-*) are not matched
+  assert.ok(!/falcone-s3-/.test(cmd), 'the cleanup never targets the new per-bucket identities');
+  // labelled for the SeaweedFS NetworkPolicy, like the seed/revoke Jobs
+  assert.equal(m.spec.template.metadata.labels['app.kubernetes.io/name'], 'seaweedfs');
+  const env = jobEnv(m);
+  assert.equal(env.SW_MASTER, 'falcone-seaweedfs-master.falcone:9333', 'master endpoint wired via env');
+});
+
+test('bbx-673-13b: the legacy-identity matcher catches every workspaceIdentityName (and the dump format) but NOT per-bucket identities', () => {
+  // The JS regex documents the same names the cleanup Job greps for. It must match every
+  // name workspaceIdentityName produces (the legacy issuer) and NOT the new per-bucket
+  // identities — keeping the in-code matcher and the shell grep in lock-step.
+  for (const ws of [WS_A, WS_B, 'ws-orphan-9', 'Ws_Mixed-Case']) {
+    const legacy = workspaceIdentityName(ws);
+    assert.ok(legacy.startsWith(LEGACY_WS_IDENTITY_PREFIX), `${legacy} carries the legacy prefix`);
+    assert.match(legacy, new RegExp(`^${LEGACY_WS_IDENTITY_RE.source}$`), `${legacy} matches the legacy matcher`);
+  }
+  // a new per-bucket identity must NOT be matched as legacy
+  assert.doesNotMatch(bucketIdentityName(BUCKET_A1), new RegExp(`^${LEGACY_WS_IDENTITY_RE.source}$`));
+  // applied to the VERIFIED weed-shell dump shape, the matcher extracts exactly the legacy names
+  const dump = JSON.stringify({ identities: [
+    { name: 'anvAdmin', actions: ['Admin'] },
+    { name: workspaceIdentityName(WS_A), actions: ['Read:' + BUCKET_A1, 'Read:' + BUCKET_A2] },
+    { name: 'falcone-ws-ws-orphan-9', actions: ['Read:ws-h9-gone'] },
+    { name: bucketIdentityName(BUCKET_A1), actions: ['Read:' + BUCKET_A1] },
+  ] });
+  const found = [...new Set(dump.match(LEGACY_WS_IDENTITY_RE) ?? [])].sort();
+  assert.deepEqual(found, [workspaceIdentityName(WS_A), 'falcone-ws-ws-orphan-9'].sort(),
+    'enumerating from the live dump yields the legacy names only (incl. the orphan), excluding admin + per-bucket');
+});
+
+test('bbx-673-14: cleanupLegacyWorkspaceIdentities posts the cleanup Job (in-cluster) and waits when asked', async () => {
+  const { calls, client } = recordingClient();
+  const res = await cleanupLegacyWorkspaceIdentities({ ns: 'falcone', client, token: 'fake-sa-token', jobSuffix: 'abcd', wait: true });
+  assert.equal(res.posted, true, `expected the Job to be posted, got ${JSON.stringify(res)}`);
+  const post = calls.find((c) => c.method === 'POST');
+  assert.ok(post, 'a cleanup Job was posted');
+  assert.match(post.path, /\/apis\/batch\/v1\/namespaces\/falcone\/jobs$/);
+  assert.equal(post.body.metadata.labels.app, 'falcone-ws-identity-legacy-cleanup');
+  assert.ok(jobCmd(post.body).includes('-delete -apply -user'), 'the posted Job deletes legacy identities');
+});
+
+test('bbx-673-15: cleanupLegacyWorkspaceIdentities is a NON-FATAL no-op when not in-cluster (no SA token)', async () => {
+  const { calls, client } = recordingClient();
+  // No token → not in a pod → it must NOT throw and must NOT post a Job (local/test runs).
+  let res;
+  await assert.doesNotReject(async () => { res = await cleanupLegacyWorkspaceIdentities({ ns: 'falcone', client, token: '', jobSuffix: 'abcd' }); });
+  assert.equal(res.posted, false);
+  assert.equal(res.skipped, 'not-in-cluster');
+  assert.equal(calls.length, 0, 'no Job posted when not in-cluster');
+  // isInCluster reflects the token presence
+  assert.equal(isInCluster(''), false);
+  assert.equal(isInCluster('   '), false);
+  assert.equal(isInCluster('tok'), true);
+});
+
+test('bbx-673-16: cleanupLegacyWorkspaceIdentities NEVER throws even if the client errors (best-effort)', async () => {
+  const throwingClient = async () => { throw new Error('apiserver exploded'); };
+  let res;
+  await assert.doesNotReject(async () => { res = await cleanupLegacyWorkspaceIdentities({ ns: 'falcone', client: throwingClient, token: 'fake-sa-token', jobSuffix: 'abcd' }); });
+  assert.equal(res.posted, false, 'a failed post is reported, not thrown');
+  assert.match(res.error, /apiserver exploded/);
+});
+
+// ===========================================================================
+// Revoke / rotate must ALSO delete the LEGACY per-workspace identity (#673) so a single
+// revoke/rotate between deploys kills EVERY key that can reach the bucket — not just the
+// per-bucket identity the post-fix issuer created.
+// ===========================================================================
+test('bbx-673-17: storageRevokeCredential deletes BOTH the per-bucket AND the legacy falcone-ws-<wsId> identity', async () => {
+  const pool = makeMockPool();
+  const { calls, client } = recordingClient();
+  const ctx = { params: { bucketId: BUCKET_A1 }, query: {}, identity: tenantAIdentity, pool, seaweedClient: client };
+  const res = await storageRevokeCredential(ctx);
+  assert.equal(res.statusCode, 200, `expected 200, got ${res.statusCode}: ${JSON.stringify(res.body)}`);
+  const deletedNames = calls.filter((c) => c.method === 'POST').map((c) => jobEnv(c.body).ID_NAME);
+  assert.ok(deletedNames.includes(bucketIdentityName(BUCKET_A1)), 'the per-bucket identity is deleted (primary)');
+  assert.ok(deletedNames.includes(workspaceIdentityName(WS_A)), 'the LEGACY per-workspace identity is ALSO deleted (the #673 over-granted key)');
+  for (const c of calls.filter((c) => c.method === 'POST')) {
+    assert.ok(jobCmd(c.body).includes('-delete -apply -user'), 'each is a delete-and-reload');
+  }
+});
+
+test('bbx-673-18: storageRotateCredential ALSO removes the legacy falcone-ws-<wsId> identity (rotated key is the only one reaching the bucket)', async () => {
+  const pool = makeMockPool();
+  const { calls, client } = recordingClient();
+  const ctx = { params: { bucketId: BUCKET_A1 }, query: {}, identity: tenantAIdentity, pool, seaweedClient: client };
+  const res = await storageRotateCredential(ctx);
+  assert.equal(res.statusCode, 200, `expected 200, got ${res.statusCode}: ${JSON.stringify(res.body)}`);
+  const posts = calls.filter((c) => c.method === 'POST');
+  // the fresh per-bucket identity is (re)applied (delete-then-apply, carries key material)
+  assert.ok(posts.some((c) => jobEnv(c.body).ID_NAME === bucketIdentityName(BUCKET_A1) && 'AK' in jobEnv(c.body)), 'a fresh per-bucket key is applied');
+  // the legacy per-workspace identity is deleted (no key material on that Job)
+  const legacyDelete = posts.find((c) => jobEnv(c.body).ID_NAME === workspaceIdentityName(WS_A));
+  assert.ok(legacyDelete, 'the LEGACY per-workspace identity is deleted on rotate');
+  assert.ok(!('AK' in jobEnv(legacyDelete.body)), 'the legacy delete carries no key material');
+});
+
+test('bbx-673-19: a best-effort legacy delete failure does NOT fail the revoke/rotate (per-bucket action is primary)', async () => {
+  const pool = makeMockPool();
+  // A client that succeeds for the per-bucket Job but throws for the legacy per-workspace one.
+  const wsName = workspaceIdentityName(WS_A);
+  const calls = [];
+  const flakyClient = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (method === 'POST' && body && jobEnv(body).ID_NAME === wsName) throw new Error('legacy delete failed');
+    if (method === 'POST') return { metadata: { name: body.metadata.name } };
+    if (method === 'GET') return { status: { succeeded: 1 }, spec: { backoffLimit: 4 } };
+    return {};
+  };
+  const ctx = { params: { bucketId: BUCKET_A1 }, query: {}, identity: tenantAIdentity, pool, seaweedClient: flakyClient };
+  const revoked = await storageRevokeCredential(ctx);
+  assert.equal(revoked.statusCode, 200, 'revoke still succeeds even if the best-effort legacy delete throws');
+  const rotated = await storageRotateCredential({ ...ctx, params: { bucketId: BUCKET_A1 } });
+  assert.equal(rotated.statusCode, 200, 'rotate still succeeds even if the best-effort legacy delete throws');
+  assert.ok(calls.some((c) => c.method === 'POST' && jobEnv(c.body).ID_NAME === wsName), 'the legacy delete was attempted');
 });

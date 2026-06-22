@@ -40,6 +40,14 @@ const SA = '/var/run/secrets/kubernetes.io/serviceaccount';
 const NS = (() => { try { return fs.readFileSync(`${SA}/namespace`, 'utf8').trim(); } catch { return 'falcone'; } })();
 const CA = (() => { try { return fs.readFileSync(`${SA}/ca.crt`); } catch { return undefined; } })();
 const readToken = () => { try { return fs.readFileSync(`${SA}/token`, 'utf8').trim(); } catch { return ''; } };
+
+// Whether we are running inside a Kubernetes pod with a usable serviceaccount token
+// (the only way to POST a one-shot Job). Local/test runs have no SA token, so any
+// in-cluster Job action (e.g. the legacy-identity cleanup at boot) must skip cleanly
+// rather than fail trying to reach the API server. Pure (token read is injectable).
+export function isInCluster(token = readToken()) {
+  return Boolean(token && String(token).trim());
+}
 const HOST = process.env.KUBERNETES_SERVICE_HOST || 'kubernetes.default.svc';
 const PORT = process.env.KUBERNETES_SERVICE_PORT || '443';
 const SW_IMAGE = process.env.SEAWEEDFS_IMAGE || 'chrislusf/seaweedfs:4.33';
@@ -174,6 +182,69 @@ export function revokeJobManifest({ ns, name, image = SW_IMAGE, master = SW_MAST
   };
 }
 
+// The legacy per-WORKSPACE identity name prefix. Identities of this shape
+// (`falcone-ws-<workspaceId>`, produced by the pre-fix issuer via workspaceIdentityName)
+// are the #673 defect: one identity accumulated a grant + a fresh key for EVERY bucket
+// in the workspace, so any one of its keys reaches every (current or RE-CREATED) bucket
+// in the workspace. The new per-BUCKET identities are `falcone-s3-<hash>` and are NEVER
+// matched by this prefix. The static SeaweedFS admin identity has no `falcone-ws-` prefix
+// either. Used both to grep the live config in the cleanup Job and (exported) for tests.
+export const LEGACY_WS_IDENTITY_PREFIX = 'falcone-ws-';
+// Regex matching a legacy per-workspace identity NAME. workspaceIdentityName lowercases
+// and collapses to [a-z0-9-], so the name charset is [a-z0-9-]; we also tolerate '_' in
+// case a hand-seeded legacy name used one. Anchored to the prefix so `falcone-s3-*`
+// (the new per-bucket identities) and bucket names (`ws-<hash>-…`) never match.
+export const LEGACY_WS_IDENTITY_RE = /falcone-ws-[a-z0-9_-]+/g;
+
+// Build the one-shot LEGACY-CLEANUP Job manifest (pure, testable) — the #673 forward
+// migration. It DUMPS the live SeaweedFS identity config (`s3.configure` with no args,
+// which the gateway returns as a JSON document `{ "identities": [ { "name": "...", … } ] }`
+// — verified semantics, services/adapters/src/seaweedfs-iam-client.mjs::parseWeedShellConfig
+// + the weed-shell transport test), greps EVERY `falcone-ws-*` identity NAME out of it
+// (enumerating from the LIVE config, not the DB, so it also catches ORPHANED legacy
+// identities whose workspace/buckets were already deleted — the exact leak the verifier
+// found), de-dupes, and deletes each with `s3.configure -delete -apply -user <name>` so the
+// gateway reloads live and every pre-fix key is rejected. A no-op when none exist (the grep
+// matches nothing → the loop body never runs). Best-effort: `|| true` keeps a partial/empty
+// run from failing the Job. NEVER introduces a wildcard/Admin grant (delete-only).
+export function legacyCleanupJobManifest({ ns, name, image = SW_IMAGE, master = SW_MASTER }) {
+  // 1) dump the config; 2) extract legacy identity names (grep -oE), unique; 3) for each,
+  // emit a `s3.configure -delete -apply -user <name>` line and pipe the whole batch into a
+  // single `weed shell` invocation. The grep prefix MUST stay in lock-step with
+  // LEGACY_WS_IDENTITY_PREFIX / workspaceIdentityName.
+  const cleanupCmd = [
+    // Dump once; tolerate a transiently-unreachable master without failing the Job.
+    "DUMP=$(printf 's3.configure\\n' | weed shell -master=\"$SW_MASTER\" 2>/dev/null || true);",
+    // Extract unique legacy identity names from the JSON dump.
+    "NAMES=$(printf '%s' \"$DUMP\" | grep -oE 'falcone-ws-[a-z0-9_-]+' | sort -u || true);",
+    // No legacy identities -> clean no-op.
+    'if [ -z "$NAMES" ]; then echo "no legacy falcone-ws-* identities to remove"; exit 0; fi;',
+    // Delete each legacy identity (delete-and-live-reload); best-effort per name.
+    'for N in $NAMES; do',
+    'printf \'s3.configure -delete -apply -user %s\\n\' "$N" | weed shell -master="$SW_MASTER" || true;',
+    'echo "removed legacy identity $N";',
+    'done',
+  ].join(' ');
+  return {
+    apiVersion: 'batch/v1', kind: 'Job',
+    metadata: { name, namespace: ns, labels: { app: 'falcone-ws-identity-legacy-cleanup' } },
+    spec: {
+      backoffLimit: 2, ttlSecondsAfterFinished: 300,
+      template: {
+        metadata: { labels: { 'app.kubernetes.io/name': 'seaweedfs', role: 'ws-identity-legacy-cleanup' } },
+        spec: {
+          restartPolicy: 'Never',
+          containers: [{
+            name: 'legacy-cleanup', image, imagePullPolicy: 'IfNotPresent',
+            env: [{ name: 'SW_MASTER', value: master }],
+            command: ['/bin/sh', '-ec', cleanupCmd],
+          }],
+        },
+      },
+    },
+  };
+}
+
 async function waitJobComplete(ns, name, { client, attempts = 30, delayMs = 2000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   for (let i = 0; i < attempts; i++) {
     const job = await client('GET', `/apis/batch/v1/namespaces/${ns}/jobs/${name}`).catch(() => null);
@@ -226,6 +297,24 @@ export async function issueWorkspaceIdentity(opts = {}) {
 }
 
 /**
+ * Revoke (delete) a SeaweedFS identity BY NAME so the identity AND all its keys are
+ * removed and the gateway reloads live (the prior access key is rejected). The low-level
+ * primitive used both for per-bucket revoke and for deleting a single legacy
+ * per-workspace identity on rotate/revoke (#673). Runs a one-shot delete Job; injectable
+ * client for tests. Fail-closed on an empty name.
+ * @returns {Promise<{identityName:string, revoked:true}>}
+ */
+export async function revokeIdentityByName({ identityName, jobPrefix = 'idrm', ns = NS, master = SW_MASTER, image = SW_IMAGE, client = k8s, jobSuffix, wait = true }) {
+  if (!identityName) throw new Error('revokeIdentityByName requires an identityName');
+  const suffix = (jobSuffix ?? randomBytes(4).toString('hex')).toLowerCase();
+  const jobName = jobNameFor(jobPrefix, identityName, suffix);
+  const manifest = revokeJobManifest({ ns, name: jobName, image, master, identityName });
+  await client('POST', `/apis/batch/v1/namespaces/${ns}/jobs`, manifest);
+  if (wait) await waitJobComplete(ns, jobName, { client });
+  return { identityName, revoked: true };
+}
+
+/**
  * Revoke (delete) the SeaweedFS identity for `bucket` so the identity AND all its keys
  * are removed and the prior access key is rejected (#673). Runs a one-shot delete Job.
  * Injectable client for tests. Returns the deleted identity name.
@@ -234,10 +323,39 @@ export async function issueWorkspaceIdentity(opts = {}) {
 export async function revokeBucketIdentity({ bucket, ns = NS, master = SW_MASTER, image = SW_IMAGE, client = k8s, jobSuffix, wait = true }) {
   if (!bucket) throw new Error('revokeBucketIdentity requires a bucket');
   const identityName = bucketIdentityName(bucket);
-  const suffix = (jobSuffix ?? randomBytes(4).toString('hex')).toLowerCase();
-  const jobName = jobNameFor('bktrm', identityName, suffix);
-  const manifest = revokeJobManifest({ ns, name: jobName, image, master, identityName });
-  await client('POST', `/apis/batch/v1/namespaces/${ns}/jobs`, manifest);
-  if (wait) await waitJobComplete(ns, jobName, { client });
-  return { identityName, bucket, revoked: true };
+  const { revoked } = await revokeIdentityByName({ identityName, jobPrefix: 'bktrm', ns, master, image, client, jobSuffix, wait });
+  return { identityName, bucket, revoked };
+}
+
+/**
+ * ONE-SHOT FORWARD MIGRATION (#673): delete EVERY legacy per-workspace identity
+ * (`falcone-ws-*`) so no pre-fix, over-granted, multi-key credential keeps authenticating
+ * after the deploy. Posts a single best-effort k8s Job (legacyCleanupJobManifest) that
+ * enumerates the legacy identities from the LIVE SeaweedFS config (catching orphaned ones
+ * whose buckets were deleted) and deletes each. Designed to run at every boot:
+ *   - Idempotent: once the legacy identities are gone the Job is a clean no-op.
+ *   - NON-FATAL: it NEVER throws. Local/test runs (no in-cluster SA token) skip cleanly;
+ *     an API-server error while posting the Job is logged and swallowed. Boot must not be
+ *     blocked or crashed by storage-credential hygiene.
+ * `wait` defaults to FALSE here (fire-and-forget at boot — we don't gate listen() on the
+ * Job completing). Returns a small status object for logging; never rejects.
+ * @returns {Promise<{posted:boolean, jobName?:string, skipped?:string, error?:string}>}
+ */
+export async function cleanupLegacyWorkspaceIdentities({ ns = NS, master = SW_MASTER, image = SW_IMAGE, client = k8s, token, jobSuffix, wait = false } = {}) {
+  try {
+    // Skip cleanly when not in a pod with a usable SA token (local/test/dev runs): we
+    // cannot post a Job, and that must be a logged no-op, not a crash.
+    if (!isInCluster(token)) {
+      return { posted: false, skipped: 'not-in-cluster' };
+    }
+    const suffix = (jobSuffix ?? randomBytes(4).toString('hex')).toLowerCase();
+    const jobName = jobNameFor('ws-legacy-cleanup', 'falcone-ws', suffix);
+    const manifest = legacyCleanupJobManifest({ ns, name: jobName, image, master });
+    await client('POST', `/apis/batch/v1/namespaces/${ns}/jobs`, manifest);
+    if (wait) await waitJobComplete(ns, jobName, { client });
+    return { posted: true, jobName };
+  } catch (e) {
+    // Best-effort: never block or crash boot on a cleanup failure.
+    return { posted: false, error: String(e?.message ?? e) };
+  }
 }
