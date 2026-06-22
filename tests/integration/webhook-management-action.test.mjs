@@ -58,12 +58,16 @@ test('management lifecycle create-read-update-pause-resume-rotate-delete and del
   assert.equal(verifyIncomingWebhook(payload, `sha256=${crypto.createHmac('sha256', oldSecret).update(payload).digest('hex')}`, oldSecret), true);
   assert.notEqual(oldSecret, newSecret);
 
-  db.state.deliveries.set('d1', { id: 'd1', subscription_id: subscriptionId, status: 'permanently_failed', attempt_count: 2 });
-  db.state.attempts.set('a1', { delivery_id: 'd1', attempt_num: 1, http_status: 503, response_ms: 10, outcome: 'failed' });
-  db.state.attempts.set('a2', { delivery_id: 'd1', attempt_num: 2, http_status: 503, response_ms: 11, outcome: 'failed' });
+  // webhook_deliveries.id is a UUID column (migration 001); use a real UUID so the
+  // fixture is faithful to the schema and reaches the by-id read path (a non-UUID
+  // delivery id is now correctly rejected as 404 — see #672).
+  const deliveryId = crypto.randomUUID();
+  db.state.deliveries.set(deliveryId, { id: deliveryId, subscription_id: subscriptionId, status: 'permanently_failed', attempt_count: 2 });
+  db.state.attempts.set('a1', { delivery_id: deliveryId, attempt_num: 1, http_status: 503, response_ms: 10, outcome: 'failed' });
+  db.state.attempts.set('a2', { delivery_id: deliveryId, attempt_num: 2, http_status: 503, response_ms: 11, outcome: 'failed' });
   const deliveries = await managementMain({ db, kafka, env, auth, method: 'GET', path: `/v1/webhooks/subscriptions/${subscriptionId}/deliveries` });
   assert.equal(deliveries.body.items.length, 1);
-  const delivery = await managementMain({ db, kafka, env, auth, method: 'GET', path: `/v1/webhooks/subscriptions/${subscriptionId}/deliveries/d1` });
+  const delivery = await managementMain({ db, kafka, env, auth, method: 'GET', path: `/v1/webhooks/subscriptions/${subscriptionId}/deliveries/${deliveryId}` });
   assert.equal(delivery.body.attempts.length, 2);
 
   const deleted = await managementMain({ db, kafka, env, auth, method: 'DELETE', path: `/v1/webhooks/subscriptions/${subscriptionId}` });
