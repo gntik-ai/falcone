@@ -90,6 +90,16 @@ export function persistKnownServiceAccountId(workspaceId: string, serviceAccount
   window.sessionStorage.setItem(getStorageKey(workspaceId), JSON.stringify([...existing]))
 }
 
+// Drop a deleted service account from the local index so it no longer appears in list results
+// (the console lists by reading the known ids and fetching each — a deleted SA would otherwise
+// surface a 404 on reload). Mirrors persistKnownServiceAccountId (#687).
+export function forgetKnownServiceAccountId(workspaceId: string, serviceAccountId: string) {
+  if (typeof window === 'undefined') return
+  const existing = new Set(readKnownServiceAccountIds(workspaceId))
+  if (!existing.delete(serviceAccountId)) return
+  window.sessionStorage.setItem(getStorageKey(workspaceId), JSON.stringify([...existing]))
+}
+
 export function normalizeServiceAccount(input: Record<string, any>): ConsoleServiceAccount {
   return {
     serviceAccountId: input.serviceAccountId ?? '',
@@ -245,6 +255,17 @@ export async function rotateServiceAccountCredential(
     secret: response.secret ?? 'secret-unavailable',
     expiresAt: response.expiresAt ?? null
   }
+}
+
+// Fully delete a service account — its Keycloak client AND its persistence row (#687). Revoke only
+// disables the credential; this removes the account entirely. Idempotent on the server (a 2nd
+// delete → 404). Drops it from the local index so it disappears from list results immediately.
+export async function deleteServiceAccount(workspaceId: string, serviceAccountId: string): Promise<void> {
+  await requestConsoleSessionJson(`/v1/workspaces/${workspaceId}/service-accounts/${serviceAccountId}`, {
+    method: 'DELETE',
+    idempotent: true
+  })
+  forgetKnownServiceAccountId(workspaceId, serviceAccountId)
 }
 
 export { toErrorMessage as consoleServiceAccountsErrorMessage }

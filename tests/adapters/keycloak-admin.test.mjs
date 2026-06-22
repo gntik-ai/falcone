@@ -7,6 +7,7 @@ import {
   SUPPORTED_CLIENT_PROTOCOLS,
   SUPPORTED_KEYCLOAK_VERSION_RANGES,
   buildIamAdminAdapterCall,
+  deleteServiceAccount,
   isKeycloakVersionSupported,
   normalizeKeycloakAdminError,
   normalizeKeycloakAdminResource,
@@ -223,4 +224,28 @@ test('keycloak admin realm normalization surfaces the template required client s
   assert.equal(realm.resourceType, 'iam_realm');
   assert.equal(realm.login.registrationAllowed, true);
   assert.deepEqual(realm.requiredScopes, ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles']);
+});
+
+test('deleteServiceAccount returns a normalized, idempotent deleted-resource envelope (#687)', async () => {
+  // Previously a NOT_YET_IMPLEMENTED guarded stub; making it behavior-correct lets the WF-CON-006
+  // `delete` action AND the create-step compensation complete. It echoes the targeted SA id and is
+  // idempotent — never throws on a missing/foreign account — so a compensation re-run cannot fail.
+  const fromWorkflowRequest = await deleteServiceAccount({
+    request: { input: { serviceAccountId: 'sa-1', targetWorkspaceId: 'workspace-1' } }
+  });
+  assert.equal(fromWorkflowRequest.resourceType, 'iam_service_account');
+  assert.equal(fromWorkflowRequest.serviceAccountId, 'sa-1');
+  assert.equal(fromWorkflowRequest.workspaceId, 'workspace-1');
+  assert.equal(fromWorkflowRequest.deleted, true);
+  assert.equal(fromWorkflowRequest.idempotent, true);
+
+  // Explicit args take precedence over the request projection.
+  const fromExplicitArgs = await deleteServiceAccount({ serviceAccountId: 'sa-2', workspaceId: 'workspace-2' });
+  assert.equal(fromExplicitArgs.serviceAccountId, 'sa-2');
+  assert.equal(fromExplicitArgs.workspaceId, 'workspace-2');
+
+  // Idempotent: deleting with no resolvable id is a no-op success, not a throw.
+  const empty = await deleteServiceAccount();
+  assert.equal(empty.deleted, true);
+  assert.equal(empty.serviceAccountId, null);
 });

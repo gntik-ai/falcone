@@ -2195,7 +2195,8 @@
           "dev",
           "sandbox",
           "staging",
-          "prod"
+          "prod",
+          "preview"
         ],
         "type": "string"
       },

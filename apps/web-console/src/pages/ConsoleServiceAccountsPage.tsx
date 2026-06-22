@@ -8,6 +8,7 @@ import { ConsolePageState } from '@/components/console/ConsolePageState'
 import {
   consoleServiceAccountsErrorMessage,
   createServiceAccount,
+  deleteServiceAccount,
   issueServiceAccountCredential,
   revokeServiceAccountCredential,
   rotateServiceAccountCredential,
@@ -99,6 +100,25 @@ export function ConsoleServiceAccountsPage() {
     }
   }
 
+  async function handleDelete(serviceAccountId: string) {
+    await deleteServiceAccount(workspaceId, serviceAccountId)
+  }
+
+  function openDeleteDialog(account: ConsoleServiceAccount) {
+    destructiveOp.openDialog({
+      level: DESTRUCTIVE_OP_LEVELS['delete-service-account'],
+      operationId: 'delete-service-account',
+      resourceName: account.displayName ?? account.serviceAccountId,
+      resourceType: 'service account',
+      impactDescription: 'Se eliminarán el cliente de Keycloak y el registro de la service account de forma permanente.',
+      onConfirm: () => handleDelete(account.serviceAccountId),
+      onSuccess: () => {
+        setFeedback('Service account eliminada.')
+        reload()
+      }
+    })
+  }
+
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
@@ -152,6 +172,8 @@ export function ConsoleServiceAccountsPage() {
                       <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleIssue(account.serviceAccountId)}>Emitir</Button>
                       <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => openRevokeDialog(account)}>Revocar</Button>
                       <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleRotate(account.serviceAccountId)}>Rotar</Button>
+                      {/* Delete works for an active OR a revoked SA — gated only by tenant suspension (#687). */}
+                      <Button type="button" variant="destructive" size="sm" disabled={writesBlocked} onClick={() => openDeleteDialog(account)}>Eliminar</Button>
                     </div>
                   </td>
                 </tr>
