@@ -125,13 +125,22 @@ export function ConsoleWorkspaceDatabasePage() {
     setBusy(true)
     setError(null)
     try {
+      // Dedicated-credential rotation -> 201 with the new DSN/password (rendered below). A
+      // shared-mode workspace has no dedicated credential to rotate and now returns a non-success
+      // 409 DB_SHARED_MODE (#686) instead of a misleading 200 {rotated:false}; that lands in catch.
       const res = await requestConsoleSessionJson<RotateResponse>(
         `/v1/workspaces/${encodeURIComponent(activeWorkspaceId)}/database/credential-rotations`,
         { method: 'POST', body: {} }
       )
       setRotation(res)
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudo rotar la credencial de base de datos.'))
+      // Clear any stale rotation panel; surface the backend reason (e.g. DB_SHARED_MODE) verbatim.
+      setRotation(null)
+      const fallback =
+        (rawError as Partial<ApiError>)?.code === 'DB_SHARED_MODE'
+          ? 'Este workspace usa la credencial compartida de la plataforma; no hay una credencial dedicada que rotar.'
+          : 'No se pudo rotar la credencial de base de datos.'
+      setError(errMsg(rawError, fallback))
     } finally {
       setBusy(false)
     }

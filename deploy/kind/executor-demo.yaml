@@ -61,6 +61,17 @@ spec:
               GRANT falcone_service TO falcone;
               GRANT CREATE, USAGE ON SCHEMA public TO falcone;
               GRANT USAGE ON SCHEMA public TO falcone_anon, falcone_service;
+              -- Enable per-workspace DEDICATED database login roles (#686). Workspace DB
+              -- provisioning (dataplane.mjs::provisionWorkspaceDatabase) mints a dedicated,
+              -- independently-rotatable `wsdb_<...>_app` LOGIN role + password and makes it the
+              -- DB owner ONLY when the provisioning role has CREATEROLE; otherwise it degrades to
+              -- `mode: shared` (the single `falcone` login) and credential rotation is an inert
+              -- no-op. Granting CREATEROLE here lets `falcone` create those per-workspace roles so
+              -- rotation performs a REAL rotation (POST .../database/credential-rotations).
+              -- Grant ONLY CREATEROLE — `falcone` stays NOSUPERUSER/NOBYPASSRLS. Under PG17 a
+              -- non-superuser CREATEROLE grantee can only administer roles it itself creates and
+              -- CANNOT escalate to superuser, so this is a bounded, safe privilege.
+              ALTER ROLE falcone CREATEROLE;
               -- NOTE: the blanket ALTER DEFAULT PRIVILEGES that previously granted
               -- SELECT, INSERT, UPDATE, DELETE on ALL tables to falcone_service/falcone_anon
               -- has been REMOVED (PG-3 fix, #490). That grant was overly broad and allowed

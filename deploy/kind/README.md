@@ -132,11 +132,25 @@ verified end-to-end through the gateway with a real superadmin JWT:
   creates an actual Postgres database on `falcone-postgresql` (catalog-level
   isolation; `REVOKE CONNECT … FROM PUBLIC`), records it in `workspace_databases`,
   returns the connection DSN. When the control-plane DB role has `CREATEROLE` it
-  also mints a dedicated, db-scoped login role + password (`mode: dedicated_role`);
-  this deploy's `falcone` role lacks `CREATEROLE` and no superuser is exposed, so
-  it degrades to `mode: shared` and reports it honestly. `GET …/database`,
-  `POST …/database/credential-rotations`. Verified: `wsdb_…` exists in
+  also mints a **dedicated, db-scoped login role + password** (`mode:
+  dedicated_role`) that OWNS the workspace database. The `cp-executor-setup`
+  bootstrap Job now runs `ALTER ROLE falcone CREATEROLE` (#686), so on this deploy
+  the `falcone` role CAN create those per-workspace roles and newly provisioned
+  workspaces get `mode: dedicated_role` with an independently rotatable credential.
+  The grant is `CREATEROLE` only — `falcone` stays `NOSUPERUSER`/`NOBYPASSRLS`, and
+  under PG17 a non-superuser CREATEROLE grantee can administer only roles it itself
+  creates (no superuser escalation). `GET …/database`. Verified: `wsdb_…` exists in
   `pg_database`, PUBLIC connect revoked.
+- **Workspace DB credential rotation (REAL).**
+  `POST /v1/workspaces/{id}/database/credential-rotations` rotates a
+  **`dedicated_role`** workspace's password (`ALTER ROLE … PASSWORD`) and returns
+  `201` with the new credential/DSN — the OLD password is then rejected by Postgres
+  and the NEW one accepted. A workspace still in **`shared`** mode (provisioned
+  before the `CREATEROLE` grant, or with no dedicated credential) has nothing to
+  rotate, so rotation returns a non-success **`409 DB_SHARED_MODE`** carrying the
+  reason — NOT a misleading `200 {rotated:false}` (#686). Pre-existing shared-mode
+  databases are not retro-migrated; re-provision a workspace to obtain a dedicated,
+  rotatable credential.
 - **Workspace function registry.** `POST /v1/workspaces/{id}/functions` /
   `GET …/functions`. Registers function metadata; reports
   `runtimeStatus: pending_data_plane` — execution needs the Knative data plane,
@@ -367,8 +381,12 @@ this control-plane serves. To make the shell usable end-to-end:
 - **Function execution** runs on the Knative data plane (each function is a ksvc;
   see the Functions section above) — both the registry and the runtime are real.
 - **Dedicated per-workspace DB credentials** need `CREATEROLE`/superuser on
-  Postgres (not granted on this deploy) — the code does it when privileges allow,
-  else falls back to `mode: shared`.
+  Postgres. As of #686 the `cp-executor-setup` bootstrap grants `falcone`
+  `CREATEROLE` (only — still `NOSUPERUSER`), so newly provisioned workspaces get a
+  dedicated, rotatable `mode: dedicated_role` credential and rotation is real.
+  Workspaces provisioned BEFORE the grant remain `mode: shared` (not retro-migrated)
+  and their credential-rotation returns `409 DB_SHARED_MODE`; re-provision to get a
+  dedicated, rotatable credential.
 - **iam-tenant-roles** (custom-role CRUD) expects a custom store, not a pg Pool —
   excluded until an adapter is written.
 - **secret-rotation** needs Vault wiring; **data-plane consoles**
