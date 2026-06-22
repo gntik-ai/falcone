@@ -2589,6 +2589,16 @@
             },
             "description": "The caller is authenticated but not authorized for this scope."
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The workspace is at its storage capacity quota (e.g. bucket-count limit); the provision is rejected with error code STORAGE_QUOTA_EXCEEDED."
+          },
           "413": {
             "content": {
               "application/json": {
@@ -3397,6 +3407,16 @@
               }
             },
             "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The upload would exceed the workspace storage byte quota; the request is rejected with error code STORAGE_QUOTA_EXCEEDED."
           },
           "413": {
             "content": {
