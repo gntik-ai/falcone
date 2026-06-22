@@ -8,7 +8,7 @@
 // usage is workspace-scoped.
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { issueWorkspaceIdentity } from './seaweedfs-identity.mjs';
+import { issueBucketIdentity, revokeBucketIdentity } from './seaweedfs-identity.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
 // or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
@@ -407,23 +407,29 @@ async function storageProvisionBucket(ctx) {
   try {
     await createBucket(bucket);
     const rec = await store.insertBucket(ctx.pool, { workspaceId: ws.id, tenantId: ws.tenant_id, bucketName: bucket, region: REGION });
-    // Issue a per-workspace SeaweedFS identity scoped to ONLY this bucket (#553), so the
-    // tenant gets a credential that can't reach any other tenant's bucket — instead of
-    // sharing the broad admin/master key. Best-effort: a failure here must not fail the
-    // provision (the bucket is still usable via the tenant-gated REST API); the credential
-    // can be re-issued. Enabled by DEFAULT (filer-mode) — see tenantIdentitiesEnabled:
-    // gating only on STORAGE_TENANT_IDENTITIES=1 meant a values overlay that REPLACED the
-    // control-plane env list silently dropped the flag, so every provision returned
-    // storageCredential:null and a single shared admin cred served all tenants (P1
-    // tenant-isolation, live 2026-06-18). It can still be turned off explicitly (='0').
+    // Issue a per-BUCKET SeaweedFS identity scoped to ONLY this bucket (#553, #673), so
+    // the tenant gets a credential that can't reach ANY other bucket — not another
+    // tenant's bucket AND not a sibling bucket in the same workspace — instead of sharing
+    // the broad admin/master key. Keyed on the (globally-unique, workspace-embedding)
+    // physical bucket name; the issuer does delete-then-apply so a re-provision is a clean
+    // rotate (exactly one active key, no accumulation) — fixing #673, where a single
+    // per-workspace identity accumulated a grant + a new key for EVERY bucket so a cred
+    // "scoped to bucket A" could list buckets B/C in the same workspace. Best-effort: a
+    // failure here must not fail the provision (the bucket is still usable via the
+    // tenant-gated REST API); the credential can be re-issued via the rotate endpoint.
+    // Enabled by DEFAULT (filer-mode) — see tenantIdentitiesEnabled: gating only on
+    // STORAGE_TENANT_IDENTITIES=1 meant a values overlay that REPLACED the control-plane
+    // env list silently dropped the flag, so every provision returned storageCredential:
+    // null and a single shared admin cred served all tenants (P1 tenant-isolation, live
+    // 2026-06-18). It can still be turned off explicitly (='0').
     let storageCredential = null;
     if (tenantIdentitiesEnabled()) {
       try {
-        const issued = await issueWorkspaceIdentity({ workspaceId: ws.id, bucket });
+        const issued = await issueBucketIdentity({ bucket, workspaceId: ws.id });
         // Return the one-time secret to the caller; never persist the plaintext secret.
         storageCredential = { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions };
       } catch (e) {
-        console.error('[storage] per-workspace identity issuance failed (bucket provisioned without a scoped credential):', e?.message ?? e);
+        console.error('[storage] per-bucket identity issuance failed (bucket provisioned without a scoped credential):', e?.message ?? e);
       }
     }
     return ok(201, { bucket: { resourceId: bucket, bucketName: bucket, workspaceId: ws.id, tenantId: ws.tenant_id, region: REGION, status: 'active' }, record: rec, storageCredential });
@@ -432,7 +438,52 @@ async function storageProvisionBucket(ctx) {
   }
 }
 
+// POST /v1/storage/buckets/{bucketId}/credentials — ROTATE the bucket's storage
+// credential (#673). Re-issues the per-bucket identity (delete-then-apply), so the
+// PRIOR access key for this bucket no longer authenticates and a single fresh key
+// scoped to ONLY this bucket is returned. Bucket-keyed (not product credentialId-keyed)
+// to match the existing kind storage routes; the response is the same `storageCredential`
+// shape `storageProvisionBucket` returns. Ownership-gated exactly like object I/O.
+async function storageRotateCredential(ctx) {
+  const bucket = ctx.params.bucketId;
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  // The bucket must exist in the registry (a superadmin bypasses the owner check above,
+  // so confirm existence here rather than leaking a 404 vs 200 distinction by ownership).
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  if (!tenantIdentitiesEnabled()) {
+    return err(409, 'STORAGE_IDENTITIES_DISABLED', 'per-bucket storage identities are disabled (STORAGE_TENANT_IDENTITIES=0)');
+  }
+  try {
+    // ctx.seaweedClient is an OPTIONAL test seam (the in-pod default is the real k8s
+    // client inside seaweedfs-identity.mjs); production passes nothing → real client.
+    const issued = await issueBucketIdentity({ bucket, workspaceId: rec.workspace_id, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
+    return ok(200, { storageCredential: { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions } });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_ROTATE_FAILED', String(e.message ?? e));
+  }
+}
+
+// DELETE /v1/storage/buckets/{bucketId}/credentials — REVOKE the bucket's storage
+// credential (#673). Deletes the per-bucket SeaweedFS identity (and all its keys) so the
+// prior access key is rejected. Idempotent (revoking when no identity exists still
+// succeeds). Ownership-gated exactly like object I/O.
+async function storageRevokeCredential(ctx) {
+  const bucket = ctx.params.bucketId;
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  try {
+    // ctx.seaweedClient is an OPTIONAL test seam (see storageRotateCredential).
+    await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
+    return ok(200, { bucket, revoked: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_REVOKE_FAILED', String(e.message ?? e));
+  }
+}
+
 export const STORAGE_HANDLERS = {
   storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
-  storagePutObject, storageGetObject, storageDeleteObject
+  storagePutObject, storageGetObject, storageDeleteObject,
+  storageRotateCredential, storageRevokeCredential
 };
