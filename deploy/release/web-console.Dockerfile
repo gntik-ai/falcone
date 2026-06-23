@@ -5,22 +5,23 @@
 # build`; the `tsc -b` type-check has a pre-existing error baseline that does NOT affect the
 # emitted bundle, so the release builds the deployable artifact with `vite build` directly.
 #
-# This image only serves the static bundle and proxies same-origin /v1/* API calls to the gateway
-# (APISIX) via the production nginx config (apps/web-console/nginx.conf). Build context = repo root:
+# Runtime is the dependency-free Node static server (deploy/kind/web-console/static-server.mjs):
+# serves the bundle on :3000, reverse-proxies same-origin /v1/* to the gateway (GATEWAY_UPSTREAM,
+# default falcone-apisix:9080 — the chart overrides it), and exposes /healthz. Chosen over nginx
+# because the platform's `restricted` security profile enforces runAsNonRoot + readOnlyRootFilesystem:
+# this server makes ZERO filesystem writes and runs as a NUMERIC non-root user (1000), which nginx
+# (named user + writes to cache/pid/conf) cannot satisfy. Build context = repo root:
 #   pnpm --filter @in-falcone/web-console exec vite build
 #   docker build -f deploy/release/web-console.Dockerfile -t in-falcone-web-console:<tag> .
-FROM nginx:1.27-alpine
+FROM node:22-alpine
+WORKDIR /app
 
-# Serve the pre-built SPA.
-COPY apps/web-console/dist /usr/share/nginx/html
+# Zero-dependency static server + the freshly built SPA bundle.
+COPY deploy/kind/web-console/static-server.mjs ./static-server.mjs
+COPY apps/web-console/dist ./dist
 
-# Same-origin API edge: ${GATEWAY_UPSTREAM} is substituted at container start by the nginx image's
-# envsubst entrypoint; NGINX_ENVSUBST_FILTER keeps nginx's own $variables (e.g. $host, $uri) intact.
-# The chart overrides GATEWAY_UPSTREAM with the in-namespace APISIX service when the release name
-# differs from the default.
-COPY apps/web-console/nginx.conf /etc/nginx/templates/default.conf.template
-ENV GATEWAY_UPSTREAM=falcone-apisix:9080
-ENV NGINX_ENVSUBST_FILTER=GATEWAY_UPSTREAM
-
+ENV NODE_ENV=production
+# Numeric non-root user -> passes runAsNonRoot verification under the restricted profile.
+USER 1000
 EXPOSE 3000
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "static-server.mjs"]
