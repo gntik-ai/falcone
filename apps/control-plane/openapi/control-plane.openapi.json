@@ -84587,6 +84587,13 @@
             "items": {
               "$ref": "#/components/schemas/FunctionDefinitionResource"
             }
+          },
+          "definitions": {
+            "description": "Self-contained deployable definitions for the exported actions (source, runtime, entrypoint, parameters, metadata). Carried so an export -> import round-trips the actual function code with fidelity, not only the resource reference. Optional and additive (consumers that only read 'resources' are unaffected).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionDefinitionPayload"
+            }
           }
         },
         "required": [
@@ -84595,6 +84602,37 @@
           "workspaceId",
           "scope",
           "resources"
+        ]
+      },
+      "FunctionDefinitionPayload": {
+        "additionalProperties": false,
+        "type": "object",
+        "description": "A single deployable function-definition payload inside an export/import bundle.",
+        "properties": {
+          "actionName": {
+            "type": "string"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "sourceCode": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "actionName"
         ]
       },
       "FunctionDefinitionResource": {
@@ -84664,6 +84702,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FunctionDefinitionResource"
+            }
+          },
+          "definitions": {
+            "description": "Self-contained deployable definitions to import (source, runtime, entrypoint, parameters, metadata). When present, the registry rows are created/updated from these; the scope is always re-stamped to the caller's verified tenant/workspace. Optional and additive.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionDefinitionPayload"
             }
           }
         },

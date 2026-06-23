@@ -218,6 +218,21 @@
   },
   {
     "method": "POST",
+    "path": "/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports/{manifestId}",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/imports",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
     "path": "/v1/functions/{id}/invoke",
     "privilege_domain": "data_access",
     "function_privilege_subdomain": "function_deployment"

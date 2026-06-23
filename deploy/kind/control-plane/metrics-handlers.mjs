@@ -160,11 +160,67 @@ async function auditRecords(ctx) {
     return ok(200, { items: [], page: { size: 0, hasMore: false, nextCursor: null } });
   }
 }
-// ---- audit export (Observability) — accept the request (no export pipeline) -
+// ---- audit export (Observability) — REAL masked export (#683) ---------------
+// Upgrades the former 202 no-op ack to a real export: query the tamper-evident audit store
+// (queryAuditEvents) scoped to the resolved tenant/workspace, then build a MASKED export manifest
+// with the product preview builder (apps/control-plane observability-audit-export — masks sensitive
+// detail fields). The guarded() wrapper has already authorized the caller for this scope, so the
+// records returned never cross a tenant/workspace boundary. The builder is lazily loaded (it lives
+// under /repo in the image, alongside services/internal-contracts which it imports) so this module
+// still imports cleanly in the blackbox harness; if it cannot be resolved, we fall back to the
+// already-imported per-row mapper + a manifest assembled inline (records are still tenant-scoped).
+let _auditExportPreview = null;
+async function loadAuditExportPreview() {
+  if (_auditExportPreview) return _auditExportPreview;
+  const candidates = [
+    '/repo/apps/control-plane/src/observability-audit-export.mjs',
+    new URL('../../../apps/control-plane/src/observability-audit-export.mjs', import.meta.url).href
+  ];
+  for (const c of candidates) {
+    try { const m = await import(c); if (m?.exportTenantAuditRecordsPreview) { _auditExportPreview = m; return m; } }
+    catch { /* try next */ }
+  }
+  return null;
+}
+
 async function auditExport(ctx) {
-  return ok(202, { exportId: `exp_${randomUUID()}`, status: 'accepted', requestedAt: nowIso(),
-    message: 'Audit export accepted (no export pipeline is deployed; this acknowledges the request).',
-    filters: ctx.body?.filters ?? {} });
+  // Resolve the scope (tenant from the path, or the workspace's owning tenant). guarded() has
+  // already verified the caller may read this scope, so this only derives the ids for the query.
+  const scope = await resolveScopeTenant(ctx);
+  if (scope.error) return scope.error;
+  const tenantId = scope.tenantId;
+  const workspaceId = ctx.params.workspaceId ?? null;
+  const limit = Math.min(Math.max(Number(ctx.body?.pageSize ?? ctx.body?.filters?.pageSize ?? 200) || 200, 1), 200);
+  let rows = [];
+  try { rows = await queryAuditEvents(ctx.pool, { tenantId, workspaceId, limit }); }
+  catch { rows = []; }
+  const records = rows.map(auditRowToRecord);
+  const builder = await loadAuditExportPreview();
+  if (builder) {
+    try {
+      const context = { actor: { id: ctx.identity?.sub ?? null }, correlationId: ctx.callerContext?.correlationId ?? randomUUID() };
+      const manifest = workspaceId
+        ? builder.exportWorkspaceAuditRecordsPreview({ ...context, workspaceId }, { workspaceId, records })
+        : builder.exportTenantAuditRecordsPreview({ ...context, tenantId }, { tenantId, records });
+      return ok(200, { ...manifest, status: 'completed' });
+    } catch (e) { console.error(`[metrics] audit export builder failed, returning inline manifest: ${String(e?.message ?? e)}`); }
+  }
+  // Inline fallback manifest (records already tenant/workspace-scoped via queryAuditEvents).
+  // Only reachable if apps/control-plane (which holds the masking profile) is absent from the
+  // image. Without the profile we cannot reproduce its per-field masking, so we conservatively
+  // redact the entire `detail` field — the only field the primary path masks — guaranteeing this
+  // fallback never exposes MORE sensitive data than the profile-masked path.
+  const maskedItems = records.map((r) => (r && r.detail !== undefined ? { ...r, detail: '[MASKED]', maskingApplied: true } : r));
+  return ok(200, {
+    exportId: `exp_${randomUUID()}`, status: 'completed',
+    queryScope: workspaceId ? 'workspace' : 'tenant',
+    tenantId, workspaceId,
+    generatedAt: nowIso(),
+    itemCount: maskedItems.length,
+    maskedItemCount: maskedItems.filter((i) => i?.maskingApplied).length,
+    appliedFilters: ctx.body?.filters ?? {},
+    items: maskedItems
+  });
 }
 
 // ---- own-tenant authorization (P0 ISO-METRICS) -----------------------------
