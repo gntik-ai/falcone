@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
+import { exportBucketObjects } from '@/services/dataExportImportApi'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline'
@@ -250,6 +251,8 @@ export function ConsoleStoragePage() {
   const [presigned, setPresigned] = useState<SectionState<StoragePresignedUrl | null>>({ data: null, loading: false, error: null })
   const [deletingBucketId, setDeletingBucketId] = useState<string | null>(null)
   const [bucketActionError, setBucketActionError] = useState<string | null>(null)
+  const [exportingBucketId, setExportingBucketId] = useState<string | null>(null)
+  const [bucketExportNotice, setBucketExportNotice] = useState<string | null>(null)
 
   const resetBucketDetailState = useCallback(() => {
     setBucketTab('objects')
@@ -337,6 +340,30 @@ export function ConsoleStoragePage() {
     } catch (error) {
       if (isAbortError(error)) return
       setPresigned({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo generar la URL prefirmada.') })
+    }
+  }, [])
+
+  // Export a bucket's objects into an inline manifest (#683). The manifest is also persisted in the
+  // bucket; here we surface the object count + a download of the manifest JSON for the operator.
+  const exportBucketAction = useCallback(async (bucketId: string, workspaceId: string) => {
+    setBucketExportNotice(null)
+    setBucketActionError(null)
+    setExportingBucketId(bucketId)
+    try {
+      const manifest = await exportBucketObjects(workspaceId, bucketId)
+      // Offer the manifest as a downloadable file so the operator can re-import it elsewhere.
+      const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${manifest.manifestId}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setBucketExportNotice(`Exportados ${manifest.totalObjects} objeto(s) (manifiesto ${manifest.manifestId}).`)
+    } catch (error) {
+      if (!isAbortError(error)) setBucketActionError(getApiErrorMessage(error, 'No se pudo exportar el bucket.'))
+    } finally {
+      setExportingBucketId(null)
     }
   }, [])
 
@@ -473,6 +500,7 @@ export function ConsoleStoragePage() {
             ) : null}
             {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el workspace seleccionado.</p> : null}
             {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
+            {bucketExportNotice ? <p className="mb-3" role="status">{bucketExportNotice}</p> : null}
             {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
@@ -509,6 +537,15 @@ export function ConsoleStoragePage() {
                           <td className="py-3 pr-3 align-top">{bucket.provisioning?.state ? <Badge variant={statusTone(bucket.provisioning.state)}>{formatEnumLabel(bucket.provisioning.state)}</Badge> : '—'}</td>
                           <td className="py-3 pr-3 align-top">{formatRelativeDate(bucket.timestamps?.createdAt)}</td>
                           <td className="py-3 align-top">
+                            <Button
+                              className="mr-2"
+                              disabled={exportingBucketId === bucket.resourceId}
+                              onClick={() => void exportBucketAction(bucket.resourceId, bucket.workspaceId)}
+                              type="button"
+                              variant="outline"
+                            >
+                              {exportingBucketId === bucket.resourceId ? 'Exportando…' : 'Exportar'}
+                            </Button>
                             <Button
                               disabled={deletingBucketId === bucket.resourceId}
                               onClick={() => void deleteBucketAction(bucket.resourceId, bucket.workspaceId)}

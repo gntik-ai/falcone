@@ -95,6 +95,59 @@ export function deleteDocument(
   )
 }
 
+// ---- Document export / import (change: add-data-export-import-clone, #683) ----
+const dataBase = (workspaceId: string, db: string, collection: string) =>
+  `/v1/mongo/workspaces/${enc(workspaceId)}/data/${enc(db)}/collections/${enc(collection)}`
+
+export interface MongoDataExport {
+  entityType: string
+  sourceWorkspaceId: string
+  sourceTenantId: string
+  databaseName: string
+  collectionName: string
+  documentCount: number
+  documents: MongoDocument[]
+}
+
+export interface MongoDataImportResult {
+  entityType: string
+  targetWorkspaceId: string
+  targetTenantId: string
+  totalEntries: number
+  importedCount: number
+  skippedCount: number
+}
+
+// Export the caller-workspace documents of a collection (bounded, inline). The backend reads only
+// documents stamped with this workspace's tenant+workspace scope.
+export function exportDocuments(
+  workspaceId: string,
+  databaseName: string,
+  collectionName: string,
+  options: { limit?: number } = {}
+): Promise<MongoDataExport> {
+  const body: Record<string, JsonValue> = {}
+  if (options.limit != null) body.limit = options.limit
+  return requestConsoleSessionJson<MongoDataExport>(
+    `${dataBase(workspaceId, databaseName, collectionName)}/exports`,
+    { method: 'POST', body }
+  )
+}
+
+// Import documents into a collection. The backend re-stamps the caller's verified tenant+workspace
+// onto every document (any body-supplied scope is ignored).
+export function importDocuments(
+  workspaceId: string,
+  databaseName: string,
+  collectionName: string,
+  documents: MongoDocument[]
+): Promise<MongoDataImportResult> {
+  return requestConsoleSessionJson<MongoDataImportResult>(
+    `${dataBase(workspaceId, databaseName, collectionName)}/imports`,
+    { method: 'POST', body: { documents } }
+  )
+}
+
 // ---- Anon-key embeds (Supabase-style) ----
 export interface MongoEmbedParams {
   apiKey: string

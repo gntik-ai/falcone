@@ -34,7 +34,11 @@ async function assertDbScope(ctx) {
   return null;
 }
 
-async function withDb(database, fn) {
+async function withDb(database, fn, injectedClient = null) {
+  // Test seam (#683): the export/import handlers may inject a per-DB client (mirrors mongo-handlers'
+  // ctx.mongoClient) so the data round-trip is unit-testable without a live Postgres. Production
+  // never injects — server.mjs builds ctx without pgClient — so the live path opens a real Client.
+  if (injectedClient) return fn(injectedClient);
   const c = new Client(withPostgresSsl({
     host: process.env.PGHOST, port: Number(process.env.PGPORT || 5432),
     user: process.env.PGUSER, password: process.env.PGPASSWORD, database,
@@ -206,6 +210,122 @@ async function pgMatViews(ctx) {
   } catch (e) { return err(502, 'PG_MATVIEWS_FAILED', String(e.message ?? e)); }
 }
 
+// ---- table data export / import (#683, data-export-import-clone) ------------
+// Bounded, synchronous, inline-row movement, WORKSPACE-addressed. CRITICAL SQL-injection guard: the
+// schema/table/column identifiers arrive in the path/body and CANNOT be bound as parameters (only
+// VALUES can), so every identifier is (1) validated to EXIST in information_schema for the target
+// database and (2) double-quote-escaped — never string-interpolated raw. Row VALUES are always bound
+// via $N placeholders. v1 caps the operation at PG_IO_MAX_ROWS rows (no async/streaming pipeline).
+const PG_IO_MAX_ROWS = (() => { const n = Number(process.env.PG_IO_MAX_ROWS); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 10000; })();
+
+// Quote a SQL identifier: double the embedded double-quotes and wrap in double quotes. This is the
+// canonical Postgres identifier-quoting rule (equivalent to pg-format %I). Applied ONLY to
+// identifiers that have ALSO been validated against information_schema (defense in depth).
+function quoteIdent(name) {
+  return `"${String(name).replace(/"/g, '""')}"`;
+}
+
+// Own-tenant gate the workspace AND verify the named database is mapped to THAT workspace (so a
+// caller cannot export from another workspace's — or another tenant's — database). 404 on any
+// mismatch (no existence leak). Returns { ws, database } or { error }.
+async function ownedWorkspaceDb(ctx) {
+  const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
+  if (!ws || !canManageTenant(ctx.identity, ws.tenant_id)) {
+    return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+  }
+  const database = D(ctx.params.databaseName);
+  const map = await store.databaseWorkspaceMap(ctx.pool);
+  const row = map[database];
+  // Superadmin/internal may reach any mapped db; a tenant caller's db must be mapped to THIS
+  // workspace and tenant.
+  const sup = ctx.identity?.actorType === 'superadmin' || ctx.identity?.actorType === 'internal';
+  if (!row || (!sup && (row.workspace_id !== ws.id || row.tenant_id !== ws.tenant_id))) {
+    return { error: err(404, 'PG_DATABASE_NOT_FOUND', `database ${database} not found`) };
+  }
+  return { ws, database };
+}
+
+// Resolve the validated, quoted (schema, table) and the validated column set for a table in `c`,
+// using information_schema. Returns { schema, table, columns } (all RAW validated names) or { error }.
+async function resolveTableColumns(c, schemaName, tableName) {
+  const t = await c.query(
+    `SELECT table_name FROM information_schema.tables WHERE table_schema=$1 AND table_name=$2 LIMIT 1`,
+    [schemaName, tableName]);
+  if (!t.rows.length) return { error: err(404, 'TABLE_NOT_FOUND', `table ${schemaName}.${tableName} not found`) };
+  const cols = await c.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2 ORDER BY ordinal_position`,
+    [schemaName, tableName]);
+  return { schema: schemaName, table: tableName, columns: cols.rows.map((r) => r.column_name) };
+}
+
+// POST .../schemas/{schemaName}/tables/{tableName}/exports
+async function pgDataExport(ctx) {
+  const { error, database } = await ownedWorkspaceDb(ctx);
+  if (error) return error;
+  const schemaName = D(ctx.params.schemaName);
+  const tableName = D(ctx.params.tableName);
+  const limit = Math.min(Math.max(Number(ctx.body?.limit ?? PG_IO_MAX_ROWS) || PG_IO_MAX_ROWS, 1), PG_IO_MAX_ROWS);
+  try {
+    return await withDb(database, async (c) => {
+      const resolved = await resolveTableColumns(c, schemaName, tableName);
+      if (resolved.error) return resolved.error;
+      // Identifiers validated against information_schema above; quote (never interpolate raw).
+      const sql = `SELECT * FROM ${quoteIdent(resolved.schema)}.${quoteIdent(resolved.table)} LIMIT $1`;
+      const { rows } = await c.query(sql, [limit]);
+      return ok(200, {
+        entityType: 'postgres_data_export',
+        databaseName: database, schemaName: resolved.schema, tableName: resolved.table,
+        columns: resolved.columns, exportedAt: new Date().toISOString(),
+        rowCount: rows.length, rows
+      });
+    }, ctx.pgClient);
+  } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PG_EXPORT_FAILED', String(e.message ?? e)); }
+}
+
+// POST .../schemas/{schemaName}/tables/{tableName}/imports
+async function pgDataImport(ctx) {
+  const { error, database } = await ownedWorkspaceDb(ctx);
+  if (error) return error;
+  const schemaName = D(ctx.params.schemaName);
+  const tableName = D(ctx.params.tableName);
+  const rows = Array.isArray(ctx.body?.rows) ? ctx.body.rows : null;
+  if (!rows) return err(400, 'VALIDATION_ERROR', 'rows (array) is required');
+  if (rows.length > PG_IO_MAX_ROWS) return err(413, 'PG_IMPORT_TOO_LARGE', `import exceeds the ${PG_IO_MAX_ROWS}-row limit`);
+  try {
+    return await withDb(database, async (c) => {
+      const resolved = await resolveTableColumns(c, schemaName, tableName);
+      if (resolved.error) return resolved.error;
+      const allowed = new Set(resolved.columns);
+      let imported = 0;
+      const skipped = [];
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
+        if (!row || typeof row !== 'object' || Array.isArray(row)) { skipped.push({ index: i, reason: 'NOT_AN_OBJECT' }); continue; }
+        // Keep ONLY columns that exist in the table (validated against information_schema). Any
+        // unknown column key is dropped — an attacker cannot inject an identifier that isn't a real,
+        // pre-validated column of this exact table.
+        const keys = Object.keys(row).filter((k) => allowed.has(k));
+        if (keys.length === 0) { skipped.push({ index: i, reason: 'NO_KNOWN_COLUMNS' }); continue; }
+        const colSql = keys.map(quoteIdent).join(', ');
+        const placeholders = keys.map((_, j) => `$${j + 1}`).join(', ');
+        const values = keys.map((k) => row[k]);
+        const sql = `INSERT INTO ${quoteIdent(resolved.schema)}.${quoteIdent(resolved.table)} (${colSql}) VALUES (${placeholders})`;
+        try { await c.query(sql, values); imported += 1; }
+        catch (e) { skipped.push({ index: i, reason: 'INSERT_FAILED', detail: String(e?.code ?? '') }); }
+      }
+      return ok(200, {
+        entityType: 'postgres_data_import_result',
+        databaseName: database, schemaName: resolved.schema, tableName: resolved.table,
+        importedAt: new Date().toISOString(),
+        totalEntries: rows.length, importedCount: imported, skippedCount: skipped.length, skipped
+      });
+    }, ctx.pgClient);
+  } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PG_IMPORT_FAILED', String(e.message ?? e)); }
+}
+
 export const PG_HANDLERS = {
-  pgListDatabases, pgListSchemas, pgListTables, pgColumns, pgIndexes, pgPolicies, pgSecurity, pgViews, pgMatViews
+  pgListDatabases, pgListSchemas, pgListTables, pgColumns, pgIndexes, pgPolicies, pgSecurity, pgViews, pgMatViews,
+  pgDataExport, pgDataImport
 };
+// Exported for unit testing the SQL-injection identifier guard in isolation.
+export { quoteIdent };

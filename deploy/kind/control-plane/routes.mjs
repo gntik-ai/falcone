@@ -50,6 +50,11 @@ export const routes = [
   { method: 'DELETE', path: '/v1/tenants/{tenantId}', localHandler: 'deleteTenant', auth: 'superadmin' },
   { method: 'POST', path: '/v1/tenants/{tenantId}/purge', localHandler: 'purgeTenant', auth: 'superadmin' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/environments', localHandler: 'listEnvironments', auth: 'authenticated' },
+  // Tenant configuration export (#683): a READ-ONLY snapshot of the tenant's portable configuration
+  // (tenant metadata, its workspaces with slugs/environments/databases, and resolved quota limits).
+  // Own-tenant gated (cross-tenant → 404, no existence leak). Deliberately EXCLUDES every secret,
+  // credential, BYOK key, and service-account material — only non-sensitive config is emitted.
+  { method: 'POST', path: '/v1/tenants/{tenantId}/exports', localHandler: 'exportTenantConfiguration', auth: 'authenticated' },
   { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/users', localHandler: 'listTenantUsers', auth: 'authenticated' },
 
@@ -76,6 +81,12 @@ export const routes = [
   // (stage-scoped) and never the source. Handler authorizes own-tenant on BOTH ends (404 on a
   // cross-tenant/missing source or target — no existence leak).
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/promotions', localHandler: 'promoteWorkspace', auth: 'authenticated' },
+  // Workspace clone (#683): reproduce a source workspace's resources into a NEW target workspace in
+  // the SAME tenant. Own-tenant gated on the source (404 cross-tenant). Copies the function-definition
+  // registry per the clone policy; NEVER copies secrets/credentials/service-accounts
+  // (resetCredentialReferences). A clone to (or from) another tenant is impossible — the new target
+  // is always created under the source's verified tenant.
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/clone', localHandler: 'cloneWorkspace', auth: 'authenticated' },
 
   // ---- domain B: service accounts + credentials (LOCAL) --------------------
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts', localHandler: 'createServiceAccount', auth: 'authenticated' },
@@ -162,6 +173,12 @@ export const routes = [
   { method: 'GET', path: '/v1/postgres/databases/{db}/schemas/{schema}/tables/{table}/security', localHandler: 'pgSecurity', auth: 'authenticated' },
   { method: 'GET', path: '/v1/postgres/databases/{db}/schemas/{schema}/views', localHandler: 'pgViews', auth: 'authenticated' },
   { method: 'GET', path: '/v1/postgres/databases/{db}/schemas/{schema}/materialized-views', localHandler: 'pgMatViews', auth: 'authenticated' },
+  // Table data export / import (#683). WORKSPACE-addressed; the database must be owned by the
+  // caller's workspace (404 otherwise, no existence leak). SQL-injection-safe: schema/table/column
+  // identifiers are validated against information_schema for THAT database and double-quote-escaped
+  // (never string-interpolated raw), and every value is bound via a parameter placeholder.
+  { method: 'POST', path: '/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/exports', localHandler: 'pgDataExport', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/imports', localHandler: 'pgDataImport', auth: 'authenticated' },
 
   // ---- domain B: MongoDB document store (REAL mongodb driver) ---------------
   { method: 'GET',  path: '/v1/mongo/databases', localHandler: 'mongoListDatabases', auth: 'authenticated' },
@@ -170,6 +187,13 @@ export const routes = [
   { method: 'GET',  path: '/v1/mongo/databases/{db}/collections/{col}/indexes', localHandler: 'mongoIndexes', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/mongo/databases/{db}/views', localHandler: 'mongoViews', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/mongo/workspaces/{workspaceId}/data/{db}/collections/{col}/documents', localHandler: 'mongoDocuments', auth: 'authenticated' },
+  // Document export / import (#683). WORKSPACE-addressed; ownership-gated on the workspace (404
+  // cross-tenant). Export reads documents stamped with BOTH the workspace's tenantId AND its
+  // workspaceId (the same scope mongoDocuments reads, #632/#661) — never another workspace's docs.
+  // Import stamps that SAME verified scope onto every inserted document, ignoring any tenantId/
+  // workspaceId in the request body, so an import can never write into another tenant/workspace.
+  { method: 'POST', path: '/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/exports', localHandler: 'mongoDataExport', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/imports', localHandler: 'mongoDataImport', auth: 'authenticated' },
   // engine-dispatched DB provisioning (postgresql | mongodb) — the SPA wizard target
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/databases', localHandler: 'provisionDatabaseGeneric', auth: 'authenticated' },
 
@@ -205,10 +229,30 @@ export const routes = [
   // storage OBJECT routes), so there is no SDK codegen drift. Ownership-gated like object I/O.
   { method: 'POST',   path: '/v1/storage/buckets/{bucketId}/credentials', localHandler: 'storageRotateCredential', auth: 'authenticated' },
   { method: 'DELETE', path: '/v1/storage/buckets/{bucketId}/credentials', localHandler: 'storageRevokeCredential', auth: 'authenticated' },
+  // Bucket export / import (#683, data-export-import-clone). Bounded, synchronous, inline-artifact
+  // object movement, ownership-gated on BOTH the workspace AND the bucket (a workspace/bucket the
+  // caller does not own → 404, no existence leak). Export returns a manifest with inline base64
+  // object bodies (per-object + total size caps → 413). The manifest is ALSO persisted as a reserved
+  // `.falcone/exports/<manifestId>.json` object in the SAME bucket so GET .../exports/{manifestId}
+  // can read it back (no new table, naturally tenant/bucket-scoped). Import accepts that same manifest
+  // shape, re-validates every entry against the TARGET tenant (path-traversal / cross-tenant /
+  // protected-key → skipped), and PUTs decoded bodies into the owned target bucket.
+  { method: 'POST', path: '/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports', localHandler: 'storageBucketExport', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports/{manifestId}', localHandler: 'storageBucketExportManifestGet', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/imports', localHandler: 'storageBucketImport', auth: 'authenticated' },
 
   // ---- domain B: Functions (REAL execution via ephemeral k8s Jobs) ----------
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/inventory', localHandler: 'fnInventory', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/actions', localHandler: 'fnListActions', auth: 'authenticated' },
+  // Function-definition export / import (#683). Export emits a self-contained bundle (source, runtime,
+  // entrypoint, parameters, metadata) for ONE action the caller's tenant owns, or for every action
+  // in a package within an owned workspace. Import re-scopes the bundle to the caller's verified
+  // tenant/workspace (rejecting any cross-scope bundle, IMPORT_SCOPE_VIOLATION) and upserts the
+  // fn_action registry row(s). Ownership-gated (action by tenant; workspace by ownedWorkspace → 404).
+  { method: 'GET',  path: '/v1/functions/actions/{resourceId}/definition-export', localHandler: 'fnDefinitionExport', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/functions/workspaces/{workspaceId}/definition-imports', localHandler: 'fnDefinitionImport', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/functions/workspaces/{workspaceId}/package-definition-imports', localHandler: 'fnPackageDefinitionImport', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/packages/{packageName}/definition-export', localHandler: 'fnPackageDefinitionExport', auth: 'authenticated' },
   // Workspace secrets-as-a-service backed by Vault (add-vault-secret-consumption, #612).
   { method: 'POST',   path: '/v1/functions/workspaces/{workspaceId}/secrets', localHandler: 'secretSet', auth: 'authenticated' },
   { method: 'GET',    path: '/v1/functions/workspaces/{workspaceId}/secrets', localHandler: 'secretList', auth: 'authenticated' },
