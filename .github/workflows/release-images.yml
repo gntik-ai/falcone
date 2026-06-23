@@ -4,9 +4,17 @@ name: release-images
 # GitHub Release. The release tag (e.g. v0.6.2) becomes the image version tag (0.6.2).
 #
 # Images are pushed to ghcr.io/<owner>/<image> using the workflow's GITHUB_TOKEN — no PAT
-# required. After a release, deploy by pinning each component image tag to the release
-# version (the in-falcone Helm chart reads controlPlane.image.tag / webConsole.image.tag /
-# workflowWorker.image.tag).
+# required. After a release, deploy by pinning each component image tag to the release version.
+#
+# IMPORTANT — which runtime each image builds (the proven, deployable runtimes):
+#   in-falcone-control-plane           deploy/kind/control-plane/Dockerfile  (server.mjs: validates the
+#                                       Keycloak JWT and dispatches /v1/* to the real action modules)
+#   in-falcone-control-plane-executor  apps/control-plane/Dockerfile         (main.mjs: the data-plane
+#                                       executor that fronts the control-plane)
+#   in-falcone-web-console             deploy/release/web-console.Dockerfile (static-server, numeric UID,
+#                                       zero-write — compatible with the restricted security profile)
+#   in-falcone-fn-runtime              deploy/kind/fn-runtime/Dockerfile     (nodejs function runtime)
+#   in-falcone-workflow-worker         services/workflow-worker/Dockerfile   (Temporal DSL worker)
 on:
   release:
     types: [published]
@@ -36,10 +44,15 @@ jobs:
       matrix:
         include:
           - image: in-falcone-control-plane
+            dockerfile: deploy/kind/control-plane/Dockerfile
+          - image: in-falcone-control-plane-executor
             dockerfile: apps/control-plane/Dockerfile
           - image: in-falcone-web-console
             dockerfile: deploy/release/web-console.Dockerfile
             build_spa: 'true'
+          - image: in-falcone-fn-runtime
+            dockerfile: deploy/kind/fn-runtime/Dockerfile
+            context: deploy/kind/fn-runtime
           - image: in-falcone-workflow-worker
             dockerfile: services/workflow-worker/Dockerfile
     steps:
@@ -118,7 +131,7 @@ jobs:
       - name: Build and push ${{ matrix.image }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context || '.' }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
