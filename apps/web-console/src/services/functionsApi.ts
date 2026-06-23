@@ -61,3 +61,59 @@ export function listActivations(workspaceId: string, name: string): Promise<{ it
     `${actionsBase(workspaceId)}/${enc(name)}/activations`
   )
 }
+
+// ---- Function definition export / import (change: add-data-export-import-clone, #683) ----
+export interface FunctionDefinitionBundle {
+  bundleVersion: string
+  tenantId: string
+  workspaceId: string
+  scope?: { tenantId: string; workspaceId: string }
+  resources: Array<Record<string, JsonValue>>
+  definitions?: Array<Record<string, JsonValue>>
+}
+
+export interface FunctionDefinitionImportResult {
+  entityType: string
+  targetTenantId: string
+  targetWorkspaceId: string
+  totalEntries: number
+  importedCount: number
+  skippedCount: number
+}
+
+// Export ONE action's deployable definition bundle (source/runtime/entrypoint/parameters).
+export function exportFunctionDefinition(resourceId: string): Promise<FunctionDefinitionBundle> {
+  return requestConsoleSessionJson<FunctionDefinitionBundle>(
+    `/v1/functions/actions/${enc(resourceId)}/definition-export`
+  )
+}
+
+// Export every action in a package within a workspace.
+export function exportPackageDefinition(workspaceId: string, packageName: string): Promise<FunctionDefinitionBundle> {
+  return requestConsoleSessionJson<FunctionDefinitionBundle>(
+    `/v1/functions/workspaces/${enc(workspaceId)}/packages/${enc(packageName)}/definition-export`
+  )
+}
+
+// Import a definition bundle into the caller's workspace (re-scoped to the verified tenant/workspace;
+// a cross-scope bundle is rejected server-side with IMPORT_SCOPE_VIOLATION).
+export function importFunctionDefinition(
+  workspaceId: string,
+  bundle: FunctionDefinitionBundle
+): Promise<FunctionDefinitionImportResult> {
+  return requestConsoleSessionJson<FunctionDefinitionImportResult>(
+    `/v1/functions/workspaces/${enc(workspaceId)}/definition-imports`,
+    { method: 'POST', body: bundle as unknown as JsonValue }
+  )
+}
+
+// Import a package definition bundle (every definition must carry a package).
+export function importPackageDefinition(
+  workspaceId: string,
+  bundle: FunctionDefinitionBundle
+): Promise<FunctionDefinitionImportResult> {
+  return requestConsoleSessionJson<FunctionDefinitionImportResult>(
+    `/v1/functions/workspaces/${enc(workspaceId)}/package-definition-imports`,
+    { method: 'POST', body: bundle as unknown as JsonValue }
+  )
+}

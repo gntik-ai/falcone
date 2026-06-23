@@ -19,6 +19,7 @@ import { FN_HANDLERS } from './fn-handlers.mjs';
 import { WEBHOOK_HANDLERS } from './webhook-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
 import { recordScopeDenial, recordQuotaEnforcement } from './audit-writer.mjs';
+import { buildTenantConfigExport } from './tenant-config-export.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -498,6 +499,156 @@ async function promoteWorkspace(ctx) {
       // service accounts, and its own isolated database — promotion NEVER copies them.
       notCopied: ['secrets', 'credentials', 'service-accounts', 'database-data'],
     },
+  });
+}
+
+// ---- tenant configuration export (#683, data-export-import-clone) -----------
+// POST /v1/tenants/{tenantId}/exports — emit a READ-ONLY, portable snapshot of the tenant's
+// NON-SENSITIVE configuration (metadata, its workspaces, its first-class environments, and resolved
+// quota LIMITS). Own-tenant gated (cross-tenant → 404, no existence leak). NEVER includes secrets,
+// credentials, BYOK keys, service-account material, or tokens (the assembler strips them). The
+// snapshot is assembled by the pure buildTenantConfigExport from already-authorized rows.
+async function exportTenantConfiguration(ctx) {
+  const { params, identity, pool } = ctx;
+  const tenant = await store.getTenant(pool, params.tenantId);
+  // Resolve-then-gate: a missing OR cross-tenant tenant is 404 (no existence leak), matching the
+  // storage/workspace no-existence-leak idiom (NOT 403, which would confirm the tenant exists).
+  if (!tenant || !canManageTenantId(identity, tenant.id)) {
+    return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+  }
+  const [workspaces, environments] = await Promise.all([
+    store.listWorkspaces(pool, { tenantId: tenant.id, limit: 1000 }),
+    store.listTenantEnvironments(pool, tenant.id)
+  ]);
+  // Resolved quota limits (best-effort, like the metrics handlers): a non-owner actor-type or a
+  // missing quota relation must not fail the export — the snapshot then omits quotas.
+  let quotaLimits = [];
+  try {
+    const mod = await import('/repo/services/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs');
+    const res = await mod.main({ tenantId: tenant.id, include: 'consumption', callerContext: ctx.callerContext }, { db: pool });
+    quotaLimits = res?.body?.quantitativeLimits ?? [];
+  } catch { quotaLimits = []; }
+  const snapshot = buildTenantConfigExport({
+    tenant, workspaces: workspaces.items ?? [], environments, quotaLimits,
+    environmentCatalog: ENVIRONMENT_CATALOG
+  });
+  return ok(200, snapshot);
+}
+
+// ---- workspace clone (#683, data-export-import-clone) -----------------------
+// buildWorkspaceCloneDraft is in services/internal-contracts (vendored at /repo in the image, but not
+// resolvable from the repo root in the blackbox harness), so it is LAZILY loaded with a dual-path
+// fallback + a minimal inline fallback that enforces the same NEVER-copy-credentials policy.
+let _buildWorkspaceCloneDraft = null;
+async function loadBuildWorkspaceCloneDraft() {
+  if (_buildWorkspaceCloneDraft) return _buildWorkspaceCloneDraft;
+  const candidates = [
+    '/repo/services/internal-contracts/src/index.mjs',
+    new URL('../../../services/internal-contracts/src/index.mjs', import.meta.url).href
+  ];
+  for (const c of candidates) {
+    try { const m = await import(c); if (m?.buildWorkspaceCloneDraft) { _buildWorkspaceCloneDraft = m.buildWorkspaceCloneDraft; return _buildWorkspaceCloneDraft; } }
+    catch { /* try next */ }
+  }
+  _buildWorkspaceCloneDraft = ({ sourceWorkspace, targetWorkspace = {}, clonePolicy = {} }) => ({
+    entityType: 'workspace_clone',
+    slug: targetWorkspace.slug,
+    displayName: targetWorkspace.displayName,
+    environment: targetWorkspace.environment ?? sourceWorkspace.environment,
+    clonePolicy: { resetCredentialReferences: true, ...clonePolicy }
+  });
+  return _buildWorkspaceCloneDraft;
+}
+
+// POST /v1/workspaces/{workspaceId}/clone — reproduce a source workspace's resources into a NEW
+// target workspace in the SAME tenant. ISOLATION (cardinal rule): resolve-then-gate the source; a
+// missing OR cross-tenant source is 404 (no existence leak). The new target is ALWAYS created under
+// the source's VERIFIED tenant — a clone into another tenant is therefore impossible (Scenario 2
+// analog). Copies the function-definition registry per the clone policy; NEVER copies secrets,
+// credentials, or service accounts (resetCredentialReferences). The new workspace's own backing
+// database is provisioned fresh (no source data co-mingling).
+async function cloneWorkspace(ctx) {
+  const { params, body, identity, pool } = ctx;
+  const source = await store.getWorkspace(pool, params.workspaceId);
+  if (!source || !canManageTenantId(identity, source.tenant_id)) {
+    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
+  }
+  const displayName = body.displayName ?? body.targetWorkspace?.displayName ?? `${source.display_name} (clone)`;
+  const slug = slugify(body.slug ?? body.targetWorkspace?.slug ?? `${source.slug}-clone`);
+  if (!slug) return err(400, 'VALIDATION_ERROR', 'a valid target slug could not be derived');
+  // Reject a body that tries to target a DIFFERENT tenant (defense in depth: the target is created
+  // under the source's tenant regardless, but an explicit foreign targetTenantId is a clear signal
+  // of a cross-tenant attempt → denied, mirroring promoteWorkspace's cross-tenant 404).
+  const requestedTenantId = body.targetTenantId ?? body.targetWorkspace?.tenantId ?? null;
+  if (requestedTenantId && requestedTenantId !== source.tenant_id) {
+    return err(404, 'TENANT_NOT_FOUND', 'cannot clone a workspace into another tenant');
+  }
+  if (await store.workspaceSlugTaken(pool, source.tenant_id, slug)) {
+    return err(409, 'SLUG_TAKEN', `workspace slug '${slug}' already exists in tenant`);
+  }
+  const environment = String(body.environment ?? body.targetWorkspace?.environment ?? source.environment ?? 'dev').toLowerCase();
+  if (!ENVIRONMENT_CATALOG.includes(environment)) {
+    return err(400, 'INVALID_ENVIRONMENT', `environment must be one of: ${ENVIRONMENT_CATALOG.join(', ')}`);
+  }
+  // Enforce the tenant's max_workspaces entitlement (the clone creates a NEW workspace) — same gate
+  // createWorkspace applies. Fails open if governance is unavailable.
+  const usedWorkspaces = await store.countTenantWorkspaces(pool, source.tenant_id);
+  const quota = await checkWorkspaceQuota(pool, source.tenant_id, usedWorkspaces);
+  if (!quota.allowed) {
+    return err(402, 'QUOTA_EXCEEDED', `workspace quota reached (max_workspaces): ${usedWorkspaces}/${quota.effectiveLimit ?? '?'}`);
+  }
+  // Build the clone draft (records the clone policy; resetCredentialReferences:true). The draft is
+  // descriptive — the actual copy below honours it (function registry only, never credentials).
+  const buildDraft = await loadBuildWorkspaceCloneDraft();
+  const clonePolicy = { resetCredentialReferences: true, includeServiceAccounts: false, ...(body.clonePolicy ?? {}) };
+  const draft = buildDraft({
+    sourceWorkspace: { workspaceId: source.id, slug: source.slug, environment: source.environment, description: source.display_name },
+    targetWorkspace: { slug, displayName, environment },
+    clonePolicy
+  });
+  // Create the target workspace under the SOURCE's tenant (never a body-supplied tenant).
+  let target;
+  try {
+    target = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: source.tenant_id, slug, displayName, environment, createdBy: identity.sub });
+  } catch (e) {
+    if (e?.code === '23505') return err(409, 'WORKSPACE_SLUG_CONFLICT', `workspace slug '${slug}' already exists in tenant`);
+    throw e;
+  }
+  // Provision the target's own fresh backing database (best-effort; mirrors createWorkspace).
+  // ctx.skipDbProvision is a test seam (mirrors deleteWorkspace's ctx.* seams) so the clone is
+  // unit-testable without a live Postgres; production never sets it.
+  let database = null;
+  if (!ctx.skipDbProvision) {
+    try { const out = await runWorkspaceDbProvisionSaga(pool, { ws: target, tenant: { id: source.tenant_id }, identity, callerContext: ctx.callerContext }); database = out.database; }
+    catch { database = null; }
+  }
+  // Copy the source's function registry into the target (the clone-able artifact). Never secrets/
+  // credentials/service-accounts.
+  const copied = [];
+  try {
+    const srcFns = await store.listFunctions(pool, source.id);
+    for (const fn of srcFns.items) {
+      if (await store.functionNameTaken(pool, target.id, fn.name)) continue;
+      await store.insertFunction(pool, {
+        id: randomUUID(), workspaceId: target.id, tenantId: source.tenant_id, name: fn.name,
+        runtime: fn.runtime, handler: fn.handler, sourceRef: fn.source_ref, createdBy: identity.sub });
+      copied.push(fn.name);
+    }
+  } catch { /* registry copy is best-effort; the target workspace already exists */ }
+  return ok(201, {
+    clone: {
+      sourceWorkspaceId: source.id,
+      targetWorkspaceId: target.id,
+      tenantId: source.tenant_id,
+      environment,
+      copied: { functions: copied },
+      clonePolicy: draft.clonePolicy ?? clonePolicy,
+      // NEVER copied (resetCredentialReferences): each workspace keeps its own isolated secrets,
+      // credentials, service accounts, and backing database.
+      notCopied: ['secrets', 'credentials', 'service-accounts', 'database-data'],
+    },
+    workspace: workspaceOut(target),
+    database,
   });
 }
 
@@ -1158,7 +1309,8 @@ export const LOCAL_HANDLERS = {
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
   recordScopeEnforcementDenial,
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
-  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, promoteWorkspace, deleteWorkspace,
+  createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, promoteWorkspace, cloneWorkspace, deleteWorkspace,
+  exportTenantConfiguration,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential, deleteServiceAccount,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,

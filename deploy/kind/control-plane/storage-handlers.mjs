@@ -388,7 +388,7 @@ async function workspaceCurrentBytes(ctx, bucket) {
   for (const row of mapped) {
     try {
       const { objects } = await listObjects(row.bucket_name, { maxKeys: 1000 });
-      total += objects.reduce((s, o) => s + o.size, 0);
+      total += objects.filter((o) => !isReservedKey(o.key)).reduce((s, o) => s + o.size, 0);
     } catch { /* a transient per-bucket list failure must not falsely block an upload */ }
   }
   return total;
@@ -483,7 +483,10 @@ async function storageListObjects(ctx) {
   const after = ctx.query['page[after]'] || undefined;
   try {
     const { objects, nextToken } = await listObjects(bucket, { maxKeys: max, after });
-    const items = objects.map((o) => ({
+    // Hide the reserved export-manifest namespace (#683): `.falcone/exports/*` objects are
+    // platform-internal export artifacts, not tenant object data, so they never appear in the
+    // bucket's object listing.
+    const items = objects.filter((o) => !isReservedKey(o.key)).map((o) => ({
       objectKey: o.key, bucketName: bucket, sizeBytes: o.size, etag: o.etag,
       storageClass: o.storageClass, timestamps: { lastModifiedAt: o.lastModified }
     }));
@@ -524,7 +527,9 @@ async function storageWorkspaceUsage(ctx) {
   let totalBytes = 0, objectCount = 0; const bucketEntries = [];
   for (const row of mapped) {
     try {
-      const { objects } = await listObjects(row.bucket_name, { maxKeys: 1000 });
+      const { objects: raw } = await listObjects(row.bucket_name, { maxKeys: 1000 });
+      // Exclude reserved export-manifest objects (#683) from usage/quota accounting.
+      const objects = raw.filter((o) => !isReservedKey(o.key));
       const bytes = objects.reduce((s, o) => s + o.size, 0);
       totalBytes += bytes; objectCount += objects.length;
       bucketEntries.push({ bucketId: row.bucket_name, totalBytes: bytes, objectCount: objects.length,
@@ -858,10 +863,239 @@ function validatePartListInline(parts) {
   return { valid: true, errors: [], parts: normalized };
 }
 
+// ---- bucket export / import (#683, data-export-import-clone) ----------------
+// Bounded, synchronous, self-contained object movement. Export lists a bucket's objects, downloads
+// each, and returns a manifest with inline base64 object bodies; import accepts that same manifest
+// shape and PUTs the (decoded) objects into a target bucket the caller owns. v1 limits (no async
+// pipeline, no streaming): a per-object and a total inline-body cap (413 over either), and a maximum
+// object count per operation. The manifest is ALSO persisted as a reserved object in the SAME bucket
+// so a later GET can read it back — no new persistence table, naturally bucket/tenant-scoped.
+//
+// Reserved manifest key prefix. Mirrors the platform adapter's protected `_platform/` namespace
+// concept (services/adapters storage-import-export validateImportManifestEntry) but uses a Falcone-
+// owned prefix that the import validator also refuses to write, so an import can never overwrite an
+// export manifest or smuggle data under the reserved namespace.
+const EXPORT_MANIFEST_PREFIX = '.falcone/exports/';
+// v1 bounded-size limits (override-able via env for operators). Defaults keep a single export/import
+// modest so the synchronous inline path stays within request/memory limits.
+const EXPORT_MAX_OBJECTS = (() => { const n = Number(process.env.STORAGE_EXPORT_MAX_OBJECTS); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1000; })();
+const EXPORT_MAX_OBJECT_BYTES = (() => { const n = Number(process.env.STORAGE_EXPORT_MAX_OBJECT_BYTES); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 10 * 1024 * 1024; })();
+const EXPORT_MAX_TOTAL_BYTES = (() => { const n = Number(process.env.STORAGE_EXPORT_MAX_TOTAL_BYTES); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 64 * 1024 * 1024; })();
+
+// Deterministic id helper (mirrors services/adapters storage-import-export buildDeterministicId:
+// `<prefix>_<sha18>`). Pure; used for manifestId / importId so a given (tenant,bucket,time,nonce)
+// is stable and carries no caller-controlled text.
+function manifestHashId(prefix, seed) {
+  return `${prefix}_${crypto.createHash('sha256').update(String(seed)).digest('hex').slice(0, 18)}`;
+}
+
+// Is a key reserved (the export-manifest namespace)? Such keys are hidden from export entries and
+// refused by import — they are platform-internal, not tenant object data.
+function isReservedKey(key) {
+  return String(key ?? '').startsWith(EXPORT_MANIFEST_PREFIX) || /(^|\/)_platform\//.test(String(key ?? ''));
+}
+
+// Resolve + gate a workspace-addressed bucket: the bucket must exist, belong to the caller's tenant,
+// AND be mapped to the workspace in the path (so the workspace param is meaningful, not decorative).
+// Superadmin/internal bypass. Returns { error } to short-circuit (404, no existence leak) or { rec }.
+async function ownedWorkspaceBucket(ctx, workspaceId, bucket) {
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (isSuperOrInternal(ctx.identity)) {
+    if (!rec) return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
+    return { rec };
+  }
+  if (!rec || rec.tenant_id !== ctx.identity.tenantId || (workspaceId && rec.workspace_id !== workspaceId)) {
+    return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
+  }
+  return { rec };
+}
+
+// Validate a single import manifest entry against the TARGET tenant. Mirrors services/adapters
+// storage-import-export::validateImportManifestEntry (duplicated inline — the services package is not
+// in this image): reject an invalid/traversal key (INVALID_OBJECT_KEY), the reserved/protected
+// namespace (OBJECT_PROTECTED), and a body whose recorded source tenant differs from the target
+// (CROSS_TENANT_VIOLATION) — so a manifest exported from tenant A can never be imported into tenant B.
+function validateImportEntryInline(entry, targetTenantId) {
+  const decoded = decodeObjectKey(String(entry?.objectKey ?? ''));
+  if (decoded.error) return { valid: false, reason: 'INVALID_OBJECT_KEY' };
+  if (isReservedKey(entry?.objectKey)) return { valid: false, reason: 'OBJECT_PROTECTED' };
+  const srcTenant = entry?.bodyReference?.tenantId;
+  if (srcTenant && targetTenantId && srcTenant !== targetTenantId) {
+    return { valid: false, reason: 'CROSS_TENANT_VIOLATION' };
+  }
+  return { valid: true, reason: null, key: decoded.key };
+}
+
+// Acting-principal projection for a manifest (no secrets — just the verified identity).
+function actingPrincipalOf(identity) {
+  return {
+    principalId: identity?.sub ?? null,
+    principalType: identity?.actorType ?? null,
+    tenantId: identity?.tenantId ?? null
+  };
+}
+
+// POST /v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports
+async function storageBucketExport(ctx) {
+  const workspaceId = ctx.params.workspaceId;
+  const bucket = ctx.params.bucketId;
+  const { error, rec } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
+  if (error) return error;
+  const prefix = typeof ctx.body?.prefix === 'string' && ctx.body.prefix ? ctx.body.prefix : null;
+  // List (bounded) then download each object's bytes inline. Reserved keys are excluded.
+  let listing;
+  try { listing = await listObjects(bucket, { maxKeys: EXPORT_MAX_OBJECTS }); }
+  catch (e) { return storageFailure(e, 'STORAGE_LIST_FAILED'); }
+  const candidates = listing.objects
+    .filter((o) => !isReservedKey(o.key))
+    .filter((o) => (prefix ? String(o.key).startsWith(prefix) : true));
+  if (candidates.length > EXPORT_MAX_OBJECTS) {
+    return err(413, 'STORAGE_EXPORT_TOO_LARGE', `export exceeds the ${EXPORT_MAX_OBJECTS}-object limit`);
+  }
+  const entries = [];
+  let totalBytes = 0;
+  for (const obj of candidates) {
+    let got;
+    try { got = await getObject(bucket, obj.key); }
+    catch (e) { return storageFailure(e, 'STORAGE_GET_FAILED'); }
+    if (got.bytes.length > EXPORT_MAX_OBJECT_BYTES) {
+      return err(413, 'STORAGE_EXPORT_TOO_LARGE', `object exceeds the ${EXPORT_MAX_OBJECT_BYTES}-byte per-object export limit`);
+    }
+    totalBytes += got.bytes.length;
+    if (totalBytes > EXPORT_MAX_TOTAL_BYTES) {
+      return err(413, 'STORAGE_EXPORT_TOO_LARGE', `export exceeds the ${EXPORT_MAX_TOTAL_BYTES}-byte total limit`);
+    }
+    entries.push({
+      entityType: 'storage_export_manifest_entry',
+      objectKey: obj.key,
+      sizeBytes: got.bytes.length,
+      contentType: got.contentType ?? 'application/octet-stream',
+      contentEncoding: 'base64',
+      storageClass: obj.storageClass ?? 'standard',
+      customMetadata: {},
+      lastModifiedAt: obj.lastModified ?? nowIso(),
+      // The inline body lives under bodyReference (open object in the OpenAPI schema). tenantId binds
+      // the body to the SOURCE tenant so import can detect a cross-tenant manifest.
+      bodyReference: { tenantId: rec.tenant_id, encoding: 'base64', inlineBase64: got.bytes.toString('base64') }
+    });
+  }
+  const exportedAt = nowIso();
+  const manifestId = manifestHashId('smf', `${rec.tenant_id}:${bucket}:${exportedAt}:${entries.length}`);
+  const manifest = {
+    entityType: 'storage_export_manifest',
+    manifestId,
+    formatVersion: 1,
+    sourceBucketId: bucket,
+    sourceWorkspaceId: rec.workspace_id,
+    sourceTenantId: rec.tenant_id,
+    actingPrincipal: actingPrincipalOf(ctx.identity),
+    exportedAt,
+    filterCriteria: { prefix, metadataFilter: null },
+    totalObjects: entries.length,
+    totalBytes,
+    entries
+  };
+  // Persist the manifest as a reserved object in the SAME bucket so GET .../exports/{manifestId}
+  // can read it back. Best-effort: a persistence failure does not fail the export (the manifest is
+  // already returned inline); the GET endpoint then 404s for that id.
+  try {
+    await putObject(bucket, `${EXPORT_MANIFEST_PREFIX}${manifestId}.json`, Buffer.from(JSON.stringify(manifest), 'utf8'), 'application/json');
+  } catch (e) { console.error(`[storage] export manifest persist failed (non-fatal): ${String(e?.message ?? e)}`); }
+  return ok(200, manifest);
+}
+
+// GET /v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports/{manifestId}
+async function storageBucketExportManifestGet(ctx) {
+  const workspaceId = ctx.params.workspaceId;
+  const bucket = ctx.params.bucketId;
+  const { error } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
+  if (error) return error;
+  const manifestId = String(ctx.params.manifestId ?? '');
+  // Only accept the deterministic id shape (no traversal into arbitrary reserved keys).
+  if (!/^smf_[0-9a-f]{18}$/.test(manifestId)) return err(404, 'EXPORT_MANIFEST_NOT_FOUND', 'export manifest not found');
+  let got;
+  try { got = await getObject(bucket, `${EXPORT_MANIFEST_PREFIX}${manifestId}.json`); }
+  catch (e) { if (e?.statusCode === 404) return err(404, 'EXPORT_MANIFEST_NOT_FOUND', 'export manifest not found'); return storageFailure(e, 'STORAGE_GET_FAILED'); }
+  try { return ok(200, JSON.parse(got.bytes.toString('utf8'))); }
+  catch { return err(404, 'EXPORT_MANIFEST_NOT_FOUND', 'export manifest not found'); }
+}
+
+// POST /v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/imports
+async function storageBucketImport(ctx) {
+  const workspaceId = ctx.params.workspaceId;
+  const bucket = ctx.params.bucketId;
+  const { error, rec } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
+  if (error) return error;
+  const manifest = ctx.body?.manifest ?? ctx.body;
+  if (!manifest || typeof manifest !== 'object' || manifest.formatVersion !== 1 || !Array.isArray(manifest.entries)) {
+    return err(400, 'INVALID_IMPORT_MANIFEST', 'a formatVersion:1 manifest with an entries array is required');
+  }
+  if (manifest.entries.length > EXPORT_MAX_OBJECTS) {
+    return err(413, 'STORAGE_IMPORT_TOO_LARGE', `import exceeds the ${EXPORT_MAX_OBJECTS}-object limit`);
+  }
+  const conflictPolicy = ['overwrite', 'skip', 'fail'].includes(ctx.body?.conflictPolicy) ? ctx.body.conflictPolicy : 'overwrite';
+  const targetTenantId = isSuperOrInternal(ctx.identity) ? rec.tenant_id : ctx.identity.tenantId;
+  const outcomes = [];
+  let totalBytesImported = 0;
+  for (const entry of manifest.entries) {
+    const verdict = validateImportEntryInline(entry, targetTenantId);
+    if (!verdict.valid) {
+      outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: entry?.objectKey ?? null, status: 'failed', reason: verdict.reason, sizeBytes: 0 });
+      continue;
+    }
+    const ref = entry.bodyReference ?? {};
+    const bytes = ref.encoding === 'base64' || ref.inlineBase64
+      ? Buffer.from(String(ref.inlineBase64 ?? ''), 'base64')
+      : Buffer.from(String(ref.inline ?? ''), 'utf8');
+    if (bytes.length > EXPORT_MAX_OBJECT_BYTES) {
+      outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'failed', reason: 'OBJECT_TOO_LARGE', sizeBytes: bytes.length });
+      continue;
+    }
+    // skip → leave an existing object untouched; fail → refuse the entry (never overwrite).
+    if (conflictPolicy === 'skip' || conflictPolicy === 'fail') {
+      let exists = false;
+      try { await headObject(bucket, verdict.key); exists = true; }
+      catch (e) { if (e?.statusCode !== 404) { outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'failed', reason: 'BACKEND_ERROR', sizeBytes: 0 }); continue; } }
+      if (exists) {
+        outcomes.push(conflictPolicy === 'skip'
+          ? { entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'skipped', reason: 'OBJECT_EXISTS', sizeBytes: 0 }
+          : { entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'failed', reason: 'OBJECT_EXISTS', sizeBytes: 0 });
+        continue;
+      }
+    }
+    try {
+      await putObject(bucket, verdict.key, bytes, entry.contentType ?? 'application/octet-stream');
+      totalBytesImported += bytes.length;
+      outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'imported', reason: null, sizeBytes: bytes.length });
+    } catch (e) {
+      outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'failed', reason: 'BACKEND_ERROR', sizeBytes: 0 });
+      console.error(`[storage] import put failed for an object (status ${e?.statusCode}): ${String(e?.message ?? e)}`);
+    }
+  }
+  const importedAt = nowIso();
+  return ok(200, {
+    entityType: 'storage_import_result_summary',
+    importId: manifestHashId('sir', `${targetTenantId}:${bucket}:${importedAt}:${conflictPolicy}:${outcomes.length}`),
+    targetBucketId: bucket,
+    targetWorkspaceId: rec.workspace_id,
+    targetTenantId,
+    actingPrincipal: actingPrincipalOf(ctx.identity),
+    importedAt,
+    conflictPolicy,
+    totalEntries: outcomes.length,
+    importedCount: outcomes.filter((o) => o.status === 'imported').length,
+    skippedCount: outcomes.filter((o) => o.status === 'skipped').length,
+    failedCount: outcomes.filter((o) => o.status === 'failed').length,
+    totalBytesImported,
+    outcomes
+  });
+}
+
 export const STORAGE_HANDLERS = {
   storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
   storagePutObject, storageGetObject, storageDeleteObject, storageDeleteBucket,
   storagePresignObject,
   storageMultipartInitiate, storageMultipartUploadPart, storageMultipartComplete, storageMultipartAbort,
-  storageRotateCredential, storageRevokeCredential
+  storageRotateCredential, storageRevokeCredential,
+  storageBucketExport, storageBucketExportManifestGet, storageBucketImport
 };

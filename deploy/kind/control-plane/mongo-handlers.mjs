@@ -213,6 +213,90 @@ async function mongoDocuments(ctx) {
   return ok(200, { items: docs.map(jsonSafe), page: { after: hasMore ? String(skip + docs.length) : null, size: docs.length } });
 }
 
+// ---- document export / import (#683, data-export-import-clone) --------------
+// Bounded, synchronous, inline-artifact document movement, WORKSPACE-addressed. The document plane
+// stamps BOTH tenantId AND workspaceId on every document (#632/#661), so export reads ONLY the
+// caller's workspace documents and import stamps that SAME verified scope — a body-supplied
+// tenantId/workspaceId is always overwritten, so an import can never cross a tenant/workspace
+// boundary. v1 caps the operation at MONGO_IO_MAX_DOCS documents (no async pipeline/streaming).
+const MONGO_IO_MAX_DOCS = (() => { const n = Number(process.env.MONGO_IO_MAX_DOCS); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5000; })();
+
+// Resolve + own-tenant gate the workspace (404 cross-tenant, no existence leak), returning the
+// workspace row so the caller can derive the canonical tenantId + workspaceId stamp.
+async function ownedWorkspaceForData(ctx) {
+  const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
+  if (!ws || !canManageTenant(ctx.identity, ws.tenant_id)) {
+    return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+  }
+  return { ws };
+}
+
+// Strip the Mongo `_id` (it is collection-managed; re-inserting a foreign _id risks a duplicate-key
+// collision) and the scope fields (re-stamped on import). Returns a plain, JSON-safe document.
+function exportDoc(doc) {
+  const { _id, tenantId, workspaceId, ...rest } = doc;
+  return jsonSafe(rest);
+}
+
+// POST /v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/exports
+async function mongoDataExport(ctx) {
+  const { error, ws } = await ownedWorkspaceForData(ctx);
+  if (error) return error;
+  const db = D(ctx.params.databaseName ?? ctx.params.db);
+  const col = C(ctx.params.collectionName ?? ctx.params.col);
+  const limit = Math.min(Math.max(Number(ctx.body?.limit ?? MONGO_IO_MAX_DOCS) || MONGO_IO_MAX_DOCS, 1), MONGO_IO_MAX_DOCS);
+  try {
+    const c = await mc(ctx);
+    const docs = await c.db(db).collection(col)
+      .find({ tenantId: ws.tenant_id, workspaceId: ws.id })
+      .limit(limit).toArray();
+    return ok(200, {
+      entityType: 'mongo_data_export',
+      sourceWorkspaceId: ws.id, sourceTenantId: ws.tenant_id,
+      databaseName: db, collectionName: col,
+      exportedAt: new Date().toISOString(),
+      documentCount: docs.length,
+      documents: docs.map(exportDoc)
+    });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_EXPORT_FAILED', String(e.message ?? e));
+  }
+}
+
+// POST /v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/imports
+async function mongoDataImport(ctx) {
+  const { error, ws } = await ownedWorkspaceForData(ctx);
+  if (error) return error;
+  const db = D(ctx.params.databaseName ?? ctx.params.db);
+  const col = C(ctx.params.collectionName ?? ctx.params.col);
+  const docs = Array.isArray(ctx.body?.documents) ? ctx.body.documents : null;
+  if (!docs) return err(400, 'VALIDATION_ERROR', 'documents (array) is required');
+  if (docs.length > MONGO_IO_MAX_DOCS) return err(413, 'MONGO_IMPORT_TOO_LARGE', `import exceeds the ${MONGO_IO_MAX_DOCS}-document limit`);
+  let inserted = 0;
+  const skipped = [];
+  try {
+    const c = await mc(ctx);
+    const collection = c.db(db).collection(col);
+    for (const raw of docs) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { skipped.push({ reason: 'NOT_AN_OBJECT' }); continue; }
+      // ALWAYS stamp the caller's VERIFIED scope; never trust a body-supplied tenantId/workspaceId.
+      // Drop any incoming _id so a foreign _id can't collide or be used to target another doc.
+      const { _id, tenantId: _t, workspaceId: _w, ...fields } = raw;
+      await collection.insertOne({ ...fields, tenantId: ws.tenant_id, workspaceId: ws.id });
+      inserted += 1;
+    }
+    return ok(200, {
+      entityType: 'mongo_data_import_result',
+      targetWorkspaceId: ws.id, targetTenantId: ws.tenant_id,
+      databaseName: db, collectionName: col,
+      importedAt: new Date().toISOString(),
+      totalEntries: docs.length, importedCount: inserted, skippedCount: skipped.length, skipped
+    });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_IMPORT_FAILED', String(e.message ?? e));
+  }
+}
+
 // engine=mongodb provisioning: create the database + initial collections.
 async function mongoProvision(ctx) {
   const ws = ctx.workspace; // set by the generic dispatcher
@@ -294,5 +378,6 @@ export async function mongoTeardown({ client, tenantId, databaseNames }) {
 }
 
 export const MONGO_HANDLERS = {
-  mongoListDatabases, mongoListCollections, mongoCollectionDetail, mongoIndexes, mongoViews, mongoDocuments, mongoProvision
+  mongoListDatabases, mongoListCollections, mongoCollectionDetail, mongoIndexes, mongoViews, mongoDocuments, mongoProvision,
+  mongoDataExport, mongoDataImport
 };
