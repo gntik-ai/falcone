@@ -1,53 +1,56 @@
-# Kind overlay — enable Vault as the secrets backend WITHOUT cert-manager (finding C.6 / D7).
+# Kind overlay — enable OpenBao as the secrets backend WITHOUT cert-manager (finding C.6 / D7).
 #
-# The base chart leaves Vault + ESO disabled. Enabling `vault.enabled=true` on a cluster that runs
-# cert-manager works out of the box (the cert-manager.io/v1 Certificate provisions the server TLS).
-# On kind there is no cert-manager, so this overlay selects the self-signed TLS path: a pre-install
-# hook Job generates the vault-server-tls Secret with openssl, and the cert-manager Certificate is
-# NOT rendered — so the release installs cleanly instead of aborting on the missing CRD.
+# The base chart leaves OpenBao + ESO disabled. Enabling `openbao.enabled=true` on a cluster that
+# runs cert-manager works out of the box (the cert-manager.io/v1 Certificate provisions the server
+# TLS). On kind there is no cert-manager, so this overlay selects the self-signed TLS path: a
+# pre-install hook Job generates the openbao-server-tls Secret with openssl, and the cert-manager
+# Certificate is NOT rendered — so the release installs cleanly instead of aborting on the missing
+# CRD.
 #
-# With Vault up, ESO's `vault-backend` ClusterSecretStore + the platform ExternalSecrets
-# (apisix/keycloak/documentdb/kafka/postgresql/s3) resolve those app secrets FROM Vault.
+# With OpenBao up, ESO's `openbao-backend` ClusterSecretStore + the platform ExternalSecrets
+# (apisix/keycloak/documentdb/kafka/postgresql/s3) resolve those app secrets FROM OpenBao.
 #
 # Usage: helm install falcone charts/in-falcone -f deploy/kind/values-kind.yaml \
 #          -f deploy/kind/values-kind-vault.yaml
 #
-# Note the subchart double-key nesting: the Vault subchart reads `.Values.vault.*`, so umbrella
-# overrides for it live under `vault.vault.*`.
-vault:
+# Note the subchart double-key nesting: the OpenBao subchart reads `.Values.openbao.*`, so umbrella
+# overrides for it live under `openbao.openbao.*`.
+openbao:
   enabled: true
-  vault:
+  openbao:
     tls:
       mode: self-signed
 
 eso:
   enabled: true
 
-# Wire the control-plane to CONSUME this Vault for workspace secrets-as-a-service
-# (add-vault-secret-consumption, #612). The control-plane writes a tenant/workspace secret to Vault
+# Wire the control-plane to CONSUME this OpenBao for workspace secrets-as-a-service
+# (add-vault-secret-consumption, #612). The control-plane writes a tenant/workspace secret to OpenBao
 # (KV v2) when it is set via POST /v1/functions/workspaces/{ws}/secrets, and reads it back to inject
 # into a function's runtime env at deploy. These keys are ADDITIVE (envFromSecrets / extraVolumes are
 # empty in the base values), so they do NOT disturb the base controlPlane.env list and leave the
-# default kind render (without this overlay) entirely Vault-free.
+# default kind render (without this overlay) entirely secret-store-free.
 #
-# The control-plane reads its Vault connection from two operator-supplied Secrets, created alongside
-# enabling Vault (the token needs write on the `secret` KV mount; the CA is the self-signed Vault CA):
-#   kubectl -n <ns> create secret generic in-falcone-vault-workspace-secrets-env \
-#     --from-literal=VAULT_ADDR=https://vault.secret-store.svc.cluster.local:8200 \
-#     --from-literal=VAULT_KV_MOUNT=secret \
-#     --from-literal=NODE_EXTRA_CA_CERTS=/vault/tls/ca.crt \
-#     --from-literal=VAULT_TOKEN=<token-with-write-on-the-kv-mount>
-#   kubectl -n <ns> create secret generic in-falcone-vault-workspace-secrets-tls \
-#     --from-literal=ca.crt="$(kubectl -n secret-store get secret vault-server-tls \
+# The control-plane reads its OpenBao connection from two operator-supplied Secrets, created
+# alongside enabling OpenBao (the token needs write on the `secret` KV mount; the CA is the
+# self-signed OpenBao CA). The control-plane reads BAO_* first and falls back to the legacy VAULT_*
+# keys, so either spelling works; the BAO_* form is canonical:
+#   kubectl -n <ns> create secret generic in-falcone-openbao-workspace-secrets-env \
+#     --from-literal=BAO_ADDR=https://openbao.secret-store.svc.cluster.local:8200 \
+#     --from-literal=BAO_KV_MOUNT=secret \
+#     --from-literal=NODE_EXTRA_CA_CERTS=/openbao/tls/ca.crt \
+#     --from-literal=BAO_TOKEN=<token-with-write-on-the-kv-mount>
+#   kubectl -n <ns> create secret generic in-falcone-openbao-workspace-secrets-tls \
+#     --from-literal=ca.crt="$(kubectl -n secret-store get secret openbao-server-tls \
 #         -o jsonpath='{.data.ca\.crt}' | base64 -d)"
 controlPlane:
   envFromSecrets:
-    - in-falcone-vault-workspace-secrets-env
+    - in-falcone-openbao-workspace-secrets-env
   extraVolumes:
-    - name: vault-ca
+    - name: openbao-ca
       secret:
-        secretName: in-falcone-vault-workspace-secrets-tls
+        secretName: in-falcone-openbao-workspace-secrets-tls
   extraVolumeMounts:
-    - name: vault-ca
-      mountPath: /vault/tls
+    - name: openbao-ca
+      mountPath: /openbao/tls
       readOnly: true

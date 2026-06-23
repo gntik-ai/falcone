@@ -70,7 +70,7 @@ It starts:
 | `keycloak` | `quay.io/keycloak/keycloak:26.0` | Identity (OIDC), realm auto-imported |
 | `redpanda` | `redpandadata/redpanda:v24.2.7` | Kafka-compatible event bus |
 | `seaweedfs` | `chrislusf/seaweedfs:4.33` | S3-compatible object storage |
-| `vault` | `hashicorp/vault:1.18` (dev) | Secret backend |
+| `openbao` | `openbao/openbao:2.3.1` (dev) | Secret backend (OpenBao; CLI `bao`) |
 | `apisix` | `apache/apisix:3.9.1-debian` | API gateway |
 
 > [!IMPORTANT]

@@ -1,30 +1,33 @@
 /**
- * Black-box regression suite for OpenSpec change fix-vault-secrets-backend-on-kind
- * (live E2E campaign 2026-06-17, finding C.6 / D7).
+ * Black-box regression suite for the kind secret-store provisioning path
+ * (OpenSpec change fix-vault-secrets-backend-on-kind, finding C.6 / D7; backend switched
+ * Vault -> OpenBao in replace-vault-with-openbao).
  *
- * Drives the PUBLIC chart surface ONLY via `helm template`, inspecting the rendered Vault TLS
- * resources, the self-signed bootstrap Job, and the ESO ClusterSecretStore / ExternalSecrets.
+ * Drives the PUBLIC chart surface ONLY via `helm template`, inspecting the rendered OpenBao TLS
+ * resources, the self-signed bootstrap Job, the OpenBao image/StatefulSet, and the ESO
+ * ClusterSecretStore / ExternalSecrets.
  *
- * Defect: enabling Vault aborted the release on a kind cluster — the server TLS was a
- * `cert-manager.io/v1 Certificate`, but cert-manager (and its CRDs) are absent on kind, so the
- * resource could not be created. There was no cert-manager-free path.
+ * Defect (original): enabling the secret store aborted the release on a kind cluster — the server
+ * TLS was a `cert-manager.io/v1 Certificate`, but cert-manager (and its CRDs) are absent on kind, so
+ * the resource could not be created. There was no cert-manager-free path.
  *
- * Fix: `vault.tls.mode` selects the provisioning path. `cert-manager` (default) keeps the
+ * Fix: `openbao.tls.mode` selects the provisioning path. `cert-manager` (default) keeps the
  * Certificate; `self-signed` instead renders a pre-install hook Job that generates the
- * vault-server-tls Secret with openssl — no cert-manager required. The ESO vault-backend
- * ClusterSecretStore + platform ExternalSecrets (already present) then resolve app secrets FROM
- * Vault, trusting the bootstrapped CA (ESO caProvider reads vault-server-tls/ca.crt).
+ * openbao-server-tls Secret with openssl — no cert-manager required. The ESO openbao-backend
+ * ClusterSecretStore + platform ExternalSecrets then resolve app secrets FROM OpenBao, trusting the
+ * bootstrapped CA (ESO caProvider reads openbao-server-tls/ca.crt).
  *
- * (Verified the rendered bootstrap against real openssl: the self-signed cert carries the Vault
- * Service SANs and -checkhost matches vault.secret-store.svc.cluster.local.)
+ * The secret store is OpenBao (image openbao/openbao), provisioned by an init Job that uses the
+ * `bao` CLI; no rendered object references the hashicorp/vault image.
  *
  * Self-skips when `helm` is absent (repo precedent: pgvector/temporal-helm).
  *
- * Scenario coverage (capability: tenant-provisioning / spec.md):
+ * Scenario coverage (capability: deployment / secrets):
  *   bbx-c6-01  default (cert-manager) mode still renders the cert-manager Certificate (no bootstrap)
  *   bbx-c6-02  self-signed mode renders NO cert-manager Certificate + a pre-install bootstrap Job
- *   bbx-c6-03  Vault+ESO render the vault-backend ClusterSecretStore + ≥1 ExternalSecret (end-to-end)
+ *   bbx-c6-03  OpenBao+ESO render the openbao-backend ClusterSecretStore + ≥1 ExternalSecret (e2e)
  *   bbx-c6-04  the kind overlay enables the self-signed path and the bootstrap script is valid bash
+ *   bbx-c6-05  the opt-in render uses the openbao/openbao image (bao init Job) and zero hashicorp/vault
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,17 +77,17 @@ function bashSyntaxOk(script) {
   }
 }
 
-const VAULT_ON = ['--set', 'vault.enabled=true', '--set', 'eso.enabled=true'];
-const SELF_SIGNED = [...VAULT_ON, '--set', 'vault.vault.tls.mode=self-signed'];
+const VAULT_ON = ['--set', 'openbao.enabled=true', '--set', 'eso.enabled=true'];
+const SELF_SIGNED = [...VAULT_ON, '--set', 'openbao.openbao.tls.mode=self-signed'];
 
 // -------------------------------------------------------------------------
 // bbx-c6-01: the cert-manager path is preserved by default
 // -------------------------------------------------------------------------
 test('bbx-c6-01: default mode renders the cert-manager Certificate and no bootstrap Job', SKIP, () => {
   const out = helmTemplate(VAULT_ON);
-  const certs = docsOfKind(out, 'Certificate').filter((d) => /cert-manager\.io\/v1/.test(d) && /vault-server-tls/.test(d));
-  assert.equal(certs.length, 1, 'cert-manager mode must still render the vault-server-tls Certificate');
-  assert.doesNotMatch(out, /name:\s*vault-tls-bootstrap/, 'the self-signed bootstrap must NOT render in cert-manager mode');
+  const certs = docsOfKind(out, 'Certificate').filter((d) => /cert-manager\.io\/v1/.test(d) && /openbao-server-tls/.test(d));
+  assert.equal(certs.length, 1, 'cert-manager mode must still render the openbao-server-tls Certificate');
+  assert.doesNotMatch(out, /name:\s*openbao-tls-bootstrap/, 'the self-signed bootstrap must NOT render in cert-manager mode');
 });
 
 // -------------------------------------------------------------------------
@@ -93,25 +96,30 @@ test('bbx-c6-01: default mode renders the cert-manager Certificate and no bootst
 test('bbx-c6-02: self-signed mode renders no cert-manager Certificate + a pre-install bootstrap Job', SKIP, () => {
   const out = helmTemplate(SELF_SIGNED);
   assert.doesNotMatch(out, /cert-manager\.io\/v1/, 'self-signed mode must render NO cert-manager resource (else it aborts on kind)');
-  const job = docsOfKind(out, 'Job').find((d) => /name:\s*vault-tls-bootstrap/.test(d));
-  assert.ok(job, 'self-signed mode must render the vault-tls-bootstrap Job');
-  assert.match(job, /helm\.sh\/hook"?:\s*pre-install,pre-upgrade/, 'bootstrap must be a pre-install hook (cert exists before the Vault pod)');
+  const job = docsOfKind(out, 'Job').find((d) => /name:\s*openbao-tls-bootstrap/.test(d));
+  assert.ok(job, 'self-signed mode must render the openbao-tls-bootstrap Job');
+  assert.match(job, /helm\.sh\/hook"?:\s*pre-install,pre-upgrade/, 'bootstrap must be a pre-install hook (cert exists before the OpenBao pod)');
   assert.match(job, /openssl req -x509/, 'bootstrap must generate a self-signed cert with openssl');
-  assert.match(job, /create secret generic "\$SECRET"/, 'bootstrap must write the vault TLS Secret');
-  assert.match(job, /from-file=ca\.crt=/, 'the Secret must carry ca.crt so ESO can trust Vault');
+  assert.match(job, /create secret generic "\$SECRET"/, 'bootstrap must write the OpenBao TLS Secret');
+  assert.match(job, /from-file=ca\.crt=/, 'the Secret must carry ca.crt so ESO can trust OpenBao');
+  // The self-signed cert SANs MUST track the renamed openbao Service DNS (else ESO/CP TLS fails).
+  assert.match(job, /DNS:openbao\.\$\{NS\}\.svc\.cluster\.local/, 'the bootstrap SANs must cover openbao.<ns>.svc.cluster.local');
+  assert.match(job, /DNS:openbao-internal\.\$\{NS\}\.svc\.cluster\.local/, 'the bootstrap SANs must cover openbao-internal.<ns>.svc.cluster.local');
 });
 
 // -------------------------------------------------------------------------
-// bbx-c6-03: ESO provides the end-to-end Vault secret-resolution path
+// bbx-c6-03: ESO provides the end-to-end OpenBao secret-resolution path
 // -------------------------------------------------------------------------
-test('bbx-c6-03: Vault+ESO render the vault-backend ClusterSecretStore and ≥1 ExternalSecret', SKIP, () => {
+test('bbx-c6-03: OpenBao+ESO render the openbao-backend ClusterSecretStore and ≥1 ExternalSecret', SKIP, () => {
   const out = helmTemplate(SELF_SIGNED);
-  const store = docsOfKind(out, 'ClusterSecretStore').find((d) => /name:\s*vault-backend/.test(d));
-  assert.ok(store, 'must render the vault-backend ClusterSecretStore');
-  assert.match(store, /provider:\s*\n\s*vault:/, 'the ClusterSecretStore must use the Vault provider');
-  assert.match(store, /name:\s*vault-server-tls/, 'ESO caProvider must reference the bootstrapped vault-server-tls Secret');
-  const externalSecrets = docsOfKind(out, 'ExternalSecret').filter((d) => /vault-backend/.test(d));
-  assert.ok(externalSecrets.length >= 1, `at least one app secret must resolve from Vault (got ${externalSecrets.length})`);
+  const store = docsOfKind(out, 'ClusterSecretStore').find((d) => /name:\s*openbao-backend/.test(d));
+  assert.ok(store, 'must render the openbao-backend ClusterSecretStore');
+  // ESO's provider TYPE stays `vault` — it is the OpenBao-compatible provider.
+  assert.match(store, /provider:\s*\n\s*vault:/, 'the ClusterSecretStore must use the (OpenBao-compatible) vault provider type');
+  assert.match(store, /name:\s*openbao-server-tls/, 'ESO caProvider must reference the bootstrapped openbao-server-tls Secret');
+  assert.match(store, /server:\s*"?https:\/\/openbao\.secret-store\.svc\.cluster\.local:8200/, 'the store must target the openbao Service');
+  const externalSecrets = docsOfKind(out, 'ExternalSecret').filter((d) => /openbao-backend/.test(d));
+  assert.ok(externalSecrets.length >= 1, `at least one app secret must resolve from OpenBao (got ${externalSecrets.length})`);
 });
 
 // -------------------------------------------------------------------------
@@ -120,7 +128,7 @@ test('bbx-c6-03: Vault+ESO render the vault-backend ClusterSecretStore and ≥1 
 test('bbx-c6-04: kind overlay selects self-signed; rendered bootstrap script is valid bash', SKIP, () => {
   const out = helmTemplate(['-f', KIND_VAULT_OVERLAY]);
   assert.doesNotMatch(out, /cert-manager\.io\/v1/, 'the kind overlay must avoid cert-manager entirely');
-  const job = docsOfKind(out, 'Job').find((d) => /name:\s*vault-tls-bootstrap/.test(d));
+  const job = docsOfKind(out, 'Job').find((d) => /name:\s*openbao-tls-bootstrap/.test(d));
   assert.ok(job, 'the kind overlay must render the bootstrap Job');
   // extract the embedded shell script (the literal block after `- -ec` / `- |`) and bash -n it.
   // The block runs to the end of the container, so collect lines indented under the `- |` marker.
@@ -140,4 +148,27 @@ test('bbx-c6-04: kind overlay selects self-signed; rendered bootstrap script is 
   const minIndent = Math.min(...body.filter((l) => l.trim()).map((l) => l.search(/\S/)));
   const r = bashSyntaxOk(body.map((l) => l.slice(minIndent)).join('\n'));
   assert.equal(r.status, 0, `rendered bootstrap script must be valid bash.\n${r.stderr}`);
+});
+
+// -------------------------------------------------------------------------
+// bbx-c6-05: the opt-in render provisions OpenBao (image + bao init Job) and zero hashicorp/vault
+// -------------------------------------------------------------------------
+test('bbx-c6-05: opt-in render uses the openbao/openbao image + bao init Job, never hashicorp/vault', SKIP, () => {
+  const out = helmTemplate(['-f', KIND_VAULT_OVERLAY]);
+  // No HashiCorp Vault image may appear anywhere in the rendered chart.
+  assert.doesNotMatch(out, /hashicorp\/vault/, 'no rendered object may reference the hashicorp/vault image');
+  // The secret-store StatefulSet runs the OpenBao image.
+  const sts = docsOfKind(out, 'StatefulSet').find((d) => /app\.kubernetes\.io\/name:\s*openbao\b/.test(d));
+  assert.ok(sts, 'an OpenBao StatefulSet must render');
+  assert.match(sts, /image:\s*"?openbao\/openbao:/, 'the StatefulSet must use the openbao/openbao image');
+  assert.match(sts, /-config=\/openbao\/config\/openbao\.hcl/, 'the server must read /openbao/config/openbao.hcl');
+  // The init Job bootstraps via the `bao` CLI (init/unseal, kv-v2, k8s auth, seed platform paths).
+  const initJob = docsOfKind(out, 'Job').find((d) => /name:\s*openbao-init\b/.test(d));
+  assert.ok(initJob, 'an openbao-init Job must render');
+  assert.match(initJob, /image:\s*"?openbao\/openbao:/, 'the init Job must use the openbao/openbao image');
+  assert.match(initJob, /bao operator init/, 'the init Job must initialize OpenBao with the bao CLI');
+  assert.match(initJob, /bao secrets enable -path=secret kv-v2/, 'the init Job must enable the KV v2 mount');
+  assert.match(initJob, /bao auth enable kubernetes/, 'the init Job must enable Kubernetes auth');
+  assert.match(initJob, /bao kv put secret\/platform\/postgresql/, 'the init Job must seed the platform secret paths');
+  assert.doesNotMatch(initJob, /(^|[^a-z])vault (operator|secrets|auth|kv|policy|audit) /, 'the init Job must use the bao CLI, not vault');
 });

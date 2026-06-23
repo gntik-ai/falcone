@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openbao
+  namespace: {{ .Values.openbao.namespace }}
+spec:
+  serviceName: openbao-internal
+  replicas: {{ .Values.openbao.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao
+    spec:
+      serviceAccountName: openbao
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: openbao
+          image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          imagePullPolicy: {{ .Values.openbao.image.pullPolicy }}
+          args:
+            - server
+            - -config=/openbao/config/openbao.hcl
+          env:
+            - name: BAO_ADDR
+              value: https://openbao.secret-store.svc.cluster.local:8200
+            - name: BAO_API_ADDR
+              value: https://openbao.secret-store.svc.cluster.local:8200
+            - name: BAO_CACERT
+              value: /openbao/tls/ca.crt
+            - name: BAO_SKIP_VERIFY
+              value: "false"
+          ports:
+            - containerPort: 8200
+              name: http
+            - containerPort: 8201
+              name: cluster
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: 8200
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              scheme: HTTPS
+              # A freshly-installed OpenBao is uninitialized/sealed until the openbao-init Job runs.
+              # Treat uninitialized (uninitcode) and sealed (sealedcode) as ALIVE (204), like the
+              # readiness probe, so kubelet does not restart the pod before init can complete.
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: 8200
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 6
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: data
+              mountPath: /openbao/data
+            - name: audit
+              mountPath: /openbao/audit
+            - name: config
+              mountPath: /openbao/config
+              readOnly: true
+            - name: tls
+              mountPath: /openbao/tls
+              readOnly: true
+{{ tpl (.Files.Get "files/openbao-audit-sidecar.yaml") . | indent 8 }}
+      volumes:
+        - name: config
+          configMap:
+            name: openbao-config
+        - name: tls
+          secret:
+            secretName: {{ .Values.openbao.tls.secretName }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: openbao-data
+        - name: audit
+          persistentVolumeClaim:
+            claimName: openbao-audit
+{{- if .Values.openbao.auditSidecar.enabled }}
+        - name: secret-audit-handler
+          configMap:
+            name: secret-audit-handler-bundle
+            optional: true
+{{- end }}

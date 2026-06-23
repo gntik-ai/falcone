@@ -1,13 +1,30 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: eso-to-vault
+  name: eso-to-openbao
   namespace: {{ .Values.eso.namespace }}
 spec:
   podSelector: {}
   policyTypes:
     - Egress
   egress:
+    # DNS resolution (kube-dns) — the ESO controller must resolve the OpenBao Service FQDN and the
+    # kube API. Without port 53 egress this policy silently breaks DNS on enforcing CNIs.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kube API server (TokenReview / TokenRequest for kubernetes auth).
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
     - to:
         - namespaceSelector:
             matchLabels:

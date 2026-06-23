@@ -1,6 +1,6 @@
 apiVersion: v2
 name: eso
-description: External Secrets Operator integration for Falcone Vault-backed secrets
+description: External Secrets Operator integration for Falcone OpenBao-backed secrets
 type: application
 version: 0.1.0
 appVersion: "0.9.0"

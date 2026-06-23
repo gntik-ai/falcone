@@ -1,10 +1,15 @@
-// Vault KV v2 secrets backend (add-vault-secret-consumption, #612).
+// OpenBao KV v2 secrets backend (add-vault-secret-consumption, #612; backend switched
+// Vault -> OpenBao in replace-vault-with-openbao).
 //
-// A direct HashiCorp Vault KV v2 client + a per-tenant/per-workspace workspace-secret store. The
-// control-plane WRITES a secret to Vault when it is set via the API, and READS it back to inject it
-// into a function's runtime env at deploy time. This is the "missing consumer": the chart can deploy
-// Vault (values-kind-vault.yaml, self-signed TLS on kind), but until now no Falcone component read
-// from or wrote to it.
+// A direct KV v2 client + a per-tenant/per-workspace workspace-secret store. The control-plane
+// WRITES a secret to OpenBao when it is set via the API, and READS it back to inject it into a
+// function's runtime env at deploy time. This is the "missing consumer": the chart can deploy
+// OpenBao (values-kind-vault.yaml, self-signed TLS on kind), but until #612 no Falcone component
+// read from or wrote to it.
+//
+// The KV v2 REST surface is byte-compatible between Vault and OpenBao (paths
+// /v1/{mount}/data|metadata/..., ?list=true, and the X-Vault-Token request header — OpenBao honors
+// the X-Vault-* headers), so this client is backend-neutral and unchanged behaviorally by the swap.
 //
 // Isolation is path-based and credential-derived: every secret lives at
 //   {mount}/data/falcone/workspace-secrets/{tenantId}/{workspaceId}/{name}
@@ -12,9 +17,9 @@
 // boundary). Values are write-only over the API — GET returns metadata only; only a server-side
 // function deploy resolves the actual value to inject as env.
 //
-// TLS: on kind, Vault uses a self-signed CA (the vault-tls-bootstrap Job). The client trusts it via
-// NODE_EXTRA_CA_CERTS (mounted from the vault-server-tls Secret) so the default global fetch works —
-// no in-code certificate handling. fetchImpl is injectable for tests (a plain-HTTP fake Vault).
+// TLS: on kind, OpenBao uses a self-signed CA (the openbao-tls-bootstrap Job). The client trusts it
+// via NODE_EXTRA_CA_CERTS (mounted from the openbao-server-tls Secret) so the default global fetch
+// works — no in-code certificate handling. fetchImpl is injectable for tests (a plain-HTTP fake).
 
 const ENC = (s) => encodeURIComponent(String(s));
 const SECRET_ROOT = 'falcone/workspace-secrets';
@@ -149,17 +154,24 @@ export function createWorkspaceSecretStore(client) {
 }
 
 /**
- * Build the workspace-secret store from the environment, or return null when Vault is not configured
- * (VAULT_ADDR/VAULT_TOKEN unset) — keeping the secrets feature off by default with zero behaviour
- * change. The chart injects these into the control-plane Deployment only when vault.enabled.
+ * Build the workspace-secret store from the environment, or return null when the backend is not
+ * configured — keeping the secrets feature off by default with zero behaviour change. The chart
+ * injects these into the control-plane Deployment only when openbao.enabled.
+ *
+ * Reads the canonical OpenBao env (BAO_ADDR/BAO_TOKEN/BAO_KV_MOUNT/BAO_NAMESPACE) first, falling back
+ * to the legacy Vault env (VAULT_ADDR/VAULT_TOKEN/VAULT_KV_MOUNT/VAULT_NAMESPACE) so existing
+ * configuration keeps working unchanged after the Vault -> OpenBao swap. The wire header stays
+ * X-Vault-Token (OpenBao honors it).
  */
 export function vaultStoreFromEnv(env = process.env, fetchImpl) {
-  if (!env.VAULT_ADDR || !env.VAULT_TOKEN) return null;
+  const addr = env.BAO_ADDR ?? env.VAULT_ADDR;
+  const token = env.BAO_TOKEN ?? env.VAULT_TOKEN;
+  if (!addr || !token) return null;
   const client = createVaultKvClient({
-    addr: env.VAULT_ADDR,
-    token: env.VAULT_TOKEN,
-    mount: env.VAULT_KV_MOUNT || 'secret',
-    namespace: env.VAULT_NAMESPACE || undefined,
+    addr,
+    token,
+    mount: env.BAO_KV_MOUNT ?? env.VAULT_KV_MOUNT ?? 'secret',
+    namespace: env.BAO_NAMESPACE ?? env.VAULT_NAMESPACE ?? undefined,
     fetchImpl,
   });
   return createWorkspaceSecretStore(client);

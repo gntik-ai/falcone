@@ -12,10 +12,12 @@ echo '[1/4] Checking literal secret env vars in pod specs'
 count=$(kubectl get pods -A -o json | jq '[.items[].spec.containers[]?.env[]? | select(.value != null) | select(.name | test("PASSWORD|SECRET|KEY|TOKEN"; "i"))] | length')
 [[ "$count" == "0" ]] || fail "found $count literal credential env vars"
 
-echo '[2/4] Checking Vault platform paths'
-vault kv list secret/platform >/tmp/falcone-secret-platform-list.txt
+echo '[2/4] Checking OpenBao platform paths'
+# OpenBao ships the `bao` CLI (the KV v2 surface is Vault-compatible). BAO_ADDR/BAO_TOKEN/BAO_CACERT
+# point at the openbao Service + its CA; the legacy VAULT_* env still works as a fallback for `bao`.
+bao kv list secret/platform >/tmp/falcone-secret-platform-list.txt
 for required in postgresql documentdb kafka s3; do
-  grep -q "$required" /tmp/falcone-secret-platform-list.txt || fail "missing Vault path $required"
+  grep -q "$required" /tmp/falcone-secret-platform-list.txt || fail "missing OpenBao path $required"
 done
 
 echo '[3/4] Checking ExternalSecrets sync status'

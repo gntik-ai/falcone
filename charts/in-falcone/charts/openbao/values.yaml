@@ -1,27 +1,27 @@
 eso:
-  serviceAccountName: "eso-vault-auth"
+  serviceAccountName: "eso-openbao-auth"
   tokenTTL: "24h"
 
-vault:
+openbao:
   namespace: secret-store
   replicas: 1
   image:
-    repository: hashicorp/vault
-    tag: "1.15.0"
+    repository: openbao/openbao
+    tag: "2.3.1"
     pullPolicy: IfNotPresent
   storage:
     size: 10Gi
     storageClassName: ""
   tls:
     enabled: true
-    secretName: vault-server-tls
+    secretName: openbao-server-tls
     # finding D7/C.6: how the server TLS Secret (<secretName>) is provisioned.
     #   cert-manager -> render a cert-manager.io/v1 Certificate (needs cert-manager CRDs; the
     #                   default, for clusters that run cert-manager).
     #   self-signed  -> a pre-install/pre-upgrade hook Job generates a self-signed CA + server
     #                   cert with openssl and writes <secretName> directly. KIND-COMPATIBLE: no
-    #                   cert-manager required, so `vault.enabled=true` no longer aborts the release.
-    # The Secret carries tls.crt/tls.key/ca.crt; ESO's caProvider reads its ca.crt to trust Vault.
+    #                   cert-manager required, so `openbao.enabled=true` no longer aborts the release.
+    # The Secret carries tls.crt/tls.key/ca.crt; ESO's caProvider reads its ca.crt to trust OpenBao.
     mode: cert-manager
     issuerRef:
       name: selfsigned-issuer
@@ -29,7 +29,9 @@ vault:
     # Used only when mode=self-signed.
     bootstrap:
       image:
-        repository: docker.io/bitnami/kubectl
+        # bitnami/* legacy images were relocated to the bitnamilegacy/* namespace; the original
+        # docker.io/bitnami/kubectl:1.32.2 reference now 404s and stalls the pre-install TLS hook.
+        repository: docker.io/bitnamilegacy/kubectl
         tag: "1.32.2"
         pullPolicy: IfNotPresent
       days: 3650
@@ -48,7 +50,14 @@ vault:
       cpu: 500m
       memory: 1Gi
   auditSidecar:
-    enabled: true
+    # The sidecar runs the secret-audit-handler service (node /opt/secret-audit-handler/src/index.mjs)
+    # from the secret-audit-handler-bundle ConfigMap. That handler imports kafkajs at runtime and
+    # requires KAFKA_BROKERS + a reachable Kafka; it cannot run from bare ConfigMap source in a vanilla
+    # node:20-alpine image (no node_modules) and exits 1 with no Kafka, which would make the OpenBao pod
+    # NotReady and block bootstrap. The OpenBao server still runs `audit enable file` regardless, so the
+    # JSON audit log is always written (and Vault-schema-compatible). Enabling the live Kafka tailer
+    # needs a purpose-built secret-audit-handler image + bundle ConfigMap; default OFF until then.
+    enabled: false
     image:
       repository: node
       tag: 20-alpine
@@ -64,12 +73,8 @@ vault:
         memory: 128Mi
   networkPolicy:
     enabled: true
-    allowedNamespaceLabel: vault-access
+    allowedNamespaceLabel: openbao-access
   metrics:
     enabled: true
   migration:
     enabled: true
-    image:
-      repository: bitnami/kubectl
-      tag: latest
-      pullPolicy: IfNotPresent
