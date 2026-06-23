@@ -202,6 +202,59 @@ export function bulkInsert(
   )
 }
 
+// ---- Table data export / import (change: add-data-export-import-clone, #683) ----
+export interface PgDataExport {
+  entityType: string
+  databaseName: string
+  schemaName: string
+  tableName: string
+  columns: string[]
+  rowCount: number
+  rows: PgRow[]
+}
+
+export interface PgDataImportResult {
+  entityType: string
+  databaseName: string
+  schemaName: string
+  tableName: string
+  totalEntries: number
+  importedCount: number
+  skippedCount: number
+}
+
+// Export a table's rows (bounded, inline). The backend validates every identifier against
+// information_schema and quotes it; values are bound — never string-interpolated.
+export function exportTableRows(
+  workspaceId: string,
+  databaseName: string,
+  schemaName: string,
+  tableName: string,
+  options: { limit?: number } = {}
+): Promise<PgDataExport> {
+  const body: Record<string, number> = {}
+  if (options.limit != null) body.limit = options.limit
+  return requestConsoleSessionJson<PgDataExport>(
+    `${dataBase(workspaceId, databaseName, schemaName, tableName)}/exports`,
+    { method: 'POST', body }
+  )
+}
+
+// Import rows into a table. Only keys that are real, validated columns of the target table are
+// inserted (unknown keys are dropped server-side).
+export function importTableRows(
+  workspaceId: string,
+  databaseName: string,
+  schemaName: string,
+  tableName: string,
+  rows: PgRow[]
+): Promise<PgDataImportResult> {
+  return requestConsoleSessionJson<PgDataImportResult>(
+    `${dataBase(workspaceId, databaseName, schemaName, tableName)}/imports`,
+    { method: 'POST', body: { rows } }
+  )
+}
+
 // ---- Workspace API keys ----
 const keysBase = (workspaceId: string) => `/v1/workspaces/${enc(workspaceId)}/api-keys`
 

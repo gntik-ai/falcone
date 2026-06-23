@@ -1106,6 +1106,13 @@
           "bundleVersion": {
             "type": "string"
           },
+          "definitions": {
+            "description": "Self-contained deployable definitions for the exported actions (source, runtime, entrypoint, parameters, metadata). Carried so an export -> import round-trips the actual function code with fidelity, not only the resource reference. Optional and additive (consumers that only read 'resources' are unaffected).",
+            "items": {
+              "$ref": "#/components/schemas/FunctionDefinitionPayload"
+            },
+            "type": "array"
+          },
           "resources": {
             "items": {
               "$ref": "#/components/schemas/FunctionDefinitionResource"
@@ -1154,6 +1161,13 @@
           "bundleVersion": {
             "type": "string"
           },
+          "definitions": {
+            "description": "Self-contained deployable definitions to import (source, runtime, entrypoint, parameters, metadata). When present, the registry rows are created/updated from these; the scope is always re-stamped to the caller's verified tenant/workspace. Optional and additive.",
+            "items": {
+              "$ref": "#/components/schemas/FunctionDefinitionPayload"
+            },
+            "type": "array"
+          },
           "importOperation": {
             "enum": [
               "apply"
@@ -1180,6 +1194,37 @@
           "tenantId",
           "workspaceId",
           "resources"
+        ],
+        "type": "object"
+      },
+      "FunctionDefinitionPayload": {
+        "additionalProperties": false,
+        "description": "A single deployable function-definition payload inside an export/import bundle.",
+        "properties": {
+          "actionName": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "sourceCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionName"
         ],
         "type": "object"
       },

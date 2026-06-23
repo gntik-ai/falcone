@@ -10,6 +10,41 @@ import * as store from './tenant-store.mjs';
 import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
 import { vaultStoreFromEnv } from './vault-secrets.mjs';
 
+// Scope-validation builder for function definition import (#683). It lives in apps/control-plane
+// (vendored into the CP image at /repo/apps/control-plane, alongside services/internal-contracts
+// which it imports) but is LAZILY loaded so this module also imports cleanly in the blackbox test
+// harness (which runs from the repo root, where `/repo` does not exist). The image path is tried
+// first; the repo-relative path is the test fallback. Cached after first resolution.
+const IMPORT_ERROR_CODES = Object.freeze({
+  COLLISION: 'IMPORT_COLLISION', POLICY_CONFLICT: 'IMPORT_POLICY_CONFLICT',
+  SCOPE_VIOLATION: 'IMPORT_SCOPE_VIOLATION', UNSUPPORTED_BUNDLE: 'IMPORT_UNSUPPORTED_BUNDLE'
+});
+let _validateImportBundle = null;
+async function loadValidateImportBundle() {
+  if (_validateImportBundle) return _validateImportBundle;
+  const candidates = [
+    '/repo/apps/control-plane/src/functions-import-export.mjs',
+    new URL('../../../apps/control-plane/src/functions-import-export.mjs', import.meta.url).href
+  ];
+  for (const c of candidates) {
+    try { const m = await import(c); if (m?.validateImportBundle) { _validateImportBundle = m.validateImportBundle; return _validateImportBundle; } }
+    catch { /* try the next candidate */ }
+  }
+  // Last-resort inline fallback (keeps imports working even if neither path resolves): enforce the
+  // same tenant/workspace scope guard the product builder enforces.
+  _validateImportBundle = (bundle = {}, context = {}) => {
+    for (const r of Array.isArray(bundle.resources) ? bundle.resources : []) {
+      const t = r.tenantId ?? bundle.tenantId ?? context.tenantId;
+      const w = r.workspaceId ?? bundle.workspaceId ?? context.workspaceId;
+      if ((context.tenantId && t && t !== context.tenantId) || (context.workspaceId && w && w !== context.workspaceId)) {
+        return { valid: false, code: IMPORT_ERROR_CODES.SCOPE_VIOLATION, violations: ['import bundle references a resource outside the caller scope.'] };
+      }
+    }
+    return { valid: true, code: null, violations: [] };
+  };
+  return _validateImportBundle;
+}
+
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 
@@ -279,8 +314,135 @@ async function secretDelete(ctx) {
   } catch (e) { return err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)); }
 }
 
+// ---- function definition export / import (#683, data-export-import-clone) ---
+// Self-contained bundle movement. Export emits both the spec `resources` reference shape AND the
+// deployable `definitions` (source/runtime/entrypoint/parameters) so an export -> import round-trips
+// the real function code. Import re-scopes the bundle to the caller's VERIFIED tenant/workspace and
+// rejects any cross-scope bundle (IMPORT_SCOPE_VIOLATION via validateImportBundle), then upserts the
+// fn_action registry row(s). Persisting the registry row IS the in-scope "import"; redeploying the
+// Knative service from imported source is deferred (a separate deploy concern) and noted in the docs.
+
+// OpenWhisk-style package convention: an action's `action_name` is `<packageName>/<actionName>`
+// (or a bare action with no package). Derive both parts for the export shapes.
+function splitActionName(actionName) {
+  const s = String(actionName ?? '');
+  const i = s.indexOf('/');
+  return i > 0 ? { packageName: s.slice(0, i), shortName: s.slice(i + 1) } : { packageName: null, shortName: s };
+}
+
+// Build one export resource (spec reference shape) + its deployable payload from a fn_actions row.
+function fnRowToExport(row) {
+  const { packageName, shortName } = splitActionName(row.action_name);
+  return {
+    resource: {
+      resourceType: 'function_action',
+      name: row.action_name,
+      actionName: shortName,
+      ...(packageName ? { packageName } : {}),
+      visibility: 'private'
+    },
+    definition: {
+      actionName: row.action_name,
+      ...(packageName ? { packageName } : {}),
+      runtime: row.runtime,
+      entrypoint: row.entrypoint,
+      sourceCode: row.source_code,
+      parameters: row.parameters ?? {},
+      metadata: { sourceResourceId: row.resource_id, version: row.version }
+    }
+  };
+}
+
+function exportBundle(ws, rows) {
+  const built = rows.map(fnRowToExport);
+  return {
+    bundleVersion: '2026-03-27',
+    tenantId: ws.tenant_id,
+    workspaceId: ws.id,
+    scope: { tenantId: ws.tenant_id, workspaceId: ws.id },
+    resources: built.map((b) => b.resource),
+    definitions: built.map((b) => b.definition)
+  };
+}
+
+// GET /v1/functions/actions/{resourceId}/definition-export — export ONE owned action.
+async function fnDefinitionExport(ctx) {
+  const row = await store.getFnAction(ctx.pool, ctx.params.resourceId, callerTenantId(ctx.identity));
+  if (!row) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.resourceId} not found`);
+  const ws = await store.getWorkspace(ctx.pool, row.workspace_id);
+  if (!ws) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.resourceId} not found`);
+  return ok(200, exportBundle(ws, [row]));
+}
+
+// GET /v1/functions/workspaces/{workspaceId}/packages/{packageName}/definition-export — export every
+// action in a package within an owned workspace.
+async function fnPackageDefinitionExport(ctx) {
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  const pkg = String(ctx.params.packageName ?? '');
+  const rows = (await store.listFnActions(ctx.pool, ws.id))
+    .filter((r) => splitActionName(r.action_name).packageName === pkg);
+  return ok(200, exportBundle(ws, rows));
+}
+
+// Shared import: re-scope the bundle to the caller's verified tenant/workspace, reject cross-scope,
+// then upsert every definition as a registry row. `expectPackage` (for the package-import route)
+// requires every definition to carry a packageName.
+async function importDefinitions(ctx, { expectPackage = false } = {}) {
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  const bundle = ctx.body ?? {};
+  // Scope validation (reuse the product builder): a bundle whose resources reference another
+  // tenant/workspace is rejected BEFORE any write. The kind runtime keys scope on the workspace's
+  // canonical tenant/workspace ids — pass those as the caller context so the gate compares against
+  // the VERIFIED owner, never body-supplied ids.
+  const validateImportBundle = await loadValidateImportBundle();
+  const verdict = validateImportBundle(
+    { ...bundle, bundleVersion: bundle.bundleVersion ?? '2026-03-27' },
+    { tenantId: ws.tenant_id, workspaceId: ws.id });
+  if (!verdict.valid && verdict.code === IMPORT_ERROR_CODES.SCOPE_VIOLATION) {
+    return err(403, 'IMPORT_SCOPE_VIOLATION', verdict.violations?.[0] ?? 'import bundle is out of the caller scope');
+  }
+  const defs = Array.isArray(bundle.definitions) ? bundle.definitions : [];
+  if (defs.length === 0) return err(400, 'VALIDATION_ERROR', 'definitions (array) is required to import function code');
+  const imported = [];
+  const skipped = [];
+  for (const def of defs) {
+    const actionName = String(def?.actionName ?? '');
+    const hasPackage = actionName.includes('/') || Boolean(def?.packageName);
+    if (expectPackage && !hasPackage) { skipped.push({ actionName, reason: 'NOT_A_PACKAGE_ACTION' }); continue; }
+    // Normalize to the package-qualified name when a packageName is provided separately.
+    const qualifiedName = def?.packageName && !actionName.includes('/') ? `${def.packageName}/${actionName}` : actionName;
+    if (!qualifiedName || !def?.sourceCode) { skipped.push({ actionName: qualifiedName, reason: 'MISSING_NAME_OR_SOURCE' }); continue; }
+    const rec = await store.upsertFnAction(ctx.pool, {
+      resourceId: `fn_${randomUUID().slice(0, 12)}`,
+      workspaceId: ws.id, tenantId: ws.tenant_id, actionName: qualifiedName,
+      runtime: def.runtime ?? 'nodejs:22', entrypoint: def.entrypoint ?? 'main',
+      sourceCode: def.sourceCode, parameters: def.parameters ?? null,
+      memoryMb: 256, timeoutMs: 60000, ksvcName: null, createdBy: ctx.identity?.sub
+    });
+    imported.push({ resourceId: rec.resource_id, actionName: qualifiedName });
+  }
+  return ok(200, {
+    entityType: 'function_definition_import_result',
+    targetTenantId: ws.tenant_id, targetWorkspaceId: ws.id,
+    importedAt: new Date().toISOString(),
+    totalEntries: defs.length, importedCount: imported.length, skippedCount: skipped.length,
+    imported, skipped,
+    // Registry rows are created; redeploying the Knative service from imported source is a separate
+    // deploy step (POST /v1/functions/actions) and is intentionally not performed here.
+    notDeployed: imported.length > 0 ? 'knative-service' : null
+  });
+}
+
+// POST /v1/functions/workspaces/{workspaceId}/definition-imports
+async function fnDefinitionImport(ctx) { return importDefinitions(ctx, { expectPackage: false }); }
+// POST /v1/functions/workspaces/{workspaceId}/package-definition-imports
+async function fnPackageDefinitionImport(ctx) { return importDefinitions(ctx, { expectPackage: true }); }
+
 export const FN_HANDLERS = {
   fnDeploy, fnInventory, fnListActions, fnActionDetail, fnInvoke,
   fnActivations, fnActivation, fnActivationLogs, fnActivationResult, fnVersions, fnRollback,
-  secretSet, secretList, secretGet, secretDelete
+  secretSet, secretList, secretGet, secretDelete,
+  fnDefinitionExport, fnPackageDefinitionExport, fnDefinitionImport, fnPackageDefinitionImport
 };
