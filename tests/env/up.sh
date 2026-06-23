@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Bring up the Falcone test environment (Postgres + Keycloak + Redpanda + MongoDB
-# + SeaweedFS + Vault), wait for health, provision the Keycloak admin service account,
+# + SeaweedFS + OpenBao), wait for health, provision the Keycloak admin service account,
 # apply known service migrations, initiate the Mongo replica set, create the SeaweedFS
-# bucket, and enable the Vault file audit device.
+# bucket, and enable the OpenBao file audit device.
 # Idempotent: safe to re-run.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd ../.. && pwd)"
 KC=/opt/keycloak/bin/kcadm.sh
 
-# Host-mounted Vault audit dir must exist + be writable before the container
+# Host-mounted OpenBao audit dir must exist + be writable before the container
 # (which writes the file audit log) starts.
-mkdir -p ./vault/audit
-chmod 777 ./vault/audit 2>/dev/null || true
+mkdir -p ./openbao/audit
+chmod 777 ./openbao/audit 2>/dev/null || true
 
 echo "==> docker compose up"
 # --build so the action-runner shim image always reflects the current
@@ -30,7 +30,7 @@ for i in $(seq 1 60); do
   # readiness is gated by the driver's connection retry).
   dd=$(docker compose ps documentdb --format '{{.Health}}' 2>/dev/null || true)
   sw=$(docker compose ps seaweedfs --format '{{.Health}}' 2>/dev/null || true)
-  va=$(docker compose ps vault --format '{{.Health}}' 2>/dev/null || true)
+  va=$(docker compose ps openbao --format '{{.Health}}' 2>/dev/null || true)
   tm=$(docker compose ps temporal --format '{{.Health}}' 2>/dev/null || true)
   [ "$pg" = "healthy" ] && [ "$kc" = "healthy" ] && [ "$rp" = "healthy" ] \
     && [ "$dd" = "healthy" ] && [ "$sw" = "healthy" ] && [ "$va" = "healthy" ] \
@@ -40,7 +40,7 @@ done
 [ "${pg:-}" = "healthy" ] && [ "${kc:-}" = "healthy" ] && [ "${rp:-}" = "healthy" ] \
   && [ "${dd:-}" = "healthy" ] && [ "${sw:-}" = "healthy" ] && [ "${va:-}" = "healthy" ] \
   && [ "${tm:-}" = "healthy" ] \
-  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp documentdb=$dd seaweedfs=$sw vault=$va temporal=$tm)" >&2; exit 1; }
+  || { echo "services not healthy (pg=$pg kc=$kc redpanda=$rp documentdb=$dd seaweedfs=$sw openbao=$va temporal=$tm)" >&2; exit 1; }
 
 echo "==> provisioning Keycloak admin service account (falcone-admin)"
 docker compose exec -T keycloak "$KC" config credentials \
@@ -76,22 +76,22 @@ docker compose exec -T seaweedfs sh -c \
   && echo "   bucket falcone-test ready" \
   || { echo "   failed to create SeaweedFS bucket" >&2; exit 1; }
 
-echo "==> enabling Vault file audit device"
+echo "==> enabling OpenBao file audit device"
 # Idempotent: enabling an already-enabled device returns an error we ignore.
 # mode=0644 so the host test process (secret-audit-handler) can read the log;
 # the dev container runs as a non-host uid and the default 0600 would lock it out.
-docker compose exec -T -e VAULT_ADDR=http://localhost:8200 -e VAULT_TOKEN=root vault \
-  vault audit enable file file_path=/vault/audit/vault-audit.log mode=0644 >/dev/null 2>&1 \
+docker compose exec -T -e BAO_ADDR=http://localhost:8200 -e BAO_TOKEN=root openbao \
+  bao audit enable file file_path=/openbao/audit/openbao-audit.log mode=0644 >/dev/null 2>&1 \
   && echo "   file audit device enabled" || echo "   file audit device already enabled"
 # Generate at least one audit entry so the host-visible log file exists + is non-empty.
-docker compose exec -T -e VAULT_ADDR=http://localhost:8200 -e VAULT_TOKEN=root vault \
-  vault kv get -mount=secret nonexistent >/dev/null 2>&1 || true
-docker compose exec -T -e VAULT_ADDR=http://localhost:8200 -e VAULT_TOKEN=root vault \
-  vault token lookup >/dev/null 2>&1 || true
-if [ -s ./vault/audit/vault-audit.log ]; then
-  echo "   audit log present on host: $(pwd)/vault/audit/vault-audit.log"
+docker compose exec -T -e BAO_ADDR=http://localhost:8200 -e BAO_TOKEN=root openbao \
+  bao kv get -mount=secret nonexistent >/dev/null 2>&1 || true
+docker compose exec -T -e BAO_ADDR=http://localhost:8200 -e BAO_TOKEN=root openbao \
+  bao token lookup >/dev/null 2>&1 || true
+if [ -s ./openbao/audit/openbao-audit.log ]; then
+  echo "   audit log present on host: $(pwd)/openbao/audit/openbao-audit.log"
 else
-  echo "   vault audit log missing or empty on host" >&2; exit 1
+  echo "   openbao audit log missing or empty on host" >&2; exit 1
 fi
 echo "==> applying scheduling-engine migrations to Postgres"
 # pgcrypto provides gen_random_uuid() used by the scheduling tables' defaults.
@@ -291,8 +291,8 @@ echo "  Postgres               : postgres://falcone:falcone@localhost:55432/falc
 echo "  Redpanda (Kafka)       : localhost:19092"
 echo "  FerretDB (document API): mongodb://falcone:falcone@localhost:57017/   (MONGO_BACKEND=ferretdb)"
 echo "  SeaweedFS S3 API       : http://localhost:58333  (falconedev/falconedevsecret, path-style), bucket falcone-test"
-echo "  Vault (dev)            : http://localhost:58200  (token root)"
-echo "  Vault audit log (host) : $(pwd)/vault/audit/vault-audit.log"
+echo "  OpenBao (dev)          : http://localhost:58200  (token root)"
+echo "  OpenBao audit log (host): $(pwd)/openbao/audit/openbao-audit.log"
 echo "  API gateway (APISIX)   : http://localhost:9080  (routes /v1/scheduling/*, /v1/async-operations[/{id}], /v1/admin/config/format-versions, /v1/plans, /v1/plans/change-history, /v1/quota-dimensions, /v1/tenant/entitlements, /v1/workspace-sub-quotas, /v1/backups/status)"
 echo "                            NOTE /v1/backups/status authenticates IN-ACTION (plain proxy, no gateway jwt-auth): the backup-status action verifies the Bearer JWT itself against the realm JWKS and reads tenant+scopes from the token's own claims."
 echo "                            backup_status_snapshots seeded with a tenant-A own row + a tenant-B SHARED row -> the smoke proves tenant A never sees tenant B's shared row (data-layer isolation), while a technical-scoped global view sees both."

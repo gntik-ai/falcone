@@ -4417,11 +4417,11 @@ gatewayPolicy:
         expect: allow
 
 # Optional infrastructure sub-charts — disabled by default; opt-in for operators
-# who want Vault secret storage or External Secrets Operator integration.
+# who want OpenBao secret storage or External Secrets Operator integration.
 eso:
   enabled: false
 
-vault:
+openbao:
   enabled: false
 
 # ---------------------------------------------------------------------------

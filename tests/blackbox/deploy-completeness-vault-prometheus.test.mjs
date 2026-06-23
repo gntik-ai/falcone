@@ -2,12 +2,12 @@
  * Black-box tests for the deployment-completeness gaps (b) + (c)
  * (add-deploy-completeness-cluster, #562; live E2E campaign 2026-06-18).
  *
- * (b) Vault is out-of-scope on the kind/campaign profile: cert-manager is absent
- *     (so enabling Vault aborts the release) AND no Falcone component reads secrets
- *     FROM Vault. The pragmatic resolution: Vault stays DISABLED on the kind/campaign
- *     values so enabling it is a deliberate, separate decision. Asserted by parsing
- *     the campaign values + rendering the chart with the kind values: vault.enabled
- *     is false and NO Vault workload renders.
+ * (b) The secret store (OpenBao, formerly Vault) is out-of-scope on the kind/campaign profile:
+ *     cert-manager is absent (so enabling it in the default TLS mode aborts the release) AND the
+ *     secret store is a deliberate, separate opt-in. The pragmatic resolution: the secret store
+ *     stays DISABLED on the kind/campaign values. Asserted by parsing the campaign values +
+ *     rendering the chart with the kind values: openbao.enabled is false, NO secret-store workload
+ *     renders, and NEITHER the hashicorp/vault NOR the openbao/openbao image appears.
  *
  * (c) The Prometheus scrape config previously covered ONLY control-plane, cp-executor,
  *     and apisix (3 targets, #499). Widen it so it covers any Falcone component that
@@ -20,8 +20,9 @@
  *
  * Self-skips when `helm` is absent (repo precedent: vault-secrets-backend-kind).
  *
- * bbx-562-vault-01: campaign values keep vault disabled (opt-out, separate decision)
- * bbx-562-vault-02: rendering the chart with the kind values renders NO Vault workload
+ * bbx-562-vault-01: campaign values keep the secret store disabled (opt-out, separate decision)
+ * bbx-562-vault-02: rendering the chart with the kind values renders NO secret-store workload and
+ *                   neither the hashicorp/vault nor the openbao/openbao image
  * bbx-562-prom-01:  the scrape config still covers control-plane, cp-executor, apisix
  * bbx-562-prom-02:  a kubernetes pod-discovery scrape job widens coverage beyond the 3 static targets
  * bbx-562-prom-03:  the metrics-exposing components carry the prometheus.io/scrape annotation
@@ -83,18 +84,22 @@ function renderedPrometheusYml(stream) {
 // -------------------------------------------------------------------------
 // (b) Vault out-of-scope on the kind/campaign profile
 // -------------------------------------------------------------------------
-test('bbx-562-vault-01: campaign values keep vault disabled (opt-out, separate decision)', () => {
+test('bbx-562-vault-01: campaign values keep the secret store disabled (opt-out, separate decision)', () => {
   const src = readFileSync(CAMPAIGN_VALUES, 'utf8');
-  // The campaign overlay must pin vault.enabled: false (a vault: stanza with enabled: false).
-  assert.match(src, /\nvault:\s*\n(?:[^\n]*\n)*?\s*enabled:\s*false/, 'campaign values must keep vault.enabled: false');
+  // The campaign overlay must pin openbao.enabled: false (an openbao: stanza with enabled: false).
+  assert.match(src, /\nopenbao:\s*\n(?:[^\n]*\n)*?\s*enabled:\s*false/, 'campaign values must keep openbao.enabled: false');
 });
 
-test('bbx-562-vault-02: chart rendered with kind values renders NO Vault workload', SKIP, () => {
+test('bbx-562-vault-02: chart rendered with kind values renders NO secret-store workload or image', SKIP, () => {
   const out = helmTemplate(['-f', KIND_VALUES]);
-  const vaultWorkloads = [...docsOfKind(out, 'StatefulSet'), ...docsOfKind(out, 'Deployment')]
-    .filter((d) => /name:\s*\S*vault\S*/.test(d) || /app\.kubernetes\.io\/name:\s*vault\b/.test(d));
-  assert.deepEqual(vaultWorkloads, [], 'no Vault server workload may render on the kind profile (cert-manager absent)');
+  const secretStoreWorkloads = [...docsOfKind(out, 'StatefulSet'), ...docsOfKind(out, 'Deployment')]
+    .filter((d) => /name:\s*\S*(?:vault|openbao)\S*/.test(d)
+      || /app\.kubernetes\.io\/name:\s*(?:vault|openbao)\b/.test(d));
+  assert.deepEqual(secretStoreWorkloads, [], 'no secret-store server workload may render on the kind profile (cert-manager absent)');
   assert.doesNotMatch(out, /cert-manager\.io\/v1/, 'the kind profile must not render any cert-manager resource');
+  // The default render must reference neither secret-store image (secret store is opt-in/off here).
+  assert.doesNotMatch(out, /hashicorp\/vault/, 'the default kind render must not reference the hashicorp/vault image');
+  assert.doesNotMatch(out, /openbao\/openbao/, 'the default kind render must not reference the openbao/openbao image (secret store off by default)');
 });
 
 // -------------------------------------------------------------------------

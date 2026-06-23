@@ -10,7 +10,7 @@
 #   - OpenShift Serverless Operator installed + a KnativeServing CR (provides Knative + Kourier).
 #   - Harbor pull secret(s) created in the namespace; optionally Harbor CA in a ConfigMap.
 #   - All images mirrored into Harbor (see the review's mirror list).
-#   - ESO/Vault providing the data-plane secrets (or pre-create the *-credentials Secrets).
+#   - ESO/OpenBao providing the data-plane secrets (or pre-create the *-credentials Secrets).
 
 global:
   namespace: falcone-prod
@@ -62,7 +62,7 @@ keycloak:
 # this overlay enables the SA token (chart default is false) + sets the env. NOTE: the
 # *HOST values below are <release>-<component> service DNS — they assume
 # `helm install <RELEASE>` with RELEASE matching the prefix (here: falcone). Adjust if
-# you use a different release name. Secret refs should be satisfied by ESO/Vault-
+# you use a different release name. Secret refs should be satisfied by ESO/OpenBao-
 # provisioned Secrets (the chart creates none).
 controlPlane:
   image:

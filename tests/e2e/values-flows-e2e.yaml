@@ -225,7 +225,7 @@ observability:
   enabled: false
 eso:
   enabled: false
-vault:
+openbao:
   enabled: false
 controlPlaneExecutor:
   enabled: false

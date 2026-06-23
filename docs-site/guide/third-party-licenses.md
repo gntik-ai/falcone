@@ -18,7 +18,7 @@ Deployed as separate services / container images that In Falcone talks to over t
 | FerretDB v2 (over DocumentDB / PostgreSQL 17) | Document data API — MongoDB-wire-compatible ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)) | `Apache-2.0` (gateway) + `MIT` (DocumentDB extension) | [ferretdb](https://github.com/FerretDB/FerretDB) · [documentdb](https://github.com/microsoft/documentdb) |
 | Redpanda 24.2 | Kafka-compatible event bus / CDC streaming | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
 | SeaweedFS 4.33 | S3-compatible object storage ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
-| HashiCorp Vault 1.18 | Secrets management | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
+| OpenBao 2.3.1 | Secrets management (open-source Vault fork; KV‑v2, k8s auth, file audit) | `MPL-2.0` | [openbao](https://github.com/openbao/openbao) |
 | Keycloak 26 | Realm-per-tenant IAM / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API gateway (public `/v1` surface) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
 | Temporal (server 1.25 + TypeScript SDK 1.18) | Durable workflow engine behind Flows | `MIT` | [temporal](https://github.com/temporalio/temporal) · [sdk-typescript](https://github.com/temporalio/sdk-typescript) |

@@ -37,13 +37,18 @@ export S3_SECRET_ACCESS_KEY="falconedevsecret"
 export S3_SECRET_KEY="falconedevsecret"
 export S3_SDK_BUCKET="falcone-test"
 
-# Vault (dev mode). The file audit device writes to a host-mounted path that
-# secret-audit-handler tails (VAULT_AUDIT_LOG_PATH).
-export VAULT_ADDR="http://localhost:58200"
-export VAULT_TOKEN="root"
+# OpenBao (dev mode). The file audit device writes to a host-mounted path that
+# secret-audit-handler tails (BAO_AUDIT_LOG_PATH). The control-plane secrets client and the
+# audit-handler read the BAO_* env first and fall back to the legacy VAULT_* names, so both
+# spellings are exported here for compatibility.
+export BAO_ADDR="http://localhost:58200"
+export BAO_TOKEN="root"
+export VAULT_ADDR="$BAO_ADDR"
+export VAULT_TOKEN="$BAO_TOKEN"
 # Absolute host path to the file audit log (computed from the repo root).
 _FALCONE_ENV_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)"
-export VAULT_AUDIT_LOG_PATH="$_FALCONE_ENV_REPO_ROOT/tests/env/vault/audit/vault-audit.log"
+export BAO_AUDIT_LOG_PATH="$_FALCONE_ENV_REPO_ROOT/tests/env/openbao/audit/openbao-audit.log"
+export VAULT_AUDIT_LOG_PATH="$BAO_AUDIT_LOG_PATH"
 unset _FALCONE_ENV_REPO_ROOT
 
 # Marker + seeded tenants. Realm name == tenantId; displayName is the tenant name.

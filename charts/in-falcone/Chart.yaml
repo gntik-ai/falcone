@@ -81,10 +81,10 @@ dependencies:
     version: 0.1.0
     repository: file://./charts/eso
     condition: eso.enabled
-  - name: vault
+  - name: openbao
     version: 0.1.0
-    repository: file://./charts/vault
-    condition: vault.enabled
+    repository: file://./charts/openbao
+    condition: openbao.enabled
   # SeaweedFS HA object-storage tier (master/volume/filer/S3 gateway) — the
   # default-active object store (the bundled MinIO storage component was removed
   # in the MinIO -> SeaweedFS migration, ADR-13). First remote sub-chart dependency

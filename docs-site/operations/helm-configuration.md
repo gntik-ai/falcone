@@ -15,7 +15,7 @@ In Falcone is configured through the umbrella chart `charts/in-falcone`. This pa
 | `bootstrap` | Reconcile payload (gateway routes, realm), lock/marker ConfigMaps |
 | `apisix`, `keycloak`, `postgresql`, `ferretdb`, `documentdb`, `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole` | Per-component config (each toggled by `<component>.enabled`). `ferretdb` + `documentdb` are the document store ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)); `seaweedfs` is the object store ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)). The former `mongodb` and `storage` (MinIO) components have been removed; functions run on Knative (provisioned by the control-plane executor — no datastore component). |
 | `gatewayPolicy` | Gateway routing/scope/rate-limit policy |
-| `eso`, `vault` | Secret management (External Secrets Operator + Vault) |
+| `eso`, `openbao` | Secret management (External Secrets Operator + OpenBao). Both off by default; opt in via `openbao.enabled`/`eso.enabled` |
 
 ## Composing values
 

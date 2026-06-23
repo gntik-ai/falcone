@@ -1,0 +1,111 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-init
+  namespace: {{ .Values.openbao.namespace }}
+spec:
+  template:
+    spec:
+      serviceAccountName: openbao
+      restartPolicy: OnFailure
+      containers:
+        - name: openbao-init
+          image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              export BAO_ADDR="https://openbao.{{ .Values.openbao.namespace }}.svc.cluster.local:8200"
+              export BAO_CACERT=/openbao/tls/ca.crt
+
+              # Wait for the server's TLS listener to ANSWER before acting. This is the key robustness
+              # fix: it stops the Job from racing pod startup and dying mid-init (which previously left
+              # the server initialized-but-sealed, and the old `if initialized: exit 0` guard then
+              # "succeeded" while sealed). NOTE: `bao status` EXITS NON-ZERO (2) when the server is
+              # sealed/uninitialized — which is the normal pre-init state — so we must test for a
+              # PARSEABLE response (the "initialized" field), not a zero exit code.
+              i=0; until bao status -format=json 2>/dev/null | grep -q '"initialized"'; do
+                i=$((i+1)); [ "$i" -gt 90 ] && { echo "openbao not reachable after 180s" >&2; exit 1; }; sleep 2; done
+
+              status=$(bao status -format=json 2>/dev/null || true)
+              initialized=$(printf '%s' "$status" | sed -n 's/.*"initialized"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n1)
+              sealed=$(printf '%s' "$status" | sed -n 's/.*"sealed"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n1)
+
+              if [ "$initialized" = "true" ] && [ "$sealed" = "false" ]; then
+                # Already fully bootstrapped by a previous successful run (config was applied then).
+                echo "OpenBao already initialized and unsealed; nothing to do"
+                exit 0
+              elif [ "$initialized" = "true" ] && [ "$sealed" = "true" ]; then
+                # Initialized but sealed and we hold no keys (init keys are single-use, printed once).
+                # Fail LOUDLY so the operator notices, rather than silently passing with a sealed server.
+                echo "ERROR: OpenBao is initialized but SEALED and init keys are not available to this Job." >&2
+                echo "       A prior init must have completed unseal in the same run; if you see this on a" >&2
+                echo "       fresh install, delete the openbao PVCs and re-install so init runs cleanly." >&2
+                exit 1
+              else
+                # `bao ... -format=json` emits PRETTY (multi-line) JSON, so the unseal_keys_b64 array
+                # spans several lines. Flatten newlines first so the single-line extractors below match
+                # (the previous line-based sed silently produced EMPTY keys -> `unseal ""` failed under
+                # set -e -> the server was left initialized-but-sealed).
+                init_json=$(bao operator init -format=json -key-shares={{ .Values.openbao.initShares }} -key-threshold={{ .Values.openbao.initThreshold }} | tr -d '\n')
+                # Extract every quoted element of the unseal_keys_b64 array, in order.
+                keys=$(printf '%s' "$init_json" | sed -n 's/.*"unseal_keys_b64"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p' | grep -o '"[^"]*"' | tr -d '"')
+                unseal1=$(printf '%s\n' "$keys" | sed -n '1p')
+                unseal2=$(printf '%s\n' "$keys" | sed -n '2p')
+                unseal3=$(printf '%s\n' "$keys" | sed -n '3p')
+                root_token=$(printf '%s' "$init_json" | sed -n 's/.*"root_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                [ -n "$unseal1" ] && [ -n "$unseal2" ] && [ -n "$unseal3" ] && [ -n "$root_token" ] || {
+                  echo "FATAL: failed to parse init output (unseal keys / root token empty)" >&2; exit 1; }
+                bao operator unseal "$unseal1"
+                bao operator unseal "$unseal2"
+                bao operator unseal "$unseal3"
+                export BAO_TOKEN="$root_token"
+              fi
+              # Configure (runs only on the fresh-init path, holding the root token). All steps are
+              # idempotent (enable has || true; writes are upserts).
+              bao auth enable kubernetes || true
+              # k8s auth config. token_reviewer_jwt is the openbao SA token (granted
+              # authentication.k8s.io/tokenreviews by the openbao-kubernetes-auth ClusterRole) used to
+              # call the TokenReview API. NOTE: this call goes to the kube API server, so the OpenBao
+              # pod's egress NetworkPolicy MUST permit it (see openbao-networkpolicy.yaml) or every
+              # login times out -> 403 "permission denied".
+              bao write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              bao secrets enable -path=secret kv-v2 || true
+              bao audit enable file file_path=/openbao/audit/openbao-audit.log || true
+              for policy in platform tenant functions gateway iam; do
+                bao policy write "$policy" "/config/policies/${policy}.hcl"
+              done
+              bao write auth/kubernetes/role/platform-role bound_service_account_names='*' bound_service_account_namespaces='postgresql,documentdb,kafka,s3-compat' policies=platform ttl=24h
+              bao write auth/kubernetes/role/gateway-role bound_service_account_names='*' bound_service_account_namespaces='apisix' policies=gateway ttl=24h
+              bao write auth/kubernetes/role/iam-role bound_service_account_names='*' bound_service_account_namespaces='keycloak' policies=iam ttl=24h
+              bao write auth/kubernetes/role/eso-role bound_service_account_names='{{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}' bound_service_account_namespaces='eso-system' policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }}
+              bao kv put secret/platform/postgresql root-password=dummy-root-password app-password=dummy-app-password
+              bao kv put secret/platform/documentdb root-password=dummy-root-password app-password=dummy-app-password
+              bao kv put secret/platform/kafka admin-password=dummy-admin-password inter-broker-secret=dummy-inter-broker-secret
+              bao kv put secret/platform/s3 access-key=dummy-access-key secret-key=dummy-secret-key
+              bao kv put secret/platform/encryption master-key=REPLACE_WITH_32_BYTE_KEY
+              bao kv put secret/gateway/apisix admin-key=dummy-admin-key dashboard-password=dummy-dashboard-password etcd-password=dummy-etcd-password
+              bao kv put secret/iam/keycloak admin-password=dummy-admin-password db-password=dummy-db-password
+          volumeMounts:
+            - name: tls
+              mountPath: /openbao/tls
+              readOnly: true
+            - name: policies
+              mountPath: /config/policies
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.openbao.tls.secretName }}
+        - name: policies
+          projected:
+            sources:
+              - configMap:
+                  name: openbao-policy-platform
+              - configMap:
+                  name: openbao-policy-tenant
+              - configMap:
+                  name: openbao-policy-functions
+              - configMap:
+                  name: openbao-policy-gateway
+              - configMap:
+                  name: openbao-policy-iam
