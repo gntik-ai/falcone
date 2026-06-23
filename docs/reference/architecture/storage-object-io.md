@@ -1,0 +1,122 @@
+# Storage object I/O: presigned URLs, range reads, multipart upload, per-bucket delete
+
+Falcone's object-store API exposes the full object-I/O surface a BaaS storage service is expected to
+provide. Beyond the basic bucket list/provision, per-workspace usage, and single-object
+PUT/GET/DELETE/metadata, the control-plane storage handlers also serve **presigned/temporary URLs**,
+**HTTP range/partial reads**, **multipart/resumable upload**, and **per-bucket delete**.
+
+All of these operations are **tenant-scoped**: the bucket-ownership gate runs **before** any
+storage-backend call, so a caller that is neither superadmin/internal nor the owning tenant of the
+target bucket receives `404 BUCKET_NOT_FOUND` with no existence leak. A presigned URL or a multipart
+session for a bucket the caller does not own is impossible, and the raw S3/SeaweedFS error payload
+and the physical bucket path are never echoed to the caller.
+
+All routes ride the gateway under `/v1/storage/*` and require an authenticated principal.
+
+## Range / partial reads (HTTP 206)
+
+`GET /v1/storage/buckets/{bucketId}/objects/{objectKey}` honours an HTTP `Range` request header.
+
+- **WHEN** the request carries a satisfiable `Range` (e.g. `Range: bytes=0-3`), the response is
+  `206 Partial Content` with a `Content-Range` header, an `Accept-Ranges: bytes` header, and only the
+  requested byte range. The JSON body's `sizeBytes` reflects the **partial** length and
+  `partial: true` is set; the bytes are carried (base64) in `contentBase64`.
+- **WHEN** no `Range` header is present, the response is the unchanged `200` with the full body (and
+  `Accept-Ranges: bytes` is still advertised so clients know the object is range-capable).
+- An **unsatisfiable** range returns a clean `416` with code `STORAGE_RANGE_NOT_SATISFIABLE`.
+
+```bash
+curl -s -H "authorization: Bearer $TOKEN" -H "Range: bytes=0-3" \
+  "$GATEWAY/v1/storage/buckets/$BUCKET/objects/report.csv"
+# -> HTTP 206, Content-Range: bytes 0-3/2048, body contains only the first 4 bytes
+```
+
+## Presigned / temporary URLs
+
+`POST /v1/storage/buckets/{bucketId}/objects/{objectKey}/presign` returns a time-limited, scope-limited
+SigV4 query-presigned URL that authorises **exactly one** operation on **exactly that** bucket+object —
+so the URL can be handed to an external client (browser, `curl`, an SDK) with **no Falcone credential**.
+
+Request body:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `operation` | yes | `download` (signs a `GET`) or `upload` (signs a `PUT`). |
+| `ttlSeconds` | no | Requested lifetime; **clamped** to the platform maximum (see below). |
+
+Response (mirrors the product `StoragePresignedUrlRecord` shape):
+
+```json
+{
+  "url": "https://s3.example.com/<bucket>/<key>?X-Amz-Algorithm=AWS4-HMAC-SHA256&...&X-Amz-Signature=...",
+  "operation": "download",
+  "bucketName": "<bucket>",
+  "objectKey": "<key>",
+  "expiresAt": "2026-06-22T00:05:00.000Z",
+  "ttlSeconds": 300,
+  "ttlClamped": false
+}
+```
+
+The URL is bound to the bucket, the object key, the HTTP verb, the host, and the expiry — it cannot be
+repointed at another bucket/key/operation without invalidating the signature. The SigV4 **signing
+secret never appears** in the URL or the response (only the derived HMAC signature does).
+
+### `STORAGE_S3_PUBLIC_ENDPOINT` (important operator caveat)
+
+The control plane reaches the S3 gateway over the **in-cluster** ClusterIP (`STORAGE_S3_ENDPOINT`,
+e.g. `http://falcone-storage:8333`), which is **not resolvable from outside the cluster**. A presigned
+URL signed against that internal host would be useless to an external client.
+
+Set **`STORAGE_S3_PUBLIC_ENDPOINT`** to the externally-routable S3 gateway address; presigned URLs are
+then signed and built against that host while the control plane keeps using the internal endpoint for
+its own traffic. Because SigV4 is host-bound (`SignedHeaders=host`), `STORAGE_S3_PUBLIC_ENDPOINT`
+**must** be the host the client actually connects to, or the signature will not verify. When unset, it
+defaults to `STORAGE_S3_ENDPOINT` (so the in-cluster default is unchanged).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `STORAGE_S3_PUBLIC_ENDPOINT` | = `STORAGE_S3_ENDPOINT` | Host baked into presigned URLs handed to callers; point at the external gateway. |
+| `STORAGE_PRESIGN_MAX_TTL_SECONDS` | `3600` | Platform maximum presigned-URL lifetime (hard-capped at the SigV4 7-day ceiling). Requests above this are clamped (`ttlClamped: true`). |
+
+## Multipart / resumable upload
+
+Large objects are uploaded in parts via initiate → upload-part(s) → complete (or abort). Each route
+re-checks bucket ownership; the `uploadId` is opaque and provider-managed (it grants nothing on its
+own).
+
+| Step | Route |
+| --- | --- |
+| Initiate | `POST /v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart` → `{ uploadId, bucketName, objectKey }` |
+| Upload part | `PUT /v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/parts/{partNumber}` (raw body) → `{ partNumber, etag }` |
+| Complete | `POST /v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/complete` with `{ "parts": [{ "partNumber": 1, "etag": "..." }, ...] }` → assembled object summary |
+| Abort | `DELETE /v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}` |
+
+The completion part list must be **non-empty, strictly ordered, gap-free, and unique** (starting at
+part 1); an invalid list is rejected `400 INVALID_PART_LIST` before the backend call.
+
+**Quota:** completion re-applies the same per-workspace byte-quota admission a single-request upload
+applies (see [storage capacity quotas](./storage-capacity-quotas.md)). If `STORAGE_MAX_BYTES` is
+configured and the assembled object would exceed the workspace's limit, the completion is rejected
+`409 STORAGE_QUOTA_EXCEEDED` and the just-assembled object is removed — multipart cannot bypass the
+quota.
+
+## Per-bucket delete
+
+`DELETE /v1/storage/buckets/{bucketId}` removes a **single** bucket the caller owns, making bucket
+lifecycle symmetric with provision (previously the only way to remove a bucket was deleting the whole
+workspace or purging the tenant). On success (`200 { "bucket": "<bucket>", "deleted": true }`) it
+removes:
+
+1. the physical SeaweedFS bucket and its objects (idempotent),
+2. the `workspace_buckets` registry row, and
+3. (best-effort) the per-bucket and legacy per-workspace SeaweedFS identities, so no orphaned
+   credential survives.
+
+A non-owner receives `404 BUCKET_NOT_FOUND` (no existence leak) and nothing is deleted.
+
+## Web console
+
+The console storage page (`Storage`) surfaces two of these directly: select an object and use the
+**Presigned URLs** tab to "Generar URL de descarga prefirmada", and use the per-row **Eliminar** action
+to delete a single bucket. A full multipart upload UI is not provided in the console.

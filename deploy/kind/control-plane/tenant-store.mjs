@@ -495,6 +495,18 @@ export async function getBucketRecord(pool, bucketName) {
        FROM workspace_buckets WHERE bucket_name=$1 LIMIT 1`, [bucketName]);
   return rows[0] ?? null;
 }
+// Remove the registry row for a SINGLE bucket (#676 per-bucket delete). The physical
+// SeaweedFS bucket is dropped by storage-handlers::deleteBucket; this drops only the
+// `workspace_buckets` mapping row so the bucket disappears from list/usage. Idempotent:
+// deleting an absent row affects 0 rows and is a clean no-op. Keyed on the
+// globally-unique physical bucket name (no tenant/workspace scoping needed — the caller
+// has already passed the ownership gate). Returns the deleted row (or null).
+export async function deleteBucketRecord(pool, bucketName) {
+  const { rows } = await pool.query(
+    `DELETE FROM workspace_buckets WHERE bucket_name=$1
+       RETURNING id, workspace_id, tenant_id, bucket_name, region, created_at`, [bucketName]);
+  return rows[0] ?? null;
+}
 
 // ---- workspace topics (event store mapping) --------------------------------
 export async function insertTopic(pool, { id, workspaceId, tenantId, topicName, physicalTopicName, partitions }) {
