@@ -18,6 +18,24 @@ const ENDPOINT = (process.env.STORAGE_S3_ENDPOINT || process.env.MINIO_ENDPOINT 
 const ACCESS = process.env.STORAGE_S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY || '';
 const SECRET = process.env.STORAGE_S3_SECRET_KEY || process.env.MINIO_SECRET_KEY || '';
 const REGION = process.env.STORAGE_S3_REGION || process.env.MINIO_REGION || 'us-east-1';
+// Endpoint baked into PRESIGNED URLs handed back to the CALLER (#676). The control plane
+// reaches the S3 gateway over the in-cluster ClusterIP (ENDPOINT, e.g.
+// http://falcone-storage:8333), which is NOT resolvable from outside the cluster — a
+// presigned URL signed against it would be useless to an external app. STORAGE_S3_PUBLIC_ENDPOINT
+// lets an operator point presigned URLs at an externally-routable S3 gateway address while
+// the control plane keeps using the internal endpoint for its own SigV4 traffic. The SigV4
+// signature is host-bound (SignedHeaders=host), so the public endpoint MUST be the host the
+// client actually connects to or the signature will not verify. Defaults to ENDPOINT (so the
+// in-cluster default is unchanged when no external endpoint is configured).
+const PUBLIC_ENDPOINT = (process.env.STORAGE_S3_PUBLIC_ENDPOINT || ENDPOINT).replace(/\/+$/, '');
+// Platform maximum TTL (seconds) for a presigned URL. Mirrors the product preview builder's
+// DEFAULT_TTL_SECONDS (services/adapters/src/storage-multipart-presigned.mjs) and the SigV4
+// hard ceiling of 7 days; an operator may lower it via STORAGE_PRESIGN_MAX_TTL_SECONDS.
+const PRESIGN_MAX_TTL_SECONDS = (() => {
+  const n = Number(process.env.STORAGE_PRESIGN_MAX_TTL_SECONDS);
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 604800) : 3600;
+})();
+const PRESIGN_DEFAULT_TTL_SECONDS = Math.min(3600, PRESIGN_MAX_TTL_SECONDS);
 const EMPTY_SHA = crypto.createHash('sha256').update('').digest('hex');
 
 if (!process.env.STORAGE_S3_ENDPOINT && process.env.MINIO_ENDPOINT) {
@@ -142,6 +160,45 @@ async function s3(method, path, { query = {}, headers = {}, body } = {}) {
   return { status: res.status, headers: res.headers, text, buffer };
 }
 
+// Build a SigV4 QUERY-presigned URL (AWS4-HMAC-SHA256, path-style) for a single object
+// operation (#676). Unlike s3()'s header-signed path, the credential + signature ride in the
+// query string so the URL alone authorizes the request — a tenant can hand it to an external
+// client (browser/curl/SDK) with no Falcone credential. The signature is bound to exactly:
+//   - method (GET for download / PUT for upload),
+//   - canonical URI `/{bucket}/{key}` (so the URL cannot be repointed at another bucket/key
+//     without invalidating the signature),
+//   - host (SignedHeaders=host), and
+//   - X-Amz-Expires (TTL).
+// payloadHash is the literal `UNSIGNED-PAYLOAD` so the body need not be known at signing time
+// (required for an upload PUT). The host comes from PUBLIC_ENDPOINT so the URL targets the
+// externally-routable gateway; the signature verifies because we sign the same host. The
+// SECRET never appears in the URL — only the derived HMAC signature does (standard SigV4).
+function presignS3Url(method, bucket, key, expiresSeconds) {
+  const url = new URL(PUBLIC_ENDPOINT);
+  const host = url.host;
+  const { amzDate, dateStamp } = amzDates();
+  const scope = `${dateStamp}/${REGION}/s3/aws4_request`;
+  const canonicalUri = `/${bucket}/${key}`.split('/').map((seg, i) => (i === 0 ? seg : enc(seg))).join('/');
+  const queryParams = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${ACCESS}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expiresSeconds),
+    'X-Amz-SignedHeaders': 'host'
+  };
+  const canonicalQuery = Object.keys(queryParams).sort()
+    .map((k) => `${enc(k)}=${enc(queryParams[k])}`).join('&');
+  const canonicalHeaders = `host:${host}\n`;
+  const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256hex(canonicalRequest)].join('\n');
+  const kDate = hmac('AWS4' + SECRET, dateStamp);
+  const kRegion = hmac(kDate, REGION);
+  const kService = hmac(kRegion, 's3');
+  const signingKey = hmac(kService, 'aws4_request');
+  const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+  return `${PUBLIC_ENDPOINT}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
 // minimal XML helpers for the (simple, known) S3 list responses.
 // Entity-aware + CDATA-tolerant: SeaweedFS (and other gateways) may encode characters
 // in bucket names / object keys (`&amp; &lt; &gt; &quot; &#34;`) or wrap text in
@@ -205,12 +262,58 @@ export async function putObject(bucket, key, body, contentType = 'application/oc
 }
 // Download an object's body (add-wire-advertised-public-routes, #500 — object I/O was NO_ROUTE).
 // Returns the exact bytes plus a best-effort UTF-8 view; callers needing binary fidelity use `bytes`.
-export async function getObject(bucket, key) {
-  const { buffer, headers } = await s3('GET', `/${bucket}/${key}`);
-  return { content: buffer.toString('utf8'), bytes: buffer, contentType: headers.get('content-type') ?? 'application/octet-stream', sizeBytes: Number(headers.get('content-length') ?? buffer.length) };
+// When `range` is set (an HTTP Range header value, e.g. 'bytes=0-3'), it is forwarded to the S3
+// backend (#676 partial reads): SeaweedFS replies 206 with only the requested bytes plus a
+// Content-Range header. `status`/`contentRange` are surfaced so the handler can emit 206. An
+// unsatisfiable range yields a backend 416, which s3() throws (status 416) and the handler maps
+// to a clean 416.
+export async function getObject(bucket, key, { range } = {}) {
+  const headersIn = range ? { range } : {};
+  const { buffer, headers, status } = await s3('GET', `/${bucket}/${key}`, { headers: headersIn });
+  return {
+    content: buffer.toString('utf8'),
+    bytes: buffer,
+    contentType: headers.get('content-type') ?? 'application/octet-stream',
+    sizeBytes: Number(headers.get('content-length') ?? buffer.length),
+    status,
+    contentRange: headers.get('content-range') ?? null
+  };
 }
 export async function deleteObject(bucket, key) {
   await s3('DELETE', `/${bucket}/${key}`);
+}
+
+// ---- multipart upload backend helpers (#676) -------------------------------
+// Thin wrappers over the S3 multipart upload API (CreateMultipartUpload / UploadPart /
+// CompleteMultipartUpload / AbortMultipartUpload), all path-style and signed by s3(). The
+// uploadId is opaque + S3-managed; isolation comes from the handler re-checking bucket
+// ownership on EVERY call (the uploadId alone grants nothing without an owned bucket).
+export async function createMultipartUpload(bucket, key, contentType = 'application/octet-stream') {
+  const { text } = await s3('POST', `/${bucket}/${key}`, { query: { uploads: '' }, headers: { 'content-type': contentType } });
+  const uploadId = oneTag(text, 'UploadId');
+  if (!uploadId) { const e = new Error('multipart initiate returned no UploadId'); e.statusCode = 502; throw e; }
+  return { uploadId };
+}
+export async function uploadPart(bucket, key, uploadId, partNumber, body) {
+  const { headers } = await s3('PUT', `/${bucket}/${key}`, { query: { partNumber: String(partNumber), uploadId }, body });
+  const etag = (headers.get('etag') ?? '').replace(/"/g, '');
+  return { partNumber: Number(partNumber), etag };
+}
+// Build the CompleteMultipartUpload XML body from an ordered part list ({partNumber, etag}).
+function buildCompleteMultipartXml(parts) {
+  const items = parts.map((p) => {
+    const etag = String(p.etag ?? '').replace(/"/g, '');
+    return `<Part><PartNumber>${Number(p.partNumber)}</PartNumber><ETag>&#34;${etag}&#34;</ETag></Part>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><CompleteMultipartUpload xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${items}</CompleteMultipartUpload>`;
+}
+export async function completeMultipartUpload(bucket, key, uploadId, parts) {
+  const body = Buffer.from(buildCompleteMultipartXml(parts), 'utf8');
+  const { text } = await s3('POST', `/${bucket}/${key}`, { query: { uploadId }, headers: { 'content-type': 'application/xml' }, body });
+  return { etag: (oneTag(text, 'ETag') ?? '').replace(/&quot;|&#34;|"/g, ''), location: oneTag(text, 'Location') ?? null };
+}
+export async function abortMultipartUpload(bucket, key, uploadId) {
+  await s3('DELETE', `/${bucket}/${key}`, { query: { uploadId } });
 }
 
 // Ownership gate: returns true for superadmin/internal (cross-tenant allowed),
@@ -315,10 +418,30 @@ async function storagePutObject(ctx) {
 async function storageGetObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  // HTTP Range / partial read (#676): when the client sends a Range header, forward it to the
+  // backend and return 206 Partial Content with ONLY the requested bytes plus a Content-Range
+  // header. Without a Range header behavior is unchanged (200, full body) — we still advertise
+  // Accept-Ranges: bytes so clients know the resource is range-capable. An unsatisfiable range
+  // (e.g. start beyond EOF) makes the backend reply 416, which s3() throws (status 416) and we
+  // map to a clean 416 here (never echoing the raw S3 XML — #675).
+  const range = ctx.req?.headers?.range;
   try {
-    const o = await getObject(bucket, key);
-    return ok(200, { objectKey: key, bucketName: bucket, content: o.content, contentBase64: o.bytes.toString('base64'), encoding: 'base64', contentType: o.contentType, sizeBytes: o.sizeBytes });
-  } catch (e) { return storageFailure(e, 'STORAGE_GET_FAILED'); }
+    const o = await getObject(bucket, key, range ? { range } : {});
+    // Treat as partial only when the client asked for a range AND the backend honored it (206 +
+    // Content-Range). If the backend ignored the range (returned 200), fall through to the full body.
+    if (range && (o.status === 206 || o.contentRange)) {
+      return {
+        statusCode: 206,
+        headers: { 'content-range': o.contentRange ?? undefined, 'accept-ranges': 'bytes' },
+        body: { objectKey: key, bucketName: bucket, content: o.content, contentBase64: o.bytes.toString('base64'), encoding: 'base64', contentType: o.contentType, sizeBytes: o.bytes.length, contentRange: o.contentRange, partial: true }
+      };
+    }
+    return { statusCode: 200, headers: { 'accept-ranges': 'bytes' }, body: { objectKey: key, bucketName: bucket, content: o.content, contentBase64: o.bytes.toString('base64'), encoding: 'base64', contentType: o.contentType, sizeBytes: o.sizeBytes } };
+  } catch (e) {
+    // A 416 from the backend is a malformed/unsatisfiable Range — return a clean 416, not a 502.
+    if (e?.statusCode === 416) return err(416, 'STORAGE_RANGE_NOT_SATISFIABLE', 'The requested range is not satisfiable for this object.');
+    return storageFailure(e, 'STORAGE_GET_FAILED');
+  }
 }
 async function storageDeleteObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
@@ -564,8 +687,181 @@ async function storageRevokeCredential(ctx) {
   }
 }
 
+// DELETE /v1/storage/buckets/{bucketId} — delete a SINGLE bucket the caller owns (#676). The
+// only prior way to remove a bucket was deleting the whole workspace (deleteWorkspace) or
+// purging the tenant; deleteBucket() existed but was wired only into those cascades. This
+// makes bucket lifecycle symmetric (provision ↔ delete one bucket). Ownership-gated exactly
+// like object I/O: non-owner → 404 BUCKET_NOT_FOUND (no existence leak). Removes the physical
+// SeaweedFS bucket (and its objects), the workspace_buckets registry row, and — best-effort —
+// the per-bucket + legacy per-workspace SeaweedFS identities so no orphaned credential survives.
+async function storageDeleteBucket(ctx) {
+  const bucket = ctx.params.bucketId;
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  // The bucket must exist in the registry (a superadmin bypasses the owner check above).
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  try {
+    // 1) Physical bucket + objects (idempotent: a missing bucket is treated as success).
+    await deleteBucket(bucket);
+    // 2) Registry row (the source of truth for the tenant→bucket mapping).
+    await store.deleteBucketRecord(ctx.pool, bucket);
+    // 3) Best-effort credential cleanup — a failure here must not fail the delete (the bucket
+    //    and its row are already gone; a dangling identity grants access to nothing).
+    try { await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) }); }
+    catch (e) { console.error('[storage] best-effort per-bucket identity delete failed on bucket delete:', e?.message ?? e); }
+    await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
+    return ok(200, { bucket, deleted: true });
+  } catch (e) {
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_BUCKET_DELETE_FAILED', String(e.message ?? e));
+  }
+}
+
+// POST /v1/storage/buckets/{bucketId}/objects/{objectKey}/presign — issue a time-limited,
+// scope-limited SigV4 query-presigned URL for ONE object operation (#676). Body:
+// { operation: 'download'|'upload', ttlSeconds? }. The TTL is clamped to PRESIGN_MAX_TTL_SECONDS
+// (mirrors validateStoragePresignedTtl in services/adapters/src/storage-multipart-presigned.mjs).
+// The returned URL is bound to exactly this bucket+key+operation (the signature covers the
+// canonical URI and method) so it grants NO cross-bucket/-tenant access — and only the requested
+// verb (GET for download, PUT for upload). Ownership-gated like object I/O; a non-owner gets 404
+// BEFORE any URL is minted, so a presigned URL for a bucket the caller does not own is impossible.
+// Response shape mirrors buildStoragePresignedUrlRecord: { url, operation, bucketName, objectKey,
+// expiresAt, ttlSeconds, ttlClamped }. The SigV4 SECRET never appears in the URL or response.
+async function storagePresignObject(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const operation = String(ctx.body?.operation ?? 'download').toLowerCase();
+  if (operation !== 'download' && operation !== 'upload') {
+    return err(400, 'INVALID_PRESIGN_OPERATION', "operation must be 'download' or 'upload'");
+  }
+  // Clamp the requested TTL to the platform max (mirrors validateStoragePresignedTtl). A
+  // missing/invalid TTL falls back to the default; a value over the max is silently clamped.
+  const requested = Number(ctx.body?.ttlSeconds);
+  const requestedTtl = Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : PRESIGN_DEFAULT_TTL_SECONDS;
+  const ttlClamped = requestedTtl > PRESIGN_MAX_TTL_SECONDS;
+  const ttlSeconds = ttlClamped ? PRESIGN_MAX_TTL_SECONDS : requestedTtl;
+  const httpMethod = operation === 'upload' ? 'PUT' : 'GET';
+  const url = presignS3Url(httpMethod, bucket, key, ttlSeconds);
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+  return ok(200, { url, operation, bucketName: bucket, objectKey: key, expiresAt, ttlSeconds, ttlClamped });
+}
+
+// ---- multipart upload handlers (#676) --------------------------------------
+// Large/resumable uploads via initiate → upload-part(s) → complete (or abort). Every route
+// re-runs denyUnlessBucketOwner + decodeObjectKey: the uploadId is opaque/S3-managed and grants
+// nothing on its own, so isolation comes from re-checking that the CALLER owns the bucket on
+// each call. A multipart session for a bucket the caller does not own is impossible (404 before
+// any S3 call). On COMPLETE the SAME per-workspace byte-quota admission storagePutObject applies
+// is enforced against the assembled object's real size, so multipart cannot bypass the quota.
+
+// POST .../objects/{objectKey}/multipart — CreateMultipartUpload. Returns the opaque uploadId.
+async function storageMultipartInitiate(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const contentType = ctx.body?.contentType ?? 'application/octet-stream';
+  try {
+    const { uploadId } = await createMultipartUpload(bucket, key, contentType);
+    return ok(201, { uploadId, bucketName: bucket, objectKey: key, state: 'active' });
+  } catch (e) { return storageFailure(e, 'STORAGE_MULTIPART_INITIATE_FAILED'); }
+}
+
+// PUT .../objects/{objectKey}/multipart/{uploadId}/parts/{partNumber} — UploadPart. The part
+// body is the raw/binary request body (resolveObjectBody handles the JSON-envelope form too).
+async function storageMultipartUploadPart(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const uploadId = ctx.params.uploadId;
+  const partNumber = Number(ctx.params.partNumber);
+  if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > 10000) {
+    return err(400, 'INVALID_PART_NUMBER', 'partNumber must be an integer in 1..10000');
+  }
+  const { bytes } = resolveObjectBody(ctx);
+  try {
+    const part = await uploadPart(bucket, key, uploadId, partNumber, bytes);
+    return ok(200, { partNumber: part.partNumber, etag: part.etag, sizeBytes: bytes.length });
+  } catch (e) { return storageFailure(e, 'STORAGE_MULTIPART_UPLOAD_PART_FAILED'); }
+}
+
+// POST .../objects/{objectKey}/multipart/{uploadId}/complete — CompleteMultipartUpload. Body:
+// { parts: [{ partNumber, etag }, ...] }. The part list is validated for a strictly-ordered,
+// gap-free, non-empty sequence (mirrors validateStoragePartList) BEFORE the backend call.
+async function storageMultipartComplete(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const uploadId = ctx.params.uploadId;
+  const parts = Array.isArray(ctx.body?.parts) ? ctx.body.parts : null;
+  // Validate the ordered part list inline (mirrors validateStoragePartList): non-empty, every
+  // partNumber a positive integer, strictly increasing with no gaps, unique.
+  const validation = validatePartListInline(parts);
+  if (!validation.valid) return err(400, 'INVALID_PART_LIST', validation.errors[0]);
+  try {
+    const result = await completeMultipartUpload(bucket, key, uploadId, validation.parts);
+    // Per-workspace byte-quota admission AFTER assembly (#674/#676): multipart must not be a
+    // quota bypass. Enforced only when STORAGE_MAX_BYTES is configured (usageLimits().maxBytes
+    // != null short-circuits otherwise, so the hot path is unchanged). HEAD the assembled object
+    // for its real size, then check it against the workspace's other buckets' current bytes. If
+    // it would exceed the limit, delete the just-assembled object and return 409 — the bytes do
+    // not persist. Fails OPEN if the quota model / size lookup is unavailable.
+    if (usageLimits().maxBytes != null) {
+      let assembledBytes = 0;
+      try { const meta = await headObject(bucket, key); assembledBytes = Number(meta.size) || 0; } catch { /* size unknown → fail open */ }
+      if (assembledBytes > 0) {
+        const currentBytes = await workspaceCurrentBytes(ctx, bucket);
+        // currentBytes already includes the just-completed object; compare prior usage + this object.
+        const priorBytes = Math.max(currentBytes - assembledBytes, 0);
+        const decision = checkByteQuota(priorBytes, assembledBytes, {});
+        if (!decision.allowed) {
+          try { await deleteObject(bucket, key); } catch { /* best-effort rollback */ }
+          return err(409, STORAGE_QUOTA_EXCEEDED,
+            `storage byte quota would be exceeded for this workspace: ${priorBytes + assembledBytes}/${decision.limit} bytes`);
+        }
+      }
+    }
+    return ok(200, { objectKey: key, bucketName: bucket, etag: result.etag, parts: validation.parts.length, completed: true });
+  } catch (e) { return storageFailure(e, 'STORAGE_MULTIPART_COMPLETE_FAILED'); }
+}
+
+// DELETE .../objects/{objectKey}/multipart/{uploadId} — AbortMultipartUpload (cleanup of an
+// in-progress session and its already-uploaded parts).
+async function storageMultipartAbort(ctx) {
+  const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const uploadId = ctx.params.uploadId;
+  try {
+    await abortMultipartUpload(bucket, key, uploadId);
+    return ok(200, { objectKey: key, bucketName: bucket, uploadId, aborted: true });
+  } catch (e) { return storageFailure(e, 'STORAGE_MULTIPART_ABORT_FAILED'); }
+}
+
+// Inline ordered-part-list validation (mirrors validateStoragePartList in
+// services/adapters/src/storage-multipart-presigned.mjs; duplicated because the kind-runtime
+// image cannot import the services package). Requires a non-empty list of { partNumber, etag }
+// with strictly-increasing, gap-free, unique partNumbers starting at 1. Returns the normalized
+// part list on success.
+function validatePartListInline(parts) {
+  if (!Array.isArray(parts) || parts.length === 0) {
+    return { valid: false, errors: ['Multipart completion requires a non-empty part list.'] };
+  }
+  const normalized = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    const p = parts[i] ?? {};
+    const partNumber = p.partNumber;
+    const etag = String(p.etag ?? '').replace(/"/g, '');
+    if (!Number.isInteger(partNumber) || partNumber < 1) {
+      return { valid: false, errors: [`Invalid part number at index ${i}.`] };
+    }
+    if (!etag) return { valid: false, errors: [`Part ${partNumber} is missing an etag.`] };
+    if (partNumber !== i + 1) {
+      return { valid: false, errors: [`Multipart part list has a gap or misordering at expected part ${i + 1}.`] };
+    }
+    normalized.push({ partNumber, etag });
+  }
+  return { valid: true, errors: [], parts: normalized };
+}
+
 export const STORAGE_HANDLERS = {
   storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
-  storagePutObject, storageGetObject, storageDeleteObject,
+  storagePutObject, storageGetObject, storageDeleteObject, storageDeleteBucket,
+  storagePresignObject,
+  storageMultipartInitiate, storageMultipartUploadPart, storageMultipartComplete, storageMultipartAbort,
   storageRotateCredential, storageRevokeCredential
 };
