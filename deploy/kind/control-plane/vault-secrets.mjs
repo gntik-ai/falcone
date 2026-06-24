@@ -43,10 +43,11 @@ function vaultError(op, path, status) {
 
 /**
  * A minimal Vault KV v2 client. Methods map to the KV v2 REST surface:
- *   write  → POST   {mount}/data/{path}      body { data }
- *   read   → GET    {mount}/data/{path}
- *   delete → DELETE {mount}/metadata/{path}  (removes ALL versions)
- *   list   → GET    {mount}/metadata/{path}?list=true
+ *   write    → POST   {mount}/data/{path}      body { data }
+ *   read     → GET    {mount}/data/{path}
+ *   readMeta → GET    {mount}/metadata/{path}   (KV v2 metadata: created_time/updated_time/versions)
+ *   delete   → DELETE {mount}/metadata/{path}  (removes ALL versions)
+ *   list     → GET    {mount}/metadata/{path}?list=true
  */
 export function createVaultKvClient({ addr, token, mount = 'secret', namespace, fetchImpl = globalThis.fetch } = {}) {
   if (!addr) throw new TypeError('createVaultKvClient requires a Vault addr');
@@ -79,6 +80,22 @@ export function createVaultKvClient({ addr, token, mount = 'secret', namespace, 
       const json = await res.json();
       return { data: json?.data?.data ?? {}, version: Number(json?.data?.metadata?.version ?? 0) };
     },
+    // KV v2 metadata read: GET {mount}/metadata/{path} (no ?list). Returns the REAL OpenBao KV-v2
+    // metadata fields created_time / updated_time (snake_case on the wire) mapped to createdTime /
+    // updatedTime; null when the metadata path 404s (the secret does not exist). The createdTime is
+    // the time of v1; updatedTime tracks the current version's create time.
+    async readMeta(path) {
+      const res = await send('GET', metaUrl(path));
+      if (res.status === 404) return null;
+      if (!res.ok) throw vaultError('read-meta', path, res.status);
+      const json = await res.json();
+      const d = json?.data ?? {};
+      return {
+        createdTime: d.created_time ?? null,
+        updatedTime: d.updated_time ?? null,
+        currentVersion: Number(d.current_version ?? 0),
+      };
+    },
     async deleteSecret(path) {
       const res = await send('DELETE', metaUrl(path));
       if (!res.ok && res.status !== 404) throw vaultError('delete', path, res.status);
@@ -102,22 +119,84 @@ export function secretEnvVarName(name) {
   return String(name).toUpperCase().replace(/[^A-Z0-9_]/g, '_');
 }
 
+// Reserved (non-secret) key carried alongside the secret value in the KV data map. The store
+// whitelists this on the read path so a description is surfaced as metadata, while the secret
+// `value` is NEVER returned by any metadata method (only getValue/resolveEnv read `value`).
+const DESC_KEY = '_desc';
+
+// Shape one secret's non-secret metadata (the published FunctionWorkspaceSecret minus tenantId/
+// workspaceId, which the handler stamps from the verified workspace). NEVER carries `value` and
+// NEVER carries a KV `version` (KV-v2 versioning stays internal; the schema is additionalProperties:
+// false). `name` is retained as a backward-compat alias of `secretName`.
+function metaShape(name, { data, meta } = {}) {
+  const description = data && typeof data[DESC_KEY] === 'string' ? data[DESC_KEY] : undefined;
+  const createdAt = meta?.createdTime ?? null;
+  const updatedAt = meta?.updatedTime ?? meta?.createdTime ?? null;
+  return {
+    secretName: name,
+    name, // backward-compat alias (pre-convergence callers read { name })
+    timestamps: { createdAt, updatedAt },
+    ...(description !== undefined ? { description } : {}),
+  };
+}
+
 /**
  * A per-tenant/per-workspace workspace-secret store over a KV v2 client. All paths are derived from
  * the (credential-verified) tenantId + workspaceId, never from the secret value or env name.
+ *
+ * Values are write-only: `getValue`/`resolveEnv` are the SOLE value-returning methods and are used
+ * server-side only (function deploy). `getMeta`/`list` return non-secret metadata (timestamps,
+ * optional description) and NEVER the value. A non-secret `description` rides in the KV data map under
+ * the reserved `_desc` key; the read path whitelists it so it surfaces as metadata only.
  */
 export function createWorkspaceSecretStore(client) {
+  // Internal: write a secret value (+ optional description) at the workspace path. Shared by the
+  // create (set) and replace paths — KV-v2 writes a new version either way; the create-vs-replace
+  // distinction (conflict on an existing name) is enforced by the caller via exists().
+  async function write(tenantId, workspaceId, name, value, description) {
+    const data = { value: String(value) };
+    if (typeof description === 'string' && description.length > 0) data[DESC_KEY] = description;
+    await client.writeSecret(workspaceSecretPath(tenantId, workspaceId, name), data);
+  }
+
+  // Internal: read this secret's non-secret metadata (description + KV-v2 timestamps), or null when
+  // the secret does not exist. Reads BOTH the data map (for the whitelisted description) and the
+  // KV-v2 metadata (for created/updated times) — never exposing the value.
+  async function readMetaShape(tenantId, workspaceId, name) {
+    const path = workspaceSecretPath(tenantId, workspaceId, name);
+    const r = await client.readSecret(path);
+    if (!r) return null;
+    let meta = null;
+    if (typeof client.readMeta === 'function') {
+      try { meta = await client.readMeta(path); } catch { meta = null; }
+    }
+    return metaShape(name, { data: r.data, meta });
+  }
+
   return {
     validName: (n) => SECRET_NAME_RE.test(String(n ?? '')),
 
-    async set(tenantId, workspaceId, name, value) {
-      const { version } = await client.writeSecret(workspaceSecretPath(tenantId, workspaceId, name), { value: String(value) });
-      return { name, version, updatedAt: new Date().toISOString() };
+    // CREATE or REPLACE the value at the workspace path (KV-v2 new version). Returns metadata only
+    // (no value, no version). The handler enforces POST=create-only via exists() before calling.
+    async set(tenantId, workspaceId, name, value, description) {
+      await write(tenantId, workspaceId, name, value, description);
+      return (await readMetaShape(tenantId, workspaceId, name))
+        ?? metaShape(name, { data: { ...(description ? { [DESC_KEY]: description } : {}) }, meta: null });
+    },
+
+    // Alias for the PUT replace path (same KV write; prior version superseded).
+    async replace(tenantId, workspaceId, name, value, description) {
+      return this.set(tenantId, workspaceId, name, value, description);
+    },
+
+    // Existence probe for the create-only POST conflict check (true when the secret already exists).
+    async exists(tenantId, workspaceId, name) {
+      const r = await client.readSecret(workspaceSecretPath(tenantId, workspaceId, name));
+      return r != null;
     },
 
     async getMeta(tenantId, workspaceId, name) {
-      const r = await client.readSecret(workspaceSecretPath(tenantId, workspaceId, name));
-      return r ? { name, version: r.version } : null;
+      return readMetaShape(tenantId, workspaceId, name);
     },
 
     // Resolve the raw value — server-side only (function deploy); never returned over the API.
@@ -128,7 +207,12 @@ export function createWorkspaceSecretStore(client) {
 
     async list(tenantId, workspaceId) {
       const keys = await client.listSecrets(workspaceSecretPrefix(tenantId, workspaceId));
-      return keys.filter((k) => !String(k).endsWith('/')).map((name) => ({ name }));
+      const names = keys.filter((k) => !String(k).endsWith('/'));
+      const out = [];
+      for (const name of names) {
+        out.push((await readMetaShape(tenantId, workspaceId, name)) ?? metaShape(name));
+      }
+      return out;
     },
 
     async delete(tenantId, workspaceId, name) {

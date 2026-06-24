@@ -9,7 +9,8 @@ import { ConsoleSecretsPage, SecretVersionBadge } from './ConsoleSecretsPage'
 describe('ConsoleSecretsPage', () => {
   it('renders secrets table', () => {
     render(<MemoryRouter><ConsoleSecretsPage /></MemoryRouter>)
-    expect(screen.getByText('Secrets')).toBeInTheDocument()
+    // Relabeled to "Secret Rotation" to disambiguate from the new Workspace Secrets screen (#723).
+    expect(screen.getByText('Secret Rotation')).toBeInTheDocument()
     expect(screen.getByText('app-password')).toBeInTheDocument()
   })
 
