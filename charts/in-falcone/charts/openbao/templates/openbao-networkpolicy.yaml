@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openbao-access-policy
+  namespace: {{ .Values.openbao.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        # OpenBao's own namespace — REQUIRED so the in-namespace openbao-init Job (and any
+        # same-namespace client) can reach the server on 8200. Without this, on an enforcing CNI
+        # (kindnet enforces here) the init/unseal handshake times out and the server never initializes.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.openbao.namespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: eso-system
+        - namespaceSelector:
+            matchLabels:
+              {{ .Values.openbao.networkPolicy.allowedNamespaceLabel }}: "true"
+      ports:
+        - protocol: TCP
+          port: 8200
+  egress:
+    # DNS resolution (kube-dns) — required so the pod can resolve the cluster API and Service FQDNs.
+    # On enforcing CNIs (Calico/Cilium) an egress policy without port 53 silently breaks DNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kube API server — REQUIRED for the kubernetes auth method's TokenReview call. Allow BOTH 443
+    # (the kubernetes.default ClusterIP) and 6443 (the apiserver's real endpoint, which the ClusterIP
+    # DNATs to; enforcing CNIs evaluate egress against the POST-DNAT destination, so 443 alone lets the
+    # TokenReview time out -> every `auth/kubernetes/login` returns 403 "permission denied").
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443

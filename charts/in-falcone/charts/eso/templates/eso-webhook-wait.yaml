@@ -1,0 +1,97 @@
+{{- /*
+  The ClusterSecretStore / ExternalSecret instances are validated by the external-secrets admission
+  webhook. On a fresh install the webhook Deployment is still starting when the CR hooks fire, so the
+  apply fails with "connection refused" calling the webhook. This post-install/upgrade hook (weight -5,
+  i.e. BEFORE the CR hooks at weight 0/5) blocks until the webhook endpoint is actually serving, so the
+  CR hooks then validate successfully — making the whole release install in a single pass.
+*/ -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eso-webhook-wait
+  namespace: {{ .Values.eso.namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-6"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eso-webhook-wait
+  namespace: {{ .Values.eso.namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-6"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eso-webhook-wait
+  namespace: {{ .Values.eso.namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-6"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eso-webhook-wait
+subjects:
+  - kind: ServiceAccount
+    name: eso-webhook-wait
+    namespace: {{ .Values.eso.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eso-webhook-wait
+  namespace: {{ .Values.eso.namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: eso-webhook-wait
+    spec:
+      restartPolicy: Never
+      serviceAccountName: eso-webhook-wait
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: wait
+          image: {{ .Values.eso.webhookWait.image.repository }}:{{ .Values.eso.webhookWait.image.tag }}
+          imagePullPolicy: {{ .Values.eso.webhookWait.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "waiting for the external-secrets webhook endpoint to be ready..."
+              i=0
+              until kubectl -n {{ .Values.eso.namespace }} get endpoints eso-external-secrets-webhook \
+                      -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null | grep -q '[0-9]'; do
+                i=$((i+1)); [ "$i" -gt 60 ] && { echo "webhook endpoint not ready after 180s" >&2; exit 1; }
+                sleep 3
+              done
+              echo "external-secrets webhook endpoint is ready"

@@ -13,7 +13,7 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
 | Redpanda | `localhost:19092` (`KAFKA_BROKERS`) | Kafka API broker (events, audit, CDC change streams); auto-creates topics |
 | MongoDB  | `mongodb://localhost:57017/?replicaSet=rs0&directConnection=true` (`MONGO_URI` / `MONGO_TEST_URI`) | document store; single-node replica set `rs0` (**required** for CDC change streams); ephemeral (tmpfs); `rs.initiate()` + wait-for-PRIMARY on `up` |
 | SeaweedFS | `http://localhost:58333` S3 API (path-style; `falconedev`/`falconedevsecret`) | S3-compatible object storage (`S3_ENDPOINT`), replaces MinIO (ADR-13); ephemeral (tmpfs); bucket `falcone-test` (`S3_SDK_BUCKET`) created on `up` |
-| Vault    | `http://localhost:58200` (token `root`) (`VAULT_ADDR`/`VAULT_TOKEN`) | dev mode (auto-unsealed); file audit device → host-mounted log at `tests/env/vault/audit/vault-audit.log` (`VAULT_AUDIT_LOG_PATH`), tailed by `secret-audit-handler` |
+| OpenBao  | `http://localhost:58200` (token `root`) (`BAO_ADDR`/`BAO_TOKEN`, legacy `VAULT_ADDR`/`VAULT_TOKEN` also honored) | dev mode (auto-unsealed); file audit device → host-mounted log at `tests/env/openbao/audit/openbao-audit.log` (`BAO_AUDIT_LOG_PATH`, legacy `VAULT_AUDIT_LOG_PATH` fallback), tailed by `secret-audit-handler` |
 
 ### What each new service is for
 
@@ -27,10 +27,12 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
   `S3_SECRET_KEY` / `S3_SDK_BUCKET`) and storage-config export (`provisioning-orchestrator`
   `collectors/s3-collector.mjs`). All-in-one `server` (master+volume+filer+S3) on the
   spike-validated 4.33 image; `up.sh` creates the `falcone-test` bucket via `weed shell`.
-- **Vault** — secret store. Its only test-relevant job is emitting a **file**
-  audit log to a host-mounted path that `secret-audit-handler` (`src/index.mjs`,
-  reads `VAULT_AUDIT_LOG_PATH`) tails and republishes. `up.sh` enables the file
-  audit device and generates an audit entry so the host log file exists.
+- **OpenBao** — secret store (the open-source Vault fork; CLI `bao`, image
+  `openbao/openbao`). Its only test-relevant job is emitting a **file** audit log to a
+  host-mounted path that `secret-audit-handler` (`src/index.mjs`, reads
+  `BAO_AUDIT_LOG_PATH` with a `VAULT_AUDIT_LOG_PATH` fallback) tails and republishes.
+  `up.sh` enables the file audit device and generates an audit entry so the host log
+  file exists. OpenBao's file-audit JSON is Vault-schema-compatible, so the parser is unchanged.
 
 ### Bootstrap performed by `up.sh` (idempotent)
 
@@ -39,8 +41,8 @@ the preferred local integration target (lighter than a throwaway Kubernetes).
   (PRIMARY).
 - **SeaweedFS**: `s3.bucket.create -name falcone-test` via the in-container `weed shell`
   (check-then-create, idempotent).
-- **Vault**: `vault audit enable file file_path=/vault/audit/vault-audit.log`
-  ("already enabled" is ignored), then a `vault kv get` / `vault token lookup` to
+- **OpenBao**: `bao audit enable file file_path=/openbao/audit/openbao-audit.log`
+  ("already enabled" is ignored), then a `bao kv get` / `bao token lookup` to
   guarantee the host-visible audit log file is non-empty.
 
 ### Out of scope (these stay on the Kubernetes/Helm path)

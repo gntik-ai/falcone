@@ -1,15 +1,15 @@
 # Secret Management
 
-In Falcone keeps secret **values** out of git and out of values files. The chart references existing Kubernetes Secrets by name (`config.secretRefs`), and those Secrets are sourced from **HashiCorp Vault** via the **External Secrets Operator (ESO)**.
+Falcone keeps secret **values** out of git and out of values files. The chart references existing Kubernetes Secrets by name (`config.secretRefs`), and those Secrets are sourced from **OpenBao** (the open-source HashiCorp Vault fork) via the **External Secrets Operator (ESO)**.
 
 ## Model
 
 ```
-Vault  ──(External Secrets Operator)──▶  Kubernetes Secret  ──(secretRefs / secretKeyRef)──▶  Pods
+OpenBao  ──(External Secrets Operator)──▶  Kubernetes Secret  ──(secretRefs / secretKeyRef)──▶  Pods
 ```
 
-- `vault` (chart alias) — the secret backend. The dev compose stack runs Vault in `-dev` mode; production points ESO at your Vault.
-- `eso` (chart alias) — the External Secrets Operator, which materializes Vault paths into namespaced Kubernetes Secrets.
+- `openbao` (chart alias) — the secret backend (image `openbao/openbao`, CLI `bao`). The dev compose stack runs OpenBao in `-dev` mode; production points ESO at your OpenBao. Disabled by default — opt in via `openbao.enabled=true` (the kind self-signed TLS path is `deploy/kind/values-kind-vault.yaml`).
+- `eso` (chart alias) — the External Secrets Operator, which materializes OpenBao KV paths into namespaced Kubernetes Secrets. Its `ClusterSecretStore` (`openbao-backend`) uses ESO's `vault` provider type, which is the OpenBao-compatible client (the KV v2 REST surface is byte-compatible).
 - `config.secretRefs` — the chart's map of which existing Secret + keys feed each component.
 
 ## secretRefs

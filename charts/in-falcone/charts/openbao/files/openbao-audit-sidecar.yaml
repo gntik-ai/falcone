@@ -1,0 +1,22 @@
+{{- if .Values.openbao.auditSidecar.enabled }}
+- name: secret-audit-handler
+  image: "{{ .Values.openbao.auditSidecar.image.repository }}:{{ .Values.openbao.auditSidecar.image.tag }}"
+  imagePullPolicy: {{ .Values.openbao.auditSidecar.image.pullPolicy }}
+  command: ["node", "/opt/secret-audit-handler/src/index.mjs"]
+  env:
+    - name: BAO_AUDIT_LOG_PATH
+      value: /openbao/audit/openbao-audit.log
+    - name: KAFKA_BROKERS
+      value: {{ .Values.openbao.auditSidecar.kafkaBrokers | quote }}
+    - name: SECRET_AUDIT_KAFKA_TOPIC
+      value: {{ .Values.openbao.auditSidecar.kafkaTopic | quote }}
+  resources:
+{{ toYaml .Values.openbao.auditSidecar.resources | indent 4 }}
+  volumeMounts:
+    - name: audit
+      mountPath: /openbao/audit
+      readOnly: true
+    - name: secret-audit-handler
+      mountPath: /opt/secret-audit-handler
+      readOnly: true
+{{- end }}

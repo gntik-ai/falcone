@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-migration
+  namespace: {{ .Values.openbao.namespace }}
+  annotations:
+    falcone.io/rollback: "Revert service chart updates to previous inline credential sources if verification fails."
+spec:
+  template:
+    spec:
+      serviceAccountName: openbao
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate-secrets
+          image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              export BAO_ADDR="https://openbao.{{ .Values.openbao.namespace }}.svc.cluster.local:8200"
+              export BAO_CACERT=/openbao/tls/ca.crt
+              : "This job is intentionally idempotent; replace credential discovery stubs with real cluster sources at deploy time."
+              : "The real Vault->OpenBao migration runbook lives under loop-state/system-changes/replace-vault-with-openbao/ (backup.sh + migrate.sh), not in this in-cluster Job."
+              echo "Idempotent migration placeholder: read existing Kubernetes Secrets and upsert them into OpenBao via bao kv put."
+              echo "Record migrated metadata into secret_metadata with INSERT ... ON CONFLICT DO NOTHING."
+              exit 0
+          volumeMounts:
+            - name: tls
+              mountPath: /openbao/tls
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.openbao.tls.secretName }}

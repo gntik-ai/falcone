@@ -15,7 +15,13 @@
  * bbx-612-isolation:   tenant/workspace are encoded in the path; one tenant cannot read another's
  * bbx-612-env:         resolveEnv maps refs (string → UPPER_SNAKE; object → explicit env); missing skipped
  * bbx-612-auth:        the client sends X-Vault-Token (and X-Vault-Namespace when set)
- * bbx-612-from-env:    vaultStoreFromEnv is null without VAULT_ADDR/VAULT_TOKEN, a store with both
+ * bbx-612-from-env:    vaultStoreFromEnv is null without addr/token, a store with both (legacy VAULT_*)
+ * bbx-612-bao-env:     vaultStoreFromEnv honors the canonical BAO_* env (Vault -> OpenBao swap), and
+ *                      BAO_* takes precedence over VAULT_* while either alone still works
+ *
+ * NOTE: the backend is OpenBao (the Vault fork). The KV v2 REST surface, paths, and the X-Vault-Token
+ * request header are byte-compatible, so the fake server below (and the asserted protocol) is
+ * unchanged by the swap; the client just additionally accepts BAO_* env aliases.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -163,12 +169,34 @@ test('bbx-612-auth: the client sends X-Vault-Token and X-Vault-Namespace', async
   }
 });
 
-test('bbx-612-from-env: vaultStoreFromEnv is null without config and a store when configured', () => {
+test('bbx-612-from-env: vaultStoreFromEnv is null without config and a store when configured (legacy VAULT_*)', () => {
   assert.equal(vaultStoreFromEnv({}), null);
   assert.equal(vaultStoreFromEnv({ VAULT_ADDR: addr }), null); // token missing → still null
   const s = vaultStoreFromEnv({ VAULT_ADDR: addr, VAULT_TOKEN: 't' });
   assert.equal(typeof s.set, 'function');
   assert.equal(typeof s.resolveEnv, 'function');
+});
+
+test('bbx-612-bao-env: vaultStoreFromEnv honors the canonical BAO_* env and BAO_* wins over VAULT_*', async () => {
+  // BAO_* alone is sufficient (the canonical OpenBao spelling after the swap).
+  assert.equal(vaultStoreFromEnv({ BAO_ADDR: addr }), null); // token missing → still null
+  const sBao = vaultStoreFromEnv({ BAO_ADDR: addr, BAO_TOKEN: 't' });
+  assert.equal(typeof sBao.set, 'function');
+  assert.equal(typeof sBao.resolveEnv, 'function');
+
+  // A store built from BAO_* operates identically against the same backend as one built from
+  // VAULT_*: a round-trip set/getValue works through the fake KV v2 server.
+  const sBaoLive = vaultStoreFromEnv({ BAO_ADDR: addr, BAO_TOKEN: 'kind-root', BAO_KV_MOUNT: 'secret' });
+  await sBaoLive.set('ten-bao', 'ws-bao', 'k_bao', 'bao-value');
+  assert.equal(await sBaoLive.getValue('ten-bao', 'ws-bao', 'k_bao'), 'bao-value');
+
+  // When BOTH are set, BAO_* takes precedence: a wrong VAULT_ADDR is ignored because BAO_ADDR wins.
+  const sBoth = vaultStoreFromEnv({
+    BAO_ADDR: addr, BAO_TOKEN: 'kind-root', BAO_KV_MOUNT: 'secret',
+    VAULT_ADDR: 'http://127.0.0.1:1', VAULT_TOKEN: 'ignored', VAULT_KV_MOUNT: 'wrong',
+  });
+  await sBoth.set('ten-prec', 'ws-prec', 'k_prec', 'prec-value');
+  assert.equal(await sBoth.getValue('ten-prec', 'ws-prec', 'k_prec'), 'prec-value');
 });
 
 test('bbx-612-token-required: the client surfaces a Vault auth failure', async () => {

@@ -1,0 +1,22 @@
+{{- /* finding D7/C.6: render the cert-manager Certificate ONLY in cert-manager mode. On a cluster
+  without cert-manager (e.g. kind) this CRD is absent, so rendering it unconditionally aborted the
+  release whenever openbao.enabled=true. The self-signed bootstrap Job covers the kind path. */ -}}
+{{- if eq (.Values.openbao.tls.mode | default "cert-manager") "cert-manager" }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openbao-server-tls
+  namespace: {{ .Values.openbao.namespace }}
+spec:
+  secretName: {{ .Values.openbao.tls.secretName }}
+  issuerRef:
+    name: {{ .Values.openbao.tls.issuerRef.name }}
+    kind: {{ .Values.openbao.tls.issuerRef.kind }}
+  commonName: openbao.secret-store.svc.cluster.local
+  dnsNames:
+    - openbao
+    - openbao.secret-store
+    - openbao.secret-store.svc
+    - openbao.secret-store.svc.cluster.local
+    - openbao-internal.secret-store.svc.cluster.local
+{{- end }}

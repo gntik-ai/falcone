@@ -75,7 +75,7 @@ message bus), and **operational add‑ons** (observability, secrets manager, flo
 
 | Component | Kind | Purpose |
 |---|---|---|
-| `vault` (+ `secret-audit-handler` sidecar) | StatefulSet | Secrets manager (KV‑v2) with file‑audit → Kafka. ESO is the integration path. |
+| `openbao` (+ `secret-audit-handler` sidecar) | StatefulSet | Secrets manager (OpenBao, KV‑v2) with file‑audit → Kafka. ESO is the integration path. |
 | `temporal` (frontend/history/matching/worker/web) | Deployments + Jobs | Flows engine; `workflow-worker` runs the DSL interpreter. |
 | `postgresql-vector` | StatefulSet | Dedicated `pgvector` Postgres for KNN/vector search (dedicated‑DB tenants). |
 | MCP runtime RBAC + NetworkPolicy | Role/RoleBinding/NetworkPolicy | Hosting of per‑tenant MCP servers as Knative Services. |
@@ -153,7 +153,7 @@ graph TD
 `kafka`, `seaweedfs`) → init Jobs (`documentdb-init`, SeaweedFS seed/bucket) →
 `keycloak` → `ferretdb` → `control-plane` → `control-plane-executor` → `apisix` →
 `web-console` → bootstrap Job (realm + routes) → `prometheus`/`grafana` → Routes.
-Optional add‑ons (`vault`, `temporal`, `postgresql-vector`, MCP) slot in after the
+Optional add‑ons (`openbao`, `temporal`, `postgresql-vector`, MCP) slot in after the
 data plane is healthy.
 
 ---
@@ -169,7 +169,7 @@ data plane is healthy.
 
 2. **Privileges.**
    - *Namespace‑scoped* operator can apply everything in §4–§7 **except** the
-     ClusterRole/ClusterRoleBinding (Vault Kubernetes‑auth, optional) and the SCC
+     ClusterRole/ClusterRoleBinding (OpenBao Kubernetes‑auth, optional) and the SCC
      binding, which need **cluster‑admin** (or a one‑time grant by cluster‑admin).
    - Creating the `Project`/`Namespace` needs the `self-provisioner` role or
      cluster‑admin.
@@ -228,8 +228,8 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 | Keycloak | `quay.io/keycloak/keycloak:26.1.0` | quay.io | `${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0` | IdP |
 | APISIX | `apache/apisix:3.10.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0` | gateway |
 | kubectl (bootstrap) | `bitnami/kubectl:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2` | bootstrap + TLS‑bootstrap Jobs |
-| Vault (opt) | `hashicorp/vault:1.15.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/hashicorp/vault:1.15.0` | secrets manager. **[VERIFY]** chart pins 1.15.0; `tests/env` uses 1.18 — standardize. |
-| Node (Vault sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
+| OpenBao (opt) | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
+| Node (OpenBao audit sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
 | Temporal server (opt) | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
 | Temporal admin‑tools (opt) | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
 | Temporal UI (opt) | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
@@ -256,7 +256,7 @@ Build bases to mirror (for BuildConfig): `node:22-alpine`, `node:22-slim`,
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
 > - `web-console` chart default `ghcr.io/example/in-falcone-web-console:0.1.0` is a
 >   placeholder — use the real `0.2.11` (or your published) tag.
-> - `vault` is `1.15.0` in the chart vs `1.18` in `tests/env` — pick one deliberately.
+> - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.
 
@@ -290,7 +290,7 @@ skopeo copy docker://docker.io/apache/apisix:3.10.0            docker://${HARBOR
 skopeo copy docker://docker.io/bitnami/kubectl:1.32.2          docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
 
 # Optional add-ons
-skopeo copy docker://docker.io/hashicorp/vault:1.15.0          docker://${HARBOR}/${HARBOR_PROJECT}/hashicorp/vault:1.15.0
+skopeo copy docker://docker.io/openbao/openbao:2.3.1           docker://${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1
 skopeo copy docker://docker.io/library/node:20-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine
 skopeo copy docker://docker.io/temporalio/server:1.31.1        docker://${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1
 skopeo copy docker://docker.io/temporalio/admin-tools:1.31.1   docker://${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1
@@ -579,7 +579,7 @@ done
 ```
 
 > **[VERIFY] Optional add‑ons that pin a uid.** Upstream `grafana` (uid 472) and
-> `vault` (uid 100) images pin a non‑root uid that is **outside** the namespace range
+> `openbao` (uid 100) images pin a non‑root uid that is **outside** the namespace range
 > and therefore **rejected by `restricted-v2`**. In §7/§ add‑ons these pins are removed
 > (let the SCC inject the uid). If a specific image truly needs a fixed uid, create a
 > dedicated SCC with `runAsUser: MustRunAs <uid>` and bind it to that SA only — do not
@@ -673,7 +673,7 @@ spec:
 
 ## 5. Configuration (Secrets & ConfigMaps)
 
-The chart **does not** create the credential Secrets — they are expected from ESO/Vault
+The chart **does not** create the credential Secrets — they are expected from ESO/OpenBao
 or pre‑created. In this plain‑manifest install you create them directly. **Never commit
 real secret values**; the YAML below uses placeholders, and the `oc create secret`
 commands keep values out of files.
@@ -1203,7 +1203,7 @@ spec:
   resources: { requests: { storage: 20Gi } }
 ```
 
-> The optional `postgresql-vector` (10Gi) and `vault` (data 10Gi + audit 2Gi) PVCs are
+> The optional `postgresql-vector` (10Gi) and `openbao` (data 10Gi + audit 2Gi) PVCs are
 > included in their respective add‑on sections (§8).
 
 ---
@@ -2269,7 +2269,7 @@ spec:
 ### 7.7 Control‑plane (Product/Management API) — Deployment + Service
 
 The env below is the production set from the OpenShift overlay (the base chart leaves
-most of it to ESO/Vault). `automountServiceAccountToken: true` because the control‑plane
+most of it to ESO/OpenBao). `automountServiceAccountToken: true` because the control‑plane
 calls the Kubernetes API to create Knative Services for functions.
 
 ```yaml
@@ -2888,22 +2888,23 @@ spec:
 Install only the capabilities you need. Each is self‑contained and slots in after the
 core data plane is healthy.
 
-### 8.1 Vault (secrets manager)
+### 8.1 OpenBao (secrets manager)
 
-> The chart deploys Vault in a separate `secret-store` namespace and uses a cert‑manager
+> The chart deploys OpenBao in a separate `secret-store` namespace and uses a cert‑manager
 > `Certificate` for TLS. In an air‑gap cluster without cert‑manager, this guide deploys
-> Vault **in `falcone`** with a **manually‑generated self‑signed TLS Secret**, and
-> disables `mlock` (the `IPC_LOCK` capability is dropped under `restricted-v2`).
+> OpenBao **in `falcone`** with a **manually‑generated self‑signed TLS Secret**, and
+> disables `mlock` (the `IPC_LOCK` capability is dropped under `restricted-v2`). OpenBao is the
+> open-source Vault fork; the CLI is `bao` and the KV‑v2 REST surface is Vault-compatible.
 
 **1) Generate the TLS Secret** (off‑cluster, then apply):
 
 ```bash
 openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
   -keyout tls.key -out tls.crt \
-  -subj "/CN=vault.falcone.svc.cluster.local" \
-  -addext "subjectAltName=DNS:vault,DNS:vault.falcone,DNS:vault.falcone.svc,DNS:vault.falcone.svc.cluster.local,DNS:vault-internal.falcone.svc.cluster.local"
+  -subj "/CN=openbao.falcone.svc.cluster.local" \
+  -addext "subjectAltName=DNS:openbao,DNS:openbao.falcone,DNS:openbao.falcone.svc,DNS:openbao.falcone.svc.cluster.local,DNS:openbao-internal.falcone.svc.cluster.local"
 cp tls.crt ca.crt   # self-signed: the cert is its own CA
-oc -n falcone create secret generic vault-server-tls \
+oc -n falcone create secret generic openbao-server-tls \
   --from-file=tls.crt=tls.crt --from-file=tls.key=tls.key --from-file=ca.crt=ca.crt \
   --dry-run=client -o yaml | oc apply -f -
 ```
@@ -2913,31 +2914,31 @@ oc -n falcone create secret generic vault-server-tls \
 ```yaml
 apiVersion: v1
 kind: ConfigMap
-metadata: { name: vault-config, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
+metadata: { name: openbao-config, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
 data:
-  vault.hcl: |
-    storage "file" { path = "/vault/data" }
+  openbao.hcl: |
+    storage "file" { path = "/openbao/data" }
     listener "tcp" {
       address       = "0.0.0.0:8200"
       tls_disable   = 0
-      tls_cert_file = "/vault/tls/tls.crt"
-      tls_key_file  = "/vault/tls/tls.key"
+      tls_cert_file = "/openbao/tls/tls.crt"
+      tls_key_file  = "/openbao/tls/tls.key"
     }
     disable_mlock     = true
     ui                = true
     default_lease_ttl = "24h"
     max_lease_ttl     = "768h"
-    api_addr     = "https://vault.falcone.svc.cluster.local:8200"
-    cluster_addr = "https://$(HOSTNAME).vault-internal.falcone.svc.cluster.local:8201"
+    api_addr     = "https://openbao.falcone.svc.cluster.local:8200"
+    cluster_addr = "https://$(HOSTNAME).openbao-internal.falcone.svc.cluster.local:8201"
 ---
 apiVersion: v1
 kind: ServiceAccount
-metadata: { name: vault, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
+metadata: { name: openbao, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
 ---
-# CLUSTER-ADMIN: Vault's Kubernetes auth needs tokenreviews + SA token creation.
+# CLUSTER-ADMIN: OpenBao's Kubernetes auth needs tokenreviews + SA token creation.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
-metadata: { name: falcone-vault-kubernetes-auth }
+metadata: { name: falcone-openbao-kubernetes-auth }
 rules:
   - apiGroups: [""]
     resources: ["serviceaccounts", "serviceaccounts/token", "nodes"]
@@ -2948,43 +2949,43 @@ rules:
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
-metadata: { name: falcone-vault-kubernetes-auth }
-roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: falcone-vault-kubernetes-auth }
+metadata: { name: falcone-openbao-kubernetes-auth }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: falcone-openbao-kubernetes-auth }
 subjects:
-  - { kind: ServiceAccount, name: vault, namespace: falcone }
+  - { kind: ServiceAccount, name: openbao, namespace: falcone }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
-metadata: { name: vault-data, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
+metadata: { name: openbao-data, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
 spec: { accessModes: ["ReadWriteOnce"], storageClassName: ${OCP_STORAGECLASS}, resources: { requests: { storage: 10Gi } } }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
-metadata: { name: vault-audit, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
+metadata: { name: openbao-audit, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
 spec: { accessModes: ["ReadWriteOnce"], storageClassName: ${OCP_STORAGECLASS}, resources: { requests: { storage: 2Gi } } }
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: { name: vault, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: vault } }
+metadata: { name: openbao, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: openbao } }
 spec:
-  serviceName: vault-internal
+  serviceName: openbao-internal
   replicas: 1
-  selector: { matchLabels: { app.kubernetes.io/name: vault } }
+  selector: { matchLabels: { app.kubernetes.io/name: openbao } }
   template:
-    metadata: { labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: vault } }
+    metadata: { labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: openbao } }
     spec:
-      serviceAccountName: vault
+      serviceAccountName: openbao
       imagePullSecrets: [{ name: harbor-pull }]
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       containers:
-        - name: vault
-          image: ${HARBOR}/${HARBOR_PROJECT}/hashicorp/vault:1.15.0
+        - name: openbao
+          image: ${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1
           imagePullPolicy: IfNotPresent
-          args: ["server", "-config=/vault/config/vault.hcl"]
+          args: ["server", "-config=/openbao/config/openbao.hcl"]
           env:
-            - { name: VAULT_ADDR, value: https://vault.falcone.svc.cluster.local:8200 }
-            - { name: VAULT_API_ADDR, value: https://vault.falcone.svc.cluster.local:8200 }
-            - { name: VAULT_CACERT, value: /vault/tls/ca.crt }
+            - { name: BAO_ADDR, value: https://openbao.falcone.svc.cluster.local:8200 }
+            - { name: BAO_API_ADDR, value: https://openbao.falcone.svc.cluster.local:8200 }
+            - { name: BAO_CACERT, value: /openbao/tls/ca.crt }
           ports:
             - { containerPort: 8200, name: http }
             - { containerPort: 8201, name: cluster }
@@ -3002,35 +3003,35 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
           volumeMounts:
-            - { name: data, mountPath: /vault/data }
-            - { name: audit, mountPath: /vault/audit }
-            - { name: config, mountPath: /vault/config, readOnly: true }
-            - { name: tls, mountPath: /vault/tls, readOnly: true }
+            - { name: data, mountPath: /openbao/data }
+            - { name: audit, mountPath: /openbao/audit }
+            - { name: config, mountPath: /openbao/config, readOnly: true }
+            - { name: tls, mountPath: /openbao/tls, readOnly: true }
       volumes:
-        - { name: config, configMap: { name: vault-config } }
-        - { name: tls, secret: { secretName: vault-server-tls } }
-        - { name: data, persistentVolumeClaim: { claimName: vault-data } }
-        - { name: audit, persistentVolumeClaim: { claimName: vault-audit } }
+        - { name: config, configMap: { name: openbao-config } }
+        - { name: tls, secret: { secretName: openbao-server-tls } }
+        - { name: data, persistentVolumeClaim: { claimName: openbao-data } }
+        - { name: audit, persistentVolumeClaim: { claimName: openbao-audit } }
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: vault, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: vault } }
+metadata: { name: openbao, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: openbao } }
 spec:
   type: ClusterIP
-  selector: { app.kubernetes.io/name: vault }
+  selector: { app.kubernetes.io/name: openbao }
   ports: [{ name: http, port: 8200, targetPort: 8200 }, { name: cluster, port: 8201, targetPort: 8201 }]
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: vault-internal, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: vault } }
+metadata: { name: openbao-internal, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: openbao } }
 spec:
   clusterIP: None
-  selector: { app.kubernetes.io/name: vault }
+  selector: { app.kubernetes.io/name: openbao }
   ports: [{ name: http, port: 8200, targetPort: 8200 }, { name: cluster, port: 8201, targetPort: 8201 }]
 ```
 
-> **[VERIFY] Vault init.** The chart ships a `vault-init` Job that runs
-> `vault operator init`/`unseal`, enables Kubernetes auth + KV‑v2, writes policies, and
+> **[VERIFY] OpenBao init.** The chart ships an `openbao-init` Job that runs
+> `bao operator init`/`unseal`, enables Kubernetes auth + KV‑v2, writes policies, and
 > seeds placeholder secrets. Reproduce it adapted to this namespace: set
 > `bound_service_account_namespaces='falcone'` (the chart uses
 > `postgresql,documentdb,kafka,apisix,keycloak,eso-system` — those don't exist here).
@@ -3574,7 +3575,7 @@ returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
 | `ImagePullBackOff` / `ErrImagePull` | Image not mirrored into Harbor, wrong path, or node doesn't trust Harbor CA | Confirm the exact tag exists in Harbor (`skopeo inspect docker://${HARBOR}/${HARBOR_PROJECT}/<img>`); verify node‑level registry trust (§2 [VERIFY]); confirm `harbor-pull` is linked to the SA. |
 | `unauthorized` pulling | Robot account lacks pull on the project, or pull secret wrong | Recreate `harbor-pull` (§3.3); `oc -n falcone get sa default -o yaml` should list it under `imagePullSecrets`. |
 | Pod `CreateContainerConfigError` referencing a Secret/ConfigMap | Referenced Secret/ConfigMap not created or wrong key | The §5.1 table lists every required Secret + keys; `oc -n falcone get secret,cm`. |
-| Pod rejected: `unable to validate against any security context constraint` / `runAsUser: Invalid value` | A pinned uid/fsGroup outside the namespace range under `restricted-v2` | Remove the pin (this guide already nulls them for grafana/vault/documentdb/pgvector); or bind a dedicated SCC to that SA only. |
+| Pod rejected: `unable to validate against any security context constraint` / `runAsUser: Invalid value` | A pinned uid/fsGroup outside the namespace range under `restricted-v2` | Remove the pin (this guide already nulls them for grafana/openbao/documentdb/pgvector); or bind a dedicated SCC to that SA only. |
 | `hostPath` volume denied | restricted SCC forbids hostPath (upstream SeaweedFS s3 default) | Already fixed here (s3 logs use `emptyDir`); ensure you used the §7.5 s3 manifest, not the upstream one. |
 | PVC stuck `Pending` | StorageClass missing/!dynamic, or no RWO capacity | `oc get pvc -n falcone`; set `${OCP_STORAGECLASS}` to a valid dynamic RWO class; check quota. |
 | Build base image not found (BuildConfig) | `FROM` points at a public registry / base not mirrored | Mirror `node:22-alpine`, `node:22-slim`, `nginx:1.27-alpine` to Harbor and set the BuildConfig `strategy.dockerStrategy.from` to the Harbor path (Appendix B). |
@@ -3586,7 +3587,7 @@ returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
 | SeaweedFS install hangs at the bucket Job | NetworkPolicy dropped the Job's traffic to master/filer | Ensure the §4.2 SeaweedFS policy admits `batch.kubernetes.io/job-name: falcone-seaweedfs-bucket`. |
 | Functions/MCP fail to deploy | OpenShift Serverless (Knative) absent | Install the Serverless Operator + `KnativeServing`, or disable functions/MCP. |
 | ImageStream trigger didn't roll out a Deployment | Deployments don't auto‑follow ImageStreams | Use direct Harbor image refs (default here), or add the `image.openshift.io/triggers` annotation (Appendix B). |
-| Vault pod CrashLoop `mlock` / `cannot allocate memory` | `IPC_LOCK` dropped under restricted SCC | `disable_mlock = true` is set in `vault.hcl` (§8.1) — confirm it's applied. |
+| OpenBao pod CrashLoop `mlock` / `cannot allocate memory` | `IPC_LOCK` dropped under restricted SCC | `disable_mlock = true` is set in `openbao.hcl` (§8.1) — confirm it's applied. |
 
 ---
 
@@ -3602,18 +3603,18 @@ Changes made versus the raw chart render to achieve a clean air‑gap/OpenShift 
 (each is called out inline above too):
 
 1. **Registry rewrite** — every `docker.io/…`, `quay.io/…`, `ghcr.io/…` image (incl.
-   init containers, the Vault `node:20-alpine` sidecar, Temporal admin‑tools, bitnami
+   init containers, the OpenBao `node:20-alpine` sidecar, Temporal admin‑tools, bitnami
    kubectl bootstrap, the `bitnamilegacy/postgresql` filer‑init image) rewritten to
    `${HARBOR}/${HARBOR_PROJECT}/…`.
 2. **SeaweedFS s3 `hostPath` → `emptyDir`** for logs (restricted SCC forbids hostPath).
-3. **Removed pinned uid/fsGroup** on grafana (472), vault (100/1000), documentdb (999),
+3. **Removed pinned uid/fsGroup** on grafana (472), openbao (100/1000), documentdb (999),
    pgvector (999) so `restricted-v2` injects them from the namespace range.
 4. **web‑console tag** `ghcr.io/example/…:0.1.0` (placeholder) → real `…:0.2.11`.
 5. **SeaweedFS** mutable tag `4.33` → recommend the digest pin in §3.1.
 6. **Removed** the stray `kubernetes.io/ingress.class: nginx` annotation from Routes.
-7. **Namespace consolidation** — Vault (`secret-store`), SeaweedFS (`default`), ESO
+7. **Namespace consolidation** — OpenBao (`secret-store`), SeaweedFS (`default`), ESO
    (`eso-system`) all moved into `falcone`; cross‑namespace DNS/policies adjusted.
-8. **Vault** `disable_mlock = true` (IPC_LOCK dropped) + manual self‑signed TLS Secret
+8. **OpenBao** `disable_mlock = true` (IPC_LOCK dropped) + manual self‑signed TLS Secret
    (no cert‑manager dependency).
 9. **APISIX** `APISIX_STAND_ALONE=false` to make the route bootstrap operative.
 
@@ -3699,7 +3700,7 @@ Repeat the ImageStream/BuildConfig per build‑from‑source image
    `web-console`, `workflow-worker`, `fn-runtime`) must be pre‑built and pushed to Harbor
    (recommended) or built via BuildConfig against an internal Git mirror. *(§3.1, App. B)*
 5. **Version pins to finalize:** SeaweedFS (use the digest, not `:4.33`), web‑console
-   real tag (`0.2.11` vs the `:0.1.0` placeholder), Vault (`1.15.0` vs `1.18`). Mirror
+   real tag (`0.2.11` vs the `:0.1.0` placeholder), OpenBao (`2.3.1`). Mirror
    by digest for production. *(§3.1)*
 6. **Executor backend env** (`PG*/MONGO*/STORAGE_S3*/KAFKA_BROKERS`,
    `CONTROL_PLANE_UPSTREAM`) and the **control‑plane `/healthz`** probe path are marked
@@ -3712,7 +3713,7 @@ Repeat the ImageStream/BuildConfig per build‑from‑source image
 10. **Temporal PostgreSQL role** (`temporal`) must be created before the schema Job, and
     the hard‑coded `temporal/temporal` password changed for production. *(§8.2)*
 11. **Secrets** are created with `oc create secret` (placeholders/random) — integrate
-    with ESO/Vault for production rotation; never commit real values. *(§5.1)*
+    with ESO/OpenBao for production rotation; never commit real values. *(§5.1)*
 12. **Intra‑namespace NetworkPolicy posture** for `postgresql`/`kafka`/`documentdb` is
     left to the operator (templates provided). *(§4.2)*
 
