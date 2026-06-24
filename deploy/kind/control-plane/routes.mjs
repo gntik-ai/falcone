@@ -253,10 +253,13 @@ export const routes = [
   { method: 'POST', path: '/v1/functions/workspaces/{workspaceId}/definition-imports', localHandler: 'fnDefinitionImport', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/workspaces/{workspaceId}/package-definition-imports', localHandler: 'fnPackageDefinitionImport', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/workspaces/{workspaceId}/packages/{packageName}/definition-export', localHandler: 'fnPackageDefinitionExport', auth: 'authenticated' },
-  // Workspace secrets-as-a-service backed by Vault (add-vault-secret-consumption, #612).
+  // Workspace secrets-as-a-service backed by OpenBao (add-vault-secret-consumption, #612; console
+  // convergence add-console-secrets-management, #723). POST = create-only (409 on conflict),
+  // PUT = replace — matching the published 5 function_workspace_secret catalog routes.
   { method: 'POST',   path: '/v1/functions/workspaces/{workspaceId}/secrets', localHandler: 'secretSet', auth: 'authenticated' },
   { method: 'GET',    path: '/v1/functions/workspaces/{workspaceId}/secrets', localHandler: 'secretList', auth: 'authenticated' },
   { method: 'GET',    path: '/v1/functions/workspaces/{workspaceId}/secrets/{secretName}', localHandler: 'secretGet', auth: 'authenticated' },
+  { method: 'PUT',    path: '/v1/functions/workspaces/{workspaceId}/secrets/{secretName}', localHandler: 'secretReplace', auth: 'authenticated' },
   { method: 'DELETE', path: '/v1/functions/workspaces/{workspaceId}/secrets/{secretName}', localHandler: 'secretDelete', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions', localHandler: 'fnDeploy', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/actions/{actionId}', localHandler: 'fnActionDetail', auth: 'authenticated' },

@@ -39,8 +39,11 @@ import { ConsoleOperationsPage } from '@/pages/ConsoleOperationsPage'
 import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
 import { ConsoleFunctionsPage } from '@/pages/ConsoleFunctionsPage'
 import { ConsoleMcpServerDetailPage } from '@/pages/ConsoleMcpServerDetailPage'
+import { ConsoleWorkspaceSecretsPage } from '@/pages/ConsoleWorkspaceSecretsPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { readConsoleShellSession } from '@/lib/console-session'
+import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
+import { useConsoleContext } from '@/lib/console-context'
 import { WelcomePage } from '@/pages/WelcomePage'
 
 const ConsoleRealtimePage = lazy(async () => {
@@ -92,6 +95,16 @@ function RequireSuperadminRoute({ children }: { children: JSX.Element }) {
   const session = readConsoleShellSession()
   const roles = session?.principal?.platformRoles ?? []
   return roles.includes('superadmin') ? children : <Navigate replace to="/console/my-plan" />
+}
+
+// Fail-safe, coarse gate for the Workspace Secrets screen (#723): an operator who is neither a
+// member of the active workspace nor a tenant-admin/platform-role operator is redirected away. This
+// runs inside ConsoleShellLayout's Outlet, so the ConsoleContext (active workspace) is available.
+// Per-secret mutate authority stays server-enforced — this is defense-in-depth only.
+function RequireWorkspaceSecretsRoute({ children }: { children: JSX.Element }) {
+  const session = readConsoleShellSession()
+  const { activeWorkspaceId } = useConsoleContext()
+  return canManageWorkspaceSecrets(session, activeWorkspaceId) ? children : <Navigate replace to="/console/my-plan" />
 }
 
 // T05 endurece la entrada a `/console/*` con guardas de sesión y refresh on-demand.
@@ -279,12 +292,24 @@ export const appRoutes = [
             element: <ConsoleDocsPage />
           },
           {
+            // Legacy superadmin secret-ROTATION mock pages (platform/tenant rotation plane) — left
+            // functionally untouched; relabeled in the nav to disambiguate from Workspace Secrets.
             path: 'secrets',
             element: <ConsoleSecretsPage />
           },
           {
             path: 'secrets/:encodedSecretPath/rotate',
             element: <ConsoleSecretRotationPage />
+          },
+          {
+            // Workspace function secrets (#723) — distinct from the rotation route above. Gated by a
+            // coarse, fail-safe workspace-membership / tenant-admin / platform guard.
+            path: 'workspace-secrets',
+            element: (
+              <RequireWorkspaceSecretsRoute>
+                <ConsoleWorkspaceSecretsPage />
+              </RequireWorkspaceSecretsRoute>
+            )
           },
           {
             path: 'profile',

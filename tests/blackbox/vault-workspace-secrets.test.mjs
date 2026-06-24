@@ -32,11 +32,15 @@ import {
   workspaceSecretPath, secretEnvVarName,
 } from '../../deploy/kind/control-plane/vault-secrets.mjs';
 
-// A faithful fake Vault KV v2 server. Stores versioned secrets keyed by the logical path
+// A faithful fake Vault/OpenBao KV v2 server. Stores versioned secrets keyed by the logical path
 // (everything after /v1/{mount}/data|metadata/). Records auth headers + the paths it was asked for.
+// Mirrors the REAL OpenBao KV-v2 wire shapes: data read { data: { data, metadata } }, and a
+// metadata read (GET {mount}/metadata/{path}, no ?list) returning the snake_case KV-v2 metadata
+// fields created_time / updated_time / current_version — so the store's timestamp mapping is
+// exercised against the actual field names (a fetch-seam fake cannot validate them otherwise).
 function startFakeVault({ requireToken = true } = {}) {
-  const store = new Map(); // path -> { versions: [data,...] }
-  const seen = { tokens: [], namespaces: [], dataPaths: [] };
+  const store = new Map(); // path -> { versions: [data,...], created_time, updated_time }
+  const seen = { tokens: [], namespaces: [], dataPaths: [], metaPaths: [] };
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; });
@@ -49,14 +53,17 @@ function startFakeVault({ requireToken = true } = {}) {
       const m = u.pathname.match(/^\/v1\/secret\/(data|metadata)\/(.+)$/);
       if (!m) return send(404, { errors: ['no route'] });
       const [, kind, path] = m;
-      if (kind === 'data') seen.dataPaths.push(decodeURIComponent(path));
-      const entry = store.get(decodeURIComponent(path));
+      const key = decodeURIComponent(path);
+      if (kind === 'data') seen.dataPaths.push(key);
+      const entry = store.get(key);
 
       if (kind === 'data' && req.method === 'POST') {
         const data = JSON.parse(body).data;
-        const e = entry ?? { versions: [] };
+        const now = new Date().toISOString();
+        const e = entry ?? { versions: [], created_time: now, updated_time: now };
         e.versions.push(data);
-        store.set(decodeURIComponent(path), e);
+        e.updated_time = now; // current version's create time (KV-v2 updated_time semantics)
+        store.set(key, e);
         return send(200, { data: { version: e.versions.length } });
       }
       if (kind === 'data' && req.method === 'GET') {
@@ -65,14 +72,25 @@ function startFakeVault({ requireToken = true } = {}) {
         return send(200, { data: { data: entry.versions[version - 1], metadata: { version } } });
       }
       if (kind === 'metadata' && req.method === 'DELETE') {
-        store.delete(decodeURIComponent(path));
+        store.delete(key);
         return send(204, {});
       }
       if (kind === 'metadata' && req.method === 'GET' && u.searchParams.get('list') === 'true') {
-        const prefix = decodeURIComponent(path).replace(/\/$/, '') + '/';
+        const prefix = key.replace(/\/$/, '') + '/';
         const keys = [...store.keys()].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length).split('/')[0]);
         if (keys.length === 0) return send(404, { errors: [] });
         return send(200, { data: { keys: [...new Set(keys)] } });
+      }
+      if (kind === 'metadata' && req.method === 'GET') {
+        // KV-v2 metadata read (no ?list): the REAL OpenBao shape uses snake_case created_time /
+        // updated_time / current_version under `data`.
+        seen.metaPaths.push(key);
+        if (!entry || entry.versions.length === 0) return send(404, { errors: [] });
+        return send(200, { data: {
+          created_time: entry.created_time,
+          updated_time: entry.updated_time,
+          current_version: entry.versions.length,
+        } });
       }
       return send(405, { errors: ['method'] });
     });
@@ -95,35 +113,70 @@ function store(opts = {}) {
 test('bbx-612-write-read: a secret set via the store is stored in Vault and read back; meta hides the value', async () => {
   const s = store();
   const r = await s.set('ten-a', 'ws-staging', 'db_password', 's3cr3t');
+  // The store now returns the FunctionWorkspaceSecret metadata (no value, no KV version): the
+  // secretName, the backward-compat `name` alias, and KV-v2 timestamps.
+  assert.equal(r.secretName, 'db_password');
   assert.equal(r.name, 'db_password');
-  assert.equal(r.version, 1);
+  assert.equal(r.version, undefined, 'no KV version is exposed (additionalProperties:false)');
+  assert.equal(r.value, undefined, 'a write response never carries the value');
+  assert.ok(r.timestamps && typeof r.timestamps.createdAt === 'string' && typeof r.timestamps.updatedAt === 'string',
+    'metadata carries KV-v2 created/updated timestamps');
   // Stored at the per-tenant/per-workspace path.
   assert.ok(fake.store.has(workspaceSecretPath('ten-a', 'ws-staging', 'db_password')));
   // getValue returns the value (server-side only); getMeta never carries it.
   assert.equal(await s.getValue('ten-a', 'ws-staging', 'db_password'), 's3cr3t');
   const meta = await s.getMeta('ten-a', 'ws-staging', 'db_password');
-  assert.deepEqual(meta, { name: 'db_password', version: 1 });
-  assert.equal(meta.value, undefined);
+  assert.equal(meta.secretName, 'db_password');
+  assert.equal(meta.name, 'db_password');
+  assert.equal(meta.value, undefined, 'getMeta never returns the value');
+  assert.equal(meta.version, undefined, 'getMeta never returns a KV version');
+  assert.ok(meta.timestamps.createdAt && meta.timestamps.updatedAt);
 });
 
-test('bbx-612-version: re-setting a secret increments the KV v2 version', async () => {
+test('bbx-612-version: re-setting a secret keeps the value current without exposing a KV version', async () => {
   const s = store();
   await s.set('ten-a', 'ws-staging', 'api_key', 'v1');
   const r2 = await s.set('ten-a', 'ws-staging', 'api_key', 'v2');
-  assert.equal(r2.version, 2);
+  // KV-v2 still versions internally, but no version is surfaced; the value is the latest.
+  assert.equal(r2.version, undefined);
   assert.equal(await s.getValue('ten-a', 'ws-staging', 'api_key'), 'v2');
 });
 
-test('bbx-612-list-delete: list returns the workspace secret names; delete removes one', async () => {
+test('bbx-612-desc: a non-secret description rides in KV and surfaces as metadata, never the value', async () => {
+  const s = store();
+  await s.set('ten-d', 'ws-d', 'with_desc', 'sensitive', 'human-readable note');
+  const meta = await s.getMeta('ten-d', 'ws-d', 'with_desc');
+  assert.equal(meta.description, 'human-readable note');
+  assert.equal(meta.value, undefined);
+  // The value is still resolvable server-side and is the secret, not the description.
+  assert.equal(await s.getValue('ten-d', 'ws-d', 'with_desc'), 'sensitive');
+  // resolveEnv injects the VALUE (not _desc) under the UPPER_SNAKE env var.
+  const env = await s.resolveEnv('ten-d', 'ws-d', ['with_desc']);
+  assert.deepEqual(env, [{ name: 'WITH_DESC', value: 'sensitive' }]);
+});
+
+test('bbx-612-exists: exists() reports presence for the create-only POST conflict check', async () => {
+  const s = store();
+  assert.equal(await s.exists('ten-x', 'ws-x', 'maybe'), false);
+  await s.set('ten-x', 'ws-x', 'maybe', 'v');
+  assert.equal(await s.exists('ten-x', 'ws-x', 'maybe'), true);
+});
+
+test('bbx-612-list-delete: list returns the workspace secret metadata; delete removes one', async () => {
   const s = store();
   await s.set('ten-list', 'ws1', 'one', 'a');
   await s.set('ten-list', 'ws1', 'two', 'b');
   const items = await s.list('ten-list', 'ws1');
-  const names = items.map((i) => i.name).sort();
+  const names = items.map((i) => i.secretName).sort();
   assert.deepEqual(names, ['one', 'two']);
+  // Each list item is metadata only — never a value.
+  for (const it of items) {
+    assert.equal(it.value, undefined, 'list items never carry the value');
+    assert.ok(it.timestamps, 'list items carry timestamps');
+  }
   await s.delete('ten-list', 'ws1', 'one');
   assert.equal(await s.getMeta('ten-list', 'ws1', 'one'), null);
-  assert.deepEqual((await s.list('ten-list', 'ws1')).map((i) => i.name), ['two']);
+  assert.deepEqual((await s.list('ten-list', 'ws1')).map((i) => i.secretName), ['two']);
 });
 
 test('bbx-612-isolation: tenant + workspace are in the path; no cross-tenant/cross-workspace read', async () => {
