@@ -308,9 +308,11 @@ async function fnRollback(ctx) {
 // server-side to inject as env. Every path is derived from the caller's verified tenant + the URL
 // workspace (never the request body), so no tenant can read/write another's secrets.
 //
-// POST is CREATE-only (409 on an existing name, no overwrite); PUT replaces the value at the same KV
-// path — this matches the already-published catalog/OpenAPI (5 function_workspace_secret routes).
-// The vault store is taken from ctx.vaultStore ?? vaultStore so tests can inject a fake KV-v2 store.
+// POST is CREATE-only (409 on an existing name, no overwrite); PUT is REPLACE-only (404
+// SECRET_NOT_FOUND when the secret does not exist, no implicit create) and writes the new value at the
+// same KV path — this matches the already-published catalog/OpenAPI (5 function_workspace_secret
+// routes; the PUT op enumerates 404). The vault store is taken from ctx.vaultStore ?? vaultStore so
+// tests can inject a fake KV-v2 store.
 
 const SECRET_VALUE_MAX = 65535;
 
@@ -348,7 +350,10 @@ async function secretSet(ctx) {
 }
 
 // PUT /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  { secretValue, description? }
-// REPLACE: write at the same KV path (prior value superseded). 200 with metadata (no value/version).
+// REPLACE-only: the secret MUST already exist (404 SECRET_NOT_FOUND otherwise); creating a new secret
+// is the explicit POST path (create-only, 409 on conflict). On replace, write at the same KV path
+// (prior value superseded) → 200 with metadata (no value/version). Value validation runs BEFORE the
+// existence check so an invalid PUT to a never-created name is 400/413, not 404.
 async function secretReplace(ctx) {
   const vault = ctx.vaultStore ?? vaultStore;
   if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
@@ -362,6 +367,11 @@ async function secretReplace(ctx) {
   const valueError = validateSecretValue(value);
   if (valueError) return valueError;
   try {
+    // Replace-only: a PUT to a non-existent secret must NOT silently create it (POST is create-only).
+    // Probe existence at the verified tenant/workspace path; if absent, 404 and write nothing.
+    if (!(await vault.exists(ws.tenant_id, ws.id, name))) {
+      return err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`);
+    }
     const meta = await vault.replace(ws.tenant_id, ws.id, name, value, description);
     const refCount = await resolvedRefCount(ctx, ws, name);
     return ok(200, secretMetaOut(meta, ws, refCount));

@@ -26,6 +26,7 @@
  *   bbx-723-create    POST create → 201 with the metadata shape (no value, no version)
  *   bbx-723-conflict  POST on an existing name → 409, the stored value is UNCHANGED (no overwrite)
  *   bbx-723-replace   PUT replaces the value at the same path → 200 metadata; getValue sees the new value
+ *   bbx-723-replace-missing  PUT on a never-created secret → 404 SECRET_NOT_FOUND, nothing is written
  *   bbx-723-meta      GET list / GET meta return ONLY the metadata schema (name alias, no version/value)
  *   bbx-723-writeonly no response body of any op (create/replace/list/meta/delete) carries the value
  *   bbx-723-validate  bad name / empty value / over-length value → 400 / 400 / 413
@@ -191,6 +192,22 @@ test('bbx-723-replace: PUT replaces the value at the same path → 200 metadata;
   assertMetaShape(res.body, { tenantId: 'ten-1', workspaceId: 'ws-1', secretName: 'token' });
   assert.equal(res.body.description, 'rotated');
   assert.equal(await vault.getValue('ten-1', 'ws-1', 'token'), 'new', 'PUT supersedes the prior value');
+});
+
+test('bbx-723-replace-missing: PUT on a never-created secret → 404 SECRET_NOT_FOUND, nothing is written', async () => {
+  const vault = vaultStore();
+  const path = workspaceSecretPath('ten-1', 'ws-1', 'never_made');
+  // Pre-condition: the secret has never been created (the create→replace happy paths create first).
+  assert.equal(fake.store.has(path), false, 'pre-condition: the secret does not exist yet');
+  // PUT is REPLACE-only: it must NOT silently create the secret. A valid value is supplied so the
+  // failure is the missing-secret 404 (not a value-validation 400/413), proving value validation
+  // still runs before the existence check.
+  const res = await FN_HANDLERS.secretReplace(ctx({ vault, params: { workspaceId: 'ws-1', secretName: 'never_made' }, body: { secretValue: 'should-not-be-stored', description: 'noop' } }));
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.code, 'SECRET_NOT_FOUND');
+  // No upsert: nothing was written to the KV store at the verified tenant/workspace path.
+  assert.equal(fake.store.has(path), false, 'a replace-only PUT must not create the secret');
+  assert.equal(await vault.getValue('ten-1', 'ws-1', 'never_made'), null, 'no value is persisted');
 });
 
 test('bbx-723-meta: GET list / GET meta return ONLY the metadata schema (name alias, no version/value)', async () => {

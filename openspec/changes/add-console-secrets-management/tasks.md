@@ -11,9 +11,13 @@
   `auth:'authenticated'` (alongside the existing `secretSet`/`secretList`/`secretGet`/`secretDelete`).
 - [x] 1.2 `deploy/kind/control-plane/fn-handlers.mjs`: add `secretReplace(ctx)` — mirror `secretSet`
   (the `vaultStore` `501` guard, `ownedWorkspace` `404`, `validName` + non-empty/`maxLength 65535`
-  value validation), reading `secretName` from the path and the value from `b.secretValue ?? b.value`;
-  perform the **replace** (write at the same path, prior value superseded) and return the metadata shape
-  (no value).
+  value validation), reading `secretName` from the path and the value from `b.secretValue ?? b.value`.
+  `PUT` is **replace-only**: after the value validation and before the write, check the secret exists for
+  the verified workspace (`vault.exists(...)`); if it does **not** exist return `404 SECRET_NOT_FOUND` and
+  write nothing (POST is the create path; PUT must not implicitly create). The check order is
+  `vault?` `501` → `ownedWorkspace` `404` → `validName` `400` → value `400`/`413` → `exists?` else `404`
+  `SECRET_NOT_FOUND` → **replace** (write at the same path, prior value superseded) → `200` metadata
+  (no value). This matches the published `updateFunctionWorkspaceSecret` PUT op, which enumerates `404`.
 - [x] 1.3 `deploy/kind/control-plane/fn-handlers.mjs`: make `secretSet` (`POST`) **create-only** — before
   writing, check the secret does not already exist for the workspace (via `getMeta`); if it exists return
   `409` (e.g. `SECRET_ALREADY_EXISTS`) and do **not** overwrite. The create-vs-replace split is `POST` =
@@ -109,7 +113,8 @@
   new PUT; metadata shape on POST/PUT/GET-list/GET-meta is **exactly** `{secretName, tenantId, workspaceId,
   resolvedRefCount, timestamps, description?}` with **no `version`** field (and no value); `POST` on an
   existing name → `409` (create-only, no overwrite — assert the stored value is unchanged) while `PUT`
-  replaces the value; `400` on bad name/empty/over-length value; `501` when the backend is disabled.
+  replaces the value; `PUT` on a **never-created** secret → `404 SECRET_NOT_FOUND` with nothing written
+  (replace-only); `400` on bad name/empty/over-length value; `501` when the backend is disabled.
 - [x] 4.2 **Write-only assertion:** assert that **no secret value appears in any response body** of any
   secret op (create/replace/list/metadata/delete), and (UI) that no stored value is ever present in the
   rendered DOM, the URL/query string, or client telemetry.
