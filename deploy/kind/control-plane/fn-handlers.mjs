@@ -55,14 +55,55 @@ const vaultStore = vaultStoreFromEnv();
 
 // Resolve the caller's workspace, returning null on cross-tenant access (no existence leak) so a
 // secret read/write can never reach another tenant's workspace. Superadmin/internal may operate
-// cross-tenant (callerTenantId → null).
+// cross-tenant (callerTenantId → null). The Postgres store is taken from ctx.store ?? store so tests
+// can inject a fake (repo DI seam, parity with b-handlers.mjs).
 async function ownedWorkspace(ctx, workspaceId) {
   if (!workspaceId) return null;
-  const ws = await store.getWorkspace(ctx.pool, workspaceId);
+  const st = ctx.store ?? store;
+  const ws = await st.getWorkspace(ctx.pool, workspaceId);
   if (!ws) return null;
   const t = callerTenantId(ctx.identity);
   if (t && ws.tenant_id !== t) return null;
   return ws;
+}
+
+// Best-effort count of the workspace's deployed functions that reference `secretName` (the advisory
+// `resolvedRefCount` of FunctionWorkspaceSecret — used only for the pre-delete warning, never a
+// delete gate). Scans the existing fn_actions registry rows' declared secret refs
+// (`execution.secrets`, or a top-level `secrets`); a ref is a bare name or { name|secretName }.
+// Returns 0 when not cheaply computable (e.g. the kind fn_actions row does not persist secret refs)
+// — a conservative under-count is acceptable for an advisory signal.
+async function resolvedRefCount(ctx, ws, secretName) {
+  try {
+    const st = ctx.store ?? store;
+    const rows = await st.listFnActions(ctx.pool, ws.id);
+    if (!Array.isArray(rows)) return 0;
+    let n = 0;
+    for (const r of rows) {
+      const refs = r?.execution?.secrets ?? r?.secrets ?? r?.parameters?.execution?.secrets ?? [];
+      if (!Array.isArray(refs)) continue;
+      for (const ref of refs) {
+        const name = typeof ref === 'string' ? ref : (ref?.name ?? ref?.secretName);
+        if (name === secretName) { n += 1; break; }
+      }
+    }
+    return n;
+  } catch { return 0; }
+}
+
+// Stamp the published FunctionWorkspaceSecret metadata onto a store meta object: tenantId/workspaceId
+// come from the VERIFIED workspace (never the body), resolvedRefCount is advisory. The store already
+// supplies { secretName, name (alias), timestamps, description? } and NEVER a value or KV version.
+function secretMetaOut(meta, ws, refCount) {
+  return {
+    secretName: meta.secretName ?? meta.name,
+    name: meta.name ?? meta.secretName, // backward-compat alias
+    tenantId: ws.tenant_id,
+    workspaceId: ws.id,
+    resolvedRefCount: refCount ?? 0,
+    timestamps: meta.timestamps ?? { createdAt: null, updatedAt: null },
+    ...(meta.description !== undefined ? { description: meta.description } : {}),
+  };
 }
 
 // Resolve the function's invocation input from the request body. The documented body is the
@@ -258,58 +299,112 @@ async function fnRollback(ctx) {
   return ok(202, { requestId: randomUUID(), resourceId: r.resource_id, requestedVersionId: ctx.body?.versionId ?? `v${r.version}`, status: 'accepted', correlationId: randomUUID() });
 }
 
-// ---- Workspace secrets (add-vault-secret-consumption, #612) -----------------------------------
-// Tenant/workspace-scoped secrets-as-a-service backed by Vault KV v2. Values are write-only: a SET
-// stores the value in Vault; GET/LIST return metadata only; a function deploy resolves the value
+// ---- Workspace secrets (add-vault-secret-consumption, #612; console convergence,
+// add-console-secrets-management) -----------------------------------------------------------------
+// Tenant/workspace-scoped secrets-as-a-service backed by OpenBao KV v2. Values are write-only: a
+// create/replace stores the value in the backend; GET/LIST return the published
+// FunctionWorkspaceSecret metadata ONLY (secretName/name/tenantId/workspaceId/resolvedRefCount/
+// timestamps/description? — NO value, NO KV version); a function deploy resolves the value
 // server-side to inject as env. Every path is derived from the caller's verified tenant + the URL
-// workspace, so no tenant can read/write another's secrets.
+// workspace (never the request body), so no tenant can read/write another's secrets.
+//
+// POST is CREATE-only (409 on an existing name, no overwrite); PUT replaces the value at the same KV
+// path — this matches the already-published catalog/OpenAPI (5 function_workspace_secret routes).
+// The vault store is taken from ctx.vaultStore ?? vaultStore so tests can inject a fake KV-v2 store.
 
-// POST /v1/functions/workspaces/{workspaceId}/secrets  { name, value }
+const SECRET_VALUE_MAX = 65535;
+
+// Validate the write body's value, returning an err(...) response or null when valid.
+function validateSecretValue(value) {
+  if (typeof value !== 'string' || value.length === 0) return err(400, 'VALIDATION_ERROR', 'secret value is required');
+  if (value.length > SECRET_VALUE_MAX) return err(413, 'VALUE_TOO_LARGE', `secret value exceeds ${SECRET_VALUE_MAX} characters`);
+  return null;
+}
+
+// POST /v1/functions/workspaces/{workspaceId}/secrets  { secretName, secretValue, description? }
+// CREATE-only: 409 SECRET_ALREADY_EXISTS if the name already exists (the stored value is preserved).
 async function secretSet(ctx) {
-  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
   const b = ctx.body ?? {};
-  const name = b.name ?? b.secretName;
-  const value = b.value ?? b.secretValue;
-  if (!vaultStore.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
-  if (typeof value !== 'string' || value.length === 0) return err(400, 'VALIDATION_ERROR', 'secret value is required');
+  const name = b.secretName ?? b.name;
+  const value = b.secretValue ?? b.value;
+  const description = typeof b.description === 'string' ? b.description : undefined;
+  if (!vault.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
+  const valueError = validateSecretValue(value);
+  if (valueError) return valueError;
   try {
-    const r = await vaultStore.set(ws.tenant_id, ws.id, name, value);
-    return ok(201, { name: r.name, version: r.version, updatedAt: r.updatedAt });
+    // Create-only: do not overwrite an existing secret — the explicit PUT replace path is required
+    // to change a value. The existing value is preserved.
+    if (await vault.exists(ws.tenant_id, ws.id, name)) {
+      return err(409, 'SECRET_ALREADY_EXISTS', `secret ${name} already exists; use PUT to replace it`);
+    }
+    const meta = await vault.set(ws.tenant_id, ws.id, name, value, description);
+    const refCount = await resolvedRefCount(ctx, ws, name);
+    return ok(201, secretMetaOut(meta, ws, refCount));
   } catch (e) { return err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)); }
 }
 
-// GET /v1/functions/workspaces/{workspaceId}/secrets
+// PUT /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  { secretValue, description? }
+// REPLACE: write at the same KV path (prior value superseded). 200 with metadata (no value/version).
+async function secretReplace(ctx) {
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  const name = ctx.params.secretName;
+  const b = ctx.body ?? {};
+  const value = b.secretValue ?? b.value;
+  const description = typeof b.description === 'string' ? b.description : undefined;
+  if (!vault.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
+  const valueError = validateSecretValue(value);
+  if (valueError) return valueError;
+  try {
+    const meta = await vault.replace(ws.tenant_id, ws.id, name, value, description);
+    const refCount = await resolvedRefCount(ctx, ws, name);
+    return ok(200, secretMetaOut(meta, ws, refCount));
+  } catch (e) { return err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)); }
+}
+
+// GET /v1/functions/workspaces/{workspaceId}/secrets  → FunctionWorkspaceSecretCollection
 async function secretList(ctx) {
-  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
   try {
-    const items = await vaultStore.list(ws.tenant_id, ws.id);
-    return ok(200, { items, page: { total: items.length } });
+    const metas = await vault.list(ws.tenant_id, ws.id);
+    const items = [];
+    for (const meta of metas) {
+      items.push(secretMetaOut(meta, ws, await resolvedRefCount(ctx, ws, meta.secretName ?? meta.name)));
+    }
+    return ok(200, { items, page: { size: items.length } });
   } catch (e) { return err(502, 'SECRET_LIST_FAILED', String(e.message ?? e)); }
 }
 
 // GET /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  (metadata only — never the value)
 async function secretGet(ctx) {
-  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
   try {
-    const meta = await vaultStore.getMeta(ws.tenant_id, ws.id, ctx.params.secretName);
+    const meta = await vault.getMeta(ws.tenant_id, ws.id, ctx.params.secretName);
     if (!meta) return err(404, 'SECRET_NOT_FOUND', `secret ${ctx.params.secretName} not found`);
-    return ok(200, meta);
+    return ok(200, secretMetaOut(meta, ws, await resolvedRefCount(ctx, ws, ctx.params.secretName)));
   } catch (e) { return err(502, 'SECRET_READ_FAILED', String(e.message ?? e)); }
 }
 
 // DELETE /v1/functions/workspaces/{workspaceId}/secrets/{secretName}
 async function secretDelete(ctx) {
-  if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
   try {
-    await vaultStore.delete(ws.tenant_id, ws.id, ctx.params.secretName);
+    await vault.delete(ws.tenant_id, ws.id, ctx.params.secretName);
     return ok(200, { name: ctx.params.secretName, deleted: true });
   } catch (e) { return err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)); }
 }
@@ -443,6 +538,6 @@ async function fnPackageDefinitionImport(ctx) { return importDefinitions(ctx, { 
 export const FN_HANDLERS = {
   fnDeploy, fnInventory, fnListActions, fnActionDetail, fnInvoke,
   fnActivations, fnActivation, fnActivationLogs, fnActivationResult, fnVersions, fnRollback,
-  secretSet, secretList, secretGet, secretDelete,
+  secretSet, secretReplace, secretList, secretGet, secretDelete,
   fnDefinitionExport, fnPackageDefinitionExport, fnDefinitionImport, fnPackageDefinitionImport
 };
