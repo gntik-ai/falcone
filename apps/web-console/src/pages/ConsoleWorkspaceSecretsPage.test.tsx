@@ -148,7 +148,8 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     mockDeleteSecret.mockResolvedValue({ name: 'db_password', deleted: true })
     renderPage()
 
-    await userEvent.click(await screen.findByRole('button', { name: /eliminar$/i }))
+    // Row action carries a per-secret accessible name so screen-reader users can tell rows apart.
+    await userEvent.click(await screen.findByRole('button', { name: /eliminar el secreto db_password/i }))
     const dialog = screen.getByRole('dialog', { name: /eliminar secreto/i })
     expect(within(dialog).getByTestId('workspace-secrets-delete-warning')).toHaveTextContent(/3 función/i)
     await userEvent.click(within(dialog).getByRole('button', { name: /eliminar secreto/i }))
@@ -193,5 +194,69 @@ describe('ConsoleWorkspaceSecretsPage', () => {
   it('shows a production stage badge for a production-environment workspace', async () => {
     renderPage(context({ activeWorkspace: { label: 'App Prod', environment: 'production' } }))
     expect(await screen.findByTestId('workspace-secrets-stage-badge')).toHaveTextContent(/producción/i)
+  })
+
+  it('submits the create form on Enter (real <form onSubmit>)', async () => {
+    mockListSecrets
+      .mockResolvedValueOnce({ items: [], page: { size: 0 } })
+      .mockResolvedValueOnce({ items: [secret({ secretName: 'api_key' })], page: { size: 1 } })
+    mockCreateSecret.mockResolvedValue(secret({ secretName: 'api_key' }))
+    renderPage()
+
+    await screen.findByText(/no hay secretos/i)
+    await userEvent.type(screen.getByLabelText(/nombre del secreto/i), 'api_key')
+    // Enter from within the masked value field submits the form (no explicit button click).
+    await userEvent.type(screen.getByLabelText(/^valor del secreto$/i), 'super-secret-value{Enter}')
+    await waitFor(() =>
+      expect(mockCreateSecret).toHaveBeenCalledWith('wrk_alpha', { secretName: 'api_key', secretValue: 'super-secret-value' })
+    )
+  })
+
+  it('announces the create outcome via an aria-live region without leaking the value', async () => {
+    mockListSecrets
+      .mockResolvedValueOnce({ items: [], page: { size: 0 } })
+      .mockResolvedValueOnce({ items: [secret({ secretName: 'api_key' })], page: { size: 1 } })
+    mockCreateSecret.mockResolvedValue(secret({ secretName: 'api_key' }))
+    const { container } = renderPage()
+
+    await screen.findByText(/no hay secretos/i)
+    await userEvent.type(screen.getByLabelText(/nombre del secreto/i), 'api_key')
+    await userEvent.type(screen.getByLabelText(/^valor del secreto$/i), 'super-secret-value')
+    await userEvent.click(screen.getByRole('button', { name: /crear secreto/i }))
+
+    const live = container.querySelector('[aria-live="polite"]') as HTMLElement
+    await waitFor(() => expect(live).toHaveTextContent(/creado/i))
+    expect(live.textContent).not.toContain('super-secret-value')
+  })
+
+  it('replace and delete dialogs expose aria-modal and close on Escape', async () => {
+    mockListSecrets.mockResolvedValue({ items: [secret()], page: { size: 1 } })
+    renderPage()
+
+    // Replace dialog: modal semantics + Escape-to-close (shared Dialog focus/escape behavior).
+    await userEvent.click(await screen.findByRole('button', { name: /reemplazar el secreto/i }))
+    const replaceDialog = screen.getByRole('dialog', { name: /reemplazar secreto/i })
+    expect(replaceDialog).toHaveAttribute('aria-modal', 'true')
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /reemplazar secreto/i })).not.toBeInTheDocument())
+
+    // Delete dialog: same modal contract; Escape dismisses without calling the API.
+    await userEvent.click(await screen.findByRole('button', { name: /eliminar el secreto/i }))
+    const deleteDialog = screen.getByRole('dialog', { name: /eliminar secreto/i })
+    expect(deleteDialog).toHaveAttribute('aria-modal', 'true')
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /eliminar secreto/i })).not.toBeInTheDocument())
+    expect(mockDeleteSecret).not.toHaveBeenCalled()
+  })
+
+  it('returns focus to the row trigger after a dialog closes', async () => {
+    mockListSecrets.mockResolvedValue({ items: [secret()], page: { size: 1 } })
+    renderPage()
+
+    const trigger = await screen.findByRole('button', { name: /reemplazar el secreto/i })
+    await userEvent.click(trigger)
+    await screen.findByRole('dialog', { name: /reemplazar secreto/i })
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 })

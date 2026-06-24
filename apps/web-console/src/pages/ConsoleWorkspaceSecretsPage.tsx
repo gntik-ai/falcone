@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
 import type { ApiError } from '@/lib/http'
 import {
@@ -86,6 +90,103 @@ function validateValue(value: string): string | null {
   return null
 }
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+// Accessible modal wrapper built on the shared Dialog primitive (which only renders the backdrop +
+// backdrop-click-to-close). This adds the modal a11y the primitive does not: role="dialog" +
+// aria-modal, an accessible name (aria-label) + description (aria-describedby), Escape-to-close,
+// focus-on-open, a Tab focus-trap, and focus-RETURN to the control that opened it on close —
+// mirroring the call-site pattern in DestructiveConfirmationDialog. The accessible name is kept as
+// an aria-label so existing `getByRole('dialog', { name })` queries keep matching.
+function SecretDialog({
+  open,
+  label,
+  describedById,
+  busy,
+  onClose,
+  children
+}: {
+  open: boolean
+  label: string
+  describedById?: string
+  busy: boolean
+  onClose: () => void
+  children: ReactNode
+}) {
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
+
+  // Remember the trigger (and restore focus to it on close) + move focus into the dialog on open.
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    restoreFocusRef.current = (document.activeElement as HTMLElement | null) ?? null
+    const panel = panelRef.current
+    const first = panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+    ;(first ?? panel)?.focus()
+    return () => {
+      restoreFocusRef.current?.focus?.()
+    }
+  }, [open])
+
+  if (!open) {
+    return null
+  }
+
+  // Keep focus inside the dialog while Tab-cycling; Escape closes (unless an op is in flight).
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape' && !busy) {
+      event.preventDefault()
+      onClose()
+      return
+    }
+    if (event.key !== 'Tab') {
+      return
+    }
+    const panel = panelRef.current
+    if (!panel) {
+      return
+    }
+    const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    if (focusable.length === 0) {
+      return
+    }
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    const active = document.activeElement
+    if (event.shiftKey && active === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose() }}>
+      <DialogContent className="max-w-lg">
+        {/* DialogContent does not set the role/name, so the modal semantics live on this inner div
+            (also where the test's getByRole('dialog', { name }) resolves). */}
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={label}
+          aria-describedby={describedById}
+          tabIndex={-1}
+          onKeyDown={handleKeyDown}
+          className="focus:outline-none"
+        >
+          {children}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function ConsoleWorkspaceSecretsPage() {
   const { activeTenant, activeWorkspace, activeWorkspaceId } = useConsoleContext()
 
@@ -115,6 +216,17 @@ export function ConsoleWorkspaceSecretsPage() {
   const [deleteBusy, setDeleteBusy] = useState(false)
 
   const [feedback, setFeedback] = useState<string | null>(null)
+
+  // Stable ids so labels/inputs and alerts/inputs are wired (htmlFor / aria-describedby).
+  const createNameId = useId()
+  const createValueId = useId()
+  const createDescriptionId = useId()
+  const createValidationId = useId()
+  const replaceValueId = useId()
+  const replaceDescriptionId = useId()
+  const replaceValidationId = useId()
+  const replaceDescId = useId()
+  const deleteDescId = useId()
 
   const environment = activeWorkspace?.environment ?? null
   const isProduction = environment === 'production' || environment === 'prod'
@@ -183,9 +295,10 @@ export function ConsoleWorkspaceSecretsPage() {
   if (backendDisabled) {
     return (
       <section className="space-y-6" data-testid="workspace-secrets-backend-disabled">
-        <header className="rounded-3xl border border-border bg-card/70 p-6">
-          <p className="text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Workspace Secrets</h1>
+        <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+          <Badge variant="outline">Workspace secrets</Badge>
+          <p className="mt-2 text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del workspace</h1>
         </header>
         <ConsolePageState
           kind="blocked"
@@ -198,7 +311,10 @@ export function ConsoleWorkspaceSecretsPage() {
 
   const workspaceId = activeWorkspaceId
 
-  async function handleCreate() {
+  async function handleCreate(event: FormEvent) {
+    event.preventDefault()
+    // A fresh op starts: drop any stale success/feedback so it is not announced as the new outcome.
+    setFeedback(null)
     setCreateError(null)
     const nameError = validateName(createName)
     const valueError = validateValue(createValue)
@@ -235,10 +351,18 @@ export function ConsoleWorkspaceSecretsPage() {
     setReplaceError(null)
   }
 
-  async function handleReplace() {
+  function closeReplace() {
+    setReplaceTarget(null)
+    setReplaceValue('')
+  }
+
+  async function handleReplace(event: FormEvent) {
+    event.preventDefault()
     if (!replaceTarget) {
       return
     }
+    // A fresh op starts: drop any stale success/feedback before the new outcome is announced.
+    setFeedback(null)
     setReplaceError(null)
     const valueError = validateValue(replaceValue)
     setReplaceValidation(valueError)
@@ -268,6 +392,8 @@ export function ConsoleWorkspaceSecretsPage() {
     if (!deleteTarget) {
       return
     }
+    // A fresh op starts: drop any stale success/feedback before the new outcome is announced.
+    setFeedback(null)
     setDeleteError(null)
     const name = readSecretName(deleteTarget)
     setDeleteBusy(true)
@@ -285,15 +411,18 @@ export function ConsoleWorkspaceSecretsPage() {
 
   return (
     <section className="space-y-6" data-testid="workspace-secrets-page">
-      <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
-            <h1 className="text-2xl font-semibold tracking-tight">Workspace Secrets</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Secretos de función del workspace activo. Los valores son de solo escritura: se inyectan en el
-              entorno de las funciones en el deploy y nunca se muestran aquí.
-            </p>
+      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <Badge variant="outline">Workspace secrets</Badge>
+            <div>
+              <p className="text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del workspace</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Secretos de función del workspace activo. Los valores son de solo escritura: se inyectan en el
+                entorno de las funciones en el deploy y nunca se muestran aquí.
+              </p>
+            </div>
           </div>
           {environment ? (
             <Badge
@@ -311,71 +440,85 @@ export function ConsoleWorkspaceSecretsPage() {
         </div>
       </header>
 
-      <section className="rounded-3xl border border-border bg-card/70 p-6">
-        <h2 className="text-lg font-semibold">Crear secreto</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground">Crear secreto</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
           El valor se envía cifrado al backend y se elimina del formulario tras crearlo. No hay forma de
           volver a leerlo desde la consola.
         </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Nombre</span>
-            <input
-              aria-label="Nombre del secreto"
-              value={createName}
-              onChange={(event) => setCreateName(event.target.value)}
-              placeholder="db_password"
-              className="rounded-xl border border-input bg-background px-3 py-2"
-            />
-            {createName ? (
-              <span className="text-xs text-muted-foreground">
-                Variable de entorno: <code>{secretEnvVarName(createName)}</code>
+        <form className="mt-5 space-y-5" onSubmit={(event) => void handleCreate(event)} noValidate>
+          <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={createNameId}>Nombre</Label>
+              <Input
+                id={createNameId}
+                aria-label="Nombre del secreto"
+                value={createName}
+                onChange={(event) => setCreateName(event.target.value)}
+                placeholder="db_password"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <span className="text-xs leading-5 text-muted-foreground">
+                {createName ? (
+                  <>
+                    Variable de entorno:{' '}
+                    <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground">{secretEnvVarName(createName)}</code>
+                  </>
+                ) : (
+                  'Minúsculas, empieza por letra. Se expone como variable de entorno en UPPER_SNAKE.'
+                )}
               </span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={createValueId}>Valor</Label>
+              <Input
+                id={createValueId}
+                type="password"
+                autoComplete="new-password"
+                aria-label="Valor del secreto"
+                value={createValue}
+                onChange={(event) => setCreateValue(event.target.value)}
+                placeholder="••••••••"
+              />
+              <span className="text-xs leading-5 text-muted-foreground">
+                Solo escritura: nunca se vuelve a mostrar tras guardarlo.
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <Label htmlFor={createDescriptionId}>Descripción (opcional)</Label>
+              <Input
+                id={createDescriptionId}
+                aria-label="Descripción del secreto"
+                value={createDescription}
+                onChange={(event) => setCreateDescription(event.target.value)}
+                placeholder="Nota no secreta para identificar el secreto"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="submit"
+              disabled={createBusy || !createName.trim() || createValue.length === 0}
+            >
+              {createBusy ? 'Creando…' : 'Crear secreto'}
+            </Button>
+            {createValidation ? (
+              <p id={createValidationId} role="alert" className="text-sm font-medium text-destructive">
+                {createValidation}
+              </p>
             ) : null}
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Valor</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              aria-label="Valor del secreto"
-              value={createValue}
-              onChange={(event) => setCreateValue(event.target.value)}
-              placeholder="••••••••"
-              className="rounded-xl border border-input bg-background px-3 py-2"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm md:col-span-2">
-            <span className="font-medium">Descripción (opcional)</span>
-            <input
-              aria-label="Descripción del secreto"
-              value={createDescription}
-              onChange={(event) => setCreateDescription(event.target.value)}
-              placeholder="Nota no secreta para identificar el secreto"
-              className="rounded-xl border border-input bg-background px-3 py-2"
-            />
-          </label>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <Button
-            type="button"
-            onClick={() => void handleCreate()}
-            disabled={createBusy || !createName.trim() || createValue.length === 0}
-          >
-            {createBusy ? 'Creando…' : 'Crear secreto'}
-          </Button>
-          {createValidation ? (
-            <p role="alert" className="text-sm text-red-700">
-              {createValidation}
-            </p>
+          </div>
+          {createError ? (
+            <Alert variant="destructive" data-testid="workspace-secrets-create-error">
+              {createError}
+            </Alert>
           ) : null}
+        </form>
+        {/* Outcomes (create / replace / delete) are announced to assistive tech. */}
+        <div aria-live="polite" className="mt-4">
+          {feedback ? <Alert variant="success">{feedback}</Alert> : null}
         </div>
-        {createError ? (
-          <p role="alert" className="mt-3 text-sm text-red-700" data-testid="workspace-secrets-create-error">
-            {createError}
-          </p>
-        ) : null}
-        {feedback ? <p className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
       </section>
 
       {loading ? (
@@ -399,38 +542,56 @@ export function ConsoleWorkspaceSecretsPage() {
       ) : null}
 
       {secrets.length > 0 ? (
-        <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-3xl border border-border bg-card/70 shadow-sm">
+          <table className="w-full min-w-[64rem] divide-y divide-border text-left text-sm">
+            <caption className="sr-only">Secretos de función del workspace activo (solo metadatos; los valores no se muestran)</caption>
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Variable de entorno</th>
-                <th className="px-4 py-3">Funciones que lo usan</th>
-                <th className="px-4 py-3">Creado</th>
-                <th className="px-4 py-3">Actualizado</th>
-                <th className="px-4 py-3">Descripción</th>
-                <th className="px-4 py-3">Acciones</th>
+              <tr className="bg-muted/40 align-top text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
+                <th scope="col" className="px-4 py-3 font-medium">Variable de entorno</th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Funciones que lo usan
+                  <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-muted-foreground">
+                    Recuento informativo; puede ir por detrás del último deploy.
+                  </span>
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">Creado</th>
+                <th scope="col" className="px-4 py-3 font-medium">Actualizado</th>
+                <th scope="col" className="px-4 py-3 font-medium">Descripción</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">Acciones</th>
               </tr>
             </thead>
-            <tbody data-testid="workspace-secrets-table-body">
+            <tbody className="divide-y divide-border/80" data-testid="workspace-secrets-table-body">
               {secrets.map((secret) => {
                 const name = readSecretName(secret)
                 return (
-                  <tr key={name} className="border-b border-border/60">
-                    <td className="px-4 py-3 font-medium">{name}</td>
-                    <td className="px-4 py-3">
-                      <code>{secretEnvVarName(name)}</code>
+                  <tr key={name} className="transition-colors hover:bg-muted/30">
+                    <th scope="row" className="px-4 py-4 text-left font-medium text-foreground">{name}</th>
+                    <td className="px-4 py-4">
+                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{secretEnvVarName(name)}</code>
                     </td>
-                    <td className="px-4 py-3">{secret.resolvedRefCount}</td>
-                    <td className="px-4 py-3">{formatTimestamp(secret.timestamps?.createdAt)}</td>
-                    <td className="px-4 py-3">{formatTimestamp(secret.timestamps?.updatedAt)}</td>
-                    <td className="px-4 py-3">{secret.description ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => openReplace(secret)}>
+                    <td className="px-4 py-4 tabular-nums text-muted-foreground">{secret.resolvedRefCount}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatTimestamp(secret.timestamps?.createdAt)}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatTimestamp(secret.timestamps?.updatedAt)}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{secret.description ?? '—'}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openReplace(secret)}
+                          aria-label={`Reemplazar el secreto ${name}`}
+                        >
                           Reemplazar
                         </Button>
-                        <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteTarget(secret)}>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => { setFeedback(null); setDeleteError(null); setDeleteTarget(secret) }}
+                          aria-label={`Eliminar el secreto ${name}`}
+                        >
                           Eliminar
                         </Button>
                       </div>
@@ -443,79 +604,93 @@ export function ConsoleWorkspaceSecretsPage() {
         </div>
       ) : null}
 
-      {replaceTarget ? (
-        <div role="dialog" aria-label="Reemplazar secreto" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold">Reemplazar "{readSecretName(replaceTarget)}"</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              El valor anterior se sustituye en el mismo path. El campo nunca se rellena con el valor actual.
-            </p>
-            <label className="mt-4 flex flex-col gap-1 text-sm">
-              <span className="font-medium">Nuevo valor</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                aria-label="Nuevo valor del secreto"
-                value={replaceValue}
-                onChange={(event) => setReplaceValue(event.target.value)}
-                placeholder="••••••••"
-                className="rounded-xl border border-input bg-background px-3 py-2"
-              />
-            </label>
-            <label className="mt-3 flex flex-col gap-1 text-sm">
-              <span className="font-medium">Descripción (opcional)</span>
-              <input
-                aria-label="Nueva descripción del secreto"
-                value={replaceDescription}
-                onChange={(event) => setReplaceDescription(event.target.value)}
-                className="rounded-xl border border-input bg-background px-3 py-2"
-              />
-            </label>
+      <SecretDialog
+        open={replaceTarget !== null}
+        label="Reemplazar secreto"
+        describedById={replaceDescId}
+        busy={replaceBusy}
+        onClose={closeReplace}
+      >
+        {replaceTarget ? (
+          <form onSubmit={(event) => void handleReplace(event)} noValidate className="space-y-5">
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold text-foreground">Reemplazar &ldquo;{readSecretName(replaceTarget)}&rdquo;</h2>
+              <p id={replaceDescId} className="text-sm leading-6 text-muted-foreground">
+                El valor anterior se sustituye en el mismo path. El campo nunca se rellena con el valor actual.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={replaceValueId}>Nuevo valor</Label>
+                <Input
+                  id={replaceValueId}
+                  type="password"
+                  autoComplete="new-password"
+                  aria-label="Nuevo valor del secreto"
+                  aria-describedby={replaceValidation ? replaceValidationId : undefined}
+                  value={replaceValue}
+                  onChange={(event) => setReplaceValue(event.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={replaceDescriptionId}>Descripción (opcional)</Label>
+                <Input
+                  id={replaceDescriptionId}
+                  aria-label="Nueva descripción del secreto"
+                  value={replaceDescription}
+                  onChange={(event) => setReplaceDescription(event.target.value)}
+                />
+              </div>
+            </div>
             {replaceValidation ? (
-              <p role="alert" className="mt-3 text-sm text-red-700">
+              <p id={replaceValidationId} role="alert" className="text-sm font-medium text-destructive">
                 {replaceValidation}
               </p>
             ) : null}
             {replaceError ? (
-              <p role="alert" className="mt-3 text-sm text-red-700" data-testid="workspace-secrets-replace-error">
+              <Alert variant="destructive" data-testid="workspace-secrets-replace-error">
                 {replaceError}
-              </p>
+              </Alert>
             ) : null}
-            <div className="mt-4 flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setReplaceTarget(null)
-                  setReplaceValue('')
-                }}
-              >
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={closeReplace} disabled={replaceBusy}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={() => void handleReplace()} disabled={replaceBusy || replaceValue.length === 0}>
+              <Button type="submit" disabled={replaceBusy || replaceValue.length === 0}>
                 {replaceBusy ? 'Reemplazando…' : 'Reemplazar'}
               </Button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </form>
+        ) : null}
+      </SecretDialog>
 
-      {deleteTarget ? (
-        <div role="dialog" aria-label="Eliminar secreto" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold">Eliminar "{readSecretName(deleteTarget)}"</h2>
-            <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800" data-testid="workspace-secrets-delete-warning">
+      <SecretDialog
+        open={deleteTarget !== null}
+        label="Eliminar secreto"
+        describedById={deleteDescId}
+        busy={deleteBusy}
+        onClose={() => setDeleteTarget(null)}
+      >
+        {deleteTarget ? (
+          <div className="space-y-5">
+            <h2 className="text-lg font-semibold text-foreground">Eliminar &ldquo;{readSecretName(deleteTarget)}&rdquo;</h2>
+            <Alert
+              id={deleteDescId}
+              className="border-amber-500/40 bg-amber-500/10 text-amber-200"
+              data-testid="workspace-secrets-delete-warning"
+            >
               {deleteTarget.resolvedRefCount > 0
                 ? `Atención: ${deleteTarget.resolvedRefCount} función(es) referencian este secreto. Al eliminarlo, la variable de entorno inyectada desaparecerá en su próximo deploy y podría romper su funcionamiento.`
                 : 'Atención: si alguna función referencia este secreto, eliminarlo puede romperla en su próximo deploy (el deploy omite silenciosamente una referencia ausente).'}
-            </div>
+            </Alert>
             {deleteError ? (
-              <p role="alert" className="mt-3 text-sm text-red-700" data-testid="workspace-secrets-delete-error">
+              <Alert variant="destructive" data-testid="workspace-secrets-delete-error">
                 {deleteError}
-              </p>
+              </Alert>
             ) : null}
-            <div className="mt-4 flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>
                 Cancelar
               </Button>
               <Button type="button" variant="destructive" onClick={() => void handleDelete()} disabled={deleteBusy}>
@@ -523,8 +698,8 @@ export function ConsoleWorkspaceSecretsPage() {
               </Button>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </SecretDialog>
     </section>
   )
 }
