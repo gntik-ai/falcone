@@ -66,13 +66,13 @@ The significant architectural decisions visible in the codebase, captured as sho
 
 **Evidence.** `charts/in-falcone/Chart.yaml`, `values/`, `templates/NOTES.txt`.
 
-## ADR-9 — Secrets via Vault + External Secrets Operator
+## ADR-9 — Secrets via OpenBao + External Secrets Operator
 
-**Decision.** Source secrets from Vault through the External Secrets Operator; reference secret *names* in the chart, never values.
+**Decision.** Source secrets from OpenBao through the External Secrets Operator; reference secret *names* in the chart, never values. (Migrated from HashiCorp Vault to OpenBao, a drop-in fork — PR #720.)
 
 **Why.** Keeps secret material out of git and values files; integrates with existing secret stores.
 
-**Evidence.** chart `eso`/`vault` sections; `secretKeyRef` mounts.
+**Evidence.** chart `eso`/`openbao` sections; `secretKeyRef` mounts.
 
 ## ADR-10 — Soft-delete lifecycle for cascading cleanup
 
