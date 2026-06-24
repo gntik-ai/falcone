@@ -67,7 +67,7 @@ APISIX `limit-count` uses `key_type: var_combination` with `$http_apikey`, givin
 
 ## Secrets
 
-Secrets come from **Vault** via the **External Secrets Operator**; the chart references secret *names*, not values. Sensitive material (e.g. the FerretDB/DocumentDB Postgres credentials behind `MONGO_URI`) is created as a Kubernetes Secret and mounted by reference — never inlined into manifests or values.
+Secrets come from **OpenBao** via the **External Secrets Operator**; the chart references secret *names*, not values. Sensitive material (e.g. the FerretDB/DocumentDB Postgres credentials behind `MONGO_URI`) is created as a Kubernetes Secret and mounted by reference — never inlined into manifests or values.
 
 ## Transport & SSRF safety
 

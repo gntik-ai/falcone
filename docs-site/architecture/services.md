@@ -6,7 +6,7 @@ This page describes **every architecture component** of In Falcone — what it d
 EDGE          CONTROL & DATA PLANE        DATA BACKENDS           PLATFORM
 ─────         ────────────────────        ─────────────           ────────
 APISIX  ─────▶ Control Plane              PostgreSQL              Keycloak (identity)
-gateway        Executor                   FerretDB + DocumentDB   Vault + ESO (secrets)
+gateway        Executor                   FerretDB + DocumentDB   OpenBao + ESO (secrets)
                Adapters                   Kafka / Redpanda        Prometheus (observability)
 Web Console    Realtime Engine            SeaweedFS (storage)     Bootstrap & Provisioning
                Functions runtime
@@ -169,11 +169,11 @@ Keycloak is the OIDC identity provider. It backs console login, issues per-tenan
 
 ---
 
-## Secret Management (Vault + External Secrets)
+## Secret Management (OpenBao + External Secrets)
 
-**Chart aliases:** `vault`, `eso`
+**Chart aliases:** `openbao`, `eso`
 
-Secrets are sourced from **HashiCorp Vault** via the **External Secrets Operator**, so the chart references secret *names* rather than embedding secret values. The dev compose stack runs Vault in `-dev` mode. (Sensitive material like the FerretDB/DocumentDB Postgres credentials behind `MONGO_URI` is created as a Kubernetes Secret and mounted via `secretKeyRef`, never inlined.)
+Secrets are sourced from **OpenBao** (the open-source Vault fork) via the **External Secrets Operator**, so the chart references secret *names* rather than embedding secret values. The dev compose stack runs OpenBao in `-dev` mode. (Sensitive material like the FerretDB/DocumentDB Postgres credentials behind `MONGO_URI` is created as a Kubernetes Secret and mounted via `secretKeyRef`, never inlined.)
 
 ---
 
