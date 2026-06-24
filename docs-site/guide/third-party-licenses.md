@@ -54,19 +54,18 @@ In Falcone's own code is **MIT**, which is compatible with consuming all the per
 components above (MIT, Apache-2.0, ISC, BSD, PostgreSQL). The ⚠ components are **not** OSI open
 source and deserve review:
 
-- **Redpanda (`BSL-1.1` + `RCL`)** and **Vault (`BUSL-1.1`)** are copyleft or source-available. The
+- **Redpanda (`BSL-1.1` + `RCL`)** is source-available. The
   former **MongoDB (`SSPL-1.0`)** and **MinIO (`AGPL-3.0`)** dependencies have been **removed** —
   replaced by **FerretDB** (`Apache-2.0`, [ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb))
   and **SeaweedFS** (`Apache-2.0`, [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs))
   respectively, retiring their SSPL/AGPL exposure.
-- Running them as **separate backing services In Falcone talks to over the network** does not, by
-  itself, impose their license on In Falcone's MIT code (no linking / derivative work). **But**
-  their "offer-as-a-service" / "competitive service" clauses are directly relevant to a
-  multi-tenant BaaS that **re-exposes** their functionality to tenants — a Mongo data API, a
-  Kafka/events API, an S3 storage API. In particular, **SSPL §13 and AGPL §13 target offering the
-  software's functionality as a service**, and the Redpanda / Vault BSL grants exclude competing
-  managed offerings. Review these terms before any hosted or commercial offering. All four are
-  swappable at the deployment layer if their terms don't fit your use.
+- Running Redpanda as a **separate backing service In Falcone talks to over the network** does not, by
+  itself, impose its license on In Falcone's MIT code (no linking / derivative work). **But**
+  its "offer-as-a-service" / "competitive service" clauses are directly relevant to a
+  multi-tenant BaaS that **re-exposes** its functionality to tenants — a Kafka/events API. In
+  particular, the Redpanda BSL grant excludes competing
+  managed offerings. Review these terms before any hosted or commercial offering. Redpanda is
+  swappable at the deployment layer if its terms don't fit your use.
 - **Object store: MinIO → SeaweedFS (Apache-2.0).** Per
   [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), **SeaweedFS** is
   the object store, chosen specifically to retire the MinIO **AGPL §13** "offer-as-a-service"

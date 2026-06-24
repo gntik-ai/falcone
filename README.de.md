@@ -95,7 +95,7 @@ Oberfläche behält — statt einer Flotte handgebauter Backends.
             ▼                           ▼                             ▼
    ┌────────────────────────────────────────────────────────────────────────┐
    │ PostgreSQL (RLS + Schema pro Mandant) · FerretDB+DocumentDB · Kafka · SeaweedFS · │
-   │ Vault (Secrets) · Keycloak (Realm pro Mandant + OAuth 2.1 für MCP) ·     │
+   │ OpenBao (Secrets) · Keycloak (Realm pro Mandant + OAuth 2.1 für MCP) ·   │
    │ Temporal (Flows-Engine) · Knative (Funktionen + MCP-Runtime pro Mandant) │
    └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -201,7 +201,7 @@ bleiben Preview unter dem obigen „nicht produktionsreif"-Hinweis:
 
 Das Repository liefert einen Compose-Stack, der die **echten Backing-Services**
 hochfährt, mit denen Falcone spricht — PostgreSQL, Keycloak, Redpanda (Kafka),
-FerretDB + DocumentDB (Dokumentspeicher mit MongoDB-Wire-Protokoll), SeaweedFS (S3) und Vault — sowie ein
+FerretDB + DocumentDB (Dokumentspeicher mit MongoDB-Wire-Protokoll), SeaweedFS (S3) und OpenBao — sowie ein
 APISIX-Gateway und einen Action-Runner. Das ist der schnellste Weg zu einer
 funktionierenden Umgebung auf deiner Maschine.
 
@@ -222,7 +222,7 @@ pnpm install
 ### 2. Den Stack mit Docker Compose hochfahren
 
 Das Hilfsskript richtet Health-Checks, Migrationen, den FerretDB + DocumentDB-Dokumentspeicher, den
-SeaweedFS-Bucket und das Vault-Audit-Device für dich ein:
+SeaweedFS-Bucket und das OpenBao-Audit-Device für dich ein:
 
 ```bash
 cd tests/env
@@ -246,7 +246,7 @@ docker compose -f tests/env/docker-compose.yml ps
 | FerretDB gateway (MongoDB wire) | `localhost:57017` | `falcone` / `falcone` |
 | Redpanda (Kafka) | `localhost:19092` | — |
 | SeaweedFS (S3-API) | <http://localhost:58333> | S3-Access-Key / Secret-Key (path-style) |
-| Vault (dev) | <http://localhost:58200> | Token `root` |
+| OpenBao (dev) | <http://localhost:58200> | Token `root` |
 
 ### 4. Ausprobieren
 
@@ -303,7 +303,7 @@ source-available** (kein OSI-Open-Source) — siehe den folgenden Kompatibilitä
 | FerretDB v2 (über DocumentDB / PostgreSQL 17) | Dokument-Daten-API — kompatibel mit dem MongoDB-Wire-Protokoll ([ADR-14](docs-site/architecture/adrs.md)) | `Apache-2.0` (Gateway) + `MIT` (DocumentDB-Erweiterung) | [ferretdb](https://github.com/FerretDB/FerretDB) · [documentdb](https://github.com/microsoft/documentdb) |
 | Redpanda 24.2 | Kafka-kompatibler Event-Bus / CDC-Streaming | ⚠ `BSL-1.1` (Redpanda) + `RCL` | [licenses](https://github.com/redpanda-data/redpanda/tree/dev/licenses) |
 | SeaweedFS 4.33 | S3-kompatibler Objektspeicher ([ADR-13](docs-site/architecture/adrs.md)) | `Apache-2.0` | [seaweedfs](https://github.com/seaweedfs/seaweedfs) |
-| HashiCorp Vault 1.18 | Secrets-Management | ⚠ `BUSL-1.1` | [LICENSE](https://github.com/hashicorp/vault/blob/main/LICENSE) |
+| OpenBao 2.3.1 | Secrets-Management | `MPL-2.0` | [LICENSE](https://github.com/openbao/openbao/blob/main/LICENSE) |
 | Keycloak 26 | IAM mit Realm pro Mandant / OIDC | `Apache-2.0` | [keycloak](https://github.com/keycloak/keycloak) |
 | Apache APISIX 3.9 | API-Gateway (öffentliche `/v1`-Oberfläche) | `Apache-2.0` | [apisix](https://github.com/apache/apisix) |
 | Temporal (Server 1.25 + TypeScript-SDK 1.18) | Langlebige Workflow-Engine hinter Flows | `MIT` | [temporal](https://github.com/temporalio/temporal) · [sdk-typescript](https://github.com/temporalio/sdk-typescript) |
@@ -337,18 +337,18 @@ source-available** (kein OSI-Open-Source) — siehe den folgenden Kompatibilitä
 > mit der Nutzung aller oben genannten permissiven Komponenten (MIT, Apache-2.0, ISC, BSD,
 > PostgreSQL) kompatibel ist. Die mit ⚠ markierten Komponenten sind **kein** OSI-Open-Source und
 > verdienen eine Prüfung:
-> - **Redpanda (`BSL-1.1` + `RCL`)** und **Vault (`BUSL-1.1`)** sind copyleft oder source-available.
+> - **Redpanda (`BSL-1.1` + `RCL`)** ist source-available.
 >   Die ehemaligen Abhängigkeiten **MongoDB (`SSPL-1.0`)** und **MinIO (`AGPL-3.0`)** wurden
 >   **entfernt** — abgelöst durch **FerretDB** (`Apache-2.0`, [ADR-14](docs-site/architecture/adrs.md))
 >   bzw. **SeaweedFS** (`Apache-2.0`, [ADR-13](docs-site/architecture/adrs.md)), womit ihr
 >   SSPL-/AGPL-Risiko entfällt.
-> - Sie als **separate Backing-Services zu betreiben, mit denen Falcone über das Netzwerk spricht**,
->   erlegt deren Lizenz dem MIT-Code von Falcone für sich genommen nicht auf (kein Linking / kein
->   abgeleitetes Werk). **Aber** ihre „Als-Service-anbieten"- / „Wettbewerbsdienst"-Klauseln sind für
->   ein mandantenfähiges BaaS, das deren Funktionalität an Mandanten **weiter exponiert**, direkt
->   relevant — eine Kafka-/Event-API. Insbesondere schließen die BSL-Gewährungen von Redpanda/Vault
+> - Redpanda als **separaten Backing-Service zu betreiben, mit dem Falcone über das Netzwerk spricht**,
+>   erlegt dessen Lizenz dem MIT-Code von Falcone für sich genommen nicht auf (kein Linking / kein
+>   abgeleitetes Werk). **Aber** seine „Als-Service-anbieten"- / „Wettbewerbsdienst"-Klauseln sind für
+>   ein mandantenfähiges BaaS, das dessen Funktionalität an Mandanten **weiter exponiert**, direkt
+>   relevant — eine Kafka-/Event-API. Insbesondere schließt die BSL-Gewährung von Redpanda
 >   konkurrierende Managed-Angebote aus. Prüfe diese Bedingungen vor jedem gehosteten oder
->   kommerziellen Angebot; beide sind auf der Deployment-Ebene austauschbar, falls ihre Bedingungen
+>   kommerziellen Angebot; Redpanda ist auf der Deployment-Ebene austauschbar, falls seine Bedingungen
 >   nicht zu deinem Anwendungsfall passen.
 > - **Objektspeicher: MinIO → SeaweedFS (Apache-2.0).** Gemäß
 >   [ADR-13](docs-site/architecture/adrs.md) ist **SeaweedFS** der Objektspeicher, gezielt gewählt, um
