@@ -7,7 +7,7 @@ In Falcone is developed test-first against **real backends**, with spec-driven c
 Bring up the real backends with docker-compose and run the suites against them:
 
 ```bash
-cd tests/env && docker compose up -d      # Postgres, FerretDB + DocumentDB, Keycloak, Redpanda, SeaweedFS, Vault, APISIX
+cd tests/env && docker compose up -d      # Postgres, FerretDB + DocumentDB, Keycloak, Redpanda, SeaweedFS, OpenBao, APISIX
 ```
 
 See [Installation → Docker Compose](/guide/installation#docker-compose-local).

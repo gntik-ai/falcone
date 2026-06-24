@@ -31,7 +31,7 @@ In Falcone is a **multi-tenant BaaS** assembled from a small set of cooperating 
                     │  (tenants, plans…) │
                     └────────────────────┘
 
-         Identity: Keycloak (OIDC)  ·  Secrets: Vault + External Secrets  ·  Metrics: Prometheus
+         Identity: Keycloak (OIDC)  ·  Secrets: OpenBao + External Secrets  ·  Metrics: Prometheus
 ```
 
 - A **data-plane** call (e.g. `GET /v1/collections/todos/documents` with `apikey: flc_anon_…`) is routed by the gateway to the executor. The executor verifies the key, resolves the tenant/workspace and DB role from it, builds an adapter query plan, and runs it against the workspace's real database — under RLS.

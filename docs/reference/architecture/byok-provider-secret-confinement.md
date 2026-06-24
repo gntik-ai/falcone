@@ -34,7 +34,7 @@ A provider config body carries `providerType`, `endpoint`, `allowedModels` / `mo
 
 ## Secret confinement (reserved env-var prefix)
 
-A BYOK key is provisioned out of band (e.g. ESO/Vault mounts it into the executor as an environment
+A BYOK key is provisioned out of band (e.g. ESO/OpenBao mounts it into the executor as an environment
 variable) and referenced by name. The resolver reads **only** an environment variable whose name is
 on the reserved-prefix allow-list:
 
