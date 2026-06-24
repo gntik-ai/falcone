@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Database,
   FolderKanban,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Users,
@@ -33,6 +34,7 @@ import {
   readConsoleShellSession
 } from '@/lib/console-session'
 import { cn } from '@/lib/utils'
+import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
 
 const consoleNavigationItems = [
   {
@@ -166,6 +168,13 @@ const consoleNavigationItems = [
     to: '/console/service-accounts',
     icon: Settings,
     description: 'Credenciales programáticas y service accounts del workspace activo.'
+  },
+  {
+    label: 'Workspace Secrets',
+    to: '/console/workspace-secrets',
+    icon: KeyRound,
+    description: 'Secretos de función del workspace activo (valores de solo escritura, inyectados en el deploy).',
+    requiresWorkspaceSecretsAccess: true
   },
   {
     label: 'Quotas',
@@ -395,36 +404,7 @@ export function ConsoleShellLayout() {
           <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-72 shrink-0 overflow-y-auto border-r border-border bg-card/35 px-4 py-6 lg:block">
             <div className="space-y-2 rounded-3xl border border-border/70 bg-background/50 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">Navegación principal</p>
-              <nav aria-label="Navegación principal de consola" className="space-y-1">
-                {consoleNavigationItems.map((item) => {
-                  const Icon = item.icon
-
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) =>
-                        cn(
-                          'flex items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
-                          isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                        )
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-current')} aria-hidden="true" />
-                          <span className="min-w-0">
-                            <span className="block font-medium">{item.label}</span>
-                            <span className={cn('mt-1 block text-xs leading-5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                              {item.description}
-                            </span>
-                          </span>
-                        </>
-                      )}
-                    </NavLink>
-                  )
-                })}
-              </nav>
+              <ConsoleNavigation />
             </div>
           </aside>
 
@@ -441,6 +421,52 @@ export function ConsoleShellLayout() {
         </div>
       </div>
     </ConsoleContextProvider>
+  )
+}
+
+function ConsoleNavigation() {
+  // The Workspace Secrets entry is shown only when the same coarse, fail-safe gate that guards the
+  // route is satisfied (workspace membership / tenant-admin / platform role). This runs inside the
+  // ConsoleContextProvider, so the active workspace is available.
+  const { activeWorkspaceId } = useConsoleContext()
+  const session = useMemo(() => readConsoleShellSession(), [])
+  const canSecrets = canManageWorkspaceSecrets(session, activeWorkspaceId)
+
+  const items = consoleNavigationItems.filter(
+    (item) => !('requiresWorkspaceSecretsAccess' in item && item.requiresWorkspaceSecretsAccess) || canSecrets
+  )
+
+  return (
+    <nav aria-label="Navegación principal de consola" className="space-y-1">
+      {items.map((item) => {
+        const Icon = item.icon
+
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              cn(
+                'flex items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
+                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-current')} aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="block font-medium">{item.label}</span>
+                  <span className={cn('mt-1 block text-xs leading-5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                    {item.description}
+                  </span>
+                </span>
+              </>
+            )}
+          </NavLink>
+        )
+      })}
+    </nav>
   )
 }
 

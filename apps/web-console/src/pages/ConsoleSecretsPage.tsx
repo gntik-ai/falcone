@@ -59,8 +59,8 @@ export function ConsoleSecretsPage() {
   return (
     <section className="space-y-4 p-4">
       <header>
-        <h1 className="text-2xl font-semibold">Secrets</h1>
-        <p className="text-sm text-slate-600">Version inventory, rotation history and safe revocation workflow.</p>
+        <h1 className="text-2xl font-semibold">Secret Rotation</h1>
+        <p className="text-sm text-slate-600">Platform/tenant secret-rotation plane: version inventory, rotation history and safe revocation workflow. (Workspace function secrets are managed on the Workspace Secrets screen.)</p>
       </header>
       <div className="overflow-hidden rounded border bg-white">
         <table className="min-w-full text-sm">
