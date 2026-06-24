@@ -1,25 +1,25 @@
 {{- /*
-  Vault server TLS bootstrap — self-signed path (finding D7/C.6).
+  OpenBao server TLS bootstrap — self-signed path (finding D7/C.6).
 
   SAFE DEFAULT for clusters WITHOUT cert-manager (e.g. kind): a Helm pre-install/pre-upgrade hook
   Job that generates a self-signed CA + server cert with openssl and writes them into the
-  `vault.tls.secretName` Secret (tls.crt/tls.key/ca.crt). The Vault Deployment mounts it at
-  /vault/tls; ESO's caProvider reads its ca.crt to trust the Vault server — so enabling Vault no
-  longer aborts the release on the missing cert-manager Certificate CRD, and the ESO ->
+  `openbao.tls.secretName` Secret (tls.crt/tls.key/ca.crt). The OpenBao StatefulSet mounts it at
+  /openbao/tls; ESO's caProvider reads its ca.crt to trust the OpenBao server — so enabling OpenBao
+  no longer aborts the release on the missing cert-manager Certificate CRD, and the ESO ->
   ClusterSecretStore -> ExternalSecret path resolves end-to-end against the bootstrapped CA.
 
-  Rendered only when vault.tls.mode=self-signed (mirrors templates/seaweedfs-tls-bootstrap.yaml).
-  Runs BEFORE the Vault pod so the cert Secret exists when the pod mounts it. Idempotent: skips if
+  Rendered only when openbao.tls.mode=self-signed (mirrors templates/seaweedfs-tls-bootstrap.yaml).
+  Runs BEFORE the OpenBao pod so the cert Secret exists when the pod mounts it. Idempotent: skips if
   the Secret already carries a server cert.
 */ -}}
-{{- if and .Values.vault.tls.enabled (eq (.Values.vault.tls.mode | default "cert-manager") "self-signed") }}
-{{- $ns := .Values.vault.namespace -}}
-{{- $secret := .Values.vault.tls.secretName -}}
-{{- $b := .Values.vault.tls.bootstrap -}}
+{{- if and .Values.openbao.tls.enabled (eq (.Values.openbao.tls.mode | default "cert-manager") "self-signed") }}
+{{- $ns := .Values.openbao.namespace -}}
+{{- $secret := .Values.openbao.tls.secretName -}}
+{{- $b := .Values.openbao.tls.bootstrap -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: vault-tls-bootstrap
+  name: openbao-tls-bootstrap
   namespace: {{ $ns }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
@@ -33,7 +33,7 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: vault-tls-bootstrap
+  name: openbao-tls-bootstrap
   namespace: {{ $ns }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
@@ -43,7 +43,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: vault-tls-bootstrap
+  name: openbao-tls-bootstrap
   namespace: {{ $ns }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
@@ -52,16 +52,16 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: vault-tls-bootstrap
+  name: openbao-tls-bootstrap
 subjects:
   - kind: ServiceAccount
-    name: vault-tls-bootstrap
+    name: openbao-tls-bootstrap
     namespace: {{ $ns }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: vault-tls-bootstrap
+  name: openbao-tls-bootstrap
   namespace: {{ $ns }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
@@ -73,10 +73,10 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: vault-tls
+        app.kubernetes.io/component: openbao-tls
     spec:
       restartPolicy: Never
-      serviceAccountName: vault-tls-bootstrap
+      serviceAccountName: openbao-tls-bootstrap
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -104,16 +104,17 @@ spec:
               command -v openssl >/dev/null || { echo "openssl required in the bootstrap image"; exit 1; }
               # Idempotent: skip if the server cert Secret already carries a tls.crt.
               if kubectl -n "$NS" get secret "$SECRET" -o jsonpath='{.data.tls\.crt}' 2>/dev/null | grep -q .; then
-                echo "$SECRET already present; skipping Vault TLS bootstrap"; exit 0
+                echo "$SECRET already present; skipping OpenBao TLS bootstrap"; exit 0
               fi
               D=$(mktemp -d)
-              # One self-signed cert carrying the Vault Service SANs (must match the ESO vaultAddress
-              # host). -addext keeps the SANs inline (no config file / heredoc). The cert is its own
-              # trust anchor, so ca.crt == tls.crt — ESO's caProvider reads ca.crt to trust Vault.
-              SAN="subjectAltName=DNS:vault,DNS:vault.${NS},DNS:vault.${NS}.svc,DNS:vault.${NS}.svc.cluster.local,DNS:vault-internal.${NS}.svc.cluster.local"
+              # One self-signed cert carrying the OpenBao Service SANs (must match the ESO
+              # vaultAddress host). -addext keeps the SANs inline (no config file / heredoc). The cert
+              # is its own trust anchor, so ca.crt == tls.crt — ESO's caProvider reads ca.crt to trust
+              # OpenBao.
+              SAN="subjectAltName=DNS:openbao,DNS:openbao.${NS},DNS:openbao.${NS}.svc,DNS:openbao.${NS}.svc.cluster.local,DNS:openbao-internal.${NS}.svc.cluster.local"
               openssl req -x509 -nodes -newkey rsa:2048 -days "$DAYS" \
                 -keyout "$D/tls.key" -out "$D/tls.crt" \
-                -subj "/CN=vault.${NS}.svc.cluster.local" \
+                -subj "/CN=openbao.${NS}.svc.cluster.local" \
                 -addext "$SAN"
               cp "$D/tls.crt" "$D/ca.crt"
               kubectl -n "$NS" create secret generic "$SECRET" \
@@ -121,5 +122,5 @@ spec:
                 --from-file=tls.key="$D/tls.key" \
                 --from-file=ca.crt="$D/ca.crt" \
                 --dry-run=client -o yaml | kubectl apply -f -
-              echo "Vault server TLS secret $SECRET created (self-signed) in $NS"
+              echo "OpenBao server TLS secret $SECRET created (self-signed) in $NS"
 {{- end }}

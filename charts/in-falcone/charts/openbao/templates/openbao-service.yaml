@@ -1,29 +1,29 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: vault
-  namespace: {{ .Values.vault.namespace }}
+  name: openbao
+  namespace: {{ .Values.openbao.namespace }}
 spec:
-  type: {{ .Values.vault.service.type }}
+  type: {{ .Values.openbao.service.type }}
   selector:
-    app.kubernetes.io/name: vault
+    app.kubernetes.io/name: openbao
   ports:
     - name: http
-      port: {{ .Values.vault.service.port }}
+      port: {{ .Values.openbao.service.port }}
       targetPort: 8200
     - name: cluster
-      port: {{ .Values.vault.service.clusterPort }}
+      port: {{ .Values.openbao.service.clusterPort }}
       targetPort: 8201
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: vault-internal
-  namespace: {{ .Values.vault.namespace }}
+  name: openbao-internal
+  namespace: {{ .Values.openbao.namespace }}
 spec:
   clusterIP: None
   selector:
-    app.kubernetes.io/name: vault
+    app.kubernetes.io/name: openbao
   ports:
     - name: http
       port: 8200

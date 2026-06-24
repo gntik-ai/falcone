@@ -1,12 +1,28 @@
+# The external-secrets operator's CRDs are vendored under this subchart's crds/ directory so Helm
+# installs them BEFORE any templates in the release (including this subchart's ClusterSecretStore /
+# ExternalSecret instances and the umbrella's other resources). Therefore the operator dependency must
+# NOT also render them as templates, or the two collide / race: keep installCRDs disabled here.
+external-secrets:
+  installCRDs: false
+
 eso:
-  vaultAddress: https://vault.secret-store.svc.cluster.local:8200
+  # NOTE: the `vault*` value-keys name ESO's provider TYPE (provider.vault), which OpenBao is
+  # served by — they are NOT a HashiCorp Vault product reference. Only the VALUES point at OpenBao.
+  vaultAddress: https://openbao.secret-store.svc.cluster.local:8200
+  # Image for the post-install Job that waits for the external-secrets admission webhook to be ready
+  # before the ClusterSecretStore/ExternalSecret hooks apply (avoids a "connection refused" race).
+  webhookWait:
+    image:
+      repository: docker.io/bitnamilegacy/kubectl
+      tag: "1.32.2"
+      pullPolicy: IfNotPresent
   vaultAuthPath: kubernetes
   vaultAuthRole: eso-role
-  serviceAccountName: eso-vault-auth
+  serviceAccountName: eso-openbao-auth
   refreshInterval: 1h
   tokenTTL: 24h
   namespace: eso-system
   caProvider:
-    name: vault-server-tls
+    name: openbao-server-tls
     key: ca.crt
     namespace: secret-store

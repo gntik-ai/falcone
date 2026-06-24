@@ -1,3 +1,3 @@
-# Runtime Vault file audit log (written by the Vault dev container on `up.sh`).
+# Runtime OpenBao file audit log (written by the OpenBao dev container on `up.sh`).
 # Never commit runtime audit logs.
-vault/audit/
+openbao/audit/
