@@ -39,10 +39,53 @@ The list operation enforces the same boundary by returning **only** schedules wh
 the caller's `{tenantId}:{workspaceId}:` prefix, even though Temporal's listing spans the whole
 `falcone-flows` namespace.
 
+## Role authorization on flow-definition writes
+
+Authoring a flow definition is a **privileged structural write**: a flow definition is executable
+workflow DSL whose activities reach the workspace's data, storage, functions, and BYOK LLM. The flow
+executor therefore authorizes the **definition-write** operations by the caller's **role**, not by
+tenant/workspace membership alone (issue #760). A request must carry a write-capable tenant/workspace
+role; a read-only or otherwise non-write role is rejected with **`403 FORBIDDEN`** and **nothing is
+persisted** (the definition/version store is never written), on every workspace and every stage
+including production.
+
+Write-capable roles (the same set the executor enforces for API-key management, #624):
+
+```text
+tenant_owner · tenant_admin · workspace_owner · workspace_admin · platform_admin · superadmin
+```
+
+The gate covers exactly the four definition-mutating operations:
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows` | create a draft definition |
+| PATCH | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}` | update a draft definition |
+| DELETE | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}` | delete a definition |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions` | publish a version |
+
+A read-only `tenant_viewer` — and any other non-write role such as `tenant_developer` — receives
+`403 FORBIDDEN` on each of these and creates/updates/deletes/publishes nothing. **Not** gated by this
+role check: the execution-lifecycle operations (start / cancel / retry / signal a run, and list/get
+executions), the read operations (list/get a definition or version, the task-type catalog), and the
+read-only `POST .../validate` check — those keep their existing identity-derived authorization
+(cancel/retry additionally enforce cross-tenant run ownership).
+
+On the kind install the APISIX gateway forwards the caller's Bearer JWT to the executor and **strips**
+`x-actor-roles`, so the executor is the sole auth authority on `/v1/flows/*`: it verifies the JWT and
+reads the roles from the verified token (`realm_access.roles`). The role gate is evaluated **after**
+the cross-tenant ownership check (`CROSS_TENANT_VIOLATION`, see above), which takes precedence — so a
+cross-tenant caller is still denied first (no existence or role leak), and a within-tenant non-write
+caller gets the `403`. The web console routes flow create/update/publish through its Flows API client
+and surfaces this `403` as an inline error; proactively hiding or disabling "New flow" for non-write
+roles is a separate, additive UX enhancement and is not required for the server-side guarantee.
+
 ## Endpoints
 
 All routes are workspace-scoped and use the same identity-derived authorization as the rest of the
 Flows API (an authenticated tenant principal; the path workspace must belong to the caller's tenant).
+Definition-write routes additionally require a write-capable role — see "Role authorization on
+flow-definition writes" above.
 
 | Method | Path | Purpose | Success |
 | --- | --- | --- | --- |

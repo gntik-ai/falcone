@@ -34,6 +34,10 @@ import {
   validateFlowDefinitionSchema,
 } from '../../../../services/internal-contracts/src/flow-definition-schema-validator.mjs';
 import { clientError } from './errors.mjs';
+// Shared write-capable admin role set + deny predicate (#760). Single source of truth shared with
+// server.mjs's API-key management gate (KEY_MGMT_ADMIN_ROLES) so the two role checks cannot drift.
+// auth-roles.mjs imports nothing from the runtime → no import cycle.
+import { isKnownNonWriteRole } from './auth-roles.mjs';
 import {
   mintExecutionToken,
   DEFAULT_MAX_RUN_DURATION_MS,
@@ -57,6 +61,20 @@ import { scheduleIdFor } from './flow-trigger-registry.mjs';
 const WORKFLOW_TYPE = 'DslInterpreterWorkflow';
 const APPROVAL_SIGNAL = 'flowApproval';
 const HUMAN_APPROVAL_ALIAS = 'human-approval';
+
+// The flow-DEFINITION write operations — these MUTATE the stored definition/version registry and
+// map to the gateway's `structural_admin` privilege domain (#760). They are role-gated (a
+// write-capable tenant/workspace role is required) before any store side effect. NOT included:
+// the EXECUTION-lifecycle ops (start/cancel/retry/signal a run) and all reads, which are
+// `data_access` and out of #760's scope. `validate` is a read-only check (no store mutation) and
+// is likewise not a write here. Keep this in sync with the operation names dispatched below and
+// the POST/PATCH/DELETE flow-definition routes in server.mjs::buildRoutes.
+const DEFINITION_WRITE_OPERATIONS = new Set([
+  'create_definition',
+  'update_definition',
+  'delete_definition',
+  'publish_version',
+]);
 
 const WORKFLOW_ID_SEPARATOR = ':';
 
@@ -626,6 +644,31 @@ export function createFlowExecutor({
   function requireIdentity(identity) {
     if (!identity?.tenantId || !identity?.workspaceId) {
       throw clientError('Missing tenant identity', 401, 'UNAUTHENTICATED');
+    }
+  }
+
+  // Authorize a flow-DEFINITION write (create / update / delete / publish-a-version) by the
+  // verified caller's ROLE, not tenant/workspace membership alone (#760). The gateway strips
+  // x-actor-roles for the flows route and the executor verifies the JWT itself, so the roles here
+  // come from the verified token (identity.roles = realm_access.roles); on the kind path a
+  // read-only `tenant_viewer` therefore arrives as roles:['tenant_viewer'].
+  //
+  // DENY only when the roles are KNOWN (a non-empty array) and contain NO write-capable admin role
+  // — that is exactly the within-tenant escalation this closes (tenant_viewer / tenant_developer).
+  // An undefined/empty roles list is treated as UNKNOWN and DEFERS (an admin token with no realm-
+  // role claims, the trusted-gateway path, the no-DB black-box mode), identical to the API-key
+  // management gate in server.mjs since #624 — so legitimate internal/system/no-claims callers are
+  // never regressed. Cross-tenant access is already denied upstream (server.mjs dispatch →
+  // CROSS_TENANT_VIOLATION) BEFORE executeFlows, so this gate fires only for within-tenant callers
+  // and never weakens or reorders the cross-tenant path. Store calls below stay scoped by the
+  // verified identity.tenantId / identity.workspaceId.
+  function requireDefinitionWriteRole(identity) {
+    if (isKnownNonWriteRole(identity?.roles)) {
+      throw clientError(
+        'Flow-definition writes require a write-capable tenant/workspace role',
+        403,
+        'FORBIDDEN',
+      );
     }
   }
 
@@ -1246,6 +1289,14 @@ export function createFlowExecutor({
   async function executeFlows(params = {}) {
     const { operation, identity } = params;
     requireIdentity(identity);
+    // Role-gate the DEFINITION-WRITE operations (create / update / delete / publish a version) —
+    // the catalog's `structural_admin` privilege domain (#760). Evaluated AFTER requireIdentity and
+    // BEFORE any store read/write side effect, so a non-write role performs NOTHING. Execution-
+    // lifecycle ops (start/cancel/retry/signal/get/list) and reads are intentionally NOT gated here
+    // (they are `data_access`; cancel/retry already enforce cross-tenant run ownership).
+    if (DEFINITION_WRITE_OPERATIONS.has(operation)) {
+      requireDefinitionWriteRole(identity);
+    }
     const flowId = params.flowId;
     switch (operation) {
       case 'create_definition':
