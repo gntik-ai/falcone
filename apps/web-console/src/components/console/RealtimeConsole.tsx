@@ -4,6 +4,9 @@
 // streaming in live.
 import { useEffect, useRef, useState } from 'react'
 
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import {
   subscribeRealtimeChanges,
   type RealtimeChange,
@@ -72,28 +75,28 @@ export function RealtimeConsole({ workspaceId }: RealtimeConsoleProps) {
       {error ? <p role="alert">{error}</p> : null}
 
       <div>
-        <label htmlFor="rt-source">Source</label>
-        <select id="rt-source" value={source} onChange={(event) => setSource(event.target.value as 'mongo' | 'postgres')}>
+        <Label htmlFor="rt-source">Source</Label>
+        <Select id="rt-source" value={source} onChange={(event) => setSource(event.target.value as 'mongo' | 'postgres')}>
           <option value="mongo">Mongo collection</option>
           <option value="postgres">Postgres table</option>
-        </select>
-        <label htmlFor="rt-db">Database</label>
-        <input id="rt-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
+        </Select>
+        <Label htmlFor="rt-db">Database</Label>
+        <Input id="rt-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
         {source === 'mongo' ? (
           <>
-            <label htmlFor="rt-collection">Collection</label>
-            <input id="rt-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} />
+            <Label htmlFor="rt-collection">Collection</Label>
+            <Input id="rt-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} />
           </>
         ) : (
           <>
-            <label htmlFor="rt-schema">Schema</label>
-            <input id="rt-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
-            <label htmlFor="rt-table">Table</label>
-            <input id="rt-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
+            <Label htmlFor="rt-schema">Schema</Label>
+            <Input id="rt-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
+            <Label htmlFor="rt-table">Table</Label>
+            <Input id="rt-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
           </>
         )}
-        <label htmlFor="rt-key">Anon key</label>
-        <input id="rt-key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="flc_anon_…" />
+        <Label htmlFor="rt-key">Anon key</Label>
+        <Input id="rt-key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="flc_anon_…" />
       </div>
       {subscribed ? (
         <button type="button" onClick={stop}>

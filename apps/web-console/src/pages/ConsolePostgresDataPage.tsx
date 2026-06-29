@@ -4,6 +4,8 @@
 import { useState } from 'react'
 
 import { PostgresDataEditor } from '@/components/console/PostgresDataEditor'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
 
 export function ConsolePostgresDataPage() {
@@ -23,12 +25,12 @@ export function ConsolePostgresDataPage() {
       <h1>Data editor</h1>
       <p>Query and edit table rows, and mint API keys for your apps.</p>
       <div>
-        <label htmlFor="pg-db">Database</label>
-        <input id="pg-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
-        <label htmlFor="pg-schema">Schema</label>
-        <input id="pg-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
-        <label htmlFor="pg-table">Table</label>
-        <input id="pg-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
+        <Label htmlFor="pg-db">Database</Label>
+        <Input id="pg-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
+        <Label htmlFor="pg-schema">Schema</Label>
+        <Input id="pg-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
+        <Label htmlFor="pg-table">Table</Label>
+        <Input id="pg-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
       </div>
       {ready ? (
         <PostgresDataEditor

@@ -3,6 +3,8 @@
 // recent activations, via the control-plane executor (@/services/functionsApi).
 import { useCallback, useEffect, useState } from 'react'
 
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import type { ApiError, JsonValue } from '@/lib/http'
 import { parseJsonObject } from '@/lib/editor-ux'
 import {
@@ -149,15 +151,15 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
       )}
 
       <h3>Deploy</h3>
-      <label htmlFor="deploy-spec-json">Function spec (JSON)</label>
-      <textarea id="deploy-spec-json" value={deploySpecJson} onChange={(event) => setDeploySpecJson(event.target.value)} />
+      <Label htmlFor="deploy-spec-json">Function spec (JSON)</Label>
+      <Textarea id="deploy-spec-json" value={deploySpecJson} onChange={(event) => setDeploySpecJson(event.target.value)} />
       <button type="button" onClick={() => void handleDeploy()} disabled={busy}>
         Deploy
       </button>
 
       <h3>Invoke</h3>
-      <label htmlFor="input-json">Input (JSON)</label>
-      <textarea id="input-json" value={inputJson} onChange={(event) => setInputJson(event.target.value)} />
+      <Label htmlFor="input-json">Input (JSON)</Label>
+      <Textarea id="input-json" value={inputJson} onChange={(event) => setInputJson(event.target.value)} />
       <button type="button" onClick={() => void handleInvoke()} disabled={busy}>
         Invoke
       </button>

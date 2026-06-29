@@ -3,6 +3,9 @@
 // control-plane executor (@/services/eventsApi), with loading + empty + status feedback.
 import { useCallback, useEffect, useState } from 'react'
 
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import type { ApiError, JsonValue } from '@/lib/http'
 import {
   consumeMessages,
@@ -138,15 +141,15 @@ export function EventsConsole({ workspaceId }: EventsConsoleProps) {
           ))}
         </ul>
       )}
-      <label htmlFor="new-topic">New topic</label>
-      <input id="new-topic" value={newTopic} onChange={(event) => setNewTopic(event.target.value)} />
+      <Label htmlFor="new-topic">New topic</Label>
+      <Input id="new-topic" value={newTopic} onChange={(event) => setNewTopic(event.target.value)} />
       <button type="button" onClick={() => void handleCreateTopic()} disabled={busy}>
         Create topic
       </button>
 
       <h3>Publish</h3>
-      <label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</label>
-      <textarea id="message-json" value={messageJson} onChange={(event) => setMessageJson(event.target.value)} />
+      <Label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</Label>
+      <Textarea id="message-json" value={messageJson} onChange={(event) => setMessageJson(event.target.value)} />
       <button type="button" onClick={() => void handlePublish()} disabled={busy}>
         Publish
       </button>
