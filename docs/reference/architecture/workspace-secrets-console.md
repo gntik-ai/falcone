@@ -90,6 +90,25 @@ cannot redirect the scope. A caller whose verified tenant does not own the works
 (`apps/web-console/src/lib/workspace-secrets-access.ts`: workspace membership / tenant-admin /
 platform role) and otherwise defers to the server `403`/`404`; it never client-trusts a mutation.
 
+## Role authorization on writes
+
+Tenant/workspace scoping (above) is **isolation**, not authorization: it proves *which* tenant a
+caller belongs to, not *whether* the caller's role may mutate. Creating, replacing, or deleting a
+secret therefore additionally requires an **administrative tenant role** — `tenant_owner` /
+`tenant_admin`, or a platform/superadmin caller — enforced server-side by `canManageTenant`
+(`deploy/kind/control-plane/tenant-scope.mjs`), the same coarse gate every other privileged
+control-plane write uses. A non-admin tenant member (`tenant_developer`, `tenant_viewer`) that
+belongs to the owning tenant receives **`403 FORBIDDEN`** on `POST` / `PUT` / `DELETE`, on **every**
+workspace and **every** stage (dev / staging / **production** alike), and **nothing is
+created/replaced/deleted**. This holds even though those roles can browse the page; the console's
+`canManageWorkspaceSecrets` nav/route gate is defense-in-depth only and the server is the authority.
+
+The gate fires **after** the tenant/isolation check, so a caller from another tenant still gets
+`404 WORKSPACE_NOT_FOUND` (the `404` wins over the `403`) and the role check never leaks
+own-tenant-vs-other-tenant existence. **Reads are not role-gated** — listing secret metadata
+(`GET` list) and reading a secret's metadata (`GET` by name) remain available to any member of the
+owning tenant (values are write-only regardless, per *Write-only values, end to end* above).
+
 ## Default-off backend (`501`)
 
 The OpenBao backend is **optional and off by default**. When it is not configured
