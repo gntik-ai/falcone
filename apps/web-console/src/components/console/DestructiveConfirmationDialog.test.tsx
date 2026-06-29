@@ -100,7 +100,7 @@ describe('DestructiveConfirmationDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
-  it('[RC-07] tras confirmación exitosa invoca onSuccess — RF-UI-026 / T03-AC7', async () => {
+  it('[RC-07] al confirmar delega en onConfirm una sola vez y NO dispara onSuccess por su cuenta — RF-UI-026 / T03-AC7', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn().mockResolvedValue(undefined)
     const onSuccess = vi.fn()
@@ -108,10 +108,13 @@ describe('DestructiveConfirmationDialog', () => {
 
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
+    // The dialog is presentational: it triggers the op exactly once and never runs the
+    // success side effects itself. The hook (useDestructiveOp.handleConfirm) owns awaiting
+    // the op and firing config.onSuccess once on success — see the integration test.
     await waitFor(() => {
-      expect(onConfirm).toHaveBeenCalled()
-      expect(onSuccess).toHaveBeenCalled()
+      expect(onConfirm).toHaveBeenCalledTimes(1)
     })
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 
   it('[RC-10] no se abren dos diálogos simultáneamente — RF-UI-026 / T03-AC10', () => {
