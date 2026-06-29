@@ -136,10 +136,7 @@ export function DestructiveConfirmationDialog({
             <Button
               type="button"
               variant="destructive"
-              onClick={async () => {
-                await Promise.resolve(onConfirm())
-                config.onSuccess?.()
-              }}
+              onClick={() => onConfirm()}
               disabled={confirmDisabled}
             >
               {isCritical ? 'Eliminar' : 'Confirmar'}
