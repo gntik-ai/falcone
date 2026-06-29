@@ -12,7 +12,7 @@ The effective-entitlements endpoint
 `EffectiveEntitlementProfile` model
 (`services/provisioning-orchestrator/src/models/effective-entitlements.mjs`):
 
-```
+```text
 EffectiveEntitlementProfile {
   tenantId
   planSlug
