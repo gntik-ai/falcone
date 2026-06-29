@@ -4,6 +4,8 @@
 import { useState } from 'react'
 
 import { PostgresDataEditor } from '@/components/console/PostgresDataEditor'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
 
 export function ConsolePostgresDataPage() {
@@ -13,23 +15,31 @@ export function ConsolePostgresDataPage() {
   const [tableName, setTableName] = useState('')
 
   if (!activeWorkspaceId) {
-    return <p>Select a workspace to edit data.</p>
+    return <p className="text-sm text-muted-foreground">Select a workspace to edit data.</p>
   }
 
   const ready = databaseName.trim() !== '' && tableName.trim() !== ''
 
   return (
-    <div>
-      <h1>Data editor</h1>
-      <p>Query and edit table rows, and mint API keys for your apps.</p>
-      <div>
-        <label htmlFor="pg-db">Database</label>
-        <input id="pg-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
-        <label htmlFor="pg-schema">Schema</label>
-        <input id="pg-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
-        <label htmlFor="pg-table">Table</label>
-        <input id="pg-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
-      </div>
+    <section className="space-y-6">
+      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Data editor</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Query and edit table rows, and mint API keys for your apps.</p>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pg-db">Database</Label>
+            <Input id="pg-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} placeholder="app_db" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pg-schema">Schema</Label>
+            <Input id="pg-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} placeholder="public" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pg-table">Table</Label>
+            <Input id="pg-table" value={tableName} onChange={(event) => setTableName(event.target.value)} placeholder="accounts" />
+          </div>
+        </div>
+      </header>
       {ready ? (
         <PostgresDataEditor
           workspaceId={activeWorkspaceId}
@@ -38,8 +48,8 @@ export function ConsolePostgresDataPage() {
           tableName={tableName.trim()}
         />
       ) : (
-        <p>Enter a database and table to begin.</p>
+        <p className="text-sm text-muted-foreground">Enter a database and table to begin.</p>
       )}
-    </div>
+    </section>
   )
 }

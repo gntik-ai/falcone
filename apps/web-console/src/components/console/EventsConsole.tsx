@@ -3,6 +3,10 @@
 // control-plane executor (@/services/eventsApi), with loading + empty + status feedback.
 import { useCallback, useEffect, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import type { ApiError, JsonValue } from '@/lib/http'
 import {
   consumeMessages,
@@ -111,11 +115,11 @@ export function EventsConsole({ workspaceId }: EventsConsoleProps) {
   }
 
   return (
-    <section aria-label="Events console">
-      {error ? <p role="alert">{error}</p> : null}
-      {status ? <p role="status">{status}</p> : null}
+    <section aria-label="Events console" className="space-y-4">
+      {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
+      {status ? <p role="status" className="text-sm font-medium text-foreground">{status}</p> : null}
 
-      <h3>Topics{topics.length > 0 ? ` (${topics.length})` : ''}</h3>
+      <h3 className="text-base font-semibold text-foreground">Topics{topics.length > 0 ? ` (${topics.length})` : ''}</h3>
       {loading ? (
         <p>Loading topics…</p>
       ) : topics.length === 0 ? (
@@ -138,23 +142,27 @@ export function EventsConsole({ workspaceId }: EventsConsoleProps) {
           ))}
         </ul>
       )}
-      <label htmlFor="new-topic">New topic</label>
-      <input id="new-topic" value={newTopic} onChange={(event) => setNewTopic(event.target.value)} />
-      <button type="button" onClick={() => void handleCreateTopic()} disabled={busy}>
-        Create topic
-      </button>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="new-topic">New topic</Label>
+        <Input id="new-topic" value={newTopic} onChange={(event) => setNewTopic(event.target.value)} placeholder="orders" />
+        <Button type="button" className="mt-1 self-start" onClick={() => void handleCreateTopic()} disabled={busy}>
+          Create topic
+        </Button>
+      </div>
 
-      <h3>Publish</h3>
-      <label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</label>
-      <textarea id="message-json" value={messageJson} onChange={(event) => setMessageJson(event.target.value)} />
-      <button type="button" onClick={() => void handlePublish()} disabled={busy}>
-        Publish
-      </button>
+      <h3 className="text-base font-semibold text-foreground">Publish</h3>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</Label>
+        <Textarea id="message-json" value={messageJson} onChange={(event) => setMessageJson(event.target.value)} />
+        <Button type="button" className="mt-1 self-start" onClick={() => void handlePublish()} disabled={busy}>
+          Publish
+        </Button>
+      </div>
 
-      <h3>Consume</h3>
-      <button type="button" onClick={() => void handleConsume()} disabled={busy}>
+      <h3 className="text-base font-semibold text-foreground">Consume</h3>
+      <Button type="button" className="self-start" onClick={() => void handleConsume()} disabled={busy}>
         Poll messages
-      </button>
+      </Button>
       {consumed && messages.length === 0 ? <p>No messages.</p> : null}
       <ul>
         {messages.map((message, index) => (
