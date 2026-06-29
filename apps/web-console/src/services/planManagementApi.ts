@@ -143,6 +143,25 @@ export interface CurrentEffectiveEntitlementSummary {
   effectiveFrom?: string
   latestHistoryEntryId?: string | null
   latestPlanChangeAt?: string | null
+  // The effective-entitlements API (services/provisioning-orchestrator
+  // EffectiveEntitlementProfile) returns per-tenant quota limits under
+  // `quantitativeLimits` with a per-item `currentUsage`. This is the real backend
+  // field and is what ConsoleTenantPlanPage reads.
+  quantitativeLimits?: Array<{
+    dimensionKey: string
+    displayLabel?: string
+    unit?: string | null
+    effectiveValue?: number | null
+    source?: 'override' | 'plan' | 'catalog_default'
+    quotaType?: 'hard' | 'soft'
+    currentUsage?: number | null
+    usageStatus: UsageStatus
+    usageUnknownReason?: string | null
+  }>
+  // Legacy/incorrect field name (the API does not return `quotaDimensions`/`observedUsage`).
+  // Still read by ConsoleTenantPlanOverviewPage.tsx, whose fix is tracked separately under
+  // issue #735; kept here so that file keeps compiling. The real API field is
+  // `quantitativeLimits` above.
   quotaDimensions: Array<{
     dimensionKey: string
     displayLabel?: string
