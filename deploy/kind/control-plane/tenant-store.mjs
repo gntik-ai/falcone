@@ -577,7 +577,11 @@ export async function insertWorkspace(pool, { id, tenantId, slug, displayName, e
     [id, tenantId, slug, displayName, environment, createdBy]);
   return rows[0];
 }
-export async function listWorkspaces(pool, { tenantId = null, limit = 100, offset = 0 } = {}) {
+export async function listWorkspaces(pool, { tenantId = null, allTenants = false, limit = 100, offset = 0 } = {}) {
+  // Fail-closed (#800): the unscoped (all-tenants) query runs ONLY on an explicit allTenants intent
+  // (superadmin/internal). A falsy tenantId without it returns no rows, so a missing tenant scope can
+  // never silently drop the WHERE predicate and leak every tenant's workspaces.
+  if (!tenantId && !allTenants) return { items: [], total: 0 };
   const where = tenantId ? 'WHERE tenant_id = $3' : '';
   const params = tenantId ? [limit, offset, tenantId] : [limit, offset];
   const { rows } = await pool.query(
