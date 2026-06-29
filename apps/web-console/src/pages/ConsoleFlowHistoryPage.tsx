@@ -8,7 +8,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import { CapabilityGate } from '@/components/console/CapabilityGate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -258,9 +257,5 @@ export function ConsoleFlowHistoryPage() {
     return <p className="p-6 text-sm text-muted-foreground">Select a workspace to view run history.</p>
   }
 
-  return (
-    <CapabilityGate capability="workflows" mode="disable">
-      <HistoryList workspaceId={activeWorkspaceId} flowId={flowId} />
-    </CapabilityGate>
-  )
+  return <HistoryList workspaceId={activeWorkspaceId} flowId={flowId} />
 }

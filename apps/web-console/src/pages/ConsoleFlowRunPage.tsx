@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 
-import { CapabilityGate } from '@/components/console/CapabilityGate'
 import { RunCanvas } from '@/components/flows/RunCanvas'
 import { RunActionToolbar, type WaitingApprovalNode } from '@/components/flows/RunActionToolbar'
 import { RunNodeDetailPanel } from '@/components/flows/RunNodeDetailPanel'
@@ -219,12 +218,10 @@ export function ConsoleFlowRunPage() {
   }
 
   return (
-    <CapabilityGate capability="workflows" mode="disable">
-      <RunView
-        workspaceId={activeWorkspaceId}
-        flowId={flowId}
-        executionId={decodeURIComponent(executionId)}
-      />
-    </CapabilityGate>
+    <RunView
+      workspaceId={activeWorkspaceId}
+      flowId={flowId}
+      executionId={decodeURIComponent(executionId)}
+    />
   )
 }
