@@ -34,6 +34,13 @@
   it cannot regress already-styled controls.
 - [x] 2.7 Leave the plan-catalog status filter (`ConsolePlanCatalogPage.tsx`, already fixed by
   #747/#814) byte-identical.
+- [x] 2.8 Bounded design pass on the affected form regions (step 5b): a UX pass (field grouping,
+  responsive grids, card-style page headers, design-system `Button` swaps, legible
+  `role="alert"`/`role="status"` feedback) and a UI visual-polish pass (unify the field-grid
+  vertical rhythm), both reusing the existing design system and preserving every control `id`,
+  `htmlFor`↔`id` pairing, `role`, button accessible name, and the asserted
+  `bg-background`/`text-foreground` classes. The full data-editor/list/result redesign is
+  deferred to the dedicated issues #757 (data-plane design system) and #789 (Functions UX/UI).
 
 ## 3. Wire / contract / docs
 
@@ -53,8 +60,9 @@
 - [ ] 4.1 CI runs `pnpm --filter @in-falcone/web-console test` (the `web-console` CI job
   executes vitest) — the new test is the executed regression gate. Local vitest execution is
   gated in this environment; CI is the authoritative check.
-- [ ] 4.2 Confirm `git diff --name-only origin/main...HEAD` touches only files under
+- [x] 4.2 Confirm `git diff --name-only origin/main...HEAD` touches only files under
   `apps/web-console/src/`, `docs/`, and `openspec/changes/fix-806-form-control-legibility/`
-  (force-added past `.gitignore`).
+  (force-added past `.gitignore`). Confirmed by the independent post-fix checker (11 files, no
+  contract/SDK/openapi/route-catalog artifacts → codegen no-diff).
 - [ ] 4.3 `openspec validate fix-806-form-control-legibility --strict` (if the CLI is
   available).

@@ -53,6 +53,14 @@ Confirmed bare controls on HEAD `17ec4af5`:
   utility classes and by any explicit background utility on an already-styled control (e.g.
   the plan-catalog status filter), so it is a no-op for styled controls and only affects
   truly-bare ones.
+- **Bounded design pass on the affected form regions** (step 5b, since the change touches the
+  web console): a UX pass (field grouping + spacing, responsive grids, card-style page headers,
+  design-system `Button` swaps, and legible `role="alert"`/`role="status"` feedback) and a UI
+  visual-polish pass (unify the field-grid vertical rhythm), both reusing the existing design
+  system and preserving every control `id`, `htmlFor`↔`id` pairing, `role`, button accessible
+  name, and the asserted `bg-background`/`text-foreground` classes. The full
+  data-editor/list/result redesign of these deliberately-bare pages is deferred to the dedicated
+  issues **#757** (data-plane design system) and **#789** (Functions UX/UI).
 - **Regression test** `apps/web-console/src/pages/form-control-legibility.test.tsx` renders
   each affected page/component and asserts each control's rendered `className` carries
   `bg-background` (and, for inputs, `text-foreground`). RED on `main` (bare control →
