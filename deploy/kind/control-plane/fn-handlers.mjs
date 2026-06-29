@@ -152,7 +152,9 @@ function actionOut(r, latest) {
   };
 }
 
-// POST /v1/functions/actions  (create/deploy) | PUT /v1/functions/actions/{actionId} (update)
+// POST /v1/functions/actions  (create/deploy) | PATCH /v1/functions/actions/{actionId} (update)
+// PATCH matches the published `updateFunctions` contract (public-route-catalog.json,
+// control-plane.openapi.json); the console's "Actualizar función" submits PATCH (#785).
 async function fnDeploy(ctx) {
   const b = ctx.body ?? {};
   const workspaceId = b.workspaceId ?? ctx.params.workspaceId;
