@@ -195,6 +195,9 @@ export function LoginPage() {
                 id="username"
                 name="username"
                 autoComplete="username"
+                // Place the caret on the first field so keyboard and assistive-tech users
+                // can start typing their credential immediately on this dedicated login screen.
+                autoFocus
                 value={form.username}
                 onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
                 placeholder="operaciones"
@@ -215,7 +218,11 @@ export function LoginPage() {
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 placeholder="••••••••••••"
                 required
-                minLength={12}
+                // No client-side minLength on login: this form authenticates an EXISTING
+                // credential, so it must never impose a length floor that can exceed (or
+                // drift from) the platform password policy (`/v1/auth/signups/policy` →
+                // `passwordPolicy.minLength`, currently 8) and block policy-valid accounts
+                // from submitting. The backend / Keycloak policy stays authoritative. (#804)
                 maxLength={256}
               />
             </div>
@@ -225,13 +232,13 @@ export function LoginPage() {
                 type="checkbox"
                 checked={form.rememberMe}
                 onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))}
-                className="mt-1 h-4 w-4 rounded border-border"
+                className="mt-1 h-4 w-4 rounded border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               />
               <span>{consoleAuthConfig.labels.rememberMe}</span>
             </label>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
                 {isSubmitting ? consoleAuthConfig.labels.submitLoading : consoleAuthConfig.labels.submit}
               </Button>
               <Button asChild type="button" variant="link" className="px-0">
