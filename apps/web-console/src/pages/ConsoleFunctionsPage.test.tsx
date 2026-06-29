@@ -26,7 +26,7 @@ function createContext(
   return {
     activeTenantId: 'ten_alpha',
     activeWorkspaceId: 'wrk_alpha',
-    capabilities: { functions_public: true },
+    capabilities: { public_functions: true },
     capabilitiesLoading: false,
     ...overrides
   }

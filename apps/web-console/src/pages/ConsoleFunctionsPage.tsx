@@ -708,7 +708,7 @@ export function ConsoleFunctionsPage() {
         </div>
       </header>
 
-      <CapabilityGate capability="functions_public" mode="disable">
+      <CapabilityGate capability="public_functions" mode="disable">
         {publishWizardOpen ? <PublishFunctionWizard open={publishWizardOpen} onOpenChange={setPublishWizardOpen} /> : null}
       </CapabilityGate>
 

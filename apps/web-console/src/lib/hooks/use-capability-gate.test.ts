@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import type { BooleanCapabilityKey } from '@/lib/capabilities/catalog-keys'
+
 // Mock the console context
 const mockContextValue = {
   capabilities: {} as Record<string, boolean>,
@@ -41,7 +43,10 @@ describe('useCapabilityGate', () => {
     mockContextValue.capabilities = { realtime: true }
     mockContextValue.capabilitiesLoading = false
 
-    const result = useCapabilityGate('unknown_capability')
+    // Cast: the param type is constrained to the catalog at compile time (#790), but this
+    // test deliberately exercises the runtime deny-by-default path for a key absent from the
+    // live capabilities map.
+    const result = useCapabilityGate('unknown_capability' as BooleanCapabilityKey)
     expect(result).toEqual({ enabled: false, loading: false, reason: 'plan_restriction' })
   })
 })
