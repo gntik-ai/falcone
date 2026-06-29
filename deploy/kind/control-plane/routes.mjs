@@ -263,7 +263,7 @@ export const routes = [
   { method: 'DELETE', path: '/v1/functions/workspaces/{workspaceId}/secrets/{secretName}', localHandler: 'secretDelete', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions', localHandler: 'fnDeploy', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/actions/{actionId}', localHandler: 'fnActionDetail', auth: 'authenticated' },
-  { method: 'PUT',  path: '/v1/functions/actions/{actionId}', localHandler: 'fnDeploy', auth: 'authenticated' },
+  { method: 'PATCH', path: '/v1/functions/actions/{actionId}', localHandler: 'fnDeploy', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions/{actionId}/invocations', localHandler: 'fnInvoke', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions/{actionId}/rollback', localHandler: 'fnRollback', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/actions/{actionId}/versions', localHandler: 'fnVersions', auth: 'authenticated' },
