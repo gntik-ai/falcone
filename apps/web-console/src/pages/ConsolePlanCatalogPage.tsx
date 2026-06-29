@@ -28,15 +28,15 @@ export function ConsolePlanCatalogPage() {
             <select
               id="plan-status-filter"
               aria-label="status-filter"
-              className="block w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="block w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               value={state.status}
               onChange={(e) => { const status = e.currentTarget.value as api.PlanStatus | 'all'; setState((current) => ({ ...current, status, page: 1 })) }}
             >
-              <option value="all">All</option>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="deprecated">Deprecated</option>
-              <option value="archived">Archived</option>
+              <option className="bg-card text-foreground" value="all">All</option>
+              <option className="bg-card text-foreground" value="draft">Draft</option>
+              <option className="bg-card text-foreground" value="active">Active</option>
+              <option className="bg-card text-foreground" value="deprecated">Deprecated</option>
+              <option className="bg-card text-foreground" value="archived">Archived</option>
             </select>
           </label>
           <p className="pb-2 text-sm text-muted-foreground" aria-live="polite">
@@ -51,7 +51,7 @@ export function ConsolePlanCatalogPage() {
               <th scope="col" className="px-4 py-3 font-medium">Slug</th>
               <th scope="col" className="px-4 py-3 font-medium">Name</th>
               <th scope="col" className="px-4 py-3 font-medium">Status</th>
-              <th scope="col" className="px-4 py-3 font-medium">Assigned</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">Assigned</th>
               <th scope="col" className="px-4 py-3 font-medium">Updated</th>
             </tr>
           </thead>
@@ -73,7 +73,7 @@ export function ConsolePlanCatalogPage() {
                 </td>
                 <td className="px-4 py-4 text-foreground">{plan.displayName}</td>
                 <td className="px-4 py-4"><PlanStatusBadge status={plan.status} /></td>
-                <td className="px-4 py-4 text-muted-foreground">{plan.assignedTenantCount ?? 0}</td>
+                <td className="px-4 py-4 text-right tabular-nums text-foreground">{plan.assignedTenantCount ?? 0}</td>
                 <td className="px-4 py-4 text-muted-foreground">{plan.updatedAt ?? '—'}</td>
               </tr>
             ))}
