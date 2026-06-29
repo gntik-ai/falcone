@@ -215,7 +215,11 @@ export function LoginPage() {
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 placeholder="••••••••••••"
                 required
-                minLength={12}
+                // No client-side minLength on login: this form authenticates an EXISTING
+                // credential, so it must never impose a length floor that can exceed (or
+                // drift from) the platform password policy (`/v1/auth/signups/policy` →
+                // `passwordPolicy.minLength`, currently 8) and block policy-valid accounts
+                // from submitting. The backend / Keycloak policy stays authoritative. (#804)
                 maxLength={256}
               />
             </div>

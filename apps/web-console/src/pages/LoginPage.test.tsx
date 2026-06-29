@@ -114,6 +114,48 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText('Overview target')).toBeInTheDocument()
   })
+
+  it('no impone un minLength de cliente mayor que el mínimo de la policy (#804)', async () => {
+    // The platform password policy minimum is 8 (`/v1/auth/signups/policy` →
+    // `passwordPolicy.minLength`). The login form must not carry a client-side
+    // `minLength` larger than that, or policy-valid 8–11-char accounts cannot submit.
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+
+    const password = (await screen.findByLabelText(/contraseña/i)) as HTMLInputElement
+    const policyMinLength = 8
+    const min = password.hasAttribute('minlength') ? Number(password.getAttribute('minlength')) : 0
+
+    expect(min).toBeLessThanOrEqual(policyMinLength)
+  })
+
+  it('envía el login con una contraseña de 8 caracteres válida según la policy (#804)', async () => {
+    // Scenario 1: WHEN the policy minLength is 8 and a user submits an 8-character
+    // password on /login THEN the form submits and POST /v1/auth/login-sessions is sent,
+    // not blocked by client-side minLength.
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+      .mockResolvedValueOnce(createJsonResponse(200, activeConsoleSession()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'Abcd1234' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/v1/auth/login-sessions',
+        expect.objectContaining({
+          method: 'POST'
+        })
+      )
+    })
+  })
 })
 
 function renderLoginPage() {
