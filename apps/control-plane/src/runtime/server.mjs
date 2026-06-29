@@ -15,6 +15,10 @@ import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 import { handleMcpMessage } from '../mcp-official-server.mjs';
 import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
 import { mcpConfigStore } from '../mcp-config.mjs';
+// Shared write-capable admin role set — the single source of truth for both the API-key
+// management gate (here) and the flow-definition write gate (flow-executor.mjs, #760) so they
+// cannot drift. This module imports nothing from the runtime → no import cycle.
+import { WRITE_CAPABLE_ADMIN_ROLES } from './auth-roles.mjs';
 
 // Roles that may change the first-party MCP configuration AND always retain base-scope access so a
 // disabled server can be re-enabled (must match SUPERADMIN_ROLES in mcp-official-server.mjs).
@@ -248,7 +252,10 @@ function jsonQueryParam(searchParams, key) {
 
 // Roles permitted to manage API keys (issue/list/rotate/revoke). A non-admin role (e.g.
 // tenant_developer) is denied; an API key never manages keys. See requestGate role check (#624).
-const KEY_MGMT_ADMIN_ROLES = new Set(['tenant_owner', 'tenant_admin', 'workspace_owner', 'workspace_admin', 'platform_admin', 'superadmin']);
+// This is the shared write-capable admin set (auth-roles.mjs) — the SAME roles the flow-definition
+// write gate enforces (#760); aliased here to keep the existing identifier and the gate at L1057
+// byte-identical.
+const KEY_MGMT_ADMIN_ROLES = WRITE_CAPABLE_ADMIN_ROLES;
 
 // Executor-side data-plane scope requirements (#624), enforced for API-key credentials as
 // defense-in-depth when the gateway scope-enforcement plugin is not wired. Mirrors the API-key scope
