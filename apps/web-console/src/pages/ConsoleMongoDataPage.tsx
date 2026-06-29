@@ -13,21 +13,27 @@ export function ConsoleMongoDataPage() {
   const [collectionName, setCollectionName] = useState('')
 
   if (!activeWorkspaceId) {
-    return <p>Select a workspace to edit data.</p>
+    return <p className="text-sm text-muted-foreground">Select a workspace to edit data.</p>
   }
 
   const ready = databaseName.trim() !== '' && collectionName.trim() !== ''
 
   return (
-    <div>
-      <h1>Mongo data editor</h1>
-      <p>Query and edit documents in a collection.</p>
-      <div>
-        <Label htmlFor="mongo-db">Database</Label>
-        <Input id="mongo-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
-        <Label htmlFor="mongo-collection">Collection</Label>
-        <Input id="mongo-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} />
-      </div>
+    <section className="space-y-6">
+      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Mongo data editor</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Query and edit documents in a collection.</p>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mongo-db">Database</Label>
+            <Input id="mongo-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} placeholder="catalog" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mongo-collection">Collection</Label>
+            <Input id="mongo-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="orders" />
+          </div>
+        </div>
+      </header>
       {ready ? (
         <MongoDataEditor
           workspaceId={activeWorkspaceId}
@@ -35,8 +41,8 @@ export function ConsoleMongoDataPage() {
           collectionName={collectionName.trim()}
         />
       ) : (
-        <p>Enter a database and collection to begin.</p>
+        <p className="text-sm text-muted-foreground">Enter a database and collection to begin.</p>
       )}
-    </div>
+    </section>
   )
 }
