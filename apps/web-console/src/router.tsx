@@ -40,6 +40,12 @@ import { ConsoleOperationDetailPage } from '@/pages/ConsoleOperationDetailPage'
 import { ConsoleFunctionsPage } from '@/pages/ConsoleFunctionsPage'
 import { ConsoleMcpServerDetailPage } from '@/pages/ConsoleMcpServerDetailPage'
 import { ConsoleWorkspaceSecretsPage } from '@/pages/ConsoleWorkspaceSecretsPage'
+// Eager (not lazy) for the same reason as the block above (#755): the secret-rotation table's
+// "Rotate"/"History" buttons reach these routes via a synchronous in-app `navigate()`, so a lazy
+// element would suspend synchronously and throw React #426 (blanking the whole shell).
+import { ConsoleSecretsPage } from '@/pages/ConsoleSecretsPage'
+import { ConsoleSecretRotationPage } from '@/pages/ConsoleSecretRotationPage'
+import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { SignupPage } from '@/pages/SignupPage'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
@@ -54,16 +60,6 @@ const ConsoleRealtimePage = lazy(async () => {
 const ConsoleDocsPage = lazy(async () => {
   const module = await import('@/pages/ConsoleDocsPage')
   return { default: module.ConsoleDocsPage }
-})
-
-const ConsoleSecretsPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleSecretsPage')
-  return { default: module.ConsoleSecretsPage }
-})
-
-const ConsoleSecretRotationPage = lazy(async () => {
-  const module = await import('@/pages/ConsoleSecretRotationPage')
-  return { default: module.ConsoleSecretRotationPage }
 })
 
 // Flows section is code-split so the @xyflow/react canvas chunk stays out of the
@@ -132,6 +128,14 @@ export const appRoutes = [
       {
         element: <ConsoleShellLayout />,
         children: [
+          // Pathless layout route (#755): renders just an <Outlet/> so the content routes below stay
+          // mounted inside ConsoleShellLayout's chrome, but carries a shell-level errorElement so a
+          // render error in any content route is contained HERE (inside the shell's main <Outlet/>,
+          // nav intact) instead of bubbling to react-router's root boundary and blanking the whole
+          // console + leaking a raw minified stack.
+          {
+            errorElement: <RouteErrorBoundary />,
+            children: [
           {
             index: true,
             element: <Navigate replace to="overview" />
@@ -334,6 +338,8 @@ export const appRoutes = [
           {
             path: '*',
             element: <Navigate replace to="/console/overview" />
+          }
+            ]
           }
         ]
       }
