@@ -3,6 +3,9 @@
 // recent activations, via the control-plane executor (@/services/functionsApi).
 import { useCallback, useEffect, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import type { ApiError, JsonValue } from '@/lib/http'
 import { parseJsonObject } from '@/lib/editor-ux'
 import {
@@ -119,11 +122,11 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
   }
 
   return (
-    <section aria-label="Functions console">
-      {error ? <p role="alert">{error}</p> : null}
-      {status ? <p role="status">{status}</p> : null}
+    <section aria-label="Functions console" className="space-y-4">
+      {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
+      {status ? <p role="status" className="text-sm font-medium text-foreground">{status}</p> : null}
 
-      <h3>Functions{functions.length > 0 ? ` (${functions.length})` : ''}</h3>
+      <h3 className="text-base font-semibold text-foreground">Functions{functions.length > 0 ? ` (${functions.length})` : ''}</h3>
       {loading ? (
         <p>Loading functions…</p>
       ) : functions.length === 0 ? (
@@ -148,22 +151,28 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
         </ul>
       )}
 
-      <h3>Deploy</h3>
-      <label htmlFor="deploy-spec-json">Function spec (JSON)</label>
-      <textarea id="deploy-spec-json" value={deploySpecJson} onChange={(event) => setDeploySpecJson(event.target.value)} />
-      <button type="button" onClick={() => void handleDeploy()} disabled={busy}>
-        Deploy
-      </button>
+      <h3 className="text-base font-semibold text-foreground">Deploy</h3>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="deploy-spec-json">Function spec (JSON)</Label>
+        <Textarea id="deploy-spec-json" value={deploySpecJson} onChange={(event) => setDeploySpecJson(event.target.value)} />
+        <Button type="button" className="mt-1 self-start" onClick={() => void handleDeploy()} disabled={busy}>
+          Deploy
+        </Button>
+      </div>
 
-      <h3>Invoke</h3>
-      <label htmlFor="input-json">Input (JSON)</label>
-      <textarea id="input-json" value={inputJson} onChange={(event) => setInputJson(event.target.value)} />
-      <button type="button" onClick={() => void handleInvoke()} disabled={busy}>
-        Invoke
-      </button>
-      <button type="button" onClick={() => void handleViewActivations()} disabled={busy}>
-        View activations
-      </button>
+      <h3 className="text-base font-semibold text-foreground">Invoke</h3>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="input-json">Input (JSON)</Label>
+        <Textarea id="input-json" value={inputJson} onChange={(event) => setInputJson(event.target.value)} />
+        <div className="mt-1 flex flex-wrap gap-3">
+          <Button type="button" onClick={() => void handleInvoke()} disabled={busy}>
+            Invoke
+          </Button>
+          <Button type="button" variant="outline" onClick={() => void handleViewActivations()} disabled={busy}>
+            View activations
+          </Button>
+        </div>
+      </div>
       {result ? (
         <div role="status">
           <h4>Result</h4>

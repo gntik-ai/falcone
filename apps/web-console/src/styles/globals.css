@@ -57,6 +57,25 @@
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
 
+  /*
+   * Defense-in-depth safety net for native form controls.
+   * Root cause: Tailwind's preflight sets `color: inherit` on inputs/selects/textareas
+   * (so they inherit the body's near-white --foreground) but only sets
+   * `background-color: transparent` on button-type inputs — text inputs/selects/textareas
+   * keep the UA-white background, yielding near-white-on-white (~1.02:1, far below WCAG
+   * AA 4.5:1). Pinning the theme background + foreground here guarantees ANY console form
+   * control (including a future bare/straggler control) is legible in the dark theme.
+   * As `@layer base` is the lowest-priority Tailwind layer, this is overridden by the
+   * design-system primitives' own `bg-background`/utility classes and by any explicit
+   * background utility on a styled control — so it is a no-op for already-styled controls
+   * (e.g. the plan-catalog status filter) and only affects truly-bare controls.
+   */
+  input,
+  textarea,
+  select {
+    @apply bg-background text-foreground;
+  }
+
   a {
     @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }

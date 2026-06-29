@@ -4,6 +4,10 @@
 // streaming in live.
 import { useEffect, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import {
   subscribeRealtimeChanges,
   type RealtimeChange,
@@ -68,44 +72,54 @@ export function RealtimeConsole({ workspaceId }: RealtimeConsoleProps) {
   }
 
   return (
-    <section aria-label="Realtime console">
-      {error ? <p role="alert">{error}</p> : null}
+    <section aria-label="Realtime console" className="space-y-4">
+      {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
 
-      <div>
-        <label htmlFor="rt-source">Source</label>
-        <select id="rt-source" value={source} onChange={(event) => setSource(event.target.value as 'mongo' | 'postgres')}>
-          <option value="mongo">Mongo collection</option>
-          <option value="postgres">Postgres table</option>
-        </select>
-        <label htmlFor="rt-db">Database</label>
-        <input id="rt-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
+      <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rt-source">Source</Label>
+          <Select id="rt-source" value={source} onChange={(event) => setSource(event.target.value as 'mongo' | 'postgres')}>
+            <option value="mongo">Mongo collection</option>
+            <option value="postgres">Postgres table</option>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rt-db">Database</Label>
+          <Input id="rt-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
+        </div>
         {source === 'mongo' ? (
-          <>
-            <label htmlFor="rt-collection">Collection</label>
-            <input id="rt-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} />
-          </>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="rt-collection">Collection</Label>
+            <Input id="rt-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} />
+          </div>
         ) : (
           <>
-            <label htmlFor="rt-schema">Schema</label>
-            <input id="rt-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
-            <label htmlFor="rt-table">Table</label>
-            <input id="rt-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rt-schema">Schema</Label>
+              <Input id="rt-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rt-table">Table</Label>
+              <Input id="rt-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
+            </div>
           </>
         )}
-        <label htmlFor="rt-key">Anon key</label>
-        <input id="rt-key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="flc_anon_…" />
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rt-key">Anon key</Label>
+          <Input id="rt-key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="flc_anon_…" />
+        </div>
       </div>
       {subscribed ? (
-        <button type="button" onClick={stop}>
+        <Button type="button" variant="outline" onClick={stop}>
           Stop
-        </button>
+        </Button>
       ) : (
-        <button type="button" onClick={start}>
+        <Button type="button" onClick={start}>
           Subscribe
-        </button>
+        </Button>
       )}
 
-      <h3>Live changes{changes.length > 0 ? ` (${changes.length})` : ''}</h3>
+      <h3 className="text-base font-semibold text-foreground">Live changes{changes.length > 0 ? ` (${changes.length})` : ''}</h3>
       {subscribed && changes.length === 0 ? <p>Listening… write to the {source === 'mongo' ? 'collection' : 'table'} to see changes.</p> : null}
       <ul>
         {changes.map((change, index) => (
