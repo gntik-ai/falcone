@@ -75,7 +75,7 @@ export function RealtimeConsole({ workspaceId }: RealtimeConsoleProps) {
     <section aria-label="Realtime console" className="space-y-4">
       {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
 
-      <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+      <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="rt-source">Source</Label>
           <Select id="rt-source" value={source} onChange={(event) => setSource(event.target.value as 'mongo' | 'postgres')}>
