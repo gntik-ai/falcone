@@ -412,9 +412,14 @@ async function createWorkspace(ctx) {
 // GET /v1/workspaces  (superadmin: all; tenant scope: own tenant)
 async function listWorkspaces(ctx) {
   const { query, identity, pool } = ctx;
+  const isPlatform = identity.actorType === 'superadmin' || identity.actorType === 'internal';
   const filterTenant = query['filter[tenantId]'] ?? query.tenantId ?? null;
-  const tenantId = (identity.actorType === 'superadmin' || identity.actorType === 'internal') ? filterTenant : identity.tenantId;
-  const res = await store.listWorkspaces(pool, { tenantId,
+  const tenantId = isPlatform ? filterTenant : identity.tenantId;
+  // Fail-closed (#800): a non-platform principal with no resolvable tenant must NEVER fall through
+  // to the unscoped (all-tenants) listing. By-id reads already 403 such a principal (canManageTenantId);
+  // the list MUST agree and return no rows rather than leak every tenant's workspace inventory.
+  if (!isPlatform && !tenantId) return ok(200, collection([], 0));
+  const res = await store.listWorkspaces(pool, { tenantId, allTenants: isPlatform && !tenantId,
     limit: Number(query['page[size]'] ?? query.limit ?? 100) || 100, offset: Number(query.offset ?? 0) || 0 });
   return ok(200, collection(res.items.map(workspaceOut), res.total));
 }
