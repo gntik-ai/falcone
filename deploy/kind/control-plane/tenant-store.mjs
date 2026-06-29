@@ -369,7 +369,13 @@ export async function getFnAction(pool, resourceId, tenantId = null) {
   const { rows } = await pool.query('SELECT * FROM fn_actions WHERE resource_id=$1 LIMIT 1', [resourceId]);
   return rows[0] ?? null;
 }
-export async function listFnActions(pool, workspaceId) {
+export async function listFnActions(pool, workspaceId, tenantId = null) {
+  if (tenantId != null) {
+    const { rows } = await pool.query(
+      'SELECT * FROM fn_actions WHERE workspace_id=$1 AND tenant_id=$2 ORDER BY created_at DESC',
+      [workspaceId, tenantId]);
+    return rows;
+  }
   const { rows } = await pool.query('SELECT * FROM fn_actions WHERE workspace_id=$1 ORDER BY created_at DESC', [workspaceId]);
   return rows;
 }
