@@ -15,8 +15,8 @@ phase, at which point `e.currentTarget` is `null`. Accessing `.value` on `null` 
 > TypeError: Cannot read properties of null (reading 'value')
 
 With no router-level `errorElement` in the console, the uncaught error in the render phase blanks the
-entire shell. The crash reproduces for every status option (all 9 values) and is confirmed on HEAD
-`10c47a9a`.
+entire shell. The crash reproduces for every status option (the issue reports 9/9 reproduction
+attempts across Draft and Active) and is confirmed on HEAD `10c47a9a`.
 
 Root cause: `apps/web-console/src/pages/ConsolePlanCatalogPage.tsx:21` — the DOM event value is
 consumed inside the deferred updater instead of being captured synchronously.
