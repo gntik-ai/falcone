@@ -37,24 +37,36 @@ export function ConsoleTenantPlanPage() {
   return (
     <main className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="tenant-plan-heading">
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Link className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" to="/console/tenants">
+        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+          <Link className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" to="/console/tenants">
             Tenants
           </Link>
-          <span aria-hidden="true">/</span>
+          <span aria-hidden="true" className="text-muted-foreground/60">/</span>
           <span className="text-foreground" aria-current="page">Tenant plan</span>
         </nav>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <h1 id="tenant-plan-heading" className="text-2xl font-semibold tracking-tight text-foreground">Tenant plan</h1>
-            <p className="font-mono text-xs text-muted-foreground" title="Tenant identifier">{tenantId}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-medium text-foreground">{planDisplayName ?? 'No plan assigned'}</span>
-              {planStatus ? <PlanStatusBadge status={planStatus} /> : null}
+        <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-4">
+            <div className="space-y-1.5">
+              <h1 id="tenant-plan-heading" className="text-2xl font-semibold tracking-tight text-foreground">Tenant plan</h1>
+              <p className="text-sm text-muted-foreground">Review and manage the billing plan and effective entitlements for this tenant.</p>
             </div>
+            <dl className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-8">
+              <div className="space-y-1">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current plan</dt>
+                <dd className="flex flex-wrap items-center gap-2.5">
+                  <span className={planDisplayName ? 'text-lg font-semibold leading-none text-foreground' : 'text-lg font-medium leading-none text-muted-foreground'}>{planDisplayName ?? 'No plan assigned'}</span>
+                  {planStatus ? <PlanStatusBadge status={planStatus} /> : null}
+                </dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tenant</dt>
+                <dd className="font-mono text-sm leading-none text-foreground" title="Tenant identifier">{tenantId}</dd>
+              </div>
+            </dl>
           </div>
           <Button
             type="button"
+            className="w-full shrink-0 sm:w-auto"
             onClick={() => setDialogOpen(true)}
             aria-busy={assigning}
             aria-haspopup="dialog"
@@ -68,9 +80,9 @@ export function ConsoleTenantPlanPage() {
         {limits.length ? (
           <QuotaConsumptionTable title="Entitlements & Consumption" showOverrideDetails rows={limits.map((item) => ({ dimensionKey: item.dimensionKey, displayLabel: item.displayLabel ?? item.dimensionKey, unit: item.unit, effectiveValue: item.effectiveValue ?? -1, source: 'plan', currentUsage: item.currentUsage ?? null, usageStatus: item.usageStatus, usageUnknownReason: item.usageUnknownReason, originalPlanValue: item.effectiveValue ?? null }))} />
         ) : (
-          <div className="rounded-2xl border border-border bg-card/70 p-4">
-            <div className="font-semibold text-foreground">Entitlements &amp; Consumption</div>
-            <p className="mt-2 text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed border-border bg-card/70 p-6 text-center">
+            <p className="text-sm font-semibold text-foreground">Entitlements &amp; Consumption</p>
+            <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
               {isAssigned
                 ? 'This plan defines no quantitative limits. Catalog defaults remain in effect.'
                 : 'No plan is assigned, so no quantitative limits apply. Assign a plan to set entitlements.'}
