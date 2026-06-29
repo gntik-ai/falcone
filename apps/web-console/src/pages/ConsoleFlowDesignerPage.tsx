@@ -30,7 +30,6 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import { CapabilityGate } from '@/components/console/CapabilityGate'
 import { FlowYamlEditor, type FlowEditorValidity } from '@/components/flows/FlowYamlEditor'
 import { FLOW_PALETTE_DRAG_MIME, FlowPalette } from '@/components/flows/FlowPalette'
 import { FlowProblemsPanel } from '@/components/flows/FlowProblemsPanel'
@@ -599,10 +598,8 @@ export function ConsoleFlowDesignerPage() {
   }
 
   return (
-    <CapabilityGate capability="workflows" mode="disable">
-      <ReactFlowProvider>
-        <DesignerSurface workspaceId={activeWorkspaceId} flowId={flowId} />
-      </ReactFlowProvider>
-    </CapabilityGate>
+    <ReactFlowProvider>
+      <DesignerSurface workspaceId={activeWorkspaceId} flowId={flowId} />
+    </ReactFlowProvider>
   )
 }

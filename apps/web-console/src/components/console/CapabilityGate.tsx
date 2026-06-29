@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
+import type { BooleanCapabilityKey } from '@/lib/capabilities/catalog-keys'
 import { useCapabilityGate } from '@/lib/hooks/use-capability-gate'
 
 interface CapabilityGateProps {
-  capability: string
+  // Constrained to the boolean-capability catalog so a feature can never be gated on a
+  // phantom key that the effective-capabilities endpoint never returns (#790).
+  capability: BooleanCapabilityKey
   mode?: 'hide' | 'disable'
   upgradeMessage?: string
   children: ReactNode
