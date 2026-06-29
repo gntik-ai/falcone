@@ -28,7 +28,7 @@ export function ConsoleTenantPlanPage() {
         <p>{data?.plan?.displayName ?? 'No plan assigned'}</p>
         <Button type="button" onClick={() => setDialogOpen(true)}>{data?.assignment ? 'Change plan' : 'Assign plan'}</Button>
       </header>
-      <QuotaConsumptionTable title="Entitlements & Consumption" showOverrideDetails rows={summary.quotaDimensions.map((item) => ({ dimensionKey: item.dimensionKey, displayLabel: item.displayLabel ?? item.dimensionKey, unit: item.unit, effectiveValue: item.effectiveValue ?? -1, source: 'plan', currentUsage: item.observedUsage ?? null, usageStatus: item.usageStatus, usageUnknownReason: item.usageUnknownReason, originalPlanValue: item.effectiveValue ?? null }))} />
+      <QuotaConsumptionTable title="Entitlements & Consumption" showOverrideDetails rows={(summary.quantitativeLimits ?? []).map((item) => ({ dimensionKey: item.dimensionKey, displayLabel: item.displayLabel ?? item.dimensionKey, unit: item.unit, effectiveValue: item.effectiveValue ?? -1, source: 'plan', currentUsage: item.currentUsage ?? null, usageStatus: item.usageStatus, usageUnknownReason: item.usageUnknownReason, originalPlanValue: item.effectiveValue ?? null }))} />
       <PlanImpactHistoryTable items={history.items} />
       <PlanAssignmentDialog open={dialogOpen} tenantId={tenantId} currentPlanId={data?.assignment?.planId ?? null} activePlans={plans.map((plan) => ({ id: plan.id, displayName: plan.displayName, status: plan.status }))} onConfirm={async (planId) => { await api.assignPlan(tenantId, { planId, assignedBy: 'console' }); setDialogOpen(false) }} onCancel={() => setDialogOpen(false)} />
     </main>
