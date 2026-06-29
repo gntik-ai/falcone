@@ -138,8 +138,9 @@ export function DestructiveConfirmationDialog({
               variant="destructive"
               onClick={() => onConfirm()}
               disabled={confirmDisabled}
+              aria-busy={isConfirming}
             >
-              {isCritical ? 'Eliminar' : 'Confirmar'}
+              {isConfirming ? (isCritical ? 'Eliminar…' : 'Confirmar…') : isCritical ? 'Eliminar' : 'Confirmar'}
             </Button>
           </DialogFooter>
         </div>
