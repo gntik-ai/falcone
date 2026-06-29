@@ -41,7 +41,7 @@ export function RouteErrorBoundary() {
       role="region"
       aria-label="Error de la sección de consola"
       data-testid="console-route-error-boundary"
-      className="space-y-4"
+      className="mx-auto w-full max-w-2xl space-y-4 py-6 sm:py-10"
     >
       <Alert variant="destructive">
         <div className="flex items-start gap-3">
@@ -52,7 +52,10 @@ export function RouteErrorBoundary() {
           </div>
         </div>
       </Alert>
-      <div>
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" variant="default" onClick={() => window.location.reload()}>
+          Reintentar
+        </Button>
         <Button asChild variant="secondary">
           <Link to="/console/overview">Volver a la consola</Link>
         </Button>
