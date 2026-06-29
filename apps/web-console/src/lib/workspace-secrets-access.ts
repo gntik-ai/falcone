@@ -4,8 +4,10 @@
 // The console session principal carries NO per-workspace role, so this gate is intentionally COARSE
 // (workspace membership OR a tenant-admin / platform role). It is defense-in-depth only — it decides
 // whether to SHOW the nav entry / render the route, never whether a specific mutation is allowed.
-// Per-secret mutate authority stays SERVER-enforced (the runtime `ownedWorkspace` gate + route
-// audiences); the screen always defers to the server `403`/`404`.
+// Per-secret mutate authority stays SERVER-enforced: the runtime now requires an admin tenant role
+// (`canManageTenant`, denying `tenant_developer`/`tenant_viewer` with 403; #798) IN ADDITION TO the
+// `ownedWorkspace` tenant/isolation check (cross-tenant → 404). The screen always defers to the
+// server `403`/`404`.
 //
 // "Fail-safe" means: an operator who is neither a member of the active workspace nor a tenant-admin/
 // platform-role operator is redirected away and does not see the entry.

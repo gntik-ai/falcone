@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
 import { vaultStoreFromEnv } from './vault-secrets.mjs';
+import { canManageTenant } from './tenant-scope.mjs';
 
 // Scope-validation builder for function definition import (#683). It lives in apps/control-plane
 // (vendored into the CP image at /repo/apps/control-plane, alongside services/internal-contracts
@@ -330,6 +331,13 @@ async function secretSet(ctx) {
   if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  // Role gate (#798): mutating a workspace secret requires an admin tenant role. ownedWorkspace only
+  // proves tenant membership/isolation (cross-tenant → 404 above), so a tenant_member (tenant_viewer/
+  // tenant_developer) would otherwise reach this write. Gate AFTER the 404 so cross-tenant stays 404
+  // (no existence leak) and own-tenant-non-admin is 403, mirroring b-handlers' canManageTenantId.
+  if (!canManageTenant(ctx.identity, ws.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
   const b = ctx.body ?? {};
   const name = b.secretName ?? b.name;
   const value = b.secretValue ?? b.value;
@@ -359,6 +367,11 @@ async function secretReplace(ctx) {
   if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  // Role gate (#798): replacing a secret value requires an admin tenant role (see secretSet). After
+  // the 404 so cross-tenant stays 404; own-tenant non-admin is 403, before any existence probe/write.
+  if (!canManageTenant(ctx.identity, ws.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
   const name = ctx.params.secretName;
   const b = ctx.body ?? {};
   const value = b.secretValue ?? b.value;
@@ -413,6 +426,11 @@ async function secretDelete(ctx) {
   if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  // Role gate (#798): deleting a secret requires an admin tenant role (see secretSet). After the 404
+  // so cross-tenant stays 404; own-tenant non-admin is 403, before the vault delete side effect.
+  if (!canManageTenant(ctx.identity, ws.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
   try {
     await vault.delete(ws.tenant_id, ws.id, ctx.params.secretName);
     return ok(200, { name: ctx.params.secretName, deleted: true });
