@@ -4,7 +4,8 @@
 // canvas designer at /console/flows/:flowId. Lazy-loaded from router.tsx so the
 // @xyflow/react chunk stays out of the initial shell bundle.
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { History, PenLine } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -71,25 +72,27 @@ export function ConsoleFlowsPage() {
   }
 
   return (
-    <section className="space-y-4 p-6" data-testid="console-flows-page">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Badge variant="outline">Workflows</Badge>
-          <h1 className="mt-1 text-xl font-semibold">Flows</h1>
-          <p className="text-sm text-muted-foreground">
+    <section className="space-y-5 p-6" data-testid="console-flows-page">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 space-y-1">
+          <Badge variant="outline" className="w-fit">Workflows</Badge>
+          <h1 className="text-2xl font-semibold tracking-tight">Flows</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
             Visual workflow definitions for workspace <span className="font-mono">{activeWorkspaceId}</span>.
           </p>
         </div>
-        <div className="flex items-end gap-2">
-          <div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="w-full sm:w-64">
             <Input
+              aria-label="New flow name"
+              className="w-full"
               placeholder="New flow name"
               value={newFlowName}
               onChange={(event) => setNewFlowName(event.target.value)}
               data-testid="new-flow-name-input"
             />
           </div>
-          <Button onClick={() => void onCreate()} disabled={creating || newFlowName.trim() === ''}>
+          <Button className="w-full sm:w-auto" onClick={() => void onCreate()} disabled={creating || newFlowName.trim() === ''}>
             {creating ? 'Creating…' : 'New flow'}
           </Button>
         </div>
@@ -111,39 +114,64 @@ export function ConsoleFlowsPage() {
           No flows yet. Create the first one to open the designer.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+          <table className="w-full table-fixed text-sm sm:min-w-[48rem] sm:table-auto">
+            <caption className="sr-only">Workspace flows</caption>
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Last modified</th>
-                <th className="px-3 py-2" />
+                <th scope="col" className="px-4 py-3 font-medium">Name</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Status</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Last modified</th>
+                <th scope="col" className="w-40 px-4 py-3 text-right font-medium sm:w-64">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {flows.map((flow) => (
-                <tr key={flow.flowId} className="border-t border-border" data-testid="flow-row">
-                  <td className="px-3 py-2 font-medium">{flow.name}</td>
-                  <td className="px-3 py-2">
-                    <Badge variant="outline" className="text-xs">
-                      {flow.status ?? 'draft'}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {formatTimestamp(flow.updatedAt ?? flow.createdAt)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/console/flows/${encodeURIComponent(flow.flowId)}`)}
-                    >
-                      Open designer
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {flows.map((flow) => {
+                const encodedFlowId = encodeURIComponent(flow.flowId)
+                const flowLabel = flow.name || flow.flowId
+
+                return (
+                  <tr key={flow.flowId} className="border-t border-border transition-colors hover:bg-muted/20" data-testid="flow-row">
+                    <th scope="row" className="px-4 py-3 text-left font-medium">
+                      <span className="block max-w-[10rem] truncate sm:max-w-[18rem]" title={flowLabel}>{flowLabel}</span>
+                    </th>
+                    <td className="hidden px-4 py-3 sm:table-cell">
+                      <Badge variant="outline" className="text-xs">
+                        {flow.status ?? 'draft'}
+                      </Badge>
+                    </td>
+                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
+                      {formatTimestamp(flow.updatedAt ?? flow.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div
+                        className="inline-flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:justify-end"
+                        role="group"
+                        aria-label={`Actions for ${flowLabel}`}
+                      >
+                        <Button size="sm" variant="outline" className="justify-start sm:justify-center" asChild>
+                          <Link
+                            to={`/console/flows/${encodedFlowId}`}
+                            aria-label={`Open designer for ${flowLabel}`}
+                          >
+                            <PenLine className="h-4 w-4" aria-hidden="true" />
+                            Open designer
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="secondary" className="justify-start sm:justify-center" asChild>
+                          <Link
+                            to={`/console/flows/${encodedFlowId}/runs`}
+                            aria-label={`View run history for ${flowLabel}`}
+                          >
+                            <History className="h-4 w-4" aria-hidden="true" />
+                            Run history
+                          </Link>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

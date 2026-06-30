@@ -7,6 +7,7 @@ import { ConsoleFlowHistoryPage } from './ConsoleFlowHistoryPage'
 
 const mockUseConsoleContext = vi.fn()
 const mockListExecutions = vi.fn()
+const EXECUTION_ID = 'ten1:ws1:flow1:run-aaaaaaaaaaaaaaaaaaaaaaaaa'
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
@@ -39,7 +40,7 @@ beforeEach(() => {
   mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: 'ws1', activeTenantId: 'ten1' })
   mockListExecutions.mockReset().mockResolvedValue({
     items: [
-      { executionId: 'ten1:ws1:flow1:run-aaaaaaaaaaaaaaaaaaaaaaaaa', status: 'Completed', triggerType: 'manual', version: 1, startedAt: '2026-01-01T00:00:00Z' }
+      { executionId: EXECUTION_ID, status: 'Completed', triggerType: 'manual', version: 1, startedAt: '2026-01-01T00:00:00Z' }
     ],
     nextPageToken: null
   })
@@ -104,5 +105,16 @@ describe('ConsoleFlowHistoryPage filters', () => {
     renderPage()
     const table = await screen.findByTestId('run-history-table')
     expect(within(table).getAllByTestId('run-history-row')).toHaveLength(1)
+  })
+
+  it('links a run-history row to the run detail route (#792)', async () => {
+    renderPage()
+
+    const row = await screen.findByTestId('run-history-row')
+    const detailLink = within(row).getByRole('link', { name: /open details for run/i })
+    expect(detailLink).toHaveAttribute(
+      'href',
+      `/console/flows/flow1/runs/${encodeURIComponent(EXECUTION_ID)}`
+    )
   })
 })
