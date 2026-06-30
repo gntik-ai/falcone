@@ -14307,7 +14307,7 @@
     "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance": {
       "post": {
         "operationId": "issueServiceAccountCredential",
-        "summary": "Issue a new secret-free credential reference for one workspace service account.",
+        "summary": "Reveal the current client secret for one workspace service account.",
         "tags": [
           "Workspaces",
           "ServiceAccounts"
