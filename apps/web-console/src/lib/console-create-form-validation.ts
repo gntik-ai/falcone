@@ -1,4 +1,8 @@
 export const MAX_FORM_INTEGER = Number.MAX_SAFE_INTEGER
+export const INVALID_FORM_CONTROL_CLASS_NAME =
+  'border-destructive bg-destructive/5 focus-visible:ring-destructive/40'
+export const FORM_FIELD_ERROR_CLASS_NAME =
+  'text-sm font-medium leading-5 text-destructive'
 
 export function parseRequiredIntegerField(
   value: string | null | undefined,

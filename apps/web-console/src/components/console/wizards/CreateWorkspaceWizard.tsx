@@ -4,14 +4,79 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useConsoleContext } from '@/lib/console-context'
-import { MAX_FORM_INTEGER, parseRequiredIntegerField } from '@/lib/console-create-form-validation'
+import {
+  FORM_FIELD_ERROR_CLASS_NAME,
+  INVALID_FORM_CONTROL_CLASS_NAME,
+  MAX_FORM_INTEGER,
+  parseRequiredIntegerField
+} from '@/lib/console-create-form-validation'
 import { createValidation, submitWizardRequest, useWizardPermissionCheck, useWizardQuotaCheck, type WizardStepProps } from '@/lib/console-wizards'
 
 interface WorkspaceData { tenantId: string; name: string; description: string; maxFunctions: string; maxDatabases: string }
 
 function TenantStep({ data, context }: WizardStepProps<WorkspaceData>) { return <div><Label>Tenant de contexto</Label><p className="mt-2 text-sm">{data.tenantId || context.tenantId || 'Sin tenant activo'}</p></div> }
-function NameStep({ data, onChange, validation }: WizardStepProps<WorkspaceData>) { return <div className="space-y-2"><Label htmlFor="workspace-name">Nombre del workspace</Label><Input id="workspace-name" value={data.name ?? ''} onChange={(e) => onChange({ name: e.target.value })} />{validation.fieldErrors.name ? <p className="text-sm text-destructive">{validation.fieldErrors.name}</p> : null}{validation.blockingError ? <p className="text-sm text-destructive">{validation.blockingError}</p> : null}</div> }
-function ConfigStep({ data, onChange, validation }: WizardStepProps<WorkspaceData>) { return <div className="grid gap-4"><div className="space-y-2"><Label htmlFor="workspace-description">Descripción</Label><Textarea id="workspace-description" value={data.description ?? ''} onChange={(e) => onChange({ description: e.target.value })} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="workspace-max-functions">Máx. funciones</Label><Input id="workspace-max-functions" inputMode="numeric" aria-invalid={Boolean(validation.fieldErrors.maxFunctions)} aria-describedby={validation.fieldErrors.maxFunctions ? 'workspace-max-functions-error' : undefined} className={validation.fieldErrors.maxFunctions ? 'border-destructive' : undefined} value={data.maxFunctions ?? ''} onChange={(e) => onChange({ maxFunctions: e.target.value })} />{validation.fieldErrors.maxFunctions ? <p id="workspace-max-functions-error" className="text-sm text-destructive">{validation.fieldErrors.maxFunctions}</p> : null}</div><div className="space-y-2"><Label htmlFor="workspace-max-databases">Máx. bases de datos</Label><Input id="workspace-max-databases" inputMode="numeric" aria-invalid={Boolean(validation.fieldErrors.maxDatabases)} aria-describedby={validation.fieldErrors.maxDatabases ? 'workspace-max-databases-error' : undefined} className={validation.fieldErrors.maxDatabases ? 'border-destructive' : undefined} value={data.maxDatabases ?? ''} onChange={(e) => onChange({ maxDatabases: e.target.value })} />{validation.fieldErrors.maxDatabases ? <p id="workspace-max-databases-error" className="text-sm text-destructive">{validation.fieldErrors.maxDatabases}</p> : null}</div></div></div> }
+function NameStep({ data, onChange, validation }: WizardStepProps<WorkspaceData>) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="workspace-name">Nombre del workspace</Label>
+      <Input
+        id="workspace-name"
+        aria-invalid={Boolean(validation.fieldErrors.name) || undefined}
+        className={validation.fieldErrors.name ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+        value={data.name ?? ''}
+        onChange={(e) => onChange({ name: e.target.value })}
+      />
+      {validation.fieldErrors.name ? <p className={FORM_FIELD_ERROR_CLASS_NAME}>{validation.fieldErrors.name}</p> : null}
+      {validation.blockingError ? <p className={FORM_FIELD_ERROR_CLASS_NAME}>{validation.blockingError}</p> : null}
+    </div>
+  )
+}
+function ConfigStep({ data, onChange, validation }: WizardStepProps<WorkspaceData>) {
+  return (
+    <div className="grid gap-4">
+      <div className="space-y-2">
+        <Label htmlFor="workspace-description">Descripción</Label>
+        <Textarea id="workspace-description" value={data.description ?? ''} onChange={(e) => onChange({ description: e.target.value })} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="workspace-max-functions">Máx. funciones</Label>
+          <Input
+            id="workspace-max-functions"
+            inputMode="numeric"
+            aria-invalid={Boolean(validation.fieldErrors.maxFunctions) || undefined}
+            aria-describedby={validation.fieldErrors.maxFunctions ? 'workspace-max-functions-error' : undefined}
+            className={validation.fieldErrors.maxFunctions ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+            value={data.maxFunctions ?? ''}
+            onChange={(e) => onChange({ maxFunctions: e.target.value })}
+          />
+          {validation.fieldErrors.maxFunctions ? (
+            <p id="workspace-max-functions-error" className={FORM_FIELD_ERROR_CLASS_NAME}>
+              {validation.fieldErrors.maxFunctions}
+            </p>
+          ) : null}
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="workspace-max-databases">Máx. bases de datos</Label>
+          <Input
+            id="workspace-max-databases"
+            inputMode="numeric"
+            aria-invalid={Boolean(validation.fieldErrors.maxDatabases) || undefined}
+            aria-describedby={validation.fieldErrors.maxDatabases ? 'workspace-max-databases-error' : undefined}
+            className={validation.fieldErrors.maxDatabases ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+            value={data.maxDatabases ?? ''}
+            onChange={(e) => onChange({ maxDatabases: e.target.value })}
+          />
+          {validation.fieldErrors.maxDatabases ? (
+            <p id="workspace-max-databases-error" className={FORM_FIELD_ERROR_CLASS_NAME}>
+              {validation.fieldErrors.maxDatabases}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function validateWorkspaceConfig(data: Partial<WorkspaceData>) {
   const maxFunctions = parseRequiredIntegerField(data.maxFunctions, { label: 'Máx. funciones', min: 1, max: MAX_FORM_INTEGER })
