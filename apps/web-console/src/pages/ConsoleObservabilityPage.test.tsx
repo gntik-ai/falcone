@@ -66,7 +66,7 @@ describe('ConsoleObservabilityPage', () => {
     expect(screen.getByText(/correlation/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /exportar/i }))
     await waitFor(() => expect(mockExportAuditRecords).toHaveBeenCalled())
-    const exportPanel = await screen.findByText('Exportación completada')
+    const exportPanel = await screen.findByText('Manifiesto de auditoría listo')
     const panel = exportPanel.closest('section')
     expect(panel).not.toBeNull()
     expect(panel!).toHaveTextContent('exp_audit_1')
@@ -74,10 +74,37 @@ describe('ConsoleObservabilityPage', () => {
     expect(panel!).toHaveTextContent(/Registros enmascarados\s*1/)
     expect(screen.queryByText('Exportación iniciada correctamente.')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /descargar json/i }))
+    await user.click(screen.getByRole('button', { name: /descargar manifiesto json/i }))
     expect(createObjectURL).toHaveBeenCalled()
     expect(anchorClick).toHaveBeenCalled()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:audit-export')
+  })
+
+  it('anuncia y deshabilita la exportación mientras espera respuesta', async () => {
+    const user = userEvent.setup()
+    let resolveExport: (value: unknown) => void = () => {}
+    const exportPromise = new Promise((resolve) => {
+      resolveExport = resolve
+    })
+
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+    mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+    mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+    mockExportAuditRecords.mockReturnValue(exportPromise)
+
+    render(<ConsoleObservabilityPage />)
+    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    const exportButton = screen.getByRole('button', { name: /exportar auditoría/i })
+
+    await user.click(exportButton)
+
+    expect(exportButton).toBeDisabled()
+    expect(exportButton).toHaveAccessibleName(/exportando auditoría/i)
+    expect(screen.getByText('Solicitando exportación de auditoría')).toBeInTheDocument()
+    expect(screen.getByText(/esperando la respuesta del backend/i)).toBeInTheDocument()
+
+    resolveExport({ status: 'accepted', message: 'queued' })
+    expect(await screen.findByText('Manifiesto no disponible')).toBeInTheDocument()
   })
 
   it('no muestra éxito ni descarga cuando el backend solo acepta sin artefacto', async () => {
@@ -91,9 +118,10 @@ describe('ConsoleObservabilityPage', () => {
     await user.click(screen.getByRole('button', { name: 'Audit' }))
     await user.click(screen.getByRole('button', { name: /exportar/i }))
 
-    expect(await screen.findByText('Exportación no disponible todavía')).toBeInTheDocument()
+    expect(await screen.findByText('Manifiesto no disponible')).toBeInTheDocument()
     expect(screen.getByText('Export queued; artifact pending.')).toBeInTheDocument()
+    expect(screen.getByText('No se descargó ningún archivo porque la respuesta no incluyó un manifiesto.')).toBeInTheDocument()
     expect(screen.queryByText('Exportación iniciada correctamente.')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /descargar json/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /descargar manifiesto json/i })).not.toBeInTheDocument()
   })
 })

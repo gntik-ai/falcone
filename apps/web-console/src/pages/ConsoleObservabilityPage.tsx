@@ -100,6 +100,8 @@ export function ConsoleObservabilityPage() {
   }
 
   const tenantId = activeTenantId
+  const isExporting = exportFeedback?.kind === 'loading'
+  const exportFeedbackId = exportFeedback ? 'audit-export-feedback' : undefined
 
   async function handleExport() {
     setExportFeedback({ kind: 'loading' })
@@ -170,56 +172,78 @@ export function ConsoleObservabilityPage() {
               </select>
             </label>
             <div className="flex items-end">
-              <Button type="button" variant="outline" disabled={exportFeedback?.kind === 'loading'} onClick={() => void handleExport()}>
-                {exportFeedback?.kind === 'loading' ? 'Exportando...' : 'Exportar'}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isExporting}
+                aria-busy={isExporting}
+                aria-describedby={exportFeedbackId}
+                onClick={() => void handleExport()}
+              >
+                {isExporting ? 'Exportando auditoría...' : 'Exportar auditoría'}
               </Button>
             </div>
           </section>
-          {exportFeedback?.kind === 'artifact' ? (
-            <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-semibold">Exportación completada</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Export ID <code className="rounded bg-muted px-1 py-0.5">{exportFeedback.manifest.exportId}</code>
+          {exportFeedback ? (
+            <div id="audit-export-feedback" aria-live="polite" aria-atomic="true">
+              {exportFeedback.kind === 'loading' ? (
+                <section role="status" aria-busy="true" className="rounded-3xl border border-border bg-card/70 p-5">
+                  <h2 className="text-sm font-semibold">Solicitando exportación de auditoría</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Estamos esperando la respuesta del backend para saber si hay un manifiesto JSON descargable.
                   </p>
-                </div>
-                <Button type="button" variant="outline" onClick={() => downloadAuditExportManifest(exportFeedback.manifest)}>
-                  Descargar JSON
-                </Button>
-              </div>
-              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                <div>
-                  <dt className="text-muted-foreground">Registros exportados</dt>
-                  <dd className="font-medium">{exportFeedback.manifest.itemCount}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Registros enmascarados</dt>
-                  <dd className="font-medium">{exportFeedback.manifest.maskedItemCount ?? 0}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Estado</dt>
-                  <dd className="font-medium">{auditExportStatus(exportFeedback.manifest) ?? 'completed'}</dd>
-                </div>
-              </dl>
-            </section>
-          ) : null}
-          {exportFeedback?.kind === 'unavailable' ? (
-            <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
-              <h2 className="text-sm font-semibold">Exportación no disponible todavía</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
-              {auditExportId(exportFeedback.result) ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Solicitud <code className="rounded bg-muted px-1 py-0.5">{auditExportId(exportFeedback.result)}</code>
-                </p>
+                </section>
               ) : null}
-            </section>
-          ) : null}
-          {exportFeedback?.kind === 'error' ? (
-            <section role="alert" className="rounded-3xl border border-destructive/40 bg-card/70 p-5">
-              <h2 className="text-sm font-semibold text-destructive">No se pudo exportar la auditoría</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
-            </section>
+              {exportFeedback.kind === 'artifact' ? (
+                <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-sm font-semibold">Manifiesto de auditoría listo</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Export ID <code className="rounded bg-muted px-1 py-0.5">{exportFeedback.manifest.exportId}</code>
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => downloadAuditExportManifest(exportFeedback.manifest)}>
+                      Descargar manifiesto JSON
+                    </Button>
+                  </div>
+                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <dt className="text-muted-foreground">Registros exportados</dt>
+                      <dd className="font-medium">{exportFeedback.manifest.itemCount}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Registros enmascarados</dt>
+                      <dd className="font-medium">{exportFeedback.manifest.maskedItemCount ?? 0}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Estado</dt>
+                      <dd className="font-medium">{auditExportStatus(exportFeedback.manifest) ?? 'completed'}</dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : null}
+              {exportFeedback.kind === 'unavailable' ? (
+                <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
+                  <h2 className="text-sm font-semibold">Manifiesto no disponible</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    No se descargó ningún archivo porque la respuesta no incluyó un manifiesto.
+                  </p>
+                  {auditExportId(exportFeedback.result) ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Solicitud <code className="rounded bg-muted px-1 py-0.5">{auditExportId(exportFeedback.result)}</code>
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
+              {exportFeedback.kind === 'error' ? (
+                <section role="alert" className="rounded-3xl border border-destructive/40 bg-card/70 p-5">
+                  <h2 className="text-sm font-semibold text-destructive">No se pudo exportar la auditoría</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
+                </section>
+              ) : null}
+            </div>
           ) : null}
           {audit.loading ? <ConsolePageState kind="loading" title="Cargando auditoría" description="Consultando eventos auditables." /> : null}
           {audit.error ? <ConsolePageState kind="error" title="No se pudo cargar la auditoría" description={audit.error} actionLabel="Reintentar" onAction={audit.reload} /> : null}
