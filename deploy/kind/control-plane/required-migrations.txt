@@ -1,5 +1,6 @@
 # Additional DB migrations required by the wireable control-plane routes
 # (route-map.runtime.json), beyond those ALREADY APPLIED to in_falcone:
+#   073, 074, 075, 076, 078       (async operations / logs / retry semantics)
 #   097, 098, 100, 103, 104, 105  (plans / quota dimensions / change-history /
 #   quota overrides / boolean capabilities / workspace sub-quotas)
 #
@@ -16,6 +17,18 @@ services/provisioning-orchestrator/src/migrations/073-async-operation-tables.sql
 
 services/provisioning-orchestrator/src/migrations/074-async-operation-log-entries.sql
 # async_operation_log_entries — read by async-operation-query queryType=logs. Depends on 073.
+
+services/provisioning-orchestrator/src/migrations/075-idempotency-retry-tables.sql
+# idempotency_key_records + retry_attempts and async_operations attempt_count/max_retries.
+# Depends on 073.
+
+services/provisioning-orchestrator/src/migrations/076-timeout-cancel-recovery.sql
+# timeout/cancel/recovery status expansion, operation_policies, and async_operations
+# cancel/timeout columns. Depends on 073.
+
+services/provisioning-orchestrator/src/migrations/078-retry-semantics-intervention.sql
+# retry semantics, failure classification, and manual intervention tables/columns.
+# Depends on 073 and coheres with the async retry/intervention actions.
 
 services/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql
 # pg_capture_configs (+ pg_capture_quotas, pg_capture_audit_log) — read by realtime/pg-capture-list
