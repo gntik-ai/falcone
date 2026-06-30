@@ -26,6 +26,12 @@ beforeEach(() => {
   useConsoleQuotasMock.mockReturnValue({ posture: null, workspacePosture: null, loading: false })
 })
 
+async function advanceToConfigStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /siguiente/i }))
+  await user.type(screen.getByLabelText(/nombre del workspace/i), 'Workspace Nuevo')
+  await user.click(screen.getByRole('button', { name: /siguiente/i }))
+}
+
 describe('CreateWorkspaceWizard', () => {
   it('[RW-01] happy path confirma creación — RF-UI-025 / T02-AC1', async () => {
     const user = userEvent.setup()
@@ -39,8 +45,33 @@ describe('CreateWorkspaceWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
-    expect(requestMock).toHaveBeenCalledWith('/v1/tenants/ten_alpha/workspaces', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ name: 'Workspace Nuevo' }) }))
+    expect(requestMock).toHaveBeenCalledWith('/v1/tenants/ten_alpha/workspaces', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ name: 'Workspace Nuevo', initialLimits: { maxFunctions: 10, maxDatabases: 5 } }) }))
     expect(await screen.findByText(/recurso creado correctamente/i)).toBeInTheDocument()
+  })
+
+  it.each([
+    { field: /máx\. funciones/i, value: '', error: /máx\. funciones es obligatorio/i },
+    { field: /máx\. funciones/i, value: 'abc', error: /máx\. funciones debe ser un número entero/i },
+    { field: /máx\. funciones/i, value: '0', error: /máx\. funciones debe estar entre 1 y 9007199254740991/i },
+    { field: /máx\. funciones/i, value: '-1', error: /máx\. funciones debe estar entre 1 y 9007199254740991/i },
+    { field: /máx\. funciones/i, value: '9007199254740992', error: /máx\. funciones debe estar entre 1 y 9007199254740991/i },
+    { field: /máx\. bases de datos/i, value: '', error: /máx\. bases de datos es obligatorio/i },
+    { field: /máx\. bases de datos/i, value: 'abc', error: /máx\. bases de datos debe ser un número entero/i },
+    { field: /máx\. bases de datos/i, value: '0', error: /máx\. bases de datos debe estar entre 1 y 9007199254740991/i },
+    { field: /máx\. bases de datos/i, value: '-1', error: /máx\. bases de datos debe estar entre 1 y 9007199254740991/i },
+    { field: /máx\. bases de datos/i, value: '9007199254740992', error: /máx\. bases de datos debe estar entre 1 y 9007199254740991/i }
+  ])('[RW-09] límites numéricos del workspace rechazan $value en $field — issue #807', async ({ field, value, error }) => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><CreateWorkspaceWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+    await advanceToConfigStep(user)
+
+    const input = screen.getByLabelText(field)
+    await user.clear(input)
+    if (value) await user.type(input, value)
+
+    expect(screen.getByText(error)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled()
+    expect(requestMock).not.toHaveBeenCalled()
   })
 
   it('[RW-02] bloqueo por validación — RF-UI-025 / T02-AC2', async () => {
