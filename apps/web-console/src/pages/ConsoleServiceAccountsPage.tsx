@@ -26,7 +26,7 @@ export function ConsoleServiceAccountsPage() {
   const [displayName, setDisplayName] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null)
-  const [issuedCredential, setIssuedCredential] = useState<ConsoleIssuedCredential | null>(null)
+  const [credentialDisclosure, setCredentialDisclosure] = useState<{ mode: 'reveal' | 'rotate'; credential: ConsoleIssuedCredential } | null>(null)
   const destructiveOp = useDestructiveOp()
   const session = readConsoleShellSession()
   const principalUserId = session?.principal?.userId ?? 'unknown-user'
@@ -59,10 +59,10 @@ export function ConsoleServiceAccountsPage() {
     setErrorFeedback(null)
     try {
       const credential = await issueServiceAccountCredential(workspaceId, serviceAccountId, { requestedByUserId: principalUserId })
-      setIssuedCredential(credential)
+      setCredentialDisclosure({ mode: 'reveal', credential })
       reload()
     } catch (rawError) {
-      // The control plane rejects issuing a credential for a revoked service account (409
+      // The control plane rejects revealing a credential for a revoked service account (409
       // CREDENTIAL_REVOKED). requestConsoleSessionJson throws on any non-2xx, so surface the failure
       // instead of leaving the rejection silent.
       setErrorFeedback(consoleServiceAccountsErrorMessage(rawError))
@@ -92,7 +92,7 @@ export function ConsoleServiceAccountsPage() {
     setErrorFeedback(null)
     try {
       const credential = await rotateServiceAccountCredential(workspaceId, serviceAccountId, { reason: 'Console rotate' })
-      setIssuedCredential(credential)
+      setCredentialDisclosure({ mode: 'rotate', credential })
       reload()
     } catch (rawError) {
       // Rotation of a revoked service account is rejected with 409 CREDENTIAL_REVOKED; surface it.
@@ -156,7 +156,7 @@ export function ConsoleServiceAccountsPage() {
             </thead>
             <tbody>
               {accounts.map((account) => {
-                // A revoked credential cannot be re-issued or rotated (the control plane rejects it with
+                // A revoked credential cannot be revealed or rotated (the control plane rejects it with
                 // 409 CREDENTIAL_REVOKED); reflect that in the UI by disabling those actions. Revocar stays
                 // available so re-revoking remains an idempotent no-op.
                 const credentialRevoked = account.credentialStatus?.state === 'revoked' || account.accessProjection?.credentialState === 'revoked'
@@ -169,7 +169,7 @@ export function ConsoleServiceAccountsPage() {
                   <td className="px-4 py-3">{account.expiresAt ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleIssue(account.serviceAccountId)}>Emitir</Button>
+                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleIssue(account.serviceAccountId)}>Revelar</Button>
                       <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => openRevokeDialog(account)}>Revocar</Button>
                       <Button type="button" variant="outline" size="sm" disabled={writesBlocked || credentialRevoked} onClick={() => void handleRotate(account.serviceAccountId)}>Rotar</Button>
                       {/* Delete works for an active OR a revoked SA — gated only by tenant suspension (#687). */}
@@ -193,14 +193,23 @@ export function ConsoleServiceAccountsPage() {
         onCancel={destructiveOp.handleCancel}
       />
 
-      {issuedCredential ? (
-        <div role="dialog" aria-label="Credencial emitida" className="rounded-3xl border border-border bg-card/70 p-6">
-          <h2 className="text-lg font-semibold">Secreto visible una sola vez</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Cópialo ahora: no podrá recuperarse después de cerrar este panel.</p>
-          <pre className="mt-4 overflow-x-auto rounded-xl bg-background p-4">{issuedCredential.secret}</pre>
+      {credentialDisclosure ? (
+        <div role="dialog" aria-label={credentialDisclosure.mode === 'rotate' ? 'Credencial rotada' : 'Credencial revelada'} className="rounded-3xl border border-border bg-card/70 p-6">
+          {credentialDisclosure.mode === 'rotate' ? (
+            <>
+              <h2 className="text-lg font-semibold">Nuevo secreto generado</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Actualiza tus clientes con este valor. Rotar reemplaza el secreto anterior e invalida los tokens emitidos antes de la rotación.</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold">Secreto actual de la service account</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Este panel revela el secreto de cliente actual y puede mostrarse de nuevo. Usa Rotar para reemplazarlo e invalidar los tokens emitidos con el secreto anterior.</p>
+            </>
+          )}
+          <pre className="mt-4 overflow-x-auto rounded-xl bg-background p-4">{credentialDisclosure.credential.secret}</pre>
           <div className="mt-4 flex gap-3">
-            <Button type="button" variant="outline" onClick={() => navigator.clipboard?.writeText(issuedCredential.secret)}>Copiar</Button>
-            <Button type="button" onClick={() => setIssuedCredential(null)}>Cerrar</Button>
+            <Button type="button" variant="outline" onClick={() => navigator.clipboard?.writeText(credentialDisclosure.credential.secret)}>Copiar</Button>
+            <Button type="button" onClick={() => setCredentialDisclosure(null)}>Cerrar</Button>
           </div>
         </div>
       ) : null}

@@ -1,5 +1,5 @@
 // Headless-Chromium verification of the Service Accounts page, wired to the
-// adapted control-plane SA endpoints (create -> get -> issue credential).
+// adapted control-plane SA endpoints (create -> get -> reveal credential).
 import { chromium } from 'playwright';
 
 const GW = process.env.GW || 'http://192.168.1.132:31908';
@@ -65,15 +65,15 @@ try {
   log(`AFTER CREATE contains "${SA_NAME}"? ${body.includes(SA_NAME)}`);
   await page.screenshot({ path: `${OUT}/14-service-accounts.png`, fullPage: true });
 
-  // issue a credential (Emitir) -> credential dialog
-  const emit = page.locator('button:has-text("Emitir")').first();
-  if (await emit.count()) {
+  // reveal the current credential secret (Revelar) -> credential dialog
+  const reveal = page.locator('button:has-text("Revelar")').first();
+  if (await reveal.count()) {
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/credential-issuance') && r.request().method() === 'POST', { timeout: 20000 }).catch(() => null),
-      emit.click()
+      reveal.click()
     ]);
     await page.waitForTimeout(2000);
-    const dialog = await page.locator('[aria-label="Credencial emitida"]').count();
+    const dialog = await page.locator('[aria-label="Credencial revelada"]').count();
     log(`credential dialog shown? ${dialog > 0}`);
     await page.screenshot({ path: `${OUT}/15-sa-credential.png`, fullPage: true });
   }

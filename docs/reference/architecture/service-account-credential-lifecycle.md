@@ -17,6 +17,19 @@ All routes are workspace-scoped and require a tenant owner/admin (or superadmin)
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations` | Rotate the client secret. |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations` | Revoke the credential. |
 
+## Reveal vs rotate
+
+`credential-issuance` is a **reveal** operation for the current Keycloak client secret. It returns
+the active client id, current client secret, token endpoint, grant type, and issue timestamp so an
+operator can recover the value needed for a `client_credentials` grant. It does not generate a new
+secret, does not invalidate existing tokens, and may reveal the same current secret again until the
+credential is rotated or revoked.
+
+`credential-rotations` is the replacement path. It regenerates the Keycloak client secret and stamps
+`credentials_invalidated_at`, so tokens minted from the pre-rotation secret are invalidated within
+the propagation window described below. Use rotation when the operator wants a fresh secret or wants
+to retire a previously disclosed value.
+
 ## Token validation
 
 The control-plane (`deploy/kind/control-plane/server.mjs`) and the executor
@@ -90,7 +103,7 @@ Set them on both the control-plane and the executor deployments to keep their wi
 ### Example
 
 ```bash
-# Issue a credential and mint a token.
+# Reveal the current credential secret and mint a token.
 ISS=$(curl -s -X POST -H "Authorization: Bearer $OWNER" --data-binary '{}' \
   "$GW/v1/workspaces/$WS/service-accounts/$SA/credential-issuance")
 CID=$(jq -r .clientId <<<"$ISS"); SEC=$(jq -r .clientSecret <<<"$ISS")

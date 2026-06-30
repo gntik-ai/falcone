@@ -32450,7 +32450,7 @@
       "requiredPlanFlags": [],
       "resourceType": "service_account",
       "scope": "workspace",
-      "summary": "Issue a new secret-free credential reference for one workspace service account.",
+      "summary": "Reveal the current client secret for one workspace service account.",
       "supportsIdempotencyKey": true,
       "tags": [
         "Workspaces",
