@@ -7,6 +7,7 @@
 // uses the continuation token from the list response.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -186,39 +187,45 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           No executions match the applied filters.
         </p>
       ) : (
-        <table className="w-full border-collapse text-sm" data-testid="run-history-table">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th className="py-2">Execution</th>
-              <th className="py-2">Status</th>
-              <th className="py-2">Trigger</th>
-              <th className="py-2">Version</th>
-              <th className="py-2">Started</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.executionId} className="border-b border-border/60" data-testid="run-history-row">
-                <td className="py-2 font-mono text-xs" title={item.executionId}>
-                  {item.executionId.slice(0, 32)}…
-                </td>
-                <td className="py-2">{item.status ?? '—'}</td>
-                <td className="py-2">{item.triggerType ?? '—'}</td>
-                <td className="py-2">{item.version ?? '—'}</td>
-                <td className="py-2 text-xs text-muted-foreground">{item.startedAt ?? '—'}</td>
-                <td className="py-2 text-right">
-                  <Link
-                    className="text-xs text-primary hover:underline"
-                    to={`/console/flows/${flowId}/runs/${encodeURIComponent(item.executionId)}`}
-                  >
-                    Open
-                  </Link>
-                </td>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+          <table className="w-full table-fixed border-collapse text-sm sm:min-w-[48rem] sm:table-auto" data-testid="run-history-table">
+            <caption className="sr-only">Flow run history</caption>
+            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-medium">Execution</th>
+                <th scope="col" className="hidden w-28 px-4 py-3 font-medium sm:table-cell">Status</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Trigger</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Version</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Started</th>
+                <th scope="col" className="w-36 px-4 py-3 text-right font-medium sm:w-auto">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.executionId} className="border-t border-border transition-colors hover:bg-muted/20" data-testid="run-history-row">
+                  <td className="px-4 py-3 font-mono text-xs" title={item.executionId}>
+                    <span className="block max-w-[8rem] truncate sm:max-w-none">{item.executionId.slice(0, 32)}…</span>
+                  </td>
+                  <td className="hidden px-4 py-3 sm:table-cell">{item.status ?? '—'}</td>
+                  <td className="hidden px-4 py-3 sm:table-cell">{item.triggerType ?? '—'}</td>
+                  <td className="hidden px-4 py-3 sm:table-cell">{item.version ?? '—'}</td>
+                  <td className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">{item.startedAt ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <Button size="sm" variant="outline" className="w-full justify-start sm:w-auto sm:justify-center" asChild>
+                      <Link
+                        to={`/console/flows/${encodeURIComponent(flowId)}/runs/${encodeURIComponent(item.executionId)}`}
+                        aria-label={`Open details for run ${item.executionId}`}
+                      >
+                        Open details
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </Link>
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <footer className="flex items-center justify-between">

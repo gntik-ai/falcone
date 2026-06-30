@@ -13,6 +13,7 @@
 //     canvas nodes; errors without nodeId show as flow-level Problems entries.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { History } from 'lucide-react'
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -491,13 +492,15 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col" data-testid="console-flow-designer-page">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <div className="flex items-center gap-2">
+      <header className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
             Flows
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-semibold">{record?.name ?? flowId}</span>
+          <span className="max-w-[18rem] truncate text-sm font-semibold sm:max-w-[24rem]" title={record?.name ?? flowId}>
+            {record?.name ?? flowId}
+          </span>
           <Badge variant="outline" className="text-xs">
             {record?.status ?? 'draft'}
           </Badge>
@@ -516,13 +519,14 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="mr-2 flex items-center gap-1" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto">
+          <div className="flex w-full items-center gap-1 overflow-x-auto rounded-md border border-border bg-muted/30 p-1 sm:w-auto" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
             {(['canvas', 'yaml', 'side-by-side'] as const).map((mode) => (
               <Button
                 key={mode}
                 size="sm"
                 variant={viewMode === mode ? 'default' : 'ghost'}
+                className="h-8 px-2.5"
                 role="tab"
                 aria-selected={viewMode === mode}
                 data-testid={`view-mode-${mode}`}
@@ -533,27 +537,46 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
               </Button>
             ))}
           </div>
-          <Button size="sm" variant="ghost" onClick={() => void revert()} disabled={saving || publishing}>
-            Revert
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void saveDraft()}
-            disabled={saving || publishing}
-            data-testid="save-draft-button"
+          <nav aria-label="Flow run navigation" className="flex w-full items-center sm:w-auto">
+            <Button size="sm" variant="secondary" className="w-full justify-start sm:w-auto sm:justify-center" asChild>
+              <Link
+                to={`/console/flows/${encodeURIComponent(flowId)}/runs`}
+                aria-label={`View run history for ${record?.name ?? flowId}`}
+              >
+                <History className="h-4 w-4" aria-hidden="true" />
+                Run history
+              </Link>
+            </Button>
+          </nav>
+          <div
+            className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:border-l sm:border-border sm:pl-3"
+            role="group"
+            aria-label="Draft actions"
           >
-            {saving ? 'Saving…' : 'Save draft'}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => void publish()}
-            disabled={publishing || saving || blockingErrors > 0}
-            title={blockingErrors > 0 ? 'Resolve the validation errors before publishing.' : undefined}
-            data-testid="publish-button"
-          >
-            {publishing ? 'Publishing…' : 'Publish'}
-          </Button>
+            <Button size="sm" variant="ghost" className="flex-1 sm:flex-none" onClick={() => void revert()} disabled={saving || publishing}>
+              Revert
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 sm:flex-none"
+              onClick={() => void saveDraft()}
+              disabled={saving || publishing}
+              data-testid="save-draft-button"
+            >
+              {saving ? 'Saving…' : 'Save draft'}
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1 sm:flex-none"
+              onClick={() => void publish()}
+              disabled={publishing || saving || blockingErrors > 0}
+              title={blockingErrors > 0 ? 'Resolve the validation errors before publishing.' : undefined}
+              data-testid="publish-button"
+            >
+              {publishing ? 'Publishing…' : 'Publish'}
+            </Button>
+          </div>
         </div>
       </header>
       {loadError && record !== null ? (
