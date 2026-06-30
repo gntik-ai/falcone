@@ -70,7 +70,7 @@ describe('ConsoleFlowDesignerPage run-history navigation (#792)', () => {
     renderPage()
 
     await waitFor(() => expect(mockGetFlow).toHaveBeenCalledWith('ws1', 'flow-1'))
-    const runHistoryLink = screen.getByRole('link', { name: /run history/i })
+    const runHistoryLink = screen.getByRole('link', { name: /view run history for alpha flow/i })
     expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-1/runs')
   })
 })

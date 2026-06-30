@@ -111,46 +111,60 @@ export function ConsoleFlowsPage() {
           No flows yet. Create the first one to open the designer.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[42rem] text-sm">
+            <caption className="sr-only">Workspace flows</caption>
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Last modified</th>
-                <th className="px-3 py-2" />
+                <th scope="col" className="px-3 py-2 font-medium">Name</th>
+                <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                <th scope="col" className="px-3 py-2 font-medium">Last modified</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {flows.map((flow) => (
-                <tr key={flow.flowId} className="border-t border-border" data-testid="flow-row">
-                  <td className="px-3 py-2 font-medium">{flow.name}</td>
-                  <td className="px-3 py-2">
-                    <Badge variant="outline" className="text-xs">
-                      {flow.status ?? 'draft'}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {formatTimestamp(flow.updatedAt ?? flow.createdAt)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link to={`/console/flows/${encodeURIComponent(flow.flowId)}/runs`}>
-                          Run history
-                        </Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/console/flows/${encodeURIComponent(flow.flowId)}`)}
+              {flows.map((flow) => {
+                const encodedFlowId = encodeURIComponent(flow.flowId)
+                const flowLabel = flow.name || flow.flowId
+
+                return (
+                  <tr key={flow.flowId} className="border-t border-border" data-testid="flow-row">
+                    <th scope="row" className="px-3 py-2 text-left font-medium">{flowLabel}</th>
+                    <td className="px-3 py-2">
+                      <Badge variant="outline" className="text-xs">
+                        {flow.status ?? 'draft'}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatTimestamp(flow.updatedAt ?? flow.createdAt)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div
+                        className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end"
+                        role="group"
+                        aria-label={`Actions for ${flowLabel}`}
                       >
-                        Open designer
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <Button size="sm" variant="outline" asChild>
+                          <Link
+                            to={`/console/flows/${encodedFlowId}`}
+                            aria-label={`Open designer for ${flowLabel}`}
+                          >
+                            Open designer
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link
+                            to={`/console/flows/${encodedFlowId}/runs`}
+                            aria-label={`View run history for ${flowLabel}`}
+                          >
+                            Run history
+                          </Link>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

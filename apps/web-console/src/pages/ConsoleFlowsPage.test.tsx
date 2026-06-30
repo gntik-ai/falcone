@@ -90,8 +90,10 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     renderPage()
 
     const row = await screen.findByTestId('flow-row')
-    const runHistoryLink = within(row).getByRole('link', { name: /run history/i })
+    expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument()
+    const openDesignerLink = within(row).getByRole('link', { name: /open designer for alpha flow/i })
+    expect(openDesignerLink).toHaveAttribute('href', '/console/flows/flow-alpha')
+    const runHistoryLink = within(row).getByRole('link', { name: /view run history for alpha flow/i })
     expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-alpha/runs')
-    expect(within(row).getByRole('button', { name: /open designer/i })).toBeInTheDocument()
   })
 })

@@ -186,39 +186,43 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           No executions match the applied filters.
         </p>
       ) : (
-        <table className="w-full border-collapse text-sm" data-testid="run-history-table">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th className="py-2">Execution</th>
-              <th className="py-2">Status</th>
-              <th className="py-2">Trigger</th>
-              <th className="py-2">Version</th>
-              <th className="py-2">Started</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.executionId} className="border-b border-border/60" data-testid="run-history-row">
-                <td className="py-2 font-mono text-xs" title={item.executionId}>
-                  {item.executionId.slice(0, 32)}…
-                </td>
-                <td className="py-2">{item.status ?? '—'}</td>
-                <td className="py-2">{item.triggerType ?? '—'}</td>
-                <td className="py-2">{item.version ?? '—'}</td>
-                <td className="py-2 text-xs text-muted-foreground">{item.startedAt ?? '—'}</td>
-                <td className="py-2 text-right">
-                  <Link
-                    className="text-xs text-primary hover:underline"
-                    to={`/console/flows/${flowId}/runs/${encodeURIComponent(item.executionId)}`}
-                  >
-                    Open
-                  </Link>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[48rem] border-collapse text-sm" data-testid="run-history-table">
+            <caption className="sr-only">Flow run history</caption>
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="py-2">Execution</th>
+                <th scope="col" className="py-2">Status</th>
+                <th scope="col" className="py-2">Trigger</th>
+                <th scope="col" className="py-2">Version</th>
+                <th scope="col" className="py-2">Started</th>
+                <th scope="col" className="py-2 text-right">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.executionId} className="border-b border-border/60" data-testid="run-history-row">
+                  <td className="py-2 font-mono text-xs" title={item.executionId}>
+                    {item.executionId.slice(0, 32)}…
+                  </td>
+                  <td className="py-2">{item.status ?? '—'}</td>
+                  <td className="py-2">{item.triggerType ?? '—'}</td>
+                  <td className="py-2">{item.version ?? '—'}</td>
+                  <td className="py-2 text-xs text-muted-foreground">{item.startedAt ?? '—'}</td>
+                  <td className="py-2 text-right">
+                    <Link
+                      className="text-xs text-primary hover:underline"
+                      to={`/console/flows/${encodeURIComponent(flowId)}/runs/${encodeURIComponent(item.executionId)}`}
+                      aria-label={`Open details for run ${item.executionId}`}
+                    >
+                      Open details
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <footer className="flex items-center justify-between">

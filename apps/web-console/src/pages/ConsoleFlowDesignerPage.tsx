@@ -491,13 +491,15 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col" data-testid="console-flow-designer-page">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <div className="flex items-center gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
             Flows
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-semibold">{record?.name ?? flowId}</span>
+          <span className="max-w-[20rem] truncate text-sm font-semibold" title={record?.name ?? flowId}>
+            {record?.name ?? flowId}
+          </span>
           <Badge variant="outline" className="text-xs">
             {record?.status ?? 'draft'}
           </Badge>
@@ -516,8 +518,8 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
             </span>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="mr-2 flex items-center gap-1" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
             {(['canvas', 'yaml', 'side-by-side'] as const).map((mode) => (
               <Button
                 key={mode}
@@ -533,32 +535,43 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
               </Button>
             ))}
           </div>
-          <Button size="sm" variant="outline" asChild>
-            <Link to={`/console/flows/${encodeURIComponent(flowId)}/runs`}>
-              Run history
-            </Link>
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void revert()} disabled={saving || publishing}>
-            Revert
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void saveDraft()}
-            disabled={saving || publishing}
-            data-testid="save-draft-button"
+          <nav aria-label="Flow run navigation" className="flex items-center">
+            <Button size="sm" variant="outline" asChild>
+              <Link
+                to={`/console/flows/${encodeURIComponent(flowId)}/runs`}
+                aria-label={`View run history for ${record?.name ?? flowId}`}
+              >
+                Run history
+              </Link>
+            </Button>
+          </nav>
+          <div
+            className="flex flex-wrap items-center justify-end gap-2 sm:border-l sm:border-border sm:pl-3"
+            role="group"
+            aria-label="Draft actions"
           >
-            {saving ? 'Saving…' : 'Save draft'}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => void publish()}
-            disabled={publishing || saving || blockingErrors > 0}
-            title={blockingErrors > 0 ? 'Resolve the validation errors before publishing.' : undefined}
-            data-testid="publish-button"
-          >
-            {publishing ? 'Publishing…' : 'Publish'}
-          </Button>
+            <Button size="sm" variant="ghost" onClick={() => void revert()} disabled={saving || publishing}>
+              Revert
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void saveDraft()}
+              disabled={saving || publishing}
+              data-testid="save-draft-button"
+            >
+              {saving ? 'Saving…' : 'Save draft'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void publish()}
+              disabled={publishing || saving || blockingErrors > 0}
+              title={blockingErrors > 0 ? 'Resolve the validation errors before publishing.' : undefined}
+              data-testid="publish-button"
+            >
+              {publishing ? 'Publishing…' : 'Publish'}
+            </Button>
+          </div>
         </div>
       </header>
       {loadError && record !== null ? (

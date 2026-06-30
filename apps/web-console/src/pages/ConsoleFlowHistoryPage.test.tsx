@@ -111,7 +111,7 @@ describe('ConsoleFlowHistoryPage filters', () => {
     renderPage()
 
     const row = await screen.findByTestId('run-history-row')
-    const detailLink = within(row).getByRole('link', { name: /open/i })
+    const detailLink = within(row).getByRole('link', { name: /open details for run/i })
     expect(detailLink).toHaveAttribute(
       'href',
       `/console/flows/flow1/runs/${encodeURIComponent(EXECUTION_ID)}`
