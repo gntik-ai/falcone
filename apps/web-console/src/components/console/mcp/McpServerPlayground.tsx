@@ -1,5 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import type { JsonValue } from '@/lib/http'
 import { invokeMcpTool, type InvokeMcpToolResult } from '@/lib/mcp/mcp-api'
 import type { McpToolView } from '@/lib/mcp/mcp-server-detail'
@@ -23,6 +28,8 @@ interface McpServerPlaygroundProps {
   ) => Promise<InvokeMcpToolResult>
 }
 
+const invalidJsonMessage = 'Los argumentos deben ser JSON válido.'
+
 export function McpServerPlayground({
   workspaceId,
   serverId,
@@ -36,16 +43,32 @@ export function McpServerPlayground({
   const [result, setResult] = useState<InvokeMcpToolResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (tools.length === 0) {
+      setToolName('')
+      return
+    }
+    if (!tools.some((tool) => tool.name === toolName)) {
+      setToolName(tools[0].name)
+    }
+  }, [toolName, tools])
+
+  const selectedTool = useMemo(
+    () => tools.find((tool) => tool.name === toolName) ?? tools[0] ?? null,
+    [toolName, tools]
+  )
+  const argsInvalid = error === invalidJsonMessage
   const disabled = !endpoint || !toolName || busy
 
-  async function handleInvoke() {
+  async function handleInvoke(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     setError(null)
     setResult(null)
     let parsed: Record<string, JsonValue>
     try {
       parsed = JSON.parse(argsText || '{}') as Record<string, JsonValue>
     } catch {
-      setError('Los argumentos deben ser JSON válido.')
+      setError(invalidJsonMessage)
       return
     }
     setBusy(true)
@@ -60,11 +83,20 @@ export function McpServerPlayground({
   }
 
   if (tools.length === 0) {
-    return <p className="text-sm text-muted-foreground">Este servidor aún no expone herramientas curadas.</p>
+    return (
+      <section
+        className="space-y-1 rounded-md border border-dashed border-border bg-muted/20 p-4"
+        role="status"
+        aria-labelledby="mcp-playground-empty-heading"
+      >
+        <h3 id="mcp-playground-empty-heading" className="text-lg font-semibold text-foreground">Playground no disponible</h3>
+        <p className="text-sm text-muted-foreground">Este servidor aún no expone herramientas curadas para invocar.</p>
+      </section>
+    )
   }
 
   return (
-    <div className="space-y-4" data-testid="mcp-playground">
+    <form className="space-y-4" data-testid="mcp-playground" aria-busy={busy} onSubmit={(event) => void handleInvoke(event)}>
       <div className="space-y-1">
         <h3 className="text-lg font-semibold text-foreground">Playground</h3>
         <p className="text-sm text-muted-foreground">
@@ -72,13 +104,14 @@ export function McpServerPlayground({
         </p>
       </div>
 
-      <label className="block text-sm font-medium text-foreground">
-        Herramienta
-        <select
-          className="mt-1 block w-full rounded-md border border-border bg-background p-2 text-sm"
+      <div className="space-y-2">
+        <Label htmlFor="mcp-playground-tool">Herramienta</Label>
+        <Select
+          id="mcp-playground-tool"
           value={toolName}
           onChange={(event) => setToolName(event.target.value)}
-          aria-label="Herramienta"
+          disabled={busy}
+          aria-describedby={selectedTool ? 'mcp-playground-tool-context' : undefined}
         >
           {tools.map((tool) => (
             <option key={tool.name} value={tool.name}>
@@ -86,41 +119,68 @@ export function McpServerPlayground({
               {tool.mutates ? ' (muta)' : ''}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+        {selectedTool ? (
+          <div id="mcp-playground-tool-context" className="space-y-1 text-sm text-muted-foreground">
+            {selectedTool.description ? <p>{selectedTool.description}</p> : null}
+            <p>
+              {selectedTool.mutates ? 'Puede modificar datos.' : 'Solo lectura según la definición publicada.'}
+              {selectedTool.scope ? ` Scope sugerido: ${selectedTool.scope}.` : ''}
+            </p>
+          </div>
+        ) : null}
+      </div>
 
-      <label className="block text-sm font-medium text-foreground">
-        Argumentos (JSON)
-        <textarea
-          className="mt-1 block w-full rounded-md border border-border bg-background p-2 font-mono text-xs"
+      <div className="space-y-2">
+        <Label htmlFor="mcp-playground-args">Argumentos (JSON)</Label>
+        <Textarea
+          id="mcp-playground-args"
+          className="font-mono text-xs"
           rows={5}
           value={argsText}
           onChange={(event) => setArgsText(event.target.value)}
-          aria-label="Argumentos (JSON)"
+          disabled={busy}
+          aria-describedby={error ? 'mcp-playground-args-help mcp-playground-error' : 'mcp-playground-args-help'}
+          aria-invalid={argsInvalid ? 'true' : undefined}
         />
-      </label>
+        <p id="mcp-playground-args-help" className="text-sm text-muted-foreground">
+          Usa un objeto JSON. Deja <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">{'{}'}</code> si la herramienta no requiere argumentos.
+        </p>
+      </div>
 
-      <button
-        type="button"
-        className="rounded-md border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
-        onClick={() => void handleInvoke()}
+      {!endpoint ? (
+        <Alert role="status" aria-live="polite">
+          <AlertTitle>Endpoint no publicado</AlertTitle>
+          <AlertDescription>El playground se habilitará cuando el servidor MCP tenga un endpoint publicado.</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Button
+        type="submit"
+        variant="outline"
+        aria-busy={busy}
         disabled={disabled}
       >
         {busy ? 'Invocando…' : 'Invocar'}
-      </button>
+      </Button>
 
       {error ? (
-        <p className="text-sm text-destructive" role="alert">{error}</p>
+        <p id="mcp-playground-error" className="text-sm text-destructive" role="alert">{error}</p>
       ) : null}
 
       {result ? (
-        <pre
-          className="overflow-x-auto rounded-xl bg-muted/50 p-3 text-xs leading-6 text-foreground whitespace-pre-wrap"
-          data-testid="mcp-playground-result"
-        >
-          <code>{JSON.stringify(result, null, 2)}</code>
-        </pre>
+        <section className="space-y-2" aria-labelledby="mcp-playground-result-heading">
+          <h4 id="mcp-playground-result-heading" className="text-sm font-medium text-foreground">Resultado</h4>
+          <pre
+            className="overflow-x-auto rounded-xl bg-muted/50 p-3 text-xs leading-6 text-foreground whitespace-pre-wrap"
+            data-testid="mcp-playground-result"
+            role="status"
+            aria-live="polite"
+          >
+            <code>{JSON.stringify(result, null, 2)}</code>
+          </pre>
+        </section>
       ) : null}
-    </div>
+    </form>
   )
 }

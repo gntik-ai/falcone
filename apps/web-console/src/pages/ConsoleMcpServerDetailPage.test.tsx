@@ -66,9 +66,11 @@ describe('ConsoleMcpServerDetailPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('mcp-connect-panel')).toBeInTheDocument())
     expect(screen.getByText('Cursor — Añadir a Cursor')).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel', { name: 'Connect' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('tab', { name: 'Playground' }))
     expect(screen.getByTestId('mcp-playground')).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel', { name: 'Playground' })).toBeInTheDocument()
   })
 
   it('does not request a server detail without an active workspace and shows a clear state', () => {

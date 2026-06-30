@@ -35,10 +35,12 @@ describe('McpServerPlayground', () => {
 
     expect(invoke).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('JSON válido')
+    expect(screen.getByLabelText('Argumentos (JSON)')).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('disables invocation when the endpoint is not published', () => {
     render(<McpServerPlayground workspaceId="ws_1" serverId="srv_1" tools={tools} endpoint={null} invoke={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Invocar' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Endpoint no publicado')
   })
 })
