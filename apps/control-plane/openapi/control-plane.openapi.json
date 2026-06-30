@@ -12271,6 +12271,118 @@
       }
     },
     "/v1/workspaces/{workspaceId}/service-accounts": {
+      "get": {
+        "operationId": "listServiceAccounts",
+        "summary": "List service accounts for one workspace",
+        "tags": [
+          "Workspaces",
+          "ServiceAccounts"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service account collection returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceAccountCollectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected control-plane error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "service_account",
+        "x-audiences": [
+          "developer_external",
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "control-read",
+        "x-owning-service": "control_api",
+        "x-console-tier": "spa"
+      },
       "post": {
         "operationId": "createServiceAccount",
         "summary": "Submit a canonical service account write request",
@@ -60276,6 +60388,207 @@
           }
         },
         "additionalProperties": false
+      },
+      "ServiceAccountCollectionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceAccountCollectionItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "size"
+            ],
+            "properties": {
+              "size": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "after": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "nextCursor": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ServiceAccountCollectionItem": {
+        "type": "object",
+        "description": "Console-listable service account item. The control plane also preserves legacy raw row fields such as id, workspace_id, tenant_id, and kc_client_id for compatibility.",
+        "required": [
+          "entityType",
+          "serviceAccountId"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "const": "service_account"
+          },
+          "serviceAccountId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "desiredState": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "active",
+              "suspended",
+              null
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "iamBinding": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "realm": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "clientId": {
+                "type": "string"
+              },
+              "credentialRef": {
+                "type": "string"
+              }
+            }
+          },
+          "credentialStatus": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "active",
+                  "rotated",
+                  "revoked",
+                  null
+                ]
+              },
+              "issuedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "lastUsedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          "accessProjection": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "effectiveAccess": {
+                "type": "string"
+              },
+              "blockedByTenantSuspension": {
+                "type": "boolean"
+              },
+              "clientState": {
+                "type": "string"
+              },
+              "credentialState": {
+                "type": "string"
+              }
+            }
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "credentialId": {
+                  "type": "string"
+                },
+                "issuedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "expiresAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": true
       },
       "ServiceAccount": {
         "type": "object",

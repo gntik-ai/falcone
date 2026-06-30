@@ -12,6 +12,7 @@ All routes are workspace-scoped and require a tenant owner/admin (or superadmin)
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts` | Create a service account (KC confidential client + registry row). |
+| GET | `/v1/workspaces/{workspaceId}/service-accounts` | List all service accounts in the workspace. The console uses this as its source of truth, independent of browser/session state. |
 | GET | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}` | Fetch one service account. |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance` | Return the current client secret + token endpoint. |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations` | Rotate the client secret. |

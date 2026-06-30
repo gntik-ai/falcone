@@ -352,14 +352,14 @@ this control-plane serves. To make the shell usable end-to-end:
     | weed shell -master=falcone-seaweedfs-master.falcone:9333
   ```
 - The repo's **Service Accounts** page (`/console/service-accounts`) is wired: it
-  calls the SA endpoints I already had, but expected camelCase shapes — the
-  control-plane now returns `serviceAccountId` on create, the full
-  `ConsoleServiceAccount` shape on get (`iamBinding`/`credentialStatus`/
+  calls the workspace SA collection endpoint as its list source of truth, so a
+  fresh browser/session shows the same workspace service accounts as any other
+  session. The control-plane returns `serviceAccountId` on create, the
+  `ConsoleServiceAccount` list/detail shape (`iamBinding`/`credentialStatus`/
   `accessProjection`/`credentials`), and `credentialId`/`secret`/`expiresAt` on
   issuance/rotation (the SA = a confidential Keycloak client; secret is the real
-  client secret). The page tracks created SA ids in sessionStorage (no list
-  endpoint). Verified: create → row appears (`enabled`/`active`/`granted`) → issue
-  credential → real secret shown once. `ConsoleServiceAccountsPage` was lazy (React #426) → eager import.
+  client secret). Verified: create → row appears (`enabled`/`active`/`granted`) → reveal
+  current credential → real secret shown. `ConsoleServiceAccountsPage` was lazy (React #426) → eager import.
 - The repo's **Observability** page (`/console/observability`) is wired: `console-metrics.ts`
   calls `/v1/metrics/{tenants|workspaces}/{id}/{overview,usage,series,audit-records,audit-exports}`.
   The control-plane `metrics-handlers.mjs` now serves the full family — `overview` carries
