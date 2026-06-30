@@ -1,6 +1,8 @@
 import { resolveTenantConsumption } from '../repositories/effective-entitlements-repository.mjs';
+import { listSubQuotas } from '../repositories/workspace-sub-quota-repository.mjs';
 
 const ERROR_STATUS_CODES = { FORBIDDEN: 403, TENANT_NOT_FOUND: 404 };
+const SUB_QUOTA_PAGE_SIZE = 1000;
 
 function resolveTenantId(params) {
   const actor = params.callerContext?.actor;
@@ -15,12 +17,24 @@ function resolveTenantId(params) {
   return actorTenantId;
 }
 
+async function listAllSubQuotasForTenant(db, tenantId) {
+  const items = [];
+  let offset = 0;
+  while (true) {
+    const page = await listSubQuotas({ tenantId, limit: SUB_QUOTA_PAGE_SIZE, offset }, db);
+    items.push(...page.items);
+    if (items.length >= page.total || page.items.length < SUB_QUOTA_PAGE_SIZE) break;
+    offset += SUB_QUOTA_PAGE_SIZE;
+  }
+  return items;
+}
+
 export async function main(params = {}, overrides = {}) {
   const db = overrides.db ?? params.db;
   try {
     const tenantId = resolveTenantId(params);
     const profile = await resolveTenantConsumption(db, tenantId);
-    const subQuotas = (db._workspaceSubQuotas ?? []).filter((item) => item.tenantId === tenantId);
+    const subQuotas = await listAllSubQuotasForTenant(db, tenantId);
     return {
       statusCode: 200,
       body: {
