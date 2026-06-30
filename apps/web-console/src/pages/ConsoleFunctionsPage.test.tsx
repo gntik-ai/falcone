@@ -174,6 +174,25 @@ describe('ConsoleFunctionsPage', () => {
     expect(screen.getByRole('button', { name: /rollback/i })).toBeDisabled()
   })
 
+  it('cuando detail indica rollback disponible, versions muestra historial previo y habilita rollback', async () => {
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_1/versions?page[size]=50') return versions()
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    expect(await screen.findByText('Rollback available')).toBeInTheDocument()
+    expect(screen.getAllByText('Sí').length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Versions' }))
+    expect(await screen.findByText('fnv_1')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: '1' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /rollback/i })).toBeEnabled()
+  })
+
   it('carga activations y detalle paralelo con logs truncados', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()

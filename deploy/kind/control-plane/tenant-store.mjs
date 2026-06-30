@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 // Tenant registry (domain B) — pg-backed CRUD over the `tenants` table.
 //
 // No in-repo migration creates `tenants` (it is deployment-owned), yet the real
@@ -187,6 +189,32 @@ export async function ensureSchema(pool) {
   // Knative-backed functions: the ksvc name (added after the Job-era table).
   await pool.query('ALTER TABLE fn_actions ADD COLUMN IF NOT EXISTS ksvc_name TEXT');
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS fn_action_versions (
+      version_id TEXT PRIMARY KEY,
+      resource_id TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      action_name TEXT NOT NULL,
+      version_number INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'historical',
+      origin_type TEXT NOT NULL DEFAULT 'publish',
+      origin_version_id TEXT,
+      runtime TEXT NOT NULL DEFAULT 'nodejs:22',
+      entrypoint TEXT NOT NULL DEFAULT 'main',
+      source_code TEXT NOT NULL,
+      parameters JSONB,
+      memory_mb INTEGER NOT NULL DEFAULT 256,
+      timeout_ms INTEGER NOT NULL DEFAULT 60000,
+      ksvc_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      activated_at TIMESTAMPTZ,
+      created_by TEXT,
+      UNIQUE (resource_id, version_number)
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS fn_action_versions_resource_idx ON fn_action_versions (resource_id, version_number DESC)');
+  await pool.query('CREATE INDEX IF NOT EXISTS fn_action_versions_scope_idx ON fn_action_versions (tenant_id, workspace_id, resource_id)');
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS fn_activations (
       activation_id TEXT PRIMARY KEY,
       resource_id TEXT NOT NULL,
@@ -346,6 +374,85 @@ export async function ensureSchema(pool) {
 }
 
 // ---- function actions (real executor) --------------------------------------
+function newFnVersionId() {
+  return `fnv_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
+}
+
+export function syntheticFnVersionId(action) {
+  const digest = createHash('sha256')
+    .update(`${action?.resource_id ?? 'unknown'}:${Number(action?.version ?? 1) || 1}`)
+    .digest('hex')
+    .slice(0, 20);
+  return `fnv_${digest}`;
+}
+
+function legacyFnVersionSummary(action) {
+  return {
+    activeVersionId: syntheticFnVersionId(action),
+    activeVersionNumber: Number(action?.version ?? 1) || 1,
+    versionCount: 1,
+    rollbackAvailable: false,
+    hasHistory: false
+  };
+}
+
+async function snapshotFnActionVersion(pool, row, { createdBy = null, originType = 'publish', originVersionId = null } = {}) {
+  const versionId = newFnVersionId();
+  const { rows } = await pool.query(
+    `INSERT INTO fn_action_versions (
+       version_id, resource_id, workspace_id, tenant_id, action_name, version_number,
+       status, origin_type, origin_version_id, runtime, entrypoint, source_code,
+       parameters, memory_mb, timeout_ms, ksvc_name, created_by
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,'historical',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     ON CONFLICT (resource_id, version_number) DO UPDATE SET
+       action_name=EXCLUDED.action_name,
+       origin_type=EXCLUDED.origin_type,
+       origin_version_id=EXCLUDED.origin_version_id,
+       runtime=EXCLUDED.runtime,
+       entrypoint=EXCLUDED.entrypoint,
+       source_code=EXCLUDED.source_code,
+       parameters=EXCLUDED.parameters,
+       memory_mb=EXCLUDED.memory_mb,
+       timeout_ms=EXCLUDED.timeout_ms,
+       ksvc_name=EXCLUDED.ksvc_name,
+       updated_at=NOW(),
+       created_by=COALESCE(EXCLUDED.created_by, fn_action_versions.created_by)
+     RETURNING *`,
+    [
+      versionId,
+      row.resource_id,
+      row.workspace_id,
+      row.tenant_id,
+      row.action_name,
+      row.version,
+      originType,
+      originVersionId,
+      row.runtime,
+      row.entrypoint,
+      row.source_code,
+      row.parameters ? JSON.stringify(row.parameters) : null,
+      row.memory_mb,
+      row.timeout_ms,
+      row.ksvc_name ?? null,
+      createdBy
+    ]);
+  const version = rows[0];
+  if (!version) return null;
+  await pool.query(
+    `UPDATE fn_action_versions
+        SET status='historical', updated_at=NOW()
+      WHERE resource_id=$1 AND version_id<>$2 AND status='active'`,
+    [row.resource_id, version.version_id]);
+  const { rows: activeRows } = await pool.query(
+    `UPDATE fn_action_versions
+        SET status='active', activated_at=NOW(), updated_at=NOW()
+      WHERE version_id=$1
+      RETURNING *`,
+    [version.version_id]);
+  return activeRows[0] ?? version;
+}
+
 export async function upsertFnAction(pool, a) {
   const { rows } = await pool.query(
     `INSERT INTO fn_actions (resource_id, workspace_id, tenant_id, action_name, runtime, entrypoint, source_code, parameters, memory_mb, timeout_ms, ksvc_name, created_by)
@@ -357,7 +464,9 @@ export async function upsertFnAction(pool, a) {
      RETURNING *`,
     [a.resourceId, a.workspaceId, a.tenantId, a.actionName, a.runtime, a.entrypoint, a.sourceCode,
      a.parameters ? JSON.stringify(a.parameters) : null, a.memoryMb, a.timeoutMs, a.ksvcName, a.createdBy]);
-  return rows[0];
+  const row = rows[0];
+  if (row) await snapshotFnActionVersion(pool, row, { createdBy: a.createdBy, originType: 'publish' });
+  return row;
 }
 export async function getFnAction(pool, resourceId, tenantId = null) {
   if (tenantId != null) {
@@ -372,6 +481,78 @@ export async function getFnAction(pool, resourceId, tenantId = null) {
 export async function listFnActions(pool, workspaceId) {
   const { rows } = await pool.query('SELECT * FROM fn_actions WHERE workspace_id=$1 ORDER BY created_at DESC', [workspaceId]);
   return rows;
+}
+export async function listFnActionVersions(pool, resourceId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM fn_action_versions WHERE resource_id=$1 ORDER BY version_number DESC, created_at DESC',
+    [resourceId]);
+  return rows;
+}
+export async function getFnActionVersion(pool, resourceId, versionId, tenantId = null) {
+  if (tenantId != null) {
+    const { rows } = await pool.query(
+      'SELECT * FROM fn_action_versions WHERE resource_id=$1 AND version_id=$2 AND tenant_id=$3 LIMIT 1',
+      [resourceId, versionId, tenantId]);
+    return rows[0] ?? null;
+  }
+  const { rows } = await pool.query(
+    'SELECT * FROM fn_action_versions WHERE resource_id=$1 AND version_id=$2 LIMIT 1',
+    [resourceId, versionId]);
+  return rows[0] ?? null;
+}
+export async function getFnActionVersionSummary(pool, action) {
+  const rows = await listFnActionVersions(pool, action.resource_id);
+  if (!rows.length) return legacyFnVersionSummary(action);
+  const active = rows.find((row) => row.status === 'active') ?? rows[0];
+  const activeVersionNumber = Number(active.version_number ?? action.version ?? 1) || 1;
+  return {
+    activeVersionId: active.version_id,
+    activeVersionNumber,
+    versionCount: rows.length,
+    rollbackAvailable: rows.some((row) => Number(row.version_number ?? 0) < activeVersionNumber),
+    hasHistory: true
+  };
+}
+export async function activateFnActionVersion(pool, action, version) {
+  if (!action || !version || action.resource_id !== version.resource_id || action.tenant_id !== version.tenant_id) {
+    return null;
+  }
+  await pool.query(
+    `UPDATE fn_action_versions
+        SET status='historical', updated_at=NOW()
+      WHERE resource_id=$1 AND version_id<>$2 AND status='active'`,
+    [action.resource_id, version.version_id]);
+  const { rows: versionRows } = await pool.query(
+    `UPDATE fn_action_versions
+        SET status='active', activated_at=NOW(), updated_at=NOW()
+      WHERE resource_id=$1 AND version_id=$2
+      RETURNING *`,
+    [action.resource_id, version.version_id]);
+  const activeVersion = versionRows[0] ?? version;
+  const { rows } = await pool.query(
+    `UPDATE fn_actions SET
+       source_code=$3,
+       runtime=$4,
+       entrypoint=$5,
+       parameters=$6,
+       memory_mb=$7,
+       timeout_ms=$8,
+       ksvc_name=COALESCE($9, ksvc_name),
+       updated_at=NOW()
+     WHERE resource_id=$1 AND tenant_id=$2
+     RETURNING *`,
+    [
+      action.resource_id,
+      action.tenant_id,
+      activeVersion.source_code,
+      activeVersion.runtime,
+      activeVersion.entrypoint,
+      activeVersion.parameters ? JSON.stringify(activeVersion.parameters) : null,
+      activeVersion.memory_mb,
+      activeVersion.timeout_ms,
+      activeVersion.ksvc_name ?? null
+    ]);
+  return rows[0] ?? null;
 }
 export async function insertFnActivation(pool, a) {
   const { rows } = await pool.query(
@@ -737,7 +918,7 @@ export async function purgeWorkspace(pool, workspaceId) {
 
   const del = async (sql, params) => { try { await pool.query(sql, params); } catch (e) { if (e.code !== '42P01') throw e; } }; // ignore undefined_table
   // Child rows first (every workspace-owned table is keyed by workspace_id), then the workspace.
-  for (const t of ['fn_activations', 'fn_actions', 'workspace_functions', 'workspace_topics',
+  for (const t of ['fn_activations', 'fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics',
                    'workspace_buckets', 'workspace_databases', 'workspace_mongo_databases',
                    'workspace_api_keys', 'service_accounts']) {
     await del(`DELETE FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
@@ -765,7 +946,7 @@ export async function purgeTenant(pool, tenantId) {
   const del = async (sql, params) => { try { await pool.query(sql, params); } catch (e) { if (e.code !== '42P01') throw e; } }; // ignore undefined_table
   // fn_activations has no tenant_id — scope by the tenant's workspaces.
   if (workspaceIds.length) await del('DELETE FROM fn_activations WHERE workspace_id = ANY($1)', [workspaceIds]);
-  for (const t of ['fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
+  for (const t of ['fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
                    'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
                    'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
                    'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements']) {
