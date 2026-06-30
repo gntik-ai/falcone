@@ -21,6 +21,7 @@ RUN npm install --omit=dev --no-package-lock
 #   - services/workflow-worker/src/activities/catalog-names.mjs (task-type names)
 #   - services/audit/src/flow-lifecycle-events.mjs (lifecycle event builder)
 #   - services/webhook-engine/src/ (webhook signing)
+#   - services/workspace-docs-service/ (console workspace docs route)
 COPY apps/control-plane/src /app/apps/control-plane/src
 COPY services/adapters/src /app/services/adapters/src
 COPY services/internal-contracts/src /app/services/internal-contracts/src
@@ -32,6 +33,8 @@ COPY services/mongo-cdc-bridge/src /app/services/mongo-cdc-bridge/src
 COPY services/workflow-worker/src/activities/catalog-names.mjs /app/services/workflow-worker/src/activities/catalog-names.mjs
 COPY services/audit/src /app/services/audit/src
 COPY services/webhook-engine/src /app/services/webhook-engine/src
+COPY services/workspace-docs-service/actions /app/services/workspace-docs-service/actions
+COPY services/workspace-docs-service/src /app/services/workspace-docs-service/src
 
 ENV NODE_ENV=production \
     PORT=8080

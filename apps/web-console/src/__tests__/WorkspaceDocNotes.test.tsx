@@ -6,18 +6,18 @@ afterEach(() => cleanup())
 
 describe('WorkspaceDocNotes', () => {
   it('admin sees add button', () => {
-    render(<WorkspaceDocNotes notes={[]} workspaceId="wrk-1" isAdmin onCreate={vi.fn()} />)
+    render(<WorkspaceDocNotes notes={[]} workspaceId="wrk-1" canManageNotes onCreate={vi.fn()} />)
     expect(screen.getByText('Add note')).toBeInTheDocument()
   })
 
   it('viewer sees readonly note', () => {
-    render(<WorkspaceDocNotes notes={[{ noteId: 'n1', content: 'hola', authorId: 'u1', createdAt: '', updatedAt: '' }]} workspaceId="wrk-1" isAdmin={false} />)
+    render(<WorkspaceDocNotes notes={[{ noteId: 'n1', content: 'hola', authorId: 'u1', createdAt: '', updatedAt: '' }]} workspaceId="wrk-1" canManageNotes={false} />)
     expect(screen.getByText('hola')).toBeInTheDocument()
   })
 
   it('admin can submit draft', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
-    render(<WorkspaceDocNotes notes={[]} workspaceId="wrk-1" isAdmin onCreate={onCreate} />)
+    render(<WorkspaceDocNotes notes={[]} workspaceId="wrk-1" canManageNotes onCreate={onCreate} />)
     fireEvent.change(screen.getByLabelText('New note'), { target: { value: 'nota' } })
     fireEvent.click(screen.getByText('Add note'))
     expect(onCreate).toHaveBeenCalledWith('nota')

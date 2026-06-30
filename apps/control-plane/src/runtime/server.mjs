@@ -15,6 +15,7 @@ import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 import { handleMcpMessage } from '../mcp-official-server.mjs';
 import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
 import { mcpConfigStore } from '../mcp-config.mjs';
+import { main as workspaceDocsAction } from '../../../../services/workspace-docs-service/actions/workspace-docs.mjs';
 // Shared write-capable admin role set — the single source of truth for both the API-key
 // management gate (here) and the flow-definition write gate (flow-executor.mjs, #760) so they
 // cannot drift. This module imports nothing from the runtime → no import cycle.
@@ -26,9 +27,23 @@ const MCP_SUPERADMIN_ROLES = new Set(['superadmin', 'platform_admin']);
 
 const META_QUERY_KEYS = new Set(['select', 'order', 'page[size]', 'page[after]', 'countMode']);
 
-function sendJson(res, statusCode, body) {
+function sendJson(res, statusCode, body, headers = {}) {
+  const responseHeaders = { ...headers };
+  delete responseHeaders['content-type'];
+  delete responseHeaders['Content-Type'];
+  delete responseHeaders['content-length'];
+  delete responseHeaders['Content-Length'];
   const payload = body == null ? '' : JSON.stringify(body);
-  res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) });
+  if (statusCode === 204) {
+    res.writeHead(statusCode, responseHeaders);
+    res.end();
+    return;
+  }
+  res.writeHead(statusCode, {
+    ...responseHeaders,
+    'content-type': 'application/json; charset=utf-8',
+    'content-length': Buffer.byteLength(payload),
+  });
   res.end(payload);
 }
 
@@ -285,13 +300,92 @@ function requiredDataScope(method, pathname) {
   return null;
 }
 
+function headerValue(headers, name) {
+  const value = headers?.[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function requestBaseUrl(headers = {}) {
+  const forwardedProto = headerValue(headers, 'x-forwarded-proto');
+  const forwardedHost = headerValue(headers, 'x-forwarded-host');
+  const proto = String(forwardedProto ?? 'http').split(',')[0].trim() || 'http';
+  const host = String(forwardedHost ?? headerValue(headers, 'host') ?? 'localhost').split(',')[0].trim() || 'localhost';
+  return `${proto}://${host}`;
+}
+
+function workspaceDocsInternalClient(c, capabilities = {}) {
+  const baseUrl = requestBaseUrl(c.headers);
+  const tokenEndpoint = process.env.KEYCLOAK_TOKEN_ENDPOINT ?? process.env.OIDC_TOKEN_ENDPOINT ?? null;
+  return {
+    getApiSurface: async (workspaceId) => ({
+      workspaceId,
+      baseUrl,
+      authMethod: 'bearer_oidc',
+      tokenEndpoint,
+      scopeHint: 'openid profile'
+    }),
+    getEffectiveCapabilities: async (workspaceId) => ({
+      workspaceId,
+      baseUrl,
+      capabilities: [
+        {
+          key: 'postgres-database',
+          endpoint: `${baseUrl}/v1/postgres/workspaces/${workspaceId}`,
+          name: 'workspace data'
+        },
+        ...(capabilities.mongoExecutor ? [{
+          key: 'mongo-collection',
+          endpoint: `${baseUrl}/v1/mongo/workspaces/${workspaceId}`,
+          name: 'documents'
+        }] : []),
+        ...(capabilities.functionsExecutor ? [{
+          key: 'serverless-function',
+          endpoint: `${baseUrl}/v1/functions/workspaces/${workspaceId}`,
+          name: 'actions'
+        }] : []),
+        ...(capabilities.realtimeExecutor || capabilities.pgRealtimeExecutor ? [{
+          key: 'realtime-subscription',
+          endpoint: `${baseUrl}/v1/realtime/workspaces/${workspaceId}`,
+          realtimeEndpoint: baseUrl.replace(/^http/, 'ws'),
+          name: 'changes'
+        }] : [])
+      ]
+    })
+  };
+}
+
+async function runWorkspaceDocs(workspaceDocsDb, c, capabilities, pathWorkspaceId) {
+  if (!workspaceDocsDb?.query) {
+    throw Object.assign(new Error('Workspace docs are not enabled'), { statusCode: 501, code: 'WORKSPACE_DOCS_DISABLED' });
+  }
+  const result = await workspaceDocsAction({
+    method: c.method,
+    path: c.url.pathname,
+    workspaceId: pathWorkspaceId,
+    body: c.body ?? {},
+    headers: c.headers,
+    auth: {
+      tenantId: c.identity.tenantId,
+      workspaceId: c.identity.workspaceId,
+      actorId: c.identity.actorId,
+      subject: c.identity.actorId,
+      roles: c.identity.roles ?? []
+    },
+    db: workspaceDocsDb,
+    internalClient: workspaceDocsInternalClient(c, capabilities)
+  });
+  return { status: result.statusCode ?? 200, body: result.body, headers: result.headers ?? {} };
+}
+
 // Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
-function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig) {
+function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig, workspaceDocsDb) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
   const emb = '^/v1/workspaces/([^/]+)/embedding-provider';
+  const wdocs = '^/v1/workspaces/([^/]+)/docs';
   // BYOK LLM completion plane (change: add-llm-agent-flow-task / #640) — sibling of the
   // embedding-provider config under the same workspace prefix. Served by THIS executor (the
   // dedicated APISIX route forwards these subpaths here, like 2003-embedding).
@@ -333,6 +427,19 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       requireStore(apiKeyStore).rotateKey({ id, workspaceId: w }).then((r) => ({ status: 201, body: r }))],
     ['DELETE', new RegExp(`${keys}/([^/]+)$`), ([w, id]) =>
       requireStore(apiKeyStore).revokeKey({ id, workspaceId: w }).then((r) => ({ status: 200, body: r }))],
+
+    // ---- Workspace documentation (console docs page + custom notes) ----
+    // The docs page is a control-plane route, not a data-plane route; keep it in the runtime route
+    // table so deployed executor images do not fall through to NO_ROUTE when the gateway forwards
+    // /v1/workspaces/{workspaceId}/docs here (#795).
+    ['GET', new RegExp(`${wdocs}$`), ([w], c) =>
+      runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
+    ['POST', new RegExp(`${wdocs}/notes$`), ([w], c) =>
+      runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
+    ['PUT', new RegExp(`${wdocs}/notes/([^/]+)$`), ([w], c) =>
+      runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
+    ['DELETE', new RegExp(`${wdocs}/notes/([^/]+)$`), ([w], c) =>
+      runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
 
     // ---- Postgres data rows (CRUD + bulk) ----
     ['GET', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
@@ -973,7 +1080,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, workspaceDocsDb, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
@@ -981,7 +1088,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
   // The first-party MCP dispatches tool calls against this executor's own loopback base (so its
   // local routes + the control-plane fallthrough reach every family). Validate it once (SSRF).
   const mcpSelf = mcpSelfBaseUrl ? new URL(mcpSelfBaseUrl).toString() : undefined;
-  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelf, mcpConfig);
+  const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelf, mcpConfig, workspaceDocsDb);
 
   return http.createServer(async (req, res) => {
     const method = (req.method ?? 'GET').toUpperCase();
@@ -1102,8 +1209,8 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // `authorization` is threaded through for handlers that must call the control-plane on the
       // caller's behalf (the platform MCP JSON-RPC route forwards the bearer token to the upstream,
       // the only credential the control-plane accepts).
-      const { status, body: out } = await handler(groups, { url, identity, body, registry, authorization: req.headers.authorization });
-      return sendJson(res, status, out);
+      const { status, body: out, headers } = await handler(groups, { method, url, identity, body, registry, headers: req.headers, authorization: req.headers.authorization });
+      return sendJson(res, status, out, headers);
     } catch (err) {
       const statusCode = err.statusCode ?? 500;
       if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
