@@ -78,6 +78,20 @@ describe('flowGraphModel round-trip', () => {
   })
 })
 
+describe('empty draft definition projection', () => {
+  it('projects a definition without nodes to an empty canvas node list', () => {
+    expect(definitionToNodes({})).toEqual([])
+  })
+
+  it('projects a definition without nodes to an empty canvas edge list', () => {
+    expect(definitionToEdges({})).toEqual([])
+  })
+
+  it('auto-layouts an absent node list to an empty position map', () => {
+    expect(autoLayout(undefined)).toEqual({})
+  })
+})
+
 describe('canvasMetadata persistence', () => {
   it('reads node positions from canvasMetadata.nodes', () => {
     expect(readCanvasMetadata(fixture())).toEqual({ start: { x: 320, y: 140 } })
