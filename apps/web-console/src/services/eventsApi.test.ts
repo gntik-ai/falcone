@@ -22,9 +22,9 @@ describe('eventsApi — executor event routes (workspace-scoped)', () => {
     expect(lastCall()).toEqual([topics])
   })
 
-  it('createTopic → POST topics { topic, partitions }', async () => {
+  it('createTopic → POST topics { name, partitions }', async () => {
     await createTopic('ws1', 'orders', { partitions: 3 })
-    expect(lastCall()).toEqual([topics, { method: 'POST', body: { topic: 'orders', partitions: 3 } }])
+    expect(lastCall()).toEqual([topics, { method: 'POST', body: { name: 'orders', partitions: 3 } }])
   })
 
   it('publishMessage → POST topics/{topic}/publish with the message body', async () => {

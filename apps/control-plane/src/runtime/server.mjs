@@ -570,7 +570,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     ['GET', new RegExp(`${evt}$`), ([w], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'list_topics' }, 200)],
     ['POST', new RegExp(`${evt}$`), ([w], c) =>
-      runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'create_topic', topic: c.body.topic, payload: c.body }, 201)],
+      runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'create_topic', topic: c.body.name ?? c.body.topic, payload: c.body }, 201)],
     ['POST', new RegExp(`${evt}/([^/]+)/publish$`), ([w, topic], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'publish', topic, payload: c.body }, 202)],
     ['GET', new RegExp(`${evt}/([^/]+)/messages$`), ([w, topic], c) =>

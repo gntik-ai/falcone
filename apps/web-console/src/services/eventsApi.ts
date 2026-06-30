@@ -8,6 +8,8 @@ const enc = encodeURIComponent
 export interface TopicRecord {
   topic: string
   partitions?: number
+  resourceId?: string
+  topicName?: string
 }
 
 export interface EventMessage {
@@ -31,7 +33,7 @@ export function createTopic(
 ): Promise<{ topic: string }> {
   return requestConsoleSessionJson<{ topic: string }>(topicsBase(workspaceId), {
     method: 'POST',
-    body: { topic, ...options }
+    body: { name: topic, ...options }
   })
 }
 

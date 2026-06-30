@@ -421,6 +421,34 @@
   },
   {
     "method": "GET",
+    "path": "/v1/events/workspaces/{workspaceId}/topics",
+    "localHandler": "eventsListTopics",
+    "auth": "authenticated",
+    "notes": "EventsConsole topic list. Handler resolves the workspace, verifies tenant ownership, and returns {items:[{topic,partitions,resourceId,topicName}]} instead of 404 NO_ROUTE."
+  },
+  {
+    "method": "POST",
+    "path": "/v1/events/workspaces/{workspaceId}/topics",
+    "localHandler": "eventsProvisionTopic",
+    "auth": "authenticated",
+    "notes": "EventsConsole topic create. Handler reads body.name, requires tenant owner/admin or platform, provisions the managed Kafka topic, and returns 201."
+  },
+  {
+    "method": "POST",
+    "path": "/v1/events/workspaces/{workspaceId}/topics/{topic}/publish",
+    "localHandler": "eventsWorkspaceTopicPublish",
+    "auth": "authenticated",
+    "notes": "EventsConsole logical-topic publish. Handler resolves the owned workspace/topic row, normalizes {key,value} to Kafka payload semantics, and returns 202 instead of 404 NO_ROUTE."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/events/workspaces/{workspaceId}/topics/{topic}/messages",
+    "localHandler": "eventsWorkspaceTopicMessages",
+    "auth": "authenticated",
+    "notes": "EventsConsole logical-topic message poll. Handler resolves the owned workspace/topic row, consumes a bounded batch from Kafka, and returns {items:[{key,value,partition,offset,timestamp}]}."
+  },
+  {
+    "method": "GET",
     "path": "/v1/workspaces/{workspaceId}/applications",
     "localHandler": "listExternalApplications",
     "auth": "authenticated",

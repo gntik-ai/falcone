@@ -83,11 +83,12 @@ export function createEventsExecutor(options = {}) {
         return { items: all.filter((t) => t.startsWith(prefix)).map((t) => ({ topic: toLogical(t, workspaceId) })) }
       }
       if (op === 'create_topic') {
-        const physical = physicalTopic(workspaceId, params.topic)
+        const topic = params.topic ?? params.payload?.name ?? params.payload?.topic
+        const physical = physicalTopic(workspaceId, topic)
         const created = await (await admin()).createTopics({
           topics: [{ topic: physical, numPartitions: params.payload?.partitions ?? 1, replicationFactor: 1 }]
         })
-        return { topic: params.topic, created }
+        return { topic, created }
       }
       if (op === 'publish') {
         const physical = physicalTopic(workspaceId, params.topic)
