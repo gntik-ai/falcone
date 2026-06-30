@@ -89,8 +89,8 @@ function recordingClient() {
   return { calls, client };
 }
 
-const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_developer' };
-const tenantBIdentity = { sub: 'user-b', tenantId: TENANT_B, workspaceId: WS_B, actorType: 'tenant_developer' };
+const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_owner' };
+const tenantBIdentity = { sub: 'user-b', tenantId: TENANT_B, workspaceId: WS_B, actorType: 'tenant_owner' };
 const superadminIdentity = { sub: 'sa', tenantId: null, actorType: 'superadmin' };
 
 // Extract the posted Job's container env as a {NAME: value} map.

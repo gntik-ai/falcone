@@ -37,7 +37,7 @@ function makePool({ bucketCount = 0, ownerTenant = TENANT } = {}) {
   };
 }
 
-const identity = (tenantId = TENANT) => ({ actorType: 'tenant_user', tenantId });
+const identity = (tenantId = TENANT) => ({ actorType: 'tenant_owner', tenantId });
 
 async function withEnv(vars, fn) {
   const saved = {};

@@ -77,10 +77,16 @@ export function createWorkspaceTenantResolver({ pool }) {
     const cached = cache.get(wsId);
     if (cached) return cached;
     try {
-      const { rows } = await pool.query(
+      let { rows } = await pool.query(
         'SELECT tenant_id FROM workspace_databases WHERE workspace_id = $1 LIMIT 1',
         [wsId],
       );
+      if (!rows[0]?.tenant_id) {
+        ({ rows } = await pool.query(
+          'SELECT tenant_id FROM workspaces WHERE id = $1 LIMIT 1',
+          [wsId],
+        ));
+      }
       const owner = rows[0]?.tenant_id;
       if (owner) cache.set(wsId, owner); // a workspace's owning tenant never changes once set
       return owner ?? undefined;

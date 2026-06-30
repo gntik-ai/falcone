@@ -19,7 +19,7 @@ import { main as workspaceDocsAction } from '../../../../services/workspace-docs
 // Shared write-capable admin role set — the single source of truth for both the API-key
 // management gate (here) and the flow-definition write gate (flow-executor.mjs, #760) so they
 // cannot drift. This module imports nothing from the runtime → no import cycle.
-import { WRITE_CAPABLE_ADMIN_ROLES } from './auth-roles.mjs';
+import { WRITE_CAPABLE_ADMIN_ROLES, isKnownNonWriteRole } from './auth-roles.mjs';
 
 // Roles that may change the first-party MCP configuration AND always retain base-scope access so a
 // disabled server can be re-enabled (must match SUPERADMIN_ROLES in mcp-official-server.mjs).
@@ -124,6 +124,10 @@ function identityFromHeaders(headers, pathWorkspaceId) {
   const roles = typeof rawRoles === 'string'
     ? rawRoles.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
     : undefined;
+  const rawWorkspaceIds = headers['x-actor-workspace-ids'] || headers['x-workspace-ids'];
+  const workspaceIds = typeof rawWorkspaceIds === 'string'
+    ? rawWorkspaceIds.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
+    : undefined;
   return {
     tenantId: headers['x-tenant-id'],
     workspaceId: headers['x-workspace-id'] || pathWorkspaceId,
@@ -131,6 +135,7 @@ function identityFromHeaders(headers, pathWorkspaceId) {
     roleName: headers['x-pg-role'] || 'falcone_app',
     ...(scopes ? { scopes } : {}),
     ...(roles ? { roles } : {}),
+    ...(workspaceIds ? { workspaceIds } : {}),
   };
 }
 
@@ -298,6 +303,46 @@ function requiredDataScope(method, pathname) {
     return 'data:write'; // POST/PATCH/PUT/DELETE writes
   }
   return null;
+}
+
+const BROAD_STRUCTURAL_ADMIN_ROLES = new Set(['tenant_owner', 'tenant_admin', 'platform_admin', 'superadmin']);
+
+function hasBroadStructuralAdminRole(roles) {
+  return Array.isArray(roles) && roles.some((r) => BROAD_STRUCTURAL_ADMIN_ROLES.has(r));
+}
+
+function workspaceScopeDeniesStructuralWrite(identity, workspaceId) {
+  if (!workspaceId || !Array.isArray(identity?.workspaceIds)) return false;
+  if (hasBroadStructuralAdminRole(identity.roles)) return false;
+  return !identity.workspaceIds.includes(workspaceId);
+}
+
+function workspaceIdFromPath(pathname) {
+  return /\/workspaces\/([^/]+)/.exec(pathname)?.[1];
+}
+
+function isStructuralWriteRequest(method, pathname) {
+  if (method === 'GET') return false;
+  if (/^\/v1\/workspaces\/[^/]+\/api-keys(?:\/|$)/.test(pathname)) {
+    return method === 'POST' || method === 'DELETE';
+  }
+  if (/^\/v1\/workspaces\/[^/]+\/(?:embedding-provider|llm-provider)$/.test(pathname)) {
+    return method === 'PUT' || method === 'DELETE';
+  }
+  if (/^\/v1\/postgres\/workspaces\/[^/]+\/data\/[^/]+\/schemas\/[^/]+\/tables\/[^/]+\/embedding-mapping$/.test(pathname)) {
+    return method === 'PUT' || method === 'DELETE';
+  }
+  if (/^\/v1\/events\/workspaces\/[^/]+\/topics$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/events\/workspaces\/[^/]+\/topics\/[^/]+\/publish$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/mcp\/workspaces\/[^/]+\/servers$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/mcp\/workspaces\/[^/]+\/servers\/[^/]+$/.test(pathname)) return method === 'DELETE';
+  if (/^\/v1\/mcp\/workspaces\/[^/]+\/servers\/[^/]+\/curations$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/mcp\/workspaces\/[^/]+\/servers\/[^/]+\/versions$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/mcp\/workspaces\/[^/]+\/servers\/[^/]+\/versions\/[^/]+\/approval$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/flows\/workspaces\/[^/]+\/flows$/.test(pathname)) return method === 'POST';
+  if (/^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+$/.test(pathname)) return method === 'PATCH' || method === 'DELETE';
+  if (/^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+\/versions$/.test(pathname)) return method === 'POST';
+  return false;
 }
 
 function headerValue(headers, name) {
@@ -1122,6 +1167,8 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
       }
+      const workspaceInPath = workspaceIdFromPath(url.pathname);
+      const structuralWrite = !opts?.noAuth && isStructuralWriteRequest(method, url.pathname);
       // Credential workspace binding check: when the authenticated credential explicitly
       // binds a workspace (identity.credentialWorkspaceId is set — from an API key or a JWT
       // with a workspace_id claim), the workspace in the URL path MUST match. A mismatch
@@ -1130,18 +1177,21 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // handler or executor runs. Credentials without a workspace binding (tenant-only JWTs,
       // gateway-injected identity headers) are not subject to this check.
       if (!opts?.noAuth && identity.credentialWorkspaceId) {
-        const workspaceInPath = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1];
         if (workspaceInPath && workspaceInPath !== identity.credentialWorkspaceId) {
           return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Credential workspace does not match the requested workspace' });
         }
       }
+      let owningTenantId;
+      let checkedWorkspaceTenant = false;
+      const workspaceToCheck = workspaceInPath || identity.workspaceId;
       // Workspace-ownership check (fix-executor-apikey-cross-tenant-idor, #517): a caller may only
       // operate on a workspace owned by its own tenant. This closes a cross-tenant IDOR that the
       // credential-binding check above misses — a tenant-only admin JWT (no workspace binding)
       // could mint/manage api-keys and reach the data plane in ANOTHER tenant's workspace. When the
       // path names a workspace whose owning tenant is known and differs from the caller's verified
-      // tenant, reject before any handler runs. Workspaces with no ownership record are left to RLS
-      // (which scopes them to the caller's own tenant), so they are not a cross-tenant exposure.
+      // tenant, reject before any handler runs. Non-structural paths with no ownership record are
+      // left to RLS (which scopes them to the caller's own tenant), so they are not a cross-tenant
+      // exposure; structural writes below reject unknown workspaces before any side effect.
       if (!opts?.noAuth && resolveWorkspaceTenant && identity.tenantId) {
         // Prefer the workspace named in the path; fall back to the credential's
         // workspace for routes that target a workspace's resources WITHOUT a
@@ -1150,9 +1200,9 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         // from identity.workspaceId. Without this fallback a forged trust-header
         // request (x-workspace-id = a foreign tenant's workspace) could run DDL on
         // that workspace's database (fix-executor-ddl-db-ownership-guard, B3).
-        const workspaceToCheck = /\/workspaces\/([^/]+)/.exec(url.pathname)?.[1] || identity.workspaceId;
         if (workspaceToCheck) {
-          const owningTenantId = await resolveWorkspaceTenant(workspaceToCheck);
+          owningTenantId = await resolveWorkspaceTenant(workspaceToCheck);
+          checkedWorkspaceTenant = true;
           if (owningTenantId && owningTenantId !== identity.tenantId) {
             return sendJson(res, 403, { code: 'CROSS_TENANT_VIOLATION', message: "Workspace does not belong to the caller's tenant" });
           }
@@ -1170,6 +1220,15 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       if (!opts?.noAuth && isKeyMgmt && Array.isArray(identity.roles) && identity.roles.length > 0
           && !identity.roles.some((r) => KEY_MGMT_ADMIN_ROLES.has(r))) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller role may not manage API keys' });
+      }
+      if (structuralWrite && isKnownNonWriteRole(identity.roles)) {
+        return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller role may not perform structural writes' });
+      }
+      if (structuralWrite && workspaceScopeDeniesStructuralWrite(identity, workspaceInPath)) {
+        return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller workspace scope does not include the requested workspace' });
+      }
+      if (structuralWrite && resolveWorkspaceTenant && workspaceToCheck && checkedWorkspaceTenant && !owningTenantId) {
+        return sendJson(res, 404, { code: 'WORKSPACE_NOT_FOUND', message: `workspace ${workspaceToCheck} not found` });
       }
       // API-key scope enforcement (#624): a scoped credential may only perform operations its scopes
       // permit (data:write for writes, ddl:write for DDL). Defense-in-depth for profiles where the gateway

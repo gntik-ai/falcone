@@ -24,6 +24,13 @@ const b64urlToBuf = (s) => Buffer.from(s, 'base64url');
 const b64urlToJson = (s) => JSON.parse(b64urlToBuf(s).toString('utf8'));
 const ALG_DIGEST = { RS256: 'sha256', RS384: 'sha384', RS512: 'sha512' };
 
+function workspaceIdsFromClaims(claims) {
+  if (Array.isArray(claims.workspace_ids)) return claims.workspace_ids.map(String).filter(Boolean);
+  if (typeof claims.workspace_ids === 'string') return claims.workspace_ids.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean);
+  if (claims.workspace_id) return [String(claims.workspace_id)];
+  return undefined;
+}
+
 export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
   const roles = claims.realm_access?.roles ?? [];
   const scopes = typeof claims.scope === 'string'
@@ -34,6 +41,7 @@ export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
   // which suppresses the path↔credential workspace binding check (the token is not
   // workspace-scoped and must not be rejected for addressing a specific workspace path).
   const credentialWorkspaceId = claims.workspace_id ?? undefined;
+  const workspaceIds = workspaceIdsFromClaims(claims);
   return {
     tenantId: claims.tenant_id ?? undefined,
     workspaceId: credentialWorkspaceId ?? pathWorkspaceId,
@@ -42,6 +50,7 @@ export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
     roleName: 'falcone_app', // a user/admin JWT is not an api-key → no SET ROLE / RLS dbRole
     roles,
     scopes,
+    ...(workspaceIds !== undefined ? { workspaceIds } : {}),
   };
 }
 

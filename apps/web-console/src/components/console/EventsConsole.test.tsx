@@ -19,6 +19,7 @@ const mocked = {
 }
 
 const render1 = () => render(<EventsConsole workspaceId="ws1" />)
+const renderReadOnly = () => render(<EventsConsole workspaceId="ws1" canManageEvents={false} />)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -68,5 +69,13 @@ describe('EventsConsole — richer UX', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create topic' }))
     await waitFor(() => expect(mocked.createTopic).toHaveBeenCalledWith('ws1', 'events'))
     expect(mocked.listTopics).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not offer create or publish actions to non-admin roles', async () => {
+    renderReadOnly()
+    await screen.findByText('orders')
+    expect(screen.queryByRole('button', { name: 'Create topic' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Poll messages' })).toBeInTheDocument()
   })
 })

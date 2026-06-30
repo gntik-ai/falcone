@@ -10,6 +10,7 @@ import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, workspaceIdentityName } from './seaweedfs-identity.mjs';
 import { checkBucketQuota, checkByteQuota, usageLimits, dimensionStatus, STORAGE_QUOTA_EXCEEDED } from './storage-quota.mjs';
+import { canManageTenant } from './tenant-scope.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
 // or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
@@ -331,6 +332,21 @@ async function denyUnlessBucketOwner(ctx, bucket) {
   return null;
 }
 
+function denyUnlessStructuralAdmin(ctx, tenantId) {
+  if (canManageTenant(ctx.identity, tenantId)) return null;
+  return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+}
+
+async function requireOwnedBucketForStructuralWrite(ctx, bucket) {
+  const deny = await denyUnlessBucketOwner(ctx, bucket);
+  if (deny) return { error: deny };
+  const rec = await store.getBucketRecord(ctx.pool, bucket);
+  if (!rec) return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
+  const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
+  if (roleDeny) return { error: roleDeny };
+  return { rec };
+}
+
 // Decode + validate a single object key from the route param, applying the SAME policy as the
 // platform storage adapter (services/adapters/src/storage-bucket-object-ops.mjs::assertObjectKey):
 // reject traversal ('..' segments), a leading '/', backslashes, control characters, an empty/too-
@@ -395,7 +411,7 @@ async function workspaceCurrentBytes(ctx, bucket) {
 }
 async function storagePutObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const { bytes, contentType } = resolveObjectBody(ctx);
   // Per-workspace total-bytes quota admission (#674). Enforced ONLY when STORAGE_MAX_BYTES is
   // configured (default unlimited) — usageLimits().maxBytes == null short-circuits BEFORE any
@@ -445,7 +461,7 @@ async function storageGetObject(ctx) {
 }
 async function storageDeleteObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   try {
     await deleteObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, deleted: true });
@@ -563,6 +579,8 @@ async function storageProvisionBucket(ctx) {
   if (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }
+  const roleDeny = denyUnlessStructuralAdmin(ctx, ws.tenant_id);
+  if (roleDeny) return roleDeny;
   // Per-workspace bucket-count quota admission (#674). Count THIS workspace's buckets (the
   // same tenant-scoped read the usage handler uses) and deny a provision that would exceed
   // the effective limit (STORAGE_MAX_BUCKETS, default 8). Runs AFTER the ownership 404 gate
@@ -626,11 +644,8 @@ async function storageProvisionBucket(ctx) {
 // shape `storageProvisionBucket` returns. Ownership-gated exactly like object I/O.
 async function storageRotateCredential(ctx) {
   const bucket = ctx.params.bucketId;
-  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
-  // The bucket must exist in the registry (a superadmin bypasses the owner check above,
-  // so confirm existence here rather than leaking a 404 vs 200 distinction by ownership).
-  const rec = await store.getBucketRecord(ctx.pool, bucket);
-  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
+  const rec = gate.rec;
   if (!tenantIdentitiesEnabled()) {
     return err(409, 'STORAGE_IDENTITIES_DISABLED', 'per-bucket storage identities are disabled (STORAGE_TENANT_IDENTITIES=0)');
   }
@@ -674,9 +689,8 @@ async function revokeLegacyWorkspaceIdentity(workspaceId, seaweedClient) {
 // succeeds). Ownership-gated exactly like object I/O.
 async function storageRevokeCredential(ctx) {
   const bucket = ctx.params.bucketId;
-  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
-  const rec = await store.getBucketRecord(ctx.pool, bucket);
-  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
+  const rec = gate.rec;
   try {
     // ctx.seaweedClient is an OPTIONAL test seam (see storageRotateCredential).
     await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
@@ -701,10 +715,8 @@ async function storageRevokeCredential(ctx) {
 // the per-bucket + legacy per-workspace SeaweedFS identities so no orphaned credential survives.
 async function storageDeleteBucket(ctx) {
   const bucket = ctx.params.bucketId;
-  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
-  // The bucket must exist in the registry (a superadmin bypasses the owner check above).
-  const rec = await store.getBucketRecord(ctx.pool, bucket);
-  if (!rec) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+  const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
+  const rec = gate.rec;
   try {
     // 1) Physical bucket + objects (idempotent: a missing bucket is treated as success).
     await deleteBucket(bucket);
@@ -733,7 +745,7 @@ async function storageDeleteBucket(ctx) {
 // expiresAt, ttlSeconds, ttlClamped }. The SigV4 SECRET never appears in the URL or response.
 async function storagePresignObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const operation = String(ctx.body?.operation ?? 'download').toLowerCase();
   if (operation !== 'download' && operation !== 'upload') {
     return err(400, 'INVALID_PRESIGN_OPERATION', "operation must be 'download' or 'upload'");
@@ -752,16 +764,17 @@ async function storagePresignObject(ctx) {
 
 // ---- multipart upload handlers (#676) --------------------------------------
 // Large/resumable uploads via initiate → upload-part(s) → complete (or abort). Every route
-// re-runs denyUnlessBucketOwner + decodeObjectKey: the uploadId is opaque/S3-managed and grants
-// nothing on its own, so isolation comes from re-checking that the CALLER owns the bucket on
-// each call. A multipart session for a bucket the caller does not own is impossible (404 before
-// any S3 call). On COMPLETE the SAME per-workspace byte-quota admission storagePutObject applies
-// is enforced against the assembled object's real size, so multipart cannot bypass the quota.
+// re-runs the bucket ownership/admin-role gate + decodeObjectKey: the uploadId is opaque/S3-managed
+// and grants nothing on its own, so isolation comes from re-checking that the CALLER owns the bucket
+// and may structurally write on each call. A multipart session for a bucket the caller does not own
+// is impossible (404 before any S3 call). On COMPLETE the SAME per-workspace byte-quota admission
+// storagePutObject applies is enforced against the assembled object's real size, so multipart cannot
+// bypass the quota.
 
 // POST .../objects/{objectKey}/multipart — CreateMultipartUpload. Returns the opaque uploadId.
 async function storageMultipartInitiate(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const contentType = ctx.body?.contentType ?? 'application/octet-stream';
   try {
     const { uploadId } = await createMultipartUpload(bucket, key, contentType);
@@ -773,7 +786,7 @@ async function storageMultipartInitiate(ctx) {
 // body is the raw/binary request body (resolveObjectBody handles the JSON-envelope form too).
 async function storageMultipartUploadPart(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const uploadId = ctx.params.uploadId;
   const partNumber = Number(ctx.params.partNumber);
   if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > 10000) {
@@ -791,7 +804,7 @@ async function storageMultipartUploadPart(ctx) {
 // gap-free, non-empty sequence (mirrors validateStoragePartList) BEFORE the backend call.
 async function storageMultipartComplete(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const uploadId = ctx.params.uploadId;
   const parts = Array.isArray(ctx.body?.parts) ? ctx.body.parts : null;
   // Validate the ordered part list inline (mirrors validateStoragePartList): non-empty, every
@@ -829,7 +842,7 @@ async function storageMultipartComplete(ctx) {
 // in-progress session and its already-uploaded parts).
 async function storageMultipartAbort(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const uploadId = ctx.params.uploadId;
   try {
     await abortMultipartUpload(bucket, key, uploadId);
@@ -941,6 +954,8 @@ async function storageBucketExport(ctx) {
   const bucket = ctx.params.bucketId;
   const { error, rec } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
   if (error) return error;
+  const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
+  if (roleDeny) return roleDeny;
   const prefix = typeof ctx.body?.prefix === 'string' && ctx.body.prefix ? ctx.body.prefix : null;
   // List (bounded) then download each object's bytes inline. Reserved keys are excluded.
   let listing;
@@ -1026,6 +1041,8 @@ async function storageBucketImport(ctx) {
   const bucket = ctx.params.bucketId;
   const { error, rec } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
   if (error) return error;
+  const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
+  if (roleDeny) return roleDeny;
   const manifest = ctx.body?.manifest ?? ctx.body;
   if (!manifest || typeof manifest !== 'object' || manifest.formatVersion !== 1 || !Array.isArray(manifest.entries)) {
     return err(400, 'INVALID_IMPORT_MANIFEST', 'a formatVersion:1 manifest with an entries array is required');

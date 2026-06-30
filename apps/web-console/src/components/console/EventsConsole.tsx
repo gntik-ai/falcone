@@ -19,6 +19,7 @@ import {
 
 export interface EventsConsoleProps {
   workspaceId: string
+  canManageEvents?: boolean
 }
 
 function errorMessage(error: unknown): string {
@@ -26,7 +27,7 @@ function errorMessage(error: unknown): string {
   return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
 }
 
-export function EventsConsole({ workspaceId }: EventsConsoleProps) {
+export function EventsConsole({ workspaceId, canManageEvents = true }: EventsConsoleProps) {
   const [topics, setTopics] = useState<TopicRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [newTopic, setNewTopic] = useState('')
@@ -142,22 +143,28 @@ export function EventsConsole({ workspaceId }: EventsConsoleProps) {
           ))}
         </ul>
       )}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="new-topic">New topic</Label>
-        <Input id="new-topic" value={newTopic} onChange={(event) => setNewTopic(event.target.value)} placeholder="orders" />
-        <Button type="button" className="mt-1 self-start" onClick={() => void handleCreateTopic()} disabled={busy}>
-          Create topic
-        </Button>
-      </div>
+      {canManageEvents ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="new-topic">New topic</Label>
+          <Input id="new-topic" value={newTopic} onChange={(event) => setNewTopic(event.target.value)} placeholder="orders" />
+          <Button type="button" className="mt-1 self-start" onClick={() => void handleCreateTopic()} disabled={busy}>
+            Create topic
+          </Button>
+        </div>
+      ) : null}
 
-      <h3 className="text-base font-semibold text-foreground">Publish</h3>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</Label>
-        <Textarea id="message-json" value={messageJson} onChange={(event) => setMessageJson(event.target.value)} />
-        <Button type="button" className="mt-1 self-start" onClick={() => void handlePublish()} disabled={busy}>
-          Publish
-        </Button>
-      </div>
+      {canManageEvents ? (
+        <>
+          <h3 className="text-base font-semibold text-foreground">Publish</h3>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</Label>
+            <Textarea id="message-json" value={messageJson} onChange={(event) => setMessageJson(event.target.value)} />
+            <Button type="button" className="mt-1 self-start" onClick={() => void handlePublish()} disabled={busy}>
+              Publish
+            </Button>
+          </div>
+        </>
+      ) : null}
 
       <h3 className="text-base font-semibold text-foreground">Consume</h3>
       <Button type="button" className="self-start" onClick={() => void handleConsume()} disabled={busy}>

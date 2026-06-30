@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
 import { resolveKafkaSecurity } from './transport-security.mjs';
-import { callerTenantScope } from './tenant-scope.mjs';
+import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
 
 const BROKERS = (process.env.KAFKA_BROKERS || 'falcone-kafka:9092').split(',').map((s) => s.trim());
 const ok = (statusCode, body) => ({ statusCode, body });
@@ -213,6 +213,9 @@ async function eventsInventory(ctx) {
 async function eventsProvisionTopic(ctx) {
   const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw.error;
   const ws = rw.ws;
+  if (!canManageTenant(ctx.identity, ws.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
   const topicName = slug(ctx.body?.name);
   if (!topicName) return err(400, 'VALIDATION_ERROR', 'topic name is required');
   const partitions = Number(ctx.body?.partitions ?? 1) || 1;
@@ -306,6 +309,9 @@ async function eventsTopicMetadata(ctx) {
 // POST /v1/events/topics/{resourceId}/publish
 async function eventsTopicPublish(ctx) {
   const r = await resolveTopic(ctx); if (r.error) return r.error;
+  if (!canManageTenant(ctx.identity, r.t.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
   const payload = ctx.body?.payload;
   const value = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
   try {
