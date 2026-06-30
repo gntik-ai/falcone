@@ -37,7 +37,7 @@ import { clientError } from './errors.mjs';
 // Shared write-capable admin role set + deny predicate (#760). Single source of truth shared with
 // server.mjs's API-key management gate (KEY_MGMT_ADMIN_ROLES) so the two role checks cannot drift.
 // auth-roles.mjs imports nothing from the runtime → no import cycle.
-import { isKnownNonWriteRole } from './auth-roles.mjs';
+import { hasWriteCapableRole } from './auth-roles.mjs';
 import {
   mintExecutionToken,
   DEFAULT_MAX_RUN_DURATION_MS,
@@ -653,17 +653,14 @@ export function createFlowExecutor({
   // come from the verified token (identity.roles = realm_access.roles); on the kind path a
   // read-only `tenant_viewer` therefore arrives as roles:['tenant_viewer'].
   //
-  // DENY only when the roles are KNOWN (a non-empty array) and contain NO write-capable admin role
-  // — that is exactly the within-tenant escalation this closes (tenant_viewer / tenant_developer).
-  // An undefined/empty roles list is treated as UNKNOWN and DEFERS (an admin token with no realm-
-  // role claims, the trusted-gateway path, the no-DB black-box mode), identical to the API-key
-  // management gate in server.mjs since #624 — so legitimate internal/system/no-claims callers are
-  // never regressed. Cross-tenant access is already denied upstream (server.mjs dispatch →
-  // CROSS_TENANT_VIOLATION) BEFORE executeFlows, so this gate fires only for within-tenant callers
-  // and never weakens or reorders the cross-tenant path. Store calls below stay scoped by the
-  // verified identity.tenantId / identity.workspaceId.
+  // DENY unless the identity carries a positive write-capable admin role (#773). Empty/missing role
+  // claims and API-key/dbRole identities are not structural admins. Cross-tenant access is already
+  // denied upstream (server.mjs dispatch → CROSS_TENANT_VIOLATION) BEFORE executeFlows, so this gate
+  // fires only for within-tenant callers and never weakens or reorders the cross-tenant path. Store
+  // calls below stay scoped by the verified identity.tenantId / identity.workspaceId.
   function requireDefinitionWriteRole(identity) {
-    if (isKnownNonWriteRole(identity?.roles)) {
+    const apiKeyIdentity = Boolean(identity?.dbRole || String(identity?.actorId ?? '').startsWith('apikey:'));
+    if (apiKeyIdentity || !hasWriteCapableRole(identity?.roles)) {
       throw clientError(
         'Flow-definition writes require a write-capable tenant/workspace role',
         403,

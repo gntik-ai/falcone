@@ -19,7 +19,7 @@ import { main as workspaceDocsAction } from '../../../../services/workspace-docs
 // Shared write-capable admin role set — the single source of truth for both the API-key
 // management gate (here) and the flow-definition write gate (flow-executor.mjs, #760) so they
 // cannot drift. This module imports nothing from the runtime → no import cycle.
-import { WRITE_CAPABLE_ADMIN_ROLES, isKnownNonWriteRole } from './auth-roles.mjs';
+import { WRITE_CAPABLE_ADMIN_ROLES, hasWriteCapableRole } from './auth-roles.mjs';
 
 // Roles that may change the first-party MCP configuration AND always retain base-scope access so a
 // disabled server can be re-enabled (must match SUPERADMIN_ROLES in mcp-official-server.mjs).
@@ -315,6 +315,16 @@ function workspaceScopeDeniesStructuralWrite(identity, workspaceId) {
   if (!workspaceId || !Array.isArray(identity?.workspaceIds)) return false;
   if (hasBroadStructuralAdminRole(identity.roles)) return false;
   return !identity.workspaceIds.includes(workspaceId);
+}
+
+function isApiKeyIdentity(identity) {
+  return Boolean(identity?.dbRole || String(identity?.actorId ?? '').startsWith('apikey:'));
+}
+
+function structuralWriteDenyMessage(identity) {
+  if (isApiKeyIdentity(identity)) return 'API keys cannot perform structural writes';
+  if (!hasWriteCapableRole(identity?.roles)) return 'Caller role may not perform structural writes';
+  return null;
 }
 
 function workspaceIdFromPath(pathname) {
@@ -1215,14 +1225,16 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       }
       // Key management is an admin-role operation (#624). When the caller's roles are KNOWN (verified
       // JWT or gateway-injected x-actor-roles) and contain no admin role, deny — a non-admin (e.g.
-      // tenant_developer) cannot mint/manage API keys. Unknown/empty roles defer to the other gates so
-      // legitimate admin tokens with no role claims and the trusted-gateway path are not regressed.
+      // tenant_developer) cannot mint/manage API keys. The broader structural-write gate below is
+      // stricter for executor structural/admin writes: API-key identities and empty-role JWT/header
+      // identities must not mutate structural state.
       if (!opts?.noAuth && isKeyMgmt && Array.isArray(identity.roles) && identity.roles.length > 0
           && !identity.roles.some((r) => KEY_MGMT_ADMIN_ROLES.has(r))) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller role may not manage API keys' });
       }
-      if (structuralWrite && isKnownNonWriteRole(identity.roles)) {
-        return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller role may not perform structural writes' });
+      const structuralDenyMessage = structuralWrite ? structuralWriteDenyMessage(identity) : null;
+      if (structuralDenyMessage) {
+        return sendJson(res, 403, { code: 'FORBIDDEN', message: structuralDenyMessage });
       }
       if (structuralWrite && workspaceScopeDeniesStructuralWrite(identity, workspaceInPath)) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller workspace scope does not include the requested workspace' });

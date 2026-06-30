@@ -13,7 +13,7 @@
 // bbx-624-04: data:read key read (GET documents)          -> 200 (no regression)
 // bbx-624-05: tenant_developer issuing api-keys           -> 403 (role unenforced was the bug)
 // bbx-624-06: tenant_owner issuing api-keys               -> 201 (admin role allowed)
-// bbx-624-07: admin JWT with EMPTY roles issuing api-keys -> 201 (back-compat; matches idor-02/04)
+// bbx-624-07: JWT with EMPTY roles issuing api-keys       -> 403 (#773 structural positive role)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
@@ -148,13 +148,13 @@ test('bbx-624-06: a tenant_owner may issue API keys -> 201', async () => {
   });
 });
 
-test('bbx-624-07: an admin JWT with empty roles may still issue API keys -> 201 (back-compat)', async () => {
+test('bbx-624-07: a JWT with empty roles cannot issue API keys -> 403 (#773 structural positive role)', async () => {
   await withServer({ jwtVerifier: rolesJwtVerifier([]) }, async ({ baseUrl, apiKeyStore }) => {
     const res = await fetch(`${baseUrl}${keys()}`, {
       method: 'POST', headers: { authorization: 'Bearer stub', 'content-type': 'application/json' },
       body: JSON.stringify({ keyType: 'service' }),
     });
-    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${await res.clone().text()}`);
-    assert.equal(apiKeyStore.issued.length, 1, 'empty-role admin issuance still works (matches bbx-xt-idor-02/04)');
+    assert.equal(res.status, 403, `expected 403, got ${res.status}: ${await res.clone().text()}`);
+    assert.equal(apiKeyStore.issued.length, 0, 'empty-role structural writes must not persist a key');
   });
 });

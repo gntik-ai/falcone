@@ -18,7 +18,9 @@ to take precedence where a foreign tenant or unknown object would otherwise leak
 ## What Changes
 
 - Add a structural-write request gate in `apps/control-plane/src/runtime/server.mjs` that applies
-  before executor side effects. Known non-write roles (`tenant_developer`, `tenant_viewer`) now receive
+  before executor side effects. API-key/dbRole identities are never structural admins, and JWT/header
+  identities must carry a positive write-capable admin role. Known non-write roles
+  (`tenant_developer`, `tenant_viewer`) and missing/empty-role identities now receive
   `403 FORBIDDEN` for structural writes, while admin roles continue through. Workspace-scoped
   structural writes also enforce verified `workspaceIds` when present and reject unknown workspaces
   with `404 WORKSPACE_NOT_FOUND` before phantom executor writes can occur.

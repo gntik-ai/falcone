@@ -19,8 +19,11 @@ Executor routes also continue to accept the existing write-capable workspace rol
 already applies (`workspace_owner`, `workspace_admin`), but kind control-plane storage and Kafka
 handlers use tenant-admin authority because those handlers authorize through tenant ownership.
 
-`tenant_developer` and `tenant_viewer` are non-admin roles. They receive `403 FORBIDDEN` on structural
-writes and the handler must perform no persistence or external side effect.
+`tenant_developer` and `tenant_viewer` are non-admin roles. API keys are also not structural-admin
+credentials, even when they carry `data:write` or `ddl:write`; those scopes authorize only
+non-structural data-plane operations. JWT or trusted-header identities with missing or empty role
+claims are likewise not authorized for structural writes. These callers receive `403 FORBIDDEN` and
+the handler must perform no persistence or external side effect.
 
 ## Covered write paths
 

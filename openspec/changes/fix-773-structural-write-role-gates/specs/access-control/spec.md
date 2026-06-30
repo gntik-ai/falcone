@@ -9,10 +9,13 @@ write path: executor JWT paths for flow definitions, MCP server hosting/curation
 workspace LLM provider config, workspace embedding provider config, and embedding mapping; and
 control-plane handlers for storage bucket provisioning/deletion, storage credential
 rotation/revocation, object write/delete I/O, presign, multipart, import/export, Kafka topic
-creation, and Kafka publish. The system SHALL deny `tenant_developer` and `tenant_viewer` with
-`403 FORBIDDEN`, persisting, creating, issuing, publishing, or deleting nothing. Workspace-scoped
-writes SHALL additionally enforce the caller's verified `workspaceIds` when present and SHALL reject
-writes to unknown workspaces before creating phantom resources.
+creation, and Kafka publish. The system SHALL require a positive write-capable admin role on executor
+structural writes; API-key/dbRole identities and JWT/header identities with missing or empty roles
+SHALL NOT be treated as structural admins. The system SHALL deny `tenant_developer`,
+`tenant_viewer`, API keys, and missing/empty-role identities with `403 FORBIDDEN`, persisting,
+creating, issuing, publishing, or deleting nothing. Workspace-scoped writes SHALL additionally
+enforce the caller's verified `workspaceIds` when present and SHALL reject writes to unknown
+workspaces before creating phantom resources.
 
 Cross-tenant/no-leak ordering SHALL be preserved: a caller addressing a resource owned by another
 tenant receives the existing cross-tenant or not-found outcome before any within-tenant role detail is
@@ -23,6 +26,12 @@ ownership checks unless they perform structural side effects.
 
 - **WHEN** a `tenant_viewer` calls `POST /v1/mcp/workspaces/{ws}/servers`
 - **THEN** the system responds `403 FORBIDDEN` and creates no server
+
+#### Scenario: API key cannot perform executor structural writes
+
+- **WHEN** an API-key credential with `data:write` calls `PUT /v1/workspaces/{ws}/llm-provider` or
+  `POST /v1/mcp/workspaces/{ws}/servers`
+- **THEN** the system responds `403 FORBIDDEN` and invokes no provider or MCP side effect
 
 #### Scenario: developer cannot mint storage credentials
 

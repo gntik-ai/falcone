@@ -13,6 +13,8 @@
 
 - [x] 2.1 Add a central executor structural-write route gate that reuses the existing non-write role
   helper and runs before handlers/executors.
+- [x] 2.1a Tighten the executor gate to require a positive write-capable admin role, denying API-key
+  credentials and empty/missing-role JWT/header identities before structural side effects.
 - [x] 2.2 Propagate verified `workspaceIds` into identities and enforce them for workspace-scoped
   structural writes.
 - [x] 2.3 Reject unknown executor workspaces for structural writes before any executor side effect.

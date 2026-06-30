@@ -50,12 +50,13 @@ function makeApiKeyStore() {
   };
 }
 
-// A tenant-only admin identity (verified JWT with a tenant_id claim and NO workspace binding) for
-// the given tenant. This is the credential class that bypassed the existing workspace-binding check.
+// A tenant-only admin identity (verified JWT with a tenant_id claim, admin role, and NO workspace
+// binding) for the given tenant. This is the credential class that bypassed the existing
+// workspace-binding check.
 function adminJwtVerifier(tenantId) {
   return {
     async verify() {
-      return { tenantId, workspaceId: undefined, actorId: `admin:${tenantId}`, roleName: 'falcone_app', roles: [], scopes: [] };
+      return { tenantId, workspaceId: undefined, actorId: `admin:${tenantId}`, roleName: 'falcone_app', roles: ['tenant_owner'], scopes: [] };
     },
   };
 }
