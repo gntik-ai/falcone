@@ -34,6 +34,40 @@ async function advanceToRuntimeStep(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('PublishFunctionWizard', () => {
+  it('[#754] tenant_owner abre y completa el wizard de publicación sin bloqueo cliente', async () => {
+    const user = userEvent.setup()
+    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles: ['tenant_owner'] } })
+    requestMock.mockResolvedValue({ functionId: 'fn_tenant_owner' })
+
+    render(<MemoryRouter><PublishFunctionWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+
+    expect(screen.queryByText(/acceso bloqueado/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/publicar función/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/workspace/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/metadatos/i)).toBeInTheDocument()
+    expect(screen.getByText(/runtime/i)).toBeInTheDocument()
+    expect(screen.getByText(/trigger/i)).toBeInTheDocument()
+    expect(screen.getByText(/resumen/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.type(screen.getByLabelText(/^nombre$/i), 'hello')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/runtime/i), 'nodejs:20')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    expect(requestMock).toHaveBeenCalledWith('/v1/workspaces/wrk_a1/functions', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({
+        name: 'hello',
+        runtime: 'nodejs:20',
+        limits: { memoryMb: 256, timeoutMs: 30000 }
+      })
+    }))
+    expect(await screen.findByText(/recurso creado correctamente/i)).toBeInTheDocument()
+  })
+
   it('[RW-02] bloqueo por validación — RF-UI-025 / T02-AC2', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><PublishFunctionWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
@@ -102,8 +136,11 @@ describe('PublishFunctionWizard', () => {
     expect(screen.getByLabelText(/^nombre$/i)).toHaveValue('hello')
   })
 
-  it('[RW-08] sin permisos muestra mensaje de permisos insuficientes — RF-UI-025 / T02-AC8', () => {
-    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles: ['member'] } })
+  it.each([
+    { label: 'tenant_member', platformRoles: ['tenant_member'] },
+    { label: 'sin roles', platformRoles: [] }
+  ])('[RW-08] $label muestra mensaje de permisos insuficientes — RF-UI-025 / T02-AC8', ({ platformRoles }) => {
+    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles } })
     render(<MemoryRouter><PublishFunctionWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
     expect(screen.getByText(/acceso bloqueado/i)).toBeInTheDocument()
   })
