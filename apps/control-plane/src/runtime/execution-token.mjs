@@ -38,7 +38,7 @@ function platformSecret() {
 // Derive a workspace-scoped signing key from the single platform secret. HMAC over the workspace
 // identity so a leaked per-workspace key never reveals the platform secret or another workspace.
 function signingKey(tenantId, workspaceId, secret = platformSecret()) {
-  // codeql[js/insufficient-password-hash]
+  // lgtm[js/insufficient-password-hash]
   return createHmac('sha256', secret).update(`${tenantId}\n${workspaceId}`).digest();
 }
 
@@ -47,7 +47,7 @@ function b64url(buf) {
 }
 
 function sign(payloadJson, tenantId, workspaceId, secret) {
-  // codeql[js/insufficient-password-hash]
+  // lgtm[js/insufficient-password-hash]
   return createHmac('sha256', signingKey(tenantId, workspaceId, secret)).update(payloadJson).digest();
 }
 
