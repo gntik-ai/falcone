@@ -516,7 +516,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="mr-2 flex items-center gap-1" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
             {(['canvas', 'yaml', 'side-by-side'] as const).map((mode) => (
               <Button
@@ -533,6 +533,11 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
               </Button>
             ))}
           </div>
+          <Button size="sm" variant="outline" asChild>
+            <Link to={`/console/flows/${encodeURIComponent(flowId)}/runs`}>
+              Run history
+            </Link>
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => void revert()} disabled={saving || publishing}>
             Revert
           </Button>

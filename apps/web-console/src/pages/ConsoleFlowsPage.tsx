@@ -4,7 +4,7 @@
 // canvas designer at /console/flows/:flowId. Lazy-loaded from router.tsx so the
 // @xyflow/react chunk stays out of the initial shell bundle.
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -134,13 +134,20 @@ export function ConsoleFlowsPage() {
                     {formatTimestamp(flow.updatedAt ?? flow.createdAt)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/console/flows/${encodeURIComponent(flow.flowId)}`)}
-                    >
-                      Open designer
-                    </Button>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to={`/console/flows/${encodeURIComponent(flow.flowId)}/runs`}>
+                          Run history
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/console/flows/${encodeURIComponent(flow.flowId)}`)}
+                      >
+                        Open designer
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

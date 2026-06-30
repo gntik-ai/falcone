@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -73,5 +73,25 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     expect(screen.getByTestId('new-flow-name-input')).toBeInTheDocument()
     const newFlowButton = screen.getByRole('button', { name: /new flow/i })
     expect(newFlowButton).toBeInTheDocument()
+  })
+
+  it('links each flow row to that flow run history (#792)', async () => {
+    mockListFlows.mockResolvedValue({
+      items: [
+        {
+          flowId: 'flow-alpha',
+          name: 'Alpha flow',
+          status: 'published',
+          updatedAt: '2026-06-30T12:00:00Z'
+        }
+      ]
+    })
+
+    renderPage()
+
+    const row = await screen.findByTestId('flow-row')
+    const runHistoryLink = within(row).getByRole('link', { name: /run history/i })
+    expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-alpha/runs')
+    expect(within(row).getByRole('button', { name: /open designer/i })).toBeInTheDocument()
   })
 })
