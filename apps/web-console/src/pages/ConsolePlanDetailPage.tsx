@@ -1,26 +1,231 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import { PlanCapabilityBadge } from '@/components/console/PlanCapabilityBadge'
 import { PlanLimitsTable } from '@/components/console/PlanLimitsTable'
-import { PlanAssignmentDialog } from '@/components/console/PlanAssignmentDialog'
-import { PlanHistoryTable } from '@/components/console/PlanHistoryTable'
-import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import * as api from '@/services/planManagementApi'
+import { useParams } from 'react-router-dom'
+
+type PlanDetailTab = 'info' | 'capabilities' | 'limits' | 'tenants'
+type LimitFeedback = { kind: 'success' | 'error'; title: string; message: string } | null
+
+function limitErrorMessage(error: unknown): string {
+  const candidate = error as Partial<api.PlanApiError>
+  const code = typeof candidate?.code === 'string' ? candidate.code : null
+
+  if (code === 'INVALID_LIMIT_VALUE') {
+    return 'INVALID_LIMIT_VALUE: use -1 for unlimited, 0, or a positive whole number.'
+  }
+  if (code === 'PLAN_LIMITS_FROZEN') {
+    return 'PLAN_LIMITS_FROZEN: this plan no longer accepts limit changes.'
+  }
+
+  const message = error instanceof Error && error.message ? error.message : 'Request failed.'
+  return code && !message.includes(code) ? `${code}: ${message}` : message
+}
+
+function mergeAcceptedSetResponse(rows: api.LimitProfileRow[], response: api.PlanLimitSetResponse): api.LimitProfileRow[] {
+  return rows.map((row) => row.dimensionKey === response.dimensionKey ? {
+    ...row,
+    effectiveValue: response.newValue,
+    source: response.source,
+    unlimitedSentinel: response.newValue === -1,
+    quotaType: response.quotaType ?? row.quotaType,
+    graceMargin: response.graceMargin ?? row.graceMargin
+  } : row)
+}
+
+function mergeAcceptedRemoveResponse(rows: api.LimitProfileRow[], response: api.PlanLimitRemoveResponse): api.LimitProfileRow[] {
+  return rows.map((row) => row.dimensionKey === response.dimensionKey ? {
+    ...row,
+    effectiveValue: response.effectiveValue,
+    source: response.source,
+    unlimitedSentinel: response.effectiveValue === -1
+  } : row)
+}
 
 export function ConsolePlanDetailPage() {
   const { planId = '' } = useParams()
   const [plan, setPlan] = useState<api.PlanRecord | null>(null)
   const [profile, setProfile] = useState<api.LimitProfileRow[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'info' | 'capabilities' | 'limits' | 'tenants'>('info')
-  useEffect(() => {
-    Promise.all([api.getPlan(planId) as Promise<api.PlanRecord>, api.getPlanLimitsProfile(planId)]).then(([nextPlan, limits]) => { setPlan(nextPlan); setProfile(limits.profile); setError(null) }).catch((fetchError) => setError(fetchError instanceof Error ? fetchError.message : 'Error'))
+  const [tab, setTab] = useState<PlanDetailTab>('info')
+  const [limitFeedback, setLimitFeedback] = useState<LimitFeedback>(null)
+  const [busyDimensionKey, setBusyDimensionKey] = useState<string | null>(null)
+
+  const refreshLimitProfile = useCallback(async () => {
+    const limits = await api.getPlanLimitsProfile(planId)
+    setProfile(limits.profile)
+    return limits.profile
   }, [planId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPlan() {
+      try {
+        const [nextPlan, limits] = await Promise.all([
+          api.getPlan(planId) as Promise<api.PlanRecord>,
+          api.getPlanLimitsProfile(planId)
+        ])
+        if (cancelled) return
+        setPlan(nextPlan)
+        setProfile(limits.profile)
+        setError(null)
+        setLimitFeedback(null)
+      } catch (fetchError) {
+        if (!cancelled) setError(fetchError instanceof Error ? fetchError.message : 'Error')
+      }
+    }
+
+    void loadPlan()
+
+    return () => {
+      cancelled = true
+    }
+  }, [planId])
+
+  async function restorePersistedLimitProfile() {
+    try {
+      await refreshLimitProfile()
+    } catch {
+      setProfile((current) => [...current])
+    }
+  }
+
+  async function handleLimitUpdate(key: string, value: number) {
+    if (!plan) return
+    setBusyDimensionKey(key)
+    setLimitFeedback(null)
+    try {
+      let result: api.PlanLimitSetResponse
+      try {
+        result = await api.setPlanLimit(plan.id, key, value)
+      } catch (caught) {
+        await restorePersistedLimitProfile()
+        setLimitFeedback({
+          kind: 'error',
+          title: 'Limit was not saved',
+          message: limitErrorMessage(caught)
+        })
+        return
+      }
+
+      setProfile((current) => mergeAcceptedSetResponse(current, result))
+      try {
+        await refreshLimitProfile()
+      } catch {
+        setProfile((current) => [...current])
+      }
+      setLimitFeedback({
+        kind: 'success',
+        title: 'Limit saved',
+        message: `${key} was accepted by the API and the row was reconciled from the saved profile.`
+      })
+    } finally {
+      setBusyDimensionKey(null)
+    }
+  }
+
+  async function handleLimitReset(key: string) {
+    if (!plan) return
+    setBusyDimensionKey(key)
+    setLimitFeedback(null)
+    try {
+      let result: api.PlanLimitRemoveResponse
+      try {
+        result = await api.removePlanLimit(plan.id, key)
+      } catch (caught) {
+        await restorePersistedLimitProfile()
+        setLimitFeedback({
+          kind: 'error',
+          title: 'Limit reset failed',
+          message: limitErrorMessage(caught)
+        })
+        return
+      }
+
+      setProfile((current) => mergeAcceptedRemoveResponse(current, result))
+      try {
+        await refreshLimitProfile()
+      } catch {
+        setProfile((current) => [...current])
+      }
+      setLimitFeedback({
+        kind: 'success',
+        title: 'Limit reset',
+        message: `${key} now reflects the default value returned by the API.`
+      })
+    } finally {
+      setBusyDimensionKey(null)
+    }
+  }
+
   if (error) return <ConsolePageState kind="error" title="Failed to load plan" description={error} />
   if (!plan) return <ConsolePageState kind="loading" title="Loading plan" description="Fetching plan detail." />
-  return <main className="space-y-6"><header className="rounded-3xl border border-border bg-card/70 p-6"><h1 className="text-2xl font-semibold">{plan.displayName}</h1><PlanStatusBadge status={plan.status} /><div className="mt-4 flex gap-2"><Button type="button" variant="outline" onClick={() => setTab('info')}>Info</Button><Button type="button" variant="outline" onClick={() => setTab('capabilities')}>Capabilities</Button><Button type="button" variant="outline" onClick={() => setTab('limits')}>Limits</Button><Button type="button" variant="outline" onClick={() => setTab('tenants')}>Tenants</Button></div></header>{tab === 'info' ? <section className="rounded-3xl border border-border bg-card/70 p-6"><p>{plan.description}</p></section> : null}{tab === 'capabilities' ? <section className="rounded-3xl border border-border bg-card/70 p-6 space-y-2">{Object.entries(plan.capabilities ?? {}).map(([key, enabled]) => <div key={key} className="flex items-center justify-between"><span>{key}</span><PlanCapabilityBadge enabled={Boolean(enabled)} label={key} /></div>)}</section> : null}{tab === 'limits' ? <section className="rounded-3xl border border-border bg-card/70 p-6"><PlanLimitsTable dimensions={profile} editable={plan.status === 'draft' || plan.status === 'active'} onUpdate={(key, value) => { api.setPlanLimit(plan.id, key, value); setProfile((current) => current.map((row) => row.dimensionKey === key ? { ...row, explicitValue: value, effectiveValue: value, source: value === -1 ? 'unlimited' : 'explicit' } : row)) }} onRemove={(key) => { api.removePlanLimit(plan.id, key); setProfile((current) => current.map((row) => row.dimensionKey === key ? { ...row, explicitValue: null, effectiveValue: row.defaultValue, source: 'default' } : row)) }} /></section> : null}{tab === 'tenants' ? <section className="rounded-3xl border border-border bg-card/70 p-6">Assigned tenant list is available from the tenant plan page.</section> : null}<DestructiveConfirmationDialog open={false} config={null} opState="idle" confirmError={null} onConfirm={() => {}} onCancel={() => {}} /></main>
+
+  const limitEditingEnabled = plan.status === 'draft' || plan.status === 'active'
+
+  return (
+    <main className="space-y-6">
+      <header className="rounded-3xl border border-border bg-card/70 p-6">
+        <h1 className="text-2xl font-semibold">{plan.displayName}</h1>
+        <PlanStatusBadge status={plan.status} />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setTab('info')}>Info</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('capabilities')}>Capabilities</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('limits')}>Limits</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('tenants')}>Tenants</Button>
+        </div>
+      </header>
+
+      {tab === 'info' ? (
+        <section className="rounded-3xl border border-border bg-card/70 p-6">
+          <p>{plan.description}</p>
+        </section>
+      ) : null}
+
+      {tab === 'capabilities' ? (
+        <section className="space-y-2 rounded-3xl border border-border bg-card/70 p-6">
+          {Object.entries(plan.capabilities ?? {}).map(([key, enabled]) => (
+            <div key={key} className="flex items-center justify-between">
+              <span>{key}</span>
+              <PlanCapabilityBadge enabled={Boolean(enabled)} label={key} />
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {tab === 'limits' ? (
+        <section className="space-y-4 rounded-3xl border border-border bg-card/70 p-6">
+          {limitFeedback ? (
+            <Alert
+              variant={limitFeedback.kind === 'error' ? 'destructive' : 'success'}
+              role={limitFeedback.kind === 'error' ? 'alert' : 'status'}
+              aria-live={limitFeedback.kind === 'error' ? 'assertive' : 'polite'}
+              className="rounded-sm text-foreground"
+            >
+              <AlertTitle>{limitFeedback.title}</AlertTitle>
+              <AlertDescription>{limitFeedback.message}</AlertDescription>
+            </Alert>
+          ) : null}
+          <PlanLimitsTable
+            dimensions={profile}
+            editable={limitEditingEnabled}
+            busyDimensionKey={busyDimensionKey}
+            onUpdate={handleLimitUpdate}
+            onRemove={handleLimitReset}
+          />
+        </section>
+      ) : null}
+
+      {tab === 'tenants' ? (
+        <section className="rounded-3xl border border-border bg-card/70 p-6">
+          Assigned tenant list is available from the tenant plan page.
+        </section>
+      ) : null}
+    </main>
+  )
 }
