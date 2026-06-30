@@ -113,6 +113,24 @@ describe('ConsoleOperationsPage', () => {
     expect(screen.getByText('No hay operaciones registradas para este tenant.')).toBeInTheDocument()
   })
 
+  it('renders the operations error state with a manual retry action', () => {
+    const refetch = vi.fn()
+    mockUseOperations.mockReturnValue({
+      isLoading: false,
+      error: new Error('async_operations missing'),
+      refetch,
+      data: undefined
+    })
+
+    render(<ConsoleOperationsPage />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar las operaciones.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
   it('F16 navigates to detail page when a row is clicked', () => {
     mockUseOperations.mockReturnValue({
       isLoading: false,

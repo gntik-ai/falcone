@@ -109,6 +109,42 @@ describe('console-operations hooks', () => {
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(1)
   })
 
+  it('bounds retries when the operations query keeps failing', async () => {
+    mockRequestConsoleSessionJson.mockRejectedValue(new Error('async_operations missing'))
+
+    const { result } = renderHook(() => useOperations(undefined, { limit: 20, offset: 0 }))
+
+    await act(async () => {
+      await flushAsyncWork()
+    })
+
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(1)
+    expect(result.current.error).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000)
+      await flushAsyncWork()
+    })
+
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000)
+      await flushAsyncWork()
+    })
+
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(3)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+      await flushAsyncWork()
+    })
+
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(3)
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.error?.message).toBe('async_operations missing')
+  })
+
   it('F23 returns the sum of pending and running operations', async () => {
     mockRequestConsoleSessionJson
       .mockResolvedValueOnce({ queryType: 'list', total: 2, pagination: { limit: 1, offset: 0 }, items: [] })
