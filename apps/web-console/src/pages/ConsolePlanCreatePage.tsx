@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,14 @@ export function ConsolePlanCreatePage() {
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [displayNameError, setDisplayNameError] = useState<string | null>(null)
+  const displayNameInputRef = useRef<HTMLInputElement>(null)
+  function handleDisplayNameChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextDisplayName = event.currentTarget.value
+    setDisplayName(nextDisplayName)
+    if (displayNameError && nextDisplayName.trim()) {
+      setDisplayNameError(null)
+    }
+  }
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     const trimmedDisplayName = displayName.trim()
@@ -25,7 +33,7 @@ export function ConsolePlanCreatePage() {
     setError(null)
     setDisplayNameError(nextDisplayNameError)
     if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) { setError('Slug format is invalid'); return }
-    if (nextDisplayNameError) return
+    if (nextDisplayNameError) { displayNameInputRef.current?.focus(); return }
     try {
       const created = await api.createPlan({ slug, displayName: trimmedDisplayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
       navigate(`/console/plans/${created.id}`)
@@ -33,5 +41,5 @@ export function ConsolePlanCreatePage() {
       setError(fetchError instanceof Error ? fetchError.message : 'Unable to create plan')
     }
   }
-  return <main className="space-y-6"><header className="rounded-3xl border border-border bg-card/70 p-6"><h1 className="text-2xl font-semibold">Create plan</h1></header><form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-border bg-card/70 p-6"><label className="block">Slug<Input aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} /></label><label className="block">Display name<Input aria-label="display-name" aria-invalid={Boolean(displayNameError)} aria-describedby={displayNameError ? 'display-name-error' : undefined} value={displayName} onChange={(e) => setDisplayName(e.currentTarget.value)} />{displayNameError ? <span id="display-name-error" role="alert" className="text-sm text-destructive">{displayNameError}</span> : null}</label><label className="block">Description<textarea aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>{error ? <div role="alert">{error}</div> : null}<Button type="submit">Create</Button></form></main>
+  return <main className="space-y-6"><header className="rounded-3xl border border-border bg-card/70 p-6"><h1 className="text-2xl font-semibold">Create plan</h1></header><form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-border bg-card/70 p-6"><label className="block">Slug<Input aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} /></label><label className="block">Display name<Input ref={displayNameInputRef} aria-label="display-name" aria-invalid={Boolean(displayNameError)} aria-describedby={displayNameError ? 'display-name-error' : undefined} className={displayNameError ? 'border-destructive' : undefined} value={displayName} onChange={handleDisplayNameChange} />{displayNameError ? <span id="display-name-error" role="alert" className="mt-1 block text-sm text-destructive">{displayNameError}</span> : null}</label><label className="block">Description<textarea aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>{error ? <div role="alert">{error}</div> : null}<Button type="submit">Create</Button></form></main>
 }

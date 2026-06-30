@@ -32,4 +32,22 @@ describe('ConsolePlanCreatePage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/display name is required/i)
     expect(createPlan).not.toHaveBeenCalled()
   })
+
+  it('focuses and clears the display name validation state when corrected', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><ConsolePlanCreatePage /></MemoryRouter>)
+    await user.type(screen.getByLabelText(/slug/i), 'starter')
+    const displayNameInput = screen.getByLabelText(/display-name/i)
+    await user.type(displayNameInput, '   ')
+    await user.click(screen.getByRole('button', { name: /create/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/display name is required/i)
+    expect(displayNameInput).toHaveFocus()
+    expect(displayNameInput).toHaveClass('border-destructive')
+
+    await user.type(displayNameInput, 'Starter')
+
+    expect(screen.queryByText(/display name is required/i)).not.toBeInTheDocument()
+    expect(displayNameInput).not.toHaveClass('border-destructive')
+  })
 })
