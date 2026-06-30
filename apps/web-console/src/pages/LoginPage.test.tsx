@@ -31,21 +31,22 @@ describe('LoginPage', () => {
     fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
     vi.stubGlobal('fetch', fetchMock)
 
-    renderLoginPage()
+    renderLoginPage('/login?tenant=ten_acme&workspaceId=wrk_console')
 
-    expect(await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })).toHaveAttribute('href', '/signup')
+    expect(await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })).toHaveAttribute(
+      'href',
+      '/signup?tenantId=ten_acme&workspaceId=wrk_console'
+    )
   })
 
   it('oculta el CTA de signup cuando la policy lo deshabilita', async () => {
     fetchMock.mockResolvedValueOnce(
       createJsonResponse(200, {
-        allowed: false,
-        approvalRequired: false,
-        effectiveMode: 'disabled',
-        globalMode: 'disabled',
-        environmentModes: {},
-        planModes: {},
-        reason: 'El auto-registro está deshabilitado por política.'
+        selfServiceEnabled: false,
+        mode: 'invitation',
+        statusView: 'login',
+        passwordPolicy: { minLength: 8 },
+        message: 'El auto-registro está deshabilitado por política.'
       })
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -158,7 +159,7 @@ describe('LoginPage', () => {
   })
 })
 
-function renderLoginPage() {
+function renderLoginPage(initialEntry = '/login') {
   const router = createMemoryRouter(
     [
       {
@@ -175,7 +176,7 @@ function renderLoginPage() {
       }
     ],
     {
-      initialEntries: ['/login']
+      initialEntries: [initialEntry]
     }
   )
 
@@ -184,12 +185,11 @@ function renderLoginPage() {
 
 function allowedSignupPolicy() {
   return {
-    allowed: true,
-    approvalRequired: false,
-    effectiveMode: 'auto_activate',
-    globalMode: 'auto_activate',
-    environmentModes: {},
-    planModes: {}
+    selfServiceEnabled: true,
+    mode: 'self_service',
+    statusView: 'signup',
+    passwordPolicy: { minLength: 8 },
+    message: 'Self-service signup is enabled.'
   }
 }
 
