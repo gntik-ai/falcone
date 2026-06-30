@@ -2,11 +2,12 @@
 //
 // Kafka runs as `falcone-kafka:9092` (KRaft, single broker, PLAINTEXT — no auth).
 // The web-console Kafka page browses a workspace's topic inventory, topic detail,
-// access policy, live metadata, publishes test events, and streams a live consume
-// (SSE). We use `kafkajs` (added to the image). Topics are addressed by a stable
-// `resourceId` mapped to the physical Kafka topic via `workspace_topics`
-// (provisioned through this control plane). ACLs: the broker has no authorizer
-// configured, so the access policy is reported as empty/native-unsupported (honest).
+// access policy, live metadata, publishes test events, polls messages, and streams
+// a live consume (SSE). We use `kafkajs` (added to the image). Topics are
+// addressed by a stable `resourceId` mapped to the physical Kafka topic via
+// `workspace_topics` (provisioned through this control plane). ACLs: the broker
+// has no authorizer configured, so the access policy is reported as
+// empty/native-unsupported (honest).
 import { randomUUID } from 'node:crypto';
 import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
@@ -183,6 +184,126 @@ async function resolveOwnedWorkspace(ctx) {
   return { ws };
 }
 
+function topicResponseRecord(t) {
+  return {
+    topic: t.topic_name,
+    partitions: t.partitions,
+    resourceId: t.id,
+    topicName: t.topic_name
+  };
+}
+
+function decodeRouteParam(value) {
+  try { return decodeURIComponent(String(value ?? '')); } catch { return String(value ?? ''); }
+}
+
+async function resolveWorkspaceTopic(ctx) {
+  const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw;
+  const topicName = slug(decodeRouteParam(ctx.params.topic));
+  if (!topicName) return { error: err(404, 'TOPIC_NOT_FOUND', 'topic not found') };
+  const topics = await getStore().listTopicsForWorkspace(ctx.pool, rw.ws.id);
+  const t = topics.find((row) => row.topic_name === topicName);
+  if (!t) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${topicName} not found`) };
+  return { ws: rw.ws, t };
+}
+
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(Object(obj), key);
+}
+
+function publishValueFromBody(body = {}) {
+  if (hasOwn(body, 'payload')) {
+    const payload = body.payload;
+    return typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
+  }
+  if (hasOwn(body, 'value')) {
+    const value = body.value;
+    return typeof value === 'string' ? value : JSON.stringify(value ?? {});
+  }
+  return JSON.stringify({});
+}
+
+async function publishToTopicRecord(ctx, t) {
+  if (!canManageTenant(ctx.identity, t.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
+  const body = ctx.body ?? {};
+  const value = publishValueFromBody(body);
+  try {
+    const headers = {};
+    if (body.eventType) headers.eventType = String(body.eventType);
+    if (body.contentType) headers.contentType = String(body.contentType);
+    const res = await withStaleMetadataRecovery(
+      producer,
+      resetProducerClient,
+      (p) => p.send({ topic: t.physical_topic_name, messages: [{ key: body.key != null && body.key !== '' ? String(body.key) : null, value, headers }] })
+    );
+    const md = res[0] ?? {};
+    const partition = md.partition ?? 0;
+    const offset = md.baseOffset ?? md.offset;
+    return ok(202, {
+      publicationId: `pub_${randomUUID().slice(0, 12)}`, status: 'accepted', acceptedAt: nowIso(),
+      topicName: t.topic_name, topic: t.topic_name, acceptedPartition: partition, partition, offset, key: body.key,
+      payloadSizeBytes: Buffer.byteLength(value), deliverySemantics: 'at_least_once', correlationId: randomUUID()
+    });
+  } catch (e) {
+    return err(502, 'PUBLISH_FAILED', String(e.message ?? e));
+  }
+}
+
+function boundedNumber(value, fallback, { min = 1, max = 100 } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+}
+
+async function consumeTopicMessages(t, { maxMessages = 10, timeoutMs = 3000 } = {}) {
+  const consumer = getKafka().consumer({ groupId: `console-messages-${randomUUID().slice(0, 8)}` });
+  const limit = boundedNumber(maxMessages, 10, { min: 1, max: 100 });
+  const timeout = boundedNumber(timeoutMs, 3000, { min: 100, max: 30000 });
+  const items = [];
+  let runError = null;
+  try {
+    await consumer.connect();
+    await consumer.subscribe({ topic: t.physical_topic_name, fromBeginning: true });
+    await new Promise((resolve) => {
+      let done = false;
+      let timer = null;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (timer) clearTimeout(timer);
+        resolve();
+      };
+      timer = setTimeout(finish, timeout);
+      Promise.resolve(consumer.run({
+        eachMessage: async ({ message, partition }) => {
+          if (done) return;
+          items.push({
+            key: message.key?.toString() ?? null,
+            value: safeParse(message.value?.toString() ?? ''),
+            partition,
+            offset: message.offset,
+            timestamp: message.timestamp
+          });
+          if (items.length >= limit) finish();
+        }
+      })).catch((e) => { runError = e; finish(); });
+    });
+    if (runError) throw runError;
+    return items.slice(0, limit);
+  } finally {
+    try { await consumer.disconnect(); } catch { /* ignore */ }
+  }
+}
+
+// GET /v1/events/workspaces/{workspaceId}/topics
+async function eventsListTopics(ctx) {
+  const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw.error;
+  const topics = await getStore().listTopicsForWorkspace(ctx.pool, rw.ws.id);
+  return ok(200, { items: topics.map(topicResponseRecord) });
+}
+
 // GET /v1/events/workspaces/{workspaceId}/inventory
 async function eventsInventory(ctx) {
   const r = await resolveOwnedWorkspace(ctx); if (r.error) return r.error;
@@ -229,7 +350,7 @@ async function eventsProvisionTopic(ctx) {
       { treatTopicAlreadyExistsAfterRecoveryAsSuccess: true }
     );
     const rec = await getStore().insertTopic(ctx.pool, { id: resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, topicName, physicalTopicName: physical, partitions });
-    return ok(201, { resourceId: rec.id, topicName: rec.topic_name, physicalTopicName: rec.physical_topic_name, partitionCount: partitions, status: 'active' });
+    return ok(201, { resourceId: rec.id, topic: rec.topic_name, topicName: rec.topic_name, physicalTopicName: rec.physical_topic_name, partitionCount: partitions, partitions, status: 'active' });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'TOPIC_PROVISION_FAILED', String(e.message ?? e));
   }
@@ -309,28 +430,26 @@ async function eventsTopicMetadata(ctx) {
 // POST /v1/events/topics/{resourceId}/publish
 async function eventsTopicPublish(ctx) {
   const r = await resolveTopic(ctx); if (r.error) return r.error;
-  if (!canManageTenant(ctx.identity, r.t.tenant_id)) {
-    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
-  }
-  const payload = ctx.body?.payload;
-  const value = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
+  return publishToTopicRecord(ctx, r.t);
+}
+
+// POST /v1/events/workspaces/{workspaceId}/topics/{topic}/publish
+async function eventsWorkspaceTopicPublish(ctx) {
+  const r = await resolveWorkspaceTopic(ctx); if (r.error) return r.error;
+  return publishToTopicRecord(ctx, r.t);
+}
+
+// GET /v1/events/workspaces/{workspaceId}/topics/{topic}/messages
+async function eventsWorkspaceTopicMessages(ctx) {
+  const r = await resolveWorkspaceTopic(ctx); if (r.error) return r.error;
   try {
-    const headers = {};
-    if (ctx.body?.eventType) headers.eventType = String(ctx.body.eventType);
-    if (ctx.body?.contentType) headers.contentType = String(ctx.body.contentType);
-    const res = await withStaleMetadataRecovery(
-      producer,
-      resetProducerClient,
-      (p) => p.send({ topic: r.t.physical_topic_name, messages: [{ key: ctx.body?.key ? String(ctx.body.key) : null, value, headers }] })
-    );
-    const md = res[0] ?? {};
-    return ok(202, {
-      publicationId: `pub_${randomUUID().slice(0, 12)}`, status: 'accepted', acceptedAt: nowIso(),
-      topicName: r.t.topic_name, acceptedPartition: md.partition ?? 0, key: ctx.body?.key,
-      payloadSizeBytes: Buffer.byteLength(value), deliverySemantics: 'at_least_once', correlationId: randomUUID()
+    const items = await consumeTopicMessages(r.t, {
+      maxMessages: ctx.query?.maxMessages,
+      timeoutMs: ctx.query?.timeoutMs
     });
+    return ok(200, { items });
   } catch (e) {
-    return err(502, 'PUBLISH_FAILED', String(e.message ?? e));
+    return err(502, 'CONSUME_FAILED', String(e.message ?? e));
   }
 }
 
@@ -378,5 +497,6 @@ async function eventsTopicStream(ctx, res) {
 }
 
 export const KAFKA_HANDLERS = {
-  eventsInventory, eventsProvisionTopic, eventsTopicDetail, eventsTopicAccess, eventsTopicMetadata, eventsTopicPublish, eventsTopicStream
+  eventsInventory, eventsListTopics, eventsProvisionTopic, eventsTopicDetail, eventsTopicAccess, eventsTopicMetadata,
+  eventsTopicPublish, eventsWorkspaceTopicPublish, eventsWorkspaceTopicMessages, eventsTopicStream
 };

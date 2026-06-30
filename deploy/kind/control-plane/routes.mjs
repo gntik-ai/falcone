@@ -305,7 +305,10 @@ export const routes = [
 
   // ---- domain B: Events / Kafka (REAL kafkajs; PLAINTEXT broker) ------------
   { method: 'GET',  path: '/v1/events/workspaces/{workspaceId}/inventory', localHandler: 'eventsInventory', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/events/workspaces/{workspaceId}/topics', localHandler: 'eventsListTopics', auth: 'authenticated' },
   { method: 'POST', path: '/v1/events/workspaces/{workspaceId}/topics', localHandler: 'eventsProvisionTopic', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/events/workspaces/{workspaceId}/topics/{topic}/publish', localHandler: 'eventsWorkspaceTopicPublish', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/events/workspaces/{workspaceId}/topics/{topic}/messages', localHandler: 'eventsWorkspaceTopicMessages', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/events/topics/{topicId}', localHandler: 'eventsTopicDetail', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/events/topics/{topicId}/access', localHandler: 'eventsTopicAccess', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/events/topics/{topicId}/metadata', localHandler: 'eventsTopicMetadata', auth: 'authenticated' },
