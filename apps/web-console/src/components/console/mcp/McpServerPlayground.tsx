@@ -10,14 +10,26 @@ import type { McpToolView } from '@/lib/mcp/mcp-server-detail'
  * The invoker is injectable for testing (defaults to the real OAuth-backed call).
  */
 interface McpServerPlaygroundProps {
+  workspaceId: string
   serverId: string
   tools: McpToolView[]
   endpoint: string | null
   /** Injection point for tests; defaults to the OAuth-backed control-plane call. */
-  invoke?: (serverId: string, toolName: string, args: Record<string, JsonValue>) => Promise<InvokeMcpToolResult>
+  invoke?: (
+    workspaceId: string,
+    serverId: string,
+    toolName: string,
+    args: Record<string, JsonValue>
+  ) => Promise<InvokeMcpToolResult>
 }
 
-export function McpServerPlayground({ serverId, tools, endpoint, invoke = invokeMcpTool }: McpServerPlaygroundProps) {
+export function McpServerPlayground({
+  workspaceId,
+  serverId,
+  tools,
+  endpoint,
+  invoke = invokeMcpTool
+}: McpServerPlaygroundProps) {
   const [toolName, setToolName] = useState<string>(tools[0]?.name ?? '')
   const [argsText, setArgsText] = useState<string>('{}')
   const [busy, setBusy] = useState(false)
@@ -38,7 +50,7 @@ export function McpServerPlayground({ serverId, tools, endpoint, invoke = invoke
     }
     setBusy(true)
     try {
-      const res = await invoke(serverId, toolName, parsed)
+      const res = await invoke(workspaceId, serverId, toolName, parsed)
       setResult(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'La invocación falló.')

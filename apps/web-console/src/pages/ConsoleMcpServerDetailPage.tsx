@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { McpServerConnectPanel } from '@/components/console/mcp/McpServerConnectPanel'
 import { McpServerPlayground } from '@/components/console/mcp/McpServerPlayground'
+import { useConsoleContext } from '@/lib/console-context'
 import { fetchMcpServerDetail } from '@/lib/mcp/mcp-api'
 import { toMcpServerDetailViewModel, type McpServerDetailView } from '@/lib/mcp/mcp-server-detail'
 
@@ -14,25 +15,39 @@ type Tab = 'connect' | 'playground'
 
 export function ConsoleMcpServerDetailPage() {
   const { mcpServerId = '' } = useParams<{ mcpServerId: string }>()
+  const { activeWorkspaceId, workspacesLoading } = useConsoleContext()
   const [view, setView] = useState<McpServerDetailView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('connect')
 
   useEffect(() => {
-    if (!mcpServerId) return undefined
-    const controller = new AbortController()
     setError(null)
     setView(null)
-    fetchMcpServerDetail(mcpServerId, controller.signal)
+
+    if (!mcpServerId || !activeWorkspaceId) return undefined
+
+    const controller = new AbortController()
+    fetchMcpServerDetail(activeWorkspaceId, mcpServerId, controller.signal)
       .then((payload) => setView(toMcpServerDetailViewModel(payload)))
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
         setError(err instanceof Error ? err.message : 'No se pudo cargar el servidor MCP.')
       })
     return () => controller.abort()
-  }, [mcpServerId])
+  }, [activeWorkspaceId, mcpServerId])
 
   const tools = useMemo(() => view?.tools ?? [], [view])
+
+  if (!activeWorkspaceId) {
+    if (workspacesLoading) {
+      return <p className="text-sm text-muted-foreground" data-testid="mcp-detail-loading">Cargando contexto del workspace…</p>
+    }
+    return (
+      <p className="text-sm text-muted-foreground" data-testid="mcp-detail-no-workspace">
+        Selecciona un workspace para cargar el servidor MCP.
+      </p>
+    )
+  }
 
   if (error) {
     return <p className="text-sm text-destructive" role="alert">{error}</p>
@@ -100,7 +115,12 @@ export function ConsoleMcpServerDetailPage() {
       {tab === 'connect' ? (
         <McpServerConnectPanel name={view.name} slug={view.slug} endpoint={view.endpoint} />
       ) : (
-        <McpServerPlayground serverId={view.id ?? mcpServerId} tools={tools} endpoint={view.endpoint} />
+        <McpServerPlayground
+          workspaceId={activeWorkspaceId}
+          serverId={view.id ?? mcpServerId}
+          tools={tools}
+          endpoint={view.endpoint}
+        />
       )}
     </section>
   )
