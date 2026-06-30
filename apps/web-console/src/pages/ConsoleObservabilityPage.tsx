@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Download, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ConsoleAuditCategoryBadge } from '@/components/console/ConsoleAuditCategoryBadge'
@@ -154,60 +155,77 @@ export function ConsoleObservabilityPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <section className="grid gap-3 rounded-3xl border border-border bg-card/70 p-6 md:grid-cols-5">
-            <label className="text-sm md:col-span-2">
-              <span className="mb-1 block">Actor</span>
-              <input aria-label="Actor" value={filters.actorId ?? ''} onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block">Categoría</span>
-              <input aria-label="Categoría" value={filters.category ?? ''} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block">Resultado</span>
-              <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full rounded-xl border border-input bg-background px-3 py-2">
-                <option value="">Todos</option>
-                <option value="success">success</option>
-                <option value="failure">failure</option>
-              </select>
-            </label>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isExporting}
-                aria-busy={isExporting}
-                aria-describedby={exportFeedbackId}
-                onClick={() => void handleExport()}
-              >
-                {isExporting ? 'Exportando auditoría...' : 'Exportar auditoría'}
-              </Button>
+          <section className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+              <label className="text-sm font-medium">
+                <span className="mb-1 block text-muted-foreground">Actor</span>
+                <input aria-label="Actor" value={filters.actorId ?? ''} onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2" />
+              </label>
+              <label className="text-sm font-medium">
+                <span className="mb-1 block text-muted-foreground">Categoría</span>
+                <input aria-label="Categoría" value={filters.category ?? ''} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2" />
+              </label>
+              <label className="text-sm font-medium">
+                <span className="mb-1 block text-muted-foreground">Resultado</span>
+                <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full rounded-xl border border-input bg-background px-3 py-2">
+                  <option value="">Todos</option>
+                  <option value="success">success</option>
+                  <option value="failure">failure</option>
+                </select>
+              </label>
+              <div className="flex md:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full md:w-auto"
+                  disabled={isExporting}
+                  aria-busy={isExporting}
+                  aria-describedby={exportFeedbackId}
+                  onClick={() => void handleExport()}
+                >
+                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
+                  {isExporting ? 'Exportando auditoría...' : 'Exportar auditoría'}
+                </Button>
+              </div>
             </div>
           </section>
           {exportFeedback ? (
-            <div id="audit-export-feedback" aria-live="polite" aria-atomic="true">
+            <div id="audit-export-feedback" aria-live="polite" aria-atomic="true" className="space-y-3">
               {exportFeedback.kind === 'loading' ? (
-                <section role="status" aria-busy="true" className="rounded-3xl border border-border bg-card/70 p-5">
-                  <h2 className="text-sm font-semibold">Solicitando exportación de auditoría</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Estamos esperando la respuesta del backend para saber si hay un manifiesto JSON descargable.
-                  </p>
+                <section role="status" aria-busy="true" className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm sm:p-5">
+                  <div className="flex gap-3">
+                    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold text-foreground">Solicitando exportación de auditoría</h2>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Estamos esperando la respuesta del backend para saber si hay un manifiesto JSON descargable.
+                      </p>
+                    </div>
+                  </div>
                 </section>
               ) : null}
               {exportFeedback.kind === 'artifact' ? (
-                <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <h2 className="text-sm font-semibold">Manifiesto de auditoría listo</h2>
-                      <p className="text-sm text-muted-foreground">
-                        Export ID <code className="rounded bg-muted px-1 py-0.5">{exportFeedback.manifest.exportId}</code>
-                      </p>
+                <section role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 shadow-sm sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 space-y-1">
+                        <h2 className="text-sm font-semibold text-foreground">Manifiesto de auditoría listo</h2>
+                        <p className="break-words text-sm leading-6 text-muted-foreground">
+                          Export ID <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{exportFeedback.manifest.exportId}</code>
+                        </p>
+                      </div>
                     </div>
-                    <Button type="button" variant="outline" onClick={() => downloadAuditExportManifest(exportFeedback.manifest)}>
+                    <Button type="button" variant="outline" className="w-full shrink-0 sm:w-auto" onClick={() => downloadAuditExportManifest(exportFeedback.manifest)}>
+                      <Download className="h-4 w-4" aria-hidden="true" />
                       Descargar manifiesto JSON
                     </Button>
                   </div>
-                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                  <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-emerald-500/20 pt-4 text-sm sm:grid-cols-3">
                     <div>
                       <dt className="text-muted-foreground">Registros exportados</dt>
                       <dd className="font-medium">{exportFeedback.manifest.itemCount}</dd>
@@ -224,23 +242,37 @@ export function ConsoleObservabilityPage() {
                 </section>
               ) : null}
               {exportFeedback.kind === 'unavailable' ? (
-                <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
-                  <h2 className="text-sm font-semibold">Manifiesto no disponible</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No se descargó ningún archivo porque la respuesta no incluyó un manifiesto.
-                  </p>
-                  {auditExportId(exportFeedback.result) ? (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Solicitud <code className="rounded bg-muted px-1 py-0.5">{auditExportId(exportFeedback.result)}</code>
-                    </p>
-                  ) : null}
+                <section role="status" className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm sm:p-5">
+                  <div className="flex gap-3">
+                    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300">
+                      <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold text-foreground">Manifiesto no disponible</h2>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{exportFeedback.message}</p>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        No se descargó ningún archivo porque la respuesta no incluyó un manifiesto.
+                      </p>
+                      {auditExportId(exportFeedback.result) ? (
+                        <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">
+                          Solicitud <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{auditExportId(exportFeedback.result)}</code>
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
                 </section>
               ) : null}
               {exportFeedback.kind === 'error' ? (
-                <section role="alert" className="rounded-3xl border border-destructive/40 bg-card/70 p-5">
-                  <h2 className="text-sm font-semibold text-destructive">No se pudo exportar la auditoría</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
+                <section role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 shadow-sm sm:p-5">
+                  <div className="flex gap-3">
+                    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 text-destructive">
+                      <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold text-foreground">No se pudo exportar la auditoría</h2>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{exportFeedback.message}</p>
+                    </div>
+                  </div>
                 </section>
               ) : null}
             </div>
