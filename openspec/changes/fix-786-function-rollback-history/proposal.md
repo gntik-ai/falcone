@@ -25,6 +25,10 @@ changed.
 - Make rollback validate the target version belongs to the same function and tenant/workspace, reject
   missing/current/ineligible targets, redeploy the selected retained source through the existing
   Knative deploy helper when a service name exists, and update `fn_actions` to the selected snapshot.
+- Gate rollback as a structural function write after scoped action lookup: only superadmin/internal
+  and the owning tenant's owner/admin roles may roll back executable code. Same-tenant non-admin
+  callers receive `403` before any deploy or database activation side effect; foreign tenants still
+  receive scoped `404`.
 - Add deterministic black-box backend coverage for create/update history, rollback state mutation,
   retained history after rollback, and legacy no-history behavior.
 - Add focused web-console Vitest coverage that when detail says rollback is available, the Versions

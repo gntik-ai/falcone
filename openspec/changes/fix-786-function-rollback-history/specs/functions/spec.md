@@ -20,6 +20,12 @@ history is introduced SHALL retain the current active function row before overwr
 pre-update source/runtime becomes a retained prior version and can be rolled back to immediately
 after that update succeeds.
 
+Rollback SHALL be authorized as a function write after the action is resolved in the caller's tenant
+scope. The system SHALL permit rollback only for superadmin/internal callers or the owning tenant's
+owner/admin role, and SHALL deny same-tenant non-admin callers before any redeploy or database
+activation side effect. Cross-tenant callers SHALL continue to receive a scoped not-found response
+before authorization details can reveal that the action exists.
+
 Existing function rows that predate retained history SHALL remain readable. They MAY produce a
 synthetic active version row for display, but they SHALL NOT claim rollback availability and SHALL
 NOT accept rollback to a version that is not durably retained.
@@ -45,3 +51,10 @@ NOT accept rollback to a version that is not durably retained.
 - **THEN** function detail reports rollback unavailable, the versions list returns only an active
   display row for the current function state, and rollback to that display row is rejected because it
   is not a retained prior version.
+
+#### Scenario: Same-tenant non-admin rollback is denied before side effects
+
+- **WHEN** an authenticated same-tenant caller without the function write role requests rollback to
+  an otherwise eligible retained prior version
+- **THEN** the rollback request is denied with `403 FORBIDDEN`, no function redeploy is attempted,
+  and no retained version or active function row is updated.

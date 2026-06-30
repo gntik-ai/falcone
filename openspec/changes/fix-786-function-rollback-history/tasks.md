@@ -27,6 +27,8 @@
 - [x] 2.7 Make `fnRollback` validate same-function same-scope targets, reject missing/current/
   ineligible targets, redeploy the selected snapshot when a Knative service exists, and update the
   active `fn_actions` row to the selected source snapshot.
+- [x] 2.8 Gate rollback as a function write after scoped action lookup so foreign tenants still get
+  404, while same-tenant non-admin callers get 403 before deploy or database activation side effects.
 
 ## 3. Frontend, docs, and OpenSpec
 

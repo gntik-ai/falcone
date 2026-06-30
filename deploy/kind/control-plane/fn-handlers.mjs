@@ -413,6 +413,9 @@ async function fnVersions(ctx) {
 async function fnRollback(ctx) {
   const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', 'action not found');
+  if (!canManageTenant(ctx.identity, r.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
   const versionId = ctx.body?.versionId;
   if (typeof versionId !== 'string' || !/^fnv_[0-9a-z]+$/.test(versionId)) {
     return err(400, 'VALIDATION_ERROR', 'versionId is required and must match fnv_[0-9a-z]+');

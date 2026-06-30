@@ -21,11 +21,19 @@ const OWNER = {
   actorType: 'tenant_owner',
   roles: ['tenant_owner']
 };
+const MEMBER = {
+  sub: 'user_alpha_member',
+  tenantId: TENANT_ID,
+  workspaceId: WORKSPACE_ID,
+  actorType: 'tenant_member',
+  roles: ['tenant_member']
+};
 
 function makePool() {
   let tick = 0;
   const actions = new Map();
   const versions = new Map();
+  const counters = { versionActivations: 0, actionUpdates: 0 };
   const workspace = {
     id: WORKSPACE_ID,
     tenant_id: TENANT_ID,
@@ -67,6 +75,7 @@ function makePool() {
   return {
     actions,
     versions,
+    counters,
     seedAction(overrides = {}) {
       const now = iso();
       const row = {
@@ -226,6 +235,7 @@ function makePool() {
         const versionId = params.length === 1 ? params[0] : params[1];
         const row = versions.get(versionId);
         if (!row) return { rows: [] };
+        counters.versionActivations += 1;
         row.status = 'active';
         row.activated_at = iso();
         row.updated_at = row.activated_at;
@@ -258,6 +268,7 @@ function makePool() {
         row.timeout_ms = timeoutMs;
         row.ksvc_name = ksvcName ?? row.ksvc_name;
         row.updated_at = iso();
+        counters.actionUpdates += 1;
         actions.set(resourceId, row);
         return { rows: [clone(row)] };
       }
@@ -289,13 +300,13 @@ function deployBody(inlineCode) {
   };
 }
 
-function ctx(pool, { params = {}, body = {}, deployKnativeService = async () => {} } = {}) {
+function ctx(pool, { params = {}, body = {}, identity = OWNER, deployKnativeService = async () => {} } = {}) {
   return {
     pool,
     params,
     body,
-    identity: OWNER,
-    callerContext: { correlationId: 'corr_786_rollback', actor: { id: OWNER.sub, type: OWNER.actorType }, tenantId: TENANT_ID },
+    identity,
+    callerContext: { correlationId: 'corr_786_rollback', actor: { id: identity.sub, type: identity.actorType }, tenantId: identity.tenantId },
     deployKnativeService
   };
 }
@@ -428,7 +439,47 @@ test('bbx-786-02: first post-upgrade update of a legacy action retains the pre-u
   assert.equal(detailAfterRollback.body.source.inlineCode, legacyCode);
 });
 
-test('bbx-786-03: legacy active rows without retained history list only active snapshot and cannot roll back', async () => {
+test('bbx-786-03: same-tenant non-admin rollback is 403 and performs no deploy or DB activation', async () => {
+  const pool = makePool();
+  const deployCalls = [];
+  const fakeDeploy = async (...args) => { deployCalls.push(args); };
+  const codeV1 = 'module.exports=async()=>({version:"one"})';
+  const codeV2 = 'module.exports=async()=>({version:"two"})';
+
+  const create = await FN_HANDLERS.fnDeploy(ctx(pool, { body: deployBody(codeV1), deployKnativeService: fakeDeploy }));
+  const resourceId = create.body.resourceId;
+  await FN_HANDLERS.fnDeploy(ctx(pool, {
+    params: { actionId: resourceId },
+    body: deployBody(codeV2),
+    deployKnativeService: fakeDeploy
+  }));
+  const listed = await FN_HANDLERS.fnVersions(ctx(pool, { params: { actionId: resourceId } }));
+  const prior = listed.body.items.find((item) => item.rollbackEligible);
+  assert.ok(prior, 'setup must have an eligible prior version');
+
+  const deployCountBefore = deployCalls.length;
+  const versionActivationsBefore = pool.counters.versionActivations;
+  const actionUpdatesBefore = pool.counters.actionUpdates;
+  const activeBefore = listed.body.items.find((item) => item.status === 'active').versionId;
+
+  const denied = await FN_HANDLERS.fnRollback(ctx(pool, {
+    params: { actionId: resourceId },
+    body: { versionId: prior.versionId },
+    identity: MEMBER,
+    deployKnativeService: fakeDeploy
+  }));
+
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.body.code, 'FORBIDDEN');
+  assert.equal(deployCalls.length, deployCountBefore, 'denied rollback must not redeploy function code');
+  assert.equal(pool.counters.versionActivations, versionActivationsBefore, 'denied rollback must not activate a retained version');
+  assert.equal(pool.counters.actionUpdates, actionUpdatesBefore, 'denied rollback must not update fn_actions');
+
+  const listedAfter = await FN_HANDLERS.fnVersions(ctx(pool, { params: { actionId: resourceId } }));
+  assert.equal(listedAfter.body.items.find((item) => item.status === 'active').versionId, activeBefore);
+});
+
+test('bbx-786-04: legacy active rows without retained history list only active snapshot and cannot roll back', async () => {
   const pool = makePool();
   const legacy = pool.seedAction();
 

@@ -38,9 +38,16 @@ execution configuration, activation policy, timestamps, and marks `rollbackEligi
 retained versions whose `version_number` is lower than the active version number.
 
 `POST /v1/functions/actions/{resourceId}/rollback` requires a retained, same-function,
-same-tenant/workspace `versionId`. The handler rejects:
+same-tenant/workspace `versionId`. The action is a structural function write: after the action is
+resolved through the caller's tenant scope, rollback is allowed only for superadmin/internal callers
+or the owning tenant's owner/admin roles. Same-tenant non-admin callers receive `403 FORBIDDEN`
+before any redeploy or database activation side effect. Foreign-tenant callers still receive the
+scoped `404 ACTION_NOT_FOUND` from action lookup, so authorization details do not leak existence.
+
+The handler rejects:
 
 - missing or malformed `versionId` with `400 VALIDATION_ERROR`;
+- same-tenant callers without the function write role with `403 FORBIDDEN`;
 - unknown or non-retained versions with `404 VERSION_NOT_FOUND`;
 - the current active version, or any non-prior retained version, with `409 VERSION_NOT_ELIGIBLE`.
 
