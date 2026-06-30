@@ -32,6 +32,18 @@ the normative spec see `openspec/specs/workflows/spec.md`. The tenant-facing gui
 - **Worker.** `services/workflow-worker/` polls the task queue and hosts the generic
   `DslInterpreterWorkflow` plus the activity catalog.
 
+## Draft definitions and canvas projection
+
+Fresh draft rows may temporarily carry an empty JSON definition. The flow definition store defaults
+`definition_json` to `{}`, and `flow-executor.mjs` returns that as `definition: {}` until the tenant
+saves a real DSL document. The console designer treats this as an authoring-only empty draft:
+`ConsoleFlowDesignerPage.normalizeDefinition` supplies `apiVersion`, the record name, and `nodes: []`,
+while `components/flows/flowGraphModel.ts` projects missing `nodes` as an empty canvas node and edge
+set. That keeps a brand-new draft openable as a blank canvas.
+
+This tolerance stops at the authoring projection boundary. Validation, publish, and the worker still
+enforce the executable DSL shape; an empty or nodes-less definition cannot be published or executed.
+
 ## DSL → Temporal mapping
 
 The DSL is the contract boundary (`services/internal-contracts/src/flow-definition.json` +

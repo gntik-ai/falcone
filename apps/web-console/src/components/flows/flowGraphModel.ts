@@ -62,9 +62,9 @@ function nodeLabel(node: FlowNode): string {
 
 // Read positions out of canvasMetadata.nodes (the DV-free round-trip channel).
 export function readCanvasMetadata(
-  definition: Pick<FlowDefinition, 'canvasMetadata'>
+  definition: Pick<Partial<FlowDefinition>, 'canvasMetadata'> | undefined
 ): Record<string, { x: number; y: number }> {
-  const nodes = definition.canvasMetadata?.nodes
+  const nodes = definition?.canvasMetadata?.nodes
   if (!nodes || typeof nodes !== 'object') return {}
   const out: Record<string, { x: number; y: number }> = {}
   for (const [id, pos] of Object.entries(nodes)) {
@@ -93,9 +93,9 @@ export function writeCanvasMetadata(
 }
 
 // Apply a deterministic vertical auto-layout when canvasMetadata is absent.
-export function autoLayout(nodes: FlowNode[]): Record<string, { x: number; y: number }> {
+export function autoLayout(nodes: FlowNode[] | undefined): Record<string, { x: number; y: number }> {
   const out: Record<string, { x: number; y: number }> = {}
-  nodes.forEach((node, index) => {
+  ;(nodes ?? []).forEach((node, index) => {
     out[node.id] = { x: AUTO_LAYOUT_X, y: AUTO_LAYOUT_Y_START + index * AUTO_LAYOUT_Y_SPACING }
   })
   return out
@@ -109,11 +109,13 @@ function stripEdgeFields(node: FlowNode): FlowNode {
 
 // DSL -> canvas nodes. Positions come from canvasMetadata (falling back to auto-layout).
 export function definitionToNodes(
-  definition: FlowDefinition,
+  definition: Partial<FlowDefinition> | undefined,
   errorsByNode: Map<string, ValidationError[]> = new Map()
 ): FlowCanvasNode[] {
-  const positions = { ...autoLayout(definition.nodes), ...readCanvasMetadata(definition) }
-  return definition.nodes.map((node) => ({
+  // Fresh drafts may arrive as `definition: {}`; project missing nodes as an empty canvas.
+  const nodes = definition && Array.isArray(definition.nodes) ? definition.nodes : []
+  const positions = { ...autoLayout(nodes), ...readCanvasMetadata(definition) }
+  return nodes.map((node) => ({
     id: node.id,
     type: node.type,
     position: positions[node.id] ?? { x: AUTO_LAYOUT_X, y: AUTO_LAYOUT_Y_START },
@@ -127,7 +129,7 @@ export function definitionToNodes(
 
 // DSL -> canvas edges, mirroring the validator's outgoingEdges so the canvas graph is the
 // SAME graph the acyclicity/reference rules run over.
-export function definitionToEdges(definition: FlowDefinition): FlowCanvasEdge[] {
+export function definitionToEdges(definition: Partial<FlowDefinition> | undefined): FlowCanvasEdge[] {
   const edges: FlowCanvasEdge[] = []
   const push = (
     source: string,
@@ -146,7 +148,8 @@ export function definitionToEdges(definition: FlowDefinition): FlowCanvasEdge[] 
     })
   }
 
-  for (const node of definition.nodes) {
+  // Fresh drafts may arrive as `definition: {}`; project missing nodes as an empty canvas.
+  for (const node of definition && Array.isArray(definition.nodes) ? definition.nodes : []) {
     switch (node.type) {
       case 'sequence':
         for (const step of node.steps ?? []) push(node.id, step, 'step')
