@@ -75,7 +75,7 @@ function versions(overrides: Record<string, unknown> = {}) {
       { versionId: 'fnv_2', resourceId: 'res_fn_1', versionNumber: 2, status: 'active', originType: 'publish', rollbackEligible: false, activationPolicy: { mode: 'workspace_default' }, source: { kind: 'inline_code' }, execution: { runtime: 'nodejs:20', entrypoint: 'index.main' }, timestamps: { createdAt: '2026-03-29T07:30:00.000Z' } },
       { versionId: 'fnv_1', resourceId: 'res_fn_1', versionNumber: 1, status: 'historical', originType: 'publish', rollbackEligible: true, activationPolicy: { mode: 'workspace_default' }, source: { kind: 'inline_code' }, execution: { runtime: 'nodejs:20', entrypoint: 'index.main' }, timestamps: { createdAt: '2026-03-29T07:00:00.000Z' } }
     ],
-    page: { total: 2 },
+    page: { size: 2 },
     ...overrides
   }
 }
@@ -172,6 +172,25 @@ describe('ConsoleFunctionsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Versions' }))
     expect(await screen.findByText(/no hay versiones anteriores disponibles para rollback/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /rollback/i })).toBeDisabled()
+  })
+
+  it('cuando detail indica rollback disponible, versions muestra historial previo y habilita rollback', async () => {
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_1/versions?page[size]=50') return versions()
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    expect(await screen.findByText('Rollback available')).toBeInTheDocument()
+    expect(screen.getAllByText('Sí').length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Versions' }))
+    expect(await screen.findByText('fnv_1')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: '1' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /rollback/i })).toBeEnabled()
   })
 
   it('carga activations y detalle paralelo con logs truncados', async () => {
