@@ -4,7 +4,11 @@ import { FunctionsConsole } from '@/components/console/FunctionsConsole'
 import { useConsoleContext } from '@/lib/console-context'
 
 export function ConsoleFunctionsDataPage() {
-  const { activeWorkspaceId } = useConsoleContext()
+  const { activeTenantId, activeWorkspaceId } = useConsoleContext()
+
+  if (!activeTenantId) {
+    return <p>Select a tenant to use functions.</p>
+  }
 
   if (!activeWorkspaceId) {
     return <p>Select a workspace to use functions.</p>
@@ -14,7 +18,7 @@ export function ConsoleFunctionsDataPage() {
     <div>
       <h1>Functions</h1>
       <p>Deploy functions and invoke them against the workspace runtime.</p>
-      <FunctionsConsole workspaceId={activeWorkspaceId} />
+      <FunctionsConsole tenantId={activeTenantId} workspaceId={activeWorkspaceId} />
     </div>
   )
 }

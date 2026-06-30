@@ -18,11 +18,24 @@ const mocked = {
   listActivations: listActivations as unknown as ReturnType<typeof vi.fn>
 }
 
-const render1 = () => render(<FunctionsConsole workspaceId="ws1" />)
+const render1 = () => render(<FunctionsConsole tenantId="ten_1" workspaceId="ws1" />)
+const functionItem = {
+  resourceId: 'res_fn_1',
+  actionName: 'hello',
+  execution: { runtime: 'nodejs:20', entrypoint: 'main' },
+  source: { kind: 'inline_code', inlineCode: 'exports.main=()=>({ok:true})' },
+  activationPolicy: {
+    logsAccess: 'workspace_developers',
+    resultAccess: 'workspace_developers',
+    rerunPolicy: 'manual_only',
+    retentionHours: 168
+  }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocked.listFunctions.mockResolvedValue({ items: [{ name: 'hello', runtime: 'nodejs' }] })
+  mocked.listFunctions.mockResolvedValue({ items: [functionItem] })
+  mocked.deployFunction.mockResolvedValue(functionItem)
 })
 afterEach(() => cleanup())
 
@@ -30,7 +43,7 @@ describe('FunctionsConsole — richer UX', () => {
   it('loads functions, then lists them with a count', async () => {
     render1()
     expect(screen.getByText('Loading functions…')).toBeInTheDocument()
-    expect(await screen.findByText(/hello/)).toBeInTheDocument()
+    expect(await screen.findByText('hello (nodejs:20)')).toBeInTheDocument()
     expect(screen.getByText('Functions (1)')).toBeInTheDocument()
   })
 
@@ -43,26 +56,74 @@ describe('FunctionsConsole — richer UX', () => {
   it('invokes the selected function and shows the result', async () => {
     mocked.invokeFunction.mockResolvedValue({ result: { ok: true } })
     render1()
-    await screen.findByText(/hello/)
-    fireEvent.click(screen.getByRole('radio', { name: /hello/ }))
+    await screen.findByText('hello (nodejs:20)')
+    fireEvent.click(screen.getByRole('radio', { name: /hello \(nodejs:20\)/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Invoke' }))
-    await waitFor(() => expect(mocked.invokeFunction).toHaveBeenCalledWith('ws1', 'hello', {}))
+    await waitFor(() => expect(mocked.invokeFunction).toHaveBeenCalledWith('res_fn_1', {}))
     expect(await screen.findByText(/"ok": true/)).toBeInTheDocument()
   })
 
   it('views activations for the selected function', async () => {
     mocked.listActivations.mockResolvedValue({ items: [{ activationId: 'a1', status: 'success', durationMs: 12 }] })
     render1()
-    await screen.findByText(/hello/)
-    fireEvent.click(screen.getByRole('radio', { name: /hello/ }))
+    await screen.findByText('hello (nodejs:20)')
+    fireEvent.click(screen.getByRole('radio', { name: /hello \(nodejs:20\)/ }))
     fireEvent.click(screen.getByRole('button', { name: 'View activations' }))
+    await waitFor(() => expect(mocked.listActivations).toHaveBeenCalledWith('res_fn_1'))
     expect(await screen.findByText(/a1 — success \(12ms\)/)).toBeInTheDocument()
   })
 
   it('requires a selection before invoking', async () => {
     render1()
-    await screen.findByText(/hello/)
+    await screen.findByText('hello (nodejs:20)')
     fireEvent.click(screen.getByRole('button', { name: 'Invoke' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Select a function to invoke')
+  })
+
+  it('deploy validation accepts actionName from contract-shaped JSON', async () => {
+    render1()
+    await screen.findByText('hello (nodejs:20)')
+    fireEvent.change(screen.getByLabelText('Function spec (JSON)'), {
+      target: { value: '{"actionName":"from-contract","runtime":"nodejs:20","code":"exports.main=()=>({ok:true})"}' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy' }))
+    await waitFor(() => expect(mocked.deployFunction).toHaveBeenCalledWith('ws1', expect.objectContaining({
+      actionName: 'from-contract'
+    }), 'ten_1'))
+  })
+
+  it('deploy validation still accepts legacy name from the simple JSON editor', async () => {
+    render1()
+    await screen.findByText('hello (nodejs:20)')
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy' }))
+    await waitFor(() => expect(mocked.deployFunction).toHaveBeenCalledWith('ws1', expect.objectContaining({
+      name: 'hello'
+    }), 'ten_1'))
+  })
+
+  it('rejects deploy JSON with neither actionName nor legacy name', async () => {
+    render1()
+    await screen.findByText('hello (nodejs:20)')
+    fireEvent.change(screen.getByLabelText('Function spec (JSON)'), {
+      target: { value: '{"runtime":"nodejs:20","code":"exports.main=()=>({ok:true})"}' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Deploy spec must include an "actionName" or legacy "name"')
+    expect(mocked.deployFunction).not.toHaveBeenCalled()
+  })
+
+  it('does not pass undefined to invoke or activations for a contract-shaped list item', async () => {
+    mocked.invokeFunction.mockResolvedValue({ result: { ok: true } })
+    mocked.listActivations.mockResolvedValue({ items: [] })
+    render1()
+    await screen.findByText('hello (nodejs:20)')
+    fireEvent.click(screen.getByRole('radio', { name: /hello \(nodejs:20\)/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Invoke' }))
+    await waitFor(() => expect(mocked.invokeFunction).toHaveBeenCalledWith('res_fn_1', {}))
+    await screen.findByText(/"ok": true/)
+    fireEvent.click(screen.getByRole('button', { name: 'View activations' }))
+    await waitFor(() => expect(mocked.listActivations).toHaveBeenCalledWith('res_fn_1'))
+    expect(mocked.invokeFunction.mock.calls.flat()).not.toContain(undefined)
+    expect(mocked.listActivations.mock.calls.flat()).not.toContain(undefined)
   })
 })

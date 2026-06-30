@@ -14,11 +14,14 @@ import {
   listActivations,
   listFunctions,
   type ActivationRecord,
+  type FunctionActionWriteRequest,
+  type LegacyFunctionDeploySpec,
   type FunctionRecord,
   type InvocationResult
 } from '@/services/functionsApi'
 
 export interface FunctionsConsoleProps {
+  tenantId: string
   workspaceId: string
 }
 
@@ -27,7 +30,7 @@ function errorMessage(error: unknown): string {
   return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
 }
 
-export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
+export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProps) {
   const [functions, setFunctions] = useState<FunctionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [deploySpecJson, setDeploySpecJson] = useState('{"name":"hello","runtime":"nodejs","code":"module.exports=async()=>({ok:true})"}')
@@ -63,13 +66,13 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
       setError(`Deploy spec: ${parsed.error}`)
       return
     }
-    if (typeof parsed.value.name !== 'string' || parsed.value.name === '') {
-      setError('Deploy spec must include a "name"')
+    if (getActionName(parsed.value) === '') {
+      setError('Deploy spec must include an "actionName" or legacy "name"')
       return
     }
     setBusy(true)
     try {
-      await deployFunction(workspaceId, parsed.value as { name: string } & Record<string, JsonValue>)
+      await deployFunction(workspaceId, parsed.value as LegacyFunctionDeploySpec | FunctionActionWriteRequest, tenantId)
       setStatus('Function deployed')
       await reload()
     } catch (caught) {
@@ -95,7 +98,7 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
     }
     setBusy(true)
     try {
-      const invocation = await invokeFunction(workspaceId, selected, payload)
+      const invocation = await invokeFunction(selected, payload)
       setResult(invocation)
       setStatus('Function invoked')
     } catch (caught) {
@@ -112,7 +115,7 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
     }
     setBusy(true)
     try {
-      const res = await listActivations(workspaceId, selected)
+      const res = await listActivations(selected)
       setActivations(res.items)
     } catch (caught) {
       setError(errorMessage(caught))
@@ -134,17 +137,17 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
       ) : (
         <ul>
           {functions.map((fn) => (
-            <li key={fn.name}>
+            <li key={fn.resourceId}>
               <label>
                 <input
                   type="radio"
                   name="function"
-                  value={fn.name}
-                  checked={selected === fn.name}
-                  onChange={() => setSelected(fn.name)}
+                  value={fn.resourceId}
+                  checked={selected === fn.resourceId}
+                  onChange={() => setSelected(fn.resourceId)}
                 />
-                {fn.name}
-                {fn.runtime ? ` (${fn.runtime})` : ''}
+                {fn.actionName}
+                {fn.execution?.runtime ? ` (${fn.execution.runtime})` : ''}
               </label>
             </li>
           ))}
@@ -196,4 +199,11 @@ export function FunctionsConsole({ workspaceId }: FunctionsConsoleProps) {
       ) : null}
     </section>
   )
+}
+
+function getActionName(value: Record<string, JsonValue>): string {
+  const actionName = value.actionName
+  if (typeof actionName === 'string' && actionName.trim() !== '') return actionName
+  const legacyName = value.name
+  return typeof legacyName === 'string' ? legacyName.trim() : ''
 }
