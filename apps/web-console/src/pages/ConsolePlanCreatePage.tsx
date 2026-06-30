@@ -17,15 +17,21 @@ export function ConsolePlanCreatePage() {
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null)
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    const trimmedDisplayName = displayName.trim()
+    const nextDisplayNameError = trimmedDisplayName ? null : 'Display name is required'
+    setError(null)
+    setDisplayNameError(nextDisplayNameError)
     if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) { setError('Slug format is invalid'); return }
+    if (nextDisplayNameError) return
     try {
-      const created = await api.createPlan({ slug, displayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
+      const created = await api.createPlan({ slug, displayName: trimmedDisplayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
       navigate(`/console/plans/${created.id}`)
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Unable to create plan')
     }
   }
-  return <main className="space-y-6"><header className="rounded-3xl border border-border bg-card/70 p-6"><h1 className="text-2xl font-semibold">Create plan</h1></header><form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-border bg-card/70 p-6"><label className="block">Slug<Input aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} /></label><label className="block">Display name<Input aria-label="display-name" value={displayName} onChange={(e) => setDisplayName(e.currentTarget.value)} /></label><label className="block">Description<textarea aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>{error ? <div role="alert">{error}</div> : null}<Button type="submit">Create</Button></form></main>
+  return <main className="space-y-6"><header className="rounded-3xl border border-border bg-card/70 p-6"><h1 className="text-2xl font-semibold">Create plan</h1></header><form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-border bg-card/70 p-6"><label className="block">Slug<Input aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} /></label><label className="block">Display name<Input aria-label="display-name" aria-invalid={Boolean(displayNameError)} aria-describedby={displayNameError ? 'display-name-error' : undefined} value={displayName} onChange={(e) => setDisplayName(e.currentTarget.value)} />{displayNameError ? <span id="display-name-error" role="alert" className="text-sm text-destructive">{displayNameError}</span> : null}</label><label className="block">Description<textarea aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>{error ? <div role="alert">{error}</div> : null}<Button type="submit">Create</Button></form></main>
 }
