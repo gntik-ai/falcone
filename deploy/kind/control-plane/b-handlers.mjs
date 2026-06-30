@@ -18,6 +18,7 @@ import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
 import { WEBHOOK_HANDLERS } from './webhook-handlers.mjs';
 import { REALTIME_HANDLERS } from './realtime-handlers.mjs';
+import { APPLICATION_HANDLERS } from './application-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
 import { recordScopeDenial, recordQuotaEnforcement } from './audit-writer.mjs';
 import { buildTenantConfigExport } from './tenant-config-export.mjs';
@@ -1388,6 +1389,7 @@ export const LOCAL_HANDLERS = {
   ...FN_HANDLERS,
   ...WEBHOOK_HANDLERS,
   ...REALTIME_HANDLERS,
+  ...APPLICATION_HANDLERS,
   ...AUTH_HANDLERS
 };
 
