@@ -70,6 +70,21 @@ function emptyDefinition(name: string): FlowDefinition {
   return { apiVersion: 'v1.0', name, nodes: [] }
 }
 
+// Fresh drafts may arrive as `definition: {}`; normalize the authoring projection shape only.
+function normalizeDefinition(
+  definition: Partial<FlowDefinition> | undefined,
+  name: string
+): FlowDefinition {
+  if (!definition || typeof definition !== 'object') return emptyDefinition(name)
+  return {
+    ...emptyDefinition(name),
+    ...definition,
+    apiVersion: definition.apiVersion === 'v1.0' ? definition.apiVersion : 'v1.0',
+    name: typeof definition.name === 'string' && definition.name.trim() ? definition.name : name,
+    nodes: Array.isArray(definition.nodes) ? definition.nodes : []
+  }
+}
+
 function nodeDisplayLabel(dsl: FlowNode): string {
   if (dsl.name && dsl.name.trim()) return dsl.name
   if (dsl.type === 'task') return dsl.taskType
@@ -123,12 +138,12 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
   })
 
   const baseDefinition: FlowDefinition = useMemo(
-    () => record?.definition ?? emptyDefinition(record?.name ?? flowId),
+    () => normalizeDefinition(record?.definition, record?.name ?? flowId),
     [record, flowId]
   )
 
   const resetFromRecord = useCallback((loaded: FlowDefinitionRecord) => {
-    const definition = loaded.definition ?? emptyDefinition(loaded.name ?? '')
+    const definition = normalizeDefinition(loaded.definition, loaded.name || loaded.flowId)
     setRecord(loaded)
     setNodes(definitionToNodes(definition) as DesignerNode[])
     setEdges(definitionToEdges(definition) as Edge[])
