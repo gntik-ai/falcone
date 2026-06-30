@@ -54,9 +54,11 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
   })
 
-  it('crea y emite credencial limpiable', async () => {
+  it('crea y revela la credencial actual sin prometer secreto de una sola vez', async () => {
     const user = userEvent.setup()
     const reload = vi.fn()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload, knownIds: ['sa_1'] })
     mockCreateServiceAccount.mockResolvedValue({ serviceAccountId: 'sa_2' })
@@ -65,10 +67,42 @@ describe('ConsoleServiceAccountsPage', () => {
     await user.type(screen.getByLabelText(/nombre de service account/i), 'Nueva SA')
     await user.click(screen.getByRole('button', { name: /^crear$/i }))
     await waitFor(() => expect(mockCreateServiceAccount).toHaveBeenCalled())
-    await user.click(screen.getByRole('button', { name: /emitir/i }))
-    expect(await screen.findByRole('dialog', { name: /credencial emitida/i })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /cerrar/i }))
+    const revealButton = screen.getByRole('button', { name: /revelar secreto actual de ops sa/i })
+    expect(revealButton).toHaveAttribute('aria-describedby', 'service-account-credential-actions-help')
+    await user.click(revealButton)
+    const dialog = await screen.findByRole('dialog', { name: /secreto actual de la service account/i })
+    expect(dialog).toHaveFocus()
+    expect(dialog).toHaveAttribute('aria-describedby')
+    expect(dialog).toHaveTextContent(/secreto actual/i)
+    expect(dialog).toHaveTextContent(/puede mostrarse de nuevo/i)
+    expect(dialog).toHaveTextContent(/usa rotar para reemplazarlo/i)
+    expect(dialog).not.toHaveTextContent(/una sola vez/i)
+    expect(dialog).not.toHaveTextContent(/no podrá recuperarse/i)
+    await user.click(screen.getByRole('button', { name: /copiar secreto/i }))
+    expect(writeText).toHaveBeenCalledWith('secret-value')
+    expect(screen.getByRole('status')).toHaveTextContent(/copiado/i)
+    await user.keyboard('{Escape}')
     expect(screen.queryByText('secret-value')).not.toBeInTheDocument()
+    expect(revealButton).toHaveFocus()
+  })
+
+  it('muestra la rotación como generación de un nuevo secreto', async () => {
+    const user = userEvent.setup()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    mockRotateServiceAccountCredential.mockResolvedValue({ credentialId: 'cred_2', secret: 'rotated-secret', expiresAt: null })
+    render(<ConsoleServiceAccountsPage />)
+
+    const rotateButton = screen.getByRole('button', { name: /rotar secreto de ops sa/i })
+    expect(rotateButton).toHaveAttribute('aria-describedby', 'service-account-credential-actions-help')
+    await user.click(rotateButton)
+    const dialog = await screen.findByRole('dialog', { name: /nuevo secreto generado/i })
+
+    expect(dialog).toHaveTextContent(/nuevo secreto generado/i)
+    expect(dialog).toHaveTextContent(/rotar reemplaza el secreto anterior/i)
+    expect(dialog).toHaveTextContent(/rotated-secret/i)
+    expect(dialog).not.toHaveTextContent(/una sola vez/i)
+    expect(dialog).not.toHaveTextContent(/no podrá recuperarse/i)
   })
 
   it('abre confirmación WARNING al revocar una credencial', async () => {
@@ -124,31 +158,31 @@ describe('ConsoleServiceAccountsPage', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'revoked' }, accessProjection: { effectiveAccess: 'denied', clientState: 'disabled', credentialState: 'revoked' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
     render(<ConsoleServiceAccountsPage />)
-    // Unlike emit/rotate, delete is NOT gated by credentialRevoked — a revoked SA is exactly what
+    // Unlike reveal/rotate, delete is NOT gated by credentialRevoked — a revoked SA is exactly what
     // a caller wants to delete so it stops accumulating.
     expect(screen.getByRole('button', { name: /eliminar/i })).toBeEnabled()
-    expect(screen.getByRole('button', { name: /emitir/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /revelar/i })).toBeDisabled()
   })
 
   it('deshabilita acciones con tenant inactivo', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'suspended' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
     render(<ConsoleServiceAccountsPage />)
-    expect(screen.getByRole('button', { name: /emitir/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /revelar/i })).toBeDisabled()
   })
 
-  it('deshabilita emitir y rotar para una credencial revocada', () => {
+  it('deshabilita revelar y rotar para una credencial revocada', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'revoked' }, accessProjection: { effectiveAccess: 'denied', clientState: 'disabled', credentialState: 'revoked' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
     render(<ConsoleServiceAccountsPage />)
-    // Re-issuing or rotating a revoked credential is rejected by the control plane (409 CREDENTIAL_REVOKED);
+    // Revealing or rotating a revoked credential is rejected by the control plane (409 CREDENTIAL_REVOKED);
     // the UI must not offer those actions. Revocar stays enabled (idempotent).
-    expect(screen.getByRole('button', { name: /emitir/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /revelar/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /rotar/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /revocar/i })).toBeEnabled()
   })
 
-  it('muestra feedback de error cuando emitir es rechazado (credencial revocada)', async () => {
+  it('muestra feedback de error cuando revelar es rechazado (credencial revocada)', async () => {
     const user = userEvent.setup()
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     // Credential not yet reflected as revoked in this browser's index, so the button is enabled and the
@@ -158,10 +192,10 @@ describe('ConsoleServiceAccountsPage', () => {
     mockIssueServiceAccountCredential.mockRejectedValue(Object.assign(new Error('service account credential is revoked'), { status: 409 }))
     render(<ConsoleServiceAccountsPage />)
 
-    await user.click(screen.getByRole('button', { name: /emitir/i }))
+    await user.click(screen.getByRole('button', { name: /revelar/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/revoked/i)
     // No success dialog opened.
-    expect(screen.queryByRole('dialog', { name: /credencial emitida/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /secreto actual de la service account/i })).not.toBeInTheDocument()
   })
 })

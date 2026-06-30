@@ -1,5 +1,5 @@
 // Headless-Chromium verification of the Service Accounts page, wired to the
-// adapted control-plane SA endpoints (create -> get -> issue credential).
+// adapted control-plane SA endpoints (create -> get -> reveal credential).
 import { chromium } from 'playwright';
 
 const GW = process.env.GW || 'http://192.168.1.132:31908';
@@ -65,18 +65,23 @@ try {
   log(`AFTER CREATE contains "${SA_NAME}"? ${body.includes(SA_NAME)}`);
   await page.screenshot({ path: `${OUT}/14-service-accounts.png`, fullPage: true });
 
-  // issue a credential (Emitir) -> credential dialog
-  const emit = page.locator('button:has-text("Emitir")').first();
-  if (await emit.count()) {
-    await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/credential-issuance') && r.request().method() === 'POST', { timeout: 20000 }).catch(() => null),
-      emit.click()
-    ]);
-    await page.waitForTimeout(2000);
-    const dialog = await page.locator('[aria-label="Credencial emitida"]').count();
-    log(`credential dialog shown? ${dialog > 0}`);
-    await page.screenshot({ path: `${OUT}/15-sa-credential.png`, fullPage: true });
+  // reveal the current credential secret (Revelar) -> credential dialog
+  const reveal = page.locator('button:has-text("Revelar")').first();
+  if (!(await reveal.count())) {
+    throw new Error('Service-account reveal action was not found.');
   }
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/credential-issuance') && r.request().method() === 'POST', { timeout: 20000 }).catch(() => null),
+    reveal.click()
+  ]);
+  const dialog = page.getByRole('dialog', { name: /secreto actual de la service account/i });
+  await dialog.waitFor({ timeout: 20000 });
+  const dialogText = await dialog.innerText();
+  if (!/puede mostrarse de nuevo/i.test(dialogText) || !/usa rotar para reemplazarlo/i.test(dialogText)) {
+    throw new Error('Service-account reveal dialog did not show current-secret/repeatable reveal guidance.');
+  }
+  log('credential reveal dialog shown with current-secret guidance');
+  await page.screenshot({ path: `${OUT}/15-sa-credential.png`, fullPage: true });
 
   log('DONE');
 } catch (e) {

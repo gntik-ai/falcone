@@ -83,7 +83,7 @@ export const OFFICIAL_TOOLS = [
     { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts', family: 'service-accounts', scope: 'mcp:falcone:service-accounts:write',
       inputSchema: obj({ workspaceId: str('The workspace id.'), name: str('Service-account name.') }, ['workspaceId', 'name']) }),
   tool('issue_service_account_credential',
-    'Issue a new credential for a service account. MUTATING — requires the mcp:falcone:credentials:write scope.',
+    'Reveal the current client secret for a service account. MUTATING — requires the mcp:falcone:credentials:write scope. Use rotation to replace the secret.',
     { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance', family: 'service-accounts', scope: 'mcp:falcone:credentials:write',
       inputSchema: obj({ workspaceId: str('The workspace id.'), serviceAccountId: str('The service-account id.') }, ['workspaceId', 'serviceAccountId']) }),
 
