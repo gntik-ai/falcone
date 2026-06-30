@@ -16,13 +16,15 @@
 
 - [x] 2.1 Add `fn_action_versions` in `ensureSchema` without changing existing `fn_actions` columns.
 - [x] 2.2 Populate `fn_action_versions` from `upsertFnAction` on creates and updates.
-- [x] 2.3 Add store helpers to list retained versions, summarize active/eligible state, and activate
+- [x] 2.3 Backfill the current active `fn_actions` row before the first post-upgrade update of a
+  legacy no-history function action overwrites it.
+- [x] 2.4 Add store helpers to list retained versions, summarize active/eligible state, and activate
   a selected retained snapshot.
-- [x] 2.4 Make detail/list responses use retained history for `activeVersionId`, `versionCount`, and
+- [x] 2.5 Make detail/list responses use retained history for `activeVersionId`, `versionCount`, and
   `rollbackAvailable`.
-- [x] 2.5 Make `fnVersions` return contract-shaped `fnv_...` version IDs with active/historical
+- [x] 2.6 Make `fnVersions` return contract-shaped `fnv_...` version IDs with active/historical
   statuses and `rollbackEligible` only for retained prior versions.
-- [x] 2.6 Make `fnRollback` validate same-function same-scope targets, reject missing/current/
+- [x] 2.7 Make `fnRollback` validate same-function same-scope targets, reject missing/current/
   ineligible targets, redeploy the selected snapshot when a Knative service exists, and update the
   active `fn_actions` row to the selected source snapshot.
 

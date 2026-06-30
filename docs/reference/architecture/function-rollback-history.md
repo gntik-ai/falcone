@@ -18,7 +18,9 @@ Every successful create or update through `POST /v1/functions/actions` or
 
 Rows created before this history table existed are handled as legacy active rows. The API can still
 return a synthetic active version row for display, but rollback is not available until a real retained
-prior snapshot exists.
+prior snapshot exists. On the first post-upgrade update of such a legacy action, the control-plane
+retains the current active row before overwriting `fn_actions`; the update then creates the new active
+snapshot, so the pre-update source is immediately rollback-eligible.
 
 ## API Behavior
 

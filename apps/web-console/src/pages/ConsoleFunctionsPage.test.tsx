@@ -75,7 +75,7 @@ function versions(overrides: Record<string, unknown> = {}) {
       { versionId: 'fnv_2', resourceId: 'res_fn_1', versionNumber: 2, status: 'active', originType: 'publish', rollbackEligible: false, activationPolicy: { mode: 'workspace_default' }, source: { kind: 'inline_code' }, execution: { runtime: 'nodejs:20', entrypoint: 'index.main' }, timestamps: { createdAt: '2026-03-29T07:30:00.000Z' } },
       { versionId: 'fnv_1', resourceId: 'res_fn_1', versionNumber: 1, status: 'historical', originType: 'publish', rollbackEligible: true, activationPolicy: { mode: 'workspace_default' }, source: { kind: 'inline_code' }, execution: { runtime: 'nodejs:20', entrypoint: 'index.main' }, timestamps: { createdAt: '2026-03-29T07:00:00.000Z' } }
     ],
-    page: { total: 2 },
+    page: { size: 2 },
     ...overrides
   }
 }

@@ -407,7 +407,7 @@ async function fnVersions(ctx) {
   const items = rows.length
     ? rows.map((row) => versionOut(row, activeVersionNumber(rows, r)))
     : [legacyVersionOut(r)];
-  return ok(200, { items, page: { total: items.length } });
+  return ok(200, { items, page: { size: items.length } });
 }
 // POST /v1/functions/actions/{actionId}/rollback
 async function fnRollback(ctx) {

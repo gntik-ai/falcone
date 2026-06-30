@@ -454,6 +454,17 @@ async function snapshotFnActionVersion(pool, row, { createdBy = null, originType
 }
 
 export async function upsertFnAction(pool, a) {
+  const { rows: existingRows } = await pool.query(
+    'SELECT * FROM fn_actions WHERE workspace_id=$1 AND action_name=$2 LIMIT 1',
+    [a.workspaceId, a.actionName]);
+  const existing = existingRows[0] ?? null;
+  if (existing) {
+    const existingVersions = await listFnActionVersions(pool, existing.resource_id);
+    if (!existingVersions.length) {
+      await snapshotFnActionVersion(pool, existing, { createdBy: existing.created_by ?? a.createdBy, originType: 'publish' });
+    }
+  }
+
   const { rows } = await pool.query(
     `INSERT INTO fn_actions (resource_id, workspace_id, tenant_id, action_name, runtime, entrypoint, source_code, parameters, memory_mb, timeout_ms, ksvc_name, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)

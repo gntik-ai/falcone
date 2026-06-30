@@ -163,7 +163,7 @@ type FunctionVersion = {
 
 type FunctionVersionCollection = {
   items: FunctionVersion[]
-  page?: { total?: number; after?: string }
+  page?: { size?: number; nextCursor?: string }
 }
 
 type FunctionActivationCollection = {

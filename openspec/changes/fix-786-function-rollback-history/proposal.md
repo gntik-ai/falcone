@@ -16,6 +16,8 @@ changed.
   - `fn_action_versions` stores immutable deploy snapshots with `fnv_[0-9a-z]+` version IDs,
     tenant/workspace scope, source, execution fields, version number, status, origin, and timestamps.
   - `upsertFnAction` snapshots every successful create/update and marks the new snapshot active.
+  - The first post-upgrade update of an existing no-history action retains the current active
+    `fn_actions` row before overwriting it, so that update immediately has a rollback target.
   - legacy `fn_actions` rows without retained snapshots still produce one synthetic active version
     response, but do not claim rollback availability.
 - Make function detail and versions derive rollback state from retained history, not from the

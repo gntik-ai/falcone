@@ -150,6 +150,11 @@ function makePool() {
         return { rows: row ? [clone(row)] : [] };
       }
 
+      if (s.includes('from fn_actions') && s.includes('where workspace_id=$1 and action_name=$2')) {
+        const row = actionByWorkspaceName(params[0], params[1]);
+        return { rows: row ? [clone(row)] : [] };
+      }
+
       if (s.includes('from fn_actions') && s.includes('where workspace_id=$1')) {
         return { rows: [...actions.values()].filter((row) => row.workspace_id === params[0]).map(clone) };
       }
@@ -322,6 +327,7 @@ test('bbx-786-01: owner deploys two versions, rolls back to retained prior versi
 
   const listedBefore = await FN_HANDLERS.fnVersions(ctx(pool, { params: { actionId: resourceId } }));
   assert.equal(listedBefore.statusCode, 200);
+  assert.deepEqual(listedBefore.body.page, { size: 2 });
   assert.equal(listedBefore.body.items.length, 2);
   assert.deepEqual(listedBefore.body.items.map((item) => item.versionNumber), [2, 1]);
   assert.ok(listedBefore.body.items.every((item) => /^fnv_[0-9a-z]+$/.test(item.versionId)));
@@ -362,12 +368,67 @@ test('bbx-786-01: owner deploys two versions, rolls back to retained prior versi
 
   const listedAfter = await FN_HANDLERS.fnVersions(ctx(pool, { params: { actionId: resourceId } }));
   assert.equal(listedAfter.statusCode, 200);
+  assert.deepEqual(listedAfter.body.page, { size: 2 });
   assert.equal(listedAfter.body.items.length, 2, 'retained history remains visible after rollback');
   assert.equal(listedAfter.body.items.find((item) => item.versionId === prior.versionId).status, 'active');
   assert.equal(listedAfter.body.items.find((item) => item.versionId === active.versionId).status, 'historical');
 });
 
-test('bbx-786-02: legacy active rows without retained history list only active snapshot and cannot roll back', async () => {
+test('bbx-786-02: first post-upgrade update of a legacy action retains the pre-update rollback target', async () => {
+  const pool = makePool();
+  const deployCalls = [];
+  const fakeDeploy = async (...args) => { deployCalls.push(args); };
+  const legacyCode = 'module.exports=async()=>({version:"legacy-before-update"})';
+  const updatedCode = 'module.exports=async()=>({version:"after-update"})';
+  const legacy = pool.seedAction({
+    resource_id: 'fn_legacy786',
+    action_name: 'hello-fn',
+    version: 1,
+    source_code: legacyCode,
+    ksvc_name: 'ksvc-legacy-786'
+  });
+
+  const update = await FN_HANDLERS.fnDeploy(ctx(pool, {
+    params: { actionId: legacy.resource_id },
+    body: deployBody(updatedCode),
+    deployKnativeService: fakeDeploy
+  }));
+  assert.equal(update.statusCode, 200);
+
+  const listed = await FN_HANDLERS.fnVersions(ctx(pool, { params: { actionId: legacy.resource_id } }));
+  assert.equal(listed.statusCode, 200);
+  assert.deepEqual(listed.body.page, { size: 2 });
+  assert.equal(listed.body.items.length, 2, 'first post-fix update must produce legacy + new retained snapshots');
+  assert.deepEqual(listed.body.items.map((item) => item.versionNumber), [2, 1]);
+
+  const prior = listed.body.items.find((item) => item.versionNumber === 1);
+  const active = listed.body.items.find((item) => item.versionNumber === 2);
+  assert.equal(active.status, 'active');
+  assert.equal(active.rollbackEligible, false);
+  assert.equal(prior.status, 'historical');
+  assert.equal(prior.rollbackEligible, true);
+  assert.equal(prior.source.inlineCode, legacyCode);
+
+  const detailBeforeRollback = await FN_HANDLERS.fnActionDetail(ctx(pool, { params: { actionId: legacy.resource_id } }));
+  assert.equal(detailBeforeRollback.statusCode, 200);
+  assert.equal(detailBeforeRollback.body.rollbackAvailable, true);
+  assert.equal(detailBeforeRollback.body.source.inlineCode, updatedCode);
+
+  const rollback = await FN_HANDLERS.fnRollback(ctx(pool, {
+    params: { actionId: legacy.resource_id },
+    body: { versionId: prior.versionId },
+    deployKnativeService: fakeDeploy
+  }));
+  assert.equal(rollback.statusCode, 202);
+  assert.equal(deployCalls.at(-1)[1], legacyCode);
+
+  const detailAfterRollback = await FN_HANDLERS.fnActionDetail(ctx(pool, { params: { actionId: legacy.resource_id } }));
+  assert.equal(detailAfterRollback.statusCode, 200);
+  assert.equal(detailAfterRollback.body.activeVersionId, prior.versionId);
+  assert.equal(detailAfterRollback.body.source.inlineCode, legacyCode);
+});
+
+test('bbx-786-03: legacy active rows without retained history list only active snapshot and cannot roll back', async () => {
   const pool = makePool();
   const legacy = pool.seedAction();
 
@@ -378,6 +439,7 @@ test('bbx-786-02: legacy active rows without retained history list only active s
 
   const listed = await FN_HANDLERS.fnVersions(ctx(pool, { params: { actionId: legacy.resource_id } }));
   assert.equal(listed.statusCode, 200);
+  assert.deepEqual(listed.body.page, { size: 1 });
   assert.equal(listed.body.items.length, 1);
   assert.equal(listed.body.items[0].versionId, syntheticFnVersionId(legacy));
   assert.match(listed.body.items[0].versionId, /^fnv_[0-9a-z]+$/);

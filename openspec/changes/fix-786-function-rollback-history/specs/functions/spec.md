@@ -15,6 +15,11 @@ SHALL retain historical versions, and SHALL mark `rollbackEligible` true only fo
 versions. Function detail SHALL report `rollbackAvailable` only when at least one retained prior
 version is actually eligible.
 
+When a legacy function action exists without retained history, the first update after retained
+history is introduced SHALL retain the current active function row before overwriting it, so the
+pre-update source/runtime becomes a retained prior version and can be rolled back to immediately
+after that update succeeds.
+
 Existing function rows that predate retained history SHALL remain readable. They MAY produce a
 synthetic active version row for display, but they SHALL NOT claim rollback availability and SHALL
 NOT accept rollback to a version that is not durably retained.
