@@ -92,7 +92,7 @@ function CredentialDisclosureDialog({
       aria-describedby={descriptionId}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
-      className="rounded-3xl border border-border bg-card/70 p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <DialogHeader>
         <h2 id={titleId} className="text-lg font-semibold">
@@ -102,28 +102,32 @@ function CredentialDisclosureDialog({
           {description}
         </p>
       </DialogHeader>
-      <pre
-        id={secretId}
-        tabIndex={0}
-        aria-label="Valor del secreto de cliente"
-        className="mt-4 overflow-x-auto rounded-xl bg-background p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {disclosure.credential.secret}
-      </pre>
-      <DialogFooter className="mt-4 flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Secreto de cliente</p>
+        <pre
+          id={secretId}
+          tabIndex={0}
+          aria-label="Valor del secreto de cliente"
+          className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-border/70 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {disclosure.credential.secret}
+        </pre>
+      </div>
+      <DialogFooter className="mt-4 flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
         <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
           {copyFeedback}
         </p>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <Button
             type="button"
             variant="outline"
+            className="sm:min-w-24"
             aria-label="Copiar secreto al portapapeles"
             onClick={() => void handleCopy()}
           >
             Copiar
           </Button>
-          <Button type="button" onClick={onClose}>Cerrar</Button>
+          <Button type="button" className="sm:min-w-24" onClick={onClose}>Cerrar</Button>
         </div>
       </DialogFooter>
     </div>
@@ -264,7 +268,7 @@ export function ConsoleServiceAccountsPage() {
                 <th className="px-4 py-3">Credencial</th>
                 <th className="px-4 py-3">Acceso</th>
                 <th className="px-4 py-3">Expira</th>
-                <th className="px-4 py-3">Acciones</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -282,7 +286,7 @@ export function ConsoleServiceAccountsPage() {
                   <td className="px-4 py-3">{account.accessProjection?.effectiveAccess ?? 'unknown'}</td>
                   <td className="px-4 py-3">{account.expiresAt ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap justify-start gap-2 md:justify-end">
                       <Button
                         type="button"
                         variant="outline"
@@ -295,7 +299,6 @@ export function ConsoleServiceAccountsPage() {
                       >
                         Revelar
                       </Button>
-                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => openRevokeDialog(account)}>Revocar</Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -308,6 +311,7 @@ export function ConsoleServiceAccountsPage() {
                       >
                         Rotar
                       </Button>
+                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => openRevokeDialog(account)}>Revocar</Button>
                       {/* Delete works for an active OR a revoked SA — gated only by tenant suspension (#687). */}
                       <Button type="button" variant="destructive" size="sm" disabled={writesBlocked} onClick={() => openDeleteDialog(account)}>Eliminar</Button>
                     </div>
