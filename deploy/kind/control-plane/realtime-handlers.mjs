@@ -59,6 +59,10 @@ function isMissingRealtimeChannels(error) {
   return error?.code === '42P01' && /realtime_channels/i.test(String(error?.message ?? ''));
 }
 
+function isPlatformIdentity(identity) {
+  return identity?.actorType === 'superadmin' || identity?.actorType === 'internal';
+}
+
 export async function listWorkspaceRealtimeDataSources(pool, tenantId, workspaceId) {
   try {
     const { rows } = await pool.query(
@@ -85,8 +89,11 @@ export async function listWorkspaceRealtimeDataSources(pool, tenantId, workspace
 export async function getWorkspaceRealtime(ctx) {
   const st = ctx.store ?? store;
   const workspaceId = ctx.params?.workspaceId;
-  const ws = await st.getWorkspace(ctx.pool, workspaceId);
   const scope = callerTenantScope(ctx.identity);
+  if (scope == null && !isPlatformIdentity(ctx.identity)) {
+    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  }
+  const ws = await st.getWorkspace(ctx.pool, workspaceId);
   if (!ws || (scope != null && ws.tenant_id !== scope)) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }

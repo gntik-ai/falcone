@@ -81,6 +81,28 @@ export async function ensureSchema(pool) {
       throw e;
     }
   }
+  // ---- identity: external applications + federated providers ---------------
+  // The public route catalog and web console both expose workspace-scoped
+  // external application management. In kind, keep the canonical application
+  // document in JSONB while indexing the routing/authorization fields here.
+  // Federated providers are stored inside app_json.federatedProviders so this
+  // shim stays minimal and durable without introducing a second table.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS external_applications (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      protocol TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'active',
+      app_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by TEXT,
+      updated_by TEXT,
+      UNIQUE (workspace_id, slug)
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS external_applications_scope_idx ON external_applications (tenant_id, workspace_id, state)');
   // ---- data plane: one provisioned database per workspace ------------------
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workspace_databases (
@@ -825,6 +847,81 @@ export async function listServiceAccounts(pool, workspaceId) {
        FROM service_accounts WHERE workspace_id = $1 ORDER BY created_at DESC`, [workspaceId]);
   return { items: rows, total: rows.length };
 }
+
+// ---- external applications -------------------------------------------------
+export async function listExternalApplications(pool, {
+  workspaceId,
+  tenantId,
+  limit = 100,
+  offset = 0,
+  protocol = null,
+  state = null,
+} = {}) {
+  const clauses = ['workspace_id = $1', 'tenant_id = $2'];
+  const params = [workspaceId, tenantId];
+  if (protocol) {
+    params.push(protocol);
+    clauses.push(`protocol = $${params.length}`);
+  }
+  if (state) {
+    params.push(state);
+    clauses.push(`state = $${params.length}`);
+  }
+  params.push(limit);
+  const limitParam = `$${params.length}`;
+  params.push(offset);
+  const offsetParam = `$${params.length}`;
+
+  const { rows } = await pool.query(
+    `SELECT id, workspace_id, tenant_id, slug, protocol, state, app_json, created_at, updated_at, created_by, updated_by,
+            COUNT(*) OVER() AS total
+       FROM external_applications
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY created_at DESC
+      LIMIT ${limitParam} OFFSET ${offsetParam}`,
+    params);
+  return { items: rows.map(({ total, ...r }) => r), total: Number(rows[0]?.total ?? 0) };
+}
+
+export async function getExternalApplication(pool, { workspaceId, tenantId, applicationId }) {
+  const { rows } = await pool.query(
+    `SELECT id, workspace_id, tenant_id, slug, protocol, state, app_json, created_at, updated_at, created_by, updated_by
+       FROM external_applications
+      WHERE workspace_id = $1
+        AND tenant_id = $2
+        AND (id = $3 OR slug = $3)
+      LIMIT 1`,
+    [workspaceId, tenantId, applicationId]);
+  return rows[0] ?? null;
+}
+
+export async function upsertExternalApplication(pool, {
+  id,
+  workspaceId,
+  tenantId,
+  slug,
+  protocol,
+  state = 'active',
+  appJson,
+  actorId = null,
+}) {
+  const { rows } = await pool.query(
+    `INSERT INTO external_applications (id, workspace_id, tenant_id, slug, protocol, state, app_json, created_by, updated_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$8)
+     ON CONFLICT (id) DO UPDATE
+       SET slug = EXCLUDED.slug,
+           protocol = EXCLUDED.protocol,
+           state = EXCLUDED.state,
+           app_json = EXCLUDED.app_json,
+           updated_at = NOW(),
+           updated_by = EXCLUDED.updated_by
+      WHERE external_applications.workspace_id = EXCLUDED.workspace_id
+        AND external_applications.tenant_id = EXCLUDED.tenant_id
+     RETURNING id, workspace_id, tenant_id, slug, protocol, state, app_json, created_at, updated_at, created_by, updated_by`,
+    [id, workspaceId, tenantId, slug, protocol, state, JSON.stringify(appJson ?? {}), actorId]);
+  return rows[0] ?? null;
+}
+
 export async function setServiceAccountStatus(pool, id, status) {
   await pool.query('UPDATE service_accounts SET status=$2 WHERE id=$1', [id, status]);
 }
@@ -931,7 +1028,7 @@ export async function purgeWorkspace(pool, workspaceId) {
   // Child rows first (every workspace-owned table is keyed by workspace_id), then the workspace.
   for (const t of ['fn_activations', 'fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics',
                    'workspace_buckets', 'workspace_databases', 'workspace_mongo_databases',
-                   'workspace_api_keys', 'service_accounts']) {
+                   'workspace_api_keys', 'service_accounts', 'external_applications']) {
     await del(`DELETE FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
   }
   await del('DELETE FROM workspaces WHERE id = $1', [workspaceId]);
@@ -959,6 +1056,7 @@ export async function purgeTenant(pool, tenantId) {
   if (workspaceIds.length) await del('DELETE FROM fn_activations WHERE workspace_id = ANY($1)', [workspaceIds]);
   for (const t of ['fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
                    'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
+                   'external_applications',
                    'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
                    'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements']) {
     await del(`DELETE FROM ${t} WHERE tenant_id = $1`, [tenantId]);

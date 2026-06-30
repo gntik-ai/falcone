@@ -186,6 +186,33 @@ test('fix-788-03: foreign workspace id is scoped by verified tenant and does not
   assert.equal(res.body.code, 'WORKSPACE_NOT_FOUND');
 });
 
+test('fix-788-03b: tenantless non-platform caller cannot read guessed workspace realtime metadata', async () => {
+  const calls = [];
+  const pool = {
+    async query() {
+      throw new Error('realtime_channels must not be queried for a tenantless non-platform caller');
+    },
+  };
+  const store = {
+    async getWorkspace() {
+      calls.push('getWorkspace');
+      return { id: 'ws-acme', tenant_id: 'ten-foreign' };
+    },
+  };
+
+  const res = await REALTIME_HANDLERS.getWorkspaceRealtime({
+    params: { workspaceId: 'ws-acme' },
+    identity: { actorType: 'tenant_member', tenantId: null, sub: 'tenantless-1' },
+    pool,
+    store,
+  });
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.code, 'WORKSPACE_NOT_FOUND');
+  assert.equal(JSON.stringify(res.body).includes('ten-foreign'), false);
+  assert.deepEqual(calls, []);
+});
+
 test('fix-788-04: missing realtime_channels relation degrades to an empty successful config', async () => {
   const pool = {
     async query() {

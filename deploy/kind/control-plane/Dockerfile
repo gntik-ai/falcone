@@ -28,7 +28,9 @@ COPY deploy/kind/control-plane/server.mjs deploy/kind/control-plane/routes.mjs \
      deploy/kind/control-plane/mongo-handlers.mjs deploy/kind/control-plane/pg-handlers.mjs \
      deploy/kind/control-plane/kafka-handlers.mjs \
      deploy/kind/control-plane/fn-handlers.mjs deploy/kind/control-plane/function-executor.mjs \
+     deploy/kind/control-plane/application-handlers.mjs \
      deploy/kind/control-plane/vault-secrets.mjs \
+     deploy/kind/control-plane/realtime-handlers.mjs \
      deploy/kind/control-plane/webhook-handlers.mjs deploy/kind/control-plane/webhook-db.mjs \
      deploy/kind/control-plane/webhook-schema.mjs \
      deploy/kind/control-plane/audit-store.mjs deploy/kind/control-plane/audit-writer.mjs \
