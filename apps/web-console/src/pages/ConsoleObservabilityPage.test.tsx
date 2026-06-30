@@ -74,7 +74,7 @@ describe('ConsoleObservabilityPage', () => {
     expect(panel!).toHaveTextContent(/Registros enmascarados\s*1/)
     expect(screen.queryByText('Exportación iniciada correctamente.')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /descargar manifiesto json/i }))
+    await user.click(screen.getByRole('button', { name: /descargar json/i }))
     expect(createObjectURL).toHaveBeenCalled()
     expect(anchorClick).toHaveBeenCalled()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:audit-export')
@@ -122,6 +122,24 @@ describe('ConsoleObservabilityPage', () => {
     expect(screen.getByText('Export queued; artifact pending.')).toBeInTheDocument()
     expect(screen.getByText('No se descargó ningún archivo porque la respuesta no incluyó un manifiesto.')).toBeInTheDocument()
     expect(screen.queryByText('Exportación iniciada correctamente.')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /descargar manifiesto json/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /descargar json/i })).not.toBeInTheDocument()
+  })
+
+  it('muestra error explícito cuando falla la exportación', async () => {
+    const user = userEvent.setup()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+    mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+    mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+    mockExportAuditRecords.mockRejectedValue(new Error('Audit export unavailable'))
+
+    render(<ConsoleObservabilityPage />)
+    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    await user.click(screen.getByRole('button', { name: /exportar/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('No se pudo exportar la auditoría')
+    expect(alert).toHaveTextContent('Audit export unavailable')
+    expect(screen.queryByText('Exportación iniciada correctamente.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /descargar json/i })).not.toBeInTheDocument()
   })
 })

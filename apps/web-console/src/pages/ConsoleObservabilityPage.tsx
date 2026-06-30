@@ -222,7 +222,7 @@ export function ConsoleObservabilityPage() {
                     </div>
                     <Button type="button" variant="outline" className="w-full shrink-0 sm:w-auto" onClick={() => downloadAuditExportManifest(exportFeedback.manifest)}>
                       <Download className="h-4 w-4" aria-hidden="true" />
-                      Descargar manifiesto JSON
+                      Descargar JSON
                     </Button>
                   </div>
                   <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-emerald-500/20 pt-4 text-sm sm:grid-cols-3">
