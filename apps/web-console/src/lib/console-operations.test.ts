@@ -145,6 +145,34 @@ describe('console-operations hooks', () => {
     expect(result.current.error?.message).toBe('async_operations missing')
   })
 
+  it('shows loading feedback while a manual retry is pending after an exhausted no-data failure', async () => {
+    mockRequestConsoleSessionJson.mockRejectedValue(new Error('async_operations missing'))
+
+    const { result } = renderHook(() => useOperations(undefined, { limit: 20, offset: 0 }))
+
+    await act(async () => {
+      await flushAsyncWork()
+      await vi.advanceTimersByTimeAsync(1_000)
+      await flushAsyncWork()
+      await vi.advanceTimersByTimeAsync(3_000)
+      await flushAsyncWork()
+    })
+
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.error?.message).toBe('async_operations missing')
+
+    mockRequestConsoleSessionJson.mockImplementation(() => new Promise<never>(() => {}))
+
+    await act(async () => {
+      result.current.refetch()
+      await flushAsyncWork()
+    })
+
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(4)
+    expect(result.current.error).toBeNull()
+    expect(result.current.isLoading).toBe(true)
+  })
+
   it('F23 returns the sum of pending and running operations', async () => {
     mockRequestConsoleSessionJson
       .mockResolvedValueOnce({ queryType: 'list', total: 2, pagination: { limit: 1, offset: 0 }, items: [] })

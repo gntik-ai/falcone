@@ -125,10 +125,25 @@ describe('ConsoleOperationsPage', () => {
     render(<ConsoleOperationsPage />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar las operaciones.')
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders accessible loading feedback before operations are available', () => {
+    mockUseOperations.mockReturnValue({
+      isLoading: true,
+      error: null,
+      refetch: vi.fn(),
+      data: undefined
+    })
+
+    render(<ConsoleOperationsPage />)
+
+    expect(screen.getByRole('status', { name: 'Cargando operaciones' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByRole('button', { name: 'Siguiente' })).not.toBeInTheDocument()
   })
 
   it('F16 navigates to detail page when a row is clicked', () => {

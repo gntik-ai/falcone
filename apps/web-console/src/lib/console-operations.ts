@@ -141,6 +141,7 @@ function useAsyncResource<T>(
   const [error, setError] = useState<Error | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
   const timerRef = useRef<number | null>(null)
+  const dataRef = useRef<T | undefined>(undefined)
   const requestFactoryRef = useRef(requestFactory)
   const getNextIntervalRef = useRef(getNextInterval)
 
@@ -171,7 +172,7 @@ function useAsyncResource<T>(
     let failedAttempts = 0
 
     async function load() {
-      setIsLoading((current) => current || reloadToken === 0)
+      setIsLoading((current) => current || reloadToken === 0 || dataRef.current === undefined)
       if (failedAttempts === 0) {
         setError(null)
       }
@@ -183,6 +184,7 @@ function useAsyncResource<T>(
         }
 
         failedAttempts = 0
+        dataRef.current = nextData
         setData(nextData)
         setIsLoading(false)
 

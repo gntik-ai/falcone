@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { OperationStatusBadge } from '@/components/console/OperationStatusBadge'
 import { OperationStatusBanner } from '@/components/console/OperationStatusBanner'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
 import { useReconnectStateSync } from '@/lib/hooks/use-reconnect-state-sync'
@@ -131,15 +133,35 @@ export function ConsoleOperationsPage() {
       </div>
 
       {error ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <p>No se pudieron cargar las operaciones.</p>
-          <Button type="button" variant="outline" className="mt-3" onClick={refetch}>
-            Reintentar
-          </Button>
-        </div>
+        <Alert variant="destructive" className="border-destructive/30 bg-destructive/5 text-foreground">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/20 text-destructive">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <AlertTitle className="text-base">No se pudieron cargar las operaciones.</AlertTitle>
+                <AlertDescription className="text-muted-foreground">
+                  Se detuvieron los reintentos automáticos para evitar tráfico continuo. Reintenta cuando el servicio esté disponible.
+                </AlertDescription>
+              </div>
+            </div>
+            <Button type="button" className="w-full shrink-0 sm:w-auto" onClick={refetch}>
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Reintentar
+            </Button>
+          </div>
+        </Alert>
       ) : null}
 
-      {isLoading && !data ? <div className="h-64 animate-pulse rounded-3xl border border-border bg-muted/60" aria-busy="true" /> : null}
+      {isLoading && !data ? (
+        <div
+          role="status"
+          aria-label="Cargando operaciones"
+          aria-busy="true"
+          className="h-64 animate-pulse rounded-3xl border border-border bg-muted/60"
+        />
+      ) : null}
 
       {data && data.items.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-8 text-sm text-muted-foreground">
@@ -180,14 +202,16 @@ export function ConsoleOperationsPage() {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="outline" disabled={!canGoBack} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>
-          Anterior
-        </Button>
-        <Button type="button" variant="outline" disabled={!canGoNext} onClick={() => setOffset((current) => current + PAGE_SIZE)}>
-          Siguiente
-        </Button>
-      </div>
+      {data ? (
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="outline" disabled={!canGoBack} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>
+            Anterior
+          </Button>
+          <Button type="button" variant="outline" disabled={!canGoNext} onClick={() => setOffset((current) => current + PAGE_SIZE)}>
+            Siguiente
+          </Button>
+        </div>
+      ) : null}
     </section>
   )
 }
