@@ -88,6 +88,19 @@ export const routes = [
   // is always created under the source's verified tenant.
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/clone', localHandler: 'cloneWorkspace', auth: 'authenticated' },
 
+  // Workspace documentation / developer onboarding (#795): route the console documentation page
+  // to the real workspace-docs action instead of leaving the path as NO_ROUTE. The action owns
+  // workspace role checks for note mutations; this server supplies the verified console identity
+  // and the shared Postgres client.
+  { method: 'GET', path: '/v1/workspaces/{workspaceId}/docs', module: '/repo/services/workspace-docs-service/actions/workspace-docs.mjs', export: 'main',
+    invoke: 'params-auth-overrides', deps: ['db'], auth: 'authenticated' },
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/docs/notes', module: '/repo/services/workspace-docs-service/actions/workspace-docs.mjs', export: 'main',
+    invoke: 'params-auth-overrides', deps: ['db'], auth: 'authenticated' },
+  { method: 'PUT', path: '/v1/workspaces/{workspaceId}/docs/notes/{noteId}', module: '/repo/services/workspace-docs-service/actions/workspace-docs.mjs', export: 'main',
+    invoke: 'params-auth-overrides', deps: ['db'], auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/workspaces/{workspaceId}/docs/notes/{noteId}', module: '/repo/services/workspace-docs-service/actions/workspace-docs.mjs', export: 'main',
+    invoke: 'params-auth-overrides', deps: ['db'], auth: 'authenticated' },
+
   // ---- domain B: service accounts + credentials (LOCAL) --------------------
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/service-accounts', localHandler: 'createServiceAccount', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}/service-accounts', localHandler: 'listServiceAccounts', auth: 'authenticated' },

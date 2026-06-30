@@ -368,6 +368,7 @@ const mcpEngine = process.env.MCP_ENABLED === 'true'
 const server = createControlPlaneServer({
   registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, jwtVerifier,
   resolveWorkspaceTenant,
+  workspaceDocsDb: keyPool,
   controlPlaneUpstream: process.env.CONTROL_PLANE_UPSTREAM,
   // First-party MCP dispatches tool calls against this executor's own loopback base, so its local
   // routes + the control-plane fallthrough reach every management family (#642).

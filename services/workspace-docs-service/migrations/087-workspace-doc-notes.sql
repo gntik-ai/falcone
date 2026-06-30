@@ -1,3 +1,5 @@
+CREATE SCHEMA IF NOT EXISTS workspace_docs_service;
+
 SET search_path TO workspace_docs_service;
 
 CREATE TABLE IF NOT EXISTS workspace_doc_notes (

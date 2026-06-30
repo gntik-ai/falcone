@@ -549,6 +549,10 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | PUT | `/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}` | workspace | application | Update one federated identity provider including metadata, certificates, and mapper bindings |
 | GET | `/v1/workspaces/{workspaceId}/applications/templates` | workspace | application | List starter templates for SPA, confidential backend, and B2B SAML external applications |
 | POST | `/v1/workspaces/{workspaceId}/clone` | workspace | workspace | Clone one workspace baseline into a new environment with optional application and credential reset policies |
+| GET | `/v1/workspaces/{workspaceId}/docs` | workspace | workspace_docs | Fetch authenticated workspace documentation, service snippets, auth instructions, and custom notes |
+| POST | `/v1/workspaces/{workspaceId}/docs/notes` | workspace | workspace_doc_note | Create a custom workspace documentation note |
+| DELETE | `/v1/workspaces/{workspaceId}/docs/notes/{noteId}` | workspace | workspace_doc_note | Delete a custom workspace documentation note |
+| PUT | `/v1/workspaces/{workspaceId}/docs/notes/{noteId}` | workspace | workspace_doc_note | Update a custom workspace documentation note |
 | GET | `/v1/workspaces/{workspaceId}/effective-capabilities` | workspace | workspace_capabilities | Resolve effective capabilities for one workspace |
 | POST | `/v1/workspaces/{workspaceId}/managed-resources` | workspace | managed_resource | Submit a canonical managed resource write request |
 | GET | `/v1/workspaces/{workspaceId}/managed-resources/{resourceId}` | workspace | managed_resource | Fetch one canonical managed resource entity |
