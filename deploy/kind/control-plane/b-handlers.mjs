@@ -852,12 +852,14 @@ async function iamListUsers(ctx) {
   }));
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
-// Extract the password to set on a created user from EITHER the flat `password` field
-// OR the standard Keycloak `credentials: [{type:'password', value, temporary}]` array.
-// The handler previously read only `body.password`, so a caller using the documented
-// `credentials` shape had the password silently dropped — the user was created with no
-// credential and ROPC login failed with invalid_grant (P1, live 2026-06-18).
+// Extract the password to set on a created user from the documented
+// `bootstrapCredentials.temporaryPassword` field or legacy payload shapes kept for
+// compatibility with earlier console/API callers.
 export function credentialPasswordFromBody(body = {}) {
+  const bootstrap = body.bootstrapCredentials;
+  if (bootstrap && typeof bootstrap.temporaryPassword === 'string' && bootstrap.temporaryPassword) {
+    return { value: bootstrap.temporaryPassword, temporary: false };
+  }
   if (typeof body.password === 'string' && body.password) {
     return { value: body.password, temporary: body.temporary === true };
   }
@@ -866,14 +868,68 @@ export function credentialPasswordFromBody(body = {}) {
     : null;
   return cred ? { value: cred.value, temporary: cred.temporary === true } : null;
 }
+
+function uniqueStrings(values = []) {
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim()))];
+}
+
+export function realmRolesFromBody(body = {}) {
+  if (Array.isArray(body.realmRoles)) return uniqueStrings(body.realmRoles);
+  if (Array.isArray(body.roles)) return uniqueStrings(body.roles);
+  return [];
+}
+
+export function requiredActionsFromBody(body = {}) {
+  return uniqueStrings([
+    ...(Array.isArray(body.requiredActions) ? body.requiredActions : []),
+    ...(Array.isArray(body.bootstrapCredentials?.requiredActions) ? body.bootstrapCredentials.requiredActions : []),
+  ]);
+}
+
+function unsupportedIamCreateFields(body = {}) {
+  const unsupported = [];
+  if (Array.isArray(body.groups) && body.groups.length > 0) unsupported.push('groups');
+  if (body.metadata && Object.keys(body.metadata).length > 0) unsupported.push('metadata');
+  if (body.bootstrapCredentials?.sendEmail === true) unsupported.push('bootstrapCredentials.sendEmail');
+  return unsupported;
+}
+
 async function iamCreateUser(ctx) {
   const { params, body, identity } = ctx;
   if (!body.username && !body.email) return err(400, 'VALIDATION_ERROR', 'username or email required');
+  const unsupported = unsupportedIamCreateFields(body);
+  if (unsupported.length > 0) {
+    return err(400, 'UNSUPPORTED_FIELD', `unsupported create-user fields: ${unsupported.join(', ')}`);
+  }
   try {
+    const kc = ctx.kcAdmin ?? kcAdmin;
     const pw = credentialPasswordFromBody(body);
-    const id = await kcAdmin.createUser(params.realmId, { username: body.username ?? body.email, email: body.email ?? null, firstName: body.firstName ?? null, lastName: body.lastName ?? null, password: pw?.value ?? null, temporary: pw?.temporary === true });
-    if (Array.isArray(body.roles) && body.roles.length) await kcAdmin.assignRealmRoles(params.realmId, id, body.roles);
-    return ok(201, { userId: id, username: body.username ?? body.email, realm: params.realmId, roles: body.roles ?? [], createdBy: identity.sub });
+    const realmRoles = realmRolesFromBody(body);
+    const requiredActions = requiredActionsFromBody(body);
+    const attributes = body.attributes && typeof body.attributes === 'object' ? body.attributes : {};
+    const id = await kc.createUser(params.realmId, {
+      username: body.username ?? body.email,
+      email: body.email ?? null,
+      firstName: body.firstName ?? null,
+      lastName: body.lastName ?? null,
+      password: pw?.value ?? null,
+      temporary: pw?.temporary === true,
+      enabled: body.enabled !== false,
+      emailVerified: body.emailVerified !== false,
+      requiredActions,
+      attributes,
+    });
+    if (realmRoles.length) await kc.assignRealmRoles(params.realmId, id, realmRoles);
+    return ok(201, {
+      userId: id,
+      username: body.username ?? body.email,
+      realm: params.realmId,
+      roles: realmRoles,
+      realmRoles,
+      attributes,
+      requiredActions,
+      createdBy: identity?.sub ?? null,
+    });
   } catch (e) { return err(e.kcStatus === 409 ? 409 : (e.statusCode && e.statusCode < 500 ? e.statusCode : 502), 'IAM_CREATE_USER_FAILED', String(e.message ?? e)); }
 }
 async function iamListRoles(ctx) {
