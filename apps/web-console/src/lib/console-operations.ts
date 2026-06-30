@@ -4,6 +4,7 @@ import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { JsonValue } from '@/lib/http'
 
 export const ASYNC_OPERATION_QUERY_ENDPOINT = '/v1/async-operation-query'
+const ASYNC_RESOURCE_ERROR_RETRY_DELAYS_MS = [1_000, 3_000] as const
 
 export type OperationStatus = 'pending' | 'running' | 'completed' | 'failed' | 'timed_out' | 'cancelled'
 export type OperationResultType = 'success' | 'failure' | 'pending'
@@ -109,6 +110,13 @@ function normalizePagination(pagination?: PaginationParams): Required<Pagination
   return { limit, offset }
 }
 
+function useNormalizedPagination(pagination?: PaginationParams): Required<PaginationParams> {
+  const limit = pagination?.limit
+  const offset = pagination?.offset
+
+  return useMemo(() => normalizePagination({ limit, offset }), [limit, offset])
+}
+
 function hasActiveOperations(items: OperationSummary[] = []): boolean {
   return items.some((item) => item.status === 'pending' || item.status === 'running')
 }
@@ -133,6 +141,12 @@ function useAsyncResource<T>(
   const [error, setError] = useState<Error | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
   const timerRef = useRef<number | null>(null)
+  const dataRef = useRef<T | undefined>(undefined)
+  const requestFactoryRef = useRef(requestFactory)
+  const getNextIntervalRef = useRef(getNextInterval)
+
+  requestFactoryRef.current = requestFactory
+  getNextIntervalRef.current = getNextInterval
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -155,21 +169,26 @@ function useAsyncResource<T>(
 
     const abortController = new AbortController()
     let cancelled = false
+    let failedAttempts = 0
 
     async function load() {
-      setIsLoading((current) => current || reloadToken === 0)
-      setError(null)
+      setIsLoading((current) => current || reloadToken === 0 || dataRef.current === undefined)
+      if (failedAttempts === 0) {
+        setError(null)
+      }
 
       try {
-        const nextData = await requestFactory(abortController.signal)
+        const nextData = await requestFactoryRef.current(abortController.signal)
         if (cancelled) {
           return
         }
 
+        failedAttempts = 0
+        dataRef.current = nextData
         setData(nextData)
         setIsLoading(false)
 
-        const interval = getNextInterval?.(nextData) ?? false
+        const interval = getNextIntervalRef.current?.(nextData) ?? false
         clearTimer()
 
         if (interval && interval > 0) {
@@ -179,6 +198,16 @@ function useAsyncResource<T>(
         }
       } catch (rawError) {
         if (cancelled || abortController.signal.aborted) {
+          return
+        }
+
+        const retryDelay = ASYNC_RESOURCE_ERROR_RETRY_DELAYS_MS[failedAttempts]
+        if (retryDelay !== undefined) {
+          failedAttempts += 1
+          clearTimer()
+          timerRef.current = window.setTimeout(() => {
+            void load()
+          }, retryDelay)
           return
         }
 
@@ -195,13 +224,13 @@ function useAsyncResource<T>(
       abortController.abort()
       clearTimer()
     }
-  }, [clearTimer, dependencyKey, enabled, getNextInterval, reloadToken, requestFactory])
+  }, [clearTimer, dependencyKey, enabled, reloadToken])
 
   return { data, isLoading, error, refetch }
 }
 
 export function useOperations(filters?: OperationFilters, pagination?: PaginationParams) {
-  const normalizedPagination = useMemo(() => normalizePagination(pagination), [pagination])
+  const normalizedPagination = useNormalizedPagination(pagination)
   const dependencyKey = useMemo(
     () => JSON.stringify({ queryType: 'list', filters: filters ?? {}, pagination: normalizedPagination }),
     [filters, normalizedPagination]
@@ -244,7 +273,7 @@ export function useOperationDetail(operationId: string | undefined) {
 
 export function useOperationLogs(operationId: string | undefined, pagination?: PaginationParams) {
   const enabled = Boolean(operationId)
-  const normalizedPagination = useMemo(() => normalizePagination(pagination), [pagination])
+  const normalizedPagination = useNormalizedPagination(pagination)
   const dependencyKey = useMemo(
     () => JSON.stringify({ queryType: 'logs', operationId: operationId ?? null, pagination: normalizedPagination }),
     [operationId, normalizedPagination]
