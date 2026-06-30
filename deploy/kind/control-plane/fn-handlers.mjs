@@ -136,16 +136,114 @@ function activationOut(r) {
     triggerKind: 'manual', statusCode: r.status_code ?? undefined
   };
 }
-function actionOut(r, latest) {
+
+function jsonObject(value) {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch { return {}; }
+  }
+  return typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function activationPolicyOut() {
+  return {
+    logsAccess: 'workspace_developers',
+    resultAccess: 'workspace_developers',
+    rerunPolicy: 'manual_only',
+    retentionHours: 168
+  };
+}
+
+function sourceOut(r) {
+  return { kind: 'inline_code', language: 'javascript', inlineCode: r.source_code, entryFile: 'index.js' };
+}
+
+function actionExecutionOut(r) {
+  return {
+    entrypoint: r.entrypoint,
+    runtime: r.runtime,
+    parameters: jsonObject(r.parameters),
+    limits: { timeoutMs: r.timeout_ms, memoryMb: r.memory_mb }
+  };
+}
+
+function versionExecutionOut(r) {
+  return {
+    entrypoint: r.entrypoint,
+    runtime: r.runtime,
+    parameters: jsonObject(r.parameters),
+    environment: {},
+    limits: { timeoutSeconds: Math.max(1, Math.ceil((Number(r.timeout_ms) || 60000) / 1000)), memoryMb: r.memory_mb },
+    webAction: { enabled: false, requireAuthentication: true, rawHttpResponse: false }
+  };
+}
+
+function timestampsOut(r) {
+  return { createdAt: r.created_at, updatedAt: r.updated_at ?? r.created_at, ...(r.activated_at ? { activatedAt: r.activated_at } : {}) };
+}
+
+function legacyVersionOut(action) {
+  return {
+    versionId: store.syntheticFnVersionId(action),
+    resourceId: action.resource_id,
+    tenantId: action.tenant_id,
+    workspaceId: action.workspace_id,
+    versionNumber: Number(action.version ?? 1) || 1,
+    status: 'active',
+    originType: 'publish',
+    rollbackEligible: false,
+    source: sourceOut(action),
+    execution: versionExecutionOut(action),
+    activationPolicy: activationPolicyOut(),
+    timestamps: timestampsOut(action)
+  };
+}
+
+function versionOut(r, activeVersionNumber) {
+  const versionNumber = Number(r.version_number ?? 1) || 1;
+  const active = r.status === 'active';
+  return {
+    versionId: r.version_id,
+    resourceId: r.resource_id,
+    tenantId: r.tenant_id,
+    workspaceId: r.workspace_id,
+    versionNumber,
+    status: active ? 'active' : 'historical',
+    originType: r.origin_type === 'rollback_restore' ? 'rollback_restore' : 'publish',
+    ...(r.origin_version_id ? { originVersionId: r.origin_version_id } : {}),
+    rollbackEligible: !active && versionNumber < activeVersionNumber,
+    source: sourceOut(r),
+    execution: versionExecutionOut(r),
+    activationPolicy: activationPolicyOut(),
+    timestamps: timestampsOut(r)
+  };
+}
+
+function activeVersionNumber(versions, action) {
+  const active = versions.find((row) => row.status === 'active') ?? versions[0];
+  return Number(active?.version_number ?? action?.version ?? 1) || 1;
+}
+
+function actionOut(r, latest, versionState = null) {
+  const effectiveVersionState = versionState ?? {
+    activeVersionId: store.syntheticFnVersionId(r),
+    versionCount: 1,
+    rollbackAvailable: false
+  };
   return {
     resourceId: r.resource_id, tenantId: r.tenant_id, workspaceId: r.workspace_id,
     actionName: r.action_name, namespaceName: r.workspace_id, status: 'active',
-    activeVersionId: `v${r.version}`, rollbackAvailable: r.version > 1, versionCount: r.version,
-    execution: {
-      entrypoint: r.entrypoint, runtime: r.runtime, parameters: r.parameters ?? {},
-      limits: { timeoutMs: r.timeout_ms, memoryMb: r.memory_mb }
-    },
-    source: { kind: 'nodejs', inlineCode: r.source_code, entryFile: 'index.js' },
+    activeVersionId: effectiveVersionState.activeVersionId,
+    rollbackAvailable: Boolean(effectiveVersionState.rollbackAvailable),
+    versionCount: Number(effectiveVersionState.versionCount ?? 1),
+    execution: actionExecutionOut(r),
+    source: sourceOut(r),
+    activationPolicy: activationPolicyOut(),
+    secretReferences: [],
+    unresolvedSecretRefs: 0,
     provisioning: { state: 'active' },
     timestamps: { createdAt: r.created_at, updatedAt: r.updated_at },
     latestActivation: latest ? activationOut(latest) : undefined
@@ -184,7 +282,7 @@ async function fnDeploy(ctx) {
   }
   // Deploy/update the function's Knative Service (new revision on code change).
   try {
-    await deployKnativeService(name, code, { memoryMb, timeoutMs, secretEnv });
+    await (ctx.deployKnativeService ?? deployKnativeService)(name, code, { memoryMb, timeoutMs, secretEnv });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DEPLOY_FAILED', String(e.message ?? e));
   }
@@ -204,19 +302,31 @@ async function fnDeploy(ctx) {
 async function fnInventory(ctx) {
   const rows = await store.listFnActions(ctx.pool, ctx.params.workspaceId);
   const actions = [];
-  for (const r of rows) actions.push(actionOut(r, await store.latestFnActivation(ctx.pool, r.resource_id)));
+  for (const r of rows) {
+    actions.push(actionOut(
+      r,
+      await store.latestFnActivation(ctx.pool, r.resource_id),
+      await store.getFnActionVersionSummary(ctx.pool, r)
+    ));
+  }
   return ok(200, { workspaceId: ctx.params.workspaceId, actions, counts: { actions: actions.length, packages: 0, rules: 0, triggers: 0, httpExposures: 0 } });
 }
 // GET /v1/functions/workspaces/{workspaceId}/actions
 async function fnListActions(ctx) {
   const rows = await store.listFnActions(ctx.pool, ctx.params.workspaceId);
-  return ok(200, { items: rows.map((r) => actionOut(r)), page: { total: rows.length } });
+  const items = [];
+  for (const r of rows) items.push(actionOut(r, null, await store.getFnActionVersionSummary(ctx.pool, r)));
+  return ok(200, { items, page: { total: rows.length } });
 }
 // GET /v1/functions/actions/{actionId}
 async function fnActionDetail(ctx) {
   const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.actionId} not found`);
-  return ok(200, actionOut(r, await store.latestFnActivation(ctx.pool, r.resource_id)));
+  return ok(200, actionOut(
+    r,
+    await store.latestFnActivation(ctx.pool, r.resource_id),
+    await store.getFnActionVersionSummary(ctx.pool, r)
+  ));
 }
 // POST /v1/functions/actions/{actionId}/invocations  — REAL execution
 async function fnInvoke(ctx) {
@@ -293,13 +403,57 @@ async function fnActivationResult(ctx) {
 async function fnVersions(ctx) {
   const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', 'action not found');
-  return ok(200, { items: [{ versionId: `v${r.version}`, resourceId: r.resource_id, versionNumber: r.version, status: 'active', originType: 'deploy', rollbackEligible: false, timestamps: { createdAt: r.created_at, updatedAt: r.updated_at } }], page: { total: 1 } });
+  const rows = await store.listFnActionVersions(ctx.pool, r.resource_id);
+  const items = rows.length
+    ? rows.map((row) => versionOut(row, activeVersionNumber(rows, r)))
+    : [legacyVersionOut(r)];
+  return ok(200, { items, page: { size: items.length } });
 }
-// POST /v1/functions/actions/{actionId}/rollback  (no historical versions kept — accept as no-op)
+// POST /v1/functions/actions/{actionId}/rollback
 async function fnRollback(ctx) {
   const r = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!r) return err(404, 'ACTION_NOT_FOUND', 'action not found');
-  return ok(202, { requestId: randomUUID(), resourceId: r.resource_id, requestedVersionId: ctx.body?.versionId ?? `v${r.version}`, status: 'accepted', correlationId: randomUUID() });
+  if (!canManageTenant(ctx.identity, r.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
+  const versionId = ctx.body?.versionId;
+  if (typeof versionId !== 'string' || !/^fnv_[0-9a-z]+$/.test(versionId)) {
+    return err(400, 'VALIDATION_ERROR', 'versionId is required and must match fnv_[0-9a-z]+');
+  }
+
+  const rows = await store.listFnActionVersions(ctx.pool, r.resource_id);
+  const target = rows.find((row) => row.version_id === versionId && row.tenant_id === r.tenant_id && row.workspace_id === r.workspace_id);
+  if (!target) return err(404, 'VERSION_NOT_FOUND', 'function version not found');
+
+  const activeNumber = activeVersionNumber(rows, r);
+  const targetNumber = Number(target.version_number ?? 0);
+  if (target.status === 'active' || targetNumber >= activeNumber) {
+    return err(409, 'VERSION_NOT_ELIGIBLE', 'rollback target must be a retained prior version');
+  }
+
+  const deployName = r.ksvc_name ?? target.ksvc_name;
+  if (deployName) {
+    try {
+      await (ctx.deployKnativeService ?? deployKnativeService)(deployName, target.source_code, {
+        memoryMb: target.memory_mb,
+        timeoutMs: target.timeout_ms,
+        secretEnv: []
+      });
+    } catch (e) {
+      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_ROLLBACK_DEPLOY_FAILED', String(e.message ?? e));
+    }
+  }
+
+  const updated = await store.activateFnActionVersion(ctx.pool, r, target);
+  if (!updated) return err(409, 'ROLLBACK_STATE_CONFLICT', 'function version could not be activated');
+  return ok(202, {
+    requestId: randomUUID(),
+    resourceId: r.resource_id,
+    requestedVersionId: versionId,
+    status: 'accepted',
+    correlationId: ctx.callerContext?.correlationId ?? randomUUID(),
+    acceptedAt: new Date().toISOString()
+  });
 }
 
 // ---- Workspace secrets (add-vault-secret-consumption, #612; console convergence,
