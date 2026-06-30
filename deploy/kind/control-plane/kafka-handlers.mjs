@@ -19,6 +19,24 @@ const err = (statusCode, code, message) => ({ statusCode, body: { code, message 
 const nowIso = () => new Date().toISOString();
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 200);
 const safeParse = (s) => { try { return JSON.parse(s); } catch { return s; } };
+const staleMetadataCodes = new Set([3, 5, 6]);
+const staleMetadataPatterns = [
+  /UNKNOWN_TOPIC_OR_PARTITION/i,
+  /LEADER_NOT_AVAILABLE/i,
+  /NOT_LEADER_FOR_PARTITION/i,
+  /KAFKAJS_METADATA_NOT_LOADED/i,
+  /does not host this topic-partition/i,
+  /not leader for partition/i,
+  /leader.*not available/i,
+  /metadata.*not.*loaded/i,
+  /metadata.*stale/i,
+  /stale.*metadata/i
+];
+const topicAlreadyExistsPatterns = [
+  /TOPIC_ALREADY_EXISTS/i,
+  /topic.*already exists/i,
+  /already exists.*topic/i
+];
 
 // Physical Kafka topic name for a workspace's logical topic. Derived from the
 // GLOBALLY-UNIQUE workspace id — NOT the per-tenant `slug`, which is not unique
@@ -31,9 +49,16 @@ export function physicalTopicName(workspaceId, topicName) {
   return `evt.${workspaceId}.${topicName}`;
 }
 
+function defaultKafkaFactory() {
+  return new Kafka({ clientId: 'in-falcone-console', brokers: BROKERS, logLevel: logLevel.NOTHING, retry: { retries: 3 }, ...resolveKafkaSecurity() });
+}
+
 let kafka = null;
+let kafkaFactory = defaultKafkaFactory;
+let storeApi = store;
+
 function getKafka() {
-  if (!kafka) kafka = new Kafka({ clientId: 'in-falcone-console', brokers: BROKERS, logLevel: logLevel.NOTHING, retry: { retries: 3 }, ...resolveKafkaSecurity() });
+  if (!kafka) kafka = kafkaFactory();
   return kafka;
 }
 let adminP = null, producerP = null;
@@ -44,6 +69,98 @@ async function admin() {
 async function producer() {
   if (!producerP) { const p = getKafka().producer(); producerP = p.connect().then(() => p).catch((e) => { producerP = null; throw e; }); }
   return producerP;
+}
+
+function getStore() {
+  return storeApi;
+}
+
+function errorValues(e) {
+  if (!e || typeof e !== 'object') return [e];
+  return [e.name, e.type, e.code, e.errorCode, e.message, String(e)];
+}
+
+function matchesError(e, patterns, seen = new Set()) {
+  if (e == null) return false;
+  if (typeof e === 'object') {
+    if (seen.has(e)) return false;
+    seen.add(e);
+    for (const value of errorValues(e)) {
+      if (value != null && patterns.some((pattern) => pattern.test(String(value)))) return true;
+    }
+    for (const nested of [e.cause, e.originalError, e.error]) {
+      if (matchesError(nested, patterns, seen)) return true;
+    }
+    if (Array.isArray(e.errors) && e.errors.some((nested) => matchesError(nested, patterns, seen))) return true;
+    return false;
+  }
+  return patterns.some((pattern) => pattern.test(String(e)));
+}
+
+export function isStaleKafkaMetadataError(e, seen = new Set()) {
+  if (e == null) return false;
+  if (typeof e === 'object') {
+    if (seen.has(e)) return false;
+    seen.add(e);
+    const code = Number(e.code ?? e.errorCode);
+    if (staleMetadataCodes.has(code)) return true;
+    if (errorValues(e).some((value) => value != null && staleMetadataPatterns.some((pattern) => pattern.test(String(value))))) return true;
+    for (const nested of [e.cause, e.originalError, e.error]) {
+      if (isStaleKafkaMetadataError(nested, seen)) return true;
+    }
+    if (Array.isArray(e.errors) && e.errors.some((nested) => isStaleKafkaMetadataError(nested, seen))) return true;
+    return false;
+  }
+  return staleMetadataPatterns.some((pattern) => pattern.test(String(e)));
+}
+
+function isTopicAlreadyExistsError(e) {
+  return matchesError(e, topicAlreadyExistsPatterns);
+}
+
+async function resetAdminClient() {
+  const cached = adminP;
+  adminP = null;
+  if (!cached) return;
+  try { await (await cached).disconnect(); } catch { /* ignore reconnect cleanup */ }
+}
+
+async function resetProducerClient() {
+  const cached = producerP;
+  producerP = null;
+  if (!cached) return;
+  try { await (await cached).disconnect(); } catch { /* ignore reconnect cleanup */ }
+}
+
+async function withStaleMetadataRecovery(getClient, resetClient, operation, options = {}) {
+  try {
+    return await operation(await getClient());
+  } catch (e) {
+    if (!isStaleKafkaMetadataError(e)) throw e;
+    await resetClient();
+    try {
+      return await operation(await getClient());
+    } catch (retryError) {
+      if (options.treatTopicAlreadyExistsAfterRecoveryAsSuccess && isTopicAlreadyExistsError(retryError)) return false;
+      throw retryError;
+    }
+  }
+}
+
+export async function __setKafkaHandlersTestHooks({ kafka: kafkaOverride, kafkaFactory: nextKafkaFactory, store: storeOverride } = {}) {
+  await resetProducerClient();
+  await resetAdminClient();
+  kafka = null;
+  kafkaFactory = nextKafkaFactory ?? (kafkaOverride ? () => kafkaOverride : defaultKafkaFactory);
+  storeApi = storeOverride ? { ...store, ...storeOverride } : store;
+}
+
+export async function __resetKafkaHandlersTestHooks() {
+  await resetProducerClient();
+  await resetAdminClient();
+  kafka = null;
+  kafkaFactory = defaultKafkaFactory;
+  storeApi = store;
 }
 
 // Best-effort physical topic teardown for tenant purge (#501). Missing topics are ignored.
@@ -59,7 +176,7 @@ export async function deleteTopics(physicalNames) {
 // a cross-tenant id is reported as 404 (no existence leak), mirroring the
 // executor's workspace-ownership guard.
 async function resolveOwnedWorkspace(ctx) {
-  const ws = await store.getWorkspace(ctx.pool, ctx.params.workspaceId);
+  const ws = await getStore().getWorkspace(ctx.pool, ctx.params.workspaceId);
   if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   const scope = callerTenantScope(ctx.identity);
   if (scope != null && ws.tenant_id !== scope) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
@@ -70,7 +187,7 @@ async function resolveOwnedWorkspace(ctx) {
 async function eventsInventory(ctx) {
   const r = await resolveOwnedWorkspace(ctx); if (r.error) return r.error;
   const workspaceId = ctx.params.workspaceId;
-  const topics = await store.listTopicsForWorkspace(ctx.pool, workspaceId);
+  const topics = await getStore().listTopicsForWorkspace(ctx.pool, workspaceId);
   let byName = {};
   if (topics.length) {
     try {
@@ -102,9 +219,13 @@ async function eventsProvisionTopic(ctx) {
   const physical = physicalTopicName(ws.id, topicName);
   const resourceId = `res_topic_${randomUUID().slice(0, 8)}`;
   try {
-    const a = await admin();
-    await a.createTopics({ topics: [{ topic: physical, numPartitions: partitions, replicationFactor: 1 }], waitForLeaders: true });
-    const rec = await store.insertTopic(ctx.pool, { id: resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, topicName, physicalTopicName: physical, partitions });
+    await withStaleMetadataRecovery(
+      admin,
+      resetAdminClient,
+      (a) => a.createTopics({ topics: [{ topic: physical, numPartitions: partitions, replicationFactor: 1 }], waitForLeaders: true }),
+      { treatTopicAlreadyExistsAfterRecoveryAsSuccess: true }
+    );
+    const rec = await getStore().insertTopic(ctx.pool, { id: resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, topicName, physicalTopicName: physical, partitions });
     return ok(201, { resourceId: rec.id, topicName: rec.topic_name, physicalTopicName: rec.physical_topic_name, partitionCount: partitions, status: 'active' });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'TOPIC_PROVISION_FAILED', String(e.message ?? e));
@@ -112,7 +233,7 @@ async function eventsProvisionTopic(ctx) {
 }
 
 async function resolveTopic(ctx) {
-  const t = await store.getTopicByResourceId(ctx.pool, ctx.params.topicId);
+  const t = await getStore().getTopicByResourceId(ctx.pool, ctx.params.topicId);
   if (!t) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
   // Enforce the caller's verified tenant owns the topic. A cross-tenant resource
   // id resolves to 404 (no existence leak) — closing the Events/Kafka IDOR where
@@ -188,11 +309,14 @@ async function eventsTopicPublish(ctx) {
   const payload = ctx.body?.payload;
   const value = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
   try {
-    const p = await producer();
     const headers = {};
     if (ctx.body?.eventType) headers.eventType = String(ctx.body.eventType);
     if (ctx.body?.contentType) headers.contentType = String(ctx.body.contentType);
-    const res = await p.send({ topic: r.t.physical_topic_name, messages: [{ key: ctx.body?.key ? String(ctx.body.key) : null, value, headers }] });
+    const res = await withStaleMetadataRecovery(
+      producer,
+      resetProducerClient,
+      (p) => p.send({ topic: r.t.physical_topic_name, messages: [{ key: ctx.body?.key ? String(ctx.body.key) : null, value, headers }] })
+    );
     const md = res[0] ?? {};
     return ok(202, {
       publicationId: `pub_${randomUUID().slice(0, 12)}`, status: 'accepted', acceptedAt: nowIso(),
@@ -206,7 +330,7 @@ async function eventsTopicPublish(ctx) {
 
 // GET /v1/events/topics/{resourceId}/stream  (SSE — owns the response)
 async function eventsTopicStream(ctx, res) {
-  const t = await store.getTopicByResourceId(ctx.pool, ctx.params.topicId);
+  const t = await getStore().getTopicByResourceId(ctx.pool, ctx.params.topicId);
   // Same tenant boundary as resolveTopic — a cross-tenant id must not open an SSE
   // consumer onto another tenant's topic (P0 ISO-EVENTS).
   const scope = callerTenantScope(ctx.identity);
