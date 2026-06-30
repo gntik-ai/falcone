@@ -3,6 +3,7 @@
 #   073, 074, 075, 076, 078       (async operations / logs / retry semantics)
 #   097, 098, 100, 103, 104, 105  (plans / quota dimensions / change-history /
 #   quota overrides / boolean capabilities / workspace sub-quotas)
+#   workspace-docs-service 087     (workspace documentation notes/access log)
 #
 # Apply in NUMERIC order. The numeric prefix already encodes the dependency order;
 # the only hard cross-FILE constraint is 073 BEFORE 074 (FK). All other FKs are
@@ -56,6 +57,12 @@ services/provisioning-orchestrator/src/migrations/117-tenant-config-reprovision.
 
 services/provisioning-orchestrator/src/migrations/118-config-preflight.sql
 # config_preflight_audit_log — written by tenant-config-preflight (insertPreflightAuditLog).
+
+# --- workspace-docs-service (services/workspace-docs-service/migrations) ---
+
+services/workspace-docs-service/migrations/087-workspace-doc-notes.sql
+# workspace_docs_service.workspace_doc_notes + workspace_doc_access_log — read/written by
+# /v1/workspaces/{workspaceId}/docs and /docs/notes routes.
 
 # --- scheduling-engine (services/scheduling-engine/migrations) ---
 

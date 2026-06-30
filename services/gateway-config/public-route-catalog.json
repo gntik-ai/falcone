@@ -152,6 +152,26 @@
     "privilege_domain": "structural_admin"
   },
   {
+    "method": "GET",
+    "path": "/v1/workspaces/{id}/docs",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{id}/docs/notes",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/workspaces/{id}/docs/notes/{noteId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/workspaces/{id}/docs/notes/{noteId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
     "method": "PUT",
     "path": "/v1/workspaces/{id}/llm-provider",
     "privilege_domain": "structural_admin"

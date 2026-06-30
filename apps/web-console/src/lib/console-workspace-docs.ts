@@ -1,4 +1,4 @@
-import { requestJson } from '@/lib/http'
+import { requestConsoleSessionJson } from '@/lib/console-session'
 
 export interface WorkspaceDocSnippet {
   id: string
@@ -45,35 +45,36 @@ export interface WorkspaceDocsResponse {
   customNotes: WorkspaceDocNote[]
 }
 
-function authHeaders(token: string): HeadersInit {
-  return token ? { Authorization: `Bearer ${token}` } : {}
+const WORKSPACE_DOC_NOTE_MANAGEMENT_ROLES = new Set(['workspace_admin', 'workspace_owner'])
+
+export function canManageWorkspaceDocNotes(roles: readonly string[] | undefined): boolean {
+  return Array.isArray(roles) && roles.some((role) => WORKSPACE_DOC_NOTE_MANAGEMENT_ROLES.has(role))
 }
 
-export async function fetchWorkspaceDocs(workspaceId: string, token: string): Promise<WorkspaceDocsResponse> {
-  return requestJson<WorkspaceDocsResponse>(`/v1/workspaces/${workspaceId}/docs`, {
-    headers: authHeaders(token)
-  })
+function workspaceDocsBase(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/docs`
 }
 
-export async function createDocNote(workspaceId: string, content: string, token: string): Promise<WorkspaceDocNote> {
-  return requestJson<WorkspaceDocNote>(`/v1/workspaces/${workspaceId}/docs/notes`, {
+export async function fetchWorkspaceDocs(workspaceId: string): Promise<WorkspaceDocsResponse> {
+  return requestConsoleSessionJson<WorkspaceDocsResponse>(workspaceDocsBase(workspaceId))
+}
+
+export async function createDocNote(workspaceId: string, content: string): Promise<WorkspaceDocNote> {
+  return requestConsoleSessionJson<WorkspaceDocNote>(`${workspaceDocsBase(workspaceId)}/notes`, {
     method: 'POST',
-    headers: authHeaders(token),
     body: { content }
   })
 }
 
-export async function updateDocNote(workspaceId: string, noteId: string, content: string, token: string): Promise<WorkspaceDocNote> {
-  return requestJson<WorkspaceDocNote>(`/v1/workspaces/${workspaceId}/docs/notes/${noteId}`, {
+export async function updateDocNote(workspaceId: string, noteId: string, content: string): Promise<WorkspaceDocNote> {
+  return requestConsoleSessionJson<WorkspaceDocNote>(`${workspaceDocsBase(workspaceId)}/notes/${encodeURIComponent(noteId)}`, {
     method: 'PUT',
-    headers: authHeaders(token),
     body: { content }
   })
 }
 
-export async function deleteDocNote(workspaceId: string, noteId: string, token: string): Promise<void> {
-  await requestJson(`/v1/workspaces/${workspaceId}/docs/notes/${noteId}`, {
-    method: 'DELETE',
-    headers: authHeaders(token)
+export async function deleteDocNote(workspaceId: string, noteId: string): Promise<void> {
+  await requestConsoleSessionJson(`${workspaceDocsBase(workspaceId)}/notes/${encodeURIComponent(noteId)}`, {
+    method: 'DELETE'
   })
 }
