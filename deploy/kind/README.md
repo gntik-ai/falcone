@@ -24,7 +24,7 @@ validates the Keycloak JWT (JWKS), builds a trusted `callerContext` from the
 verified claims, and dispatches `/v1/*` to the repo's REAL action modules
 (`/repo/services/...`) with a pg Pool injected — **54 routes** loaded
 (`routes.mjs` seed + `route-map.runtime.json`). Backed by the `in_falcone`
-Postgres DB (migrations 073,074,080,093,097,098,100,103,104,105,114,115,117,118
+Postgres DB (migrations 073,074,075,076,078,080,093,097,098,100,103,104,105,114,115,117,118
 applied). Proven end-to-end through the gateway: create plan → set resource
 limit (`max_workspaces` 10→42) → activate (lifecycle) → read limit profile, plus
 quota-dimension catalog, plan list/get, change-history.
@@ -214,8 +214,9 @@ this control-plane serves. To make the shell usable end-to-end:
   and threw React #426 (suspend-on-click) — converted to an eager import in `router.tsx`.
 - The repo's **Operations** page (`/console/operations` + detail) is wired to the
   **real `async_operations` tables**. The endpoint (`POST /v1/async-operation-query`,
-  the real `async-operation-query` action) was already in the route map but the
-  table was empty — so my durable saga (`saga.mjs`) now records a real async
+  the real `async-operation-query` action) was already in the route map, and boot
+  applies the async-operation migration chain (073, 074, 075, 076, 078) before the
+  server declares schema readiness. Durable saga (`saga.mjs`) records a real async
   operation (+ transition + log) on start/complete/fail. `createTenant` →
   `tenant.create`, DB provisioning → `workspace.database.provision`. Verified:
   created tenants + a DB + a deliberately failing tenant → the list shows

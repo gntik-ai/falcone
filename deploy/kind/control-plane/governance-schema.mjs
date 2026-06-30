@@ -1,19 +1,20 @@
-// Governance schema bootstrap for the kind control-plane (#555 BUG-GOV-SCHEMA).
+// Provisioning-orchestrator schema bootstrap for the kind control-plane (#555 BUG-GOV-SCHEMA, #736).
 //
-// The wireable governance routes (capability-catalog, plan-assign, scope-enforcement
-// audit, quota dimensions / effective-limits) dispatch to the REAL product actions
-// dynamically imported under `/repo/services/provisioning-orchestrator/...`. Those
-// actions query tables that live in the provisioning-orchestrator MIGRATIONS — but
-// the kind boot only ran `ensureSchema` (the hand-written domain-B tables: tenants /
-// workspaces / workspace_databases / saga). The governance migrations were never
-// applied to `in_falcone` (the planning note `required-migrations.txt` listed them but
-// nothing consumed it), so every governance read/write hit a missing relation and
-// 500'd with PostgreSQL 42P01. This module applies that governance migration set at
+// The wireable control-plane routes dispatch to REAL product actions dynamically
+// imported under `/repo/services/provisioning-orchestrator/...`. Those actions query
+// tables that live in the provisioning-orchestrator MIGRATIONS — but the kind boot
+// only ran `ensureSchema` (the hand-written domain-B tables: tenants / workspaces /
+// workspace_databases / saga). The required migrations were never applied to
+// `in_falcone` (the planning note `required-migrations.txt` listed them but nothing
+// consumed it), so reads/writes hit missing relations and 500'd with PostgreSQL 42P01.
+// This module applies the route-serving provisioning-orchestrator migration set at
 // boot so the actions resolve.
 //
-// Ordering is dependency-safe (and numeric): 080 (pg_capture_configs + pg_capture_quotas +
-// pg_capture_audit_log — read by realtime/pg-capture-list; standalone, intra-file FKs only)
-// → 093 (scope_enforcement_denials, standalone)
+// Ordering is dependency-safe (and numeric): 073/074/075/076/078 (async operations
+// base tables, logs, retry/idempotency, timeout/cancel/recovery, intervention schema;
+// 074+ depend on 073)
+// → 080 (pg_capture_configs + pg_capture_quotas + pg_capture_audit_log — read by
+// realtime/pg-capture-list; standalone, intra-file FKs only) → 093 (scope_enforcement_denials, standalone)
 // → 097 (defines set_updated_at_timestamp() + plans, the prerequisites for the rest)
 // → 098 (creates AND seeds quota_dimension_catalog, before 103/105 FK it)
 // → 100 (tenant_plan_change_history) → 103 (quota_overrides) → 104 (boolean_capability_catalog)
@@ -27,6 +28,11 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 export const GOVERNANCE_MIGRATIONS = [
+  'services/provisioning-orchestrator/src/migrations/073-async-operation-tables.sql',
+  'services/provisioning-orchestrator/src/migrations/074-async-operation-log-entries.sql',
+  'services/provisioning-orchestrator/src/migrations/075-idempotency-retry-tables.sql',
+  'services/provisioning-orchestrator/src/migrations/076-timeout-cancel-recovery.sql',
+  'services/provisioning-orchestrator/src/migrations/078-retry-semantics-intervention.sql',
   'services/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql',
   'services/provisioning-orchestrator/src/migrations/093-scope-enforcement.sql',
   'services/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql',
@@ -76,6 +82,6 @@ export async function applyGovernanceSchema(pool, opts = {}) {
     await pool.query(forwardMigration(sql));
     applied.push(rel);
   }
-  log.log?.(`[control-plane] governance schema ready (${applied.length} migrations)`);
+  log.log?.(`[control-plane] provisioning-orchestrator schema ready (${applied.length} migrations)`);
   return applied;
 }

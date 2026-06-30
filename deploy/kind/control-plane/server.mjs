@@ -427,9 +427,10 @@ loadRoutes();
 runWithRetry(async (attempt) => {
   await ensureSchema(pool);
   await ensureSagaSchema(pool);
-  // Apply the governance migration set (plans / quota dimensions / change-history /
-  // quota overrides / boolean capabilities / scope-enforcement) so the wireable
-  // governance routes' real actions resolve instead of 500'ing on 42P01 (#555).
+  // Apply the provisioning-orchestrator migration set required by served real actions
+  // (async operations, plans / quota dimensions / change-history / quota overrides /
+  // boolean capabilities / scope-enforcement) so the wireable routes resolve instead
+  // of 500'ing on 42P01 (#555, #736).
   await applyGovernanceSchema(pool);
   // Webhook management plane (#643): create webhook_subscriptions/_signing_secrets/
   // _deliveries/_delivery_attempts (migrations 001+002) so /v1/webhooks/* has durable
