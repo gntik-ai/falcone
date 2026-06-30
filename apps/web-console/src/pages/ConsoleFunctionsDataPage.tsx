@@ -7,18 +7,20 @@ export function ConsoleFunctionsDataPage() {
   const { activeTenantId, activeWorkspaceId } = useConsoleContext()
 
   if (!activeTenantId) {
-    return <p>Select a tenant to use functions.</p>
+    return <p role="status">Select a tenant to use functions.</p>
   }
 
   if (!activeWorkspaceId) {
-    return <p>Select a workspace to use functions.</p>
+    return <p role="status">Select a workspace to use functions.</p>
   }
 
   return (
-    <div>
-      <h1>Functions</h1>
-      <p>Deploy functions and invoke them against the workspace runtime.</p>
+    <section className="space-y-6" aria-labelledby="functions-data-title">
+      <header className="space-y-2">
+        <h1 id="functions-data-title" className="text-2xl font-semibold text-foreground">Data: Functions</h1>
+        <p className="text-sm text-muted-foreground">Deploy functions and invoke them against the workspace runtime.</p>
+      </header>
       <FunctionsConsole tenantId={activeTenantId} workspaceId={activeWorkspaceId} />
-    </div>
+    </section>
   )
 }
