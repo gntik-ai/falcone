@@ -90,10 +90,33 @@ export interface LimitProfileRow {
   dimensionKey: string
   displayLabel: string
   unit?: string | null
-  defaultValue: number
   effectiveValue: number
+  // Older console code expected `defaultValue`/`explicitValue`, but the plan-limits
+  // profile API returns the authoritative saved value as `effectiveValue` plus `source`.
+  defaultValue?: number
   explicitValue?: number | null
+  unlimitedSentinel?: boolean
+  quotaType?: 'hard' | 'soft'
+  graceMargin?: number
   source: 'default' | 'explicit' | 'unlimited'
+}
+
+export interface PlanLimitSetResponse {
+  planId: string
+  dimensionKey: string
+  previousValue?: number | null
+  newValue: number
+  source: 'explicit'
+  quotaType?: 'hard' | 'soft'
+  graceMargin?: number
+}
+
+export interface PlanLimitRemoveResponse {
+  planId: string
+  dimensionKey: string
+  removedValue?: number | null
+  effectiveValue: number
+  source: 'default'
 }
 
 export interface PlanQuotaImpact {
@@ -241,8 +264,8 @@ export function getPlan(planIdOrSlug: string) { return request<PlanRecord>(`/v1/
 export function updatePlan(planId: string, body: Record<string, unknown>) { return request<PlanRecord>(`/v1/plans/${planId}`, { method: 'PUT', body: JSON.stringify(body) }) }
 export function transitionPlanLifecycle(planId: string, body: Record<string, unknown>) { return request(`/v1/plans/${planId}/lifecycle`, { method: 'POST', body: JSON.stringify(body) }) }
 export function getPlanLimitsProfile(planId: string) { return request<{ planId: string; profile: LimitProfileRow[] }>(`/v1/plans/${planId}/limits`) }
-export function setPlanLimit(planId: string, dimensionKey: string, value: number) { return request(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'PUT', body: JSON.stringify({ value }) }) }
-export function removePlanLimit(planId: string, dimensionKey: string) { return request(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'DELETE' }) }
+export function setPlanLimit(planId: string, dimensionKey: string, value: number) { return request<PlanLimitSetResponse>(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'PUT', body: JSON.stringify({ value }) }) }
+export function removePlanLimit(planId: string, dimensionKey: string) { return request<PlanLimitRemoveResponse>(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'DELETE' }) }
 export function listQuotaDimensions() { return request<{ dimensions: LimitProfileRow[]; total: number }>('/v1/quota-dimensions') }
 export function assignPlan(tenantId: string, body: Record<string, unknown>) { return request<AssignmentRecord>(`/v1/tenants/${tenantId}/plan`, { method: 'POST', body: JSON.stringify(body) }) }
 export function getTenantCurrentPlan(tenantId: string) { return request(`/v1/tenants/${tenantId}/plan`) }
