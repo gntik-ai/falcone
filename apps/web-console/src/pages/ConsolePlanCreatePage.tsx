@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
-import { PlanCapabilityBadge } from '@/components/console/PlanCapabilityBadge'
-import { PlanLimitsTable } from '@/components/console/PlanLimitsTable'
-import { PlanAssignmentDialog } from '@/components/console/PlanAssignmentDialog'
-import { PlanHistoryTable } from '@/components/console/PlanHistoryTable'
-import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
 import * as api from '@/services/planManagementApi'
 
 export function ConsolePlanCreatePage() {
@@ -17,15 +14,65 @@ export function ConsolePlanCreatePage() {
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null)
+  const displayNameInputRef = useRef<HTMLInputElement>(null)
+  function handleDisplayNameChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextDisplayName = event.currentTarget.value
+    setDisplayName(nextDisplayName)
+    if (displayNameError && nextDisplayName.trim()) {
+      setDisplayNameError(null)
+    }
+  }
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    const trimmedDisplayName = displayName.trim()
+    const nextDisplayNameError = trimmedDisplayName ? null : 'Display name is required'
+    setError(null)
+    setDisplayNameError(nextDisplayNameError)
     if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) { setError('Slug format is invalid'); return }
+    if (nextDisplayNameError) { displayNameInputRef.current?.focus(); return }
     try {
-      const created = await api.createPlan({ slug, displayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
+      const created = await api.createPlan({ slug, displayName: trimmedDisplayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
       navigate(`/console/plans/${created.id}`)
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Unable to create plan')
     }
   }
-  return <main className="space-y-6"><header className="rounded-3xl border border-border bg-card/70 p-6"><h1 className="text-2xl font-semibold">Create plan</h1></header><form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-border bg-card/70 p-6"><label className="block">Slug<Input aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} /></label><label className="block">Display name<Input aria-label="display-name" value={displayName} onChange={(e) => setDisplayName(e.currentTarget.value)} /></label><label className="block">Description<textarea aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>{error ? <div role="alert">{error}</div> : null}<Button type="submit">Create</Button></form></main>
+  return (
+    <main className="space-y-6">
+      <header className="rounded-3xl border border-border bg-card/70 p-6">
+        <h1 className="text-2xl font-semibold">Create plan</h1>
+      </header>
+      <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-border bg-card/70 p-6">
+        <div className="space-y-2">
+          <Label htmlFor="plan-slug">Slug</Label>
+          <Input id="plan-slug" aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="plan-display-name">Display name</Label>
+          <Input
+            ref={displayNameInputRef}
+            id="plan-display-name"
+            aria-label="display-name"
+            aria-invalid={Boolean(displayNameError) || undefined}
+            aria-describedby={displayNameError ? 'display-name-error' : undefined}
+            className={displayNameError ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+            value={displayName}
+            onChange={handleDisplayNameChange}
+          />
+          {displayNameError ? (
+            <span id="display-name-error" role="alert" className={`block ${FORM_FIELD_ERROR_CLASS_NAME}`}>
+              {displayNameError}
+            </span>
+          ) : null}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="plan-description">Description</Label>
+          <Textarea id="plan-description" aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
+        </div>
+        {error ? <Alert variant="destructive">{error}</Alert> : null}
+        <Button type="submit">Create</Button>
+      </form>
+    </main>
+  )
 }
