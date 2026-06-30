@@ -2,7 +2,7 @@
 // Lists/creates topics, publishes a message, and polls (consumes) recent messages via the
 // control-plane executor (@/services/eventsApi), with loading + empty + status feedback.
 import { useCallback, useEffect, useState } from 'react'
-import { Inbox, Plus, RefreshCw, Send } from 'lucide-react'
+import { Inbox, LockKeyhole, Plus, RefreshCw, Send } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -28,10 +28,12 @@ export interface EventsConsoleProps {
 
 type EventOperation = 'create' | 'publish' | 'consume'
 
-const panelClassName = 'rounded-sm border border-border bg-card/40 p-4 shadow-sm'
-const panelHeaderClassName = 'flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3'
-const emptyStateClassName = 'rounded-sm border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground'
-const codeBlockClassName = 'overflow-x-auto rounded-sm border border-border/60 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground'
+const panelClassName = 'rounded-2xl border border-border bg-card/60 p-4 shadow-sm sm:p-5'
+const panelHeaderClassName = 'flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3'
+const panelTitleClassName = 'text-base font-semibold tracking-tight text-foreground'
+const panelDescriptionClassName = 'mt-1 text-xs leading-5 text-muted-foreground'
+const emptyStateClassName = 'rounded-xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm leading-6 text-muted-foreground'
+const codeBlockClassName = 'overflow-x-auto rounded-lg border border-border/60 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground'
 
 function errorMessage(error: unknown): string {
   const candidate = error as Partial<ApiError>
@@ -158,18 +160,22 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
       ) : null}
 
       {!canManageEvents ? (
-        <div role="note" className="rounded-sm border border-border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
-          Event writes are restricted to workspace or tenant admins. You can still select a topic and poll messages.
+        <div role="note" className="flex items-start gap-3 rounded-2xl border border-border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground shadow-sm">
+          <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
+          <p>Event writes are restricted to workspace or tenant admins. You can still select a topic and poll messages.</p>
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(16rem,0.82fr)_minmax(0,1.18fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.82fr)_minmax(0,1.18fr)]">
         <section aria-labelledby="events-topics-heading" className={panelClassName}>
           <div className={panelHeaderClassName}>
-            <h3 id="events-topics-heading" className="text-base font-semibold text-foreground">
-              Topics{topics.length > 0 ? ` (${topics.length})` : ''}
-            </h3>
-            <Badge variant={selectedTopic ? 'secondary' : 'outline'} className="max-w-full truncate">
+            <div>
+              <h3 id="events-topics-heading" className={panelTitleClassName}>
+                Topics{topics.length > 0 ? ` (${topics.length})` : ''}
+              </h3>
+              <p className={panelDescriptionClassName}>Select a workspace topic before publishing or polling messages.</p>
+            </div>
+            <Badge variant={selectedTopic ? 'secondary' : 'outline'} className="max-w-full truncate px-3 py-1">
               {selectedTopic ? `Selected: ${selectedTopic.topic}` : 'No topic selected'}
             </Badge>
           </div>
@@ -190,8 +196,8 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                     <label
                       key={topic.topic}
                       className={cn(
-                        'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 rounded-sm border border-border/80 bg-background/40 p-3 text-sm transition-colors hover:bg-muted/40',
-                        isSelected && 'border-primary/70 bg-primary/10'
+                        'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 rounded-xl border border-border/80 bg-background/40 p-3 text-sm transition-colors hover:border-border hover:bg-muted/40 sm:grid-cols-[auto_minmax(0,1fr)_auto]',
+                        isSelected && 'border-primary/70 bg-primary/10 shadow-sm'
                       )}
                     >
                       <input
@@ -204,9 +210,12 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                         className="row-span-2 h-4 w-4 accent-primary"
                       />
                       <span className="min-w-0 truncate font-medium text-foreground">{topic.topic}</span>
-                      <span className="col-start-2 text-xs text-muted-foreground">
-                        {topic.partitions != null ? `${topic.partitions} partitions` : 'Workspace topic'}
-                      </span>
+                      {topic.partitions != null ? (
+                        <Badge variant="outline" className="col-start-2 w-fit justify-self-start sm:col-start-3 sm:row-start-1 sm:justify-self-end">
+                          {topic.partitions} partitions
+                        </Badge>
+                      ) : null}
+                      <span className="col-start-2 text-xs text-muted-foreground sm:col-span-2">Workspace topic</span>
                     </label>
                   )
                 })}
@@ -224,20 +233,25 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
             <div className="grid gap-4 lg:grid-cols-2">
               <section aria-labelledby="events-create-heading" className={panelClassName}>
                 <div className={panelHeaderClassName}>
-                  <h3 id="events-create-heading" className="text-base font-semibold text-foreground">Create topic</h3>
+                  <div>
+                    <h3 id="events-create-heading" className={panelTitleClassName}>Create topic</h3>
+                    <p className={panelDescriptionClassName}>Admin-only structural write for this workspace.</p>
+                  </div>
                 </div>
-                <div className="mt-4 flex flex-col gap-2">
-                  <Label htmlFor="new-topic">New topic</Label>
-                  <Input
-                    id="new-topic"
-                    value={newTopic}
-                    onChange={(event) => setNewTopic(event.target.value)}
-                    placeholder="orders"
-                    aria-describedby="new-topic-help"
-                    disabled={busy}
-                  />
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-topic">New topic</Label>
+                    <Input
+                      id="new-topic"
+                      value={newTopic}
+                      onChange={(event) => setNewTopic(event.target.value)}
+                      placeholder="orders"
+                      aria-describedby="new-topic-help"
+                      disabled={busy}
+                    />
+                  </div>
                   <p id="new-topic-help" className="sr-only">Topic name to add to the selected workspace.</p>
-                  <Button type="button" className="mt-1 w-full sm:w-auto sm:self-start" onClick={() => void handleCreateTopic()} disabled={!canCreateTopic}>
+                  <Button type="button" className="w-full sm:w-auto" onClick={() => void handleCreateTopic()} disabled={!canCreateTopic}>
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     {operation === 'create' ? 'Creating…' : 'Create topic'}
                   </Button>
@@ -246,9 +260,12 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
 
               <section aria-labelledby="events-publish-heading" className={panelClassName}>
                 <div className={panelHeaderClassName}>
-                  <h3 id="events-publish-heading" className="text-base font-semibold text-foreground">Publish</h3>
+                  <div>
+                    <h3 id="events-publish-heading" className={panelTitleClassName}>Publish</h3>
+                    <p className={panelDescriptionClassName}>Send a JSON test message to the selected topic.</p>
+                  </div>
                 </div>
-                <div className="mt-4 flex flex-col gap-2">
+                <div className="mt-4 space-y-3">
                   <Label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</Label>
                   <Textarea
                     id="message-json"
@@ -260,7 +277,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                     disabled={busy}
                   />
                   <p id="message-json-help" className="sr-only">JSON object containing a value field and optional key.</p>
-                  <Button type="button" className="mt-1 w-full sm:w-auto sm:self-start" onClick={() => void handlePublish()} disabled={!canPublishMessage}>
+                  <Button type="button" className="w-full sm:w-auto" onClick={() => void handlePublish()} disabled={!canPublishMessage}>
                     <Send className="h-4 w-4" aria-hidden="true" />
                     {operation === 'publish' ? 'Publishing…' : 'Publish'}
                   </Button>
@@ -271,8 +288,11 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
 
           <section aria-labelledby="events-consume-heading" className={panelClassName} aria-live="polite">
             <div className={panelHeaderClassName}>
-              <h3 id="events-consume-heading" className="text-base font-semibold text-foreground">Consume</h3>
-              <Badge variant="outline">
+              <div>
+                <h3 id="events-consume-heading" className={panelTitleClassName}>Consume</h3>
+                <p className={panelDescriptionClassName}>Poll the selected topic without requiring write access.</p>
+              </div>
+              <Badge variant="outline" className="px-3 py-1">
                 {messages.length > 0 ? `${messages.length} messages` : 'No messages loaded'}
               </Badge>
             </div>
@@ -289,7 +309,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
               ) : messages.length > 0 ? (
                 <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
                   {messages.map((message, index) => (
-                    <li key={`${String(message.offset ?? index)}-${index}`} className="rounded-sm border border-border/80 bg-background/40 p-3 text-sm">
+                    <li key={`${String(message.offset ?? index)}-${index}`} className="rounded-xl border border-border/80 bg-background/40 p-3 text-sm shadow-sm">
                       <pre className={codeBlockClassName}>{JSON.stringify(message.value, null, 2)}</pre>
                       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         {message.key != null ? <span>key={message.key}</span> : null}
