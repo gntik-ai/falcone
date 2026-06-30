@@ -196,6 +196,6 @@ describe('ConsoleServiceAccountsPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/revoked/i)
     // No success dialog opened.
-    expect(screen.queryByRole('dialog', { name: /credencial revelada/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /secreto actual de la service account/i })).not.toBeInTheDocument()
   })
 })

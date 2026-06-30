@@ -67,16 +67,21 @@ try {
 
   // reveal the current credential secret (Revelar) -> credential dialog
   const reveal = page.locator('button:has-text("Revelar")').first();
-  if (await reveal.count()) {
-    await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/credential-issuance') && r.request().method() === 'POST', { timeout: 20000 }).catch(() => null),
-      reveal.click()
-    ]);
-    await page.waitForTimeout(2000);
-    const dialog = await page.locator('[aria-label="Credencial revelada"]').count();
-    log(`credential dialog shown? ${dialog > 0}`);
-    await page.screenshot({ path: `${OUT}/15-sa-credential.png`, fullPage: true });
+  if (!(await reveal.count())) {
+    throw new Error('Service-account reveal action was not found.');
   }
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/credential-issuance') && r.request().method() === 'POST', { timeout: 20000 }).catch(() => null),
+    reveal.click()
+  ]);
+  const dialog = page.getByRole('dialog', { name: /secreto actual de la service account/i });
+  await dialog.waitFor({ timeout: 20000 });
+  const dialogText = await dialog.innerText();
+  if (!/puede mostrarse de nuevo/i.test(dialogText) || !/usa rotar para reemplazarlo/i.test(dialogText)) {
+    throw new Error('Service-account reveal dialog did not show current-secret/repeatable reveal guidance.');
+  }
+  log('credential reveal dialog shown with current-secret guidance');
+  await page.screenshot({ path: `${OUT}/15-sa-credential.png`, fullPage: true });
 
   log('DONE');
 } catch (e) {
