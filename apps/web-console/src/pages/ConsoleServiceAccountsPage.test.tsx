@@ -54,6 +54,14 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
   })
 
+  it('muestra empty state del workspace, no del navegador local', () => {
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />)
+    expect(screen.getByText(/no hay service accounts en este workspace/i)).toBeInTheDocument()
+    expect(screen.queryByText(/navegador/i)).not.toBeInTheDocument()
+  })
+
   it('crea y revela la credencial actual sin prometer secreto de una sola vez', async () => {
     const user = userEvent.setup()
     const reload = vi.fn()

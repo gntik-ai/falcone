@@ -1366,18 +1366,32 @@
     "consoleUsed": true
   },
   {
+    "operationId": "listServiceAccounts",
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/service-accounts",
+    "family": "workspaces",
+    "module": "deploy/kind/control-plane/b-handlers.mjs",
+    "export": "listServiceAccounts",
+    "invoke": "local",
+    "deps": ["pg"],
+    "auth": "workspace member",
+    "subroutes": "no",
+    "notes": "console-service-accounts.ts::useConsoleServiceAccounts. Backend collection source of truth for the Service Accounts page; returns workspace service accounts independent of browser sessionStorage.",
+    "consoleUsed": true
+  },
+  {
     "operationId": "getServiceAccount",
     "method": "GET",
     "path": "/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}",
     "family": "workspaces",
-    "module": "NONE",
-    "export": "",
-    "invoke": "UNKNOWN",
+    "module": "deploy/kind/control-plane/b-handlers.mjs",
+    "export": "getServiceAccount",
+    "invoke": "local",
     "deps": ["pg"],
     "auth": "workspace member",
     "subroutes": "no",
-    "notes": "console-service-accounts.ts fetches each by id. No reader handler. GAP.",
-    "consoleUsed": true
+    "notes": "Direct service-account detail reader; the console list page uses listServiceAccounts as its collection source.",
+    "consoleUsed": false
   },
   {
     "operationId": "issueServiceAccountCredential",

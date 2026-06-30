@@ -747,8 +747,11 @@ async function getServiceAccount(ctx) {
 }
 // GET /v1/workspaces/{workspaceId}/service-accounts
 async function listServiceAccountsHandler(ctx) {
+  const st = ctx.store ?? store;
   const r = await resolveWorkspaceForManage(ctx); if (r.error) return r.error;
-  return ok(200, await store.listServiceAccounts(ctx.pool, r.ws.id));
+  const result = await st.listServiceAccounts(ctx.pool, r.ws.id);
+  const items = (result.items ?? []).map((sa) => ({ ...sa, ...serviceAccountOut(sa) }));
+  return ok(200, collection(items, result.total ?? items.length));
 }
 async function saForCredential(ctx) {
   const st = ctx.store ?? store;
