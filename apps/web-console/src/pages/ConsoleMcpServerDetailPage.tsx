@@ -53,6 +53,7 @@ export function ConsoleMcpServerDetailPage() {
   }, [activeWorkspaceId, mcpServerId])
 
   const tools = useMemo(() => view?.tools ?? [], [view])
+  const toolsCountLabel = tools.length === 1 ? '1 publicada' : `${tools.length} publicadas`
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, value: Tab) {
     const currentIndex = tabs.findIndex((item) => item.value === value)
@@ -116,47 +117,68 @@ export function ConsoleMcpServerDetailPage() {
 
   return (
     <section className="space-y-6" data-testid="mcp-server-detail" aria-labelledby="mcp-server-detail-heading">
-      <header className="space-y-3">
-        <h2 id="mcp-server-detail-heading" className="text-2xl font-semibold text-foreground">{view.name ?? mcpServerId}</h2>
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Endpoint</dt>
-            <dd className="break-all text-sm text-foreground" data-testid="mcp-detail-endpoint">{view.endpoint ?? 'No publicado'}</dd>
+      <header className="space-y-5 rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
+        <div className="min-w-0 space-y-1">
+          <h2 id="mcp-server-detail-heading" className="break-words text-2xl font-semibold tracking-tight text-foreground">
+            {view.name ?? mcpServerId}
+          </h2>
+          <p className="text-sm text-muted-foreground">Detalle operativo del servidor MCP en el workspace activo.</p>
+        </div>
+
+        <dl className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="min-w-0 rounded-2xl border border-border/70 bg-background/60 p-4 md:col-span-2">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Endpoint</dt>
+            <dd className="mt-1 break-all text-sm leading-6 text-foreground" data-testid="mcp-detail-endpoint">
+              {view.endpoint ?? 'No publicado'}
+            </dd>
           </div>
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Versión activa</dt>
-            <dd className="text-sm text-foreground" data-testid="mcp-detail-version">{view.version ?? '—'}</dd>
+          <div className="min-w-0 rounded-2xl border border-border/70 bg-background/60 p-4">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Versión activa</dt>
+            <dd className="mt-1 break-words text-sm leading-6 text-foreground" data-testid="mcp-detail-version">
+              {view.version ?? '—'}
+            </dd>
           </div>
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Estado</dt>
-            <dd className="text-sm text-foreground" data-testid="mcp-detail-status">
-              <Badge variant="outline">{view.status ?? 'Sin estado'}</Badge>
+          <div className="min-w-0 rounded-2xl border border-border/70 bg-background/60 p-4">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado</dt>
+            <dd className="mt-2 text-sm text-foreground" data-testid="mcp-detail-status">
+              <Badge variant="outline" className="max-w-full whitespace-normal break-words text-left">
+                {view.status ?? 'Sin estado'}
+              </Badge>
             </dd>
           </div>
         </dl>
       </header>
 
-      <section aria-labelledby="mcp-tools-heading" className="space-y-2">
-        <h3 id="mcp-tools-heading" className="text-lg font-semibold text-foreground">Herramientas curadas</h3>
+      <section aria-labelledby="mcp-tools-heading" className="space-y-4 rounded-3xl border border-border bg-card/60 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h3 id="mcp-tools-heading" className="text-lg font-semibold text-foreground">Herramientas curadas</h3>
+          <Badge variant="secondary" className="w-fit">{toolsCountLabel}</Badge>
+        </div>
         {tools.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin herramientas publicadas todavía.</p>
+          <p className="rounded-2xl border border-dashed border-border bg-background/50 px-4 py-6 text-sm text-muted-foreground">
+            Sin herramientas publicadas todavía.
+          </p>
         ) : (
-          <ul className="space-y-1" data-testid="mcp-detail-tools">
+          <ul className="grid gap-3" data-testid="mcp-detail-tools">
             {tools.map((tool) => (
-              <li key={tool.name} className="rounded-md border border-border/70 bg-background/70 p-2 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-foreground">{tool.name}</span>
-                  {tool.mutates ? <Badge variant="secondary" className="border border-amber-500/40 bg-amber-500/10 text-amber-700">Muta estado</Badge> : null}
-                  {tool.scope ? <Badge variant="outline">Scope: {tool.scope}</Badge> : null}
+              <li key={tool.name} className="min-w-0 rounded-2xl border border-border/70 bg-background/70 p-4 text-sm">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="min-w-0 break-all font-medium text-foreground">{tool.name}</span>
+                  {tool.mutates ? <Badge variant="secondary">Muta estado</Badge> : null}
+                  {tool.scope ? (
+                    <Badge variant="outline" className="max-w-full whitespace-normal break-all text-left">
+                      Scope: {tool.scope}
+                    </Badge>
+                  ) : null}
                 </div>
-                {tool.description ? <p className="mt-1 text-muted-foreground">{tool.description}</p> : null}
+                {tool.description ? <p className="mt-2 break-words leading-6 text-muted-foreground">{tool.description}</p> : null}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <div role="tablist" aria-label="Servidor MCP" className="flex flex-wrap gap-2">
+      <div role="tablist" aria-label="Servidor MCP" className="flex w-full flex-wrap gap-1 rounded-2xl border border-border bg-card/60 p-1 sm:w-fit">
         {tabs.map(({ value, label }) => (
           <Button
             key={value}
@@ -166,8 +188,9 @@ export function ConsoleMcpServerDetailPage() {
             aria-controls={getPanelId(value)}
             aria-selected={tab === value}
             tabIndex={tab === value ? 0 : -1}
-            variant={tab === value ? 'default' : 'outline'}
+            variant={tab === value ? 'default' : 'ghost'}
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={() => setTab(value)}
             onKeyDown={(event) => handleTabKeyDown(event, value)}
           >
