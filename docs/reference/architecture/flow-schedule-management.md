@@ -64,12 +64,13 @@ The gate covers exactly the four definition-mutating operations:
 | DELETE | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}` | delete a definition |
 | POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions` | publish a version |
 
-A read-only `tenant_viewer` — and any other non-write role such as `tenant_developer` — receives
-`403 FORBIDDEN` on each of these and creates/updates/deletes/publishes nothing. **Not** gated by this
-role check: the execution-lifecycle operations (start / cancel / retry / signal a run, and list/get
-executions), the read operations (list/get a definition or version, the task-type catalog), and the
-read-only `POST .../validate` check — those keep their existing identity-derived authorization
-(cancel/retry additionally enforce cross-tenant run ownership).
+A read-only `tenant_viewer`, any other non-write role such as `tenant_developer`, an API-key/dbRole
+identity, or a JWT/trusted-header identity with missing or empty roles receives `403 FORBIDDEN` on
+each of these and creates/updates/deletes/publishes nothing. **Not** gated by this role check: the
+execution-lifecycle operations (start / cancel / retry / signal a run, and list/get executions), the
+read operations (list/get a definition or version, the task-type catalog), and the read-only
+`POST .../validate` check — those keep their existing identity-derived authorization (cancel/retry
+additionally enforce cross-tenant run ownership).
 
 On the kind install the APISIX gateway forwards the caller's Bearer JWT to the executor and **strips**
 `x-actor-roles`, so the executor is the sole auth authority on `/v1/flows/*`: it verifies the JWT and

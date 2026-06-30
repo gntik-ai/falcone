@@ -19,6 +19,7 @@ const mocked = {
 }
 
 const render1 = () => render(<EventsConsole workspaceId="ws1" />)
+const renderReadOnly = () => render(<EventsConsole workspaceId="ws1" canManageEvents={false} />)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -44,7 +45,9 @@ describe('EventsConsole — richer UX', () => {
     mocked.publishMessage.mockResolvedValue({ offset: 5 })
     render1()
     await screen.findByText('orders')
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
     fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled()
     fireEvent.change(screen.getByLabelText(/Message \(JSON/), { target: { value: '{"value":{"a":1}}' } })
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }))
     await waitFor(() => expect(mocked.publishMessage).toHaveBeenCalledWith('ws1', 'orders', { value: { a: 1 } }))
@@ -68,5 +71,19 @@ describe('EventsConsole — richer UX', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create topic' }))
     await waitFor(() => expect(mocked.createTopic).toHaveBeenCalledWith('ws1', 'events'))
     expect(mocked.listTopics).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not offer create or publish actions to non-admin roles', async () => {
+    renderReadOnly()
+    await screen.findByText('orders')
+    expect(screen.getByText(/Event writes are restricted/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('New topic')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Message \(JSON/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create topic' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
+    const pollButton = screen.getByRole('button', { name: 'Poll messages' })
+    expect(pollButton).toBeDisabled()
+    fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
+    expect(pollButton).toBeEnabled()
   })
 })

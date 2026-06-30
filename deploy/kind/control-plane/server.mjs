@@ -161,6 +161,12 @@ function deriveActorType(claims) {
   for (const [role, type] of KNOWN_ROLE_TO_ACTORTYPE) if (roles.includes(role)) return type;
   return 'tenant_member';
 }
+function workspaceIdsFromClaims(claims) {
+  if (Array.isArray(claims.workspace_ids)) return claims.workspace_ids.map(String).filter(Boolean);
+  if (typeof claims.workspace_ids === 'string') return claims.workspace_ids.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean);
+  if (claims.workspace_id) return [String(claims.workspace_id)];
+  return [];
+}
 async function authenticate(headers) {
   const auth = headers['authorization'];
   if (!auth || !/^bearer\s+/i.test(auth)) return null;
@@ -173,10 +179,12 @@ async function authenticate(headers) {
   // cryptographically bound to the signature and cannot be forged by a claim, so a tenant-A token
   // can never act as tenant B. Platform/legacy tokens keep the tenant_id claim.
   const tenantId = trust.kind === 'tenant' ? trust.realm : (payload.tenant_id ?? null);
+  const workspaceIds = workspaceIdsFromClaims(payload);
   return {
     sub: payload.sub,
     tenantId,
     workspaceId: payload.workspace_id ?? null,
+    workspaceIds,
     actorType: deriveActorType(payload),
     roles, scopes,
     // The trusted x-* headers a Falcone action / buildCallerContext expects.
