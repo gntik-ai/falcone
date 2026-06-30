@@ -16,8 +16,8 @@
 // per-resource audiences are a separate, broader concern (#761 / #773).
 
 // Roles permitted to perform a privileged structural write (manage API keys; create/update/delete/
-// publish a flow definition). A non-admin role (e.g. tenant_developer) is denied; an API key is
-// never granted a role and is gated separately by its data-plane scopes.
+// publish a flow definition). A non-admin role (e.g. tenant_developer) is denied. API keys are
+// never structural admins: their data-plane scopes govern non-structural data operations only.
 export const WRITE_CAPABLE_ADMIN_ROLES = new Set([
   'tenant_owner',
   'tenant_admin',
@@ -27,21 +27,16 @@ export const WRITE_CAPABLE_ADMIN_ROLES = new Set([
   'superadmin',
 ]);
 
-// Returns true when `roles` is a KNOWN, non-empty list that contains at least one write-capable
-// admin role. Returns false ONLY when the roles are known (an array with entries) and none is
-// write-capable — that is the deny case. Callers MUST treat an undefined/empty `roles` as
-// "unknown" and DEFER to the other gates (e.g. RLS, the trusted-gateway path, an admin token that
-// carries no realm-role claims), exactly as the API-key management gate has done since #624 — so
-// legitimate internal/system/no-claims callers are never regressed. The within-tenant escalation
-// this guards (a `tenant_viewer` JWT) always carries a non-empty, non-admin roles array, so the
-// deny fires precisely for it.
+// Returns true only when `roles` is a non-empty list containing at least one write-capable admin role.
+// The #773 structural-write gate uses this as a positive authorization check, so undefined/empty
+// roles do NOT authorize structural writes. Older compatibility gates may still choose to defer on
+// unknown roles for narrower surfaces.
 export function hasWriteCapableRole(roles) {
   return Array.isArray(roles) && roles.length > 0 && roles.some((r) => WRITE_CAPABLE_ADMIN_ROLES.has(r));
 }
 
-// True when `roles` is KNOWN (a non-empty array) but contains NO write-capable admin role — the
-// explicit deny condition for a structural write. Mirrors the server.mjs API-key gate's predicate
-// (`Array.isArray(roles) && roles.length > 0 && !roles.some(...)`) so the two gates stay identical.
+// True when `roles` is KNOWN (a non-empty array) but contains NO write-capable admin role. This
+// supports compatibility gates that still distinguish "known non-admin" from "unknown/empty" roles.
 export function isKnownNonWriteRole(roles) {
   return Array.isArray(roles) && roles.length > 0 && !roles.some((r) => WRITE_CAPABLE_ADMIN_ROLES.has(r));
 }

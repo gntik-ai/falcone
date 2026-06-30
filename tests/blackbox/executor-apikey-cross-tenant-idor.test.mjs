@@ -12,7 +12,7 @@
 // bbx-xt-idor-01: tenant-A admin token, POST api-keys on a tenant-B workspace → 403 CROSS_TENANT_VIOLATION (no key minted)
 // bbx-xt-idor-02: tenant-A admin token, POST api-keys on its OWN workspace      → 201 (unchanged)
 // bbx-xt-idor-03: tenant-A admin token, GET (list) api-keys on a tenant-B workspace → 403 CROSS_TENANT_VIOLATION
-// bbx-xt-idor-04: tenant-A admin token, POST api-keys on an UNKNOWN workspace   → not 403 (no foreign owner ⇒ RLS scopes it to the caller)
+// bbx-xt-idor-04: tenant-A admin token, POST api-keys on an UNKNOWN workspace   → 404 WORKSPACE_NOT_FOUND (no phantom key)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
@@ -50,12 +50,13 @@ function makeApiKeyStore() {
   };
 }
 
-// A tenant-only admin identity (verified JWT with a tenant_id claim and NO workspace binding) for
-// the given tenant. This is the credential class that bypassed the existing workspace-binding check.
+// A tenant-only admin identity (verified JWT with a tenant_id claim, admin role, and NO workspace
+// binding) for the given tenant. This is the credential class that bypassed the existing
+// workspace-binding check.
 function adminJwtVerifier(tenantId) {
   return {
     async verify() {
-      return { tenantId, workspaceId: undefined, actorId: `admin:${tenantId}`, roleName: 'falcone_app', roles: [], scopes: [] };
+      return { tenantId, workspaceId: undefined, actorId: `admin:${tenantId}`, roleName: 'falcone_app', roles: ['tenant_owner'], scopes: [] };
     },
   };
 }
@@ -132,17 +133,16 @@ test('bbx-xt-idor-03: tenant-A admin listing api-keys of a tenant-B workspace re
 });
 
 // ---------------------------------------------------------------------------
-// bbx-xt-idor-04: an unprovisioned workspace (no recorded owner) is NOT blocked
-// The breach requires a KNOWN foreign owner. With no owner record, the key binds to the caller's
-// own tenant and RLS scopes any later data access — so issuance must not 403 (no false positive).
+// bbx-xt-idor-04: an unprovisioned workspace (no recorded owner) is rejected
+// #773 tightened structural writes so unknown workspace ids cannot create phantom resources.
 // ---------------------------------------------------------------------------
-test('bbx-xt-idor-04: issuance in a workspace with no recorded owner is not rejected with 403', async () => {
+test('bbx-xt-idor-04: issuance in a workspace with no recorded owner returns 404 and persists no key', async () => {
   await withServer({ tenantId: TEN_A }, async (baseUrl, apiKeyStore) => {
     const res = await fetch(`${baseUrl}/v1/workspaces/${WS_UNKNOWN}/api-keys`, {
       method: 'POST', headers: ADMIN, body: JSON.stringify({ keyType: 'anon' }),
     });
-    assert.notEqual(res.status, 403, 'an unowned workspace must not trigger the cross-tenant check');
-    assert.equal(apiKeyStore.issued.length, 1, 'issuance proceeds for an unowned workspace');
-    assert.equal(apiKeyStore.issued[0].tenantId, TEN_A, 'the key is bound to the caller tenant');
+    assert.equal(res.status, 404, `expected 404, got ${res.status}: ${await res.clone().text()}`);
+    assert.equal((await res.json()).code, 'WORKSPACE_NOT_FOUND');
+    assert.equal(apiKeyStore.issued.length, 0, 'unknown workspace structural writes must persist nothing');
   });
 });

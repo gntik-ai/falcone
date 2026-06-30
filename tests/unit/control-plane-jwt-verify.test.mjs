@@ -39,6 +39,7 @@ test('valid RS256 token → identity derived from claims', async () => {
   assert.equal(id.actorId, 'user-1');
   assert.deepEqual(id.roles, ['tenant_admin']);
   assert.deepEqual(id.scopes, ['data:read', 'data:write']);
+  assert.deepEqual(id.workspaceIds, ['ws-jwt']);
   assert.equal(id.dbRole, undefined); // a JWT is not an api-key → no RLS SET ROLE
 });
 

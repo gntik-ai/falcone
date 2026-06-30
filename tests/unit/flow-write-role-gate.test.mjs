@@ -9,11 +9,10 @@
 //
 // THE FIX: executeFlows role-gates the DEFINITION-WRITE operations (create_definition /
 // update_definition / delete_definition / publish_version) AFTER requireIdentity and BEFORE any
-// store side effect. A caller whose verified roles are KNOWN (a non-empty array) and contain NO
-// write-capable admin role (auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES) is rejected with
-// 403 FORBIDDEN and the store is never touched. A write-capable role (tenant_owner /
-// workspace_admin / superadmin / …) is authorized, preserving today's behavior. An undefined/empty
-// roles list DEFERS (no-claims admin token / trusted-gateway / no-DB mode) — unchanged.
+// store side effect. A caller must carry a positive write-capable admin role
+// (auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES); a non-admin role, an empty/missing roles list, or an
+// API-key/dbRole identity is rejected with 403 FORBIDDEN and the store is never touched. A
+// write-capable role (tenant_owner / workspace_admin / superadmin / …) is authorized.
 //
 // These tests encode the issue's WHEN/THEN. They are RED on `main` (no gate → a viewer write
 // reaches the store) and GREEN on the branch. The flow store is injected as a RECORDING FAKE:
@@ -116,6 +115,8 @@ const viewer = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'viewer', ro
 // A non-write developer role: the gate denies ANY non-write role, which also closes the flows
 // slice of #773 — correct and in-scope as a consequence of the role model.
 const developer = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'dev', roles: ['tenant_developer'] };
+const noRoles = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'noroles', roles: [] };
+const apiKey = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'apikey:service', dbRole: 'falcone_service', scopes: ['data:write'] };
 const owner = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'owner', roles: ['tenant_owner'] };
 const wsadmin = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'wsadmin', roles: ['workspace_admin'] };
 const superadmin = { tenantId: TENANT, workspaceId: WORKSPACE, actorId: 'root', roles: ['superadmin'] };
@@ -129,7 +130,7 @@ const WRITE_OPS = [
 ];
 
 const assert403 = (err) => {
-  assert.equal(err.statusCode, 403, 'a non-write role must get HTTP 403');
+  assert.equal(err.statusCode, 403, 'an unauthorized structural writer must get HTTP 403');
   assert.equal(err.code, 'FORBIDDEN', "the code must be 'FORBIDDEN'");
   return true;
 };
@@ -170,6 +171,26 @@ for (const { operation, extra } of WRITE_OPS) {
       await executor.close().catch(() => {});
     }
   });
+}
+
+// -- DENIED: empty-role JWTs and API keys are not structural admins (#773 reviewer blocker) ------
+
+for (const identity of [noRoles, apiKey]) {
+  for (const { operation, extra } of WRITE_OPS) {
+    test(`ut-flowrole: ${identity.actorId} is denied 403 on ${operation}, store untouched`, async () => {
+      const store = makeRecordingStore();
+      const executor = makeExecutor(store);
+      try {
+        await assert.rejects(
+          () => executor.executeFlows({ operation, identity, ...extra }),
+          assert403,
+        );
+        assert.equal(store.calls.length, 0, `${operation}: no store mutation for ${identity.actorId}`);
+      } finally {
+        await executor.close().catch(() => {});
+      }
+    });
+  }
 }
 
 // -- AUTHORIZED: write-capable roles still succeed, scoped by the caller's tenant/workspace -------

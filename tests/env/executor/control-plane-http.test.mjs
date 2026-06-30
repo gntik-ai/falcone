@@ -36,6 +36,7 @@ function probeUrl(role, pw) {
 
 const rowsPath = `/v1/postgres/workspaces/${WS_A}/data/appdb/schemas/public/tables/notes/rows`;
 const authHeaders = { 'content-type': 'application/json', 'x-tenant-id': TEN_A, 'x-workspace-id': WS_A, 'x-auth-subject': 'user-1' };
+const adminAuthHeaders = { ...authHeaders, 'x-actor-roles': 'tenant_owner' };
 
 before(async () => {
   bootstrap = new Pool({ connectionString: ADMIN_URL, max: 1 });
@@ -140,14 +141,14 @@ test('POST bulk insert via the documented catalog path (…/tables/{t}/bulk/inse
 test('API-key lifecycle over HTTP: issue (201) → list → anon-key cannot manage keys (403) → revoke', async () => {
   // issue an anon key (admin/JWT identity)
   const issueRes = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, {
-    method: 'POST', headers: authHeaders, body: JSON.stringify({ keyType: 'anon' }),
+    method: 'POST', headers: adminAuthHeaders, body: JSON.stringify({ keyType: 'anon' }),
   });
   assert.equal(issueRes.status, 201);
   const issued = await issueRes.json();
   assert.ok(issued.key.startsWith('flc_anon_'));
 
   // list shows it (no secret)
-  const listRes = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, { headers: authHeaders });
+  const listRes = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys`, { headers: adminAuthHeaders });
   assert.equal(listRes.status, 200);
   const list = await listRes.json();
   assert.ok(list.items.some((k) => k.id === issued.id));
@@ -163,7 +164,7 @@ test('API-key lifecycle over HTTP: issue (201) → list → anon-key cannot mana
   assert.equal(escalate.status, 403);
 
   // revoke
-  const del = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys/${issued.id}`, { method: 'DELETE', headers: authHeaders });
+  const del = await fetch(`${baseUrl}/v1/workspaces/${WS_A}/api-keys/${issued.id}`, { method: 'DELETE', headers: adminAuthHeaders });
   assert.equal(del.status, 200);
 });
 

@@ -63,8 +63,8 @@ function makeMockPool({ buckets = { ...BUCKET_ROWS } } = {}) {
   };
 }
 
-const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_developer' };
-const tenantBIdentity = { sub: 'user-b', tenantId: TENANT_B, workspaceId: 'ws-b', actorType: 'tenant_developer' };
+const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_owner' };
+const tenantBIdentity = { sub: 'user-b', tenantId: TENANT_B, workspaceId: 'ws-b', actorType: 'tenant_owner' };
 
 // A recording SeaweedFS client seam (the handlers thread ctx.seaweedClient into the identity
 // revoke calls; with this fake no real k8s request is made). A GET on a Job status path returns
