@@ -113,6 +113,13 @@ async function kc(method, path, body) {
   return { status: res.status, json, id: loc ? loc.split('/').pop() : undefined };
 }
 
+export function normalizeKeycloakAttributes(attributes = {}) {
+  return Object.fromEntries(Object.entries(attributes).map(([key, value]) => {
+    const values = Array.isArray(value) ? value : [value];
+    return [key, values.map((entry) => String(entry))];
+  }));
+}
+
 export const kcAdmin = {
   base: BASE,
   async realmExists(realm) {
@@ -233,12 +240,24 @@ export const kcAdmin = {
     catch (e) { if (e.kcStatus !== 409) throw e; } // 409 = already exists, fine
   },
   async getRealmRole(realm, name) { return (await kc('GET', `/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(name)}`)).json; },
-  async createUser(realm, { username, email, firstName, lastName, password, enabled = true, temporary = false, attributes }) {
+  async createUser(realm, {
+    username,
+    email,
+    firstName,
+    lastName,
+    password,
+    enabled = true,
+    temporary = false,
+    attributes,
+    emailVerified = true,
+    requiredActions = [],
+  }) {
     const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/users`, {
-      username, email, firstName, lastName, enabled, emailVerified: true,
+      username, email, firstName, lastName, enabled, emailVerified,
+      requiredActions,
       ...(password ? { credentials: [{ type: 'password', value: password, temporary }] } : {}),
       ...(attributes && Object.keys(attributes).length > 0
-        ? { attributes: Object.fromEntries(Object.entries(attributes).map(([k, v]) => [k, [String(v)]])) }
+        ? { attributes: normalizeKeycloakAttributes(attributes) }
         : {})
     });
     let id = created.id;
