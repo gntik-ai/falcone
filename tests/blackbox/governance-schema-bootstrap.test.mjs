@@ -37,6 +37,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { GOVERNANCE_MIGRATIONS, applyGovernanceSchema, forwardMigration } from '../../deploy/kind/control-plane/governance-schema.mjs';
+import { main as asyncOperationQueryAction } from '../../services/provisioning-orchestrator/src/actions/async-operation-query.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
@@ -46,7 +47,77 @@ async function runBootstrap() {
   const executed = [];
   const pool = { query: async (sql) => { executed.push(sql); return { rows: [] }; } };
   const applied = await applyGovernanceSchema(pool, { repoRoot: REPO_ROOT, log: { log() {} } });
-  return { applied, executed, all: executed.join('\n;\n') };
+  const tables = new Set();
+  for (const sql of executed) {
+    for (const match of sql.matchAll(/\bCREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z_][a-zA-Z0-9_]*)\b/gi)) {
+      tables.add(match[1]);
+    }
+  }
+  return { applied, executed, all: executed.join('\n;\n'), tables };
+}
+
+function referencedTables(sql) {
+  const refs = new Set();
+  const patterns = [
+    /\bFROM\s+([a-zA-Z_][a-zA-Z0-9_.]*)/gi,
+    /\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_.]*)/gi,
+    /\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_.]*)/gi,
+    /\bINSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_.]*)/gi,
+  ];
+  for (const pattern of patterns) {
+    for (const match of sql.matchAll(pattern)) {
+      refs.add(match[1].split('.').at(-1));
+    }
+  }
+  return refs;
+}
+
+function schemaAwareAsyncOperationDb(tables) {
+  const operation = {
+    operation_id: '00000000-0000-0000-0000-000000000736',
+    tenant_id: 'tenant-736',
+    actor_id: 'actor-736',
+    actor_type: 'tenant_owner',
+    workspace_id: null,
+    operation_type: 'tenant.create',
+    status: 'completed',
+    error_summary: null,
+    correlation_id: 'corr-736',
+    idempotency_key: null,
+    saga_id: null,
+    created_at: '2026-06-30T00:00:00.000Z',
+    updated_at: '2026-06-30T00:00:00.000Z',
+  };
+
+  return {
+    async query(sql) {
+      for (const table of referencedTables(sql)) {
+        if (!tables.has(table)) {
+          const error = new Error(`relation "${table}" does not exist`);
+          error.code = '42P01';
+          throw error;
+        }
+      }
+
+      if (/SELECT\s+COUNT\(\*\)::int\s+AS\s+total/i.test(sql)) {
+        return { rows: [{ total: 0 }] };
+      }
+
+      if (/\bFROM\s+async_operation_log_entries\b/i.test(sql)) {
+        return { rows: [] };
+      }
+
+      if (/\bFROM\s+async_operations\b/i.test(sql) && /\bWHERE\s+operation_id\s*=\s*\$1\b/i.test(sql)) {
+        return { rows: [operation] };
+      }
+
+      if (/\bFROM\s+async_operations\b/i.test(sql)) {
+        return { rows: [] };
+      }
+
+      return { rows: [] };
+    },
+  };
 }
 
 test('bbx-555-01: applies every governance migration in declared order', async () => {
@@ -127,4 +198,88 @@ test('bbx-611-02: the forward-only applier strips the `-- down` rollback section
   assert.match(forwardMigration(sample), /CREATE TABLE IF NOT EXISTS t/);
   assert.doesNotMatch(forwardMigration(sample), /DROP TABLE/);
   assert.equal(forwardMigration('CREATE TABLE x();'), 'CREATE TABLE x();', 'files without `-- down` pass through unchanged');
+});
+
+test('bbx-736-01: bootstrap creates the async-operation query tables', async () => {
+  // #736: POST /v1/async-operation-query is served by the real action, so kind boot
+  // must apply the async-operation schema before the server declares readiness.
+  const { applied, all, tables } = await runBootstrap();
+  for (const migration of [
+    '073-async-operation-tables',
+    '074-async-operation-log-entries',
+    '075-idempotency-retry-tables',
+    '076-timeout-cancel-recovery',
+    '078-retry-semantics-intervention',
+  ]) {
+    assert.ok(
+      applied.some((m) => m.includes(migration)),
+      `${migration} is applied at boot`,
+    );
+  }
+
+  for (const table of ['async_operations', 'async_operation_transitions', 'async_operation_log_entries']) {
+    assert.ok(tables.has(table), `must create ${table}`);
+    assert.match(all, new RegExp(`CREATE TABLE IF NOT EXISTS\\s+${table}\\b`), `real migration SQL creates ${table}`);
+  }
+});
+
+test('bbx-736-02: async-operation migrations are applied in dependency-safe numeric order', () => {
+  const idx = (frag) => GOVERNANCE_MIGRATIONS.findIndex((m) => m.includes(frag));
+  for (const migration of ['073-', '074-', '075-', '076-', '078-']) {
+    assert.ok(idx(migration) > -1, `${migration} is in the boot migration set`);
+  }
+
+  assert.ok(idx('073-') < idx('074-'), '073 (async_operations) before 074 logs FK');
+  assert.ok(idx('073-') < idx('075-'), '073 before 075 idempotency/retry FKs');
+  assert.ok(idx('073-') < idx('076-'), '073 before 076 status/timeout ALTERs');
+  assert.ok(idx('073-') < idx('078-'), '073 before 078 intervention FKs/ALTERs');
+  assert.ok(idx('074-') < idx('075-'), '074 before 075 in numeric order');
+  assert.ok(idx('075-') < idx('076-'), '075 before 076 in numeric order');
+  assert.ok(idx('076-') < idx('078-'), '076 before 078 in numeric order');
+  assert.ok(idx('078-') < idx('080-'), 'async-operation chain before later provisioning migrations');
+});
+
+test('bbx-736-03: async-operation-query list/logs run against the boot-created schema without 42P01', async () => {
+  const { tables } = await runBootstrap();
+  const db = schemaAwareAsyncOperationDb(tables);
+  const baseParams = {
+    __ow_headers: {
+      'x-auth-subject': 'superadmin-736',
+      'x-actor-type': 'superadmin',
+      'x-correlation-id': 'corr-736',
+    },
+  };
+
+  const listResponse = await asyncOperationQueryAction(
+    {
+      ...baseParams,
+      queryType: 'list',
+      filters: {},
+      pagination: { limit: 20, offset: 0 },
+    },
+    { db, log() {} },
+  );
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.deepEqual(listResponse.body, {
+    queryType: 'list',
+    items: [],
+    total: 0,
+    pagination: { limit: 20, offset: 0 },
+  });
+
+  const logsResponse = await asyncOperationQueryAction(
+    {
+      ...baseParams,
+      queryType: 'logs',
+      operationId: '00000000-0000-0000-0000-000000000736',
+      pagination: { limit: 20, offset: 0 },
+    },
+    { db, log() {} },
+  );
+
+  assert.equal(logsResponse.statusCode, 200);
+  assert.deepEqual(logsResponse.body.entries, []);
+  assert.equal(logsResponse.body.total, 0);
+  assert.deepEqual(logsResponse.body.pagination, { limit: 20, offset: 0 });
 });
