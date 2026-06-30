@@ -13155,8 +13155,8 @@
           }
         },
         "responses": {
-          "202": {
-            "description": "The signup was accepted and normalized into a platform-user registration envelope.",
+          "201": {
+            "description": "The signup was created and normalized into a platform-user registration envelope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -65282,7 +65282,14 @@
       "SignupPolicyMode": {
         "type": "string",
         "enum": [
-          "disabled",
+          "self_service",
+          "invitation"
+        ]
+      },
+      "ConsoleSignupActivationMode": {
+        "type": "string",
+        "enum": [
+          "self_service",
           "approval_required",
           "auto_activate"
         ]
@@ -65294,7 +65301,8 @@
           "username",
           "displayName",
           "primaryEmail",
-          "password"
+          "password",
+          "tenantId"
         ],
         "properties": {
           "username": {
@@ -65312,8 +65320,18 @@
           },
           "password": {
             "type": "string",
-            "minLength": 12,
+            "minLength": 8,
             "maxLength": 256
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "requestedPlanId": {
             "type": "string",
@@ -65360,7 +65378,7 @@
             "pattern": "^usr_[0-9a-z]+$"
           },
           "activationMode": {
-            "$ref": "#/components/schemas/SignupPolicyMode"
+            "$ref": "#/components/schemas/ConsoleSignupActivationMode"
           },
           "state": {
             "$ref": "#/components/schemas/ConsoleSignupState"
@@ -65476,39 +65494,36 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "globalMode",
-          "environmentModes",
-          "planModes",
-          "effectiveMode",
-          "allowed",
-          "approvalRequired"
+          "selfServiceEnabled",
+          "mode",
+          "statusView",
+          "passwordPolicy",
+          "message"
         ],
         "properties": {
-          "globalMode": {
-            "$ref": "#/components/schemas/SignupPolicyMode"
-          },
-          "environmentModes": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/SignupPolicyMode"
-            }
-          },
-          "planModes": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/SignupPolicyMode"
-            }
-          },
-          "effectiveMode": {
-            "$ref": "#/components/schemas/SignupPolicyMode"
-          },
-          "allowed": {
+          "selfServiceEnabled": {
             "type": "boolean"
           },
-          "approvalRequired": {
-            "type": "boolean"
+          "mode": {
+            "$ref": "#/components/schemas/SignupPolicyMode"
           },
-          "reason": {
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
+          },
+          "passwordPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "minLength"
+            ],
+            "properties": {
+              "minLength": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "message": {
             "type": "string",
             "minLength": 3,
             "maxLength": 280

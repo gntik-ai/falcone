@@ -597,13 +597,11 @@ export async function installContextAuthMocks(page: Page, scenario: MockScenario
 
     if (method === 'GET' && pathname === '/v1/auth/signups/policy') {
       await fulfillJson(route, 200, {
-        allowSignups: false,
-        allowed: false,
-        approvalRequired: false,
-        effectiveMode: 'disabled',
-        globalMode: 'disabled',
-        environmentModes: {},
-        planModes: {}
+        selfServiceEnabled: false,
+        mode: 'invitation',
+        statusView: 'signup',
+        passwordPolicy: { minLength: 8 },
+        message: 'Signup is invitation-only in this deployment.'
       })
       return
     }

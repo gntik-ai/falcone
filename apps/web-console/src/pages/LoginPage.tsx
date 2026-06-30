@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +39,7 @@ function resolvePostLoginDestination(): string {
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState(initialForm)
   const [signupPolicy, setSignupPolicy] = useState<ConsoleSignupPolicy | null>(null)
   const [policyLoading, setPolicyLoading] = useState(true)
@@ -90,7 +91,43 @@ export function LoginPage() {
     }
   }, [navigate])
 
-  const signupVisible = Boolean(signupPolicy?.allowed)
+  const signupVisible = signupPolicy?.selfServiceEnabled === true
+
+  const signupTarget = useMemo(() => {
+    const tenantId = (searchParams.get('tenantId') ?? searchParams.get('tenant') ?? '').trim()
+    const workspaceId = (searchParams.get('workspaceId') ?? '').trim()
+    const nextParams = new URLSearchParams()
+
+    if (tenantId) {
+      nextParams.set('tenantId', tenantId)
+    }
+
+    if (workspaceId) {
+      nextParams.set('workspaceId', workspaceId)
+    }
+
+    const query = nextParams.toString()
+    return query ? `${consoleAuthConfig.signupPath}?${query}` : consoleAuthConfig.signupPath
+  }, [searchParams])
+
+  const signupContextSummary = useMemo(() => {
+    const tenantId = (searchParams.get('tenantId') ?? searchParams.get('tenant') ?? '').trim()
+    const workspaceId = (searchParams.get('workspaceId') ?? '').trim()
+
+    if (tenantId && workspaceId) {
+      return `El alta conservará el tenant ${tenantId} y el workspace ${workspaceId}.`
+    }
+
+    if (tenantId) {
+      return `El alta conservará el tenant ${tenantId}.`
+    }
+
+    if (workspaceId) {
+      return `El alta conservará el workspace ${workspaceId}; revisa el tenant antes de enviar el registro.`
+    }
+
+    return null
+  }, [searchParams])
 
   const statusAction = useMemo(() => {
     const firstAllowedAction = statusView?.allowedActions[0] ?? null
@@ -109,6 +146,7 @@ export function LoginPage() {
 
     return null
   }, [statusView])
+  const loginFeedbackId = feedback ? 'login-feedback' : undefined
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -174,27 +212,34 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
-      <section className="w-full max-w-3xl rounded-3xl border border-border bg-card/80 p-10 shadow-2xl shadow-black/20 backdrop-blur">
-        <div className="mb-8 space-y-3">
-          <img src="/img/logo-wide.png" alt="In Falcone" className="mb-4 h-16 w-auto" />
-          <Badge variant="secondary">EP-14 / US-UI-01-T05</Badge>
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">{consoleAuthConfig.headings.title}</h1>
-          <p className="max-w-2xl text-lg leading-8 text-muted-foreground">{consoleAuthConfig.headings.subtitle}</p>
-          <p className="text-sm leading-6 text-muted-foreground">
+    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
+      <section className="w-full max-w-4xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
+        <div className="mb-8 space-y-3 sm:mb-10">
+          <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
+          <Badge variant="secondary" className="w-fit">
+            EP-14 / US-UI-01-T05
+          </Badge>
+          <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+            {consoleAuthConfig.headings.title}
+          </h1>
+          <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+            {consoleAuthConfig.headings.subtitle}
+          </p>
+          <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
             Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · Client ID{' '}
             <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
           </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
+          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId}>
             <div className="space-y-2">
               <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
               <Input
                 id="username"
                 name="username"
                 autoComplete="username"
+                aria-describedby="login-username-help"
                 // Place the caret on the first field so keyboard and assistive-tech users
                 // can start typing their credential immediately on this dedicated login screen.
                 autoFocus
@@ -205,6 +250,9 @@ export function LoginPage() {
                 minLength={3}
                 maxLength={120}
               />
+              <p id="login-username-help" className="text-xs leading-5 text-muted-foreground">
+                Usa el usuario de consola asociado a tu tenant.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -214,6 +262,7 @@ export function LoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
+                aria-describedby="login-password-help"
                 value={form.password}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 placeholder="••••••••••••"
@@ -225,29 +274,32 @@ export function LoginPage() {
                 // from submitting. The backend / Keycloak policy stays authoritative. (#804)
                 maxLength={256}
               />
+              <p id="login-password-help" className="text-xs leading-5 text-muted-foreground">
+                La policy de contraseña se valida en el servicio de acceso.
+              </p>
             </div>
 
-            <label className="flex items-start gap-3 rounded-2xl border border-border/70 p-4 text-sm text-muted-foreground">
+            <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground transition-colors hover:bg-accent/40">
               <input
                 type="checkbox"
                 checked={form.rememberMe}
                 onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))}
-                className="mt-1 h-4 w-4 rounded border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               />
               <span>{consoleAuthConfig.labels.rememberMe}</span>
             </label>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting ? consoleAuthConfig.labels.submitLoading : consoleAuthConfig.labels.submit}
               </Button>
-              <Button asChild type="button" variant="link" className="px-0">
+              <Button asChild type="button" variant="link" className="justify-start px-0 sm:justify-center">
                 <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
               </Button>
             </div>
 
             {feedback ? (
-              <Alert variant={feedback.variant}>
+              <Alert id="login-feedback" variant={feedback.variant} aria-live="assertive">
                 <AlertTitle>{feedback.title}</AlertTitle>
                 <AlertDescription>{feedback.message}</AlertDescription>
               </Alert>
@@ -268,21 +320,32 @@ export function LoginPage() {
             ) : null}
           </form>
 
-          <aside className="space-y-4 rounded-3xl border border-border/70 bg-background/40 p-6">
-            <h2 className="text-lg font-semibold">Acceso y descubribilidad</h2>
+          <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
+            <h2 className="text-lg font-semibold">Acceso y alta</h2>
             <p className="text-sm leading-6 text-muted-foreground">
               La consola consulta la policy efectiva de auto-registro y, si la sesión expira, devuelve al usuario al destino protegido una vez vuelva a autenticarse.
             </p>
             {policyLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando policy de registro…</p>
+              <p className="text-sm text-muted-foreground" role="status" aria-live="polite" aria-busy="true">
+                Cargando policy de registro…
+              </p>
             ) : signupVisible ? (
-              <Button asChild variant="outline" className="w-full">
-                <Link to={consoleAuthConfig.signupPath}>{consoleAuthConfig.labels.signup}</Link>
-              </Button>
+              <div className="space-y-2">
+                <Button asChild variant="outline" className="w-full">
+                  <Link to={signupTarget} aria-describedby={signupContextSummary ? 'signup-context-help' : undefined}>
+                    {consoleAuthConfig.labels.signup}
+                  </Link>
+                </Button>
+                {signupContextSummary ? (
+                  <p id="signup-context-help" className="text-xs leading-5 text-muted-foreground">
+                    {signupContextSummary}
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <Alert>
                 <AlertTitle>Registro no disponible</AlertTitle>
-                <AlertDescription>{signupPolicy?.reason ?? consoleAuthConfig.labels.signupDisabled}</AlertDescription>
+                <AlertDescription>{signupPolicy?.message ?? consoleAuthConfig.labels.signupDisabled}</AlertDescription>
               </Alert>
             )}
             <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
