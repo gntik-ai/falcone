@@ -57,7 +57,8 @@ function CredentialDisclosureDialog({
     return null
   }
 
-  const isRotate = disclosure.mode === 'rotate'
+  const activeDisclosure = disclosure
+  const isRotate = activeDisclosure.mode === 'rotate'
   const title = isRotate ? 'Nuevo secreto generado' : 'Secreto actual de la service account'
   const description = isRotate
     ? 'Actualiza tus clientes con este valor. Rotar reemplaza el secreto anterior e invalida los tokens emitidos antes de la rotación.'
@@ -77,7 +78,7 @@ function CredentialDisclosureDialog({
     }
 
     try {
-      await navigator.clipboard.writeText(disclosure.credential.secret)
+      await navigator.clipboard.writeText(activeDisclosure.credential.secret)
       setCopyFeedback('Secreto copiado al portapapeles.')
     } catch {
       setCopyFeedback('No se pudo copiar automáticamente. Selecciona el secreto para copiarlo.')
@@ -110,7 +111,7 @@ function CredentialDisclosureDialog({
           aria-label="Valor del secreto de cliente"
           className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-border/70 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {disclosure.credential.secret}
+          {activeDisclosure.credential.secret}
         </pre>
       </div>
       <DialogFooter className="mt-4 flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
@@ -136,7 +137,7 @@ function CredentialDisclosureDialog({
 
 export function ConsoleServiceAccountsPage() {
   const { activeTenant, activeTenantId, activeWorkspace, activeWorkspaceId } = useConsoleContext()
-  const { accounts, loading, error, reload, knownIds } = useConsoleServiceAccounts(activeWorkspaceId)
+  const { accounts, loading, error, reload } = useConsoleServiceAccounts(activeWorkspaceId)
   const [displayName, setDisplayName] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null)
@@ -145,7 +146,7 @@ export function ConsoleServiceAccountsPage() {
   const session = readConsoleShellSession()
   const principalUserId = session?.principal?.userId ?? 'unknown-user'
   const writesBlocked = activeTenant?.state !== 'active'
-  const isEmpty = !loading && !error && knownIds.length === 0
+  const isEmpty = !loading && !error && accounts.length === 0
 
   const header = useMemo(() => [activeTenant?.label, activeWorkspace?.label].filter(Boolean).join(' · '), [activeTenant?.label, activeWorkspace?.label])
 
@@ -251,9 +252,9 @@ export function ConsoleServiceAccountsPage() {
         {errorFeedback ? <p role="alert" className="mt-3 text-sm text-red-700">{errorFeedback}</p> : null}
       </section>
 
-      {loading ? <ConsolePageState kind="loading" title="Cargando service accounts" description="Rehidratando las fichas conocidas del workspace." /> : null}
+      {loading ? <ConsolePageState kind="loading" title="Cargando service accounts" description="Consultando el listado del workspace." /> : null}
       {error ? <ConsolePageState kind="error" title="No se pudieron cargar las service accounts" description={error} actionLabel="Reintentar" onAction={reload} /> : null}
-      {isEmpty ? <ConsolePageState kind="empty" title="No hay service accounts conocidas todavía en este navegador" description="Crea una nueva para empezar; el listado global llegará cuando exista un endpoint dedicado." /> : null}
+      {isEmpty ? <ConsolePageState kind="empty" title="No hay service accounts en este workspace" description="Crea una nueva para empezar." /> : null}
 
       {accounts.length > 0 ? (
         <div className="overflow-hidden rounded-3xl border border-border bg-card/70">

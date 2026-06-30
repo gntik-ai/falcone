@@ -68,6 +68,10 @@ interface MutationAccepted {
   expiresAt?: string | null
 }
 
+interface ConsoleServiceAccountListResponse {
+  items?: Record<string, any>[]
+}
+
 function getStorageKey(workspaceId: string) {
   return `${STORAGE_PREFIX}${workspaceId}`
 }
@@ -90,9 +94,8 @@ export function persistKnownServiceAccountId(workspaceId: string, serviceAccount
   window.sessionStorage.setItem(getStorageKey(workspaceId), JSON.stringify([...existing]))
 }
 
-// Drop a deleted service account from the local index so it no longer appears in list results
-// (the console lists by reading the known ids and fetching each — a deleted SA would otherwise
-// surface a 404 on reload). Mirrors persistKnownServiceAccountId (#687).
+// Preserve the local index for compatibility with create/delete flows that still record recently
+// touched ids; the list view itself is loaded from the backend collection endpoint.
 export function forgetKnownServiceAccountId(workspaceId: string, serviceAccountId: string) {
   if (typeof window === 'undefined') return
   const existing = new Set(readKnownServiceAccountIds(workspaceId))
@@ -101,18 +104,29 @@ export function forgetKnownServiceAccountId(workspaceId: string, serviceAccountI
 }
 
 export function normalizeServiceAccount(input: Record<string, any>): ConsoleServiceAccount {
+  const status = input.status ?? input.desiredState ?? input.state ?? null
+  const createdAt = input.created_at ?? input.createdAt ?? null
+  const clientId = input.kc_client_id ?? input.clientId ?? input.iamBinding?.clientId ?? ''
+  const iamRealm = input.iam_realm ?? input.iamRealm ?? input.iamBinding?.realm ?? ''
+
   return {
-    serviceAccountId: input.serviceAccountId ?? '',
-    displayName: input.displayName ?? null,
+    serviceAccountId: input.serviceAccountId ?? input.id ?? '',
+    displayName: input.displayName ?? input.display_name ?? null,
     entityType: 'service_account',
-    desiredState: input.desiredState ?? null,
-    expiresAt: input.expiresAt ?? null,
+    desiredState: input.desiredState ?? (status === 'active' ? 'active' : status ? 'suspended' : null),
+    expiresAt: input.expiresAt ?? input.expires_at ?? null,
     iamBinding: input.iamBinding
       ? {
           realm: input.iamBinding.realm ?? '',
           clientId: input.iamBinding.clientId ?? '',
           credentialRef: input.iamBinding.credentialRef ?? ''
         }
+      : clientId
+        ? {
+            realm: iamRealm,
+            clientId,
+            credentialRef: clientId
+          }
       : null,
     credentialStatus: input.credentialStatus
       ? {
@@ -121,6 +135,13 @@ export function normalizeServiceAccount(input: Record<string, any>): ConsoleServ
           expiresAt: input.credentialStatus.expiresAt ?? null,
           lastUsedAt: input.credentialStatus.lastUsedAt ?? null
         }
+      : status
+        ? {
+            state: status === 'revoked' ? 'revoked' : 'active',
+            issuedAt: createdAt,
+            expiresAt: null,
+            lastUsedAt: null
+          }
       : null,
     accessProjection: input.accessProjection
       ? {
@@ -129,6 +150,13 @@ export function normalizeServiceAccount(input: Record<string, any>): ConsoleServ
           clientState: input.accessProjection.clientState ?? 'unknown',
           credentialState: input.accessProjection.credentialState ?? 'unknown'
         }
+      : status
+        ? {
+            effectiveAccess: status === 'active' ? 'granted' : 'blocked',
+            blockedByTenantSuspension: false,
+            clientState: status === 'active' ? 'enabled' : 'disabled',
+            credentialState: status === 'revoked' ? 'revoked' : 'active'
+          }
       : null,
     credentials: Array.isArray(input.credentials)
       ? input.credentials.map((credential: Record<string, any>) => ({
@@ -137,6 +165,8 @@ export function normalizeServiceAccount(input: Record<string, any>): ConsoleServ
           expiresAt: credential.expiresAt ?? null,
           status: credential.status ?? null
         }))
+      : clientId
+        ? [{ credentialId: clientId, issuedAt: createdAt, expiresAt: null, status }]
       : []
   }
 }
@@ -167,21 +197,12 @@ export function useConsoleServiceAccounts(workspaceId: string | null) {
         return
       }
 
-      const ids = readKnownServiceAccountIds(workspaceId)
-      if (ids.length === 0) {
-        setAccounts([])
-        setError(null)
-        setLoading(false)
-        return
-      }
-
       setLoading(true)
       setError(null)
 
       try {
-        const loaded = await Promise.all(
-          ids.map(async (id) => normalizeServiceAccount(await requestConsoleSessionJson(`/v1/workspaces/${workspaceId}/service-accounts/${id}`)))
-        )
+        const response = await requestConsoleSessionJson<ConsoleServiceAccountListResponse>(`/v1/workspaces/${workspaceId}/service-accounts`)
+        const loaded = Array.isArray(response.items) ? response.items.map((item) => normalizeServiceAccount(item)) : []
         if (!cancelled) setAccounts(loaded)
       } catch (error) {
         if (!cancelled) {

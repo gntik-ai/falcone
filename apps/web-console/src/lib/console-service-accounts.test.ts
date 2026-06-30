@@ -28,6 +28,14 @@ describe('console-service-accounts', () => {
     expect(account.credentials[0]?.credentialId).toBe('cred_1')
   })
 
+  it('normaliza filas legacy del endpoint de colección', () => {
+    const account = normalizeServiceAccount({ id: 'sa_1', display_name: 'Ops SA', kc_client_id: 'sa-ops', iam_realm: 'tenant-a', status: 'active', created_at: '2026-06-30T00:00:00Z' })
+    expect(account.serviceAccountId).toBe('sa_1')
+    expect(account.displayName).toBe('Ops SA')
+    expect(account.iamBinding?.clientId).toBe('sa-ops')
+    expect(account.credentialStatus?.state).toBe('active')
+  })
+
   it('crea y persiste service account id', async () => {
     mockRequestConsoleSessionJson.mockResolvedValue({ serviceAccountId: 'sa_1' })
     await expect(createServiceAccount('wrk_1', { displayName: 'Ops SA', entityType: 'service_account' })).resolves.toEqual({ serviceAccountId: 'sa_1' })
@@ -43,11 +51,13 @@ describe('console-service-accounts', () => {
     await expect(rotateServiceAccountCredential('wrk_1', 'sa_1', { reason: 'rotate' })).resolves.toMatchObject({ credentialId: 'cred_2' })
   })
 
-  it('rehidrata ids persistidos', async () => {
-    window.sessionStorage.setItem('in-falcone.console-service-account-index:wrk_1', JSON.stringify(['sa_1']))
-    mockRequestConsoleSessionJson.mockResolvedValue({ serviceAccountId: 'sa_1', displayName: 'Ops SA' })
+  it('lista service accounts desde el endpoint de colección aunque sessionStorage esté vacío', async () => {
+    mockRequestConsoleSessionJson.mockResolvedValue({ items: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA' }], total: 1 })
     const { result } = renderHook(() => useConsoleServiceAccounts('wrk_1'))
     await waitFor(() => expect(result.current.accounts[0]?.serviceAccountId).toBe('sa_1'))
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledTimes(1)
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/workspaces/wrk_1/service-accounts')
+    expect(mockRequestConsoleSessionJson).not.toHaveBeenCalledWith('/v1/workspaces/wrk_1/service-accounts/sa_1')
   })
 
   it('elimina una service account vía DELETE y la quita del índice local (#687)', async () => {

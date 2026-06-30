@@ -843,7 +843,7 @@ export async function getServiceAccount(pool, id) {
 }
 export async function listServiceAccounts(pool, workspaceId) {
   const { rows } = await pool.query(
-    `SELECT id, workspace_id, tenant_id, kc_client_id, display_name, status, created_at, created_by
+    `SELECT id, workspace_id, tenant_id, iam_realm, kc_client_id, display_name, status, created_at, created_by
        FROM service_accounts WHERE workspace_id = $1 ORDER BY created_at DESC`, [workspaceId]);
   return { items: rows, total: rows.length };
 }
