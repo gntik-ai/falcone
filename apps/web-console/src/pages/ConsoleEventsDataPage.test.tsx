@@ -33,6 +33,8 @@ describe('ConsoleEventsDataPage', () => {
 
   it('passes structural-write access for admin roles', () => {
     render(<ConsoleEventsDataPage />)
+    expect(screen.getByText('Admin write access')).toBeInTheDocument()
+    expect(screen.getByText('Manage topics, publish messages, and consume from a workspace stream.')).toBeInTheDocument()
     expect(screen.getByTestId('events-console')).toHaveTextContent('true')
     expect(mockEventsConsole).toHaveBeenCalledWith({ workspaceId: 'ws1', canManageEvents: true })
   })
@@ -40,7 +42,24 @@ describe('ConsoleEventsDataPage', () => {
   it('withholds Events create/publish access for tenant_developer', () => {
     mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_developer'] } })
     render(<ConsoleEventsDataPage />)
+    expect(screen.getByText('Read-only')).toBeInTheDocument()
+    expect(screen.getByText('Browse topics and consume messages from a workspace stream.')).toBeInTheDocument()
     expect(screen.getByTestId('events-console')).toHaveTextContent('false')
     expect(mockEventsConsole).toHaveBeenCalledWith({ workspaceId: 'ws1', canManageEvents: false })
+  })
+
+  it('withholds Events create/publish access for tenant_viewer', () => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_viewer'] } })
+    render(<ConsoleEventsDataPage />)
+    expect(screen.getByText('Read-only')).toBeInTheDocument()
+    expect(screen.getByTestId('events-console')).toHaveTextContent('false')
+    expect(mockEventsConsole).toHaveBeenCalledWith({ workspaceId: 'ws1', canManageEvents: false })
+  })
+
+  it('shows a workspace selection state before rendering the Events console', () => {
+    mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: '' })
+    render(<ConsoleEventsDataPage />)
+    expect(screen.getByRole('status')).toHaveTextContent('Select a workspace to use events.')
+    expect(mockEventsConsole).not.toHaveBeenCalled()
   })
 })
