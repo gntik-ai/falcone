@@ -596,46 +596,51 @@
         ],
         "type": "object"
       },
+      "ConsoleSignupActivationMode": {
+        "enum": [
+          "self_service",
+          "approval_required",
+          "auto_activate"
+        ],
+        "type": "string"
+      },
       "ConsoleSignupPolicy": {
         "additionalProperties": false,
         "properties": {
-          "allowed": {
-            "type": "boolean"
-          },
-          "approvalRequired": {
-            "type": "boolean"
-          },
-          "effectiveMode": {
-            "$ref": "#/components/schemas/SignupPolicyMode"
-          },
-          "environmentModes": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/SignupPolicyMode"
-            },
-            "type": "object"
-          },
-          "globalMode": {
-            "$ref": "#/components/schemas/SignupPolicyMode"
-          },
-          "planModes": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/SignupPolicyMode"
-            },
-            "type": "object"
-          },
-          "reason": {
+          "message": {
             "maxLength": 280,
             "minLength": 3,
             "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/SignupPolicyMode"
+          },
+          "passwordPolicy": {
+            "additionalProperties": false,
+            "properties": {
+              "minLength": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "minLength"
+            ],
+            "type": "object"
+          },
+          "selfServiceEnabled": {
+            "type": "boolean"
+          },
+          "statusView": {
+            "$ref": "#/components/schemas/ConsoleStatusViewId"
           }
         },
         "required": [
-          "globalMode",
-          "environmentModes",
-          "planModes",
-          "effectiveMode",
-          "allowed",
-          "approvalRequired"
+          "selfServiceEnabled",
+          "mode",
+          "statusView",
+          "passwordPolicy",
+          "message"
         ],
         "type": "object"
       },
@@ -643,7 +648,7 @@
         "additionalProperties": false,
         "properties": {
           "activationMode": {
-            "$ref": "#/components/schemas/SignupPolicyMode"
+            "$ref": "#/components/schemas/ConsoleSignupActivationMode"
           },
           "createdAt": {
             "format": "date-time",
@@ -701,7 +706,7 @@
           },
           "password": {
             "maxLength": 256,
-            "minLength": 12,
+            "minLength": 8,
             "type": "string"
           },
           "primaryEmail": {
@@ -721,8 +726,18 @@
             "pattern": "^pln_[0-9a-z]+$",
             "type": "string"
           },
+          "tenantId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
           "username": {
             "pattern": "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$",
+            "type": "string"
+          },
+          "workspaceId": {
+            "maxLength": 128,
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -730,7 +745,8 @@
           "username",
           "displayName",
           "primaryEmail",
-          "password"
+          "password",
+          "tenantId"
         ],
         "type": "object"
       },
@@ -1629,9 +1645,8 @@
       },
       "SignupPolicyMode": {
         "enum": [
-          "disabled",
-          "approval_required",
-          "auto_activate"
+          "self_service",
+          "invitation"
         ],
         "type": "string"
       },
@@ -3753,7 +3768,7 @@
           "required": true
         },
         "responses": {
-          "202": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3761,7 +3776,7 @@
                 }
               }
             },
-            "description": "The signup was accepted and normalized into a platform-user registration envelope."
+            "description": "The signup was created and normalized into a platform-user registration envelope."
           },
           "400": {
             "content": {

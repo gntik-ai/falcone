@@ -1,7 +1,8 @@
 import { requestJson, type ApiError } from '@/lib/http'
 
 export type ConsoleAuthenticationState = 'active' | 'pending_activation' | 'suspended' | 'credentials_expired'
-export type ConsoleSignupMode = 'disabled' | 'approval_required' | 'auto_activate'
+export type ConsoleSignupActivationMode = 'self_service' | 'approval_required' | 'auto_activate'
+export type ConsoleSignupPolicyMode = 'self_service' | 'invitation'
 export type ConsoleSignupState = 'pending_activation' | 'active' | 'rejected'
 export type ConsoleStatusViewId =
   | 'login'
@@ -22,18 +23,20 @@ export interface ConsoleSignupRequest {
   displayName: string
   primaryEmail: string
   password: string
+  tenantId: string
+  workspaceId?: string
   requestedEnvironment?: 'dev' | 'sandbox' | 'staging' | 'prod'
   requestedPlanId?: string
 }
 
 export interface ConsoleSignupPolicy {
-  allowed: boolean
-  approvalRequired: boolean
-  effectiveMode: ConsoleSignupMode
-  globalMode: string
-  environmentModes: Record<string, string>
-  planModes: Record<string, string>
-  reason?: string
+  selfServiceEnabled: boolean
+  mode: ConsoleSignupPolicyMode
+  statusView: ConsoleStatusViewId
+  passwordPolicy: {
+    minLength: number
+  }
+  message: string
 }
 
 export interface ConsoleActionLink {
@@ -99,7 +102,7 @@ export interface ConsoleTokenRefreshRequest {
 export interface ConsoleSignupRegistration {
   registrationId: string
   userId: string
-  activationMode: ConsoleSignupMode
+  activationMode: ConsoleSignupActivationMode
   state: ConsoleSignupState
   statusView: ConsoleStatusViewId
   createdAt: string

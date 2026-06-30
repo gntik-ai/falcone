@@ -15,37 +15,28 @@ describe('SignupPage', () => {
   })
 
   it('renderiza el formulario cuando la policy permite signup', async () => {
-    fetchMock.mockResolvedValueOnce(
-      createJsonResponse(200, {
-        allowed: true,
-        approvalRequired: false,
-        effectiveMode: 'auto_activate',
-        globalMode: 'auto_activate',
-        environmentModes: {},
-        planModes: {}
-      })
-    )
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 10 })))
     vi.stubGlobal('fetch', fetchMock)
 
-    renderPage()
+    renderPage('/signup?tenant=ten_acme&workspaceId=wrk_console')
 
     expect(await screen.findByRole('heading', { name: /crea tu acceso a in falcone console/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre visible/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/correo principal/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/tenant id/i)).toHaveValue('ten_acme')
+    expect(screen.getByLabelText(/workspace id/i)).toHaveValue('wrk_console')
+    expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('minlength', '10')
   })
 
   it('muestra una pantalla informativa cuando la policy deshabilita signup', async () => {
     fetchMock.mockResolvedValueOnce(
       createJsonResponse(200, {
-        allowed: false,
-        approvalRequired: false,
-        effectiveMode: 'disabled',
-        globalMode: 'disabled',
-        environmentModes: {},
-        planModes: {},
-        reason: 'El auto-registro está deshabilitado por política.'
+        selfServiceEnabled: false,
+        mode: 'invitation',
+        statusView: 'login',
+        passwordPolicy: { minLength: 8 },
+        message: 'El auto-registro está deshabilitado por política.'
       })
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -59,36 +50,27 @@ describe('SignupPage', () => {
 
   it('envía el signup y muestra feedback de éxito cuando la cuenta queda activa', async () => {
     fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
       .mockResolvedValueOnce(
-        createJsonResponse(200, {
-          allowed: true,
-          approvalRequired: false,
-          effectiveMode: 'auto_activate',
-          globalMode: 'auto_activate',
-          environmentModes: {},
-          planModes: {}
-        })
-      )
-      .mockResolvedValueOnce(
-        createJsonResponse(202, {
+        createJsonResponse(201, {
           registrationId: 'reg_abc123',
           userId: 'usr_abc123',
-          activationMode: 'auto_activate',
+          activationMode: 'self_service',
           state: 'active',
-          statusView: 'signup',
+          statusView: 'login',
           createdAt: '2026-03-28T19:00:00.000Z',
           message: 'La cuenta ya puede continuar a login.'
         })
       )
     vi.stubGlobal('fetch', fetchMock)
 
-    renderPage()
+    renderPage('/signup?tenantId=ten_acme&workspaceId=wrk_console')
     await screen.findByRole('button', { name: /crear solicitud de acceso/i })
 
     fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
     fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
     fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'Abcd1234' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
     expect(await screen.findByText(/registration id: reg_abc123/i)).toBeInTheDocument()
@@ -104,7 +86,9 @@ describe('SignupPage', () => {
             username: 'operaciones',
             displayName: 'Operaciones Plataforma',
             primaryEmail: 'ops@example.com',
-            password: 'super-secret-123'
+            password: 'Abcd1234',
+            tenantId: 'ten_acme',
+            workspaceId: 'wrk_console'
           }),
           headers: expect.any(Headers)
         })
@@ -120,18 +104,9 @@ describe('SignupPage', () => {
 
   it('navega a activación pendiente cuando el signup queda pendiente', async () => {
     fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
       .mockResolvedValueOnce(
-        createJsonResponse(200, {
-          allowed: true,
-          approvalRequired: true,
-          effectiveMode: 'approval_required',
-          globalMode: 'approval_required',
-          environmentModes: {},
-          planModes: {}
-        })
-      )
-      .mockResolvedValueOnce(
-        createJsonResponse(202, {
+        createJsonResponse(201, {
           registrationId: 'reg_pending123',
           userId: 'usr_pending123',
           activationMode: 'approval_required',
@@ -157,6 +132,7 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
     fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
     fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
+    fireEvent.change(screen.getByLabelText(/tenant id/i), { target: { value: 'ten_acme' } })
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
@@ -166,16 +142,7 @@ describe('SignupPage', () => {
 
   it('muestra feedback cuando ya existe una cuenta con esos datos', async () => {
     fetchMock
-      .mockResolvedValueOnce(
-        createJsonResponse(200, {
-          allowed: true,
-          approvalRequired: false,
-          effectiveMode: 'auto_activate',
-          globalMode: 'auto_activate',
-          environmentModes: {},
-          planModes: {}
-        })
-      )
+      .mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
       .mockResolvedValueOnce(
         createJsonResponse(409, {
           status: 409,
@@ -195,6 +162,7 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
     fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
     fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
+    fireEvent.change(screen.getByLabelText(/tenant id/i), { target: { value: 'ten_acme' } })
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
@@ -202,15 +170,25 @@ describe('SignupPage', () => {
   })
 })
 
-function renderPage() {
+function renderPage(initialEntry = '/signup') {
   return render(
-    <MemoryRouter initialEntries={['/signup']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/signup/pending-activation" element={<PendingActivationPage />} />
       </Routes>
     </MemoryRouter>
   )
+}
+
+function enabledSignupPolicy({ minLength }: { minLength: number }) {
+  return {
+    selfServiceEnabled: true,
+    mode: 'self_service',
+    statusView: 'signup',
+    passwordPolicy: { minLength },
+    message: 'Self-service signup is enabled.'
+  }
 }
 
 function createJsonResponse(status: number, body: unknown) {

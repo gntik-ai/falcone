@@ -404,17 +404,35 @@ test('control-plane contract enforces versioning, authorization, family metadata
 
   assert.equal(createConsoleSignup['x-family'], 'auth');
   assert.equal(createConsoleSignupParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
-  assert.ok(createConsoleSignup.responses['202']);
+  assert.ok(createConsoleSignup.responses['201']);
   assert.ok(createConsoleSignup.responses['409']);
   assert.ok(document.components.schemas.ConsoleSignupRequest);
   assert.ok(document.components.schemas.ConsoleSignupRegistration);
   assert.ok(document.components.schemas.ConsoleSignupState);
+  assert.ok(document.components.schemas.ConsoleSignupActivationMode);
+  assert.equal(document.components.schemas.ConsoleSignupRequest.required.includes('tenantId'), true);
+  assert.equal(document.components.schemas.ConsoleSignupRequest.properties.password.minLength, 8);
+  assert.ok(document.components.schemas.ConsoleSignupRequest.properties.workspaceId);
+  assert.deepEqual(document.components.schemas.ConsoleSignupRegistration.properties.activationMode.enum, [
+    'self_service',
+    'approval_required',
+    'auto_activate'
+  ]);
 
   assert.equal(getConsoleSignupPolicy['x-family'], 'auth');
   assert.equal(getConsoleSignupPolicyParameters.some((parameter) => parameter.name === 'X-API-Version'), true);
   assert.ok(getConsoleSignupPolicy.responses['200']);
   assert.ok(document.components.schemas.ConsoleSignupPolicy);
   assert.ok(document.components.schemas.SignupPolicyMode);
+  assert.deepEqual(document.components.schemas.ConsoleSignupPolicy.required, [
+    'selfServiceEnabled',
+    'mode',
+    'statusView',
+    'passwordPolicy',
+    'message'
+  ]);
+  assert.deepEqual(document.components.schemas.ConsoleSignupPolicy.properties.mode.enum, ['self_service', 'invitation']);
+  assert.deepEqual(document.components.schemas.SignupPolicyMode.enum, ['self_service', 'invitation']);
 
   assert.equal(decideConsoleSignupActivation['x-family'], 'auth');
   assert.equal(decideConsoleSignupActivation.security?.[0]?.bearerAuth?.length ?? 0, 0);

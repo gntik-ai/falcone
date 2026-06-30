@@ -37,22 +37,19 @@ const consoleSession = {
 } as const
 
 const signupPolicyAllowed = {
-  allowed: true,
-  approvalRequired: false,
-  effectiveMode: 'auto_activate',
-  globalMode: 'auto_activate',
-  environmentModes: {},
-  planModes: {}
+  selfServiceEnabled: true,
+  mode: 'self_service',
+  statusView: 'signup',
+  passwordPolicy: { minLength: 8 },
+  message: 'Self-service signup is enabled.'
 } as const
 
 const signupPolicyApprovalRequired = {
-  allowed: true,
-  approvalRequired: true,
-  effectiveMode: 'approval_required',
-  globalMode: 'approval_required',
-  environmentModes: {},
-  planModes: {},
-  reason: 'El acceso requiere aprobación antes de entrar en la consola.'
+  selfServiceEnabled: true,
+  mode: 'self_service',
+  statusView: 'signup',
+  passwordPolicy: { minLength: 8 },
+  message: 'Self-service signup is enabled.'
 } as const
 
 const pendingActivationRegistration = {
@@ -134,10 +131,12 @@ test('permite signup con aprobación y aterriza en pending activation', async ({
     pendingActivationView
   })
 
-  await page.goto('/signup')
+  await page.goto('/signup?tenantId=ten_console&workspaceId=wrk_console')
 
-  await expect(page).toHaveURL(/\/signup$/)
+  await expect(page).toHaveURL(/\/signup\?tenantId=ten_console&workspaceId=wrk_console$/)
   await expect(page.getByLabel(/nombre visible/i)).toBeVisible()
+  await expect(page.locator('input[name="tenantId"]')).toHaveValue('ten_console')
+  await expect(page.locator('input[name="workspaceId"]')).toHaveValue('wrk_console')
 
   await page.locator('input[name="username"]').fill('nuevo-operador')
   await page.locator('input[name="displayName"]').fill('Nuevo Operador')
@@ -188,6 +187,17 @@ async function installConsoleAuthMocks(page: Page, options: ConsoleAuthMockOptio
     }
 
     if (method === 'POST' && pathname === '/v1/auth/signups') {
+      const body = request.postDataJSON() as Record<string, unknown>
+
+      if (body.tenantId !== 'ten_console') {
+        await fulfillJson(route, 400, {
+          status: 400,
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required'
+        })
+        return
+      }
+
       await fulfillJson(route, 201, registration)
       return
     }
