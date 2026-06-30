@@ -20,12 +20,17 @@
  * bbx-audit-write-04: the dispatch-level writer records a mutating local action with the request correlation id
  * bbx-audit-write-05: a recorded scope-enforcement denial is returned by the scope-enforcement audit query (no 500)
  * bbx-audit-write-06: scope-enforcement denials are tenant-scoped (a tenant owner sees only its own)
+ * bbx-audit-filter-07: outcome filters narrow tenant audit records and impossible values return empty
+ * bbx-audit-filter-08: actionCategory and actorId filters narrow tenant audit records
+ * bbx-audit-filter-09: occurredAfter/occurredBefore filters narrow tenant audit records
+ * bbx-audit-filter-10: derived action categories stay in the audit event schema vocabulary
  */
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { METRICS_HANDLERS } from '../../deploy/kind/control-plane/metrics-handlers.mjs';
-import { recordAuditEvent, queryAuditEvents } from '../../deploy/kind/control-plane/audit-store.mjs';
+import { auditActionCategoryForType, recordAuditEvent } from '../../deploy/kind/control-plane/audit-store.mjs';
 import { recordScopeDenial, auditEventForRoute } from '../../deploy/kind/control-plane/audit-writer.mjs';
 import { main as scopeAuditQuery } from '../../services/provisioning-orchestrator/src/actions/scope-enforcement-audit-query.mjs';
 
@@ -34,6 +39,8 @@ const TENANT_B = '22222222-2222-2222-2222-222222222222';
 const WS_A = '33333333-3333-3333-3333-333333333333';
 
 const WS_A_ROW = { id: WS_A, tenant_id: TENANT_A, slug: 'app-staging', display_name: 'App Staging', status: 'active', environment: 'staging' };
+const AUDIT_EVENT_SCHEMA = JSON.parse(readFileSync(new URL('../../services/internal-contracts/src/observability-audit-event-schema.json', import.meta.url), 'utf8'));
+const AUDIT_ACTION_CATEGORIES = new Set(AUDIT_EVENT_SCHEMA.action.categories);
 
 // In-memory pool that emulates the plan_audit_events + scope_enforcement_denials
 // tables. It honours the WHERE tenant_id / workspace + ORDER BY / column shape the
@@ -69,11 +76,41 @@ function memPool() {
     if (s.includes('FROM plan_audit_events')) {
       // tenant_id is always the first filter param; workspace_id (when present) the second.
       const tenantId = params[0];
-      const workspaceId = s.includes('workspace_id =') ? params[1] : null;
+      let nextParam = 1;
+      const workspaceId = s.includes("new_state->>'workspaceId' =") ? params[nextParam++] : null;
       let rows = audit.filter((r) => r.tenant_id === tenantId);
       if (workspaceId) rows = rows.filter((r) => r.workspace_id === workspaceId);
+      if (s.includes('outcome = $')) {
+        const outcome = params[nextParam++];
+        rows = rows.filter((r) => r.outcome === outcome);
+      }
+      if (s.includes('OR action_type =')) {
+        const actionCategory = params[nextParam++];
+        rows = rows.filter((r) =>
+          auditActionCategoryForType(r.action_type, r.action_category ?? r.new_state?.actionCategory ?? r.new_state?.action_category) === actionCategory
+          || r.action_type === actionCategory
+        );
+      }
+      if (s.includes('actor_id =')) {
+        const actorId = params[nextParam++];
+        rows = rows.filter((r) => r.actor_id === actorId);
+      }
+      if (s.includes('created_at >=')) {
+        const occurredAfter = params[nextParam++];
+        rows = rows.filter((r) => new Date(r.created_at).valueOf() >= new Date(occurredAfter).valueOf());
+      }
+      if (s.includes('created_at <=')) {
+        const occurredBefore = params[nextParam++];
+        rows = rows.filter((r) => new Date(r.created_at).valueOf() <= new Date(occurredBefore).valueOf());
+      }
       rows = rows.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-      return { rows };
+      const limit = Number(params[params.length - 1]) || rows.length;
+      return {
+        rows: rows.slice(0, limit).map((r) => ({
+          ...r,
+          action_category: auditActionCategoryForType(r.action_type, r.action_category ?? r.new_state?.actionCategory ?? r.new_state?.action_category)
+        }))
+      };
     }
     if (s.includes('FROM workspaces')) {
       return { rows: params[0] === WS_A ? [WS_A_ROW] : [] };
@@ -104,8 +141,26 @@ const IDENTITY_A = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actor
 const IDENTITY_B = { sub: 'user-b', tenantId: TENANT_B, workspaceId: null, actorType: 'tenant_owner', roles: ['tenant_owner'], scopes: [] };
 const IDENTITY_SA = { sub: 'sa', tenantId: null, workspaceId: null, actorType: 'superadmin', roles: ['superadmin'], scopes: [] };
 
-function metricsCtx(pool, identity, params = {}) {
-  return { pool, params, query: {}, body: {}, identity, callerContext: { actor: { id: identity.sub, type: identity.actorType }, tenantId: identity.tenantId } };
+function metricsCtx(pool, identity, params = {}, query = {}) {
+  return { pool, params, query, body: {}, identity, callerContext: { actor: { id: identity.sub, type: identity.actorType }, tenantId: identity.tenantId } };
+}
+
+function seedAuditRow(pool, row) {
+  pool._audit.push({
+    id: row.id,
+    action_type: row.action_type,
+    action_category: row.action_category ?? row.new_state?.actionCategory ?? row.new_state?.action_category ?? null,
+    actor_id: row.actor_id,
+    tenant_id: row.tenant_id,
+    workspace_id: row.workspace_id ?? row.new_state?.workspaceId ?? null,
+    previous_state: row.previous_state ?? null,
+    new_state: row.new_state ?? {},
+    outcome: row.outcome ?? 'succeeded',
+    correlation_id: row.correlation_id ?? null,
+    created_at: row.created_at,
+    prev_hash: row.prev_hash ?? '',
+    row_hash: row.row_hash ?? ''
+  });
 }
 
 test('bbx-audit-write-01: a recorded action surfaces in the tenant audit-records read WITH its correlation id', async () => {
@@ -146,6 +201,144 @@ test('bbx-audit-write-03: a workspace action surfaces in the workspace audit-rec
   assert.equal(r.statusCode, 200, JSON.stringify(r.body));
   assert.equal(r.body.items.length, 1, `expected only the workspace event, got ${JSON.stringify(r.body.items)}`);
   assert.equal(r.body.items[0].correlationId, 'corr-ws');
+});
+
+test('bbx-audit-filter-07: outcome filters narrow tenant audit records and impossible values return empty', async () => {
+  const pool = memPool();
+  await recordAuditEvent(pool, {
+    actionType: 'tenant.user.create', actorId: 'actor-a', tenantId: TENANT_A, outcome: 'failed',
+    newState: { username: 'bad' }, correlationId: 'corr-failed-a'
+  });
+  await recordAuditEvent(pool, {
+    actionType: 'tenant.user.create', actorId: 'actor-a', tenantId: TENANT_A, outcome: 'succeeded',
+    newState: { username: 'good' }, correlationId: 'corr-succeeded-a'
+  });
+  await recordAuditEvent(pool, {
+    actionType: 'tenant.user.create', actorId: 'actor-b', tenantId: TENANT_B, outcome: 'failed',
+    newState: { username: 'foreign' }, correlationId: 'corr-failed-b'
+  });
+
+  const r = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(
+    pool,
+    IDENTITY_A,
+    { tenantId: TENANT_A },
+    { 'page[size]': '50', 'filter[outcome]': 'failed' }
+  ));
+  assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+  assert.equal(r.body.items.length, 1, `outcome filter must narrow to tenant A failed records: ${JSON.stringify(r.body.items)}`);
+  assert.equal(r.body.items[0].result.outcome, 'failed');
+  assert.equal(r.body.items[0].scope.tenantId, TENANT_A);
+  assert.equal(r.body.items[0].correlationId, 'corr-failed-a');
+
+  const none = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(
+    pool,
+    IDENTITY_A,
+    { tenantId: TENANT_A },
+    { 'page[size]': '50', 'filter[outcome]': 'zzz' }
+  ));
+  assert.equal(none.statusCode, 200, JSON.stringify(none.body));
+  assert.equal(none.body.items.length, 0, `unknown outcome must not return the full unfiltered set: ${JSON.stringify(none.body.items)}`);
+});
+
+test('bbx-audit-filter-08: actionCategory and actorId filters narrow tenant audit records', async () => {
+  const pool = memPool();
+  await recordAuditEvent(pool, {
+    actionType: 'tenant.user.create', actorId: 'actor-target', tenantId: TENANT_A,
+    newState: { actionCategory: 'access_control_modification', username: 'alice' }, correlationId: 'corr-access'
+  });
+  await recordAuditEvent(pool, {
+    actionType: 'workspace.create', actorId: 'actor-other', tenantId: TENANT_A,
+    newState: { actionCategory: 'resource_creation', slug: 'app' }, correlationId: 'corr-resource'
+  });
+
+  const byCategory = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(
+    pool,
+    IDENTITY_A,
+    { tenantId: TENANT_A },
+    { 'page[size]': '50', 'filter[actionCategory]': 'access_control_modification' }
+  ));
+  assert.equal(byCategory.statusCode, 200, JSON.stringify(byCategory.body));
+  assert.equal(byCategory.body.items.length, 1, `category filter must narrow: ${JSON.stringify(byCategory.body.items)}`);
+  assert.equal(byCategory.body.items[0].action.actionId, 'tenant.user.create');
+  assert.equal(byCategory.body.items[0].action.category, 'access_control_modification');
+
+  const byStoredActionType = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(
+    pool,
+    IDENTITY_A,
+    { tenantId: TENANT_A },
+    { 'page[size]': '50', 'filter[actionCategory]': 'tenant.user.create' }
+  ));
+  assert.equal(byStoredActionType.body.items.length, 1, `kind action-type filter compatibility must narrow: ${JSON.stringify(byStoredActionType.body.items)}`);
+  assert.equal(byStoredActionType.body.items[0].correlationId, 'corr-access');
+
+  const byActor = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(
+    pool,
+    IDENTITY_A,
+    { tenantId: TENANT_A },
+    { 'page[size]': '50', 'filter[actorId]': 'actor-other' }
+  ));
+  assert.equal(byActor.statusCode, 200, JSON.stringify(byActor.body));
+  assert.equal(byActor.body.items.length, 1, `actor filter must narrow: ${JSON.stringify(byActor.body.items)}`);
+  assert.equal(byActor.body.items[0].actor.actorId, 'actor-other');
+  assert.equal(byActor.body.items[0].correlationId, 'corr-resource');
+});
+
+test('bbx-audit-filter-09: occurredAfter/occurredBefore filters narrow tenant audit records', async () => {
+  const pool = memPool();
+  seedAuditRow(pool, {
+    id: 'old', action_type: 'tenant.create', actor_id: 'actor-old', tenant_id: TENANT_A,
+    correlation_id: 'corr-old', created_at: '2026-06-01T00:00:00.000Z'
+  });
+  seedAuditRow(pool, {
+    id: 'mid', action_type: 'workspace.create', actor_id: 'actor-mid', tenant_id: TENANT_A,
+    correlation_id: 'corr-mid', created_at: '2026-06-15T00:00:00.000Z'
+  });
+  seedAuditRow(pool, {
+    id: 'late', action_type: 'tenant.delete', actor_id: 'actor-late', tenant_id: TENANT_A,
+    correlation_id: 'corr-late', created_at: '2026-06-30T00:00:00.000Z'
+  });
+  seedAuditRow(pool, {
+    id: 'foreign-mid', action_type: 'workspace.create', actor_id: 'actor-foreign', tenant_id: TENANT_B,
+    correlation_id: 'corr-foreign-mid', created_at: '2026-06-15T00:00:00.000Z'
+  });
+
+  const r = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(
+    pool,
+    IDENTITY_A,
+    { tenantId: TENANT_A },
+    {
+      'page[size]': '50',
+      'filter[occurredAfter]': '2026-06-10T00:00:00.000Z',
+      'filter[occurredBefore]': '2026-06-20T00:00:00.000Z'
+    }
+  ));
+  assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+  assert.deepEqual(r.body.items.map((item) => item.correlationId), ['corr-mid']);
+  assert.equal(r.body.items[0].scope.tenantId, TENANT_A);
+});
+
+test('bbx-audit-filter-10: derived action categories stay in the audit event schema vocabulary', async () => {
+  const pool = memPool();
+  [
+    ['cred-rotate', 'workspace.service-account.credential.rotate'],
+    ['db-rotate', 'workspace.database.credential.rotate'],
+    ['secret-set', 'workspace.secret.set'],
+    ['secret-delete', 'workspace.secret.delete']
+  ].forEach(([id, action_type], index) => seedAuditRow(pool, {
+    id, action_type, actor_id: 'actor-secret', tenant_id: TENANT_A,
+    correlation_id: `corr-${id}`, created_at: `2026-06-30T00:00:0${index}.000Z`
+  }));
+
+  const r = await METRICS_HANDLERS.metricsTenantAudit(metricsCtx(pool, IDENTITY_A, { tenantId: TENANT_A }, { 'page[size]': '50' }));
+  assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+  assert.equal(r.body.items.length, 4, JSON.stringify(r.body.items));
+  for (const item of r.body.items) {
+    assert.ok(
+      AUDIT_ACTION_CATEGORIES.has(item.action.category),
+      `derived category ${item.action.category} for ${item.action.actionId} is outside the audit event schema vocabulary`
+    );
+    assert.equal(item.action.category, 'configuration_change');
+  }
 });
 
 test('bbx-audit-write-04: the dispatch-level writer records a mutating local action with the request correlation id', async () => {
