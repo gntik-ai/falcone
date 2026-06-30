@@ -34,6 +34,16 @@ const referencedTrees = [...new Set(
 )];
 // Trees the Dockerfile COPYs into /repo/services/.
 const copiedTrees = [...dockerfile.matchAll(/COPY\s+services\/([^/\s]+)\s+\/repo\/services\//g)].map((m) => m[1]);
+const copiedControlPlaneModules = new Set(
+  [...dockerfile.matchAll(/deploy\/kind\/control-plane\/([A-Za-z0-9_.-]+\.mjs)\b/g)].map((m) => m[1]),
+);
+
+function localImports(moduleName) {
+  const source = readFileSync(resolve(CP_DIR, moduleName), 'utf8');
+  const staticImports = [...source.matchAll(/(?:^|\n)\s*import\s+(?:[^'"]+\s+from\s+)?['"]\.\/([^'"]+\.mjs)['"]/g)].map((m) => m[1]);
+  const dynamicImports = [...source.matchAll(/import\(\s*['"]\.\/([^'"]+\.mjs)['"]\s*\)/g)].map((m) => m[1]);
+  return [...new Set([...staticImports, ...dynamicImports])];
+}
 
 test('bbx-sched-dockerfile-01: every route-map services tree is COPYed by the Dockerfile', () => {
   const missing = referencedTrees.filter((t) => !copiedTrees.includes(t));
@@ -56,4 +66,20 @@ test('bbx-sched-dockerfile-04: the Dockerfile fails the build when a route handl
   // A build-time guard (node -e over route-map.runtime.json) turns a missing COPY into a
   // build failure instead of a runtime 500.
   assert.match(dockerfile, /RUN node -e[\s\S]*route-map\.runtime\.json[\s\S]*process\.exit\(1\)/, 'a build-time route-module resolution check must be present');
+});
+
+test('bbx-sched-dockerfile-05: every copied local control-plane module import is also COPYed', () => {
+  const missing = [];
+  for (const moduleName of copiedControlPlaneModules) {
+    for (const imported of localImports(moduleName)) {
+      if (!copiedControlPlaneModules.has(imported)) missing.push(`${moduleName} -> ${imported}`);
+    }
+  }
+
+  assert.deepEqual(missing, [], `Dockerfile is missing local control-plane module COPY entries: ${missing.join(', ')}`);
+});
+
+test('bbx-sched-dockerfile-06: realtime handlers are COPYed with b-handlers dependencies', () => {
+  assert.ok(copiedControlPlaneModules.has('b-handlers.mjs'), 'Dockerfile must COPY b-handlers.mjs');
+  assert.ok(copiedControlPlaneModules.has('realtime-handlers.mjs'), 'Dockerfile must COPY realtime-handlers.mjs');
 });

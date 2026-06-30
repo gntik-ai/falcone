@@ -421,6 +421,69 @@
   },
   {
     "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/applications",
+    "localHandler": "listExternalApplications",
+    "auth": "authenticated",
+    "notes": "ConsoleAuthPage external applications list. Handler resolves the workspace first, allows same-tenant reads, and returns 200 empty collection for owned workspaces instead of 404 NO_ROUTE."
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/applications",
+    "localHandler": "createExternalApplication",
+    "auth": "authenticated",
+    "notes": "ConsoleAuthPage external application create. Handler owns tenant write gate (tenant_owner/admin or platform) and returns 202 or structured 400 VALIDATION_ERROR, never NO_ROUTE."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/applications/templates",
+    "localHandler": "listExternalApplicationStarterTemplates",
+    "auth": "authenticated",
+    "notes": "Workspace external application starter templates from the existing IAM helper, scoped by a real workspace lookup."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}",
+    "localHandler": "getExternalApplication",
+    "auth": "authenticated",
+    "notes": "Read one workspace external application after workspace tenant scope verification."
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}",
+    "localHandler": "updateExternalApplication",
+    "auth": "authenticated",
+    "notes": "Update or soft-delete one workspace external application. Handler requires tenant owner/admin or platform and validates canonical application shape."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers",
+    "localHandler": "listExternalApplicationFederatedProviders",
+    "auth": "authenticated",
+    "notes": "List federated providers embedded in the external application JSONB document after workspace tenant scope verification."
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers",
+    "localHandler": "createExternalApplicationFederatedProvider",
+    "auth": "authenticated",
+    "notes": "Create one embedded federated provider. Handler requires tenant owner/admin or platform and returns structured validation errors."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}",
+    "localHandler": "getExternalApplicationFederatedProvider",
+    "auth": "authenticated",
+    "notes": "Read one embedded federated provider after workspace and application scope verification."
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}",
+    "localHandler": "updateExternalApplicationFederatedProvider",
+    "auth": "authenticated",
+    "notes": "Update one embedded federated provider. Handler requires tenant owner/admin or platform and rejects providerId changes."
+  },
+  {
+    "method": "GET",
     "path": "/v1/realtime/workspaces/{workspaceId}/pg-captures",
     "module": "/repo/services/provisioning-orchestrator/src/actions/realtime/pg-capture-list.mjs",
     "export": "main",

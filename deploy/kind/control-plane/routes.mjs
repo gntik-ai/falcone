@@ -75,6 +75,19 @@ export const routes = [
   // metadata shape the page consumes. An owned workspace with no realtime channel rows returns
   // 200 + empty dataSources/realtime:false, not 404 NO_ROUTE.
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}/realtime', localHandler: 'getWorkspaceRealtime', auth: 'authenticated' },
+  // Workspace external applications + federation providers (#781): the public route catalog and
+  // `/console/auth` already advertise these routes. Serve them in the kind control-plane with a
+  // durable workspace-scoped JSONB registry so list/create/update/provider actions reach handlers
+  // instead of falling through to 404 NO_ROUTE. The handlers own tenant read/write gates.
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/applications', localHandler: 'listExternalApplications', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/applications', localHandler: 'createExternalApplication', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/applications/templates', localHandler: 'listExternalApplicationStarterTemplates', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/applications/{applicationId}', localHandler: 'getExternalApplication', auth: 'authenticated' },
+  { method: 'PUT',  path: '/v1/workspaces/{workspaceId}/applications/{applicationId}', localHandler: 'updateExternalApplication', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers', localHandler: 'listExternalApplicationFederatedProviders', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers', localHandler: 'createExternalApplicationFederatedProvider', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}', localHandler: 'getExternalApplicationFederatedProvider', auth: 'authenticated' },
+  { method: 'PUT',  path: '/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}', localHandler: 'updateExternalApplicationFederatedProvider', auth: 'authenticated' },
   // Single-workspace cascading teardown (#562): owner-of-the-workspace's-tenant OR superadmin
   // (handler authorizes own-tenant; cross-tenant → 404). The per-workspace counterpart of
   // POST /v1/tenants/{tenantId}/purge — drops the wsdb_* DB, deletes the bucket(s)/topic(s), and
