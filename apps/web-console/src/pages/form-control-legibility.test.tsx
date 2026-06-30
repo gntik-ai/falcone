@@ -104,7 +104,7 @@ describe('issue #806 — console form controls are legible in the dark theme', (
   })
 
   it('FunctionsConsole: deploy-spec + input textareas sit on the theme background', () => {
-    const { container } = render(<FunctionsConsole workspaceId="wrk_a" />)
+    const { container } = render(<FunctionsConsole tenantId="ten_a" workspaceId="wrk_a" />)
     expectLegibleBackground(container, 'deploy-spec-json') // <Textarea>
     expectLegibleBackground(container, 'input-json') // <Textarea>
   })
