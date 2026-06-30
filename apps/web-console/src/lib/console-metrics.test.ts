@@ -38,9 +38,25 @@ describe('console-metrics', () => {
     expect(mockRequestConsoleSessionJson.mock.calls[0][0]).toContain('filter%5BactorId%5D=usr_1')
   })
 
-  it('exporta auditoría', async () => {
-    mockRequestConsoleSessionJson.mockResolvedValue({ ok: true })
-    await exportAuditRecords('ten_1', null, { category: 'resource_creation' })
+  it('exporta auditoría y devuelve el manifiesto producido', async () => {
+    const manifest = {
+      exportId: 'exp_audit_1',
+      status: 'completed',
+      queryScope: 'tenant',
+      itemCount: 1,
+      maskedItemCount: 1,
+      items: [{ eventId: 'evt_1', maskingApplied: true }]
+    }
+    mockRequestConsoleSessionJson.mockResolvedValue(manifest)
+    const result = await exportAuditRecords('ten_1', null, { category: 'resource_creation' })
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/tenants/ten_1/audit-exports', expect.objectContaining({ method: 'POST' }))
+    expect(result).toEqual(manifest)
+  })
+
+  it('preserva respuestas aceptadas sin artefacto para que la UI no las trate como descarga', async () => {
+    const acknowledgement = { status: 'accepted', message: 'Export queued; artifact pending.' }
+    mockRequestConsoleSessionJson.mockResolvedValue(acknowledgement)
+    const result = await exportAuditRecords('ten_1', null, {})
+    expect(result).toEqual(acknowledgement)
   })
 })
