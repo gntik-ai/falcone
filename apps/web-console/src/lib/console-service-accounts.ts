@@ -199,6 +199,7 @@ export function useConsoleServiceAccounts(workspaceId: string | null) {
 
       setLoading(true)
       setError(null)
+      setAccounts([])
 
       try {
         const response = await requestConsoleSessionJson<ConsoleServiceAccountListResponse>(`/v1/workspaces/${workspaceId}/service-accounts`)

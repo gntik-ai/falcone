@@ -4,6 +4,7 @@ import { DestructiveConfirmationDialog } from '@/components/console/DestructiveC
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
 import { Button } from '@/components/ui/button'
 import { DialogFooter, DialogHeader } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { ConsoleCredentialStatusBadge } from '@/components/console/ConsoleCredentialStatusBadge'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import {
@@ -143,6 +144,7 @@ export function ConsoleServiceAccountsPage() {
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null)
   const [credentialDisclosure, setCredentialDisclosure] = useState<{ mode: 'reveal' | 'rotate'; credential: ConsoleIssuedCredential } | null>(null)
   const destructiveOp = useDestructiveOp()
+  const displayNameId = useId()
   const session = readConsoleShellSession()
   const principalUserId = session?.principal?.userId ?? 'unknown-user'
   const writesBlocked = activeTenant?.state !== 'active'
@@ -152,6 +154,10 @@ export function ConsoleServiceAccountsPage() {
 
   useEffect(() => {
     destructiveOp.handleCancel()
+    setFeedback(null)
+    setErrorFeedback(null)
+    setCredentialDisclosure(null)
+    setDisplayName('')
   }, [activeTenantId, activeWorkspaceId, destructiveOp.handleCancel])
 
   if (!activeTenantId) {
@@ -244,11 +250,14 @@ export function ConsoleServiceAccountsPage() {
 
       <section className="rounded-3xl border border-border bg-card/70 p-6">
         <h2 className="text-lg font-semibold">Crear service account</h2>
-        <div className="mt-4 flex flex-col gap-3 md:flex-row">
-          <input aria-label="Nombre de service account" value={displayName} onChange={(event) => setDisplayName(event.target.value)} className="flex-1 rounded-xl border border-input bg-background px-3 py-2" />
-          <Button type="button" onClick={() => void handleCreate()} disabled={writesBlocked || !displayName.trim()}>Crear</Button>
+        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
+          <label className="flex-1 space-y-2 text-sm text-foreground" htmlFor={displayNameId}>
+            <span>Nombre de service account</span>
+            <Input id={displayNameId} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          </label>
+          <Button type="button" className="md:min-w-24" onClick={() => void handleCreate()} disabled={writesBlocked || !displayName.trim()}>Crear</Button>
         </div>
-        {feedback ? <p className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
+        {feedback ? <p aria-live="polite" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
         {errorFeedback ? <p role="alert" className="mt-3 text-sm text-red-700">{errorFeedback}</p> : null}
       </section>
 
@@ -312,9 +321,27 @@ export function ConsoleServiceAccountsPage() {
                       >
                         Rotar
                       </Button>
-                      <Button type="button" variant="outline" size="sm" disabled={writesBlocked} onClick={() => openRevokeDialog(account)}>Revocar</Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Revocar credencial de ${accountName}`}
+                        disabled={writesBlocked}
+                        onClick={() => openRevokeDialog(account)}
+                      >
+                        Revocar
+                      </Button>
                       {/* Delete works for an active OR a revoked SA — gated only by tenant suspension (#687). */}
-                      <Button type="button" variant="destructive" size="sm" disabled={writesBlocked} onClick={() => openDeleteDialog(account)}>Eliminar</Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        aria-label={`Eliminar service account ${accountName}`}
+                        disabled={writesBlocked}
+                        onClick={() => openDeleteDialog(account)}
+                      >
+                        Eliminar
+                      </Button>
                     </div>
                   </td>
                 </tr>
