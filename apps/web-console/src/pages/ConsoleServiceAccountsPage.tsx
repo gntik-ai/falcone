@@ -266,22 +266,22 @@ export function ConsoleServiceAccountsPage() {
       {isEmpty ? <ConsolePageState kind="empty" title="No hay service accounts en este workspace" description="Crea una nueva para empezar." /> : null}
 
       {accounts.length > 0 ? (
-        <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-3xl border border-border bg-card/70 shadow-sm">
+          <table className="w-full min-w-[60rem] divide-y divide-border text-left text-sm">
             <caption className="sr-only">
               Service accounts del workspace activo. Revelar muestra el secreto de cliente actual y puede usarse de nuevo; Rotar genera un secreto nuevo que reemplaza el anterior.
             </caption>
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Credencial</th>
-                <th className="px-4 py-3">Acceso</th>
-                <th className="px-4 py-3">Expira</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
+              <tr className="bg-muted/40 align-top text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
+                <th scope="col" className="px-4 py-3 font-medium">Cliente</th>
+                <th scope="col" className="px-4 py-3 font-medium">Credencial</th>
+                <th scope="col" className="px-4 py-3 font-medium">Acceso</th>
+                <th scope="col" className="px-4 py-3 font-medium">Expira</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">Acciones</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/80">
               {accounts.map((account) => {
                 // A revoked credential cannot be revealed or rotated (the control plane rejects it with
                 // 409 CREDENTIAL_REVOKED); reflect that in the UI by disabling those actions. Revocar stays
@@ -289,62 +289,62 @@ export function ConsoleServiceAccountsPage() {
                 const credentialRevoked = account.credentialStatus?.state === 'revoked' || account.accessProjection?.credentialState === 'revoked'
                 const accountName = account.displayName ?? account.serviceAccountId
                 return (
-                <tr key={account.serviceAccountId} className="border-b border-border/60">
-                  <td className="px-4 py-3">{accountName}</td>
-                  <td className="px-4 py-3">{account.accessProjection?.clientState ?? account.desiredState ?? 'unknown'}</td>
-                  <td className="px-4 py-3"><ConsoleCredentialStatusBadge status={account.credentialStatus?.state} /></td>
-                  <td className="px-4 py-3">{account.accessProjection?.effectiveAccess ?? 'unknown'}</td>
-                  <td className="px-4 py-3">{account.expiresAt ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Revelar secreto actual de ${accountName}`}
-                        aria-describedby={credentialActionsHelpId}
-                        title={credentialRevoked ? 'La credencial revocada no se puede revelar.' : 'Muestra el secreto de cliente actual; puede mostrarse de nuevo.'}
-                        disabled={writesBlocked || credentialRevoked}
-                        onClick={() => void handleIssue(account.serviceAccountId)}
-                      >
-                        Revelar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Rotar secreto de ${accountName}`}
-                        aria-describedby={credentialActionsHelpId}
-                        title={credentialRevoked ? 'La credencial revocada no se puede rotar.' : 'Genera un secreto nuevo y reemplaza el anterior.'}
-                        disabled={writesBlocked || credentialRevoked}
-                        onClick={() => void handleRotate(account.serviceAccountId)}
-                      >
-                        Rotar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Revocar credencial de ${accountName}`}
-                        disabled={writesBlocked}
-                        onClick={() => openRevokeDialog(account)}
-                      >
-                        Revocar
-                      </Button>
-                      {/* Delete works for an active OR a revoked SA — gated only by tenant suspension (#687). */}
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        aria-label={`Eliminar service account ${accountName}`}
-                        disabled={writesBlocked}
-                        onClick={() => openDeleteDialog(account)}
-                      >
-                        Eliminar
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
+                  <tr key={account.serviceAccountId} className="transition-colors hover:bg-muted/30">
+                    <th scope="row" className="max-w-[18rem] break-words px-4 py-4 text-left font-medium text-foreground">{accountName}</th>
+                    <td className="px-4 py-4 text-muted-foreground">{account.accessProjection?.clientState ?? account.desiredState ?? 'unknown'}</td>
+                    <td className="px-4 py-4"><ConsoleCredentialStatusBadge status={account.credentialStatus?.state} /></td>
+                    <td className="px-4 py-4 text-muted-foreground">{account.accessProjection?.effectiveAccess ?? 'unknown'}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{account.expiresAt ?? '—'}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Revelar secreto actual de ${accountName}`}
+                          aria-describedby={credentialActionsHelpId}
+                          title={credentialRevoked ? 'La credencial revocada no se puede revelar.' : 'Muestra el secreto de cliente actual; puede mostrarse de nuevo.'}
+                          disabled={writesBlocked || credentialRevoked}
+                          onClick={() => void handleIssue(account.serviceAccountId)}
+                        >
+                          Revelar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Rotar secreto de ${accountName}`}
+                          aria-describedby={credentialActionsHelpId}
+                          title={credentialRevoked ? 'La credencial revocada no se puede rotar.' : 'Genera un secreto nuevo y reemplaza el anterior.'}
+                          disabled={writesBlocked || credentialRevoked}
+                          onClick={() => void handleRotate(account.serviceAccountId)}
+                        >
+                          Rotar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Revocar credencial de ${accountName}`}
+                          disabled={writesBlocked}
+                          onClick={() => openRevokeDialog(account)}
+                        >
+                          Revocar
+                        </Button>
+                        {/* Delete works for an active OR a revoked SA — gated only by tenant suspension (#687). */}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          aria-label={`Eliminar service account ${accountName}`}
+                          disabled={writesBlocked}
+                          onClick={() => openDeleteDialog(account)}
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
                 )
               })}
             </tbody>
