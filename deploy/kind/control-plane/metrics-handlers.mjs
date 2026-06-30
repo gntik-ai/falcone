@@ -139,6 +139,22 @@ async function series(ctx) {
     return ok(200, { metricKey, points: [], source: 'prometheus_unreachable' });
   }
 }
+function auditFilter(query = {}, name) {
+  const value = query[`filter[${name}]`];
+  if (value === undefined || value === null || value === '') return undefined;
+  return String(value);
+}
+
+function auditFiltersFromQuery(query = {}) {
+  return {
+    outcome: auditFilter(query, 'outcome'),
+    actionCategory: auditFilter(query, 'actionCategory'),
+    actorId: auditFilter(query, 'actorId'),
+    occurredAfter: auditFilter(query, 'occurredAfter'),
+    occurredBefore: auditFilter(query, 'occurredBefore')
+  };
+}
+
 // ---- audit records (Observability) — read the action-audit store (#557) ----
 // Reads plan_audit_events (the WRITER side, audit-store.mjs), scoped to the path's
 // owning tenant (and workspace, for the workspace route). guarded() has already
@@ -152,7 +168,8 @@ async function auditRecords(ctx) {
     const rows = await queryAuditEvents(ctx.pool, {
       tenantId: scope.tenantId,
       workspaceId: ctx.params.workspaceId ?? null,
-      limit
+      limit,
+      ...auditFiltersFromQuery(ctx.query)
     });
     const items = rows.map(auditRowToRecord);
     return ok(200, { items, page: { size: items.length, hasMore: false, nextCursor: null } });
