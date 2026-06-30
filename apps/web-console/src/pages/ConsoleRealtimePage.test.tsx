@@ -91,4 +91,25 @@ describe('ConsoleRealtimePage', () => {
     await screen.findByText('Realtime panel mock')
     expect(panelSpy).toHaveBeenCalledWith(expect.objectContaining({ realtimeEnabled: false }))
   })
+
+  it('renderiza la página con configuración realtime vacía en lugar de error', async () => {
+    requestConsoleSessionJsonMock.mockResolvedValue({
+      workspaceId: 'ws_123',
+      realtimeEndpointUrl: null,
+      features: { realtime: false },
+      dataSources: []
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Realtime del workspace')).toBeInTheDocument()
+    expect(screen.getByText('Realtime panel mock')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(panelSpy).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'ws_123',
+      realtimeEndpoint: null,
+      channelTypes: [],
+      realtimeEnabled: false
+    }))
+  })
 })

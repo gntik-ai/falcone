@@ -1173,13 +1173,13 @@
     "method": "GET",
     "path": "/v1/workspaces/{workspaceId}/realtime",
     "family": "realtime",
-    "module": "services/provisioning-orchestrator/src/actions/realtime/realtime-channel-list.mjs",
-    "export": "main",
-    "invoke": "owhttp-overrides",
+    "module": "deploy/kind/control-plane/realtime-handlers.mjs",
+    "export": "getWorkspaceRealtime",
+    "invoke": "localHandler",
     "deps": ["pg"],
-    "auth": "workspace member (identity from __ow_headers x-tenant-id/x-workspace-id)",
+    "auth": "authenticated; tenant scope verified against workspace owner",
     "subroutes": "no",
-    "notes": "ConsoleRealtimePage. main(params,{db}) -> listRealtimeChannels. Identity via parse-identity.mjs from __ow_headers; second-arg deps object {db}.",
+    "notes": "ConsoleRealtimePage. Returns {workspaceId,realtimeEndpointUrl,features:{realtime},dataSources:[{type,...}]} from realtime_channels rows owned by the verified tenant. Owned workspace with no rows returns 200 empty config instead of 404 NO_ROUTE.",
     "consoleUsed": true
   },
   {

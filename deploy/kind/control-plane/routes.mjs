@@ -70,6 +70,11 @@ export const routes = [
   { method: 'GET',  path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'listTenantWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces', localHandler: 'listWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}', localHandler: 'getWorkspace', auth: 'authenticated' },
+  // Workspace realtime config (#788): ConsoleRealtimePage calls this workspace-addressed route.
+  // The handler verifies the workspace belongs to the caller's tenant and returns the exact
+  // metadata shape the page consumes. An owned workspace with no realtime channel rows returns
+  // 200 + empty dataSources/realtime:false, not 404 NO_ROUTE.
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/realtime', localHandler: 'getWorkspaceRealtime', auth: 'authenticated' },
   // Single-workspace cascading teardown (#562): owner-of-the-workspace's-tenant OR superadmin
   // (handler authorizes own-tenant; cross-tenant → 404). The per-workspace counterpart of
   // POST /v1/tenants/{tenantId}/purge — drops the wsdb_* DB, deletes the bucket(s)/topic(s), and

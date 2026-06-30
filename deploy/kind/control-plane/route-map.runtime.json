@@ -414,6 +414,13 @@
   },
   {
     "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/realtime",
+    "localHandler": "getWorkspaceRealtime",
+    "auth": "authenticated",
+    "notes": "ConsoleRealtimePage config endpoint. Tenant scope is verified against the workspace owner; returns WorkspaceRealtimeResponse shape and 200 empty config when no realtime_channels rows exist."
+  },
+  {
+    "method": "GET",
     "path": "/v1/realtime/workspaces/{workspaceId}/pg-captures",
     "module": "/repo/services/provisioning-orchestrator/src/actions/realtime/pg-capture-list.mjs",
     "export": "main",
