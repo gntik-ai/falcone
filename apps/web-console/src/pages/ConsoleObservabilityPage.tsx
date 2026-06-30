@@ -8,8 +8,77 @@ import { ConsoleMetricDimensionRow } from '@/components/console/ConsoleMetricDim
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostureBadge'
 import { ConsoleTimeRangeSelector } from '@/components/console/ConsoleTimeRangeSelector'
-import { exportAuditRecords, useConsoleAuditRecords, useConsoleMetrics, type ConsoleAuditFilter, type ConsoleMetricRange } from '@/lib/console-metrics'
+import {
+  exportAuditRecords,
+  useConsoleAuditRecords,
+  useConsoleMetrics,
+  type ConsoleAuditExportManifest,
+  type ConsoleAuditExportResult,
+  type ConsoleAuditFilter,
+  type ConsoleMetricRange
+} from '@/lib/console-metrics'
 import { useConsoleContext } from '@/lib/console-context'
+
+type AuditExportFeedback =
+  | { kind: 'loading' }
+  | { kind: 'artifact'; manifest: ConsoleAuditExportManifest }
+  | { kind: 'unavailable'; result: ConsoleAuditExportResult; message: string }
+  | { kind: 'error'; message: string }
+
+function isAuditExportManifest(result: ConsoleAuditExportResult): result is ConsoleAuditExportManifest {
+  return Boolean(
+    result &&
+      typeof result === 'object' &&
+      typeof result.exportId === 'string' &&
+      result.exportId.length > 0 &&
+      typeof result.itemCount === 'number' &&
+      Array.isArray(result.items)
+  )
+}
+
+function auditExportStatus(result: ConsoleAuditExportResult): string | null {
+  return result && typeof result === 'object' && typeof result.status === 'string' && result.status.trim()
+    ? result.status.trim()
+    : null
+}
+
+function auditExportId(result: ConsoleAuditExportResult): string | null {
+  return result && typeof result === 'object' && typeof result.exportId === 'string' && result.exportId.trim()
+    ? result.exportId.trim()
+    : null
+}
+
+function auditExportUnavailableMessage(result: ConsoleAuditExportResult): string {
+  if (result && typeof result === 'object' && typeof result.message === 'string' && result.message.trim()) {
+    return result.message.trim()
+  }
+
+  const status = auditExportStatus(result)
+  if (status) {
+    return `El backend devolvió estado ${status}, pero no incluyó un manifiesto descargable.`
+  }
+
+  return 'El backend respondió sin un manifiesto descargable para esta solicitud.'
+}
+
+function auditExportErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+    return (error as { message: string }).message
+  }
+
+  return 'No se pudo exportar la auditoría.'
+}
+
+function downloadAuditExportManifest(manifest: ConsoleAuditExportManifest) {
+  const filename = `${manifest.exportId.replace(/[^a-zA-Z0-9_.-]/g, '-') || 'audit-export'}.json`
+  const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 export function ConsoleObservabilityPage() {
   const { activeTenant, activeTenantId, activeWorkspace, activeWorkspaceId } = useConsoleContext()
@@ -17,7 +86,7 @@ export function ConsoleObservabilityPage() {
   const [range, setRange] = useState<ConsoleMetricRange>({ preset: '24h' })
   const [filters, setFilters] = useState<ConsoleAuditFilter>({})
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null)
-  const [exportMessage, setExportMessage] = useState<string | null>(null)
+  const [exportFeedback, setExportFeedback] = useState<AuditExportFeedback | null>(null)
 
   const metrics = useConsoleMetrics(activeTenantId, activeWorkspaceId, range)
   const audit = useConsoleAuditRecords(activeTenantId, activeWorkspaceId, filters)
@@ -33,8 +102,19 @@ export function ConsoleObservabilityPage() {
   const tenantId = activeTenantId
 
   async function handleExport() {
-    await exportAuditRecords(tenantId, activeWorkspaceId, filters)
-    setExportMessage('Exportación iniciada correctamente.')
+    setExportFeedback({ kind: 'loading' })
+
+    try {
+      const result = await exportAuditRecords(tenantId, activeWorkspaceId, filters)
+      if (isAuditExportManifest(result)) {
+        setExportFeedback({ kind: 'artifact', manifest: result })
+        return
+      }
+
+      setExportFeedback({ kind: 'unavailable', result, message: auditExportUnavailableMessage(result) })
+    } catch (error) {
+      setExportFeedback({ kind: 'error', message: auditExportErrorMessage(error) })
+    }
   }
 
   return (
@@ -90,10 +170,57 @@ export function ConsoleObservabilityPage() {
               </select>
             </label>
             <div className="flex items-end">
-              <Button type="button" variant="outline" onClick={() => void handleExport()}>Exportar</Button>
+              <Button type="button" variant="outline" disabled={exportFeedback?.kind === 'loading'} onClick={() => void handleExport()}>
+                {exportFeedback?.kind === 'loading' ? 'Exportando...' : 'Exportar'}
+              </Button>
             </div>
           </section>
-          {exportMessage ? <p className="text-sm text-emerald-700">{exportMessage}</p> : null}
+          {exportFeedback?.kind === 'artifact' ? (
+            <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-semibold">Exportación completada</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Export ID <code className="rounded bg-muted px-1 py-0.5">{exportFeedback.manifest.exportId}</code>
+                  </p>
+                </div>
+                <Button type="button" variant="outline" onClick={() => downloadAuditExportManifest(exportFeedback.manifest)}>
+                  Descargar JSON
+                </Button>
+              </div>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-muted-foreground">Registros exportados</dt>
+                  <dd className="font-medium">{exportFeedback.manifest.itemCount}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Registros enmascarados</dt>
+                  <dd className="font-medium">{exportFeedback.manifest.maskedItemCount ?? 0}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Estado</dt>
+                  <dd className="font-medium">{auditExportStatus(exportFeedback.manifest) ?? 'completed'}</dd>
+                </div>
+              </dl>
+            </section>
+          ) : null}
+          {exportFeedback?.kind === 'unavailable' ? (
+            <section role="status" className="rounded-3xl border border-border bg-card/70 p-5">
+              <h2 className="text-sm font-semibold">Exportación no disponible todavía</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
+              {auditExportId(exportFeedback.result) ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Solicitud <code className="rounded bg-muted px-1 py-0.5">{auditExportId(exportFeedback.result)}</code>
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+          {exportFeedback?.kind === 'error' ? (
+            <section role="alert" className="rounded-3xl border border-destructive/40 bg-card/70 p-5">
+              <h2 className="text-sm font-semibold text-destructive">No se pudo exportar la auditoría</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{exportFeedback.message}</p>
+            </section>
+          ) : null}
           {audit.loading ? <ConsolePageState kind="loading" title="Cargando auditoría" description="Consultando eventos auditables." /> : null}
           {audit.error ? <ConsolePageState kind="error" title="No se pudo cargar la auditoría" description={audit.error} actionLabel="Reintentar" onAction={audit.reload} /> : null}
           {!audit.loading && !audit.error && audit.records.length === 0 ? <ConsolePageState kind="empty" title="Sin eventos de auditoría" description="No se encontraron registros con los filtros actuales." /> : null}

@@ -49,6 +49,37 @@ export interface ConsoleAuditRecord {
   metadata?: Record<string, unknown> | null
 }
 
+export interface ConsoleAuditExportManifest {
+  exportId: string
+  status?: string
+  queryScope?: 'tenant' | 'workspace' | string
+  tenantId?: string
+  workspaceId?: string | null
+  format?: 'jsonl' | 'csv' | string
+  maskingProfileId?: string
+  correlationId?: string
+  generatedAt?: string
+  appliedFilters?: Record<string, unknown>
+  itemCount: number
+  maskedItemCount?: number
+  items: Array<Record<string, unknown>>
+  message?: string
+}
+
+export interface ConsoleAuditExportAcknowledgement {
+  exportId?: string
+  status?: string
+  message?: string
+  itemCount?: number
+  maskedItemCount?: number
+  items?: unknown
+  artifactUrl?: string
+  downloadUrl?: string
+  jobId?: string
+}
+
+export type ConsoleAuditExportResult = ConsoleAuditExportManifest | ConsoleAuditExportAcknowledgement | null
+
 interface OverviewResponse {
   generatedAt?: string
   overallPosture?: string
@@ -309,7 +340,7 @@ export function useConsoleAuditRecords(tenantId: string | null, workspaceId: str
   return { records, loading, error, reload }
 }
 
-export async function exportAuditRecords(tenantId: string, workspaceId: string | null, filters: ConsoleAuditFilter): Promise<void> {
+export async function exportAuditRecords(tenantId: string, workspaceId: string | null, filters: ConsoleAuditFilter): Promise<ConsoleAuditExportResult> {
   const base = workspaceId ? `/v1/metrics/workspaces/${workspaceId}` : `/v1/metrics/tenants/${tenantId}`
   const body: any = {
     filters: {
@@ -321,7 +352,7 @@ export async function exportAuditRecords(tenantId: string, workspaceId: string |
     }
   }
 
-  await requestConsoleSessionJson(`${base}/audit-exports`, {
+  return requestConsoleSessionJson<ConsoleAuditExportResult>(`${base}/audit-exports`, {
     method: 'POST',
     body
   })
