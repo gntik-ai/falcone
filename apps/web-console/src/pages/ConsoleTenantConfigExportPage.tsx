@@ -35,7 +35,7 @@ export default function ConsoleTenantConfigExportPage({ tenantId = 'default' }: 
       .catch(err => {
         if (cancelled) return
         if (err instanceof ConfigExportApiError && err.statusCode === 403) {
-          setError('No tienes permisos para exportar configuración de este tenant.')
+          setError('No tienes permisos para exportar configuración de esta organización.')
         } else {
           setError('Error al obtener dominios exportables.')
         }
@@ -62,7 +62,7 @@ export default function ConsoleTenantConfigExportPage({ tenantId = 'default' }: 
             setError('Permiso denegado: no tienes el rol necesario para esta operación.')
             break
           case 404:
-            setError(`Tenant '${tenantId}' no encontrado.`)
+            setError(`Organización '${tenantId}' no encontrada.`)
             break
           case 422:
             setError('El artefacto de exportación es demasiado grande. Prueba seleccionando menos dominios.')
@@ -90,7 +90,7 @@ export default function ConsoleTenantConfigExportPage({ tenantId = 'default' }: 
       <div>
         <h1 className="text-2xl font-bold">Exportación de Configuración Funcional</h1>
         <p className="text-sm text-slate-600">
-          Selecciona los dominios a exportar y genera un artefacto JSON con la configuración del tenant.
+          Selecciona los dominios a exportar y genera un artefacto JSON con la configuración de la organización.
         </p>
       </div>
 

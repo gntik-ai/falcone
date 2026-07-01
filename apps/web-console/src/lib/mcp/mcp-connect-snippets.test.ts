@@ -39,11 +39,12 @@ describe('generateMcpConnectSnippets', () => {
     }
   })
 
-  it('falls back to a placeholder + note when the endpoint is not published yet', () => {
+  it('falls back to the marker + note when the endpoint is not published yet', () => {
     const snippets = generateMcpConnectSnippets({ name: 'Acme', endpoint: null })
     const vs = JSON.parse(snippets.find((s) => s.id === 'mcp-vscode')!.code)
     expect(vs.servers['acme'].url).toBe('<MCP_ENDPOINT>')
-    expect(snippets[0].notes.some((n) => n.includes('endpoint aún no está publicado'))).toBe(true)
+    expect(snippets[0].notes.some((n) => n.includes('punto de conexión aún no está publicado'))).toBe(true)
+    expect(snippets[0].notes.join('\n')).not.toMatch(/\bplaceholder\b|\bendpoint\b|\bEndpoint\b/)
   })
 
   it('is deterministic for the same input', () => {

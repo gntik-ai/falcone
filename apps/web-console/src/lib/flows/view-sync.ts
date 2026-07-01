@@ -92,7 +92,7 @@ export function makeViewSyncReducer(deps: ViewSyncDeps) {
           yamlText: action.yaml,
           yamlInvalid: true,
           dirty: true,
-          banner: 'YAML is invalid — the canvas shows the last valid version and the draft will not be saved until you fix it.'
+          banner: 'El YAML no es válido; el lienzo muestra la última versión válida y el borrador no se guardará hasta que lo corrijas.'
         }
       }
       case 'EDIT_CANVAS': {
@@ -116,7 +116,7 @@ export function makeViewSyncReducer(deps: ViewSyncDeps) {
         if (leavingYaml && enteringCanvas && state.yamlInvalid) {
           return {
             ...state,
-            banner: 'Cannot switch views: the YAML is syntactically invalid. Fix the highlighted errors first.'
+            banner: 'No se puede cambiar de vista: el YAML no es sintácticamente válido. Corrige primero los errores resaltados.'
           }
         }
         // Valid switch: the last-valid model is already current (EDIT_YAML kept it in sync),

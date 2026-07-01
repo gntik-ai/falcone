@@ -123,30 +123,30 @@ describe('console secrets routes are eagerly importable (no synchronous-suspense
   // and locks in the end-to-end click -> rotation-page-render behavior. The RED->GREEN gate is the
   // structural guard above.
 
-  it('clicking "Rotate" on a secrets row renders the rotation page inside the shell', async () => {
+  it('clicking "Rotar" on a secrets row renders the rotation page inside the shell', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/secrets'] })
     render(<RouterProvider router={router} />)
 
-    expect(await screen.findByRole('heading', { name: /secret rotation/i })).toBeInTheDocument()
-    await user.click(screen.getAllByRole('button', { name: /^rotate$/i })[0])
+    expect(await screen.findByRole('heading', { name: /rotación de secretos/i })).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /^rotar$/i })[0])
 
-    expect(await screen.findByRole('heading', { name: /rotate secret/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /rotar secreto/i })).toBeInTheDocument()
     // The shell nav chrome is still mounted (no whole-shell blank), and no error boundary showed.
     expect(screen.getByRole('navigation', { name: /primary-nav-stub/i })).toBeInTheDocument()
     expect(screen.queryByTestId('console-route-error-boundary')).not.toBeInTheDocument()
   })
 
-  it('clicking "History" on a secrets row renders the rotation/history page inside the shell', async () => {
+  it('clicking "Historial" on a secrets row renders the rotation/history page inside the shell', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/secrets'] })
     render(<RouterProvider router={router} />)
 
-    expect(await screen.findByRole('heading', { name: /secret rotation/i })).toBeInTheDocument()
-    await user.click(screen.getAllByRole('button', { name: /^history$/i })[0])
+    expect(await screen.findByRole('heading', { name: /rotación de secretos/i })).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /^historial$/i })[0])
 
-    expect(await screen.findByRole('heading', { name: /rotate secret/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /rotation history/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /rotar secreto/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /historial de rotación/i })).toBeInTheDocument()
     expect(screen.queryByTestId('console-route-error-boundary')).not.toBeInTheDocument()
   })
 })

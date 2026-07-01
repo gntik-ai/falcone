@@ -27,7 +27,7 @@ describe('ScopeEnforcementDenialsTable', () => {
   it('export csv button triggers download', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     render(<ScopeEnforcementDenialsTable denials={rows as any} isLoading={false} hasMore={false} isSuperadmin />)
-    fireEvent.click(screen.getByText('Export CSV'))
+    fireEvent.click(screen.getByText('Exportar CSV'))
     expect(click).toHaveBeenCalled()
     click.mockRestore()
   })
@@ -35,12 +35,12 @@ describe('ScopeEnforcementDenialsTable', () => {
   it('load more button calls onLoadMore', () => {
     const onLoadMore = vi.fn()
     render(<ScopeEnforcementDenialsTable denials={rows as any} isLoading={false} hasMore isSuperadmin onLoadMore={onLoadMore} />)
-    fireEvent.click(screen.getByText('Load more'))
+    fireEvent.click(screen.getByText('Cargar más'))
     expect(onLoadMore).toHaveBeenCalled()
   })
 
   it('renders empty state', () => {
     render(<ScopeEnforcementDenialsTable denials={[]} isLoading={false} hasMore={false} isSuperadmin />)
-    expect(screen.getByText('No denial events in this period')).toBeInTheDocument()
+    expect(screen.getByText('No hay eventos denegados en este periodo')).toBeInTheDocument()
   })
 })

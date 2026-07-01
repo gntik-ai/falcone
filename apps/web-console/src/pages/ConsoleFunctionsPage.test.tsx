@@ -124,11 +124,11 @@ describe('ConsoleFunctionsPage', () => {
 
   it('muestra los guards de tenant y workspace', () => {
     renderPage(createContext({ activeTenantId: null, activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un tenant/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
 
     cleanup()
     renderPage(createContext({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
   })
 
   it('carga inventario y renderiza la lista', async () => {
@@ -144,7 +144,7 @@ describe('ConsoleFunctionsPage', () => {
     mockRequestConsoleSessionJson.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ items: [] })
     renderPage()
 
-    expect(await screen.findByText(/no hay funciones en este workspace/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no hay funciones en esta área de trabajo/i)).toBeInTheDocument()
   })
 
   it('selecciona función y carga detalle', async () => {
@@ -156,6 +156,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    expect(await screen.findByText('Tiempo de espera (ms)')).toBeInTheDocument()
     expect((await screen.findAllByText(/https:\/\/example.test\/fn/i)).length).toBeGreaterThan(0)
   })
 
@@ -169,9 +170,9 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Versions' }))
-    expect(await screen.findByText(/no hay versiones anteriores disponibles para rollback/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /rollback/i })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Versiones' }))
+    expect(await screen.findByText(/no hay versiones anteriores disponibles para revertir/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /revertir/i })).toBeDisabled()
   })
 
   it('cuando detail indica rollback disponible, versions muestra historial previo y habilita rollback', async () => {
@@ -184,13 +185,13 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    expect(await screen.findByText('Rollback available')).toBeInTheDocument()
+    expect(await screen.findByText('Reversión disponible')).toBeInTheDocument()
     expect(screen.getAllByText('Sí').length).toBeGreaterThan(0)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Versions' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Versiones' }))
     expect(await screen.findByText('fnv_1')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: '1' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: /rollback/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /revertir/i })).toBeEnabled()
   })
 
   it('carga activations y detalle paralelo con logs truncados', async () => {
@@ -206,10 +207,10 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
-    expect(await screen.findByText(/logs están truncados/i)).toBeInTheDocument()
+    expect(await screen.findByText(/registros están truncados/i)).toBeInTheDocument()
     expect(screen.getByText(/hello\s+world/)).toBeInTheDocument()
     expect(screen.getByText(/"ok": true/)).toBeInTheDocument()
   })
@@ -228,10 +229,10 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
-    expect(await screen.findByText(/no hay logs disponibles/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no hay registros disponibles/i)).toBeInTheDocument()
   })
 
   it('fallo en logs no bloquea metadata ni resultado (RF-FEL-05)', async () => {
@@ -254,10 +255,10 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
-    expect(await screen.findByText(/resource id/i)).toBeInTheDocument()
+    expect(await screen.findByText(/id de recurso/i)).toBeInTheDocument()
     expect(screen.getByText(/"ok": true/)).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent(/server error/i)
   })
@@ -282,10 +283,10 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
-    expect(await screen.findByText(/resource id/i)).toBeInTheDocument()
+    expect(await screen.findByText(/id de recurso/i)).toBeInTheDocument()
     expect(screen.getByText(/hello\s+world/)).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent(/result unavailable/i)
   })
@@ -303,7 +304,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/no se puede mostrar en texto/i)).toBeInTheDocument()
@@ -319,7 +320,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
 
     expect(await screen.findByText(/no tiene activaciones registradas/i)).toBeInTheDocument()
   })
@@ -337,7 +338,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/sin resultado disponible/i)).toBeInTheDocument()
@@ -357,7 +358,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText('done')).toBeInTheDocument()
@@ -378,10 +379,10 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
-    expect(await screen.findByText(/logs pueden no estar disponibles aún/i)).toBeInTheDocument()
+    expect(await screen.findByText(/registros pueden no estar disponibles aún/i)).toBeInTheDocument()
     expect(screen.getByText(/resultado puede no estar disponible aún/i)).toBeInTheDocument()
   })
 
@@ -398,10 +399,10 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
-    expect(await screen.findByText(/no tienes permisos para ver los logs/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no tienes permisos para ver los registros/i)).toBeInTheDocument()
   })
 
   it('mapea 404 de detalle al mensaje de activación no disponible', async () => {
@@ -417,7 +418,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activations' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/esta activación ya no está disponible/i)).toBeInTheDocument()
@@ -432,11 +433,11 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Triggers' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Disparadores' }))
 
     expect(await screen.findByText('Kafka')).toBeInTheDocument()
     expect(screen.getByText('Cron')).toBeInTheDocument()
-    expect(screen.getByText('Storage')).toBeInTheDocument()
+    expect(screen.getByText('Almacenamiento')).toBeInTheDocument()
     expect(screen.getByText(/res_topic_1/i)).toBeInTheDocument()
     expect(screen.getByText(/res_bucket_1/i)).toBeInTheDocument()
   })
@@ -451,8 +452,8 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Invoke' }))
-    await userEvent.click(screen.getByRole('button', { name: /invocar/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Invocar' })[1])
 
     expect(await screen.findByText(/inv_1/i)).toBeInTheDocument()
     const [, options] = mockRequestConsoleSessionJson.mock.calls.find((call: unknown[]) => call[0] === '/v1/functions/actions/res_fn_1/invocations') as [string, { headers: Record<string, string> }]
@@ -469,8 +470,8 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Invoke' }))
-    await userEvent.click(screen.getByRole('button', { name: /invocar/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Invocar' })[1])
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/quota exceeded/i)
   })
@@ -485,10 +486,11 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await screen.findByText('hello-fn')
-    await userEvent.click(screen.getByRole('button', { name: /deploy nueva función/i }))
-    await userEvent.type(screen.getByLabelText(/action name/i), 'new-fn')
-    await userEvent.type(screen.getByLabelText(/runtime/i), 'nodejs:20')
-    await userEvent.type(screen.getByLabelText(/entrypoint/i), 'index.main')
+    await userEvent.click(screen.getByRole('button', { name: /desplegar función nueva/i }))
+    await userEvent.type(screen.getByLabelText(/nombre de acción/i), 'new-fn')
+    await userEvent.type(screen.getByLabelText(/entorno/i), 'nodejs:20')
+    await userEvent.type(screen.getByLabelText(/punto de entrada/i), 'index.main')
+    expect(screen.getByLabelText(/tiempo de espera \(ms\)/i)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /crear función/i }))
 
     await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/actions', expect.objectContaining({ method: 'POST' })))
@@ -503,7 +505,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Deploy' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Desplegar' }))
     expect(await screen.findByDisplayValue('hello-fn')).toBeDisabled()
     expect(screen.getByDisplayValue('nodejs:20')).toBeInTheDocument()
   })
@@ -519,9 +521,9 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Versions' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Versiones' }))
     await screen.findByText('fnv_1')
-    await userEvent.click(screen.getByRole('button', { name: /rollback/i }))
+    await userEvent.click(screen.getByRole('button', { name: /revertir/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/fnv_1/i)
   })
 
@@ -534,9 +536,9 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Invoke' }))
-    expect(await screen.findByRole('button', { name: /invocar/i })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Deploy' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
+    expect((await screen.findAllByRole('button', { name: 'Invocar' }))[1]).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Desplegar' }))
     expect(screen.getByRole('button', { name: /actualizar función/i })).toBeDisabled()
   })
 
@@ -555,7 +557,7 @@ describe('ConsoleFunctionsPage', () => {
     mockUseConsoleContext.mockReturnValue(createContext({ activeWorkspaceId: 'wrk_beta' }))
     rerender(<ConsoleFunctionsPage />)
 
-    expect(await screen.findByText(/no hay funciones en este workspace/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no hay funciones en esta área de trabajo/i)).toBeInTheDocument()
     expect(screen.queryByText('hello-fn')).not.toBeInTheDocument()
   })
 
@@ -569,7 +571,7 @@ describe('ConsoleFunctionsPage', () => {
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
 
-    expect(await screen.findByRole('heading', { name: 'Snippets de conexión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/https:\/\/example.test\/fn/).length).toBeGreaterThan(0)
   })
 })

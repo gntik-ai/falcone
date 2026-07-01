@@ -48,9 +48,9 @@ export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigEx
   return (
     <div data-testid="result-panel" className="space-y-4">
       <div className="rounded-md border border-slate-200 p-4">
-        <h3 className="text-sm font-semibold text-slate-700 mb-2">Metadata de exportación</h3>
+        <h3 className="text-sm font-semibold text-slate-700 mb-2">Metadatos de exportación</h3>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          <dt className="text-slate-500">Tenant</dt>
+          <dt className="text-slate-500">Organización</dt>
           <dd>{artifact.tenant_id}</dd>
           <dt className="text-slate-500">Formato</dt>
           <dd>{artifact.format_version}</dd>
@@ -58,7 +58,7 @@ export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigEx
           <dd>{artifact.export_timestamp}</dd>
           <dt className="text-slate-500">Perfil</dt>
           <dd>{artifact.deployment_profile}</dd>
-          <dt className="text-slate-500">Correlation ID</dt>
+          <dt className="text-slate-500">ID de correlación</dt>
           <dd className="font-mono text-[10px]">{artifact.correlation_id}</dd>
         </dl>
       </div>

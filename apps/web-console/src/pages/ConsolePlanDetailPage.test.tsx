@@ -47,8 +47,8 @@ function renderPage() {
 
 async function openLimitsTab() {
   expect(await screen.findByText('Starter')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: /limits/i }))
-  return screen.findByLabelText(/max workspaces limit value/i) as Promise<HTMLInputElement>
+  await userEvent.click(screen.getByRole('button', { name: /límites/i }))
+  return screen.findByLabelText(/max workspaces: valor del límite/i) as Promise<HTMLInputElement>
 }
 
 async function tabPastLimitReset() {
@@ -72,7 +72,8 @@ describe('ConsolePlanDetailPage', () => {
   it('renders plan detail tabs', async () => {
     renderPage()
     expect(await screen.findByText('Starter')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /capabilities/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /capacidades/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /asignaciones de organizaciones/i })).toBeInTheDocument()
   })
 
   it('shows an explicit error and restores the persisted value when the API rejects an edit', async () => {
@@ -91,7 +92,7 @@ describe('ConsolePlanDetailPage', () => {
     await waitFor(() => expect(planApi.setPlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces', 1.5))
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid_limit_value/i)
     await waitFor(() => expect(input).toHaveValue(10))
-    expect(screen.getByText('explicit')).toBeInTheDocument()
+    expect(screen.getByText('Explícito')).toBeInTheDocument()
   })
 
   it('updates the row from accepted API data after a successful edit', async () => {
@@ -114,9 +115,9 @@ describe('ConsolePlanDetailPage', () => {
     await tabPastLimitReset()
 
     await waitFor(() => expect(planApi.setPlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces', 41))
-    expect(await screen.findByRole('status')).toHaveTextContent(/limit saved/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/límite guardado/i)
     await waitFor(() => expect(input).toHaveValue(42))
-    expect(screen.getByText('explicit')).toBeInTheDocument()
+    expect(screen.getByText('Explícito')).toBeInTheDocument()
   })
 
   it('shows the reverted default value without reload after reset succeeds', async () => {
@@ -135,11 +136,11 @@ describe('ConsolePlanDetailPage', () => {
     const input = await openLimitsTab()
     expect(input).toHaveValue(42)
 
-    await userEvent.click(screen.getByRole('button', { name: /reset max workspaces limit to default/i }))
+    await userEvent.click(screen.getByRole('button', { name: /restablecer límite de max workspaces al valor predeterminado/i }))
 
     await waitFor(() => expect(planApi.removePlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces'))
-    expect(await screen.findByRole('status')).toHaveTextContent(/limit reset/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/límite restablecido/i)
     await waitFor(() => expect(input).toHaveValue(5))
-    expect(screen.getByText('default')).toBeInTheDocument()
+    expect(screen.getByText('Predeterminado')).toBeInTheDocument()
   })
 })

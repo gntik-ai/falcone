@@ -36,7 +36,7 @@ export interface PostgresDataEditorProps {
 
 function errorMessage(error: unknown): string {
   const candidate = error as Partial<ApiError>
-  return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
+  return typeof candidate?.message === 'string' ? candidate.message : 'La solicitud falló'
 }
 
 export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tableName }: PostgresDataEditorProps) {
@@ -148,14 +148,14 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     setStatus(null)
     const parsed = parseJsonObject(newRowJson)
     if (!parsed.ok) {
-      setError(`New row: ${parsed.error}`)
+      setError(`Fila nueva: ${parsed.error}`)
       return
     }
     setBusy(true)
     try {
       await insertRow(workspaceId, databaseName, schemaName, tableName, parsed.value)
       setNewRowJson('{}')
-      setStatus('Row inserted')
+      setStatus('Fila insertada')
       await reloadRows()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -166,7 +166,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
 
   function beginEdit(row: PgRow) {
     if (row.id == null) {
-      setError('Row has no "id" primary key to edit by')
+      setError('La fila no tiene clave primaria "id" para editarla')
       return
     }
     setError(null)
@@ -179,7 +179,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     if (editingId == null) return
     const parsed = parseJsonObject(editJson)
     if (!parsed.ok) {
-      setError(`Edited row: ${parsed.error}`)
+      setError(`Fila editada: ${parsed.error}`)
       return
     }
     const { id: _id, ...changes } = parsed.value
@@ -187,7 +187,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
     try {
       await updateRow(workspaceId, databaseName, schemaName, tableName, { id: editingId }, changes)
       setEditingId(null)
-      setStatus('Row updated')
+      setStatus('Fila actualizada')
       await reloadRows()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -198,13 +198,13 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
 
   async function handleDelete(row: PgRow) {
     if (row.id == null) {
-      setError('Row has no "id" primary key to delete by')
+      setError('La fila no tiene clave primaria "id" para eliminarla')
       return
     }
     setBusy(true)
     try {
       await deleteRow(workspaceId, databaseName, schemaName, tableName, { id: String(row.id) })
-      setStatus('Row deleted')
+      setStatus('Fila eliminada')
       await reloadRows()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -258,28 +258,28 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
   }
 
   return (
-    <section aria-label="Postgres data editor">
+    <section aria-label="Editor de datos Postgres">
       <h2>
         {schemaName}.{tableName}
       </h2>
       {error ? <p role="alert">{error}</p> : null}
       {status ? <p role="status">{status}</p> : null}
 
-      <div aria-label="Filters">
-        <h3>Filters</h3>
+      <div aria-label="Filtros">
+        <h3>Filtros</h3>
         <ul>
           {filters.map((filter, index) => (
             <li key={`${filter.columnName}-${filter.operator}-${index}`}>
               {filter.columnName} {filter.operator} {String(filter.value)}
               <button type="button" onClick={() => removeFilter(index)}>
-                Remove
+                Quitar
               </button>
             </li>
           ))}
         </ul>
-        <label htmlFor="filter-column">Column</label>
+        <label htmlFor="filter-column">Columna</label>
         <input id="filter-column" value={draftColumn} onChange={(event) => setDraftColumn(event.target.value)} />
-        <label htmlFor="filter-op">Operator</label>
+        <label htmlFor="filter-op">Operador</label>
         <select id="filter-op" value={draftOp} onChange={(event) => setDraftOp(event.target.value as PgFilterOperator)}>
           {FILTER_OPERATORS.map((op) => (
             <option key={op} value={op}>
@@ -287,16 +287,16 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
             </option>
           ))}
         </select>
-        <label htmlFor="filter-value">Value{draftOp === 'in' ? ' (comma-separated)' : ''}</label>
+        <label htmlFor="filter-value">Valor{draftOp === 'in' ? ' (separado por comas)' : ''}</label>
         <input id="filter-value" value={draftValue} onChange={(event) => setDraftValue(event.target.value)} />
         <button type="button" onClick={addFilter}>
-          Add filter
+          Añadir filtro
         </button>
       </div>
 
-      <h3>Rows{count != null ? ` (${count})` : ''}</h3>
-      <div aria-label="Pagination">
-        <label htmlFor="page-size">Page size</label>
+      <h3>Filas{count != null ? ` (${count})` : ''}</h3>
+      <div aria-label="Paginación">
+        <label htmlFor="page-size">Tamaño de página</label>
         <select id="page-size" value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
           {PAGE_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -305,16 +305,16 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
           ))}
         </select>
         <button type="button" onClick={prevPage} disabled={cursorStack.length === 0 || busy}>
-          Previous
+          Anterior
         </button>
         <button type="button" onClick={nextPage} disabled={!nextAfter || busy}>
-          Next
+          Siguiente
         </button>
       </div>
       {loading ? (
-        <p>Loading rows…</p>
+        <p>Cargando filas…</p>
       ) : rows.length === 0 ? (
-        <p>No rows yet.</p>
+        <p>Todavía no hay filas.</p>
       ) : (
         <table>
           <thead>
@@ -322,7 +322,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
               {columns.map((column) => (
                 <th key={column}>{column}</th>
               ))}
-              <th>Actions</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -333,10 +333,10 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
                 ))}
                 <td>
                   <button type="button" onClick={() => beginEdit(row)} disabled={busy}>
-                    Edit
+                    Editar
                   </button>
                   <button type="button" onClick={() => void handleDelete(row)} disabled={busy}>
-                    Delete
+                    Eliminar
                   </button>
                 </td>
               </tr>
@@ -346,53 +346,53 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
       )}
 
       {editingId != null ? (
-        <div aria-label="Edit row">
-          <h3>Edit row {editingId}</h3>
-          <label htmlFor="edit-row-json">Row (JSON)</label>
+        <div aria-label="Editar fila">
+          <h3>Editar fila {editingId}</h3>
+          <label htmlFor="edit-row-json">Fila (JSON)</label>
           <textarea id="edit-row-json" value={editJson} onChange={(event) => setEditJson(event.target.value)} />
           <button type="button" onClick={() => void saveEdit()} disabled={busy}>
-            Save
+            Guardar
           </button>
           <button type="button" onClick={() => setEditingId(null)} disabled={busy}>
-            Cancel
+            Cancelar
           </button>
         </div>
       ) : null}
 
-      <h3>Insert row</h3>
-      <label htmlFor="new-row-json">New row (JSON)</label>
+      <h3>Insertar fila</h3>
+      <label htmlFor="new-row-json">Fila nueva (JSON)</label>
       <textarea id="new-row-json" value={newRowJson} onChange={(event) => setNewRowJson(event.target.value)} />
       <button type="button" onClick={() => void handleInsert()} disabled={busy}>
-        Insert
+        Insertar
       </button>
 
-      <h3>API keys</h3>
+      <h3>Claves API</h3>
       <button type="button" onClick={() => void handleIssue('anon')}>
-        Issue anon key
+        Emitir clave anónima
       </button>
       <button type="button" onClick={() => void handleIssue('service')}>
-        Issue service key
+        Emitir clave de servicio
       </button>
       {issued ? (
         <div role="status">
-          <p>Copy this key now — it will not be shown again:</p>
+          <p>Copia esta clave ahora; no volverá a mostrarse:</p>
           <code>{issued.key}</code>
           <button type="button" onClick={() => void handleCopyKey()}>
-            {copied ? 'Copied!' : 'Copy key'}
+            {copied ? 'Copiada' : 'Copiar clave'}
           </button>
 
-          <div aria-label="Anon-key embed">
-            <h4>Embed (fetch)</h4>
+          <div aria-label="Integración con clave anónima">
+            <h4>Fragmento fetch</h4>
             <pre>{buildFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, schemaName, tableName, origin: embedOrigin })}</pre>
-            <h4>Embed (curl)</h4>
+            <h4>Fragmento curl</h4>
             <pre>{buildCurlSnippet({ apiKey: issued.key, workspaceId, databaseName, schemaName, tableName, origin: embedOrigin })}</pre>
             <button type="button" onClick={() => void handlePreview()} disabled={previewBusy}>
-              Run read-only preview
+              Ejecutar vista previa de solo lectura
             </button>
             {previewError ? <p role="alert">{previewError}</p> : null}
             {previewRows != null ? (
-              <div aria-label="Embed preview">
-                <p>Preview as this key — {previewRows.length} row(s):</p>
+              <div aria-label="Vista previa de embed">
+                <p>Vista previa con esta clave: {previewRows.length} fila(s).</p>
                 <table>
                   <thead>
                     <tr>

@@ -262,28 +262,28 @@ export function buildWorkspacePostgresExplorer({
       },
       {
         id: 'views',
-        title: 'Views',
+        title: 'Vistas',
         count: views.length,
         route: getConsolePostgresRoute('listPostgresViews'),
         items: buildPostgresViewExplorer(views, 'getPostgresView')
       },
       {
         id: 'materialized_views',
-        title: 'Materialized views',
+        title: 'Vistas materializadas',
         count: materializedViews.length,
         route: getConsolePostgresRoute('listPostgresMaterializedViews'),
         items: buildPostgresViewExplorer(materializedViews, 'getPostgresMaterializedView')
       },
       {
         id: 'functions',
-        title: 'Functions',
+        title: 'Funciones',
         count: functions.length,
         route: getConsolePostgresRoute('listPostgresFunctions'),
         items: buildPostgresRoutineExplorer(functions, 'getPostgresFunction')
       },
       {
         id: 'procedures',
-        title: 'Procedures',
+        title: 'Procedimientos',
         count: procedures.length,
         route: getConsolePostgresRoute('listPostgresProcedures'),
         items: buildPostgresRoutineExplorer(procedures, 'getPostgresProcedure')

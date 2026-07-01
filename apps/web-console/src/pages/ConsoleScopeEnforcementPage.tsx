@@ -43,22 +43,22 @@ export function ConsoleScopeEnforcementPage({ isSuperadmin = true }: { isSuperad
     <section className="space-y-4 p-4">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Scope Enforcement — Denial Events</h1>
-          <p className="text-sm text-slate-600">Recent blocked requests caused by token scope, plan entitlement, workspace isolation or missing endpoint declarations.</p>
+          <h1 className="text-2xl font-semibold">Cumplimiento de scopes — eventos denegados</h1>
+          <p className="text-sm text-slate-600">Solicitudes bloqueadas recientes por scopes de token, derechos del plan, aislamiento de área de trabajo o puntos de conexión sin declarar.</p>
         </div>
         <div className="flex gap-2">
-          <button className="rounded border px-3 py-2" onClick={() => setRefreshTick((value) => value + 1)}>Refresh</button>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />Auto-refresh</label>
+          <button className="rounded border px-3 py-2" onClick={() => setRefreshTick((value) => value + 1)}>Actualizar</button>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />Autoactualizar</label>
         </div>
       </header>
-      {isSuperadmin && summary.CONFIG_ERROR > 0 ? <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">⚠ Unconfigured endpoints detected. Check platform configuration.</div> : null}
+      {isSuperadmin && summary.CONFIG_ERROR > 0 ? <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Puntos de conexión sin configurar detectados. Revisa la configuración de plataforma.</div> : null}
       <div className="grid gap-3 md:grid-cols-4">
         {Object.entries(summary).map(([key, value]) => <div key={key} className="rounded border bg-white p-3 text-sm"><div className="text-slate-500">{key}</div><div className="text-2xl font-semibold">{value}</div></div>)}
       </div>
       <div className="flex gap-2">
         <input aria-label="from-range" type="date" onChange={(event) => setRange((current) => ({ ...current, from: new Date(event.target.value).toISOString() }))} />
         <input aria-label="to-range" type="date" onChange={(event) => setRange((current) => ({ ...current, to: new Date(event.target.value).toISOString() }))} />
-        <div className="rounded border bg-white px-3 py-2 text-sm">Total denials in window: {denials.length}</div>
+        <div className="rounded border bg-white px-3 py-2 text-sm">Denegaciones totales en la ventana: {denials.length}</div>
       </div>
       <ScopeEnforcementDenialsTable denials={denials} isLoading={loading} hasMore={Boolean(nextCursor)} isSuperadmin={isSuperadmin} />
     </section>

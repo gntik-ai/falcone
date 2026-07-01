@@ -14,8 +14,10 @@ describe('WelcomePage', () => {
 
     const heading = screen.getByRole('heading', { level: 1, name: /in falcone console/i })
     expect(heading).toBeInTheDocument()
-    expect(screen.getByText(/consola administrativa del producto baas multi-tenant/i)).toBeInTheDocument()
+    expect(screen.getByText(/consola administrativa del producto baas multi-organización/i)).toBeInTheDocument()
     expect(screen.getByText(/fundación de consola lista/i)).toBeInTheDocument()
+    expect(screen.getByText(/marco persistente de consola/i)).toBeInTheDocument()
+    expect(screen.queryByText(/\bshell\b/i)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ir al login/i })).toHaveAttribute('href', '/login')
     expect(screen.getByRole('link', { name: /ver alcance inicial/i })).toHaveAttribute('href', '#foundation-overview')
   })

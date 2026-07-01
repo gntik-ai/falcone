@@ -60,13 +60,13 @@ export function RealtimeSnippetsPanel({ workspaceId, realtimeEndpoint, channelTy
   if (!realtimeEnabled || channelTypes.length === 0) {
     return (
       <section aria-labelledby="realtime-snippets-heading">
-        <h2 id="realtime-snippets-heading" className="sr-only">Realtime Subscription Snippets</h2>
+        <h2 id="realtime-snippets-heading" className="sr-only">Fragmentos de suscripción en tiempo real</h2>
         <Alert>
-          <AlertTitle>Realtime no disponible</AlertTitle>
+          <AlertTitle>Tiempo real no disponible</AlertTitle>
           <AlertDescription>
-            Realtime subscriptions require at least one provisioned data source. Visit the provisioning section to configure your workspace.{' '}
+            Las suscripciones en tiempo real requieren al menos una fuente de datos aprovisionada. Visita la sección de aprovisionamiento para configurar tu área de trabajo.{' '}
             <Link className="underline" to={`/console/workspaces/${workspaceId}/provisioning`}>
-              Go to provisioning
+              Ir a aprovisionamiento
             </Link>
           </AlertDescription>
         </Alert>
@@ -76,9 +76,9 @@ export function RealtimeSnippetsPanel({ workspaceId, realtimeEndpoint, channelTy
 
   return (
     <section aria-labelledby="realtime-snippets-heading" className="space-y-4">
-      <h2 id="realtime-snippets-heading" className="sr-only">Realtime Subscription Snippets</h2>
+      <h2 id="realtime-snippets-heading" className="sr-only">Fragmentos de suscripción en tiempo real</h2>
       <div className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm">
-        <div role="tablist" aria-label="Realtime snippet languages" className="flex flex-wrap gap-2">
+        <div role="tablist" aria-label="Lenguajes de fragmentos en tiempo real" className="flex flex-wrap gap-2">
           {(['javascript', 'nodejs', 'python'] as const).map((tab) => (
             <button
               key={tab}
@@ -100,7 +100,7 @@ export function RealtimeSnippetsPanel({ workspaceId, realtimeEndpoint, channelTy
       </div>
       {channelTypes.length > 1 ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          Additional channel types available: {channelTypes.slice(1).join(', ')}. Change the <code>channelType</code> value in the snippet accordingly.
+          Tipos de canal adicionales disponibles: {channelTypes.slice(1).join(', ')}. Ajusta el valor <code>channelType</code> en el fragmento según corresponda.
         </p>
       ) : null}
     </section>

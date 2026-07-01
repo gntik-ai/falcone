@@ -8,13 +8,13 @@ describe('CapabilityStatusGrid', () => {
   it('renders enabled and disabled capabilities', () => {
     render(<CapabilityStatusGrid capabilities={[{ capabilityKey: 'realtime', displayLabel: 'Realtime', enabled: true, source: 'plan' }, { capabilityKey: 'webhooks', displayLabel: 'Webhooks', enabled: false, source: 'catalog_default' }]} />)
     expect(screen.getByText('Realtime')).toBeInTheDocument()
-    expect(screen.getByText('Enabled')).toBeInTheDocument()
-    expect(screen.getByText('Disabled')).toBeInTheDocument()
+    expect(screen.getByText('Habilitada')).toBeInTheDocument()
+    expect(screen.getByText('Deshabilitada')).toBeInTheDocument()
   })
 
   it('renders an accessible empty state', () => {
     render(<CapabilityStatusGrid capabilities={[]} />)
-    expect(screen.getByRole('heading', { name: /capabilities/i })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(/no inherited capabilities/i)
+    expect(screen.getByRole('heading', { name: /capacidades/i })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/no se devolvieron capacidades heredadas/i)
   })
 })

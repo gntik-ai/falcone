@@ -26,10 +26,10 @@ describe('ConsoleSecretRotationPage', () => {
       </MemoryRouter>
     )
 
-    fireEvent.change(screen.getByLabelText('Grace period input'), { target: { value: '900' } })
-    fireEvent.change(screen.getByLabelText('Justification'), { target: { value: 'planned rotation' } })
-    fireEvent.change(screen.getByLabelText('New value'), { target: { value: 'ciphertext' } })
-    fireEvent.click(screen.getByText('Submit rotation'))
+    fireEvent.change(screen.getByLabelText('Entrada de periodo de gracia'), { target: { value: '900' } })
+    fireEvent.change(screen.getByLabelText('Justificación'), { target: { value: 'planned rotation' } })
+    fireEvent.change(screen.getByLabelText('Valor nuevo'), { target: { value: 'ciphertext' } })
+    fireEvent.click(screen.getByText('Enviar rotación'))
 
     await waitFor(() => expect(mocks.initiateRotation).toHaveBeenCalledWith('platform/postgresql/app-password', {
       gracePeriodSeconds: 900,

@@ -41,6 +41,7 @@ describe('RunActionToolbar — Cancel', () => {
 
     await user.click(screen.getByTestId('run-cancel-button'))
     expect(screen.getByTestId('confirm-action-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('confirm-action-dialog')).toHaveTextContent('flujo de trabajo en ejecución')
     // No API call yet — the dialog gates it.
     expect(mockCancel).not.toHaveBeenCalled()
 
@@ -70,6 +71,8 @@ describe('RunActionToolbar — Retry', () => {
     render(<RunActionToolbar {...base} status="Failed" onRetried={onRetried} />)
     await user.click(screen.getByTestId('run-retry-button'))
     expect(screen.getByTestId('confirm-action-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('confirm-action-dialog')).toHaveTextContent('misma versión del flujo')
+    expect(screen.getByTestId('confirm-action-dialog')).toHaveTextContent('disparador')
     expect(mockRetry).not.toHaveBeenCalled()
     await user.click(screen.getByTestId('confirm-action-confirm'))
     await waitFor(() => expect(mockRetry).toHaveBeenCalledWith('ws1', 'flow1', 'e1'))
@@ -98,6 +101,7 @@ describe('RunActionToolbar — Approval signal', () => {
     await user.click(screen.getByTestId('run-approve-button'))
     // Dialog identifies the node before any API call.
     expect(screen.getByTestId('confirm-action-dialog')).toHaveTextContent('review')
+    expect(screen.getByTestId('confirm-action-dialog')).toHaveTextContent('El flujo de trabajo continúa')
     expect(mockSignal).not.toHaveBeenCalled()
     await user.click(screen.getByTestId('confirm-action-confirm'))
     await waitFor(() =>
@@ -112,6 +116,7 @@ describe('RunActionToolbar — Approval signal', () => {
       <RunActionToolbar {...base} status="Running" waitingApproval={{ nodeId: 'review', signalName: 'review' }} />
     )
     await user.click(screen.getByTestId('run-reject-button'))
+    expect(screen.getByTestId('confirm-action-dialog')).toHaveTextContent('El flujo de trabajo sigue su ruta de rechazo')
     await user.click(screen.getByTestId('confirm-action-confirm'))
     await waitFor(() =>
       expect(mockSignal).toHaveBeenCalledWith('ws1', 'flow1', 'e1', 'review', { approved: false, nodeId: 'review' })

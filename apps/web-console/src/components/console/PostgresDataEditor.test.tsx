@@ -51,23 +51,23 @@ afterEach(() => cleanup())
 describe('PostgresDataEditor — richer UX', () => {
   it('shows a loading state, then the rows with an exact count', async () => {
     renderEditor()
-    expect(screen.getByText('Loading rows…')).toBeInTheDocument()
+    expect(screen.getByText('Cargando filas…')).toBeInTheDocument()
     expect(await screen.findByText('hello')).toBeInTheDocument()
-    expect(screen.getByText('Rows (1)')).toBeInTheDocument()
+    expect(screen.getByText('Filas (1)')).toBeInTheDocument()
   })
 
   it('shows an empty state when there are no rows', async () => {
     mocked.listRows.mockResolvedValue({ items: [], count: 0 })
     renderEditor()
-    expect(await screen.findByText('No rows yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Todavía no hay filas.')).toBeInTheDocument()
   })
 
   it('validates new-row JSON before inserting', async () => {
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.change(screen.getByLabelText('New row (JSON)'), { target: { value: '{bad' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('New row: Not valid JSON')
+    fireEvent.change(screen.getByLabelText('Fila nueva (JSON)'), { target: { value: '{bad' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Insertar' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Fila nueva: Not valid JSON')
     expect(mocked.insertRow).not.toHaveBeenCalled()
   })
 
@@ -75,8 +75,8 @@ describe('PostgresDataEditor — richer UX', () => {
     mocked.insertRow.mockResolvedValue({ item: {} })
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.change(screen.getByLabelText('New row (JSON)'), { target: { value: '{"body":"new"}' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }))
+    fireEvent.change(screen.getByLabelText('Fila nueva (JSON)'), { target: { value: '{"body":"new"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Insertar' }))
     await waitFor(() => expect(mocked.insertRow).toHaveBeenCalledWith('ws1', 'appdb', 'public', 'notes', { body: 'new' }))
     expect(mocked.listRows).toHaveBeenCalledTimes(2) // initial + after insert
   })
@@ -85,10 +85,10 @@ describe('PostgresDataEditor — richer UX', () => {
     mocked.updateRow.mockResolvedValue({ item: {}, affected: 1 })
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    const textarea = await screen.findByLabelText('Row (JSON)')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const textarea = await screen.findByLabelText('Fila (JSON)')
     fireEvent.change(textarea, { target: { value: '{"id":"r1","body":"edited"}' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
     await waitFor(() =>
       expect(mocked.updateRow).toHaveBeenCalledWith('ws1', 'appdb', 'public', 'notes', { id: 'r1' }, { body: 'edited' })
     )
@@ -98,16 +98,16 @@ describe('PostgresDataEditor — richer UX', () => {
     mocked.deleteRow.mockResolvedValue({ affected: 1 })
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
     await waitFor(() => expect(mocked.deleteRow).toHaveBeenCalledWith('ws1', 'appdb', 'public', 'notes', { id: 'r1' }))
   })
 
   it('adds a filter and requeries the rows with it', async () => {
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.change(screen.getByLabelText('Column'), { target: { value: 'status' } })
-    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'active' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add filter' }))
+    fireEvent.change(screen.getByLabelText('Columna'), { target: { value: 'status' } })
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: 'active' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir filtro' }))
     await waitFor(() =>
       expect(mocked.listRows).toHaveBeenLastCalledWith(
         'ws1', 'appdb', 'public', 'notes',
@@ -120,7 +120,7 @@ describe('PostgresDataEditor — richer UX', () => {
   it('changing the page size requeries from the first page', async () => {
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.change(screen.getByLabelText('Page size'), { target: { value: '50' } })
+    fireEvent.change(screen.getByLabelText('Tamaño de página'), { target: { value: '50' } })
     await waitFor(() =>
       expect(mocked.listRows).toHaveBeenLastCalledWith(
         'ws1', 'appdb', 'public', 'notes', expect.objectContaining({ pageSize: 50, after: undefined })
@@ -132,25 +132,25 @@ describe('PostgresDataEditor — richer UX', () => {
     mocked.listRows.mockResolvedValue({ items: [{ id: 'r1', body: 'hello' }], count: 5, page: { after: 'CUR1' } })
     renderEditor()
     await screen.findByText('hello')
-    const next = screen.getByRole('button', { name: 'Next' })
+    const next = screen.getByRole('button', { name: 'Siguiente' })
     expect(next).not.toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
     fireEvent.click(next)
     await waitFor(() =>
       expect(mocked.listRows).toHaveBeenLastCalledWith(
         'ws1', 'appdb', 'public', 'notes', expect.objectContaining({ after: 'CUR1' })
       )
     )
-    expect(screen.getByRole('button', { name: 'Previous' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Anterior' })).not.toBeDisabled()
   })
 
   it('issues an anon key and reveals the plaintext once with copy + embed snippets', async () => {
     mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.click(screen.getByRole('button', { name: 'Issue anon key' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir clave anónima' }))
     expect(await screen.findByText('flc_anon_secret')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Copy key' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copiar clave' })).toBeInTheDocument()
     // fetch + curl embed snippets are shown
     expect(screen.getByText('FETCH_SNIPPET')).toBeInTheDocument()
     expect(screen.getByText('CURL_SNIPPET')).toBeInTheDocument()
@@ -161,13 +161,13 @@ describe('PostgresDataEditor — richer UX', () => {
     mocked.previewRowsWithApiKey.mockResolvedValue({ items: [{ id: 'r9', body: 'as-anon' }] })
     renderEditor()
     await screen.findByText('hello')
-    fireEvent.click(screen.getByRole('button', { name: 'Issue anon key' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir clave anónima' }))
     await screen.findByText('flc_anon_secret')
-    fireEvent.click(screen.getByRole('button', { name: 'Run read-only preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar vista previa de solo lectura' }))
     await waitFor(() =>
       expect(mocked.previewRowsWithApiKey).toHaveBeenCalledWith('flc_anon_secret', 'ws1', 'appdb', 'public', 'notes', { pageSize: 10 })
     )
     expect(await screen.findByText('as-anon')).toBeInTheDocument()
-    expect(screen.getByText(/Preview as this key — 1 row/)).toBeInTheDocument()
+    expect(screen.getByText(/Vista previa con esta clave: 1 fila/)).toBeInTheDocument()
   })
 })

@@ -68,6 +68,8 @@ describe('ConsoleFlowHistoryPage filters', () => {
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => expect(mockListExecutions).toHaveBeenCalledTimes(1))
+    expect(screen.getByLabelText(/disparador/i)).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /cualquier disparador/i })).toBeInTheDocument()
     await user.selectOptions(screen.getByTestId('filter-trigger-type'), 'webhook')
     await waitFor(() => expect(mockListExecutions.mock.calls.at(-1)![1].triggerType).toBe('webhook'))
   })
@@ -83,7 +85,7 @@ describe('ConsoleFlowHistoryPage filters', () => {
   it('renders the empty-state message when no executions match', async () => {
     mockListExecutions.mockResolvedValue({ items: [], nextPageToken: null })
     renderPage()
-    expect(await screen.findByTestId('run-history-empty')).toHaveTextContent('No executions match')
+    expect(await screen.findByTestId('run-history-empty')).toHaveTextContent('No hay ejecuciones que coincidan')
     expect(screen.queryByTestId('run-history-row')).toBeNull()
   })
 
@@ -111,7 +113,7 @@ describe('ConsoleFlowHistoryPage filters', () => {
     renderPage()
 
     const row = await screen.findByTestId('run-history-row')
-    const detailLink = within(row).getByRole('link', { name: /open details for run/i })
+    const detailLink = within(row).getByRole('link', { name: /abrir detalles de ejecución/i })
     expect(detailLink).toHaveAttribute(
       'href',
       `/console/flows/flow1/runs/${encodeURIComponent(EXECUTION_ID)}`

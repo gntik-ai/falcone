@@ -29,7 +29,7 @@ export function SpecDownloadButton({ workspaceId, specVersion, lastUpdated }: Pr
           }
         }}
       >
-        {loading ? 'Downloading…' : `Download ${format.toUpperCase()}`}
+        {loading ? 'Descargando…' : `Descargar ${format.toUpperCase()}`}
       </button>
       <span>{`v${specVersion}`}</span>
       <time dateTime={lastUpdated}>{lastUpdated}</time>

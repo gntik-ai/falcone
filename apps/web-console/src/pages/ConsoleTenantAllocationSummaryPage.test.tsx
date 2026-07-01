@@ -42,9 +42,9 @@ describe('ConsoleTenantAllocationSummaryPage', () => {
 
     render(<ConsoleTenantAllocationSummaryPage />)
 
-    expect(await screen.findByRole('table', { name: /workspace allocation summary/i })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /resumen de asignación de áreas de trabajo/i })).toBeInTheDocument()
     expect(screen.getByText('ws-prod: 2')).toBeInTheDocument()
-    expect(screen.queryByText('No workspace allocations yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('Todavía no hay asignaciones de área de trabajo')).not.toBeInTheDocument()
   })
 
   it('renders the no-allocation empty state only when every dimension has no workspaces', async () => {
@@ -66,8 +66,9 @@ describe('ConsoleTenantAllocationSummaryPage', () => {
 
     render(<ConsoleTenantAllocationSummaryPage />)
 
-    expect(await screen.findByText('No workspace allocations yet')).toBeInTheDocument()
-    expect(screen.queryByRole('table', { name: /workspace allocation summary/i })).not.toBeInTheDocument()
+    expect(await screen.findByText('Todavía no hay asignaciones de área de trabajo')).toBeInTheDocument()
+    expect(screen.getByText(/reserva compartida de la organización/i)).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: /resumen de asignación de áreas de trabajo/i })).not.toBeInTheDocument()
   })
 
   it('renders a platform-admin no-personal-plan state without self-tenant allocation lookup or raw backend code', async () => {
@@ -76,8 +77,8 @@ describe('ConsoleTenantAllocationSummaryPage', () => {
 
     render(<ConsoleTenantAllocationSummaryPage />)
 
-    expect(await screen.findByRole('status', { name: /no personal tenant plan/i })).toBeInTheDocument()
-    expect(screen.getByText(/no personal tenant allocations/i)).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: /sin plan de organización personal/i })).toBeInTheDocument()
+    expect(screen.getByText(/no hay asignaciones personales de organización/i)).toBeInTheDocument()
     expect(screen.queryByText(/TENANT_NOT_FOUND/)).not.toBeInTheDocument()
     expect(mockGetTenantAllocationSummary).not.toHaveBeenCalled()
   })

@@ -23,6 +23,16 @@ function isLimitInputForDimension(target: EventTarget | null, dimensionKey: stri
   return target instanceof HTMLElement && target.dataset.limitInputDimensionKey === dimensionKey
 }
 
+function formatLimitSource(source: LimitProfileRow['source']): string {
+  const labels: Partial<Record<LimitProfileRow['source'], string>> = {
+    explicit: 'Explícito',
+    default: 'Predeterminado',
+    unlimited: 'Sin límite'
+  }
+
+  return labels[source] ?? String(source).replace(/_/g, ' ')
+}
+
 export function PlanLimitsTable({
   dimensions,
   editable,
@@ -70,15 +80,15 @@ export function PlanLimitsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[42rem] divide-y divide-border text-left text-sm" aria-busy={busyDimensionKey !== null}>
-        <caption className="sr-only">Plan limits</caption>
+      <table className="w-full min-w-[46rem] divide-y divide-border text-left text-sm" aria-busy={busyDimensionKey !== null}>
+        <caption className="sr-only">Límites del plan</caption>
         <thead className="bg-muted/40">
           <tr className="text-xs uppercase text-muted-foreground">
-            <th scope="col" className="px-4 py-3 font-medium">Dimension</th>
-            <th scope="col" className="px-4 py-3 text-right font-medium">Value</th>
-            <th scope="col" className="px-4 py-3 font-medium">Source</th>
-            <th scope="col" className="px-4 py-3 font-medium">Unit</th>
-            <th scope="col" className="px-4 py-3 text-right font-medium"><span className="sr-only">Actions</span></th>
+            <th scope="col" className="px-4 py-3 font-medium">Dimensión</th>
+            <th scope="col" className="px-4 py-3 text-right font-medium">Valor</th>
+            <th scope="col" className="px-4 py-3 font-medium">Origen</th>
+            <th scope="col" className="px-4 py-3 font-medium">Unidad</th>
+            <th scope="col" className="px-4 py-3 text-right font-medium"><span className="sr-only">Acciones</span></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/80">
@@ -95,7 +105,7 @@ export function PlanLimitsTable({
                     <div>
                       <Input
                         className="ml-auto h-9 w-32 rounded-md text-right tabular-nums"
-                        aria-label={`${dimension.displayLabel} limit value`}
+                        aria-label={`${dimension.displayLabel}: valor del límite`}
                         aria-describedby={isBusy ? `${helpId} ${statusId}` : helpId}
                         data-limit-input-dimension-key={dimension.dimensionKey}
                         type="number"
@@ -137,27 +147,27 @@ export function PlanLimitsTable({
                           commitDraftValue(dimension, event.currentTarget.value)
                         }}
                       />
-                      <span id={helpId} className="sr-only">Use -1 for unlimited. Changes save when this field loses focus.</span>
+                      <span id={helpId} className="sr-only">Usa -1 para indicar sin límite. Los cambios se guardan cuando este campo pierde el foco.</span>
                       {isBusy ? (
                         <span id={statusId} className="sr-only" role="status" aria-live="polite">
-                          Saving {dimension.displayLabel} limit.
+                          Guardando límite de {dimension.displayLabel}.
                         </span>
                       ) : null}
                     </div>
-                  ) : dimension.effectiveValue === -1 ? 'Unlimited' : String(dimension.effectiveValue)}
+                  ) : dimension.effectiveValue === -1 ? 'Sin límite' : String(dimension.effectiveValue)}
                 </td>
-                <td className="px-4 py-4 text-muted-foreground">{dimension.effectiveValue === -1 ? 'unlimited' : dimension.source}</td>
+                <td className="px-4 py-4 text-muted-foreground">{dimension.effectiveValue === -1 ? 'Sin límite' : formatLimitSource(dimension.source)}</td>
                 <td className="px-4 py-4 text-muted-foreground">{dimension.unit ?? 'count'}</td>
-                <td className="w-28 px-4 py-4 text-right">
+                <td className="w-36 px-4 py-4 text-right">
                   {editable ? (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="min-w-20"
+                      className="min-w-[7rem] whitespace-nowrap"
                       disabled={isBusy}
                       data-reset-dimension-key={dimension.dimensionKey}
-                      aria-label={isBusy ? `Saving ${dimension.displayLabel} limit` : `Reset ${dimension.displayLabel} limit to default`}
+                      aria-label={isBusy ? `Guardando límite de ${dimension.displayLabel}` : `Restablecer límite de ${dimension.displayLabel} al valor predeterminado`}
                       onPointerDown={() => {
                         resetIntentDimensionKey.current = dimension.dimensionKey
                       }}
@@ -173,7 +183,7 @@ export function PlanLimitsTable({
                         commitDraftValue(dimension, inputValues[dimension.dimensionKey] ?? limitInputValue(dimension))
                       }}
                     >
-                      {isBusy ? 'Saving...' : 'Reset'}
+                      {isBusy ? 'Guardando...' : 'Restablecer'}
                     </Button>
                   ) : null}
                 </td>

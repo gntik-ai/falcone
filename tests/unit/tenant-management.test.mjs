@@ -165,6 +165,10 @@ test('tenant helper modules expose governance dashboard, inventory, export, and 
   assert.equal(purgeDraft.approvalTicket, 'APR-42');
   assert.equal(controlPlanePurgeDraft.confirmationText.includes('PURGE ten_01growthbeta'), true);
   assert.equal(cards.some((card) => card.id === 'tenant-lifecycle'), true);
+  assert.equal(
+    cards.find((card) => card.id === 'tenant-inventory')?.secondary,
+    `${inventory.workspaceCount} área(s) de trabajo, ${inventory.applicationCount} aplicación(es)`
+  );
   assert.equal(rows.some((row) => row.workspaceId === 'wrk_01betaprod'), true);
   assert.equal(exportSummary.exportId.startsWith('exp_'), true);
   assert.equal(actionChecklist.allowed, true);

@@ -52,7 +52,7 @@ function buildNotes(template: SnippetTemplate, context: SnippetContext): string[
   const notes = [...(template.fallbackNotes ?? [])]
 
   if (!context.externalAccessEnabled) {
-    notes.push('El acceso externo está deshabilitado o no confirmado; revisa la configuración de exposición antes de usar este snippet.')
+    notes.push('El acceso externo está deshabilitado o no confirmado; revisa la configuración de exposición antes de usar este fragmento.')
   }
 
   if (context.resourceState && STATE_WARNING_SET.has(context.resourceState.toLowerCase())) {
@@ -60,7 +60,7 @@ function buildNotes(template: SnippetTemplate, context: SnippetContext): string[
   }
 
   if (hasMissingEndpointContext(context)) {
-    notes.push('Faltan datos de endpoint/host en la vista actual, por eso se muestran placeholders descriptivos.')
+    notes.push('Faltan datos de punto de conexión o host en la vista actual; por eso se muestran marcadores temporales descriptivos.')
   }
 
   return Array.from(new Set(notes))

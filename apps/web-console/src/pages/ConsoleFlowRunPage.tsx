@@ -68,7 +68,7 @@ function RunView({
       setRecord(flow)
       setDetail(exec)
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Failed to load the run')
+      setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la ejecución.')
     }
   }, [workspaceId, flowId, executionId])
 
@@ -122,7 +122,7 @@ function RunView({
           {loadError}
         </p>
         <button type="button" className="text-xs underline" onClick={() => void load()}>
-          Retry
+          Reintentar
         </button>
       </div>
     )
@@ -133,36 +133,36 @@ function RunView({
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
         <div className="flex items-center gap-2">
           <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
-            Flows
+            Flujos
           </Link>
           <span className="text-muted-foreground">/</span>
           <Link className="text-sm text-muted-foreground hover:underline" to={`/console/flows/${flowId}/runs`}>
-            Runs
+            Ejecuciones
           </Link>
           <span className="text-muted-foreground">/</span>
           <span className="text-sm font-semibold" title={executionId}>
             {record?.name ?? flowId}
           </span>
           <Badge variant="outline" className="text-xs" data-testid="run-status-badge">
-            {detail?.status ?? 'unknown'}
+            {detail?.status ?? 'desconocido'}
           </Badge>
           {!terminal ? (
             live.streaming ? (
               <span className="text-xs text-emerald-600" data-testid="run-streaming-indicator">
-                Live
+                En vivo
               </span>
             ) : (
               <Input
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
-                placeholder="anon key (flc_anon_…) to stream live"
+                placeholder="clave anónima (flc_anon_…) para transmitir en vivo"
                 className="h-8 w-64 text-xs"
                 data-testid="run-apikey-input"
               />
             )
           ) : (
             <span className="text-xs text-muted-foreground" data-testid="run-static-indicator">
-              Final state from history
+              Estado final del historial
             </span>
           )}
         </div>
@@ -191,7 +191,7 @@ function RunView({
             onSelectNode={setSelectedNodeId}
           />
         ) : (
-          <p className="p-6 text-sm text-muted-foreground">No flow definition available for this run.</p>
+          <p className="p-6 text-sm text-muted-foreground">No hay definición de flujo disponible para esta ejecución.</p>
         )}
         {selectedNodeId ? (
           <RunNodeDetailPanel
@@ -211,10 +211,10 @@ export function ConsoleFlowRunPage() {
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId || !executionId) {
-    return <p className="p-6 text-sm text-muted-foreground">Missing flow or execution identifier.</p>
+    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo o de la ejecución.</p>
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Select a workspace to open the run view.</p>
+    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para abrir la vista de ejecución.</p>
   }
 
   return (

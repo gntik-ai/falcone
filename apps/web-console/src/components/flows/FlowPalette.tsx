@@ -33,7 +33,7 @@ export function FlowPalette({ workspaceId, onCatalogLoaded }: FlowPaletteProps) 
       setState({ phase: 'ready', items })
       onCatalogLoaded?.(items)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load task types'
+      const message = error instanceof Error ? error.message : 'No se pudieron cargar los tipos de tarea.'
       setState({ phase: 'error', message })
     }
   }, [workspaceId, onCatalogLoaded])
@@ -60,10 +60,10 @@ export function FlowPalette({ workspaceId, onCatalogLoaded }: FlowPaletteProps) 
   if (state.phase === 'error') {
     return (
       <div data-testid="flow-palette-error" className="space-y-2 p-3 text-sm">
-        <p className="text-destructive">Could not load the task-type catalog.</p>
+        <p className="text-destructive">No se pudo cargar el catálogo de tipos de tarea.</p>
         <p className="text-xs text-muted-foreground">{state.message}</p>
         <Button size="sm" variant="outline" onClick={() => void load()}>
-          Retry
+          Reintentar
         </Button>
       </div>
     )
@@ -101,7 +101,7 @@ export function FlowPalette({ workspaceId, onCatalogLoaded }: FlowPaletteProps) 
         </div>
       ))}
       {state.items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">The task-type catalog is empty.</p>
+        <p className="text-xs text-muted-foreground">El catálogo de tipos de tarea está vacío.</p>
       ) : null}
     </div>
   )

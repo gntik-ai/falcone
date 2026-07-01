@@ -59,7 +59,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
+    throw new Error(`La solicitud falló con estado ${response.status}`)
   }
 
   return response.json() as Promise<T>

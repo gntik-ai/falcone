@@ -13,12 +13,12 @@ describe('ConsumptionBar', () => {
 
   it('renders unavailable usage', () => {
     render(<ConsumptionBar current={null} limit={100} />)
-    expect(screen.getByText('Data unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Datos no disponibles')).toBeInTheDocument()
   })
 
   it('renders unlimited usage without progressbar', () => {
     render(<ConsumptionBar current={12} limit={-1} />)
-    expect(screen.getByText('/ Unlimited')).toBeInTheDocument()
+    expect(screen.getByText('/ Sin límite')).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 })

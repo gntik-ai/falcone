@@ -38,9 +38,9 @@ describe('CreateIamClientWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/tipo/i), 'public')
-    await user.type(screen.getByLabelText(/client id/i), 'falcone-console')
+    await user.type(screen.getByLabelText(/id del cliente/i), 'falcone-console')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/redirect uris/i), 'https://app.example/callback')
+    await user.type(screen.getByLabelText(/uris de redirección/i), 'https://app.example/callback')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
@@ -57,9 +57,9 @@ describe('CreateIamClientWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/tipo/i), 'public')
-    await user.type(screen.getByLabelText(/client id/i), 'falcone-console')
+    await user.type(screen.getByLabelText(/id del cliente/i), 'falcone-console')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/redirect uris/i), 'https://app.example/callback')
+    await user.type(screen.getByLabelText(/uris de redirección/i), 'https://app.example/callback')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
@@ -68,7 +68,7 @@ describe('CreateIamClientWizard', () => {
     await user.click(screen.getByRole('button', { name: /anterior/i }))
     await user.click(screen.getByRole('button', { name: /anterior/i }))
     await user.click(screen.getByRole('button', { name: /anterior/i }))
-    expect(screen.getByLabelText(/client id/i)).toHaveValue('falcone-console')
+    expect(screen.getByLabelText(/id del cliente/i)).toHaveValue('falcone-console')
   })
 
   it('[RW-08] sin permisos muestra mensaje de permisos insuficientes — RF-UI-025 / T02-AC8', () => {

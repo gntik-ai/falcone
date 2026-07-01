@@ -18,11 +18,25 @@ import {
   type ConsoleIssuedCredential,
   type ConsoleServiceAccount
 } from '@/lib/console-service-accounts'
-import { useConsoleContext } from '@/lib/console-context'
+import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
 import { readConsoleShellSession } from '@/lib/console-session'
 
 const credentialActionsHelpId = 'service-account-credential-actions-help'
+
+function formatAccessProjection(value: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    rw: 'Lectura y escritura',
+    read_write: 'Lectura y escritura',
+    read_only: 'Solo lectura',
+    denied: 'Denegado',
+    none: 'Sin acceso',
+    unknown: 'Desconocido'
+  }
+
+  if (!value) return 'Desconocido'
+  return labels[value] ?? formatConsoleEnumLabel(value)
+}
 
 function CredentialDisclosureDialog({
   disclosure,
@@ -60,7 +74,7 @@ function CredentialDisclosureDialog({
 
   const activeDisclosure = disclosure
   const isRotate = activeDisclosure.mode === 'rotate'
-  const title = isRotate ? 'Nuevo secreto generado' : 'Secreto actual de la service account'
+  const title = isRotate ? 'Nuevo secreto generado' : 'Secreto actual de la cuenta de servicio'
   const description = isRotate
     ? 'Actualiza tus clientes con este valor. Rotar reemplaza el secreto anterior e invalida los tokens emitidos antes de la rotación.'
     : 'Este panel revela el secreto de cliente actual y puede mostrarse de nuevo. Usa Rotar para reemplazarlo e invalidar los tokens emitidos con el secreto anterior.'
@@ -161,17 +175,17 @@ export function ConsoleServiceAccountsPage() {
   }, [activeTenantId, activeWorkspaceId, destructiveOp.handleCancel])
 
   if (!activeTenantId) {
-    return <ConsolePageState kind="blocked" title="Service accounts bloqueadas" description="Selecciona un tenant para continuar." />
+    return <ConsolePageState kind="blocked" title="Cuentas de servicio bloqueadas" description="Selecciona una organización para continuar." />
   }
   if (!activeWorkspaceId) {
-    return <ConsolePageState kind="blocked" title="Service accounts bloqueadas" description="Selecciona un workspace para gestionar credenciales." />
+    return <ConsolePageState kind="blocked" title="Cuentas de servicio bloqueadas" description="Selecciona un área de trabajo para gestionar credenciales." />
   }
 
   const workspaceId = activeWorkspaceId
 
   async function handleCreate() {
     const result = await createServiceAccount(workspaceId, { displayName, entityType: 'service_account', desiredState: 'active' })
-    setFeedback(`Service account creada: ${result.serviceAccountId}`)
+    setFeedback(`Cuenta de servicio creada: ${result.serviceAccountId}`)
     setDisplayName('')
     reload()
   }
@@ -199,7 +213,7 @@ export function ConsoleServiceAccountsPage() {
       level: DESTRUCTIVE_OP_LEVELS['revoke-service-account-credential'],
       operationId: 'revoke-service-account-credential',
       resourceName: account.displayName ?? account.serviceAccountId,
-      resourceType: 'credencial de service account',
+      resourceType: 'credencial de cuenta de servicio',
       impactDescription: 'La credencial dejará de funcionar de inmediato.',
       onConfirm: () => handleRevoke(account.serviceAccountId),
       onSuccess: () => {
@@ -230,11 +244,11 @@ export function ConsoleServiceAccountsPage() {
       level: DESTRUCTIVE_OP_LEVELS['delete-service-account'],
       operationId: 'delete-service-account',
       resourceName: account.displayName ?? account.serviceAccountId,
-      resourceType: 'service account',
-      impactDescription: 'Se eliminarán el cliente de Keycloak y el registro de la service account de forma permanente.',
+      resourceType: 'cuenta de servicio',
+      impactDescription: 'Se eliminarán el cliente de Keycloak y el registro de la cuenta de servicio de forma permanente.',
       onConfirm: () => handleDelete(account.serviceAccountId),
       onSuccess: () => {
-        setFeedback('Service account eliminada.')
+        setFeedback('Cuenta de servicio eliminada.')
         reload()
       }
     })
@@ -243,16 +257,16 @@ export function ConsoleServiceAccountsPage() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <p className="text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Service Accounts</h1>
-        {writesBlocked ? <p className="mt-2 text-sm text-amber-700">El tenant no está activo; las acciones de escritura están deshabilitadas.</p> : null}
+        <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Cuentas de servicio</h1>
+        {writesBlocked ? <p className="mt-2 text-sm text-amber-700">La organización no está activa; las acciones de escritura están deshabilitadas.</p> : null}
       </header>
 
       <section className="rounded-3xl border border-border bg-card/70 p-6">
-        <h2 className="text-lg font-semibold">Crear service account</h2>
+        <h2 className="text-lg font-semibold">Crear cuenta de servicio</h2>
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 space-y-2 text-sm text-foreground" htmlFor={displayNameId}>
-            <span>Nombre de service account</span>
+            <span>Nombre de cuenta de servicio</span>
             <Input id={displayNameId} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
           </label>
           <Button type="button" className="md:min-w-24" onClick={() => void handleCreate()} disabled={writesBlocked || !displayName.trim()}>Crear</Button>
@@ -261,15 +275,15 @@ export function ConsoleServiceAccountsPage() {
         {errorFeedback ? <p role="alert" className="mt-3 text-sm text-red-700">{errorFeedback}</p> : null}
       </section>
 
-      {loading ? <ConsolePageState kind="loading" title="Cargando service accounts" description="Consultando el listado del workspace." /> : null}
-      {error ? <ConsolePageState kind="error" title="No se pudieron cargar las service accounts" description={error} actionLabel="Reintentar" onAction={reload} /> : null}
-      {isEmpty ? <ConsolePageState kind="empty" title="No hay service accounts en este workspace" description="Crea una nueva para empezar." /> : null}
+      {loading ? <ConsolePageState kind="loading" title="Cargando cuentas de servicio" description="Consultando el listado del área de trabajo." /> : null}
+      {error ? <ConsolePageState kind="error" title="No se pudieron cargar las cuentas de servicio" description={error} actionLabel="Reintentar" onAction={reload} /> : null}
+      {isEmpty ? <ConsolePageState kind="empty" title="No hay cuentas de servicio en esta área de trabajo" description="Crea una nueva para empezar." /> : null}
 
       {accounts.length > 0 ? (
         <div className="overflow-x-auto rounded-3xl border border-border bg-card/70 shadow-sm">
           <table className="w-full min-w-[60rem] divide-y divide-border text-left text-sm">
             <caption className="sr-only">
-              Service accounts del workspace activo. Revelar muestra el secreto de cliente actual y puede usarse de nuevo; Rotar genera un secreto nuevo que reemplaza el anterior.
+              Cuentas de servicio del área de trabajo activa. Revelar muestra el secreto de cliente actual y puede usarse de nuevo; Rotar genera un secreto nuevo que reemplaza el anterior.
             </caption>
             <thead>
               <tr className="bg-muted/40 align-top text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -291,9 +305,9 @@ export function ConsoleServiceAccountsPage() {
                 return (
                   <tr key={account.serviceAccountId} className="transition-colors hover:bg-muted/30">
                     <th scope="row" className="max-w-[18rem] break-words px-4 py-4 text-left font-medium text-foreground">{accountName}</th>
-                    <td className="px-4 py-4 text-muted-foreground">{account.accessProjection?.clientState ?? account.desiredState ?? 'unknown'}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatConsoleEnumLabel(account.accessProjection?.clientState ?? account.desiredState ?? null)}</td>
                     <td className="px-4 py-4"><ConsoleCredentialStatusBadge status={account.credentialStatus?.state} /></td>
-                    <td className="px-4 py-4 text-muted-foreground">{account.accessProjection?.effectiveAccess ?? 'unknown'}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatAccessProjection(account.accessProjection?.effectiveAccess)}</td>
                     <td className="px-4 py-4 text-muted-foreground">{account.expiresAt ?? '—'}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap justify-end gap-2">
@@ -336,7 +350,7 @@ export function ConsoleServiceAccountsPage() {
                           type="button"
                           variant="destructive"
                           size="sm"
-                          aria-label={`Eliminar service account ${accountName}`}
+                          aria-label={`Eliminar cuenta de servicio ${accountName}`}
                           disabled={writesBlocked}
                           onClick={() => openDeleteDialog(account)}
                         >

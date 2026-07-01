@@ -10,7 +10,7 @@ import { invokeMcpTool, type InvokeMcpToolResult } from '@/lib/mcp/mcp-api'
 import type { McpToolView } from '@/lib/mcp/mcp-server-detail'
 
 /**
- * Interactive playground (issue #397): pick a curated tool, supply JSON arguments, and invoke it
+ * Interactive test area (issue #397): pick a curated tool, supply JSON arguments, and invoke it
  * through the gateway via the console's OAuth session (#390); the structured result is shown.
  * The invoker is injectable for testing (defaults to the real OAuth-backed call).
  */
@@ -89,7 +89,7 @@ export function McpServerPlayground({
         role="status"
         aria-labelledby="mcp-playground-empty-heading"
       >
-        <h3 id="mcp-playground-empty-heading" className="text-lg font-semibold text-foreground">Playground no disponible</h3>
+        <h3 id="mcp-playground-empty-heading" className="text-lg font-semibold text-foreground">Área de pruebas no disponible</h3>
         <p className="text-sm text-muted-foreground">Este servidor aún no expone herramientas curadas para invocar.</p>
       </section>
     )
@@ -103,7 +103,7 @@ export function McpServerPlayground({
       onSubmit={(event) => void handleInvoke(event)}
     >
       <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-foreground">Playground</h3>
+        <h3 className="text-lg font-semibold text-foreground">Área de pruebas</h3>
         <p className="text-sm text-muted-foreground">
           Prueba una herramienta a través del flujo OAuth antes de conectar un cliente.
         </p>
@@ -134,7 +134,7 @@ export function McpServerPlayground({
               {selectedTool.description ? <p className="break-words leading-6">{selectedTool.description}</p> : null}
               <p className="break-words leading-6">
                 {selectedTool.mutates ? 'Puede modificar datos.' : 'Solo lectura según la definición publicada.'}
-                {selectedTool.scope ? ` Scope sugerido: ${selectedTool.scope}.` : ''}
+                {selectedTool.scope ? ` Alcance sugerido: ${selectedTool.scope}.` : ''}
               </p>
             </div>
           ) : null}
@@ -160,8 +160,8 @@ export function McpServerPlayground({
 
       {!endpoint ? (
         <Alert role="status" aria-live="polite">
-          <AlertTitle>Endpoint no publicado</AlertTitle>
-          <AlertDescription>El playground se habilitará cuando el servidor MCP tenga un endpoint publicado.</AlertDescription>
+          <AlertTitle>Punto de conexión no publicado</AlertTitle>
+          <AlertDescription>El área de pruebas se habilitará cuando el servidor MCP tenga un punto de conexión publicado.</AlertDescription>
         </Alert>
       ) : null}
 

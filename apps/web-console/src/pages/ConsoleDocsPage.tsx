@@ -58,7 +58,7 @@ export function ConsoleDocsPage() {
         aria-busy="true"
         className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm"
       >
-        <p className="text-sm text-muted-foreground">Loading workspace docs…</p>
+        <p className="text-sm text-muted-foreground">Cargando documentación del área de trabajo…</p>
       </section>
     )
   }
@@ -77,7 +77,7 @@ export function ConsoleDocsPage() {
           <div>
             <AlertTitle className="text-base">No se pudo cargar la documentación.</AlertTitle>
             <AlertDescription className="text-muted-foreground">
-              No se pudo cargar la documentación del workspace.
+              No se pudo cargar la documentación del área de trabajo.
             </AlertDescription>
             <Button
               type="button"
@@ -99,17 +99,17 @@ export function ConsoleDocsPage() {
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="workspace-docs-heading">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-4">
-            <nav aria-label="Breadcrumb" className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            <nav aria-label="Ruta de navegación" className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               <ol className="flex flex-wrap items-center gap-2">
                 <li>
                   <Link className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" to="/console/overview">
-                    Console
+                    Consola
                   </Link>
                 </li>
                 <li aria-hidden="true" className="text-border">/</li>
                 <li>
                   <Link className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" to="/console/workspaces">
-                    Workspaces
+                    Áreas de trabajo
                   </Link>
                 </li>
                 <li aria-hidden="true" className="text-border">/</li>
@@ -119,15 +119,15 @@ export function ConsoleDocsPage() {
                   </Link>
                 </li>
                 <li aria-hidden="true" className="text-border">/</li>
-                <li aria-current="page" className="text-foreground">Documentation</li>
+                <li aria-current="page" className="text-foreground">Documentación</li>
               </ol>
             </nav>
 
             <div className="space-y-2">
-              <h1 id="workspace-docs-heading" className="text-2xl font-semibold tracking-tight">Documentación del workspace</h1>
+              <h1 id="workspace-docs-heading" className="text-2xl font-semibold tracking-tight">Documentación del área de trabajo</h1>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <p className="break-all rounded-2xl border border-border/70 bg-background/60 p-3 font-mono text-foreground">
-                  {`Base URL: ${data.baseUrl}`}
+                  {`URL base: ${data.baseUrl}`}
                 </p>
                 <p className="rounded-2xl border border-border/70 bg-background/60 p-3 text-muted-foreground">
                   {`Última generación: ${new Date(data.generatedAt).toLocaleString()}`}
@@ -140,11 +140,11 @@ export function ConsoleDocsPage() {
             type="button"
             variant="outline"
             className="w-full shrink-0 sm:w-auto"
-            aria-label="Refresh workspace documentation"
+            aria-label="Actualizar documentación del área de trabajo"
             onClick={() => setReloadKey((value) => value + 1)}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Refresh
+            Actualizar
           </Button>
         </div>
       </header>

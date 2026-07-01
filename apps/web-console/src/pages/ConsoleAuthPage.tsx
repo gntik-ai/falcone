@@ -265,9 +265,9 @@ export function ConsoleAuthPage() {
   const realmId = activeTenant?.consoleUserRealm ?? null
   const workspaceId = activeWorkspace?.workspaceId ?? null
   const writeBlockedReason = !realmId
-    ? 'Este tenant no tiene un realm IAM de consola configurado.'
+    ? 'Esta organización no tiene un realm IAM de consola configurado.'
     : !workspaceId
-      ? 'Selecciona un workspace para operar aplicaciones externas y providers.'
+      ? 'Selecciona un área de trabajo para operar aplicaciones externas y proveedores.'
       : null
 
   useEffect(() => {
@@ -331,7 +331,7 @@ export function ConsoleAuthPage() {
         setApplicationsState({
           ...EMPTY_APPLICATIONS_STATE,
           loading: false,
-          error: getErrorMessage(error, 'No se pudieron cargar las aplicaciones externas del workspace.')
+          error: getErrorMessage(error, 'No se pudieron cargar las aplicaciones externas del área de trabajo.')
         })
       })
 
@@ -407,7 +407,7 @@ export function ConsoleAuthPage() {
           <h1 id="console-auth-title" className="text-3xl font-semibold tracking-tight text-foreground">
             Gestión Auth/IAM
           </h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">Selecciona un tenant para inspeccionar Auth/IAM.</p>
+          <p className="max-w-3xl text-sm text-muted-foreground">Selecciona una organización para inspeccionar Auth/IAM.</p>
         </div>
       </section>
     )
@@ -421,7 +421,7 @@ export function ConsoleAuthPage() {
           <h1 id="console-auth-title" className="text-3xl font-semibold tracking-tight text-foreground">
             Gestión Auth/IAM
           </h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">Este tenant no tiene un realm IAM de consola configurado.</p>
+          <p className="max-w-3xl text-sm text-muted-foreground">Esta organización no tiene un realm IAM de consola configurado.</p>
         </div>
       </section>
     )
@@ -437,7 +437,7 @@ export function ConsoleAuthPage() {
   async function submitCreateOrUpdateApplication(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!workspaceId) {
-      setFeedback({ tone: 'error', message: 'Selecciona un workspace antes de guardar una aplicación.' })
+      setFeedback({ tone: 'error', message: 'Selecciona un área de trabajo antes de guardar una aplicación.' })
       return
     }
 
@@ -482,9 +482,9 @@ export function ConsoleAuthPage() {
       operationId: 'soft-delete-application',
       resourceName: application.displayName || application.slug,
       resourceType: 'aplicación externa',
-      impactDescription: 'La aplicación se marcará como soft_deleted y sus providers asociados dejarán de estar operativos.',
+      impactDescription: 'La aplicación se marcará con baja lógica y sus proveedores asociados dejarán de estar operativos.',
       onConfirm: async () => {
-        if (!workspaceId) throw new Error('Selecciona un workspace antes de eliminar la aplicación.')
+        if (!workspaceId) throw new Error('Selecciona un área de trabajo antes de eliminar la aplicación.')
 
         setIsSubmittingApplication(true)
         setFeedback(null)
@@ -506,7 +506,7 @@ export function ConsoleAuthPage() {
   async function submitProvider(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!workspaceId || !providerApplication) {
-      setFeedback({ tone: 'error', message: 'Selecciona un workspace y una aplicación antes de guardar un provider.' })
+      setFeedback({ tone: 'error', message: 'Selecciona un área de trabajo y una aplicación antes de guardar un proveedor.' })
       return
     }
 
@@ -534,9 +534,9 @@ export function ConsoleAuthPage() {
       setProviderForm(EMPTY_PROVIDER_FORM)
       setProviderErrors({})
       setProviderEditingId(null)
-      await reloadApplications(isEditing ? 'Provider actualizado. Refrescando inventario…' : 'Provider añadido. Refrescando inventario…')
+      await reloadApplications(isEditing ? 'Proveedor actualizado. Refrescando inventario…' : 'Proveedor añadido. Refrescando inventario…')
     } catch (error) {
-      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo guardar el provider.') })
+      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo guardar el proveedor.') })
     } finally {
       setIsSubmittingProvider(false)
     }
@@ -551,9 +551,9 @@ export function ConsoleAuthPage() {
         `/v1/workspaces/${workspaceId}/applications/${providerApplication.applicationId}/federation/providers/${provider.providerId}`,
         { method: 'PUT', body: { ...provider, enabled: !(provider.enabled ?? true) } as never }
       )
-      await reloadApplications(`Provider ${provider.alias} actualizado.`)
+      await reloadApplications(`Proveedor ${provider.alias} actualizado.`)
     } catch (error) {
-      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo cambiar el estado del provider.') })
+      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo cambiar el estado del proveedor.') })
     } finally {
       setIsSubmittingProvider(false)
     }
@@ -564,10 +564,10 @@ export function ConsoleAuthPage() {
       level: DESTRUCTIVE_OP_LEVELS['detach-provider'],
       operationId: 'detach-provider',
       resourceName: provider.alias || provider.displayName || provider.providerId,
-      resourceType: 'provider federado',
-      impactDescription: 'El provider dejará de estar asociado a la aplicación actual.',
+      resourceType: 'proveedor federado',
+      impactDescription: 'El proveedor dejará de estar asociado a la aplicación actual.',
       onConfirm: async () => {
-        if (!workspaceId) throw new Error('Selecciona un workspace antes de desasociar el provider.')
+        if (!workspaceId) throw new Error('Selecciona un área de trabajo antes de desasociar el proveedor.')
 
         const nextProviders = (application.federatedProviders ?? []).filter((item) => item.providerId !== provider.providerId)
         setIsSubmittingProvider(true)
@@ -590,7 +590,7 @@ export function ConsoleAuthPage() {
       onSuccess: () => {
         setProviderEditingId(null)
         setProviderForm(EMPTY_PROVIDER_FORM)
-        void reloadApplications('Provider desasociado. Refrescando inventario…')
+        void reloadApplications('Proveedor desasociado. Refrescando inventario…')
       }
     })
   }
@@ -634,17 +634,17 @@ export function ConsoleAuthPage() {
             <Badge variant="secondary">Auth / IAM</Badge>
             <div className="space-y-2">
               <h1 id="console-auth-title" className="text-3xl font-semibold tracking-tight text-foreground">Gestión Auth/IAM</h1>
-              <p className="max-w-3xl text-sm text-muted-foreground">Superficie operativa del realm de consola y de las aplicaciones externas del workspace activo.</p>
+              <p className="max-w-3xl text-sm text-muted-foreground">Superficie operativa del realm de consola y de las aplicaciones externas del área de trabajo activa.</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline">Tenant: {activeTenant.label}</Badge>
+              <Badge variant="outline">Organización: {activeTenant.label}</Badge>
               <Badge variant="outline">Realm: {realmId}</Badge>
-              <Badge variant="outline">Workspace: {activeWorkspace?.label ?? 'No seleccionado'}</Badge>
+              <Badge variant="outline">Área de trabajo: {activeWorkspace?.label ?? 'No seleccionada'}</Badge>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={() => setIamWizardOpen(true)}>Nuevo cliente IAM</Button>
-            <Link to="/console/members" className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground">Abrir Members</Link>
+            <Link to="/console/members" className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground">Abrir miembros</Link>
           </div>
         </div>
       </header>
@@ -661,7 +661,7 @@ export function ConsoleAuthPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 id="auth-realm-heading" className="text-xl font-semibold text-foreground">Resumen del realm</h2>
-            <p className="text-sm text-muted-foreground">Users y roles se resumen aquí y mantienen su detalle operativo en la vista Members.</p>
+            <p className="text-sm text-muted-foreground">Los usuarios y roles se resumen aquí y mantienen su detalle operativo en la vista Miembros.</p>
           </div>
           {realmState.compatibility ? <Badge variant="outline">{realmState.compatibility.provider} · {realmState.compatibility.contractVersion}</Badge> : null}
         </div>
@@ -680,30 +680,30 @@ export function ConsoleAuthPage() {
         {!realmState.loading && !realmState.error ? (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard label="Users" value={realmState.usersCount} testId="auth-summary-users" />
+              <SummaryCard label="Usuarios" value={realmState.usersCount} testId="auth-summary-users" />
               <SummaryCard label="Roles" value={realmState.rolesCount} testId="auth-summary-roles" />
-              <SummaryCard label="Scopes" value={realmState.scopes.length} testId="auth-summary-scopes" />
-              <SummaryCard label="Clients" value={realmState.clients.length} testId="auth-summary-clients" />
+              <SummaryCard label="Alcances" value={realmState.scopes.length} testId="auth-summary-scopes" />
+              <SummaryCard label="Clientes" value={realmState.clients.length} testId="auth-summary-clients" />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-              <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+            <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+              <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
                 <div className="mb-4 space-y-1">
-                  <h3 className="text-lg font-semibold text-foreground">Client scopes</h3>
-                  <p className="text-sm text-muted-foreground">Scopes gestionados del realm activo con sus flags operativas.</p>
+                  <h3 className="text-lg font-semibold text-foreground">Alcances de cliente</h3>
+                  <p className="text-sm text-muted-foreground">Alcances gestionados del realm activo con sus opciones operativas.</p>
                 </div>
                 {realmState.scopes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay scopes gestionados para este realm.</p>
+                  <p className="text-sm text-muted-foreground">No hay alcances gestionados para este realm.</p>
                 ) : (
                   <TableContainer>
                     <table className="min-w-full text-left text-sm">
-                      <thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Scope</th><th scope="col" className="px-3 py-2 font-medium">Protocol</th><th scope="col" className="px-3 py-2 font-medium">Flags</th><th scope="col" className="px-3 py-2 font-medium">Clients</th></tr></thead>
+                      <thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Alcance</th><th scope="col" className="px-3 py-2 font-medium">Protocolo</th><th scope="col" className="px-3 py-2 font-medium">Opciones</th><th scope="col" className="px-3 py-2 font-medium">Clientes</th></tr></thead>
                       <tbody>
                         {realmState.scopes.map((scope) => (
                           <tr key={scope.scopeName} className="border-b border-border/40 align-top last:border-b-0">
                             <td className="px-3 py-3"><div className="font-medium text-foreground">{scope.scopeName}</div></td>
                             <td className="px-3 py-3"><Badge variant="outline">{formatConsoleEnumLabel(scope.protocol)}</Badge></td>
-                            <td className="px-3 py-3"><div className="flex flex-wrap gap-2"><BooleanBadge label="Default" value={scope.isDefault} /><BooleanBadge label="Optional" value={scope.isOptional} /><BooleanBadge label="Token" value={scope.includeInTokenScope} /></div></td>
+                            <td className="px-3 py-3"><div className="flex flex-wrap gap-2"><BooleanBadge label="Predeterminado" value={scope.isDefault} /><BooleanBadge label="Opcional" value={scope.isOptional} /><BooleanBadge label="Token" value={scope.includeInTokenScope} /></div></td>
                             <td className="px-3 py-3 text-muted-foreground">{formatList(scope.assignedClientIds)}</td>
                           </tr>
                         ))}
@@ -713,17 +713,17 @@ export function ConsoleAuthPage() {
                 )}
               </div>
 
-              <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+              <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
                 <div className="mb-4 space-y-1">
-                  <h3 className="text-lg font-semibold text-foreground">IAM clients</h3>
-                  <p className="text-sm text-muted-foreground">Clients gestionados del realm con access type, estado y scopes asociados.</p>
+                  <h3 className="text-lg font-semibold text-foreground">Clientes IAM</h3>
+                  <p className="text-sm text-muted-foreground">Clientes gestionados del realm con tipo de acceso, estado y alcances asociados.</p>
                 </div>
                 {realmState.clients.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay clients gestionados para este realm.</p>
+                  <p className="text-sm text-muted-foreground">No hay clientes gestionados para este realm.</p>
                 ) : (
                   <TableContainer>
                     <table className="min-w-full text-left text-sm">
-                      <thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Client</th><th scope="col" className="px-3 py-2 font-medium">Protocol</th><th scope="col" className="px-3 py-2 font-medium">Access</th><th scope="col" className="px-3 py-2 font-medium">Estado</th><th scope="col" className="px-3 py-2 font-medium">Redirects</th><th scope="col" className="px-3 py-2 font-medium">Scopes</th></tr></thead>
+                      <thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Cliente</th><th scope="col" className="px-3 py-2 font-medium">Protocolo</th><th scope="col" className="px-3 py-2 font-medium">Acceso</th><th scope="col" className="px-3 py-2 font-medium">Estado</th><th scope="col" className="px-3 py-2 font-medium">Redirecciones</th><th scope="col" className="px-3 py-2 font-medium">Alcances</th></tr></thead>
                       <tbody>
                         {realmState.clients.map((client) => (
                           <tr
@@ -734,9 +734,9 @@ export function ConsoleAuthPage() {
                             <td className="px-3 py-3"><div className="font-medium text-foreground">{client.clientId}</div></td>
                             <td className="px-3 py-3"><Badge variant="outline">{formatConsoleEnumLabel(client.protocol)}</Badge></td>
                             <td className="px-3 py-3 text-muted-foreground">{formatConsoleEnumLabel(client.accessType)}</td>
-                            <td className="px-3 py-3"><div className="flex flex-wrap gap-2"><BooleanBadge label="Enabled" value={client.enabled} /><Badge variant="outline">{formatConsoleEnumLabel(client.state)}</Badge></div></td>
+                            <td className="px-3 py-3"><div className="flex flex-wrap gap-2"><BooleanBadge label="Habilitado" value={client.enabled} /><Badge variant="outline">{formatConsoleEnumLabel(client.state)}</Badge></div></td>
                             <td className="px-3 py-3 text-muted-foreground">{formatList(client.redirectUris)}</td>
-                            <td className="px-3 py-3 text-muted-foreground"><div><span className="font-medium text-foreground">Default:</span> {formatList(client.defaultScopes)}</div><div><span className="font-medium text-foreground">Optional:</span> {formatList(client.optionalScopes)}</div></td>
+                            <td className="px-3 py-3 text-muted-foreground"><div><span className="font-medium text-foreground">Predeterminados:</span> {formatList(client.defaultScopes)}</div><div><span className="font-medium text-foreground">Opcionales:</span> {formatList(client.optionalScopes)}</div></td>
                           </tr>
                         ))}
                       </tbody>
@@ -753,8 +753,8 @@ export function ConsoleAuthPage() {
       <section className="space-y-4" aria-labelledby="auth-applications-heading">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 id="auth-applications-heading" className="text-xl font-semibold text-foreground">Aplicaciones externas y providers</h2>
-            <p className="text-sm text-muted-foreground">Gestión operativa del workspace activo con mutaciones inline y feedback inmediato.</p>
+            <h2 id="auth-applications-heading" className="text-xl font-semibold text-foreground">Aplicaciones externas y proveedores</h2>
+            <p className="text-sm text-muted-foreground">Gestión operativa del área de trabajo activa con mutaciones integradas y feedback inmediato.</p>
           </div>
           <Button type="button" onClick={openCreateForm} disabled={Boolean(writeBlockedReason)}>Crear aplicación externa</Button>
         </div>
@@ -765,54 +765,54 @@ export function ConsoleAuthPage() {
           <form className="space-y-4 rounded-3xl border border-border/60 bg-card p-5 shadow-sm" onSubmit={submitCreateOrUpdateApplication}>
             <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold text-foreground">{editingApplication ? `Editar ${editingApplication.displayName}` : 'Crear aplicación externa'}</h3><Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setEditingApplicationId(null); setApplicationForm(EMPTY_APPLICATION_FORM); setApplicationErrors({}) }}>Cancelar</Button></div>
             <div className="grid gap-4 md:grid-cols-2">
-              <TextField label="Display name" name="displayName" value={applicationForm.displayName} onChange={(value) => setApplicationForm((current) => ({ ...current, displayName: value }))} error={applicationErrors.displayName} />
+              <TextField label="Nombre visible" name="displayName" value={applicationForm.displayName} onChange={(value) => setApplicationForm((current) => ({ ...current, displayName: value }))} error={applicationErrors.displayName} />
               <TextField label="Slug" name="slug" value={applicationForm.slug} onChange={(value) => setApplicationForm((current) => ({ ...current, slug: value }))} error={applicationErrors.slug} disabled={Boolean(editingApplication)} />
-              <label className="space-y-2 text-sm text-foreground"><span>Protocol</span><select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={applicationForm.protocol} onChange={(event) => setApplicationForm((current) => ({ ...current, protocol: event.target.value as ApplicationFormState['protocol'] }))}><option value="oidc">OIDC</option><option value="saml">SAML</option><option value="api_key">API key</option></select></label>
-              <TextField label="Logout URL" name="logoutUrl" value={applicationForm.logoutUrl} onChange={(value) => setApplicationForm((current) => ({ ...current, logoutUrl: value }))} error={applicationErrors.logoutUrl} />
+              <label className="space-y-2 text-sm text-foreground"><span>Protocolo</span><select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={applicationForm.protocol} onChange={(event) => setApplicationForm((current) => ({ ...current, protocol: event.target.value as ApplicationFormState['protocol'] }))}><option value="oidc">OIDC</option><option value="saml">SAML</option><option value="api_key">API key</option></select></label>
+              <TextField label="URL de cierre de sesión" name="logoutUrl" value={applicationForm.logoutUrl} onChange={(value) => setApplicationForm((current) => ({ ...current, logoutUrl: value }))} error={applicationErrors.logoutUrl} />
             </div>
-            <TextAreaField label="Redirect URIs (una por línea)" name="redirectUris" value={applicationForm.redirectUris} onChange={(value) => setApplicationForm((current) => ({ ...current, redirectUris: value }))} error={applicationErrors.redirectUris} />
-            <TextField label="Scopes (CSV)" name="scopes" value={applicationForm.scopes} onChange={(value) => setApplicationForm((current) => ({ ...current, scopes: value }))} />
-            <fieldset className="space-y-2"><legend className="text-sm font-medium text-foreground">Authentication flows</legend><div className="grid gap-2 md:grid-cols-2">{APPLICATION_FLOW_OPTIONS.map((flow) => (<label key={flow} className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={applicationForm.authenticationFlows.includes(flow)} onChange={(event) => setApplicationForm((current) => ({ ...current, authenticationFlows: event.target.checked ? [...current.authenticationFlows, flow] : current.authenticationFlows.filter((item) => item !== flow) }))} />{formatConsoleEnumLabel(flow)}</label>))}</div></fieldset>
+            <TextAreaField label="URIs de redirección (una por línea)" name="redirectUris" value={applicationForm.redirectUris} onChange={(value) => setApplicationForm((current) => ({ ...current, redirectUris: value }))} error={applicationErrors.redirectUris} />
+            <TextField label="Alcances (CSV)" name="scopes" value={applicationForm.scopes} onChange={(value) => setApplicationForm((current) => ({ ...current, scopes: value }))} />
+            <fieldset className="space-y-2"><legend className="text-sm font-medium text-foreground">Flujos de autenticación</legend><div className="grid gap-2 md:grid-cols-2">{APPLICATION_FLOW_OPTIONS.map((flow) => (<label key={flow} className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={applicationForm.authenticationFlows.includes(flow)} onChange={(event) => setApplicationForm((current) => ({ ...current, authenticationFlows: event.target.checked ? [...current.authenticationFlows, flow] : current.authenticationFlows.filter((item) => item !== flow) }))} />{formatConsoleEnumLabel(flow)}</label>))}</div></fieldset>
             <div className="flex justify-end"><Button type="submit" disabled={isSubmittingApplication}>{isSubmittingApplication ? 'Guardando…' : editingApplication ? 'Guardar cambios' : 'Crear aplicación'}</Button></div>
           </form>
         ) : null}
 
-        {applicationsState.loading ? <div className="rounded-2xl border border-dashed border-border/70 bg-card p-6 text-sm text-muted-foreground">Cargando aplicaciones externas del workspace…</div> : null}
+        {applicationsState.loading ? <div className="rounded-2xl border border-dashed border-border/70 bg-card p-6 text-sm text-muted-foreground">Cargando aplicaciones externas del área de trabajo…</div> : null}
         {applicationsState.error ? <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4" role="alert"><div className="space-y-3"><p className="text-sm text-foreground">{applicationsState.error}</p><Button type="button" variant="outline" onClick={() => setApplicationsReloadToken((value) => value + 1)}>Reintentar</Button></div></div> : null}
 
         {!applicationsState.loading && !applicationsState.error && workspaceId ? (
-          <div className="grid gap-6 xl:grid-cols-2">
-            <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
-              <div className="mb-4 space-y-1"><h3 className="text-lg font-semibold text-foreground">Aplicaciones externas</h3><p className="text-sm text-muted-foreground">Alta, edición, baja lógica y acceso a providers por aplicación.</p></div>
-              {applicationsState.applications.length === 0 ? <p className="text-sm text-muted-foreground">No hay aplicaciones externas vinculadas a este workspace.</p> : (
-                <div className="space-y-4">{applicationsState.applications.filter((application) => application.state !== 'soft_deleted').map((application) => (<article key={application.applicationId} className="rounded-2xl border border-border/60 p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="space-y-2"><div className="flex flex-wrap items-center gap-2"><h4 className="text-base font-semibold text-foreground">{application.displayName}</h4><Badge variant="outline">{formatConsoleEnumLabel(application.protocol)}</Badge><Badge variant="outline">{formatConsoleEnumLabel(application.state)}</Badge></div><p className="text-xs text-muted-foreground">{application.slug}</p><p className="text-sm text-muted-foreground">Flows: {formatList(application.authenticationFlows)}</p><p className="text-sm text-muted-foreground">Redirects: {formatList(application.redirectUris)}</p><p className="text-sm text-muted-foreground">Scopes: {formatList((application.scopes ?? []).map((scope) => scope.scopeName))}</p><ValidationBadge validation={application.validation} /></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => openEditForm(application)} disabled={Boolean(writeBlockedReason)}>Editar</Button><Button type="button" variant="outline" onClick={() => openProviderPanel(application)} disabled={Boolean(writeBlockedReason) || application.protocol === 'api_key'}>Providers</Button><Button type="button" variant="outline" onClick={() => openSoftDeleteApplicationDialog(application)} disabled={Boolean(writeBlockedReason)}>Eliminar</Button></div></div></article>))}</div>
+          <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+            <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+              <div className="mb-4 space-y-1"><h3 className="text-lg font-semibold text-foreground">Aplicaciones externas</h3><p className="text-sm text-muted-foreground">Alta, edición, baja lógica y acceso a proveedores por aplicación.</p></div>
+              {applicationsState.applications.length === 0 ? <p className="text-sm text-muted-foreground">No hay aplicaciones externas vinculadas a esta área de trabajo.</p> : (
+                <div className="space-y-4">{applicationsState.applications.filter((application) => application.state !== 'soft_deleted').map((application) => (<article key={application.applicationId} className="rounded-2xl border border-border/60 p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="space-y-2"><div className="flex flex-wrap items-center gap-2"><h4 className="text-base font-semibold text-foreground">{application.displayName}</h4><Badge variant="outline">{formatConsoleEnumLabel(application.protocol)}</Badge><Badge variant="outline">{formatConsoleEnumLabel(application.state)}</Badge></div><p className="text-xs text-muted-foreground">{application.slug}</p><p className="text-sm text-muted-foreground">Flujos: {formatList(application.authenticationFlows)}</p><p className="text-sm text-muted-foreground">Redirecciones: {formatList(application.redirectUris)}</p><p className="text-sm text-muted-foreground">Alcances: {formatList((application.scopes ?? []).map((scope) => scope.scopeName))}</p><ValidationBadge validation={application.validation} /></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => openEditForm(application)} disabled={Boolean(writeBlockedReason)}>Editar</Button><Button type="button" variant="outline" onClick={() => openProviderPanel(application)} disabled={Boolean(writeBlockedReason) || application.protocol === 'api_key'}>Proveedores</Button><Button type="button" variant="outline" onClick={() => openSoftDeleteApplicationDialog(application)} disabled={Boolean(writeBlockedReason)}>Eliminar</Button></div></div></article>))}</div>
               )}
             </div>
 
-            <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
-              <div className="mb-4 space-y-1"><h3 className="text-lg font-semibold text-foreground">Providers federados</h3><p className="text-sm text-muted-foreground">Providers OIDC/SAML derivados de las aplicaciones externas del workspace activo.</p></div>
-              {providerRows.length === 0 ? <p className="text-sm text-muted-foreground">No hay providers federados asociados a las aplicaciones del workspace.</p> : (<TableContainer><table className="min-w-full text-left text-sm"><thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Aplicación</th><th scope="col" className="px-3 py-2 font-medium">Alias</th><th scope="col" className="px-3 py-2 font-medium">Protocol</th><th scope="col" className="px-3 py-2 font-medium">Modo</th><th scope="col" className="px-3 py-2 font-medium">Estado</th></tr></thead><tbody>{providerRows.map((provider) => (<tr key={`${provider.applicationLabel}-${provider.providerId}`} className="border-b border-border/40 align-top last:border-b-0"><td className="px-3 py-3 text-foreground">{provider.applicationLabel}</td><td className="px-3 py-3"><div className="font-medium text-foreground">{provider.alias}</div><div className="text-xs text-muted-foreground">{provider.displayName}</div></td><td className="px-3 py-3"><Badge variant="outline">{formatConsoleEnumLabel(provider.protocol)}</Badge></td><td className="px-3 py-3 text-muted-foreground">{formatConsoleEnumLabel(provider.providerMode)}</td><td className="px-3 py-3"><BooleanBadge label="Enabled" value={provider.enabled} /></td></tr>))}</tbody></table></TableContainer>)}
+            <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+              <div className="mb-4 space-y-1"><h3 className="text-lg font-semibold text-foreground">Proveedores federados</h3><p className="text-sm text-muted-foreground">Proveedores OIDC/SAML derivados de las aplicaciones externas del área de trabajo activa.</p></div>
+              {providerRows.length === 0 ? <p className="text-sm text-muted-foreground">No hay proveedores federados asociados a las aplicaciones del área de trabajo.</p> : (<TableContainer><table className="min-w-full text-left text-sm"><thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Aplicación</th><th scope="col" className="px-3 py-2 font-medium">Alias</th><th scope="col" className="px-3 py-2 font-medium">Protocolo</th><th scope="col" className="px-3 py-2 font-medium">Modo</th><th scope="col" className="px-3 py-2 font-medium">Estado</th></tr></thead><tbody>{providerRows.map((provider) => (<tr key={`${provider.applicationLabel}-${provider.providerId}`} className="border-b border-border/40 align-top last:border-b-0"><td className="px-3 py-3 text-foreground">{provider.applicationLabel}</td><td className="px-3 py-3"><div className="font-medium text-foreground">{provider.alias}</div><div className="text-xs text-muted-foreground">{provider.displayName}</div></td><td className="px-3 py-3"><Badge variant="outline">{formatConsoleEnumLabel(provider.protocol)}</Badge></td><td className="px-3 py-3 text-muted-foreground">{formatConsoleEnumLabel(provider.providerMode)}</td><td className="px-3 py-3"><BooleanBadge label="Habilitado" value={provider.enabled} /></td></tr>))}</tbody></table></TableContainer>)}
             </div>
           </div>
         ) : null}
 
         {providerApplication ? (
-          <section className="space-y-4 rounded-3xl border border-border/60 bg-card p-5 shadow-sm" aria-label={`Providers de ${providerApplication.displayName}`}>
-            <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-semibold text-foreground">Providers de {providerApplication.displayName}</h3><p className="text-sm text-muted-foreground">Gestiona alta, edición, toggle y desasociación.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => { setProviderPanelApplicationId(null); setProviderEditingId(null); setProviderForm(EMPTY_PROVIDER_FORM) }}>Cerrar</Button><Button type="button" onClick={() => { setProviderEditingId(null); setProviderForm(EMPTY_PROVIDER_FORM); setProviderErrors({}) }} disabled={providerApplication.protocol === 'api_key'}>Añadir provider</Button></div></div>
+          <section className="min-w-0 space-y-4 rounded-3xl border border-border/60 bg-card p-5 shadow-sm" aria-label={`Proveedores de ${providerApplication.displayName}`}>
+            <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-semibold text-foreground">Proveedores de {providerApplication.displayName}</h3><p className="text-sm text-muted-foreground">Gestiona alta, edición, cambio de estado y desasociación.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => { setProviderPanelApplicationId(null); setProviderEditingId(null); setProviderForm(EMPTY_PROVIDER_FORM) }}>Cerrar</Button><Button type="button" onClick={() => { setProviderEditingId(null); setProviderForm(EMPTY_PROVIDER_FORM); setProviderErrors({}) }} disabled={providerApplication.protocol === 'api_key'}>Añadir proveedor</Button></div></div>
 
-            {providerApplication.protocol === 'api_key' ? <div className="rounded-2xl border border-dashed border-border/70 bg-background p-4 text-sm text-muted-foreground">Las aplicaciones API key no soportan providers federados en esta consola.</div> : null}
+            {providerApplication.protocol === 'api_key' ? <div className="rounded-2xl border border-dashed border-border/70 bg-background p-4 text-sm text-muted-foreground">Las aplicaciones API key no soportan proveedores federados en esta consola.</div> : null}
 
             {providerApplication.protocol !== 'api_key' ? (
               <>
-                <div className="space-y-3">{(providerApplication.federatedProviders ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No hay providers asociados a esta aplicación.</p> : (providerApplication.federatedProviders ?? []).map((provider) => (<article key={provider.providerId} className="rounded-2xl border border-border/60 p-4"><div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div className="space-y-1"><div className="flex flex-wrap items-center gap-2"><h4 className="font-medium text-foreground">{provider.alias}</h4><Badge variant="outline">{formatConsoleEnumLabel(provider.protocol)}</Badge><Badge variant="outline">{formatConsoleEnumLabel(provider.providerMode)}</Badge></div><p className="text-sm text-muted-foreground">{provider.displayName}</p><BooleanBadge label="Enabled" value={provider.enabled ?? true} /></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => openProviderEditor(provider)}>Editar</Button><Button type="button" variant="outline" onClick={() => toggleProvider(provider)} disabled={isSubmittingProvider}>{provider.enabled ?? true ? 'Deshabilitar' : 'Habilitar'}</Button><Button type="button" variant="outline" onClick={() => openDetachProviderDialog(providerApplication, provider)}>Desasociar</Button></div></div></article>))}</div>
+                <div className="space-y-3">{(providerApplication.federatedProviders ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No hay proveedores asociados a esta aplicación.</p> : (providerApplication.federatedProviders ?? []).map((provider) => (<article key={provider.providerId} className="rounded-2xl border border-border/60 p-4"><div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div className="space-y-1"><div className="flex flex-wrap items-center gap-2"><h4 className="font-medium text-foreground">{provider.alias}</h4><Badge variant="outline">{formatConsoleEnumLabel(provider.protocol)}</Badge><Badge variant="outline">{formatConsoleEnumLabel(provider.providerMode)}</Badge></div><p className="text-sm text-muted-foreground">{provider.displayName}</p><BooleanBadge label="Habilitado" value={provider.enabled ?? true} /></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => openProviderEditor(provider)}>Editar</Button><Button type="button" variant="outline" onClick={() => toggleProvider(provider)} disabled={isSubmittingProvider}>{provider.enabled ?? true ? 'Deshabilitar' : 'Habilitar'}</Button><Button type="button" variant="outline" onClick={() => openDetachProviderDialog(providerApplication, provider)}>Desasociar</Button></div></div></article>))}</div>
                 <form className="space-y-4 rounded-2xl border border-border/60 p-4" onSubmit={submitProvider}>
-                  <h4 className="text-base font-semibold text-foreground">{providerEditingId ? `Editar provider ${providerEditingId}` : 'Añadir provider federado'}</h4>
-                  <div className="grid gap-4 md:grid-cols-2"><TextField label="Provider ID" name="providerId" value={providerForm.providerId} onChange={(value) => setProviderForm((current) => ({ ...current, providerId: value }))} error={providerErrors.providerId} disabled={Boolean(providerEditingId)} /><TextField label="Alias" name="alias" value={providerForm.alias} onChange={(value) => setProviderForm((current) => ({ ...current, alias: value }))} error={providerErrors.alias} /><TextField label="Display name" name="providerDisplayName" value={providerForm.displayName} onChange={(value) => setProviderForm((current) => ({ ...current, displayName: value }))} error={providerErrors.displayName} /><label className="space-y-2 text-sm text-foreground"><span>Protocol</span><select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={providerForm.protocol} onChange={(event) => setProviderForm((current) => ({ ...current, protocol: event.target.value as ProviderFormState['protocol'] }))}><option value="oidc">OIDC</option><option value="saml">SAML</option></select></label><label className="space-y-2 text-sm text-foreground"><span>Provider mode</span><select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={providerForm.providerMode} onChange={(event) => setProviderForm((current) => ({ ...current, providerMode: event.target.value as ProviderFormState['providerMode'] }))}><option value="manual_endpoints">Manual endpoints</option><option value="metadata_url">Metadata URL</option><option value="inline_metadata">Inline metadata</option></select></label><label className="flex items-center gap-2 pt-8 text-sm text-foreground"><input type="checkbox" checked={providerForm.enabled} onChange={(event) => setProviderForm((current) => ({ ...current, enabled: event.target.checked }))} />Enabled</label></div>
-                  {providerForm.providerMode === 'metadata_url' ? <TextField label="Metadata URL" name="metadataUrl" value={providerForm.metadataUrl} onChange={(value) => setProviderForm((current) => ({ ...current, metadataUrl: value }))} error={providerErrors.metadataUrl} /> : null}
-                  {providerForm.protocol === 'oidc' && providerForm.providerMode === 'manual_endpoints' ? <div className="grid gap-4 md:grid-cols-2"><TextField label="Authorization URL" name="authorizationUrl" value={providerForm.authorizationUrl} onChange={(value) => setProviderForm((current) => ({ ...current, authorizationUrl: value }))} error={providerErrors.authorizationUrl} /><TextField label="Token URL" name="tokenUrl" value={providerForm.tokenUrl} onChange={(value) => setProviderForm((current) => ({ ...current, tokenUrl: value }))} error={providerErrors.tokenUrl} /><TextField label="User info URL" name="userInfoUrl" value={providerForm.userInfoUrl} onChange={(value) => setProviderForm((current) => ({ ...current, userInfoUrl: value }))} error={providerErrors.userInfoUrl} /><TextField label="Requested scopes (CSV)" name="requestedScopes" value={providerForm.requestedScopes} onChange={(value) => setProviderForm((current) => ({ ...current, requestedScopes: value }))} /></div> : null}
-                  {providerForm.protocol === 'saml' && providerForm.providerMode === 'manual_endpoints' ? <div className="grid gap-4 md:grid-cols-2"><TextField label="Entity ID" name="entityId" value={providerForm.entityId} onChange={(value) => setProviderForm((current) => ({ ...current, entityId: value }))} error={providerErrors.entityId} /><TextField label="Issuer" name="issuer" value={providerForm.issuer} onChange={(value) => setProviderForm((current) => ({ ...current, issuer: value }))} /><TextField label="SSO service URL" name="ssoServiceUrl" value={providerForm.ssoServiceUrl} onChange={(value) => setProviderForm((current) => ({ ...current, ssoServiceUrl: value }))} error={providerErrors.ssoServiceUrl} /><TextField label="SLO service URL" name="sloServiceUrl" value={providerForm.sloServiceUrl} onChange={(value) => setProviderForm((current) => ({ ...current, sloServiceUrl: value }))} error={providerErrors.sloServiceUrl} /></div> : null}
-                  {providerForm.providerMode === 'inline_metadata' ? <TextAreaField label="Metadata XML" name="metadataXml" value={providerForm.metadataXml} onChange={(value) => setProviderForm((current) => ({ ...current, metadataXml: value }))} error={providerErrors.metadataXml} rows={5} /> : null}
-                  <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { setProviderEditingId(null); setProviderForm(EMPTY_PROVIDER_FORM); setProviderErrors({}) }}>Reset</Button><Button type="submit" disabled={isSubmittingProvider}>{isSubmittingProvider ? 'Guardando…' : providerEditingId ? 'Guardar provider' : 'Crear provider'}</Button></div>
+                  <h4 className="text-base font-semibold text-foreground">{providerEditingId ? `Editar proveedor ${providerEditingId}` : 'Añadir proveedor federado'}</h4>
+                  <div className="grid gap-4 md:grid-cols-2"><TextField label="ID del proveedor" name="providerId" value={providerForm.providerId} onChange={(value) => setProviderForm((current) => ({ ...current, providerId: value }))} error={providerErrors.providerId} disabled={Boolean(providerEditingId)} /><TextField label="Alias" name="alias" value={providerForm.alias} onChange={(value) => setProviderForm((current) => ({ ...current, alias: value }))} error={providerErrors.alias} /><TextField label="Nombre visible" name="providerDisplayName" value={providerForm.displayName} onChange={(value) => setProviderForm((current) => ({ ...current, displayName: value }))} error={providerErrors.displayName} /><label className="space-y-2 text-sm text-foreground"><span>Protocolo</span><select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={providerForm.protocol} onChange={(event) => setProviderForm((current) => ({ ...current, protocol: event.target.value as ProviderFormState['protocol'] }))}><option value="oidc">OIDC</option><option value="saml">SAML</option></select></label><label className="space-y-2 text-sm text-foreground"><span>Modo del proveedor</span><select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={providerForm.providerMode} onChange={(event) => setProviderForm((current) => ({ ...current, providerMode: event.target.value as ProviderFormState['providerMode'] }))}><option value="manual_endpoints">Puntos de conexión manuales</option><option value="metadata_url">URL de metadatos</option><option value="inline_metadata">Metadatos incorporados</option></select></label><label className="flex items-center gap-2 pt-8 text-sm text-foreground"><input type="checkbox" checked={providerForm.enabled} onChange={(event) => setProviderForm((current) => ({ ...current, enabled: event.target.checked }))} />Habilitado</label></div>
+                  {providerForm.providerMode === 'metadata_url' ? <TextField label="URL de metadatos" name="metadataUrl" value={providerForm.metadataUrl} onChange={(value) => setProviderForm((current) => ({ ...current, metadataUrl: value }))} error={providerErrors.metadataUrl} /> : null}
+                  {providerForm.protocol === 'oidc' && providerForm.providerMode === 'manual_endpoints' ? <div className="grid gap-4 md:grid-cols-2"><TextField label="URL de autorización" name="authorizationUrl" value={providerForm.authorizationUrl} onChange={(value) => setProviderForm((current) => ({ ...current, authorizationUrl: value }))} error={providerErrors.authorizationUrl} /><TextField label="URL de token" name="tokenUrl" value={providerForm.tokenUrl} onChange={(value) => setProviderForm((current) => ({ ...current, tokenUrl: value }))} error={providerErrors.tokenUrl} /><TextField label="URL de información de usuario" name="userInfoUrl" value={providerForm.userInfoUrl} onChange={(value) => setProviderForm((current) => ({ ...current, userInfoUrl: value }))} error={providerErrors.userInfoUrl} /><TextField label="Alcances solicitados (CSV)" name="requestedScopes" value={providerForm.requestedScopes} onChange={(value) => setProviderForm((current) => ({ ...current, requestedScopes: value }))} /></div> : null}
+                  {providerForm.protocol === 'saml' && providerForm.providerMode === 'manual_endpoints' ? <div className="grid gap-4 md:grid-cols-2"><TextField label="ID de entidad" name="entityId" value={providerForm.entityId} onChange={(value) => setProviderForm((current) => ({ ...current, entityId: value }))} error={providerErrors.entityId} /><TextField label="Emisor" name="issuer" value={providerForm.issuer} onChange={(value) => setProviderForm((current) => ({ ...current, issuer: value }))} /><TextField label="URL de servicio SSO" name="ssoServiceUrl" value={providerForm.ssoServiceUrl} onChange={(value) => setProviderForm((current) => ({ ...current, ssoServiceUrl: value }))} error={providerErrors.ssoServiceUrl} /><TextField label="URL de servicio SLO" name="sloServiceUrl" value={providerForm.sloServiceUrl} onChange={(value) => setProviderForm((current) => ({ ...current, sloServiceUrl: value }))} error={providerErrors.sloServiceUrl} /></div> : null}
+                  {providerForm.providerMode === 'inline_metadata' ? <TextAreaField label="XML de metadatos" name="metadataXml" value={providerForm.metadataXml} onChange={(value) => setProviderForm((current) => ({ ...current, metadataXml: value }))} error={providerErrors.metadataXml} rows={5} /> : null}
+                  <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { setProviderEditingId(null); setProviderForm(EMPTY_PROVIDER_FORM); setProviderErrors({}) }}>Restablecer</Button><Button type="submit" disabled={isSubmittingProvider}>{isSubmittingProvider ? 'Guardando…' : providerEditingId ? 'Guardar proveedor' : 'Crear proveedor'}</Button></div>
                 </form>
               </>
             ) : null}
@@ -851,7 +851,7 @@ function ValidationBadge({ validation }: { validation?: ExternalApplicationValid
 }
 
 function TableContainer({ children }: { children: React.ReactNode }) {
-  return <div className="overflow-x-auto">{children}</div>
+  return <div className="max-w-full overflow-x-auto">{children}</div>
 }
 
 function TextField({ label, value, onChange, error, name, ...props }: { label: string; value: string; onChange: (value: string) => void; error?: string; name: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'name'>) {
@@ -901,31 +901,31 @@ function validateApplicationForm(form: ApplicationFormState): FormErrors {
   if (!form.slug.trim()) errors.slug = 'El slug es obligatorio.'
   else if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(form.slug.trim())) errors.slug = 'El slug debe usar minúsculas, números y guiones.'
   const redirectUris = splitLines(form.redirectUris)
-  if (redirectUris.length === 0) errors.redirectUris = 'Indica al menos una redirect URI válida.'
-  else if (redirectUris.some((uri) => !isValidUrl(uri))) errors.redirectUris = 'Todas las redirect URI deben ser válidas.'
-  if (form.logoutUrl.trim() && !isValidUrl(form.logoutUrl.trim())) errors.logoutUrl = 'La logout URL debe ser válida.'
+  if (redirectUris.length === 0) errors.redirectUris = 'Indica al menos una URI de redirección válida.'
+  else if (redirectUris.some((uri) => !isValidUrl(uri))) errors.redirectUris = 'Todas las URI de redirección deben ser válidas.'
+  if (form.logoutUrl.trim() && !isValidUrl(form.logoutUrl.trim())) errors.logoutUrl = 'La URL de cierre de sesión debe ser válida.'
   return errors
 }
 
 function validateProviderForm(form: ProviderFormState): FormErrors {
   const errors: FormErrors = {}
-  if (!form.providerId.trim()) errors.providerId = 'El providerId es obligatorio.'
+  if (!form.providerId.trim()) errors.providerId = 'El ID del proveedor es obligatorio.'
   if (!form.alias.trim()) errors.alias = 'El alias es obligatorio.'
-  if (!form.displayName.trim()) errors.displayName = 'El displayName es obligatorio.'
+  if (!form.displayName.trim()) errors.displayName = 'El nombre visible es obligatorio.'
   if (form.providerMode === 'metadata_url') {
-    if (!form.metadataUrl.trim()) errors.metadataUrl = 'La metadata URL es obligatoria.'
-    else if (!isValidUrl(form.metadataUrl.trim())) errors.metadataUrl = 'La metadata URL debe ser válida.'
+    if (!form.metadataUrl.trim()) errors.metadataUrl = 'La URL de metadatos es obligatoria.'
+    else if (!isValidUrl(form.metadataUrl.trim())) errors.metadataUrl = 'La URL de metadatos debe ser válida.'
   }
-  if (form.providerMode === 'inline_metadata' && form.protocol === 'saml' && form.metadataXml.trim().length < 32) errors.metadataXml = 'El metadata XML debe tener contenido suficiente.'
+  if (form.providerMode === 'inline_metadata' && form.protocol === 'saml' && form.metadataXml.trim().length < 32) errors.metadataXml = 'El XML de metadatos debe tener contenido suficiente.'
   if (form.protocol === 'oidc' && form.providerMode === 'manual_endpoints') {
-    if (!form.authorizationUrl.trim() || !isValidUrl(form.authorizationUrl.trim())) errors.authorizationUrl = 'La authorization URL es obligatoria y debe ser válida.'
-    if (!form.tokenUrl.trim() || !isValidUrl(form.tokenUrl.trim())) errors.tokenUrl = 'La token URL es obligatoria y debe ser válida.'
-    if (form.userInfoUrl.trim() && !isValidUrl(form.userInfoUrl.trim())) errors.userInfoUrl = 'La user info URL debe ser válida.'
+    if (!form.authorizationUrl.trim() || !isValidUrl(form.authorizationUrl.trim())) errors.authorizationUrl = 'La URL de autorización es obligatoria y debe ser válida.'
+    if (!form.tokenUrl.trim() || !isValidUrl(form.tokenUrl.trim())) errors.tokenUrl = 'La URL de token es obligatoria y debe ser válida.'
+    if (form.userInfoUrl.trim() && !isValidUrl(form.userInfoUrl.trim())) errors.userInfoUrl = 'La URL de información de usuario debe ser válida.'
   }
   if (form.protocol === 'saml' && form.providerMode === 'manual_endpoints') {
-    if (!form.entityId.trim()) errors.entityId = 'El entityId es obligatorio.'
-    if (!form.ssoServiceUrl.trim() || !isValidUrl(form.ssoServiceUrl.trim())) errors.ssoServiceUrl = 'La SSO service URL es obligatoria y debe ser válida.'
-    if (form.sloServiceUrl.trim() && !isValidUrl(form.sloServiceUrl.trim())) errors.sloServiceUrl = 'La SLO service URL debe ser válida.'
+    if (!form.entityId.trim()) errors.entityId = 'El ID de entidad es obligatorio.'
+    if (!form.ssoServiceUrl.trim() || !isValidUrl(form.ssoServiceUrl.trim())) errors.ssoServiceUrl = 'La URL de servicio SSO es obligatoria y debe ser válida.'
+    if (form.sloServiceUrl.trim() && !isValidUrl(form.sloServiceUrl.trim())) errors.sloServiceUrl = 'La URL de servicio SLO debe ser válida.'
   }
   return errors
 }

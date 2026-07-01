@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { terminateConsoleLoginSession } from '@/lib/console-auth'
 import {
   ConsoleContextProvider,
+  formatConsoleContextEnumLabel,
   formatConsoleEnumLabel,
   getConsoleTenantStatusMeta,
   getConsoleWorkspaceStatusMeta,
@@ -39,66 +40,66 @@ import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
 
 const consoleNavigationItems = [
   {
-    label: 'Overview',
+    label: 'Vista general',
     to: '/console/overview',
     icon: LayoutDashboard,
     description: 'Punto de entrada para la consola administrativa y su estado general.'
   },
   {
-    label: 'Tenants',
+    label: 'Gestión de organizaciones',
     to: '/console/tenants',
     icon: Shield,
-    description: 'Acceso base al dominio multi-tenant y su navegación principal.'
+    description: 'Gestión del dominio multiorganización y su navegación principal.'
   },
   {
-    label: 'Workspaces',
+    label: 'Gestión de áreas de trabajo',
     to: '/console/workspaces',
     icon: FolderKanban,
-    description: 'Superficie incremental para la organización por workspaces.'
+    description: 'Gestión de la organización por áreas de trabajo.'
   },
   {
-    label: 'Workspace DB',
+    label: 'DB del área de trabajo',
     to: '/console/database',
     icon: Database,
-    description: 'Aprovisiona y rota la base de datos PostgreSQL dedicada del workspace activo.'
+    description: 'Aprovisiona y rota la base de datos PostgreSQL dedicada del área de trabajo activa.'
   },
   {
-    label: 'Functions (Registry)',
+    label: 'Registro de funciones',
     to: '/console/functions-registry',
     icon: Workflow,
-    description: 'Registra funciones del workspace activo (ejecución pendiente del plano de datos).'
+    description: 'Registra funciones del área de trabajo activa (ejecución pendiente del plano de datos).'
   },
   {
-    label: 'IAM Access',
+    label: 'Acceso IAM',
     to: '/console/iam-access',
     icon: Shield,
-    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm del tenant activo.',
+    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm de la organización activa.',
     requiresSuperadminAccess: true
   },
   {
-    label: 'Members',
+    label: 'Miembros',
     to: '/console/members',
     icon: Users,
-    description: 'Miembros, roles y permisos del realm IAM del tenant activo.'
+    description: 'Miembros, roles y permisos del realm IAM de la organización activa.'
   },
   {
-    label: 'Plans',
+    label: 'Planes',
     to: '/console/plans',
     icon: FolderKanban,
-    description: 'Gestión del catálogo de planes, límites base y asignaciones por tenant.'
+    description: 'Gestión del catálogo de planes, límites base y asignaciones por organización.'
   },
   {
-    label: 'Auth',
+    label: 'Autenticación',
     to: '/console/auth',
     icon: Shield,
-    description: 'Superficie Auth/IAM para scopes, clients, providers y aplicaciones externas del contexto activo.',
+    description: 'Superficie Auth/IAM para alcances, clientes, proveedores y aplicaciones externas del contexto activo.',
     requiresSuperadminAccess: true
   },
   {
     label: 'PostgreSQL',
     to: '/console/postgres',
     icon: Database,
-    description: 'Bases de datos, esquemas, tablas, índices, vistas y preview DDL.'
+    description: 'Bases de datos, esquemas, tablas, índices, vistas y vista previa DDL.'
   },
   {
     label: 'MongoDB',
@@ -110,80 +111,80 @@ const consoleNavigationItems = [
     label: 'Kafka',
     to: '/console/kafka',
     icon: Activity,
-    description: 'Topics, ACLs, métricas de lag, bridges y helpers de publish/stream.'
+    description: 'Tópicos, ACLs, métricas de retraso, puentes y herramientas de publicación/flujo.'
   },
   {
-    label: 'Functions',
+    label: 'Funciones',
     to: '/console/functions',
     icon: Workflow,
     description: 'Entrada persistente al dominio serverless del producto.'
   },
   {
-    label: 'Data: Postgres',
+    label: 'Datos: Postgres',
     to: '/console/postgres/data',
     icon: Database,
     description: 'Editor de filas (CRUD) y claves API anon/service sobre el ejecutor de datos.'
   },
   {
-    label: 'Data: Mongo',
+    label: 'Datos: Mongo',
     to: '/console/mongo/data',
     icon: Database,
     description: 'Editor de documentos (CRUD) de una colección sobre el ejecutor de datos.'
   },
   {
-    label: 'Data: Events',
+    label: 'Datos: eventos',
     to: '/console/events/data',
     icon: Activity,
-    description: 'Topics, publish y consume sobre el ejecutor de eventos del workspace.'
+    description: 'Tópicos, publicación y consumo sobre el ejecutor de eventos del área de trabajo.'
   },
   {
-    label: 'Data: Functions',
+    label: 'Datos: funciones',
     to: '/console/functions/data',
     icon: Workflow,
-    description: 'Deploy e invocación de funciones sobre el ejecutor del workspace.'
+    description: 'Despliegue e invocación de funciones sobre el ejecutor del área de trabajo.'
   },
   {
-    label: 'Data: Realtime',
+    label: 'Datos: tiempo real',
     to: '/console/realtime/changes',
     icon: Activity,
-    description: 'Stream de cambios (SSE) de una colección con anon key sobre el ejecutor.'
+    description: 'Flujo de cambios (SSE) de una colección con clave anónima sobre el ejecutor.'
   },
   {
     label: 'Operaciones',
     to: '/console/operations',
     icon: Activity,
-    description: 'Seguimiento de operaciones asíncronas, logs resumidos y resultado final.'
+    description: 'Seguimiento de operaciones asíncronas, registros resumidos y resultado final.'
   },
   {
-    label: 'Storage',
+    label: 'Almacenamiento',
     to: '/console/storage',
     icon: Database,
     description: 'Navegación base al área de almacenamiento y datos relacionados.'
   },
   {
-    label: 'Observability',
+    label: 'Observabilidad',
     to: '/console/observability',
     icon: Activity,
     description: 'Métricas, auditoría y señales operativas del contexto activo.'
   },
   {
-    label: 'Service Accounts',
+    label: 'Cuentas de servicio',
     to: '/console/service-accounts',
     icon: Settings,
-    description: 'Credenciales programáticas y service accounts del workspace activo.'
+    description: 'Credenciales programáticas y service accounts del área de trabajo activa.'
   },
   {
-    label: 'Workspace Secrets',
+    label: 'Secretos del área de trabajo',
     to: '/console/workspace-secrets',
     icon: KeyRound,
-    description: 'Secretos de función del workspace activo (valores de solo escritura, inyectados en el deploy).',
+    description: 'Secretos de función del área de trabajo activa (valores de solo escritura, inyectados en el despliegue).',
     requiresWorkspaceSecretsAccess: true
   },
   {
-    label: 'Quotas',
+    label: 'Cuotas',
     to: '/console/quotas',
     icon: Activity,
-    description: 'Postura de cuotas, límites y consumo por tenant y workspace.'
+    description: 'Postura de cuotas, límites y consumo por organización y área de trabajo.'
   }
 ] as const
 
@@ -317,9 +318,9 @@ export function ConsoleShellLayout() {
               <img src="/img/logo-wide.png" alt="In Falcone" className="h-10 w-auto" />
               <div className="min-w-0">
                 <Link className="block truncate text-base font-semibold tracking-tight" to="/console/overview">
-                  In Falcone Console
+                  Consola In Falcone
                 </Link>
-                <p className="truncate text-xs text-muted-foreground">Shell persistente + estado contextual · EP-14 / US-UI-02-T02</p>
+                <p className="truncate text-xs text-muted-foreground">Marco persistente + estado contextual · EP-14 / US-UI-02-T02</p>
               </div>
             </div>
 
@@ -384,7 +385,7 @@ export function ConsoleShellLayout() {
                       className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <User className="h-4 w-4" aria-hidden="true" />
-                      Profile
+                      Perfil
                     </Link>
                     <Link
                       to="/console/settings"
@@ -394,7 +395,7 @@ export function ConsoleShellLayout() {
                       className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Settings className="h-4 w-4" aria-hidden="true" />
-                      Settings
+                      Ajustes
                     </Link>
                     <button
                       type="button"
@@ -405,7 +406,7 @@ export function ConsoleShellLayout() {
                       className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <LogOut className="h-4 w-4" aria-hidden="true" />
-                      {isLoggingOut ? 'Cerrando sesión…' : 'Logout'}
+                      {isLoggingOut ? 'Cerrando sesión…' : 'Cerrar sesión'}
                     </button>
                   </div>
                 </div>
@@ -431,7 +432,7 @@ export function ConsoleShellLayout() {
         </div>
 
         <div className="border-t border-border bg-background/95 px-4 py-3 lg:hidden">
-          <p className="text-xs text-muted-foreground">La experiencia optimizada para móvil llegará en una iteración posterior. T02 prioriza el estado contextual dentro del shell de escritorio.</p>
+          <p className="text-xs text-muted-foreground">La experiencia optimizada para móvil llegará en una iteración posterior. T02 prioriza el estado contextual dentro de la consola de escritorio.</p>
         </div>
       </div>
     </ConsoleContextProvider>
@@ -518,30 +519,30 @@ function ConsoleHeaderContextControls() {
     }
 
     if (tenantsLoading) {
-      return 'Cargando tenants accesibles…'
+      return 'Cargando organizaciones accesibles…'
     }
 
     if (hasNoTenants) {
-      return 'Tu cuenta no tiene tenants accesibles todavía.'
+      return 'Tu cuenta no tiene organizaciones accesibles todavía.'
     }
 
     if (!activeTenantId) {
-      return 'Selecciona un tenant para establecer el contexto de trabajo.'
+      return 'Selecciona una organización para establecer el contexto de trabajo.'
     }
 
     if (workspacesLoading) {
-      return 'Cargando workspaces del tenant seleccionado…'
+      return 'Cargando áreas de trabajo de la organización seleccionada…'
     }
 
     if (hasNoWorkspaces) {
-      return 'El tenant activo no tiene workspaces accesibles para tu cuenta.'
+      return 'La organización activa no tiene áreas de trabajo accesibles para tu cuenta.'
     }
 
     if (!activeWorkspaceId) {
-      return 'Selecciona un workspace para completar el contexto activo.'
+      return 'Selecciona un área de trabajo para completar el contexto activo.'
     }
 
-    return `Contexto activo: ${activeTenant?.label ?? 'Tenant'} / ${activeWorkspace?.label ?? 'Workspace'}`
+    return `Contexto activo: ${activeTenant?.label ?? 'Organización'} / ${activeWorkspace?.label ?? 'Área de trabajo'}`
   }, [
     activeTenant?.label,
     activeTenantId,
@@ -569,9 +570,9 @@ function ConsoleHeaderContextControls() {
         </div>
 
         <label className="flex min-w-[210px] max-w-[240px] flex-1 flex-col gap-1">
-          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Tenant</span>
+          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Organización</span>
           <select
-            aria-label="Seleccionar tenant"
+            aria-label="Seleccionar organización"
             data-testid="console-context-tenant-select"
             value={activeTenantId ?? ''}
             disabled={tenantsLoading || hasNoTenants}
@@ -579,7 +580,7 @@ function ConsoleHeaderContextControls() {
             className="h-8 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
-              {tenantsLoading ? 'Cargando tenants…' : hasNoTenants ? 'Sin tenants accesibles' : 'Selecciona un tenant'}
+              {tenantsLoading ? 'Cargando organizaciones…' : hasNoTenants ? 'Sin organizaciones accesibles' : 'Selecciona una organización'}
             </option>
             {tenants.map((tenant) => (
               <option key={tenant.tenantId} value={tenant.tenantId}>
@@ -590,9 +591,9 @@ function ConsoleHeaderContextControls() {
         </label>
 
         <label className="flex min-w-[210px] max-w-[240px] flex-1 flex-col gap-1">
-          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Workspace</span>
+          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Área de trabajo</span>
           <select
-            aria-label="Seleccionar workspace"
+            aria-label="Seleccionar área de trabajo"
             data-testid="console-context-workspace-select"
             value={activeWorkspaceId ?? ''}
             disabled={workspaceDisabled}
@@ -601,12 +602,12 @@ function ConsoleHeaderContextControls() {
           >
             <option value="">
               {!activeTenantId
-                ? 'Selecciona un tenant primero'
+                ? 'Selecciona una organización primero'
                 : workspacesLoading
-                  ? 'Cargando workspaces…'
+                  ? 'Cargando áreas de trabajo…'
                   : hasNoWorkspaces
-                    ? 'Sin workspaces accesibles'
-                    : 'Selecciona un workspace'}
+                    ? 'Sin áreas de trabajo accesibles'
+                    : 'Selecciona un área de trabajo'}
             </option>
             {workspaces.map((workspace) => (
               <option key={workspace.workspaceId} value={workspace.workspaceId}>
@@ -621,8 +622,8 @@ function ConsoleHeaderContextControls() {
             type="button"
             variant="outline"
             size="sm"
-            aria-label="Reintentar tenants"
-            title="Reintentar tenants"
+            aria-label="Reintentar organizaciones"
+            title="Reintentar organizaciones"
             onClick={() => void reloadTenants()}
             className="h-9 w-9 shrink-0 rounded-lg px-0"
           >
@@ -633,8 +634,8 @@ function ConsoleHeaderContextControls() {
             type="button"
             variant="outline"
             size="sm"
-            aria-label="Reintentar workspaces"
-            title="Reintentar workspaces"
+            aria-label="Reintentar áreas de trabajo"
+            title="Reintentar áreas de trabajo"
             onClick={() => void reloadWorkspaces()}
             className="h-9 w-9 shrink-0 rounded-lg px-0"
           >
@@ -676,9 +677,9 @@ function ConsoleContextStatusPanel() {
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Tenant activo</p>
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">{activeTenant?.label ?? 'Sin tenant seleccionado'}</h2>
-              <p className="text-sm text-muted-foreground">{activeTenant?.secondary ?? 'Selecciona un tenant para ver su estado operativo.'}</p>
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Organización activa</p>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">{activeTenant?.label ?? 'Sin organización seleccionada'}</h2>
+              <p className="text-sm text-muted-foreground">{activeTenant?.secondary ?? 'Selecciona una organización para ver su estado operativo.'}</p>
             </div>
             <Badge variant="outline" className={getStatusBadgeClasses(tenantStatus.tone)}>
               {tenantStatus.label}
@@ -686,9 +687,9 @@ function ConsoleContextStatusPanel() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {activeTenant?.state ? <Badge variant="secondary">Lifecycle: {formatConsoleEnumLabel(activeTenant.state)}</Badge> : null}
+            {activeTenant?.state ? <Badge variant="secondary">Ciclo de vida: {formatConsoleContextEnumLabel(activeTenant.state)}</Badge> : null}
             {activeTenant?.governanceStatus ? (
-              <Badge variant="secondary">Gobernanza: {formatConsoleEnumLabel(activeTenant.governanceStatus)}</Badge>
+              <Badge variant="secondary">Gobernanza: {formatConsoleContextEnumLabel(activeTenant.governanceStatus)}</Badge>
             ) : null}
             {activeTenant?.quotaSummary ? (
               <Badge variant="secondary">
@@ -696,19 +697,19 @@ function ConsoleContextStatusPanel() {
               </Badge>
             ) : null}
             {activeTenant?.inventorySummary ? (
-              <Badge variant="secondary">Inventario: {activeTenant.inventorySummary.workspaceCount} workspaces</Badge>
+              <Badge variant="secondary">Inventario: {activeTenant.inventorySummary.workspaceCount} áreas de trabajo</Badge>
             ) : null}
           </div>
 
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            {tenantsLoading && !activeTenant ? 'Cargando el estado del tenant seleccionado…' : tenantStatus.description}
+            {tenantsLoading && !activeTenant ? 'Cargando el estado de la organización seleccionada…' : tenantStatus.description}
           </p>
           {tenantsError ? (
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <p className="text-sm text-destructive">{tenantsError}</p>
               <Button type="button" variant="outline" size="sm" onClick={() => void reloadTenants()}>
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                Reintentar tenants
+                Reintentar organizaciones
               </Button>
             </div>
           ) : null}
@@ -722,10 +723,10 @@ function ConsoleContextStatusPanel() {
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Workspace activo</p>
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">{activeWorkspace?.label ?? 'Sin workspace seleccionado'}</h2>
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Área de trabajo activa</p>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">{activeWorkspace?.label ?? 'Sin área de trabajo seleccionada'}</h2>
               <p className="text-sm text-muted-foreground">
-                {activeWorkspace?.secondary ?? 'Selecciona un workspace para completar el contexto operativo.'}
+                {activeWorkspace?.secondary ?? 'Selecciona un área de trabajo para completar el contexto operativo.'}
               </p>
             </div>
             <Badge variant="outline" className={getStatusBadgeClasses(workspaceStatus.tone)}>
@@ -735,17 +736,17 @@ function ConsoleContextStatusPanel() {
 
           <div className="mt-4 flex flex-wrap gap-2">
             {activeWorkspace?.environment ? <Badge variant="secondary">Entorno: {formatConsoleEnumLabel(activeWorkspace.environment)}</Badge> : null}
-            {activeWorkspace?.state ? <Badge variant="secondary">Lifecycle: {formatConsoleEnumLabel(activeWorkspace.state)}</Badge> : null}
+            {activeWorkspace?.state ? <Badge variant="secondary">Ciclo de vida: {formatConsoleContextEnumLabel(activeWorkspace.state)}</Badge> : null}
             {activeWorkspace?.provisioningStatus ? (
-              <Badge variant="secondary">Provisioning: {formatConsoleEnumLabel(activeWorkspace.provisioningStatus)}</Badge>
+              <Badge variant="secondary">Aprovisionamiento: {formatConsoleContextEnumLabel(activeWorkspace.provisioningStatus)}</Badge>
             ) : null}
           </div>
 
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
             {workspacesLoading && !activeWorkspace
-              ? 'Cargando el estado del workspace seleccionado…'
+              ? 'Cargando el estado del área de trabajo seleccionada…'
               : hasNoWorkspaces
-                ? 'No se encontraron workspaces accesibles para el tenant activo.'
+                ? 'No se encontraron áreas de trabajo accesibles para la organización activa.'
                 : workspaceStatus.description}
           </p>
           {workspacesError || hasNoWorkspaces ? (
@@ -753,11 +754,11 @@ function ConsoleContextStatusPanel() {
               {workspacesError ? (
                 <p className="text-sm text-destructive">{workspacesError}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">Vuelve a consultar workspaces si el tenant se acaba de aprovisionar.</p>
+                <p className="text-sm text-muted-foreground">Vuelve a consultar áreas de trabajo si la organización se acaba de aprovisionar.</p>
               )}
               <Button type="button" variant="outline" size="sm" onClick={() => void reloadWorkspaces()}>
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                Reintentar workspaces
+                Reintentar áreas de trabajo
               </Button>
             </div>
           ) : null}

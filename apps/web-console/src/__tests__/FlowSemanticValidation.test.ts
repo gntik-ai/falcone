@@ -24,6 +24,7 @@ describe('validateFlowSemantics (shared FLW rule set)', () => {
     const e001 = errors.filter((error) => error.code === 'FLW-E001')
     expect(e001).toHaveLength(1)
     expect(e001[0]?.nodeId).toBe('step-1')
+    expect(e001[0]?.message).toBe('ID de nodo duplicado "step-1"; los ID de nodo deben ser únicos dentro del flujo.')
 
     const byNode = groupErrorsByNode(errors)
     expect(byNode.get('step-1')?.some((error) => error.code === 'FLW-E001')).toBe(true)
@@ -53,7 +54,10 @@ describe('validateFlowSemantics (shared FLW rule set)', () => {
       definition([{ id: 'a', type: 'task', taskType: 'not-in-catalog' }]),
       { taskTypeCatalog: ['send-email', 'http-request'] }
     )
-    expect(errors.some((error) => error.code === 'FLW-E006' && error.nodeId === 'a')).toBe(true)
+    const e006 = errors.find((error) => error.code === 'FLW-E006' && error.nodeId === 'a')
+    expect(e006?.message).toBe(
+      'Tipo de tarea desconocido "not-in-catalog"; no está presente en el catálogo de tipos de tarea.'
+    )
   })
 
   it('flags an unparseable branch arm expression with FLW-E005', () => {
@@ -63,7 +67,8 @@ describe('validateFlowSemantics (shared FLW rule set)', () => {
         { id: 'a', type: 'task', taskType: 'send-email' }
       ])
     )
-    expect(errors.some((error) => error.code === 'FLW-E005' && error.nodeId === 'br')).toBe(true)
+    const e005 = errors.find((error) => error.code === 'FLW-E005' && error.nodeId === 'br')
+    expect(e005?.message).toBe('La expresión "input.total >" no puede analizarse con el motor cel.')
   })
 
   it('returns an empty list for a clean graph', () => {

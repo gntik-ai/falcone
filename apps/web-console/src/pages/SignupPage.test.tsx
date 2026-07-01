@@ -24,9 +24,11 @@ describe('SignupPage', () => {
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre visible/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/correo principal/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/tenant id/i)).toHaveValue('ten_acme')
-    expect(screen.getByLabelText(/workspace id/i)).toHaveValue('wrk_console')
+    expect(screen.getByLabelText(/ID de organización/i)).toHaveValue('ten_acme')
+    expect(screen.getByLabelText(/ID de área de trabajo/i)).toHaveValue('wrk_console')
     expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('minlength', '10')
+    expect(screen.getByText(/la consola autenticada y la gestión robusta de sesión/i)).toBeInTheDocument()
+    expect(screen.queryByText(/el shell autenticado/i)).not.toBeInTheDocument()
   })
 
   it('muestra una pantalla informativa cuando la policy deshabilita signup', async () => {
@@ -73,7 +75,7 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'Abcd1234' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
-    expect(await screen.findByText(/registration id: reg_abc123/i)).toBeInTheDocument()
+    expect(await screen.findByText(/id de registro: reg_abc123/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /continuar hacia login/i })).toHaveAttribute('href', '/login')
 
     await waitFor(() => {
@@ -132,12 +134,12 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
     fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
     fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
-    fireEvent.change(screen.getByLabelText(/tenant id/i), { target: { value: 'ten_acme' } })
+    fireEvent.change(screen.getByLabelText(/ID de organización/i), { target: { value: 'ten_acme' } })
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
     expect(await screen.findByText(/estamos esperando la aprobación final para habilitar el acceso/i)).toBeInTheDocument()
-    expect(screen.getByText(/registration id: reg_pending123/i)).toBeInTheDocument()
+    expect(screen.getByText(/id de registro: reg_pending123/i)).toBeInTheDocument()
   })
 
   it('muestra feedback cuando ya existe una cuenta con esos datos', async () => {
@@ -162,7 +164,7 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
     fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
     fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
-    fireEvent.change(screen.getByLabelText(/tenant id/i), { target: { value: 'ten_acme' } })
+    fireEvent.change(screen.getByLabelText(/ID de organización/i), { target: { value: 'ten_acme' } })
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 

@@ -55,7 +55,7 @@ describe('CreateTenantWizard', () => {
   it('carga planes activos del catálogo y envía el id real seleccionado', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
-    await user.type(screen.getByLabelText(/nombre del tenant/i), 'Tenant Nuevo')
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     expect(requestMock).toHaveBeenCalledWith('/v1/plans?status=active&page=1&pageSize=100', expect.objectContaining({ method: 'GET' }))
     expect(await screen.findByRole('option', { name: /enterprise real \(enterprise-real\)/i })).toBeInTheDocument()
@@ -78,7 +78,7 @@ describe('CreateTenantWizard', () => {
     const user = userEvent.setup()
 
     render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
-    await user.type(screen.getByLabelText(/nombre del tenant/i), 'Tenant Nuevo')
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
 
     expect(await screen.findByText(/no hay planes activos en el catálogo/i)).toBeInTheDocument()
@@ -101,7 +101,7 @@ describe('CreateTenantWizard', () => {
     const user = userEvent.setup()
 
     render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
-    await user.type(screen.getByLabelText(/nombre del tenant/i), 'Tenant Nuevo')
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/catalog timeout/i)
@@ -125,7 +125,7 @@ describe('CreateTenantWizard', () => {
     })
 
     render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
-    await user.type(screen.getByLabelText(/nombre del tenant/i), 'Tenant Nuevo')
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
 
     expect(screen.queryByText(/sin cuota disponible/i)).not.toBeInTheDocument()

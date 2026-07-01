@@ -48,7 +48,7 @@ export function ConsoleBackupScopePage({
         })))
       }
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError : new Error('Unknown error'))
+      setError(fetchError instanceof Error ? fetchError : new Error('Error desconocido'))
     } finally {
       setLoading(false)
     }
@@ -63,13 +63,13 @@ export function ConsoleBackupScopePage({
   }
 
   if (error) {
-    return <div data-testid="scope-error" className="text-red-600">Error loading backup scope: {error.message}</div>
+    return <div data-testid="scope-error" className="text-red-600">Error al cargar el alcance de backup: {error.message}</div>
   }
 
   return (
     <div className="space-y-6" data-testid="backup-scope-page">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Backup Scope & Limits</h1>
+        <h1 className="text-xl font-semibold">Alcance y límites de backup</h1>
         {isAdmin && <BackupScopeProfileSelector value={profile} onChange={handleProfileChange} />}
       </div>
       <BackupScopeMatrix entries={entries} isLoading={loading} />

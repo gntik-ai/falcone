@@ -22,7 +22,7 @@ export function WelcomePage() {
               In Falcone Console
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Consola administrativa del producto BaaS multi-tenant preparada para crecer con login,
+              Consola administrativa del producto BaaS multi-organización preparada para crecer con login,
               navegación contextual y flujos seguros basados en Keycloak por medio de la familia pública
               `/v1/auth/*`.
             </p>
@@ -64,7 +64,7 @@ export function WelcomePage() {
             <p className="text-sm leading-6 text-muted-foreground">
               Esta pantalla valida la disponibilidad de la SPA, el sistema de estilos, el enrutamiento base
               y el acceso inicial de la consola. Las rutas protegidas, la persistencia robusta de sesión y
-              el shell persistente se incorporarán en tareas posteriores sin rehacer la base tecnológica.
+              el marco persistente de consola se incorporarán en tareas posteriores sin rehacer la base tecnológica.
             </p>
           </div>
         </div>

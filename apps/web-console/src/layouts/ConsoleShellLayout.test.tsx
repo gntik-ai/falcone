@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { readFileSync } from 'node:fs'
 import { RouterProvider, createMemoryRouter, useParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -64,8 +65,8 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    expect(await screen.findByRole('link', { name: /in falcone console/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /overview/i })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByRole('link', { name: /consola in falcone/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /vista general/i })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText(/operaciones plataforma/i)).toBeInTheDocument()
     expect(screen.getByTestId('console-shell-avatar')).toHaveTextContent('OP')
     expect(screen.getByLabelText(/contexto activo de consola/i)).toBeInTheDocument()
@@ -91,9 +92,9 @@ describe('ConsoleShellLayout', () => {
     await user.click(await screen.findByTestId('console-shell-avatar'))
 
     expect(screen.getByRole('menu')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /profile/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /settings/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /logout/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /perfil/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /ajustes/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /cerrar sesión/i })).toBeInTheDocument()
 
     await user.keyboard('{Escape}')
 
@@ -102,7 +103,7 @@ describe('ConsoleShellLayout', () => {
     })
   })
 
-  it('navega a profile desde el menú de usuario', async () => {
+  it('navega a perfil desde el menú de usuario', async () => {
     stubShellApi()
     persistConsoleShellSession(baseSession)
     const user = userEvent.setup()
@@ -110,7 +111,7 @@ describe('ConsoleShellLayout', () => {
     renderShell('/console/overview')
 
     await user.click(await screen.findByTestId('console-shell-avatar'))
-    await user.click(screen.getByRole('menuitem', { name: /profile/i }))
+    await user.click(screen.getByRole('menuitem', { name: /perfil/i }))
 
     expect(await screen.findByRole('heading', { name: /perfil/i })).toBeInTheDocument()
   })
@@ -188,7 +189,7 @@ describe('ConsoleShellLayout', () => {
       expect(screen.getByTestId('workspace-route-data-state')).toHaveTextContent('loaded:wrk_beta')
     })
 
-    expect(screen.queryByText(/sin workspace seleccionado/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/sin área de trabajo seleccionada/i)).not.toBeInTheDocument()
     expect(window.localStorage.getItem('in-falcone.console-active-context')).toContain('"workspaceId":"wrk_beta"')
   })
 
@@ -230,7 +231,7 @@ describe('ConsoleShellLayout', () => {
       expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
     })
 
-    expect(screen.getByTestId('console-context-workspace-status')).toHaveTextContent(/sin workspace seleccionado/i)
+    expect(screen.getByTestId('console-context-workspace-status')).toHaveTextContent(/sin área de trabajo seleccionada/i)
     expect(screen.getByTestId('console-context-workspace-status')).not.toHaveTextContent(/workspace alpha/i)
   })
 
@@ -240,18 +241,18 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    expect(await screen.findByText(/no tiene tenants accesibles/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no tiene organizaciones accesibles/i)).toBeInTheDocument()
     expect(screen.getByTestId('console-context-tenant-select')).toBeDisabled()
     expect(screen.getByTestId('console-context-workspace-select')).toBeDisabled()
   })
 
-  it('renderiza el ítem Members y apunta a /console/members', async () => {
+  it('renderiza el ítem Miembros y apunta a /console/members', async () => {
     stubShellApi()
     persistConsoleShellSession(baseSession)
 
     renderShell('/console/overview')
 
-    const membersLink = await screen.findByRole('link', { name: /members/i })
+    const membersLink = await screen.findByRole('link', { name: /miembros/i })
     expect(membersLink).toHaveAttribute('href', '/console/members')
   })
 
@@ -261,9 +262,9 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    expect(await screen.findByRole('link', { name: /overview/i })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^iam access/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^auth/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /vista general/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
   })
 
   it('[#740] mantiene Auth e IAM Access visibles para superadmin', async () => {
@@ -272,8 +273,8 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    expect(await screen.findByRole('link', { name: /^iam access/i })).toHaveAttribute('href', '/console/iam-access')
-    expect(await screen.findByRole('link', { name: /^auth/i })).toHaveAttribute('href', '/console/auth')
+    expect(await screen.findByRole('link', { name: /^acceso iam/i })).toHaveAttribute('href', '/console/iam-access')
+    expect(await screen.findByRole('link', { name: /^autenticación/i })).toHaveAttribute('href', '/console/auth')
   })
 
   it('renderiza el ítem PostgreSQL en el sidebar', async () => {
@@ -335,7 +336,7 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/overview')
 
-    const retryButtons = await screen.findAllByRole('button', { name: /reintentar tenants/i })
+    const retryButtons = await screen.findAllByRole('button', { name: /reintentar organizaciones/i })
     expect(retryButtons.length).toBeGreaterThan(0)
     expect(screen.getAllByText(/tenants degradados/i).length).toBeGreaterThan(0)
 
@@ -421,10 +422,10 @@ describe('ConsoleShellLayout', () => {
     await waitFor(() => {
       expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
       expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
-      expect(screen.getByTestId('console-context-workspace-select')).toHaveTextContent(/sin workspaces accesibles/i)
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveTextContent(/sin áreas de trabajo accesibles/i)
     })
 
-    const retryButtons = screen.getAllByRole('button', { name: /reintentar workspaces/i })
+    const retryButtons = screen.getAllByRole('button', { name: /reintentar áreas de trabajo/i })
     expect(retryButtons.length).toBeGreaterThan(0)
 
     const workspaceCallsBeforeRetry = workspaceRequestCount
@@ -444,7 +445,7 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/functions')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/tenant suspended/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/organización suspendido/i)
   })
 
   it('muestra un banner cuando el workspace activo tiene provisioning parcialmente fallido', async () => {
@@ -461,7 +462,7 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/storage')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/provisioning del workspace incompleto/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/aprovisionamiento del área de trabajo incompleto/i)
   })
 
   it('muestra un banner cuando existe una cuota bloqueada en el tenant activo', async () => {
@@ -488,17 +489,39 @@ describe('ConsoleShellLayout', () => {
 
     renderShell('/console/observability')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/cuotas agotadas en el tenant activo/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cuotas agotadas en la organización activa/i)
   })
 
-  it('renderiza los links nuevos de service accounts y quotas en el sidebar', async () => {
+  it('renderiza los links nuevos de cuentas de servicio y cuotas en el sidebar', async () => {
     stubShellApi()
     persistConsoleShellSession(baseSession)
 
     renderShell('/console/overview')
 
-    expect(await screen.findByRole('link', { name: /service accounts/i })).toHaveAttribute('href', '/console/service-accounts')
-    expect(screen.getByRole('link', { name: /quotas/i })).toHaveAttribute('href', '/console/quotas')
+    expect(await screen.findByRole('link', { name: /cuentas de servicio/i })).toHaveAttribute('href', '/console/service-accounts')
+    expect(screen.getByRole('link', { name: /cuotas/i })).toHaveAttribute('href', '/console/quotas')
+  })
+
+  it('[#803] mantiene lang=es y chrome/navegación autenticada en español', async () => {
+    const indexHtml = readFileSync('index.html', 'utf8')
+    expect(indexHtml).toMatch(/<html\s+lang="es"/)
+
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('link', { name: /consola in falcone/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /vista general/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
+    expect(screen.getByRole('link', { name: /gestión de áreas de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+    expect(screen.getByRole('link', { name: /observabilidad/i })).toHaveAttribute('href', '/console/observability')
+    expect(screen.getByRole('link', { name: /cuentas de servicio/i })).toHaveAttribute('href', '/console/service-accounts')
+    expect(screen.getByRole('link', { name: /cuotas/i })).toHaveAttribute('href', '/console/quotas')
+    expect(screen.queryByRole('link', { name: /^overview\b/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^observability\b/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^service accounts\b/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^quotas\b/i })).not.toBeInTheDocument()
   })
 
   it('ejecuta logout, limpia storage y redirige a login', async () => {
@@ -509,7 +532,7 @@ describe('ConsoleShellLayout', () => {
     renderShell('/console/overview')
 
     await user.click(await screen.findByTestId('console-shell-avatar'))
-    await user.click(screen.getByRole('menuitem', { name: /logout/i }))
+    await user.click(screen.getByRole('menuitem', { name: /cerrar sesión/i }))
 
     expect(await screen.findByText(/pantalla de login/i)).toBeInTheDocument()
     expect(readConsoleShellSession()).toBeNull()
@@ -553,7 +576,7 @@ function renderShell(initialPath = '/console/overview') {
         children: [
           {
             path: 'overview',
-            element: <h1>Overview</h1>
+            element: <h1>Vista general</h1>
           },
           {
             path: 'profile',
@@ -561,7 +584,7 @@ function renderShell(initialPath = '/console/overview') {
           },
           {
             path: 'settings',
-            element: <h1>Settings</h1>
+            element: <h1>Ajustes</h1>
           },
           {
             path: 'tenants',
@@ -577,7 +600,7 @@ function renderShell(initialPath = '/console/overview') {
           },
           {
             path: 'members',
-            element: <h1>Members</h1>
+            element: <h1>Miembros</h1>
           },
           {
             path: 'postgres',
@@ -585,23 +608,23 @@ function renderShell(initialPath = '/console/overview') {
           },
           {
             path: 'functions',
-            element: <h1>Functions</h1>
+            element: <h1>Funciones</h1>
           },
           {
             path: 'storage',
-            element: <h1>Storage</h1>
+            element: <h1>Almacenamiento</h1>
           },
           {
             path: 'observability',
-            element: <h1>Observability</h1>
+            element: <h1>Observabilidad</h1>
           },
           {
             path: 'service-accounts',
-            element: <h1>Service Accounts</h1>
+            element: <h1>Cuentas de servicio</h1>
           },
           {
             path: 'quotas',
-            element: <h1>Quotas</h1>
+            element: <h1>Cuotas</h1>
           }
         ]
       }
@@ -763,5 +786,5 @@ it('renderiza el ítem Plans en el sidebar', async () => {
   stubShellApi()
   persistConsoleShellSession(baseSession)
   renderShell('/console/overview')
-  expect(await screen.findByRole('link', { name: /plans/i })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: /planes/i })).toBeInTheDocument()
 })

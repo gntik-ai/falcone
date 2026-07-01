@@ -26,7 +26,7 @@ describe('generateSnippets', () => {
     expect(snippets[1]?.code).toContain('port: 5432')
   })
 
-  it('usa placeholders cuando faltan endpoints', () => {
+  it('usa marcadores temporales cuando faltan puntos de conexión', () => {
     const snippets = generateSnippets('storage-bucket', {
       ...baseContext,
       resourceHost: null,
@@ -35,10 +35,10 @@ describe('generateSnippets', () => {
     })
 
     expect(snippets[0]?.code).toContain('<RESOURCE_HOST>')
-    expect(snippets.some((snippet) => snippet.notes.some((note) => /placeholders descriptivos/i.test(note)))).toBe(true)
+    expect(snippets.some((snippet) => snippet.notes.some((note) => /marcadores temporales descriptivos/i.test(note)))).toBe(true)
   })
 
-  it('preserva placeholders de secretos y no inyecta credenciales reales', () => {
+  it('preserva marcadores de secretos y no inyecta credenciales reales', () => {
     const snippets = generateSnippets('iam-client', {
       ...baseContext,
       resourceName: 'falcone-console',

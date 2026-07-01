@@ -23,7 +23,7 @@ export function ConfirmActionDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = 'Cancel',
+  cancelLabel = 'Cancelar',
   destructive = false,
   pending = false,
   onConfirm,
@@ -53,7 +53,7 @@ export function ConfirmActionDialog({
             disabled={pending}
             data-testid="confirm-action-confirm"
           >
-            {pending ? 'Working…' : confirmLabel}
+            {pending ? 'Trabajando…' : confirmLabel}
           </Button>
         </DialogFooter>
         </div>

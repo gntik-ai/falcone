@@ -38,28 +38,28 @@ export function SdkDownloadPanel({ workspaceId, currentSpecVersion }: Props) {
 
   return (
     <section>
-      <h2>SDK downloads</h2>
+      <h2>Descargas de SDK</h2>
       <div className="grid gap-4 md:grid-cols-2">
         {SUPPORTED_LANGUAGES.map((language) => {
           const status = statuses[language]
           return (
             <article key={language} className="rounded border p-4">
               <h3 className="capitalize">{language}</h3>
-              <p>Current spec: {currentSpecVersion}</p>
-              <p>Status: {status?.status ?? 'pending'}</p>
-              {status?.status === 'ready' && status.downloadUrl ? <a href={status.downloadUrl}>Download SDK</a> : null}
+              <p>Especificación actual: {currentSpecVersion}</p>
+              <p>Estado: {status?.status ?? 'pending'}</p>
+              {status?.status === 'ready' && status.downloadUrl ? <a href={status.downloadUrl}>Descargar SDK</a> : null}
               {status?.status === 'failed' ? <p className="text-red-600">{status.errorMessage}</p> : null}
               {(status?.status === 'stale' || !status) ? (
-                <button type="button" onClick={() => void requestSdkGeneration(workspaceId, language)}>Regenerate</button>
+                <button type="button" onClick={() => void requestSdkGeneration(workspaceId, language)}>Regenerar</button>
               ) : null}
-              {(status?.status === 'pending' || status?.status === 'building') ? <p>Generating your SDK…</p> : null}
+              {(status?.status === 'pending' || status?.status === 'building') ? <p>Generando tu SDK…</p> : null}
             </article>
           )
         })}
       </div>
       <article className="mt-4 rounded border p-4">
-        <h3>Need another language?</h3>
-        <a href="https://openapi-generator.tech/docs/generators">OpenAPI Generator language catalog</a>
+        <h3>¿Necesitas otro lenguaje?</h3>
+        <a href="https://openapi-generator.tech/docs/generators">Catálogo de lenguajes de OpenAPI Generator</a>
       </article>
     </section>
   )

@@ -40,7 +40,7 @@ describe('RealtimeSnippetsPanel', () => {
 
   it('renderiza guard cuando realtimeEnabled es false', () => {
     renderPanel({ realtimeEnabled: false })
-    expect(screen.getByRole('alert')).toHaveTextContent(/Realtime subscriptions require at least one provisioned data source/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/suscripciones en tiempo real requieren al menos una fuente de datos aprovisionada/i)
     expect(screen.queryByText(/WebSocket subscription/i)).not.toBeInTheDocument()
   })
 
@@ -51,13 +51,35 @@ describe('RealtimeSnippetsPanel', () => {
 
   it('incluye link a provisioning', () => {
     renderPanel({ realtimeEnabled: false })
-    expect(screen.getByRole('link', { name: /go to provisioning/i })).toHaveAttribute('href', '/console/workspaces/ws-test/provisioning')
+    expect(screen.getByRole('link', { name: /ir a aprovisionamiento/i })).toHaveAttribute('href', '/console/workspaces/ws-test/provisioning')
   })
 
   it('usa JavaScript por defecto', () => {
     renderPanel()
     expect(screen.getByRole('tab', { name: 'JavaScript' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getAllByText(/const ws = new WebSocket/i).length).toBeGreaterThan(0)
+  })
+
+  it('muestra los títulos de snippets realtime en español', async () => {
+    const user = userEvent.setup()
+    renderPanel()
+
+    expect(screen.getByRole('heading', { name: 'JavaScript (navegador) — suscripción WebSocket' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'JavaScript (navegador) — suscripción filtrada' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'JavaScript (navegador) — reconexión con espera exponencial y refresco de token' })).toBeInTheDocument()
+    expect(screen.queryByText(/WebSocket subscription|Filtered subscription|Reconnection with backoff/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Node.js' }))
+    expect(screen.getByRole('heading', { name: 'Node.js (servidor) — suscripción WebSocket' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Node.js (servidor) — suscripción filtrada' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Node.js (servidor) — reconexión con espera exponencial' })).toBeInTheDocument()
+    expect(screen.queryByText(/WebSocket subscription|Filtered subscription|Reconnection with backoff/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Python' }))
+    expect(screen.getByRole('heading', { name: 'Python (servidor) — suscripción WebSocket' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Python (servidor) — suscripción filtrada' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Python (servidor) — reconexión con espera exponencial' })).toBeInTheDocument()
+    expect(screen.queryByText(/WebSocket subscription|Filtered subscription|Reconnection with backoff/i)).not.toBeInTheDocument()
   })
 
   it('lee sessionStorage al montar', () => {
@@ -86,7 +108,7 @@ describe('RealtimeSnippetsPanel', () => {
 
   it('muestra la nota de canales adicionales', () => {
     renderPanel()
-    expect(screen.getByText(/Additional channel types available: mongodb-changes/i)).toBeInTheDocument()
+    expect(screen.getByText(/tipos de canal adicionales disponibles: mongodb-changes/i)).toBeInTheDocument()
   })
 
   it('permite copiar con teclado', async () => {
@@ -95,7 +117,7 @@ describe('RealtimeSnippetsPanel', () => {
     copyButtons[0].focus()
     fireEvent.click(copyButtons[0])
     await waitFor(() => expect(writeText).toHaveBeenCalled())
-    expect(await screen.findByText(/Snippet copiado al portapapeles/i)).toBeInTheDocument()
+    expect(await screen.findByText(/fragmento copiado al portapapeles/i)).toBeInTheDocument()
   })
 
   it('mantiene semántica accesible mínima de tabs y tabpanel', () => {

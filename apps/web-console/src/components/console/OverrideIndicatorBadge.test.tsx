@@ -7,6 +7,6 @@ afterEach(cleanup)
 describe('OverrideIndicatorBadge', () => {
   it('renders badge and tooltip text via title', () => {
     render(<OverrideIndicatorBadge overriddenFromValue={5} overrideValue={10} />)
-    expect(screen.getByText('Override')).toHaveAttribute('title', 'Plan: 5 → Override: 10')
+    expect(screen.getByText('Sobrescritura')).toHaveAttribute('title', 'Plan: 5 → Sobrescritura: 10')
   })
 })

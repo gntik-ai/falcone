@@ -45,23 +45,23 @@ function BranchPanel({ node, onChange }: { node: BranchNode; onChange: (next: Br
       {arms.map((arm, index) => (
         <div key={index} className="space-y-1 rounded-lg border border-border p-2">
           <ExpressionField
-            label={`Arm ${index + 1} condition`}
+            label={`Condición del brazo ${index + 1}`}
             value={arm.when}
             onChange={(when) => setArmWhen(index, when)}
           />
           <p className="font-mono text-[10px] text-muted-foreground">
-            next: {arm.next || '(connect on canvas)'}
+            siguiente: {arm.next || '(conectar en el canvas)'}
           </p>
           <Button size="sm" variant="ghost" onClick={() => removeArm(index)}>
-            Remove arm
+            Quitar brazo
           </Button>
         </div>
       ))}
       <Button size="sm" variant="outline" onClick={addArm}>
-        Add arm
+        Añadir brazo
       </Button>
       <p className="text-xs text-muted-foreground">
-        A branch needs at least two arms, or one arm plus a default connection (FLW-E009).
+        Una rama necesita al menos dos brazos, o un brazo más una conexión predeterminada (FLW-E009).
       </p>
     </div>
   )
@@ -72,7 +72,7 @@ function WaitPanel({ node, onChange }: { node: WaitNode; onChange: (next: WaitNo
   const invalid = Boolean(node.duration) && !ISO8601_DURATION.test(node.duration)
   return (
     <div className="space-y-1" data-testid="wait-property-panel">
-      <Label htmlFor={id}>Duration (ISO 8601)</Label>
+      <Label htmlFor={id}>Duración (ISO 8601)</Label>
       <Input
         id={id}
         placeholder="PT10M"
@@ -82,7 +82,7 @@ function WaitPanel({ node, onChange }: { node: WaitNode; onChange: (next: WaitNo
         className={invalid ? 'border-destructive font-mono' : 'font-mono'}
       />
       {invalid ? (
-        <p className="text-xs text-destructive">FLW-E008: not a valid ISO 8601 duration (e.g. PT10M).</p>
+        <p className="text-xs text-destructive">FLW-E008: no es una duración ISO 8601 válida (por ejemplo, PT10M).</p>
       ) : null}
     </div>
   )
@@ -93,7 +93,7 @@ function ApprovalPanel({ node, onChange }: { node: ApprovalNode; onChange: (next
   return (
     <div className="space-y-3" data-testid="approval-property-panel">
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-approvers`}>Approvers (comma-separated)</Label>
+        <Label htmlFor={`${idBase}-approvers`}>Aprobadores (separados por coma)</Label>
         <Input
           id={`${idBase}-approvers`}
           value={(node.approvers ?? []).join(', ')}
@@ -110,7 +110,7 @@ function ApprovalPanel({ node, onChange }: { node: ApprovalNode; onChange: (next
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-timeout`}>Timeout (ISO 8601)</Label>
+        <Label htmlFor={`${idBase}-timeout`}>Tiempo de espera (ISO 8601)</Label>
         <Input
           id={`${idBase}-timeout`}
           placeholder="P1D"
@@ -133,7 +133,7 @@ function SubFlowPanel({ node, onChange }: { node: SubFlowNode; onChange: (next: 
   return (
     <div className="space-y-3" data-testid="sub-flow-property-panel">
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-flow`}>Flow ID</Label>
+        <Label htmlFor={`${idBase}-flow`}>ID del flujo</Label>
         <Input
           id={`${idBase}-flow`}
           value={node.flowId ?? ''}
@@ -142,7 +142,7 @@ function SubFlowPanel({ node, onChange }: { node: SubFlowNode; onChange: (next: 
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-version`}>Flow version</Label>
+        <Label htmlFor={`${idBase}-version`}>Versión del flujo</Label>
         <Input
           id={`${idBase}-version`}
           value={node.flowVersion ?? ''}
@@ -170,7 +170,7 @@ export function NodePropertyPanel({ node, taskTypes, onChangeDsl }: NodeProperty
         </div>
       </div>
       <div className="space-y-1">
-        <Label htmlFor={nameId}>Name</Label>
+        <Label htmlFor={nameId}>Nombre</Label>
         <Input
           id={nameId}
           value={dsl.name ?? ''}

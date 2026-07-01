@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
 
 export interface AssignmentPlanChoice { id: string; displayName: string; status: 'draft' | 'active' | 'deprecated' | 'archived' }
 
@@ -12,13 +13,16 @@ export function PlanAssignmentDialog({ open, tenantId, activePlans, currentPlanI
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel() }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Assign plan to {tenantId}</DialogTitle></DialogHeader>
-        <select aria-label="active-plan-select" value={selected} onChange={(event) => setSelected(event.currentTarget.value)}>
-          {selectable.map((plan) => <option key={plan.id} value={plan.id}>{plan.displayName}</option>)}
-        </select>
+        <DialogHeader><DialogTitle className="break-words">Asignar plan a {tenantId}</DialogTitle></DialogHeader>
+        <label className="block space-y-2 text-sm">
+          <span className="font-medium text-foreground">Plan activo</span>
+          <Select aria-label="Seleccionar plan activo" value={selected} onChange={(event) => setSelected(event.currentTarget.value)}>
+            {selectable.map((plan) => <option key={plan.id} value={plan.id}>{plan.displayName}</option>)}
+          </Select>
+        </label>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          <Button type="button" onClick={() => onConfirm(selected)} disabled={!selected}>Confirm</Button>
+          <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
+          <Button type="button" onClick={() => onConfirm(selected)} disabled={!selected}>Confirmar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

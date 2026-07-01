@@ -22,7 +22,7 @@ export function ExpressionField({ label, value, onChange, placeholder, descripti
   return (
     <div className="space-y-1">
       <Label htmlFor={id}>
-        {label} <span className="font-mono text-[10px] text-muted-foreground">(expression)</span>
+        {label} <span className="font-mono text-[10px] text-muted-foreground">(expresión)</span>
       </Label>
       <Input
         id={id}
@@ -35,7 +35,7 @@ export function ExpressionField({ label, value, onChange, placeholder, descripti
       {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
       {invalid ? (
         <p data-testid="expression-field-error" className="text-xs text-destructive">
-          FLW-E005: expression is not parseable by the CEL engine.
+          FLW-E005: la expresión no puede analizarse con el motor CEL.
         </p>
       ) : null}
     </div>

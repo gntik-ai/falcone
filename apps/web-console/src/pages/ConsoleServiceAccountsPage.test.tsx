@@ -13,7 +13,10 @@ const mockRotateServiceAccountCredential = vi.fn()
 const mockDeleteServiceAccount = vi.fn()
 const mockReadConsoleShellSession = vi.fn()
 
-vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => mockUseConsoleContext() }))
+vi.mock('@/lib/console-context', () => ({
+  formatConsoleEnumLabel: (value: string | null | undefined) => value ? value.replace(/_/g, ' ') : 'No disponible',
+  useConsoleContext: () => mockUseConsoleContext()
+}))
 vi.mock('@/lib/console-service-accounts', () => ({
   useConsoleServiceAccounts: (...args: unknown[]) => mockUseConsoleServiceAccounts(...args),
   createServiceAccount: (...args: unknown[]) => mockCreateServiceAccount(...args),
@@ -51,14 +54,14 @@ describe('ConsoleServiceAccountsPage', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
     render(<ConsoleServiceAccountsPage />)
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
   })
 
   it('muestra empty state del workspace, no del navegador local', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
     render(<ConsoleServiceAccountsPage />)
-    expect(screen.getByText(/no hay service accounts en este workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/no hay cuentas de servicio en esta área de trabajo/i)).toBeInTheDocument()
     expect(screen.queryByText(/navegador/i)).not.toBeInTheDocument()
   })
 
@@ -72,13 +75,13 @@ describe('ConsoleServiceAccountsPage', () => {
     mockCreateServiceAccount.mockResolvedValue({ serviceAccountId: 'sa_2' })
     mockIssueServiceAccountCredential.mockResolvedValue({ credentialId: 'cred_1', secret: 'secret-value', expiresAt: null })
     render(<ConsoleServiceAccountsPage />)
-    await user.type(screen.getByLabelText(/nombre de service account/i), 'Nueva SA')
+    await user.type(screen.getByLabelText(/nombre de cuenta de servicio/i), 'Nueva SA')
     await user.click(screen.getByRole('button', { name: /^crear$/i }))
     await waitFor(() => expect(mockCreateServiceAccount).toHaveBeenCalled())
     const revealButton = screen.getByRole('button', { name: /revelar secreto actual de ops sa/i })
     expect(revealButton).toHaveAttribute('aria-describedby', 'service-account-credential-actions-help')
     await user.click(revealButton)
-    const dialog = await screen.findByRole('dialog', { name: /secreto actual de la service account/i })
+    const dialog = await screen.findByRole('dialog', { name: /secreto actual de la cuenta de servicio/i })
     expect(dialog).toHaveFocus()
     expect(dialog).toHaveAttribute('aria-describedby')
     expect(dialog).toHaveTextContent(/secreto actual/i)
@@ -145,7 +148,7 @@ describe('ConsoleServiceAccountsPage', () => {
     // The row's destructive "Eliminar" button opens the CRITICAL confirmation dialog.
     await user.click(screen.getByRole('button', { name: /eliminar/i }))
     const dialog = screen.getByRole('alertdialog')
-    expect(dialog).toHaveTextContent(/eliminar service account/i)
+    expect(dialog).toHaveTextContent(/eliminar cuenta de servicio/i)
     expect(dialog).toHaveTextContent(/ops sa/i)
     expect(dialog).toHaveTextContent(/esta operación es irreversible/i)
 
@@ -204,6 +207,18 @@ describe('ConsoleServiceAccountsPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/revoked/i)
     // No success dialog opened.
-    expect(screen.queryByRole('dialog', { name: /secreto actual de la service account/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /secreto actual de la cuenta de servicio/i })).not.toBeInTheDocument()
+  })
+
+  it('[#803] renderiza los encabezados de cuentas de servicio en español', () => {
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+
+    render(<ConsoleServiceAccountsPage />)
+
+    expect(screen.getByRole('heading', { name: 'Cuentas de servicio' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Crear cuenta de servicio' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Service Accounts' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Service accounts del workspace activo/i)).not.toBeInTheDocument()
   })
 })

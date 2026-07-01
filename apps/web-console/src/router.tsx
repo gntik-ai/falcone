@@ -150,9 +150,9 @@ export const appRoutes = [
             path: 'overview',
             element: (
               <ConsolePlaceholderPage
-                badge="Overview"
+                badge="Vista general"
                 title="Vista general de la consola"
-                description="Resumen inicial del producto y punto de entrada persistente para la navegación administrativa del BaaS multi-tenant."
+                description="Resumen inicial del producto y punto de entrada persistente para la navegación administrativa del BaaS multi-organización."
               />
             )
           },
@@ -325,7 +325,7 @@ export const appRoutes = [
             path: 'profile',
             element: (
               <ConsolePlaceholderPage
-                badge="Profile"
+                badge="Perfil"
                 title="Perfil de usuario"
                 description="Entrada base para la futura gestión del perfil del operador autenticado dentro de la consola."
               />
@@ -335,7 +335,7 @@ export const appRoutes = [
             path: 'settings',
             element: (
               <ConsolePlaceholderPage
-                badge="Settings"
+                badge="Ajustes"
                 title="Ajustes de consola"
                 description="Entrada base para los ajustes operativos y preferencias de la experiencia administrativa."
               />

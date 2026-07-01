@@ -36,7 +36,7 @@ export function CriticalConfirmationPanel({
         <div className="mt-3 space-y-2">
           <label className="block text-sm font-medium text-slate-700">Código OTP de 6 dígitos</label>
           <input
-            aria-label="OTP code"
+            aria-label="Código OTP"
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={6}
@@ -51,7 +51,7 @@ export function CriticalConfirmationPanel({
         <div className="mt-3 space-y-2">
           <label className="block text-sm font-medium text-slate-700">Token JWT del segundo superadmin</label>
           <textarea
-            aria-label="Second actor token"
+            aria-label="Token del segundo actor"
             value={secondActorTokenValue}
             onChange={(e) => onSecondActorTokenChange(e.target.value)}
             rows={4}

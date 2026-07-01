@@ -12,7 +12,7 @@ vi.mock('@/lib/console-operations', () => ({
 }))
 
 vi.mock('@/components/console/OperationLogEntriesList', () => ({
-  OperationLogEntriesList: ({ operationId }: { operationId: string }) => <div>Logs resumidos mock: {operationId}</div>
+  OperationLogEntriesList: ({ operationId }: { operationId: string }) => <div>Registros resumidos mock: {operationId}</div>
 }))
 
 vi.mock('@/components/console/OperationResultSummary', () => ({
@@ -88,8 +88,8 @@ describe('ConsoleOperationDetailPage', () => {
 
     renderPage()
 
-    expect(screen.getByRole('heading', { name: 'Logs resumidos' })).toBeInTheDocument()
-    expect(screen.getByText('Logs resumidos mock: op_1')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Registros resumidos' })).toBeInTheDocument()
+    expect(screen.getByText('Registros resumidos mock: op_1')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Resultado' })).toBeInTheDocument()
     expect(screen.getByText('Resultado mock: op_1')).toBeInTheDocument()
   })

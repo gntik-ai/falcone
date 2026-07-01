@@ -26,29 +26,29 @@ export function buildTenantGovernanceCards({
   return [
     {
       id: 'tenant-lifecycle',
-      title: 'Lifecycle',
+      title: 'Ciclo de vida',
       value: surface.dashboard.state,
       emphasis: surface.dashboard.governanceStatus,
-      secondary: `Allowed actions: ${surface.dashboard.allowedActions.join(', ') || 'none'}`
+      secondary: `Acciones permitidas: ${surface.dashboard.allowedActions.join(', ') || 'ninguna'}`
     },
     {
       id: 'tenant-quotas',
-      title: 'Quota posture',
-      value: surface.dashboard.quotaAlerts.length === 0 ? 'nominal' : `${surface.dashboard.quotaAlerts.length} alert(s)`,
+      title: 'Postura de cuotas',
+      value: surface.dashboard.quotaAlerts.length === 0 ? 'nominal' : `${surface.dashboard.quotaAlerts.length} alerta(s)`,
       emphasis: surface.dashboard.quotaAlerts.some((alert) => alert.severity === 'blocked') ? 'blocked' : 'warning',
-      secondary: `Retention: ${surface.dashboard.retentionDays ?? 'n/a'} days`
+      secondary: `Retención: ${surface.dashboard.retentionDays ?? 'n/a'} días`
     },
     {
       id: 'tenant-inventory',
-      title: 'Inventory',
-      value: `${surface.dashboard.inventory.managedResourceCount} resources`,
-      secondary: `${surface.dashboard.inventory.workspaceCount} workspace(s), ${surface.dashboard.inventory.applicationCount} app(s)`
+      title: 'Inventario',
+      value: `${surface.dashboard.inventory.managedResourceCount} recursos`,
+      secondary: `${surface.dashboard.inventory.workspaceCount} área(s) de trabajo, ${surface.dashboard.inventory.applicationCount} aplicación(es)`
     },
     {
       id: 'tenant-export',
-      title: 'Recovery export',
-      value: surface.dashboard.lastExportId ?? 'none',
-      secondary: surface.dashboard.deleteProtection ? 'Delete protection enabled' : 'Delete protection disabled'
+      title: 'Export de recuperación',
+      value: surface.dashboard.lastExportId ?? 'ninguno',
+      secondary: surface.dashboard.deleteProtection ? 'Protección de borrado habilitada' : 'Protección de borrado deshabilitada'
     }
   ];
 }

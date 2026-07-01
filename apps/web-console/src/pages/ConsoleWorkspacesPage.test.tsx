@@ -12,7 +12,10 @@ describe('ConsoleWorkspacesPage', () => {
   it('abre el wizard desde el CTA principal', async () => {
     const user = userEvent.setup()
     render(<ConsoleWorkspacesPage />)
-    await user.click(screen.getByRole('button', { name: /nuevo workspace/i }))
-    expect(screen.getByRole('heading', { name: /nuevo workspace/i })).toBeInTheDocument()
+    expect(screen.getByText('Áreas de trabajo')).toBeInTheDocument()
+    expect(screen.getByText(/sin salir de la consola administrativa/i)).toBeInTheDocument()
+    expect(screen.queryByText(/sin salir del shell administrativo/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /nueva área de trabajo/i }))
+    expect(screen.getByRole('heading', { name: /nueva área de trabajo/i })).toBeInTheDocument()
   })
 })

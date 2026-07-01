@@ -39,7 +39,7 @@ describe('ProvisionDatabaseWizard', () => {
 
     expect(screen.queryByText(/acceso bloqueado/i)).not.toBeInTheDocument()
     expect(screen.getByText(/nueva base de datos/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/workspace/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/área de trabajo/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/motor/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/configuración/i)).toBeInTheDocument()
     expect(screen.getByText(/resumen/i)).toBeInTheDocument()

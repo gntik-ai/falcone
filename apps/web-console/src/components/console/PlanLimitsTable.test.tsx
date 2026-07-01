@@ -9,14 +9,14 @@ describe('PlanLimitsTable', () => {
   it('renders unlimited and editable states', () => {
     const onRemove = vi.fn()
     render(<PlanLimitsTable dimensions={rows} editable onRemove={onRemove} />)
-    expect(screen.getByLabelText(/requests limit value/i)).toBeInTheDocument()
-    screen.getByRole('button', { name: /reset requests limit to default/i }).click()
+    expect(screen.getByLabelText(/requests: valor del límite/i)).toBeInTheDocument()
+    screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i }).click()
     expect(onRemove).toHaveBeenCalledWith('requests')
   })
 
   it('resets the visible input when refreshed dimensions change', async () => {
     const { rerender } = render(<PlanLimitsTable dimensions={[{ ...rows[0], effectiveValue: 10 }]} editable />)
-    const input = screen.getByLabelText(/requests limit value/i)
+    const input = screen.getByLabelText(/requests: valor del límite/i)
 
     await userEvent.clear(input)
     await userEvent.type(input, '1.5')
@@ -40,10 +40,10 @@ describe('PlanLimitsTable', () => {
       />
     )
 
-    const input = screen.getByLabelText(/requests limit value/i)
+    const input = screen.getByLabelText(/requests: valor del límite/i)
     await user.clear(input)
     await user.type(input, '12')
-    await user.click(screen.getByRole('button', { name: /reset requests limit to default/i }))
+    await user.click(screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i }))
 
     expect(onUpdate).not.toHaveBeenCalled()
     expect(onRemove).toHaveBeenCalledWith('requests')
@@ -63,12 +63,12 @@ describe('PlanLimitsTable', () => {
       />
     )
 
-    const input = screen.getByLabelText(/requests limit value/i)
+    const input = screen.getByLabelText(/requests: valor del límite/i)
     await user.clear(input)
     await user.type(input, '12')
     await user.tab()
 
-    const resetButton = screen.getByRole('button', { name: /reset requests limit to default/i })
+    const resetButton = screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i })
     expect(resetButton).toHaveFocus()
     expect(onUpdate).not.toHaveBeenCalled()
 
@@ -92,7 +92,7 @@ describe('PlanLimitsTable', () => {
       />
     )
 
-    const input = screen.getByLabelText(/requests limit value/i)
+    const input = screen.getByLabelText(/requests: valor del límite/i)
     await user.clear(input)
     await user.type(input, '12')
     await user.tab()
@@ -108,7 +108,7 @@ describe('PlanLimitsTable', () => {
 
     render(<PlanLimitsTable dimensions={[{ ...rows[0], effectiveValue: 10 }]} editable onUpdate={onUpdate} />)
 
-    const input = screen.getByLabelText(/requests limit value/i)
+    const input = screen.getByLabelText(/requests: valor del límite/i)
     await user.clear(input)
     await user.tab()
 
@@ -119,8 +119,8 @@ describe('PlanLimitsTable', () => {
   it('makes the busy row state explicit', () => {
     render(<PlanLimitsTable dimensions={[{ ...rows[0], effectiveValue: 10 }]} editable busyDimensionKey="requests" />)
 
-    expect(screen.getByLabelText(/requests limit value/i)).toBeDisabled()
-    expect(screen.getByRole('button', { name: /saving requests limit/i })).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent(/saving requests limit/i)
+    expect(screen.getByLabelText(/requests: valor del límite/i)).toBeDisabled()
+    expect(screen.getByRole('button', { name: /guardando límite de requests/i })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent(/guardando límite de requests/i)
   })
 })

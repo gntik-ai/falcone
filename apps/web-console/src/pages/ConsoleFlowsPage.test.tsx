@@ -59,19 +59,20 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
 
     // The page content is present and NOT wrapped in the disabled capability-gate overlay.
     expect(await screen.findByTestId('console-flows-page')).toBeInTheDocument()
+    expect(screen.getAllByText('Flujos').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByTestId('capability-gate-disabled')).not.toBeInTheDocument()
     expect(screen.queryByTestId('capability-gate-badge')).not.toBeInTheDocument()
     expect(screen.queryByTestId('capability-gate-skeleton')).not.toBeInTheDocument()
   })
 
-  it('renders the interactive "New flow" affordance and the flow-name input', async () => {
+  it('renders the interactive "Flujo nuevo" affordance and the flow-name input', async () => {
     renderPage()
 
     await waitFor(() => expect(mockListFlows).toHaveBeenCalledWith('wrk_alpha'))
 
     // Key controls are rendered and live (not inside a `pointer-events-none` gate overlay).
     expect(screen.getByTestId('new-flow-name-input')).toBeInTheDocument()
-    const newFlowButton = screen.getByRole('button', { name: /new flow/i })
+    const newFlowButton = screen.getByRole('button', { name: /flujo nuevo/i })
     expect(newFlowButton).toBeInTheDocument()
   })
 
@@ -90,10 +91,11 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     renderPage()
 
     const row = await screen.findByTestId('flow-row')
-    expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument()
-    const openDesignerLink = within(row).getByRole('link', { name: /open designer for alpha flow/i })
+    expect(screen.getByRole('columnheader', { name: /acciones/i })).toBeInTheDocument()
+    expect(within(row).getByText('Publicado')).toBeInTheDocument()
+    const openDesignerLink = within(row).getByRole('link', { name: /abrir diseñador para alpha flow/i })
     expect(openDesignerLink).toHaveAttribute('href', '/console/flows/flow-alpha')
-    const runHistoryLink = within(row).getByRole('link', { name: /view run history for alpha flow/i })
+    const runHistoryLink = within(row).getByRole('link', { name: /ver historial de ejecuciones para alpha flow/i })
     expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-alpha/runs')
   })
 })

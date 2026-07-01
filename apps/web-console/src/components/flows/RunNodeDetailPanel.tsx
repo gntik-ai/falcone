@@ -46,7 +46,7 @@ function PayloadBlock({ label, value }: { label: string; value: JsonValue | null
         <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</h4>
         {truncated ? (
           <Badge variant="outline" className="text-[9px]" data-testid={`run-node-${label.toLowerCase()}-truncated`}>
-            truncated · 4 KB display cap
+            truncado · límite visual de 4 KB
           </Badge>
         ) : null}
       </div>
@@ -88,13 +88,13 @@ export function RunNodeDetailPanel({ nodeId, detail, liveStatus, onClose }: RunN
             onClick={onClose}
             data-testid="run-node-detail-close"
           >
-            Close
+            Cerrar
           </button>
         ) : null}
       </header>
 
-      <PayloadBlock label="Input" value={detail?.input ?? null} />
-      <PayloadBlock label="Output" value={detail?.output ?? null} />
+      <PayloadBlock label="Entrada" value={detail?.input ?? null} />
+      <PayloadBlock label="Salida" value={detail?.output ?? null} />
 
       {error ? (
         <section className="space-y-1" data-testid="run-node-error">
@@ -109,9 +109,9 @@ export function RunNodeDetailPanel({ nodeId, detail, liveStatus, onClose }: RunN
       ) : null}
 
       <section className="space-y-1" data-testid="run-node-attempts">
-        <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Attempts</h4>
+        <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Intentos</h4>
         {attempts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No recorded attempts.</p>
+          <p className="text-xs text-muted-foreground">No hay intentos registrados.</p>
         ) : (
           <ol className="space-y-1">
             {attempts.map((attempt, index) => (

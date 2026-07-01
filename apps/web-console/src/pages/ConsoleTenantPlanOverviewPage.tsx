@@ -23,37 +23,37 @@ export function ConsoleTenantPlanOverviewPage() {
       return
     }
 
-    api.getEffectiveEntitlements(undefined, { includeConsumption: true }).then(setSummary).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load plan overview'))
+    api.getEffectiveEntitlements(undefined, { includeConsumption: true }).then(setSummary).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el resumen del plan'))
   }, [tenantlessPlatformPrincipal])
 
   if (tenantlessPlatformPrincipal) {
     return (
       <ConsolePageState
         kind="empty"
-        title="No personal tenant plan"
+        title="Sin plan personal de organización"
         description={canOpenPlanCatalog
-          ? 'This platform-level account is not attached to a tenant, so there is no personal tenant plan to display. Open the plan catalog and choose a tenant plan page to review or manage tenant entitlements.'
-          : 'This platform-level account is not attached to a tenant, so there is no personal tenant plan to display. Tenant entitlements are reviewed from tenant-specific plan pages when your role has access.'}
-        actionLabel={canOpenPlanCatalog ? 'Open plan catalog' : undefined}
+          ? 'Esta cuenta de nivel plataforma no está asociada a una organización, así que no hay un plan personal de organización para mostrar. Abre el catálogo de planes y elige una página de plan de organización para revisar o gestionar sus derechos.'
+          : 'Esta cuenta de nivel plataforma no está asociada a una organización, así que no hay un plan personal de organización para mostrar. Los derechos de la organización se revisan desde páginas específicas de organización cuando tu rol tiene acceso.'}
+        actionLabel={canOpenPlanCatalog ? 'Abrir catálogo de planes' : undefined}
         onAction={canOpenPlanCatalog ? () => navigate('/console/plans') : undefined}
       />
     )
   }
-  if (error) return <ConsolePageState kind="error" title="Plan overview unavailable" description={error} />
-  if (!summary) return <ConsolePageState kind="loading" title="Loading plan overview" description="Fetching current effective entitlements." />
-  if (summary.noAssignment) return <ConsolePageState kind="empty" title="No plan assigned" description="Your tenant does not currently have a plan assignment. Catalog defaults remain active." />
+  if (error) return <ConsolePageState kind="error" title="Resumen del plan no disponible" description={error} />
+  if (!summary) return <ConsolePageState kind="loading" title="Cargando resumen del plan" description="Consultando los derechos efectivos actuales." />
+  if (summary.noAssignment) return <ConsolePageState kind="empty" title="Sin plan asignado" description="Tu organización no tiene una asignación de plan actualmente. Los valores predeterminados del catálogo siguen activos." />
 
   const overLimitDimensionCount = summary.quotaDimensions.filter((item) => item.usageStatus === 'over_limit').length
   return (
     <main className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <h1 className="text-2xl font-semibold">My plan</h1>
+        <h1 className="text-2xl font-semibold">Mi plan</h1>
         <p>{summary.planDisplayName}</p>
         <p>{summary.planSlug}</p>
-        <p>Latest history entry: {summary.latestHistoryEntryId ?? '—'}</p>
+        <p>Última entrada del historial: {summary.latestHistoryEntryId ?? '—'}</p>
       </header>
-      {overLimitDimensionCount > 0 ? <section className="rounded-3xl border border-amber-500 bg-amber-50 p-4">{overLimitDimensionCount} dimensions are currently over limit.</section> : null}
-      <QuotaConsumptionTable title="Current effective quotas" rows={summary.quotaDimensions.map((item) => ({ dimensionKey: item.dimensionKey, displayLabel: item.displayLabel ?? item.dimensionKey, unit: item.unit, effectiveValue: item.effectiveValue ?? -1, source: 'plan', currentUsage: item.observedUsage ?? null, usageStatus: item.usageStatus, usageUnknownReason: item.usageUnknownReason }))} />
+      {overLimitDimensionCount > 0 ? <section className="rounded-3xl border border-amber-500 bg-amber-50 p-4">{overLimitDimensionCount} dimensiones están actualmente por encima del límite.</section> : null}
+      <QuotaConsumptionTable title="Cuotas efectivas actuales" rows={summary.quotaDimensions.map((item) => ({ dimensionKey: item.dimensionKey, displayLabel: item.displayLabel ?? item.dimensionKey, unit: item.unit, effectiveValue: item.effectiveValue ?? -1, source: 'plan', currentUsage: item.observedUsage ?? null, usageStatus: item.usageStatus, usageUnknownReason: item.usageUnknownReason }))} />
       <CapabilityStatusGrid capabilities={summary.capabilities.map((item) => ({ capabilityKey: item.capabilityKey, displayLabel: item.displayLabel ?? item.capabilityKey, enabled: item.enabled, source: 'plan' }))} />
     </main>
   )

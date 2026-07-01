@@ -55,44 +55,44 @@ export function ConsoleSecretRotationPage() {
   return (
     <section className="space-y-6 p-4">
       <header>
-        <h1 className="text-2xl font-semibold">Rotate secret</h1>
+        <h1 className="text-2xl font-semibold">Rotar secreto</h1>
         <p className="text-sm text-slate-600">{secretPath}</p>
       </header>
 
       <div className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">Rotation form</h2>
+        <h2 className="text-lg font-medium">Formulario de rotación</h2>
         <div className="mt-4 grid gap-4">
           <label className="grid gap-2">
-            <span>Grace period (seconds)</span>
-            <input aria-label="Grace period slider" type="range" min={300} max={86400} value={gracePeriodSeconds} onChange={(event) => setGracePeriodSeconds(Number(event.target.value))} />
-            <input aria-label="Grace period input" type="number" min={300} max={86400} value={gracePeriodSeconds} onChange={(event) => setGracePeriodSeconds(Number(event.target.value))} className="rounded border p-2" />
+            <span>Periodo de gracia (segundos)</span>
+            <input aria-label="Selector de periodo de gracia" type="range" min={300} max={86400} value={gracePeriodSeconds} onChange={(event) => setGracePeriodSeconds(Number(event.target.value))} />
+            <input aria-label="Entrada de periodo de gracia" type="number" min={300} max={86400} value={gracePeriodSeconds} onChange={(event) => setGracePeriodSeconds(Number(event.target.value))} className="rounded border p-2" />
           </label>
           <label className="grid gap-2">
-            <span>Justification</span>
-            <textarea aria-label="Justification" required className="rounded border p-2" value={justification} onChange={(event) => setJustification(event.target.value)} />
+            <span>Justificación</span>
+            <textarea aria-label="Justificación" required className="rounded border p-2" value={justification} onChange={(event) => setJustification(event.target.value)} />
           </label>
           <label className="grid gap-2">
-            <span>New value</span>
-            <input aria-label="New value" type="password" className="rounded border p-2" value={newValue} onChange={(event) => setNewValue(event.target.value)} />
+            <span>Valor nuevo</span>
+            <input aria-label="Valor nuevo" type="password" className="rounded border p-2" value={newValue} onChange={(event) => setNewValue(event.target.value)} />
           </label>
           <div>
             <button className="rounded bg-blue-600 px-3 py-2 text-white" onClick={async () => {
               await initiateRotation(secretPath, { gracePeriodSeconds, justification, newValue })
-            }}>Submit rotation</button>
+            }}>Enviar rotación</button>
           </div>
         </div>
       </div>
 
       <div className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">Rotation history</h2>
+        <h2 className="text-lg font-medium">Historial de rotación</h2>
         <table className="mt-3 min-w-full text-sm">
           <thead>
             <tr>
-              <th className="px-2 py-1 text-left">Event</th>
+              <th className="px-2 py-1 text-left">Evento</th>
               <th className="px-2 py-1 text-left">Actor</th>
-              <th className="px-2 py-1 text-left">Timestamp</th>
-              <th className="px-2 py-1 text-left">Version new</th>
-              <th className="px-2 py-1 text-left">Version old</th>
+              <th className="px-2 py-1 text-left">Marca temporal</th>
+              <th className="px-2 py-1 text-left">Versión nueva</th>
+              <th className="px-2 py-1 text-left">Versión anterior</th>
             </tr>
           </thead>
           <tbody>
@@ -110,7 +110,7 @@ export function ConsoleSecretRotationPage() {
       </div>
 
       <div className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">Consumer status</h2>
+        <h2 className="text-lg font-medium">Estado de consumidores</h2>
         <div className="mt-3 space-y-2">
           {consumers.map((consumer) => (
             <div key={consumer.consumer_id} className="flex items-center justify-between rounded border p-3 text-sm">

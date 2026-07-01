@@ -68,7 +68,7 @@ describe('ConsolePostgresPage', () => {
 
     renderPage()
 
-    expect((await screen.findAllByText(/selecciona un tenant para explorar las bases de datos postgresql/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Selecciona una organización para explorar las bases de datos PostgreSQL/i)).length).toBeGreaterThan(0)
     expect(requestConsoleSessionJsonMock).not.toHaveBeenCalled()
   })
 
@@ -83,7 +83,7 @@ describe('ConsolePostgresPage', () => {
     expect(await screen.findByRole('table', { name: /listado de bases de datos postgresql/i })).toBeInTheDocument()
     await user.click(screen.getByText('app_db'))
 
-    expect(await screen.findByText('Selecciona un workspace para ver esquemas.')).toBeInTheDocument()
+    expect(await screen.findByText('Selecciona un área de trabajo para ver esquemas.')).toBeInTheDocument()
   })
 
   it('T01.11.03 Carga de databases: renderiza tabla con databaseName, state, ownerRoleName', async () => {
@@ -105,7 +105,7 @@ describe('ConsolePostgresPage', () => {
 
     await user.click(await screen.findByText('app_db'))
 
-    expect(await screen.findByRole('table', { name: /listado de esquemas postgresql del workspace activo/i })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /listado de esquemas postgresql del área de trabajo activa/i })).toBeInTheDocument()
     expect(screen.getByText('public')).toBeInTheDocument()
     expectRequested('/v1/postgres/databases/app_db/schemas?page%5Bsize%5D=100')
   })
@@ -138,7 +138,7 @@ describe('ConsolePostgresPage', () => {
     expectRequested('/v1/postgres/databases/app_db/schemas/public/tables/accounts/security')
   })
 
-  it('T01.11.07 Tab Columns: muestra columnName, tipo, nullable, default', async () => {
+  it('T01.11.07 Tab Columnas: muestra columnName, tipo, nullable, default', async () => {
     mockConsoleApi()
     const user = userEvent.setup()
 
@@ -151,26 +151,26 @@ describe('ConsolePostgresPage', () => {
     expect(screen.getByText('gen_random_uuid()')).toBeInTheDocument()
   })
 
-  it('T01.11.08 Tab Indexes: muestra indexName, método, unicidad', async () => {
+  it('T01.11.08 Tab Índices: muestra indexName, método, unicidad', async () => {
     mockConsoleApi()
     const user = userEvent.setup()
 
     renderPage()
     await selectTable(user)
-    await user.click(screen.getByRole('button', { name: /indexes/i }))
+    await user.click(screen.getByRole('button', { name: /índices/i }))
 
     expect(await screen.findByText('accounts_pkey')).toBeInTheDocument()
     expect(screen.getByText('btree')).toBeInTheDocument()
     expect(screen.getByText('Único')).toBeInTheDocument()
   })
 
-  it('T01.11.09 Tab Policies: muestra policyName, policyMode, command, roles', async () => {
+  it('T01.11.09 Tab Políticas: muestra policyName, policyMode, command, roles', async () => {
     mockConsoleApi()
     const user = userEvent.setup()
 
     renderPage()
     await selectTable(user)
-    await user.click(screen.getByRole('button', { name: /policies/i }))
+    await user.click(screen.getByRole('button', { name: /políticas/i }))
 
     expect(await screen.findByText('accounts_select_policy')).toBeInTheDocument()
     expect(screen.getByText(/permissive/i)).toBeInTheDocument()
@@ -178,15 +178,15 @@ describe('ConsolePostgresPage', () => {
     expect(screen.getByText('tenant_user')).toBeInTheDocument()
   })
 
-  it('T01.11.10 Tab Security: muestra rlsEnabled, forceRls, policyCount, estado', async () => {
+  it('T01.11.10 Tab Seguridad: muestra rlsEnabled, forceRls, policyCount, estado', async () => {
     mockConsoleApi()
     const user = userEvent.setup()
 
     renderPage()
     await selectTable(user)
-    await user.click(screen.getByRole('button', { name: /security/i }))
+    await user.click(screen.getByRole('button', { name: /seguridad/i }))
 
-    expect(await screen.findByText('RLS enabled')).toBeInTheDocument()
+    expect(await screen.findByText('RLS habilitado')).toBeInTheDocument()
     expect(screen.getAllByText('Sí').length).toBeGreaterThan(0)
     expect(screen.getAllByText('2').length).toBeGreaterThan(0)
     expect(screen.getByText(/tenant scoped/i)).toBeInTheDocument()
@@ -220,18 +220,18 @@ describe('ConsolePostgresPage', () => {
     expect(screen.getAllByText('Sí').length).toBeGreaterThan(0)
   })
 
-  it('T01.11.13 Panel DDL Preview: clic en "Preview DDL" → llama al endpoint preview; renderiza statements + warnings + riskProfile', async () => {
+  it('T01.11.13 Panel DDL Preview: clic en "Vista previa DDL" → llama al endpoint preview; renderiza statements + warnings + riskProfile', async () => {
     mockConsoleApi()
     const user = userEvent.setup()
 
     renderPage()
     await selectTable(user)
-    await user.click(screen.getByRole('button', { name: /preview ddl/i }))
+    await user.click(screen.getByRole('button', { name: /vista previa ddl/i }))
 
-    expect(await screen.findByText(/preview ddl — accounts/i)).toBeInTheDocument()
+    expect(await screen.findByText(/vista previa ddl — accounts/i)).toBeInTheDocument()
     expect(screen.getByText(/create table public.accounts/i)).toBeInTheDocument()
     expect(screen.getByText(/exclusive lock possible/i)).toBeInTheDocument()
-    expect(screen.getByText(/locks: 1/i)).toBeInTheDocument()
+    expect(screen.getByText(/bloqueos: 1/i)).toBeInTheDocument()
     expectRequestedWithMethod('PUT', '/v1/postgres/databases/app_db/schemas/public/tables/accounts')
   })
 
@@ -241,14 +241,14 @@ describe('ConsolePostgresPage', () => {
 
     renderPage()
     await selectTable(user)
-    await user.click(screen.getByRole('button', { name: /preview ddl/i }))
+    await user.click(screen.getByRole('button', { name: /vista previa ddl/i }))
 
     const warningCard = (await screen.findByText('Critical warning')).closest('div[data-severity]')
     expect(warningCard).toHaveAttribute('data-severity', 'critical')
     expect(warningCard).toHaveClass('warning-critical')
   })
 
-  it('T01.11.15 Error parcial en indexes: tab Indexes muestra error aislado; tabs Columns y Policies operativos', async () => {
+  it('T01.11.15 Error parcial en índices: tab Índices muestra error aislado; tabs Columnas y Políticas operativos', async () => {
     mockConsoleApi({ indexesError: 'Índices degradados' })
     const user = userEvent.setup()
 
@@ -256,23 +256,23 @@ describe('ConsolePostgresPage', () => {
     await selectTable(user)
 
     expect(await screen.findByText('id')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /indexes/i }))
+    await user.click(screen.getByRole('button', { name: /índices/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/índices degradados/i)
 
-    await user.click(screen.getByRole('button', { name: /columns/i }))
+    await user.click(screen.getByRole('button', { name: /columnas/i }))
     expect(await screen.findByText('gen_random_uuid()')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /policies/i }))
+    await user.click(screen.getByRole('button', { name: /políticas/i }))
     expect(await screen.findByText('accounts_select_policy')).toBeInTheDocument()
   })
 
-  it('T01.11.16 Tabla sin índices: empty state específico en tab Indexes', async () => {
+  it('T01.11.16 Tabla sin índices: empty state específico en tab Índices', async () => {
     mockConsoleApi({ indexes: [] })
     const user = userEvent.setup()
 
     renderPage()
     await selectTable(user)
-    await user.click(screen.getByRole('button', { name: /indexes/i }))
+    await user.click(screen.getByRole('button', { name: /índices/i }))
 
     expect(await screen.findByText(/esta tabla no tiene índices definidos/i)).toBeInTheDocument()
   })
@@ -294,7 +294,7 @@ describe('ConsolePostgresPage', () => {
 
     await waitFor(() => {
       expect(screen.queryByText(/tabla accounts/i)).not.toBeInTheDocument()
-      expect(screen.getByText(/tenant: tenant beta/i)).toBeInTheDocument()
+      expect(screen.getByText(/organización: tenant beta/i)).toBeInTheDocument()
     })
 
     expect(getRequestCount('/v1/postgres/databases?page%5Bsize%5D=100')).toBeGreaterThanOrEqual(2)
@@ -316,7 +316,7 @@ describe('ConsolePostgresPage', () => {
     view.rerender(renderUi())
 
     await waitFor(() => {
-      expect(screen.getByText(/workspace: workspace beta/i)).toBeInTheDocument()
+      expect(screen.getByText(/área de trabajo: workspace beta/i)).toBeInTheDocument()
     })
 
     expect(getRequestCount('/v1/postgres/databases/app_db/schemas?page%5Bsize%5D=100')).toBeGreaterThanOrEqual(2)
@@ -354,7 +354,7 @@ describe('ConsolePostgresPage', () => {
     renderPage()
     await user.click(await screen.findByText('app_db'))
 
-    expect(await screen.findByRole('heading', { name: 'Snippets de conexión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/<RESOURCE_HOST>/).length).toBeGreaterThan(0)
   })
 
@@ -363,7 +363,7 @@ describe('ConsolePostgresPage', () => {
 
     renderPage()
 
-    expect(screen.queryByRole('heading', { name: 'Snippets de conexión' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Fragmentos de conexión' })).not.toBeInTheDocument()
   })
 })
 

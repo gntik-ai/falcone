@@ -58,8 +58,31 @@ describe('ConsoleObservabilityPage', () => {
     expect(rangeSelect).toHaveDisplayValue('Sin ventana activa')
     expect(rangeSelect).toHaveAccessibleDescription(/rango temporal no está activo/i)
     expect(screen.getByText(/rango temporal no está activo/i)).toBeInTheDocument()
-    expect(screen.getByText(/selecciona un workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/selecciona un área de trabajo/i)).toBeInTheDocument()
     expect(mockUseConsoleMetrics).toHaveBeenCalledWith('ten_1', null, expect.objectContaining({ preset: '24h' }))
+  })
+
+  it('[#803] renderiza la página de observabilidad con la copia citada en español', async () => {
+    const user = userEvent.setup()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant activo' }, activeWorkspace: null })
+    mockUseConsoleMetrics.mockReturnValue({ overview: { generatedAt: 'now', overallPosture: 'within_limit', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10, pctUsed: 50, policyMode: 'enforced', freshnessStatus: 'fresh' }], hasQuotaWarning: false }, loading: false, error: null, reload: vi.fn() })
+    mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+
+    render(<ConsoleObservabilityPage />)
+
+    expect(screen.getByRole('heading', { name: 'Observabilidad' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Métricas' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Auditoría' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Observability' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Metrics' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Audit' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Auditoría' }))
+
+    expect(screen.getByLabelText('Categoría')).toBeInTheDocument()
+    expect(screen.getByLabelText('Resultado')).toHaveDisplayValue('Todos')
+    expect(screen.getByRole('option', { name: 'Éxito' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Fallo' })).toBeInTheDocument()
   })
 
   it('renderiza auditoría, detalle y exportación', async () => {
@@ -86,9 +109,9 @@ describe('ConsoleObservabilityPage', () => {
     })
 
     render(<ConsoleObservabilityPage />)
-    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     await user.click(screen.getByRole('button', { name: 'evt_1' }))
-    expect(screen.getByText(/correlation/i)).toBeInTheDocument()
+    expect(screen.getByText(/correlación/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /exportar/i }))
     await waitFor(() => expect(mockExportAuditRecords).toHaveBeenCalled())
     const exportPanel = await screen.findByText('Manifiesto de auditoría listo')
@@ -118,7 +141,7 @@ describe('ConsoleObservabilityPage', () => {
     mockExportAuditRecords.mockReturnValue(exportPromise)
 
     render(<ConsoleObservabilityPage />)
-    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     const exportButton = screen.getByRole('button', { name: /exportar auditoría/i })
 
     await user.click(exportButton)
@@ -126,7 +149,7 @@ describe('ConsoleObservabilityPage', () => {
     expect(exportButton).toBeDisabled()
     expect(exportButton).toHaveAccessibleName(/exportando auditoría/i)
     expect(screen.getByText('Solicitando exportación de auditoría')).toBeInTheDocument()
-    expect(screen.getByText(/esperando la respuesta del backend/i)).toBeInTheDocument()
+    expect(screen.getByText(/esperando la respuesta del servidor/i)).toBeInTheDocument()
 
     resolveExport({ status: 'accepted', message: 'queued' })
     expect(await screen.findByText('Manifiesto no disponible')).toBeInTheDocument()
@@ -140,7 +163,7 @@ describe('ConsoleObservabilityPage', () => {
     mockExportAuditRecords.mockResolvedValue({ status: 'accepted', message: 'Export queued; artifact pending.' })
 
     render(<ConsoleObservabilityPage />)
-    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     await user.click(screen.getByRole('button', { name: /exportar/i }))
 
     expect(await screen.findByText('Manifiesto no disponible')).toBeInTheDocument()
@@ -158,7 +181,7 @@ describe('ConsoleObservabilityPage', () => {
     mockExportAuditRecords.mockRejectedValue(new Error('Audit export unavailable'))
 
     render(<ConsoleObservabilityPage />)
-    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     await user.click(screen.getByRole('button', { name: /exportar/i }))
 
     const alert = await screen.findByRole('alert')

@@ -80,7 +80,7 @@ export function RunActionToolbar({
       }
       setDialog(null)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Action failed')
+      setError(caught instanceof Error ? caught.message : 'La acción falló')
     } finally {
       setPending(false)
     }
@@ -96,13 +96,13 @@ export function RunActionToolbar({
         disabled={terminal}
         data-testid="run-cancel-button"
       >
-        Cancel
+        Cancelar
       </Button>
 
       {/* Retry — only for a terminal execution. */}
       {terminal ? (
         <Button size="sm" variant="outline" onClick={() => setDialog('retry')} data-testid="run-retry-button">
-          Retry
+          Reintentar
         </Button>
       ) : null}
 
@@ -110,10 +110,10 @@ export function RunActionToolbar({
       {waitingApproval ? (
         <>
           <Button size="sm" onClick={() => setDialog('approve')} data-testid="run-approve-button">
-            Approve
+            Aprobar
           </Button>
           <Button size="sm" variant="destructive" onClick={() => setDialog('reject')} data-testid="run-reject-button">
-            Reject
+            Rechazar
           </Button>
         </>
       ) : null}
@@ -126,10 +126,10 @@ export function RunActionToolbar({
 
       <ConfirmActionDialog
         open={dialog === 'cancel'}
-        title="Cancel execution"
-        description="This stops the running workflow gracefully. In-flight activities are signalled to cancel."
-        confirmLabel="Cancel execution"
-        cancelLabel="Keep running"
+        title="Cancelar ejecución"
+        description="Esto detiene el flujo de trabajo en ejecución de forma controlada. Las actividades en curso reciben una señal de cancelación."
+        confirmLabel="Cancelar ejecución"
+        cancelLabel="Mantener ejecución"
         destructive
         pending={pending}
         onConfirm={runConfirm}
@@ -138,9 +138,9 @@ export function RunActionToolbar({
 
       <ConfirmActionDialog
         open={dialog === 'retry'}
-        title="Retry execution"
-        description="This launches a new run with the same flow version and original trigger input. The original run is unchanged."
-        confirmLabel="Start retry"
+        title="Reintentar ejecución"
+        description="Esto inicia una ejecución nueva con la misma versión del flujo y la entrada original del disparador. La ejecución original no cambia."
+        confirmLabel="Iniciar reintento"
         pending={pending}
         onConfirm={runConfirm}
         onOpenChange={(open) => (open ? setDialog('retry') : close())}
@@ -148,9 +148,9 @@ export function RunActionToolbar({
 
       <ConfirmActionDialog
         open={dialog === 'approve'}
-        title="Approve node"
-        description={`Send an approval signal to node "${waitingApproval?.nodeId ?? ''}". The workflow continues past the approval gate.`}
-        confirmLabel="Approve"
+        title="Aprobar nodo"
+        description={`Envía una señal de aprobación al nodo "${waitingApproval?.nodeId ?? ''}". El flujo de trabajo continúa después de la compuerta de aprobación.`}
+        confirmLabel="Aprobar"
         pending={pending}
         onConfirm={runConfirm}
         onOpenChange={(open) => (open ? setDialog('approve') : close())}
@@ -158,9 +158,9 @@ export function RunActionToolbar({
 
       <ConfirmActionDialog
         open={dialog === 'reject'}
-        title="Reject node"
-        description={`Send a rejection signal to node "${waitingApproval?.nodeId ?? ''}". The workflow follows its rejection path.`}
-        confirmLabel="Reject"
+        title="Rechazar nodo"
+        description={`Envía una señal de rechazo al nodo "${waitingApproval?.nodeId ?? ''}". El flujo de trabajo sigue su ruta de rechazo.`}
+        confirmLabel="Rechazar"
         destructive
         pending={pending}
         onConfirm={runConfirm}

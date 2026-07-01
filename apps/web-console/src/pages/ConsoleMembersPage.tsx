@@ -193,37 +193,37 @@ export function ConsoleMembersPage() {
 
   const headerDescription = useMemo(() => {
     if (!activeTenant) {
-      return 'Selecciona un tenant para consultar los miembros y roles de su realm IAM de consola.'
+      return 'Selecciona una organización para consultar los miembros y roles de su realm IAM de consola.'
     }
 
     if (!realmId) {
-      return 'El tenant activo todavía no expone un realm IAM de consola asociado.'
+      return 'La organización activa todavía no expone un realm IAM de consola asociado.'
     }
 
     return `Realm IAM activo: ${realmId}`
   }, [activeTenant, realmId])
 
   if (!activeTenant) {
-    return <ConsoleMembersEmptyState message="Selecciona un tenant para gestionar sus miembros y roles." />
+    return <ConsoleMembersEmptyState message="Selecciona una organización para gestionar sus miembros y roles." />
   }
 
   if (!realmId) {
-    return <ConsoleMembersEmptyState message="Este tenant no tiene un realm de consola IAM configurado." />
+    return <ConsoleMembersEmptyState message="Esta organización no tiene un realm de consola IAM configurado." />
   }
 
   return (
-    <section className="space-y-6" aria-label="Members del tenant activo">
+    <section className="space-y-6" aria-label="Miembros de la organización activa">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <Badge variant="outline">Members</Badge>
+            <Badge variant="outline">Miembros</Badge>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Miembros y roles del tenant</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Miembros y roles de la organización</h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{headerDescription}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">Tenant: {activeTenant.label}</Badge>
+            <Badge variant="secondary">Organización: {activeTenant.label}</Badge>
             <Badge variant="secondary">Realm: {realmId}</Badge>
             <Button type="button" onClick={() => setCreateOpen((current) => !current)}>
               {createOpen ? 'Cerrar' : 'Crear usuario'}
@@ -249,7 +249,7 @@ export function ConsoleMembersPage() {
             <h2 id="console-members-users-heading" className="text-lg font-semibold text-foreground">
               Usuarios IAM
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">Usuarios disponibles en el realm de consola del tenant activo.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Usuarios disponibles en el realm de consola de la organización activa.</p>
           </div>
           {usersError ? (
             <Button type="button" variant="outline" size="sm" onClick={reloadUsers}>
@@ -270,7 +270,7 @@ export function ConsoleMembersPage() {
             <h2 id="console-members-roles-heading" className="text-lg font-semibold text-foreground">
               Roles IAM
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">Roles definidos en el realm de consola para este tenant.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Roles definidos en el realm de consola para esta organización.</p>
           </div>
           {rolesError ? (
             <Button type="button" variant="outline" size="sm" onClick={reloadRoles}>
@@ -326,17 +326,17 @@ function CreateUserPanel({
       setPassword('')
       onCreated()
     } catch (rawError) {
-      setError(getApiErrorMessage(rawError, 'No se pudo crear el usuario en el realm del tenant.'))
+      setError(getApiErrorMessage(rawError, 'No se pudo crear el usuario en el realm de la organización.'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-label="Crear usuario en el realm del tenant">
+    <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-label="Crear usuario en el realm de la organización">
       <h2 className="text-lg font-semibold text-foreground">Crear usuario</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Crea un usuario directamente en el realm del tenant (Keycloak) y asígnale un rol inicial.
+        Crea un usuario directamente en el realm de la organización (Keycloak) y asígnale un rol inicial.
       </p>
       {error ? (
         <div role="alert" className="mt-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -360,7 +360,7 @@ function CreateUserPanel({
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="jdoe@tenant.example"
+            placeholder="jdoe@example.com"
             className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </label>
@@ -381,7 +381,7 @@ function CreateUserPanel({
             onChange={(event) => setRole(event.target.value)}
             className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {assignableRoles.length === 0 ? <option value="tenant_developer">tenant_developer</option> : null}
+            {assignableRoles.length === 0 ? <option value="tenant_developer">Desarrollador de organización</option> : null}
             {assignableRoles.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -402,8 +402,8 @@ function CreateUserPanel({
 function ConsoleMembersEmptyState({ message }: { message: string }) {
   return (
     <section data-testid="console-section-empty" className="rounded-3xl border border-dashed border-border bg-card/40 p-10 text-center shadow-sm">
-      <Badge variant="outline">Members</Badge>
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Members del tenant</h1>
+      <Badge variant="outline">Miembros</Badge>
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Miembros de la organización</h1>
       <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{message}</p>
     </section>
   )
@@ -450,7 +450,7 @@ function UsersTable({ users }: { users: IamUser[] }) {
             <th scope="col" className="px-3 py-3 font-medium">Usuario</th>
             <th scope="col" className="px-3 py-3 font-medium">Email</th>
             <th scope="col" className="px-3 py-3 font-medium">Estado</th>
-            <th scope="col" className="px-3 py-3 font-medium">Lifecycle</th>
+            <th scope="col" className="px-3 py-3 font-medium">Ciclo de vida</th>
             <th scope="col" className="px-3 py-3 font-medium">Roles</th>
             <th scope="col" className="px-3 py-3 font-medium">Acciones requeridas</th>
           </tr>

@@ -13,7 +13,7 @@ export function WaitNode({ data, selected }: NodeProps) {
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Wait"
+        typeLabel="Espera"
         label={nodeData.label}
         icon={Clock}
         selected={selected}

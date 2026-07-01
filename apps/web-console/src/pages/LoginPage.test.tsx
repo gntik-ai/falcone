@@ -25,6 +25,8 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /mantener la sesión abierta/i })).toBeInTheDocument()
+    expect(screen.getByText(/esta iteración ya protege la consola/i)).toBeInTheDocument()
+    expect(screen.queryByText(/protege el shell/i)).not.toBeInTheDocument()
     const recoveryLink = screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })
     expect(recoveryLink).toHaveAttribute('href', '/password-recovery')
     expect(recoveryLink).not.toHaveAttribute('type')
