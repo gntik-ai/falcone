@@ -347,6 +347,49 @@ describe('ConsoleShellLayout', () => {
     })
   })
 
+  it('[#770] ofrece reintento cuando el tenant activo queda con la lista de workspaces vacía', async () => {
+    let workspaceRequestCount = 0
+    const shellApi = createShellApiImplementation({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: []
+      }
+    })
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const parsedUrl = new URL(url, 'http://localhost')
+
+      if (parsedUrl.pathname === '/v1/workspaces') {
+        workspaceRequestCount += 1
+      }
+
+      return shellApi(input)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    persistConsoleShellSession(baseSession)
+    const user = userEvent.setup()
+
+    renderShell('/console/overview')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveTextContent(/sin workspaces accesibles/i)
+    })
+
+    const retryButtons = screen.getAllByRole('button', { name: /reintentar workspaces/i })
+    expect(retryButtons.length).toBeGreaterThan(0)
+
+    const workspaceCallsBeforeRetry = workspaceRequestCount
+
+    await user.click(retryButtons[0])
+
+    await waitFor(() => {
+      expect(workspaceRequestCount).toBeGreaterThan(workspaceCallsBeforeRetry)
+    })
+  })
+
   it('muestra un banner cuando el tenant activo está suspendido', async () => {
     stubShellApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha', { state: 'suspended' })]

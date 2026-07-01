@@ -619,7 +619,7 @@ function ConsoleHeaderContextControls() {
           <Button type="button" variant="outline" size="sm" onClick={() => void reloadTenants()}>
             Reintentar tenants
           </Button>
-        ) : workspacesError ? (
+        ) : workspacesError || hasNoWorkspaces ? (
           <Button type="button" variant="outline" size="sm" onClick={() => void reloadWorkspaces()}>
             Reintentar workspaces
           </Button>
@@ -632,18 +632,21 @@ function ConsoleHeaderContextControls() {
 function ConsoleContextStatusPanel() {
   const {
     activeTenant,
+    activeTenantId,
     activeWorkspace,
     operationalAlerts,
     reloadTenants,
     reloadWorkspaces,
     tenantsError,
     tenantsLoading,
+    workspaces,
     workspacesError,
     workspacesLoading
   } = useConsoleContext()
 
   const tenantStatus = useMemo(() => getConsoleTenantStatusMeta(activeTenant), [activeTenant])
   const workspaceStatus = useMemo(() => getConsoleWorkspaceStatusMeta(activeWorkspace), [activeWorkspace])
+  const hasNoWorkspaces = Boolean(activeTenantId) && !workspacesLoading && !workspacesError && workspaces.length === 0
 
   return (
     <section aria-label="Estado operativo del contexto" className="space-y-4" data-testid="console-context-status-panel">
@@ -721,11 +724,15 @@ function ConsoleContextStatusPanel() {
           </div>
 
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            {workspacesLoading && !activeWorkspace ? 'Cargando el estado del workspace seleccionado…' : workspaceStatus.description}
+            {workspacesLoading && !activeWorkspace
+              ? 'Cargando el estado del workspace seleccionado…'
+              : hasNoWorkspaces
+                ? 'No se encontraron workspaces accesibles para el tenant activo.'
+                : workspaceStatus.description}
           </p>
-          {workspacesError ? (
+          {workspacesError || hasNoWorkspaces ? (
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="text-sm text-destructive">{workspacesError}</p>
+              {workspacesError ? <p className="text-sm text-destructive">{workspacesError}</p> : null}
               <Button type="button" variant="outline" size="sm" onClick={() => void reloadWorkspaces()}>
                 Reintentar workspaces
               </Button>

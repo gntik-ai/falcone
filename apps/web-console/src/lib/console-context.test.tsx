@@ -198,6 +198,62 @@ describe('console-context', () => {
     })
   })
 
+  it('[#770] preserva la lista de workspaces al reseleccionar el tenant activo', async () => {
+    stubContextApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+    persistConsoleContextSelection('usr_abc123', 'ten_alpha', 'wrk_alpha')
+    const user = userEvent.setup()
+
+    renderContextProbe()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_alpha')
+      expect(screen.getByTestId('active-workspace')).toHaveTextContent('wrk_alpha')
+      expect(screen.getByTestId('workspaces-count')).toHaveTextContent('1')
+    })
+
+    const workspaceCallsBeforeReselect = countWorkspaceRequests('ten_alpha')
+
+    await user.click(screen.getByRole('button', { name: /reseleccionar tenant activo/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_alpha')
+      expect(screen.getByTestId('active-workspace')).toHaveTextContent('wrk_alpha')
+      expect(screen.getByTestId('workspaces-count')).toHaveTextContent('1')
+    })
+    expect(countWorkspaceRequests('ten_alpha')).toBe(workspaceCallsBeforeReselect)
+  })
+
+  it('[#770] recarga workspaces al reseleccionar el tenant activo si la lista está vacía', async () => {
+    stubContextApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: []
+      }
+    })
+    const user = userEvent.setup()
+
+    renderContextProbe()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_alpha')
+      expect(screen.getByTestId('active-workspace')).toHaveTextContent('none')
+      expect(screen.getByTestId('workspaces-count')).toHaveTextContent('0')
+    })
+
+    const workspaceCallsBeforeReselect = countWorkspaceRequests('ten_alpha')
+
+    await user.click(screen.getByRole('button', { name: /reseleccionar tenant activo/i }))
+
+    await waitFor(() => {
+      expect(countWorkspaceRequests('ten_alpha')).toBeGreaterThan(workspaceCallsBeforeReselect)
+    })
+  })
+
   it('enriquece el tenant activo con gobernanza, cuotas e inventario y expone alertas operativas', async () => {
     stubContextApi({
       tenants: [
@@ -429,6 +485,7 @@ function ContextProbe() {
       <div data-testid="active-tenant">{context.activeTenantId ?? 'none'}</div>
       <div data-testid="active-workspace">{context.activeWorkspaceId ?? 'none'}</div>
       <div data-testid="tenants-count">{context.tenants.length}</div>
+      <div data-testid="workspaces-count">{context.workspaces.length}</div>
       <div data-testid="tenant-governance">{context.activeTenant?.governanceStatus ?? 'none'}</div>
       <div data-testid="tenant-console-user-realm">{context.activeTenant?.consoleUserRealm ?? 'none'}</div>
       <div data-testid="tenant-quota-warning">{context.activeTenant?.quotaSummary?.totals.warning ?? '0'}</div>
@@ -438,6 +495,9 @@ function ContextProbe() {
       <div data-testid="operational-alerts-count">{context.operationalAlerts.length}</div>
       <button type="button" onClick={() => context.selectTenant('ten_beta')}>
         Seleccionar tenant beta
+      </button>
+      <button type="button" onClick={() => context.selectTenant(context.activeTenantId)}>
+        Reseleccionar tenant activo
       </button>
     </div>
   )
@@ -583,4 +643,12 @@ function fetchPathnames() {
     const requestUrl = typeof call[0] === 'string' ? call[0] : call[0] instanceof URL ? call[0].toString() : (call[0] as Request).url
     return new URL(requestUrl, 'http://localhost').pathname
   })
+}
+
+function countWorkspaceRequests(tenantId: string) {
+  return fetchMock.mock.calls.filter((call) => {
+    const requestUrl = typeof call[0] === 'string' ? call[0] : call[0] instanceof URL ? call[0].toString() : (call[0] as Request).url
+    const parsedUrl = new URL(requestUrl, 'http://localhost')
+    return parsedUrl.pathname === '/v1/workspaces' && parsedUrl.searchParams.get('filter[tenantId]') === tenantId
+  }).length
 }
