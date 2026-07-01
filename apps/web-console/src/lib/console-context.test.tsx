@@ -198,7 +198,7 @@ describe('console-context', () => {
     })
   })
 
-  it('[#770] preserva la lista de workspaces al reseleccionar el tenant activo', async () => {
+  it('[bbx-770-001][fn-console-context-tenant-selection][Scenario: Re-selecting the already-active tenant] preserva la lista de workspaces al reseleccionar el tenant activo', async () => {
     stubContextApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
       workspacesByTenant: {
@@ -228,7 +228,7 @@ describe('console-context', () => {
     expect(countWorkspaceRequests('ten_alpha')).toBe(workspaceCallsBeforeReselect)
   })
 
-  it('[#770] recarga workspaces al reseleccionar el tenant activo si la lista está vacía', async () => {
+  it('[bbx-770-002][fn-console-context-tenant-selection][Scenario: Re-selecting the already-active tenant] recarga workspaces al reseleccionar el tenant activo si la lista está vacía', async () => {
     stubContextApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
       workspacesByTenant: {
