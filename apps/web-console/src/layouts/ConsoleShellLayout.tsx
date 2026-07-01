@@ -7,6 +7,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Rocket,
   RefreshCw,
   Users,
   Settings,
@@ -38,38 +39,71 @@ import {
 import { cn } from '@/lib/utils'
 import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
 
+const consoleNavigationGroupLabels = {
+  main: 'Principal',
+  workspace: 'Área de trabajo',
+  functions: 'Funciones',
+  administration: 'Administración',
+  dataPlane: 'Plano de datos',
+  operations: 'Operaciones'
+} as const
+
+type ConsoleNavigationGroup = keyof typeof consoleNavigationGroupLabels
+
+const consoleNavigationGroupOrder = Object.keys(consoleNavigationGroupLabels) as ConsoleNavigationGroup[]
+
 const consoleNavigationItems = [
   {
+    group: 'main',
     label: 'Vista general',
     to: '/console/overview',
     icon: LayoutDashboard,
     description: 'Punto de entrada para la consola administrativa y su estado general.'
   },
   {
+    group: 'main',
     label: 'Gestión de organizaciones',
     to: '/console/tenants',
     icon: Shield,
     description: 'Gestión del dominio multiorganización y su navegación principal.'
   },
   {
+    group: 'main',
     label: 'Gestión de áreas de trabajo',
     to: '/console/workspaces',
     icon: FolderKanban,
     description: 'Gestión de la organización por áreas de trabajo.'
   },
   {
+    group: 'workspace',
     label: 'DB del área de trabajo',
     to: '/console/database',
     icon: Database,
     description: 'Aprovisiona y rota la base de datos PostgreSQL dedicada del área de trabajo activa.'
   },
   {
-    label: 'Registro de funciones',
+    group: 'functions',
+    label: 'Funciones: registro',
     to: '/console/functions-registry',
-    icon: Workflow,
+    icon: Settings,
     description: 'Registra funciones del área de trabajo activa (ejecución pendiente del plano de datos).'
   },
   {
+    group: 'functions',
+    label: 'Funciones: administrar',
+    to: '/console/functions',
+    icon: Workflow,
+    description: 'Ciclo de vida serverless: inventario, versiones, activaciones, disparadores, despliegue y rollback.'
+  },
+  {
+    group: 'functions',
+    label: 'Funciones: despliegue rápido',
+    to: '/console/functions/data',
+    icon: Rocket,
+    description: 'Editor JSON para desplegar, invocar y consultar activaciones sobre el ejecutor del área de trabajo.'
+  },
+  {
+    group: 'administration',
     label: 'Acceso IAM',
     to: '/console/iam-access',
     icon: Shield,
@@ -77,18 +111,21 @@ const consoleNavigationItems = [
     requiresSuperadminAccess: true
   },
   {
+    group: 'administration',
     label: 'Miembros',
     to: '/console/members',
     icon: Users,
     description: 'Miembros, roles y permisos del realm IAM de la organización activa.'
   },
   {
+    group: 'administration',
     label: 'Planes',
     to: '/console/plans',
     icon: FolderKanban,
     description: 'Gestión del catálogo de planes, límites base y asignaciones por organización.'
   },
   {
+    group: 'administration',
     label: 'Autenticación',
     to: '/console/auth',
     icon: Shield,
@@ -96,84 +133,84 @@ const consoleNavigationItems = [
     requiresSuperadminAccess: true
   },
   {
+    group: 'dataPlane',
     label: 'PostgreSQL',
     to: '/console/postgres',
     icon: Database,
     description: 'Bases de datos, esquemas, tablas, índices, vistas y vista previa DDL.'
   },
   {
+    group: 'dataPlane',
     label: 'MongoDB',
     to: '/console/mongo',
     icon: Database,
     description: 'Bases de datos, colecciones, índices, validación, documentos y vistas del dominio documental.'
   },
   {
+    group: 'dataPlane',
     label: 'Kafka',
     to: '/console/kafka',
     icon: Activity,
     description: 'Tópicos, ACLs, métricas de retraso, puentes y herramientas de publicación/flujo.'
   },
   {
-    label: 'Funciones',
-    to: '/console/functions',
-    icon: Workflow,
-    description: 'Entrada persistente al dominio serverless del producto.'
-  },
-  {
+    group: 'dataPlane',
     label: 'Datos: Postgres',
     to: '/console/postgres/data',
     icon: Database,
     description: 'Editor de filas (CRUD) y claves API anon/service sobre el ejecutor de datos.'
   },
   {
+    group: 'dataPlane',
     label: 'Datos: Mongo',
     to: '/console/mongo/data',
     icon: Database,
     description: 'Editor de documentos (CRUD) de una colección sobre el ejecutor de datos.'
   },
   {
+    group: 'dataPlane',
     label: 'Datos: eventos',
     to: '/console/events/data',
     icon: Activity,
     description: 'Tópicos, publicación y consumo sobre el ejecutor de eventos del área de trabajo.'
   },
   {
-    label: 'Datos: funciones',
-    to: '/console/functions/data',
-    icon: Workflow,
-    description: 'Despliegue e invocación de funciones sobre el ejecutor del área de trabajo.'
-  },
-  {
+    group: 'dataPlane',
     label: 'Datos: tiempo real',
     to: '/console/realtime/changes',
     icon: Activity,
     description: 'Flujo de cambios (SSE) de una colección con clave anónima sobre el ejecutor.'
   },
   {
+    group: 'operations',
     label: 'Operaciones',
     to: '/console/operations',
     icon: Activity,
     description: 'Seguimiento de operaciones asíncronas, registros resumidos y resultado final.'
   },
   {
+    group: 'dataPlane',
     label: 'Almacenamiento',
     to: '/console/storage',
     icon: Database,
     description: 'Navegación base al área de almacenamiento y datos relacionados.'
   },
   {
+    group: 'operations',
     label: 'Observabilidad',
     to: '/console/observability',
     icon: Activity,
     description: 'Métricas, auditoría y señales operativas del contexto activo.'
   },
   {
+    group: 'operations',
     label: 'Cuentas de servicio',
     to: '/console/service-accounts',
     icon: Settings,
     description: 'Credenciales programáticas y service accounts del área de trabajo activa.'
   },
   {
+    group: 'operations',
     label: 'Secretos del área de trabajo',
     to: '/console/workspace-secrets',
     icon: KeyRound,
@@ -181,6 +218,7 @@ const consoleNavigationItems = [
     requiresWorkspaceSecretsAccess: true
   },
   {
+    group: 'operations',
     label: 'Cuotas',
     to: '/console/quotas',
     icon: Activity,
@@ -453,35 +491,54 @@ function ConsoleNavigation() {
       (!('requiresWorkspaceSecretsAccess' in item && item.requiresWorkspaceSecretsAccess) || canSecrets) &&
       (!('requiresSuperadminAccess' in item && item.requiresSuperadminAccess) || isSuperadmin)
   )
+  const groupedItems = consoleNavigationGroupOrder
+    .map((group) => ({
+      group,
+      items: items.filter((item) => item.group === group)
+    }))
+    .filter((group) => group.items.length > 0)
 
   return (
-    <nav aria-label="Navegación principal de consola" className="space-y-1">
-      {items.map((item) => {
-        const Icon = item.icon
+    <nav aria-label="Navegación principal de consola" className="space-y-5">
+      {groupedItems.map(({ group, items: groupItems }) => {
+        const headingId = `console-navigation-${group}`
 
         return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
-                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-current')} aria-hidden="true" />
-                <span className="min-w-0">
-                  <span className="block font-medium">{item.label}</span>
-                  <span className={cn('mt-1 block text-xs leading-5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                    {item.description}
-                  </span>
-                </span>
-              </>
-            )}
-          </NavLink>
+          <section key={group} aria-labelledby={headingId} className="space-y-1.5">
+            <p id={headingId} className="px-3 text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
+              {consoleNavigationGroupLabels[group]}
+            </p>
+            <div className="space-y-1">
+              {groupItems.map((item) => {
+                const Icon = item.icon
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
+                        isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-current')} aria-hidden="true" />
+                        <span className="min-w-0">
+                          <span className="block font-medium">{item.label}</span>
+                          <span className={cn('mt-1 block text-xs leading-5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                            {item.description}
+                          </span>
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })}
+            </div>
+          </section>
         )
       })}
     </nav>

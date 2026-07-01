@@ -135,6 +135,8 @@ describe('ConsoleFunctionsPage', () => {
     mockRequestConsoleSessionJson.mockResolvedValue(inventory())
     renderPage()
 
+    expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Funciones: despliegue rápido' })).toHaveAttribute('href', '/console/functions/data')
     expect(screen.getByText(/cargando inventario/i)).toBeInTheDocument()
     expect(await screen.findByText('hello-fn')).toBeInTheDocument()
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/workspaces/wrk_alpha/inventory', expect.any(Object))
@@ -552,7 +554,7 @@ describe('ConsoleFunctionsPage', () => {
 
     const { rerender } = renderPage(createContext({ activeWorkspaceId: 'wrk_alpha' }))
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    expect(screen.getByText(/consola de funciones/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
 
     mockUseConsoleContext.mockReturnValue(createContext({ activeWorkspaceId: 'wrk_beta' }))
     rerender(<ConsoleFunctionsPage />)

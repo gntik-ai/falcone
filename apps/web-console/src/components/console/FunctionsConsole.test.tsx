@@ -42,7 +42,7 @@ afterEach(() => cleanup())
 describe('FunctionsConsole — richer UX', () => {
   it('loads functions, then lists them with a count', async () => {
     render1()
-    expect(screen.getByText('Cargando funciones…')).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Cargando funciones…' })).toBeInTheDocument()
     expect(await screen.findByText('hello')).toBeInTheDocument()
     expect(screen.getByText('nodejs:20')).toBeInTheDocument()
     expect(screen.getByText('Funciones (1)')).toBeInTheDocument()
@@ -51,7 +51,7 @@ describe('FunctionsConsole — richer UX', () => {
   it('shows an empty state with no functions', async () => {
     mocked.listFunctions.mockResolvedValue({ items: [] })
     render1()
-    expect(await screen.findByText('No hay funciones desplegadas todavía.')).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: 'No hay funciones desplegadas todavía.' })).toBeInTheDocument()
   })
 
   it('invokes the selected function and shows the result', async () => {
@@ -83,7 +83,7 @@ describe('FunctionsConsole — richer UX', () => {
     fireEvent.click(screen.getByRole('radio', { name: /hello \(nodejs:20\)/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Ver activaciones' }))
     await waitFor(() => expect(mocked.listActivations).toHaveBeenCalledWith('res_fn_1'))
-    expect(await screen.findByText('No hay activaciones para esta función.')).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: 'No hay activaciones para esta función.' })).toBeInTheDocument()
   })
 
   it('requires a selection before invoking', async () => {

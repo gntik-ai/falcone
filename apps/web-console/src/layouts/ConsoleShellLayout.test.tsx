@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { readFileSync } from 'node:fs'
 import { RouterProvider, createMemoryRouter, useParams } from 'react-router-dom'
@@ -313,6 +313,26 @@ describe('ConsoleShellLayout', () => {
     expect(await screen.findByRole('link', { name: /kafka/i })).toHaveAttribute('href', '/console/kafka')
   })
 
+  it('[#797] agrupa y etiqueta las superficies de funciones por propósito', async () => {
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/functions')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    expect(within(navigation).getByText('Funciones')).toBeInTheDocument()
+    expect(within(navigation).getByText('Plano de datos')).toBeInTheDocument()
+
+    expect(within(navigation).getByRole('link', { name: /^funciones: registro/i })).toHaveAttribute('href', '/console/functions-registry')
+    expect(within(navigation).getByRole('link', { name: /^funciones: administrar/i })).toHaveAttribute('href', '/console/functions')
+    expect(within(navigation).getByRole('link', { name: /^funciones: despliegue rápido/i })).toHaveAttribute('href', '/console/functions/data')
+    expect(within(navigation).getByRole('link', { name: /^datos: postgres/i })).toHaveAttribute('href', '/console/postgres/data')
+
+    expect(within(navigation).queryByRole('link', { name: /^datos: funciones/i })).not.toBeInTheDocument()
+    expect(within(navigation).queryByRole('link', { name: /^funciones$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
+  })
+
   it('muestra reintento cuando falla la carga de tenants y se recupera al reintentar', async () => {
     let tenantRequestCount = 0
 
@@ -607,8 +627,16 @@ function renderShell(initialPath = '/console/overview') {
             element: <h1>PostgreSQL</h1>
           },
           {
+            path: 'functions-registry',
+            element: <h1>Funciones: registro</h1>
+          },
+          {
             path: 'functions',
-            element: <h1>Funciones</h1>
+            element: <h1>Funciones: administrar</h1>
+          },
+          {
+            path: 'functions/data',
+            element: <h1>Funciones: despliegue rápido</h1>
           },
           {
             path: 'storage',

@@ -698,8 +698,14 @@ export function ConsoleFunctionsPage() {
         <Badge variant="outline">Funciones</Badge>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Consola de funciones</h1>
+            <h1 className="text-2xl font-semibold">Funciones: administrar</h1>
             <p className="text-sm text-muted-foreground">Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Para una prueba directa con JSON sin historial operativo, usa{' '}
+              <a className="font-medium text-primary underline-offset-4 hover:underline" href="/console/functions/data">
+                Funciones: despliegue rápido
+              </a>.
+            </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setPublishWizardOpen(true)} type="button" variant="default">Publicar función</Button>
