@@ -123,7 +123,10 @@ async function createTenant(ctx) {
 
   const tenantId = randomUUID();
   const realm = tenantId; // realm name == tenantId (Falcone tenancy model)
-  if (await kc.realmExists(realm)) return err(409, 'REALM_EXISTS', `realm ${realm} already exists`);
+  let realmExists;
+  try { realmExists = await kc.realmExists(realm); }
+  catch (e) { return kcBackedErr(e, 'CREATE_TENANT_FAILED'); }
+  if (realmExists) return err(409, 'REALM_EXISTS', `realm ${realm} already exists`);
 
   // Durable saga: each forward step records a serializable compensation in
   // Postgres, so a crash mid-provision is rolled back (here on failure, or by

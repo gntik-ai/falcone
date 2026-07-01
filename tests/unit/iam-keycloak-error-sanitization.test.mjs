@@ -105,6 +105,33 @@ test('tenant admin own-realm IAM mutation returns a sanitized domain error on up
   assertSafeClientError(response, 'SET_USER_STATUS_FAILED');
 });
 
+test('superadmin tenant create realmExists preflight maps Keycloak failure to a sanitized domain error', async () => {
+  const response = await LOCAL_HANDLERS.createTenant({
+    pool: {},
+    params: {},
+    query: {},
+    body: { displayName: 'Tenant Alpha', slug: 'tenant-alpha' },
+    identity: { sub: 'superadmin-1', actorType: 'superadmin' },
+    store: {
+      async slugTaken(_pool, slug) {
+        assert.equal(slug, 'tenant-alpha');
+        return false;
+      },
+    },
+    kcAdmin: {
+      async realmExists(realm) {
+        assert.match(realm, /^[0-9a-f-]{36}$/i);
+        throw rawKeycloak404('GET', `/realms/${realm}`);
+      },
+    },
+    async startSaga() {
+      assert.fail('createTenant must not start the saga when realmExists fails');
+    },
+  });
+
+  assertSafeClientError(response, 'CREATE_TENANT_FAILED');
+});
+
 test('superadmin IAM role list returns a sanitized domain error on upstream Keycloak 404', async () => {
   const response = await LOCAL_HANDLERS.iamListRoles({
     params: { realmId: 'tenant-alpha' },
