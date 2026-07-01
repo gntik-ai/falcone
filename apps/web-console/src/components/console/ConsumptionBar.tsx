@@ -16,10 +16,23 @@ export function ConsumptionBar({ current, limit, label }: { current: number | nu
     return <div aria-label={label ?? 'Usage unavailable'} className="text-sm text-muted-foreground">Data unavailable</div>
   }
   const percentage = limit <= 0 ? 100 : Math.min((current / limit) * 100, 100)
+  const ariaMax = limit > 0 ? limit : 100
+  const ariaNow = limit > 0 ? Math.min(current, limit) : current > 0 ? 100 : 0
+  const ariaValueText = limit > 0
+    ? `${current} of ${limit}${current > limit ? ', over limit' : ''}`
+    : `${current} used with a zero limit`
   return (
     <div className="space-y-2">
       <div className="text-sm">{current} / {limit}</div>
-      <div role="progressbar" aria-label={label ?? 'Consumption progress'} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={current} className="h-2 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        role="progressbar"
+        aria-label={label ?? 'Consumption progress'}
+        aria-valuemin={0}
+        aria-valuemax={ariaMax}
+        aria-valuenow={ariaNow}
+        aria-valuetext={ariaValueText}
+        className="h-2 w-full overflow-hidden rounded-full bg-muted"
+      >
         <div data-testid="consumption-bar-fill" className={cn('h-full rounded-full transition-all', getTone(current, limit))} style={{ width: `${percentage}%` }} />
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -22,10 +23,21 @@ describe('ConsoleWorkspaceDashboardPage', () => {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/console/workspaces/:workspaceId" element={<ConsoleWorkspaceDashboardPage />} />
+          <Route path="/console/my-plan" element={<div>My plan route</div>} />
         </Routes>
       </MemoryRouter>
     )
   }
+
+  it('announces the loading state with workspace context', () => {
+    getWorkspaceConsumptionMock.mockReturnValue(new Promise(() => undefined))
+
+    renderPage()
+
+    const state = screen.getByRole('status', { name: /loading workspace dashboard/i })
+    expect(state).toHaveAttribute('aria-busy', 'true')
+    expect(state).toHaveTextContent(/ws-prod/i)
+  })
 
   it('renders workspace consumption and capabilities when the API succeeds', async () => {
     getWorkspaceConsumptionMock.mockResolvedValue({
@@ -53,9 +65,14 @@ describe('ConsoleWorkspaceDashboardPage', () => {
     renderPage()
 
     expect((await screen.findByRole('heading', { name: /workspace dashboard/i })).textContent).toMatch(/workspace dashboard/i)
+    expect(screen.getAllByText('Workspace').length).toBeGreaterThan(0)
     expect(screen.getByText('ws-prod')).toBeInTheDocument()
+    expect(screen.getByText('pro-corp')).toBeInTheDocument()
+    expect(screen.getByText(/Jul 1, 2026/i)).toBeInTheDocument()
     expect(screen.getByText('PostgreSQL databases')).toBeInTheDocument()
+    expect(screen.getByText('Within limit')).toBeInTheDocument()
     expect(screen.getByText('Realtime')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /capabilities/i })).toBeInTheDocument()
     expect(screen.queryByText(/consumption data unavailable/i)).not.toBeInTheDocument()
     expect(getWorkspaceConsumptionMock).toHaveBeenCalledWith('ws-prod')
   })
@@ -73,5 +90,16 @@ describe('ConsoleWorkspaceDashboardPage', () => {
     expect(screen.queryByText(/No action mapped/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(getWorkspaceConsumptionMock).toHaveBeenCalledWith('ws-prod')
+  })
+
+  it('offers a clean route to tenant-level quotas when workspace consumption is unavailable', async () => {
+    const user = userEvent.setup()
+    getWorkspaceConsumptionMock.mockRejectedValue(new Error('404 NO_ROUTE'))
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: /open my plan/i }))
+
+    expect(screen.getByText('My plan route')).toBeInTheDocument()
   })
 })
