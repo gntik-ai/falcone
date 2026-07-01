@@ -12,6 +12,8 @@ import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const FAVICON_MAX_BYTES = 10 * 1024;
+const REFERRER_POLICY = 'strict-origin-when-cross-origin';
+const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
 
 const staticServers = [
   {
@@ -125,6 +127,7 @@ function request(port, path, { method = 'GET', headers = {}, body } = {}) {
 
 function assertCompressed(response, encoding, rawBody) {
   assert.equal(response.statusCode, 200);
+  assertSecurityHeaders(response.headers, `${encoding} compressed asset`);
   assert.equal(response.headers['content-encoding'], encoding);
   assert.equal(response.headers['cache-control'], IMMUTABLE);
   assert.match(response.headers.vary ?? '', /Accept-Encoding/i);
@@ -135,6 +138,63 @@ function assertCompressed(response, encoding, rawBody) {
 
   const decompressed = encoding === 'br' ? brotliDecompressSync(response.body) : gunzipSync(response.body);
   assert.equal(decompressed.toString('utf8'), rawBody);
+}
+
+function parseCsp(header) {
+  return new Map(
+    header
+      .split(';')
+      .map((directive) => directive.trim())
+      .filter(Boolean)
+      .map((directive) => {
+        const [name, ...values] = directive.split(/\s+/);
+        return [name.toLowerCase(), values];
+      })
+  );
+}
+
+function assertSecurityHeaders(headers, label = 'response') {
+  assert.ok(headers['content-security-policy'], `${label} includes Content-Security-Policy`);
+  assert.equal(headers['x-frame-options'], 'DENY', `${label} denies framing via X-Frame-Options`);
+  assert.equal(headers['x-content-type-options'], 'nosniff', `${label} disables content sniffing`);
+  assert.equal(headers['referrer-policy'], REFERRER_POLICY, `${label} sets a referrer policy`);
+  assert.equal(headers['permissions-policy'], PERMISSIONS_POLICY, `${label} sets a permissions policy`);
+
+  const csp = parseCsp(headers['content-security-policy']);
+  assert.deepEqual(csp.get('frame-ancestors'), ["'none'"], `${label} denies all framing via CSP`);
+  assert.deepEqual(csp.get('script-src'), ["'self'"], `${label} constrains scripts to self`);
+  assert.deepEqual(csp.get('default-src'), ["'self'"], `${label} constrains default loads to self`);
+  assert.deepEqual(csp.get('object-src'), ["'none'"], `${label} disables plugin/object execution`);
+  assert.deepEqual(csp.get('base-uri'), ["'self'"], `${label} constrains base URI mutation`);
+  assert.deepEqual(csp.get('connect-src'), ["'self'"], `${label} keeps console API traffic same-origin`);
+  assert.deepEqual(csp.get('form-action'), ["'self'"], `${label} constrains form submissions`);
+
+  const scriptSrc = csp.get('script-src') ?? [];
+  assert.ok(!scriptSrc.includes("'unsafe-inline'"), `${label} does not allow inline scripts`);
+  assert.ok(!scriptSrc.includes("'unsafe-eval'"), `${label} does not allow eval-like script execution`);
+  assert.ok(!scriptSrc.includes('*'), `${label} does not allow wildcard script origins`);
+}
+
+function assertNginxSecurityHeaderSource(source, name, scope) {
+  assert.match(
+    source,
+    /add_header\s+Content-Security-Policy\s+"[^"]*frame-ancestors 'none'[^"]*script-src 'self'[^"]*"\s+always;/,
+    `${name} ${scope} declares CSP with frame denial and self-only scripts`
+  );
+  assert.match(source, /add_header\s+X-Frame-Options\s+"DENY"\s+always;/, `${name} ${scope} denies framing`);
+  assert.match(source, /add_header\s+X-Content-Type-Options\s+"nosniff"\s+always;/, `${name} ${scope} disables sniffing`);
+  assert.match(
+    source,
+    /add_header\s+Referrer-Policy\s+"strict-origin-when-cross-origin"\s+always;/,
+    `${name} ${scope} declares referrer policy`
+  );
+  assert.match(source, /add_header\s+Permissions-Policy\s+"[^"]+"\s+always;/, `${name} ${scope} declares permissions policy`);
+}
+
+function extractNginxLocation(source, pattern, name, scope) {
+  const match = source.match(pattern);
+  assert.ok(match, `${name} declares ${scope}`);
+  return match[1];
 }
 
 function escapeRegex(value) {
@@ -181,7 +241,7 @@ test('web console declares a lightweight SVG-capable favicon asset', async () =>
 });
 
 for (const server of staticServers) {
-  test(`${server.name} compresses compressible assets and sets static cache headers`, async (t) => {
+  test(`${server.name} compresses assets and sets cache and security headers`, async (t) => {
     const { root, files } = await createDistRoot(t);
     const { port } = await startStaticServer(t, server.script, root);
 
@@ -209,21 +269,36 @@ for (const server of staticServers) {
       headers: { 'accept-encoding': 'br, gzip' }
     });
     assert.equal(png.statusCode, 200);
+    assertSecurityHeaders(png.headers, `${server.name} PNG asset`);
     assert.equal(png.headers['cache-control'], IMMUTABLE);
     assert.equal(png.headers['content-encoding'], undefined);
     assert.equal(png.headers.vary, undefined);
     assert.deepEqual(png.body, files['/assets/icon.01020304.png']);
 
+    const rootResponse = await request(port, '/');
+    assert.equal(rootResponse.statusCode, 200);
+    assertSecurityHeaders(rootResponse.headers, `${server.name} root shell`);
+    assert.equal(rootResponse.headers['cache-control'], 'no-store');
+    assert.equal(rootResponse.body.toString('utf8'), files['/index.html']);
+
     const index = await request(port, '/index.html', {
       headers: { 'accept-encoding': 'br, gzip' }
     });
     assert.equal(index.statusCode, 200);
+    assertSecurityHeaders(index.headers, `${server.name} index shell`);
     assert.equal(index.headers['cache-control'], 'no-store');
     assert.equal(index.headers['content-encoding'], undefined);
     assert.equal(index.body.toString('utf8'), files['/index.html']);
 
+    const login = await request(port, '/login');
+    assert.equal(login.statusCode, 200);
+    assertSecurityHeaders(login.headers, `${server.name} /login SPA fallback`);
+    assert.equal(login.headers['cache-control'], 'no-store');
+    assert.equal(login.body.toString('utf8'), files['/index.html']);
+
     const spaFallback = await request(port, '/console/workspaces/demo');
     assert.equal(spaFallback.statusCode, 200);
+    assertSecurityHeaders(spaFallback.headers, `${server.name} SPA fallback`);
     assert.equal(spaFallback.headers['cache-control'], 'no-store');
     assert.equal(spaFallback.body.toString('utf8'), files['/index.html']);
 
@@ -263,7 +338,7 @@ test('deploy kind static server keeps the same-origin /v1 proxy ahead of the SPA
   });
 });
 
-test('nginx static serving configs declare gzip and cache-control parity', async () => {
+test('nginx static serving configs declare gzip, cache-control, and security-header parity', async () => {
   const configs = [
     {
       name: 'production web-console nginx',
@@ -279,6 +354,30 @@ test('nginx static serving configs declare gzip and cache-control parity', async
 
   for (const config of configs) {
     const source = await readFile(join(repoRoot, config.path), 'utf8');
+    const indexLocation = extractNginxLocation(
+      source,
+      /location\s+=\s+\/index\.html\s*\{([\s\S]*?)\n\s*\}/,
+      config.name,
+      'index.html location'
+    );
+    assertNginxSecurityHeaderSource(indexLocation, config.name, 'index.html location');
+
+    const assetsLocation = extractNginxLocation(
+      source,
+      /location\s+\/assets\/\s*\{([\s\S]*?)\n\s*\}/,
+      config.name,
+      'assets location'
+    );
+    assertNginxSecurityHeaderSource(assetsLocation, config.name, 'assets location');
+
+    const shellLocation = extractNginxLocation(
+      source,
+      /location\s+\/\s*\{([\s\S]*?)\n\s*\}/,
+      config.name,
+      'SPA shell fallback location'
+    );
+    assertNginxSecurityHeaderSource(shellLocation, config.name, 'SPA shell fallback location');
+
     assert.match(source, /gzip\s+on;/, `${config.name} enables gzip`);
     assert.match(source, /gzip_vary\s+on;/, `${config.name} varies compressed assets by Accept-Encoding`);
     for (const type of ['text/css', 'text/javascript', 'application/javascript', 'application/json', 'image/svg+xml']) {
