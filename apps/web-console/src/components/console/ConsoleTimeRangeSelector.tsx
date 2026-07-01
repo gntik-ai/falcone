@@ -1,5 +1,6 @@
 import { useId, type ChangeEvent } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
@@ -30,40 +31,53 @@ export function ConsoleTimeRangeSelector({ value, onChange, disabled = false, di
       aria-describedby={descriptionId}
       aria-disabled={disabled ? 'true' : undefined}
       className={cn(
-        'space-y-3 rounded-2xl border p-4',
-        disabled ? 'border-dashed border-border bg-muted/20' : 'border-border bg-card/50'
+        'rounded-3xl border p-5 shadow-sm sm:p-6',
+        disabled ? 'border-dashed border-border bg-card/40' : 'border-border bg-card/70'
       )}
       disabled={disabled}
     >
-      <legend className="text-sm font-medium">Rango temporal</legend>
-      {disabledReason ? (
-        <p id={descriptionId} role="status" aria-live="polite" className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          {disabledReason}
-        </p>
-      ) : null}
-      <div className="space-y-2">
-        <Label htmlFor={presetId}>Ventana de métricas</Label>
-        <Select
-          id={presetId}
-          aria-describedby={descriptionId}
-          value={value.preset}
-          onChange={handlePresetChange}
-          disabled={disabled}
-        >
-          {disabled ? (
-            <option value={value.preset}>Sin ventana activa</option>
-          ) : (
-            <>
-              <option value="24h">24h</option>
-              <option value="7d">7d</option>
-              <option value="30d">30d</option>
-              <option value="custom">custom</option>
-            </>
-          )}
-        </Select>
+      <legend className="sr-only">Rango temporal</legend>
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] md:items-start">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold tracking-tight text-foreground">Rango temporal</p>
+            {disabled ? (
+              <Badge variant="outline" className="border-border/80 bg-background/60 text-muted-foreground">
+                No aplicable
+              </Badge>
+            ) : null}
+          </div>
+          {disabledReason ? (
+            <p id={descriptionId} role="status" aria-live="polite" className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
+              {disabledReason}
+            </p>
+          ) : null}
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={presetId}>Ventana de métricas</Label>
+          <Select
+            id={presetId}
+            aria-describedby={descriptionId}
+            value={value.preset}
+            onChange={handlePresetChange}
+            disabled={disabled}
+            className={cn('min-w-0', disabled && 'disabled:opacity-70')}
+          >
+            {disabled ? (
+              <option value={value.preset}>Sin ventana activa</option>
+            ) : (
+              <>
+                <option value="24h">24h</option>
+                <option value="7d">7d</option>
+                <option value="30d">30d</option>
+                <option value="custom">custom</option>
+              </>
+            )}
+          </Select>
+        </div>
       </div>
       {value.preset === 'custom' ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor={fromId}>Desde</Label>
             <Input
@@ -73,6 +87,7 @@ export function ConsoleTimeRangeSelector({ value, onChange, disabled = false, di
               value={value.from ?? ''}
               onChange={(event) => onChange({ ...value, from: event.target.value })}
               disabled={disabled}
+              className={cn(disabled && 'disabled:opacity-70')}
             />
           </div>
           <div className="space-y-2">
@@ -84,6 +99,7 @@ export function ConsoleTimeRangeSelector({ value, onChange, disabled = false, di
               value={value.to ?? ''}
               onChange={(event) => onChange({ ...value, to: event.target.value })}
               disabled={disabled}
+              className={cn(disabled && 'disabled:opacity-70')}
             />
           </div>
         </div>
