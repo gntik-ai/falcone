@@ -213,12 +213,15 @@ const emptyConsoleContextValue: ConsoleContextValue = {
 
 export function ConsoleContextProvider({
   children,
+  routeWorkspaceId,
   session
 }: {
   children: ReactNode
+  routeWorkspaceId?: string | null
   session: ConsoleShellSession | null
 }) {
   const userId = session?.principal?.userId?.trim() || null
+  const matchedRouteWorkspaceId = useMemo(() => normalizeContextId(routeWorkspaceId), [routeWorkspaceId])
   const tenantIds = useMemo(
     () => (Array.isArray(session?.principal?.tenantIds) ? session?.principal?.tenantIds.filter(Boolean) : []),
     [session?.principal?.tenantIds]
@@ -323,7 +326,13 @@ export function ConsoleContextProvider({
       try {
         const collection = await listAccessibleTenants({ isTenantOperator, ownTenantIds: tenantIds })
         const options = filterTenantOptions(normalizeTenantOptions(collection.items), tenantIds)
-        const nextTenantId = resolveInitialTenantId(options, persistedSnapshot?.tenantId ?? null)
+        const routeWorkspaceContext = matchedRouteWorkspaceId
+          ? await resolveRouteWorkspaceContext(options, matchedRouteWorkspaceId, workspaceIds)
+          : null
+        const nextTenantId = matchedRouteWorkspaceId
+          ? routeWorkspaceContext?.tenantId ?? null
+          : resolveInitialTenantId(options, persistedSnapshot?.tenantId ?? null)
+        const nextWorkspaceId = routeWorkspaceContext ? matchedRouteWorkspaceId : null
 
         if (cancelled) {
           return
@@ -331,13 +340,15 @@ export function ConsoleContextProvider({
 
         setTenants(options)
         setActiveTenantId(nextTenantId)
-        setActiveWorkspaceId(null)
-        setWorkspaces([])
+        setActiveWorkspaceId(nextWorkspaceId)
+        setWorkspaces(routeWorkspaceContext?.workspaces ?? [])
         setWorkspacesError(null)
 
-        if (!nextTenantId) {
+        if (matchedRouteWorkspaceId && routeWorkspaceContext) {
+          persistSelection(nextTenantId, nextWorkspaceId)
+        } else if (!nextTenantId) {
           clearPersistedConsoleContext()
-        } else if (nextTenantId !== persistedSnapshot?.tenantId || persistedSnapshot?.workspaceId) {
+        } else if (!matchedRouteWorkspaceId && (nextTenantId !== persistedSnapshot?.tenantId || persistedSnapshot?.workspaceId)) {
           persistSelection(nextTenantId, null)
         }
       } catch (error) {
@@ -362,7 +373,7 @@ export function ConsoleContextProvider({
     return () => {
       cancelled = true
     }
-  }, [isTenantOperator, persistSelection, tenantIds, tenantReloadKey, userId])
+  }, [isTenantOperator, matchedRouteWorkspaceId, persistSelection, tenantIds, tenantReloadKey, userId, workspaceIds])
 
   useEffect(() => {
     if (!userId || !activeTenantId) {
@@ -376,7 +387,7 @@ export function ConsoleContextProvider({
     let cancelled = false
     const currentTenantId = activeTenantId
     const persistedSnapshot = readPersistedConsoleContext(userId)
-    const preferredWorkspaceId = persistedSnapshot?.tenantId === currentTenantId ? persistedSnapshot.workspaceId : null
+    const preferredWorkspaceId = matchedRouteWorkspaceId ?? (persistedSnapshot?.tenantId === currentTenantId ? persistedSnapshot.workspaceId : null)
 
     async function loadWorkspaces() {
       setWorkspacesLoading(true)
@@ -385,7 +396,9 @@ export function ConsoleContextProvider({
       try {
         const collection = await listAccessibleWorkspaces(currentTenantId)
         const options = filterWorkspaceOptions(normalizeWorkspaceOptions(collection.items), workspaceIds)
-        const nextWorkspaceId = resolveInitialWorkspaceId(options, preferredWorkspaceId)
+        const nextWorkspaceId = resolveInitialWorkspaceId(options, preferredWorkspaceId, {
+          allowFallback: !matchedRouteWorkspaceId
+        })
 
         if (cancelled) {
           return
@@ -394,7 +407,7 @@ export function ConsoleContextProvider({
         setWorkspaces(options)
         setActiveWorkspaceId(nextWorkspaceId)
 
-        if (nextWorkspaceId || preferredWorkspaceId) {
+        if (matchedRouteWorkspaceId || nextWorkspaceId || preferredWorkspaceId) {
           persistSelection(currentTenantId, nextWorkspaceId)
         }
       } catch (error) {
@@ -417,7 +430,7 @@ export function ConsoleContextProvider({
     return () => {
       cancelled = true
     }
-  }, [activeTenantId, persistSelection, userId, workspaceIds, workspaceReloadKey])
+  }, [activeTenantId, matchedRouteWorkspaceId, persistSelection, userId, workspaceIds, workspaceReloadKey])
 
   useEffect(() => {
     if (!activeTenantId) {
@@ -589,12 +602,20 @@ export function resolveInitialTenantId(options: ConsoleTenantOption[], preferred
   return options.length === 1 ? options[0].tenantId : null
 }
 
-export function resolveInitialWorkspaceId(options: ConsoleWorkspaceOption[], preferredWorkspaceId: string | null): string | null {
+export function resolveInitialWorkspaceId(
+  options: ConsoleWorkspaceOption[],
+  preferredWorkspaceId: string | null,
+  {
+    allowFallback = true
+  }: {
+    allowFallback?: boolean
+  } = {}
+): string | null {
   if (preferredWorkspaceId && options.some((option) => option.workspaceId === preferredWorkspaceId)) {
     return preferredWorkspaceId
   }
 
-  return options.length === 1 ? options[0].workspaceId : null
+  return allowFallback && options.length === 1 ? options[0].workspaceId : null
 }
 
 export function getConsoleTenantStatusMeta(tenant: ConsoleTenantOption | null): {
@@ -817,6 +838,30 @@ async function listAccessibleWorkspaces(tenantId: string): Promise<WorkspaceColl
   return requestConsoleSessionJson<WorkspaceCollectionResponse>(`/v1/workspaces?${searchParams.toString()}`)
 }
 
+async function resolveRouteWorkspaceContext(
+  tenants: ConsoleTenantOption[],
+  routeWorkspaceId: string,
+  allowedWorkspaceIds: string[]
+): Promise<{ tenantId: string; workspaces: ConsoleWorkspaceOption[] } | null> {
+  if (allowedWorkspaceIds.length > 0 && !allowedWorkspaceIds.includes(routeWorkspaceId)) {
+    return null
+  }
+
+  for (const tenant of tenants) {
+    const collection = await listAccessibleWorkspaces(tenant.tenantId)
+    const workspaces = filterWorkspaceOptions(normalizeWorkspaceOptions(collection.items), allowedWorkspaceIds)
+
+    if (workspaces.some((workspace) => workspace.workspaceId === routeWorkspaceId)) {
+      return {
+        tenantId: tenant.tenantId,
+        workspaces
+      }
+    }
+  }
+
+  return null
+}
+
 function normalizeTenantOptions(items: Tenant[]): ConsoleTenantOption[] {
   return items.map((tenant) => ({
     tenantId: tenant.tenantId,
@@ -969,6 +1014,11 @@ function isProvisioningDegraded(status: string | null | undefined): boolean {
 function getConsoleContextErrorMessage(rawError: unknown, fallback: string): string {
   const message = typeof rawError === 'object' && rawError !== null && 'message' in rawError ? (rawError.message as string | undefined) : undefined
   return message?.trim() || fallback
+}
+
+function normalizeContextId(value: string | null | undefined): string | null {
+  const normalized = value?.trim()
+  return normalized ? normalized : null
 }
 
 function readContextStorage(): string | null {
