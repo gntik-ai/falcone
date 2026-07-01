@@ -1,10 +1,11 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { RouterProvider, createMemoryRouter } from 'react-router-dom'
+import { RouterProvider, createMemoryRouter, useParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleShellLayout } from './ConsoleShellLayout'
 
+import { useConsoleContext } from '@/lib/console-context'
 import { clearConsoleShellSession, persistConsoleShellSession, readConsoleShellSession } from '@/lib/console-session'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -154,6 +155,83 @@ describe('ConsoleShellLayout', () => {
       expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_beta')
       expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
     })
+  })
+
+  it('[#738] restaura tenant y workspace desde /console/workspaces/:workspaceId en una sesión fresca', async () => {
+    stubShellApi({
+      tenants: [
+        createTenant('ten_alpha', 'Tenant Alpha'),
+        createTenant('ten_beta', 'Tenant Beta')
+      ],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')],
+        ten_beta: [createWorkspace('wrk_beta', 'ten_beta', 'Workspace Beta')]
+      }
+    })
+    persistConsoleShellSession(
+      createSessionWithRoles(['tenant_owner'], {
+        tenantIds: ['ten_alpha', 'ten_beta'],
+        workspaceIds: ['wrk_alpha', 'wrk_beta']
+      })
+    )
+
+    renderShell('/console/workspaces/wrk_beta')
+
+    expect(await screen.findByRole('heading', { name: /workspace route probe/i })).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_beta')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('wrk_beta')
+      expect(screen.getByTestId('console-context-workspace-status')).toHaveTextContent(/workspace beta/i)
+      expect(screen.getByTestId('workspace-route-active-tenant')).toHaveTextContent('ten_beta')
+      expect(screen.getByTestId('workspace-route-active-workspace')).toHaveTextContent('wrk_beta')
+      expect(screen.getByTestId('workspace-route-data-state')).toHaveTextContent('loaded:wrk_beta')
+    })
+
+    expect(screen.queryByText(/sin workspace seleccionado/i)).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('in-falcone.console-active-context')).toContain('"workspaceId":"wrk_beta"')
+  })
+
+  it('[#738] no usa un workspace persistido no relacionado cuando el workspace de la ruta no es accesible', async () => {
+    stubShellApi({
+      tenants: [
+        createTenant('ten_alpha', 'Tenant Alpha'),
+        createTenant('ten_beta', 'Tenant Beta')
+      ],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')],
+        ten_beta: [createWorkspace('wrk_beta', 'ten_beta', 'Workspace Beta')]
+      }
+    })
+    window.localStorage.setItem(
+      'in-falcone.console-active-context',
+      JSON.stringify({
+        userId: 'usr_abc123',
+        tenantId: 'ten_alpha',
+        workspaceId: 'wrk_alpha',
+        updatedAt: '2026-03-28T18:05:00.000Z'
+      })
+    )
+    persistConsoleShellSession(
+      createSessionWithRoles(['tenant_owner'], {
+        tenantIds: ['ten_alpha', 'ten_beta'],
+        workspaceIds: ['wrk_alpha', 'wrk_beta']
+      })
+    )
+
+    renderShell('/console/workspaces/wrk_forbidden')
+
+    expect(await screen.findByRole('heading', { name: /workspace route probe/i })).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-route-param')).toHaveTextContent('wrk_forbidden')
+      expect(screen.getByTestId('workspace-route-active-workspace')).toHaveTextContent('none')
+      expect(screen.getByTestId('workspace-route-data-state')).toHaveTextContent('no-workspace')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
+    })
+
+    expect(screen.getByTestId('console-context-workspace-status')).toHaveTextContent(/sin workspace seleccionado/i)
+    expect(screen.getByTestId('console-context-workspace-status')).not.toHaveTextContent(/workspace alpha/i)
   })
 
   it('muestra estado vacío cuando no hay tenants accesibles', async () => {
@@ -405,6 +483,10 @@ function renderShell(initialPath = '/console/overview') {
             element: <h1>Workspaces</h1>
           },
           {
+            path: 'workspaces/:workspaceId',
+            element: <WorkspaceRouteProbe />
+          },
+          {
             path: 'members',
             element: <h1>Members</h1>
           },
@@ -441,6 +523,22 @@ function renderShell(initialPath = '/console/overview') {
   )
 
   return render(<RouterProvider router={router} />)
+}
+
+function WorkspaceRouteProbe() {
+  const { workspaceId } = useParams()
+  const { activeTenantId, activeWorkspaceId, activeWorkspace } = useConsoleContext()
+
+  return (
+    <section>
+      <h1>Workspace route probe</h1>
+      <p data-testid="workspace-route-param">{workspaceId ?? 'none'}</p>
+      <p data-testid="workspace-route-active-tenant">{activeTenantId ?? 'none'}</p>
+      <p data-testid="workspace-route-active-workspace">{activeWorkspaceId ?? 'none'}</p>
+      <p data-testid="workspace-route-active-workspace-label">{activeWorkspace?.label ?? 'none'}</p>
+      <p data-testid="workspace-route-data-state">{activeWorkspaceId && activeWorkspaceId === workspaceId ? `loaded:${activeWorkspaceId}` : 'no-workspace'}</p>
+    </section>
+  )
 }
 
 function stubShellApi({

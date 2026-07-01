@@ -13,7 +13,7 @@ import {
   User,
   Workflow
 } from 'lucide-react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom'
 
 import { ActiveOperationsIndicator } from '@/components/console/ActiveOperationsIndicator'
 import { Badge } from '@/components/ui/badge'
@@ -189,6 +189,17 @@ const consoleNavigationItems = [
 export function ConsoleShellLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const routeMatches = useMatches()
+  const routeWorkspaceId = useMemo(() => {
+    for (let index = routeMatches.length - 1; index >= 0; index -= 1) {
+      const workspaceId = routeMatches[index]?.params.workspaceId
+      if (workspaceId) {
+        return workspaceId
+      }
+    }
+
+    return null
+  }, [routeMatches])
   const [session, setSession] = useState(() => readConsoleShellSession())
   const [menuOpen, setMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -297,7 +308,7 @@ export function ConsoleShellLayout() {
   }
 
   return (
-    <ConsoleContextProvider session={session}>
+    <ConsoleContextProvider session={session} routeWorkspaceId={routeWorkspaceId}>
       <div className="min-h-screen bg-background text-foreground">
         <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
           <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
