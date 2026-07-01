@@ -10,7 +10,7 @@ describe('ConsoleTimeRangeSelector', () => {
     const onChange = vi.fn()
     render(<ConsoleTimeRangeSelector value={{ preset: '24h' }} onChange={onChange} />)
 
-    await user.selectOptions(screen.getByLabelText(/rango temporal/i), 'custom')
+    await user.selectOptions(screen.getByLabelText(/ventana de métricas/i), 'custom')
     expect(onChange).toHaveBeenCalled()
   })
 
@@ -25,10 +25,14 @@ describe('ConsoleTimeRangeSelector', () => {
       />
     )
 
-    expect(screen.getByLabelText(/rango temporal/i)).toBeDisabled()
+    const rangeSelect = screen.getByLabelText(/ventana de métricas/i)
+    expect(screen.getByRole('group', { name: /rango temporal/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(rangeSelect).toBeDisabled()
+    expect(rangeSelect).toHaveDisplayValue('Sin ventana activa')
+    expect(rangeSelect).toHaveAccessibleDescription('No aplica al scope tenant.')
     expect(screen.getByLabelText(/desde/i)).toBeDisabled()
     expect(screen.getByLabelText(/hasta/i)).toBeDisabled()
-    expect(screen.getByText('No aplica al scope tenant.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('No aplica al scope tenant.')
     expect(onChange).not.toHaveBeenCalled()
   })
 })

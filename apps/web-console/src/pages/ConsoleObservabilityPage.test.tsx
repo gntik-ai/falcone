@@ -34,9 +34,9 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
     render(<ConsoleObservabilityPage />)
     expect(screen.getByText('API')).toBeInTheDocument()
-    expect(screen.getByLabelText(/rango temporal/i)).toBeEnabled()
+    expect(screen.getByLabelText(/ventana de métricas/i)).toBeEnabled()
 
-    await user.selectOptions(screen.getByLabelText(/rango temporal/i), '7d')
+    await user.selectOptions(screen.getByLabelText(/ventana de métricas/i), '7d')
 
     await waitFor(() => {
       expect(mockUseConsoleMetrics).toHaveBeenCalledWith('ten_1', 'wrk_1', expect.objectContaining({ preset: '7d' }))
@@ -50,9 +50,11 @@ describe('ConsoleObservabilityPage', () => {
 
     render(<ConsoleObservabilityPage />)
 
-    const rangeSelect = screen.getByLabelText(/rango temporal/i)
+    const rangeSelect = screen.getByLabelText(/ventana de métricas/i)
     expect(rangeSelect).toBeDisabled()
-    expect(screen.getByText(/no aplica al scope tenant/i)).toBeInTheDocument()
+    expect(rangeSelect).toHaveDisplayValue('Sin ventana activa')
+    expect(rangeSelect).toHaveAccessibleDescription(/rango temporal no está activo/i)
+    expect(screen.getByText(/rango temporal no está activo/i)).toBeInTheDocument()
     expect(screen.getByText(/selecciona un workspace/i)).toBeInTheDocument()
     expect(mockUseConsoleMetrics).toHaveBeenCalledWith('ten_1', null, expect.objectContaining({ preset: '24h' }))
   })

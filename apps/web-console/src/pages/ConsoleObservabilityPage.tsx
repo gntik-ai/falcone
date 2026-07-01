@@ -145,7 +145,7 @@ export function ConsoleObservabilityPage() {
             value={metricsRangeApplies ? range : TENANT_SCOPE_METRICS_RANGE}
             onChange={setRange}
             disabled={!metricsRangeApplies}
-            disabledReason={!metricsRangeApplies ? 'No aplica al scope tenant. Selecciona un workspace para consultar series con ventana temporal.' : undefined}
+            disabledReason={!metricsRangeApplies ? 'El rango temporal no está activo para métricas de tenant. Selecciona un workspace en el contexto de consola para consultar series con ventana temporal.' : undefined}
           />
           {metrics.loading ? <ConsolePageState kind="loading" title="Cargando métricas" description="Consultando overview y snapshot de uso." /> : null}
           {metrics.error ? <ConsolePageState kind="error" title="No se pudieron cargar las métricas" description={metrics.error} actionLabel="Reintentar" onAction={metrics.reload} /> : null}
