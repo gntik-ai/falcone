@@ -208,11 +208,7 @@ export async function refreshConsoleShellSession(session = readConsoleShellSessi
       return readConsoleShellSession()
     } catch {
       clearConsoleShellSession()
-      persistConsoleAuthStatusHint({
-        statusView: 'login',
-        title: 'Tu sesión ha expirado',
-        message: 'Vuelve a autenticarte para continuar en la consola.'
-      })
+      persistExpiredConsoleSessionHint()
       emitConsoleSessionInvalidated()
       return null
     } finally {
@@ -336,7 +332,16 @@ function resolveAccessTokenExpiry(session: ConsoleShellSession): string {
 
 function clearUnusableConsoleShellSession(): void {
   clearConsoleShellSession()
+  persistExpiredConsoleSessionHint()
   emitConsoleSessionInvalidated()
+}
+
+function persistExpiredConsoleSessionHint(): void {
+  persistConsoleAuthStatusHint({
+    statusView: 'login',
+    title: 'Tu sesión ha expirado',
+    message: 'Vuelve a autenticarte para continuar en la consola.'
+  })
 }
 
 function emitConsoleSessionInvalidated(): void {

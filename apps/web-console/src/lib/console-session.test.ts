@@ -192,6 +192,23 @@ describe('console-session', () => {
       message: 'Vuelve a autenticarte para continuar en la consola.'
     })
   })
+
+  it('persiste el hint auth cuando la sesión ya no puede refrescarse', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-30T10:00:00.000Z'))
+    persistConsoleShellSession(baseSession)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(refreshConsoleShellSession()).resolves.toBeNull()
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(readConsoleShellSession()).toBeNull()
+    expect(consumeConsoleAuthStatusHint()).toEqual({
+      statusView: 'login',
+      title: 'Tu sesión ha expirado',
+      message: 'Vuelve a autenticarte para continuar en la consola.'
+    })
+  })
 })
 
 function createJsonResponse(status: number, body: unknown): Response {
