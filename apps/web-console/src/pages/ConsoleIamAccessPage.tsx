@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { ApiError } from '@/lib/http'
+import type { ApiError, JsonValue } from '@/lib/http'
 
 interface IamUser {
   id: string
@@ -35,8 +37,32 @@ interface ListGroupsResponse {
   total: number
 }
 
+const IAM_ACCESS_ERROR_MESSAGES: Record<string, string> = {
+  IAM_ASSIGN_ROLE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
+  IAM_REMOVE_ROLE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
+  IAM_GROUP_ADD_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
+  IAM_GROUP_REMOVE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
+  IAM_LIST_USERS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_ROLES_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_GROUPS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_CLIENTS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_GET_USER_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
+  IAM_GET_ROLE_FAILED: 'No se pudo cargar la información de roles IAM.',
+  IAM_LIST_USER_ROLES_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
+  IAM_LIST_USER_GROUPS_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
+  IAM_LIST_GROUP_MEMBERS_FAILED: 'No se pudo cargar la información del grupo IAM.'
+}
+
+const RAW_KEYCLOAK_ERROR_PATTERN = /\bkeycloak\s+[A-Z]+\s+\/realms\/|\/admin\/realms\/|\/realms\/|\{[^{}]*(?:"error"|"errorMessage")\s*:/i
+
 function errMsg(error: unknown, fallback: string): string {
-  return (error as Partial<ApiError>)?.message?.trim() || fallback
+  const apiError = error as Partial<ApiError>
+  const code = apiError?.code?.trim()
+  if (code && IAM_ACCESS_ERROR_MESSAGES[code]) return IAM_ACCESS_ERROR_MESSAGES[code]
+
+  const message = apiError?.message?.trim()
+  if (!message || RAW_KEYCLOAK_ERROR_PATTERN.test(message)) return fallback
+  return message
 }
 
 export function ConsoleIamAccessPage() {
@@ -116,12 +142,12 @@ export function ConsoleIamAccessPage() {
     void loadUserDetail(realm, selectedUserId)
   }, [realm, selectedUserId, loadUserDetail])
 
-  async function mutate(path: string, method: 'POST' | 'DELETE' | 'PUT', body?: Record<string, unknown>) {
+  async function mutate(path: string, method: 'POST' | 'DELETE' | 'PUT', body?: JsonValue) {
     if (!realm || !selectedUserId) return
     setBusy(true)
     setError(null)
     try {
-      await requestConsoleSessionJson(path, { method, body: body ?? {} })
+      await requestConsoleSessionJson(path, { method, body: body ?? ({} as JsonValue) })
       await loadUserDetail(realm, selectedUserId)
     } catch (rawError) {
       setError(errMsg(rawError, 'La operación de IAM no pudo completarse.'))
@@ -163,9 +189,17 @@ export function ConsoleIamAccessPage() {
       ) : null}
 
       {error ? (
-        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Alert variant="destructive" className="border-destructive/30 bg-destructive/5 text-foreground shadow-sm">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/20 text-destructive">
+              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 max-w-3xl">
+              <AlertTitle className="text-base text-foreground">Acción IAM no completada</AlertTitle>
+              <AlertDescription className="break-words text-muted-foreground">{error}</AlertDescription>
+            </div>
+          </div>
+        </Alert>
       ) : null}
 
       {realm ? (
