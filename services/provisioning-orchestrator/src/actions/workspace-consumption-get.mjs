@@ -2,12 +2,44 @@ import { resolveTenantConsumption, resolveWorkspaceConsumption } from '../reposi
 
 const ERROR_STATUS_CODES = { FORBIDDEN: 403, TENANT_NOT_FOUND: 404, WORKSPACE_NOT_FOUND: 404 };
 
+const TENANT_OWNER_TYPES = new Set(['tenant_owner', 'tenant-owner', 'tenant']);
+const WORKSPACE_ADMIN_TYPES = new Set(['workspace_admin', 'workspace-admin']);
+
+function resolveActorTenantId(params, actor) {
+  return actor.tenantId ?? actor.tenant?.id ?? params.callerContext?.tenantId ?? null;
+}
+
+function resolveActorWorkspaceIds(params, actor) {
+  const candidates = [
+    actor.workspaceId,
+    actor.workspace?.id,
+    params.callerContext?.workspaceId,
+    ...(Array.isArray(actor.workspaceIds) ? actor.workspaceIds : []),
+    ...(Array.isArray(params.callerContext?.workspaceIds) ? params.callerContext.workspaceIds : [])
+  ];
+  return candidates.map((value) => value == null ? null : String(value)).filter(Boolean);
+}
+
 function authorize(params) {
   const actor = params.callerContext?.actor;
   if (!actor?.id) throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
-  if (actor.type === 'superadmin' || actor.type === 'internal') return { tenantId: params.tenantId, workspaceId: params.workspaceId };
-  if ((actor.type === 'tenant_owner' || actor.type === 'tenant-owner' || actor.type === 'tenant') && (actor.tenantId ?? params.tenantId) === params.tenantId) return { tenantId: params.tenantId, workspaceId: params.workspaceId };
-  if ((actor.type === 'workspace_admin' || actor.type === 'workspace-admin') && (actor.tenantId ?? params.tenantId) === params.tenantId && (actor.workspaceId ?? actor.workspace?.id ?? params.workspaceId) === params.workspaceId) return { tenantId: params.tenantId, workspaceId: params.workspaceId };
+  if (!params.workspaceId) throw Object.assign(new Error('Workspace not found'), { code: 'WORKSPACE_NOT_FOUND' });
+  if (actor.type === 'superadmin' || actor.type === 'internal') {
+    if (!params.tenantId) throw Object.assign(new Error('Tenant not found'), { code: 'TENANT_NOT_FOUND' });
+    return { tenantId: params.tenantId, workspaceId: params.workspaceId };
+  }
+
+  const actorTenantId = resolveActorTenantId(params, actor);
+  if (!actorTenantId || (params.tenantId && params.tenantId !== actorTenantId)) {
+    throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
+  }
+  if (TENANT_OWNER_TYPES.has(actor.type)) return { tenantId: actorTenantId, workspaceId: params.workspaceId };
+
+  if (WORKSPACE_ADMIN_TYPES.has(actor.type)) {
+    const actorWorkspaceIds = resolveActorWorkspaceIds(params, actor);
+    if (actorWorkspaceIds.includes(String(params.workspaceId))) return { tenantId: actorTenantId, workspaceId: params.workspaceId };
+  }
+
   throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
 }
 

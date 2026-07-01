@@ -11,4 +11,10 @@ describe('CapabilityStatusGrid', () => {
     expect(screen.getByText('Enabled')).toBeInTheDocument()
     expect(screen.getByText('Disabled')).toBeInTheDocument()
   })
+
+  it('renders an accessible empty state', () => {
+    render(<CapabilityStatusGrid capabilities={[]} />)
+    expect(screen.getByRole('heading', { name: /capabilities/i })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/no inherited capabilities/i)
+  })
 })
