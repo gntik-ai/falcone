@@ -12868,8 +12868,18 @@
               }
             }
           },
+          "401": {
+            "description": "The username/password credentials are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
-            "description": "The credentials are invalid or the account is not allowed to enter the console.",
+            "description": "The account is not allowed to enter the console.",
             "content": {
               "application/json": {
                 "schema": {
