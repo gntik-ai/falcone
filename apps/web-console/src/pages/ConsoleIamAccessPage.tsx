@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
@@ -44,7 +46,7 @@ const IAM_ACCESS_ERROR_MESSAGES: Record<string, string> = {
   IAM_GET_ROLE_FAILED: 'No se pudo cargar la información de roles IAM.'
 }
 
-const RAW_KEYCLOAK_ERROR_PATTERN = /\bkeycloak\s+[A-Z]+\s+\/realms\/|\/admin\/realms\/|\/realms\/[^/\s]+\/(?:users|roles|clients|groups|identity-provider|client-scopes)\b/i
+const RAW_KEYCLOAK_ERROR_PATTERN = /\bkeycloak\s+[A-Z]+\s+\/realms\/|\/admin\/realms\/|\/realms\/|\{[^{}]*(?:"error"|"errorMessage")\s*:/i
 
 function errMsg(error: unknown, fallback: string): string {
   const apiError = error as Partial<ApiError>
@@ -180,9 +182,17 @@ export function ConsoleIamAccessPage() {
       ) : null}
 
       {error ? (
-        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Alert variant="destructive" className="border-destructive/30 bg-destructive/5 text-foreground">
+          <div className="flex gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/20 text-destructive">
+              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <AlertTitle className="text-base">Acción IAM no completada</AlertTitle>
+              <AlertDescription className="text-muted-foreground">{error}</AlertDescription>
+            </div>
+          </div>
+        </Alert>
       ) : null}
 
       {realm ? (
