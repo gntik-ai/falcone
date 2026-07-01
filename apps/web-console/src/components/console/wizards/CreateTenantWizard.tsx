@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { WizardShell } from '@/components/console/wizards/WizardShell'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,7 @@ interface PlanCatalogState { loading: boolean; error: string | null; items: Plan
 function NameStep({ data, onChange, validation }: WizardStepProps<TenantData>) {
   return <div className="space-y-2"><Label htmlFor="tenant-name">Nombre del tenant</Label><Input id="tenant-name" value={data.name ?? ''} onChange={(e) => onChange({ name: e.target.value })} />{validation.fieldErrors.name ? <p className="text-sm text-destructive">{validation.fieldErrors.name}</p> : null}</div>
 }
-function PlanStep({ data, onChange, validation, planCatalog }: WizardStepProps<TenantData> & { planCatalog: PlanCatalogState }) {
+function PlanStep({ data, onChange, validation, planCatalog, onRetry }: WizardStepProps<TenantData> & { planCatalog: PlanCatalogState; onRetry: () => void }) {
   const catalogBlocked = planCatalog.loading || Boolean(planCatalog.error) || planCatalog.items.length === 0
   const placeholder = planCatalog.loading
     ? 'Cargando planes activos'
@@ -24,31 +25,50 @@ function PlanStep({ data, onChange, validation, planCatalog }: WizardStepProps<T
       : planCatalog.items.length === 0
         ? 'No hay planes activos'
         : 'Selecciona un plan'
+  const fieldErrorVisible = Boolean(validation.fieldErrors.planId) && !catalogBlocked
+  const blockingErrorVisible = Boolean(validation.blockingError) && !catalogBlocked
+  const describedBy = [
+    planCatalog.loading ? 'tenant-plan-catalog-loading' : null,
+    planCatalog.error ? 'tenant-plan-catalog-error' : null,
+    !planCatalog.loading && !planCatalog.error && planCatalog.items.length === 0 ? 'tenant-plan-catalog-empty' : null,
+    fieldErrorVisible ? 'tenant-plan-field-error' : null,
+    blockingErrorVisible ? 'tenant-plan-blocking-error' : null
+  ].filter(Boolean).join(' ') || undefined
 
   return (
     <div className="space-y-3">
       <div className="space-y-2">
         <Label htmlFor="tenant-plan">Plan</Label>
-        <Select id="tenant-plan" value={data.planId ?? ''} disabled={catalogBlocked} onChange={(e) => onChange({ planId: e.target.value })}>
+        <Select
+          id="tenant-plan"
+          value={data.planId ?? ''}
+          disabled={catalogBlocked}
+          aria-describedby={describedBy}
+          aria-invalid={fieldErrorVisible || blockingErrorVisible || undefined}
+          onChange={(e) => onChange({ planId: e.target.value })}
+        >
           <option value="">{placeholder}</option>
           {planCatalog.items.map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.displayName} ({plan.slug})</option>
           ))}
         </Select>
-        {validation.fieldErrors.planId && !catalogBlocked ? <p className="text-sm text-destructive">{validation.fieldErrors.planId}</p> : null}
-        {validation.blockingError && !catalogBlocked ? <p className="text-sm text-destructive">{validation.blockingError}</p> : null}
+        {fieldErrorVisible ? <p id="tenant-plan-field-error" className="text-sm text-destructive">{validation.fieldErrors.planId}</p> : null}
+        {blockingErrorVisible ? <p id="tenant-plan-blocking-error" className="text-sm text-destructive">{validation.blockingError}</p> : null}
       </div>
       {planCatalog.loading ? (
-        <p role="status" aria-live="polite" className="text-sm leading-6 text-muted-foreground">Cargando planes activos del catálogo.</p>
+        <p id="tenant-plan-catalog-loading" role="status" aria-live="polite" className="text-sm leading-6 text-muted-foreground">Cargando planes activos del catálogo.</p>
       ) : null}
       {planCatalog.error ? (
-        <Alert variant="destructive">
+        <Alert id="tenant-plan-catalog-error" variant="destructive">
           <AlertTitle>No se pudo cargar el catálogo de planes</AlertTitle>
           <AlertDescription>{planCatalog.error}</AlertDescription>
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>
+            Reintentar
+          </Button>
         </Alert>
       ) : null}
       {!planCatalog.loading && !planCatalog.error && planCatalog.items.length === 0 ? (
-        <p role="status" className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">No hay planes activos en el catálogo. Activa un plan antes de crear tenants con asignación inicial.</p>
+        <p id="tenant-plan-catalog-empty" role="status" className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">No hay planes activos en el catálogo. Activa un plan antes de crear tenants con asignación inicial.</p>
       ) : null}
     </div>
   )
@@ -63,19 +83,23 @@ export function CreateTenantWizard({ open, onOpenChange, onCreated }: { open: bo
   const [openBlocked, setOpenBlocked] = useState(false)
   const [planCatalog, setPlanCatalog] = useState<PlanCatalogState>({ loading: false, error: null, items: [] })
 
+  const loadPlanCatalog = useCallback((isCancelled: () => boolean = () => false) => {
+    setPlanCatalog({ loading: true, error: null, items: [] })
+    listPlans({ status: 'active', page: 1, pageSize: 100 })
+      .then((response) => {
+        if (!isCancelled()) setPlanCatalog({ loading: false, error: null, items: response.items })
+      })
+      .catch((error) => {
+        if (!isCancelled()) setPlanCatalog({ loading: false, error: error instanceof Error ? error.message : 'No se pudo cargar el catálogo de planes.', items: [] })
+      })
+  }, [])
+
   useEffect(() => {
     if (!open || !permission.allowed) return
     let cancelled = false
-    setPlanCatalog((current) => ({ ...current, loading: true, error: null }))
-    listPlans({ status: 'active', page: 1, pageSize: 100 })
-      .then((response) => {
-        if (!cancelled) setPlanCatalog({ loading: false, error: null, items: response.items })
-      })
-      .catch((error) => {
-        if (!cancelled) setPlanCatalog({ loading: false, error: error instanceof Error ? error.message : 'No se pudo cargar el catálogo de planes.', items: [] })
-      })
+    loadPlanCatalog(() => cancelled)
     return () => { cancelled = true }
-  }, [open, permission.allowed])
+  }, [loadPlanCatalog, open, permission.allowed])
 
   const selectedPlan = (planId?: string) => planCatalog.items.find((plan) => plan.id === planId)
   const planCatalogBlockingError = planCatalog.loading
@@ -99,7 +123,7 @@ export function CreateTenantWizard({ open, onOpenChange, onCreated }: { open: bo
       {
         id: 'plan',
         label: 'Plan',
-        component: (props) => <PlanStep {...props} planCatalog={planCatalog} />,
+        component: (props) => <PlanStep {...props} planCatalog={planCatalog} onRetry={() => loadPlanCatalog()} />,
         validate: (data) => createValidation(
           !data.planId || !selectedPlan(data.planId) ? { planId: 'Selecciona un plan activo del catálogo.' } : {},
           planCatalogBlockingError ?? (quota.available ? undefined : quota.reason ?? 'Sin cuota disponible.')

@@ -83,6 +83,36 @@ describe('CreateTenantWizard', () => {
 
     expect(await screen.findByText(/no hay planes activos en el catálogo/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^plan$/i)).toBeDisabled()
+    expect(screen.getByLabelText(/^plan$/i)).toHaveAttribute('aria-describedby', expect.stringContaining('tenant-plan-catalog-empty'))
+    expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled()
+  })
+
+  it('permite reintentar cuando falla la carga del catálogo de planes', async () => {
+    let planCatalogRequests = 0
+    requestMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) => {
+      if (url.startsWith('/v1/plans')) {
+        planCatalogRequests += 1
+        if (planCatalogRequests === 1) return Promise.reject(new Error('Catalog timeout'))
+        return Promise.resolve({ items: catalogPlans, total: catalogPlans.length, page: 1, pageSize: 100 })
+      }
+      if (url === '/v1/tenants' && init?.method === 'POST') return Promise.resolve({ tenantId: 'ten_new' })
+      return Promise.resolve({})
+    })
+    const user = userEvent.setup()
+
+    render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+    await user.type(screen.getByLabelText(/nombre del tenant/i), 'Tenant Nuevo')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/catalog timeout/i)
+    expect(screen.getByLabelText(/^plan$/i)).toBeDisabled()
+    expect(screen.getByLabelText(/^plan$/i)).toHaveAttribute('aria-describedby', expect.stringContaining('tenant-plan-catalog-error'))
+    expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    expect(await screen.findByRole('option', { name: /enterprise real \(enterprise-real\)/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^plan$/i)).not.toBeDisabled()
     expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled()
   })
 
