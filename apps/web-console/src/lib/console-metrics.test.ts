@@ -23,7 +23,7 @@ describe('console-metrics', () => {
     expect(record.action.category).toBe('resource_creation')
   })
 
-  it('carga métricas workspace con la ventana seleccionada', async () => {
+  it('carga métricas workspace con las ventanas soportadas seleccionadas', async () => {
     mockRequestConsoleSessionJson.mockImplementation((url: string) => {
       if (url.includes('/overview')) {
         return Promise.resolve({ generatedAt: 'now', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10 }] })
@@ -34,16 +34,60 @@ describe('console-metrics', () => {
       return Promise.resolve({ measuredAt: 'now', dimensions: [] })
     })
     const { result, rerender } = renderHook(({ range }) => useConsoleMetrics('ten_1', 'wrk_1', range), {
-      initialProps: { range: { preset: '7d' } as ConsoleMetricRange }
+      initialProps: { range: { preset: '24h' } as ConsoleMetricRange }
     })
     await waitFor(() => expect(result.current.overview?.dimensions[0]?.displayName).toBe('API'))
-    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/workspaces/wrk_1/series?metricKey=api_requests&window=7d')
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/workspaces/wrk_1/series?metricKey=api_requests&window=24h')
+
+    mockRequestConsoleSessionJson.mockClear()
+    rerender({ range: { preset: '7d' } })
+    await waitFor(() => {
+      expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/workspaces/wrk_1/series?metricKey=api_requests&window=7d')
+    })
 
     mockRequestConsoleSessionJson.mockClear()
     rerender({ range: { preset: '30d' } })
     await waitFor(() => {
       expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/workspaces/wrk_1/series?metricKey=api_requests&window=30d')
     })
+  })
+
+  it('no usa campos custom obsoletos como reload key ni como window de series', async () => {
+    mockRequestConsoleSessionJson.mockImplementation((url: string) => {
+      if (url.includes('/overview')) {
+        return Promise.resolve({ generatedAt: 'now', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10 }] })
+      }
+      if (url.includes('/series')) {
+        return Promise.resolve({ points: [{ timestamp: 'now', value: 5 }] })
+      }
+      return Promise.resolve({ measuredAt: 'now', dimensions: [] })
+    })
+
+    const staleCustomRange = {
+      preset: 'custom',
+      from: '2026-01-01T00:00',
+      to: '2026-01-02T00:00'
+    } as unknown as ConsoleMetricRange
+    const { result, rerender } = renderHook(({ range }) => useConsoleMetrics('ten_1', 'wrk_1', range), {
+      initialProps: { range: staleCustomRange }
+    })
+
+    await waitFor(() => expect(result.current.overview?.dimensions[0]?.displayName).toBe('API'))
+    const initialUrls = mockRequestConsoleSessionJson.mock.calls.map(([url]) => String(url))
+    expect(initialUrls).toEqual(['/v1/metrics/workspaces/wrk_1/overview', '/v1/metrics/workspaces/wrk_1/usage'])
+    expect(initialUrls.some((url) => url.includes('/series') || url.includes('window=24h') || url.includes('window=custom'))).toBe(false)
+
+    mockRequestConsoleSessionJson.mockClear()
+    rerender({
+      range: {
+        preset: 'custom',
+        from: '2026-01-03T00:00',
+        to: '2026-01-04T00:00'
+      } as unknown as ConsoleMetricRange
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mockRequestConsoleSessionJson).not.toHaveBeenCalled()
   })
 
   it('ignora cambios de rango en métricas tenant sin pedir series ni window', async () => {

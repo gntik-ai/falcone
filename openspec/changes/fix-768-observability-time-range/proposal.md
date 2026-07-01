@@ -11,6 +11,8 @@ tenant data without changing the rendered metrics.
 
 - Keep the time-range selector active for workspace-scoped Metrics, where the console requests
   `/v1/metrics/workspaces/{workspaceId}/series?metricKey=api_requests&window=...`.
+- Offer only the workspace metric-series presets currently supported by the console contract
+  (`24h`, `7d`, and `30d`); custom from/to ranges stay unavailable until a real API exists.
 - Disable and label the selector at tenant-scoped Metrics so it is clearly non-applicable when no
   workspace series is rendered.
 - Prevent tenant-only Metrics loads from using range changes as a reload key, avoiding identical
@@ -24,7 +26,8 @@ tenant data without changing the rendered metrics.
 - Frontend:
   - `ConsoleObservabilityPage` marks the selector disabled/non-applicable when no workspace is
     selected.
-  - `ConsoleTimeRangeSelector` supports a disabled explanatory state.
+  - `ConsoleTimeRangeSelector` supports a disabled explanatory state and only renders supported
+    metric window presets.
   - `useConsoleMetrics` ignores range changes for tenant-only metrics while preserving workspace
     `/series?window=` behavior.
 - Backend/wire:
@@ -36,5 +39,6 @@ tenant data without changing the rendered metrics.
 ## Non-Goals
 
 - No new tenant metrics windowing API.
+- No custom from/to metric range UI or API.
 - No change to the existing workspace metric-series request shape.
 - No cluster deployment or mutation in this isolated implementation run.

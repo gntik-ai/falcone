@@ -20,5 +20,6 @@ GET /v1/metrics/workspaces/{workspaceId}/series?metricKey=api_requests&window=7d
 ```
 
 The console keeps the selector active for workspace-scoped Metrics and maps the presets to the
-existing `window` values (`24h`, `7d`, and `30d`). This behavior does not change the public API or
-the generated SDK surface.
+existing `window` values (`24h`, `7d`, and `30d`). Custom from/to metric ranges are not exposed in
+the active selector until the backend provides a corresponding range-aware API. This behavior does
+not change the public API or the generated SDK surface.

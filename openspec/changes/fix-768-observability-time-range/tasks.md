@@ -17,6 +17,8 @@
 - [x] 2.2 Keep the selector active at workspace scope.
 - [x] 2.3 Avoid using range changes as a reload key for tenant-only metrics.
 - [x] 2.4 Preserve workspace `/series?metricKey=api_requests&window=24h|7d|30d` requests.
+- [x] 2.5 Remove unsupported custom from/to range controls from the active workspace selector
+  until a real custom range API exists.
 
 ## 3. Specs And Docs
 
@@ -24,7 +26,9 @@
   `openspec/changes/fix-768-observability-time-range/`.
 - [x] 3.2 Add a web-console MODIFIED requirement for metrics time-range effect/non-applicability.
 - [x] 3.3 Add a concise architecture/reference note for observability metrics time-range scope.
-- [x] 3.4 Leave backend, OpenAPI/AsyncAPI, generated SDKs, shared wire types, and route catalog
+- [x] 3.4 Document that active console metric windows are the supported presets only (`24h`,
+  `7d`, and `30d`).
+- [x] 3.5 Leave backend, OpenAPI/AsyncAPI, generated SDKs, shared wire types, and route catalog
   unchanged because no wire contract changes are required.
 
 ## 4. Verification

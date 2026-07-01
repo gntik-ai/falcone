@@ -1,7 +1,6 @@
 import { useId, type ChangeEvent } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import type { ConsoleMetricRange } from '@/lib/console-metrics'
@@ -17,13 +16,11 @@ interface ConsoleTimeRangeSelectorProps {
 export function ConsoleTimeRangeSelector({ value, onChange, disabled = false, disabledReason }: ConsoleTimeRangeSelectorProps) {
   const idBase = useId()
   const presetId = `${idBase}-preset`
-  const fromId = `${idBase}-from`
-  const toId = `${idBase}-to`
   const descriptionId = disabledReason ? `${idBase}-description` : undefined
 
   function handlePresetChange(event: ChangeEvent<HTMLSelectElement>) {
     const preset = event.target.value as ConsoleMetricRange['preset']
-    onChange({ preset, from: preset === 'custom' ? value.from : undefined, to: preset === 'custom' ? value.to : undefined })
+    onChange({ preset })
   }
 
   return (
@@ -70,40 +67,11 @@ export function ConsoleTimeRangeSelector({ value, onChange, disabled = false, di
                 <option value="24h">24h</option>
                 <option value="7d">7d</option>
                 <option value="30d">30d</option>
-                <option value="custom">custom</option>
               </>
             )}
           </Select>
         </div>
       </div>
-      {value.preset === 'custom' ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor={fromId}>Desde</Label>
-            <Input
-              id={fromId}
-              aria-describedby={descriptionId}
-              type="datetime-local"
-              value={value.from ?? ''}
-              onChange={(event) => onChange({ ...value, from: event.target.value })}
-              disabled={disabled}
-              className={cn(disabled && 'disabled:opacity-70')}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={toId}>Hasta</Label>
-            <Input
-              id={toId}
-              aria-describedby={descriptionId}
-              type="datetime-local"
-              value={value.to ?? ''}
-              onChange={(event) => onChange({ ...value, to: event.target.value })}
-              disabled={disabled}
-              className={cn(disabled && 'disabled:opacity-70')}
-            />
-          </div>
-        </div>
-      ) : null}
     </fieldset>
   )
 }

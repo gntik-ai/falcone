@@ -34,9 +34,12 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
     render(<ConsoleObservabilityPage />)
     expect(screen.getByText('API')).toBeInTheDocument()
-    expect(screen.getByLabelText(/ventana de métricas/i)).toBeEnabled()
+    const rangeSelect = screen.getByLabelText(/ventana de métricas/i) as HTMLSelectElement
+    expect(rangeSelect).toBeEnabled()
+    expect(Array.from(rangeSelect.options).map((option) => option.value)).toEqual(['24h', '7d', '30d'])
+    expect(screen.queryByRole('option', { name: /custom/i })).not.toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText(/ventana de métricas/i), '7d')
+    await user.selectOptions(rangeSelect, '7d')
 
     await waitFor(() => {
       expect(mockUseConsoleMetrics).toHaveBeenCalledWith('ten_1', 'wrk_1', expect.objectContaining({ preset: '7d' }))
