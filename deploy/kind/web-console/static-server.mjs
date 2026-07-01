@@ -17,6 +17,27 @@ const configuredPort = Number.parseInt(process.env.PORT ?? '3000', 10);
 const PORT = Number.isFinite(configuredPort) ? configuredPort : 3000;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon', '.woff2':'font/woff2', '.map':'application/json' };
 const COMPRESSIBLE = new Set(['.js', '.css', '.json', '.svg', '.map']);
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "frame-src 'self'",
+  "worker-src 'self' blob:",
+  "form-action 'self'"
+].join('; ');
+const SECURITY_HEADERS = {
+  'content-security-policy': CONTENT_SECURITY_POLICY,
+  'x-frame-options': 'DENY',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+};
 const gzipAsync = promisify(gzip);
 const brotliAsync = promisify(brotliCompress);
 
@@ -50,7 +71,7 @@ function cacheControl(filePath) {
 }
 
 async function sendStatic(req, res, filePath, body, contentType) {
-  const headers = { 'content-type': contentType };
+  const headers = { ...SECURITY_HEADERS, 'content-type': contentType };
   const cache = cacheControl(filePath);
   if (cache) headers['cache-control'] = cache;
   if (COMPRESSIBLE.has(extname(filePath))) headers.vary = 'Accept-Encoding';

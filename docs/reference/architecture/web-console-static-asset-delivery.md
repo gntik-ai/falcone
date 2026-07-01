@@ -31,6 +31,30 @@ Cache-Control: no-store
 for `index.html`. The Node static servers also apply the same `no-store` policy to SPA fallback
 responses that return `index.html` for client-side routes.
 
+Every static-serving path also sends the baseline browser security headers for the console shell and
+assets:
+
+```http
+Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self' blob:; form-action 'self'
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+```
+
+The CSP is the defense-in-depth boundary for the current console session model: the auth API still
+returns the console `tokenSet`, and the frontend still stores it in session storage for bearer
+requests. To keep arbitrary page script from becoming an easy full-session exfiltration path, static
+serving constrains script execution to same-origin bundle files, omits `unsafe-inline` and
+`unsafe-eval` from `script-src`, disables plugin/object execution, and denies all framing with both
+`frame-ancestors 'none'` and `X-Frame-Options: DENY`. `style-src 'unsafe-inline'` is intentionally
+limited to styles because several existing React components use inline style attributes.
+
+For nginx, remember that a `location` block with its own `add_header` does not inherit headers from
+the parent server block. Static locations repeat the security headers so direct `/index.html`,
+`/assets/*`, and SPA fallback responses stay protected. The production template keeps these headers
+out of the `/v1/` proxy location so API response headers are not changed by static-serving hardening.
+
 ## Icon asset policy
 
 The SVG-capable favicon declared by `apps/web-console/index.html` is part of the console boot path.
