@@ -63,6 +63,22 @@ routes:
       nodes:
         provisioning-orchestrator: 1
 
+  - name: plans-delete
+    uri: /v1/plans/:planId
+    methods:
+      - DELETE
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+      correlation-id:
+        header_name: X-Correlation-Id
+      prometheus:
+        prefer_name: true
+    upstream:
+      type: roundrobin
+      nodes:
+        provisioning-orchestrator: 1
+
   - name: plans-lifecycle
     uri: /v1/plans/:planId/lifecycle
     methods:

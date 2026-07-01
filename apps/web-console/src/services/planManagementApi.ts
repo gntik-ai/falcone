@@ -119,6 +119,18 @@ export interface PlanLimitRemoveResponse {
   source: 'default'
 }
 
+export interface PlanLifecycleTransitionResponse {
+  planId: string
+  previousStatus: PlanStatus
+  newStatus: PlanStatus
+  transitionedAt?: string
+}
+
+export interface PlanDeleteResponse {
+  planId: string
+  deleted: boolean
+}
+
 export interface PlanQuotaImpact {
   dimensionKey: string
   displayLabel?: string
@@ -262,7 +274,8 @@ export async function listPlans(params: { status?: PlanStatus | 'all'; page?: nu
 export function createPlan(body: Record<string, unknown>) { return request<PlanRecord>('/v1/plans', { method: 'POST', body: JSON.stringify(body) }) }
 export function getPlan(planIdOrSlug: string) { return request<PlanRecord>(`/v1/plans/${planIdOrSlug}`) }
 export function updatePlan(planId: string, body: Record<string, unknown>) { return request<PlanRecord>(`/v1/plans/${planId}`, { method: 'PUT', body: JSON.stringify(body) }) }
-export function transitionPlanLifecycle(planId: string, body: Record<string, unknown>) { return request(`/v1/plans/${planId}/lifecycle`, { method: 'POST', body: JSON.stringify(body) }) }
+export function deletePlan(planId: string) { return request<PlanDeleteResponse>(`/v1/plans/${planId}`, { method: 'DELETE' }) }
+export function transitionPlanLifecycle(planId: string, body: { targetStatus: PlanStatus }) { return request<PlanLifecycleTransitionResponse>(`/v1/plans/${planId}/lifecycle`, { method: 'POST', body: JSON.stringify(body) }) }
 export function getPlanLimitsProfile(planId: string) { return request<{ planId: string; profile: LimitProfileRow[] }>(`/v1/plans/${planId}/limits`) }
 export function setPlanLimit(planId: string, dimensionKey: string, value: number) { return request<PlanLimitSetResponse>(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'PUT', body: JSON.stringify({ value }) }) }
 export function removePlanLimit(planId: string, dimensionKey: string) { return request<PlanLimitRemoveResponse>(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'DELETE' }) }

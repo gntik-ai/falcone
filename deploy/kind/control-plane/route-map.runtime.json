@@ -50,6 +50,16 @@
     "notes": "reads params.planId (path) + params.displayName/description/capabilities/quotaDimensions (body); event emission no-op (no kafka)"
   },
   {
+    "method": "DELETE",
+    "path": "/v1/plans/{planId}",
+    "module": "/repo/services/provisioning-orchestrator/src/actions/plan-delete.mjs",
+    "export": "main",
+    "invoke": "callercontext-overrides",
+    "deps": ["db"],
+    "auth": "superadmin",
+    "notes": "hard-deletes never-assigned plans only; assigned or historically assigned plans return PLAN_HAS_ASSIGNMENT_HISTORY and must be archived instead"
+  },
+  {
     "method": "POST",
     "path": "/v1/plans/{planId}/lifecycle",
     "module": "/repo/services/provisioning-orchestrator/src/actions/plan-lifecycle.mjs",

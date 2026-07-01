@@ -2,6 +2,7 @@ const TOPIC_MAP = {
   'plan.created': 'PLAN_KAFKA_TOPIC_CREATED',
   'plan.updated': 'PLAN_KAFKA_TOPIC_UPDATED',
   'plan.lifecycle_transitioned': 'PLAN_KAFKA_TOPIC_LIFECYCLE',
+  'plan.deleted': 'PLAN_KAFKA_TOPIC_DELETED',
   'assignment.created': 'PLAN_KAFKA_TOPIC_ASSIGNMENT_CREATED',
   'assignment.superseded': 'PLAN_KAFKA_TOPIC_ASSIGNMENT_SUPERSEDED'
 };
@@ -10,6 +11,7 @@ const DEFAULT_TOPICS = {
   PLAN_KAFKA_TOPIC_CREATED: 'console.plan.created',
   PLAN_KAFKA_TOPIC_UPDATED: 'console.plan.updated',
   PLAN_KAFKA_TOPIC_LIFECYCLE: 'console.plan.lifecycle_transitioned',
+  PLAN_KAFKA_TOPIC_DELETED: 'console.plan.deleted',
   PLAN_KAFKA_TOPIC_ASSIGNMENT_CREATED: 'console.plan.assignment.created',
   PLAN_KAFKA_TOPIC_ASSIGNMENT_SUPERSEDED: 'console.plan.assignment.superseded'
 };

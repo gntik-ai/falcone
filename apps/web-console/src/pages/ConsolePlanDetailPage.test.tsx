@@ -9,7 +9,9 @@ const planApi = vi.hoisted(() => ({
   getPlan: vi.fn(),
   getPlanLimitsProfile: vi.fn(),
   setPlanLimit: vi.fn(),
-  removePlanLimit: vi.fn()
+  removePlanLimit: vi.fn(),
+  transitionPlanLifecycle: vi.fn(),
+  deletePlan: vi.fn()
 }))
 
 vi.mock('@/services/planManagementApi', () => planApi)
@@ -40,6 +42,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/console/plans/p1']}>
       <Routes>
         <Route path="/console/plans/:planId" element={<ConsolePlanDetailPage />} />
+        <Route path="/console/plans" element={<div>Catálogo listo</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -47,7 +50,7 @@ function renderPage() {
 
 async function openLimitsTab() {
   expect(await screen.findByText('Starter')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: /límites/i }))
+  await userEvent.click(screen.getByRole('tab', { name: /límites/i }))
   return screen.findByLabelText(/max workspaces: valor del límite/i) as Promise<HTMLInputElement>
 }
 
@@ -64,16 +67,106 @@ describe('ConsolePlanDetailPage', () => {
     planApi.getPlanLimitsProfile.mockReset()
     planApi.setPlanLimit.mockReset()
     planApi.removePlanLimit.mockReset()
+    planApi.transitionPlanLifecycle.mockReset()
+    planApi.deletePlan.mockReset()
 
     planApi.getPlan.mockResolvedValue(plan)
     planApi.getPlanLimitsProfile.mockResolvedValue({ planId: 'p1', profile: [limitRow(10)] })
+    planApi.transitionPlanLifecycle.mockResolvedValue({
+      planId: 'p1',
+      previousStatus: 'draft',
+      newStatus: 'active',
+      transitionedAt: '2026-07-01T00:00:00Z'
+    })
+    planApi.deletePlan.mockResolvedValue({ planId: 'p1', deleted: true })
   })
 
   it('renders plan detail tabs', async () => {
     renderPage()
     expect(await screen.findByText('Starter')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /capacidades/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /asignaciones de organizaciones/i })).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: /detalle del plan/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /información/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /capacidades/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /asignaciones de organizaciones/i })).toBeInTheDocument()
+  })
+
+  it('offers lifecycle controls on a draft plan and reflects the activated status', async () => {
+    planApi.getPlan
+      .mockResolvedValueOnce({ ...plan, status: 'draft' })
+      .mockResolvedValueOnce({ ...plan, status: 'active', updatedAt: '2026-07-01T00:00:00Z' })
+    planApi.transitionPlanLifecycle.mockResolvedValue({
+      planId: 'p1',
+      previousStatus: 'draft',
+      newStatus: 'active',
+      transitionedAt: '2026-07-01T00:00:00Z'
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: /activar plan/i })).toBeInTheDocument()
+    expect(screen.getByText('Borrador', { selector: '[aria-current="step"]' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /activar plan/i }))
+
+    await waitFor(() => expect(planApi.transitionPlanLifecycle).toHaveBeenCalledWith('p1', { targetStatus: 'active' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(/estado del plan actualizado/i)
+    await waitFor(() => expect(screen.getByText('Activo', { selector: '[aria-current="step"]' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /marcar como obsoleto/i })).toBeInTheDocument()
+  })
+
+  it('guards plan deletion behind confirmation and returns to the catalog after success', async () => {
+    planApi.getPlan.mockResolvedValue({ ...plan, status: 'draft' })
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: /eliminar plan/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /eliminar plan/i }))
+
+    expect(screen.getByRole('alertdialog', { name: /eliminar plan/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^eliminar$/i })).toBeDisabled()
+
+    await userEvent.type(screen.getByPlaceholderText('Starter'), 'Starter')
+    await userEvent.click(screen.getByRole('button', { name: /^eliminar$/i }))
+
+    await waitFor(() => expect(planApi.deletePlan).toHaveBeenCalledWith('p1'))
+    expect(await screen.findByText('Catálogo listo')).toBeInTheDocument()
+  })
+
+  it('requires confirmation before deprecating a plan and surfaces transition refusals in the dialog', async () => {
+    planApi.getPlan.mockResolvedValue({ ...plan, status: 'active', assignedTenantCount: 1 })
+    planApi.transitionPlanLifecycle.mockRejectedValue(apiError(409, 'PLAN_HAS_ACTIVE_ASSIGNMENTS'))
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: /marcar como obsoleto/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /eliminar plan/i })).toBeDisabled()
+    expect(screen.getByText(/los planes activos se retiran/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /marcar como obsoleto/i }))
+
+    expect(screen.getByRole('alertdialog', { name: /confirmar acción/i })).toBeInTheDocument()
+    expect(planApi.transitionPlanLifecycle).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: /^confirmar$/i }))
+
+    await waitFor(() => expect(planApi.transitionPlanLifecycle).toHaveBeenCalledWith('p1', { targetStatus: 'deprecated' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/plan_has_active_assignments/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/organizaciones activas/i)
+  })
+
+  it('keeps backend deletion refusals visible in the confirmation dialog', async () => {
+    planApi.getPlan.mockResolvedValue({ ...plan, status: 'draft', assignedTenantCount: 0 })
+    planApi.deletePlan.mockRejectedValue(apiError(409, 'PLAN_HAS_ASSIGNMENT_HISTORY'))
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /eliminar plan/i }))
+    await userEvent.type(screen.getByPlaceholderText('Starter'), 'Starter')
+    await userEvent.click(screen.getByRole('button', { name: /^eliminar$/i }))
+
+    await waitFor(() => expect(planApi.deletePlan).toHaveBeenCalledWith('p1'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/plan_has_assignment_history/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/archívalo/i)
+    expect(screen.queryByText('Catálogo listo')).not.toBeInTheDocument()
   })
 
   it('shows an explicit error and restores the persisted value when the API rejects an edit', async () => {
