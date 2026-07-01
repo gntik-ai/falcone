@@ -90,13 +90,13 @@
     "method": "GET",
     "path": "/v1/auth/status-views/{statusViewId}",
     "family": "auth",
-    "module": "NONE",
-    "export": "",
-    "invoke": "UNKNOWN",
+    "module": "deploy/kind/control-plane/auth-handlers.mjs",
+    "export": "getConsoleAccountStatusView",
+    "invoke": "localHandler",
     "deps": [],
     "auth": "public",
     "subroutes": "no",
-    "notes": "console-auth.ts::fetchConsoleAccountStatusView (PendingActivationPage). GAP.",
+    "notes": "console-auth.ts::fetchConsoleAccountStatusView (PendingActivationPage/LoginPage). Public static ConsoleAccountStatusView handler for canonical auth edge-state copy; no Keycloak or DB dependency.",
     "consoleUsed": true
   },
   {

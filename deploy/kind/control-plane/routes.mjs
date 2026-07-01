@@ -353,5 +353,6 @@ export const routes = [
   { method: 'POST',   path: '/v1/auth/signups', localHandler: 'signup', auth: 'public' },
   { method: 'POST',   path: '/v1/auth/login-sessions/{sessionId}/refresh', localHandler: 'refresh', auth: 'public' },
   { method: 'DELETE', path: '/v1/auth/login-sessions/{sessionId}', localHandler: 'logout', auth: 'authenticated' },
+  { method: 'GET',    path: '/v1/auth/status-views/{statusViewId}', localHandler: 'getConsoleAccountStatusView', auth: 'public' },
   { method: 'GET',    path: '/v1/auth/signups/policy', localHandler: 'signupPolicy', auth: 'public' }
 ];
