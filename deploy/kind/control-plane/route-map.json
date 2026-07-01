@@ -522,7 +522,21 @@
     "consoleUsed": true
   },
   {
-    "operationId": "getWorkspaceConsumption",
+    "operationId": "getWorkspaceConsumption_self",
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/consumption",
+    "family": "plans",
+    "module": "services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs",
+    "export": "main",
+    "invoke": "callercontext-overrides",
+    "deps": ["pg"],
+    "auth": "tenant_owner own; workspace_admin own ws",
+    "subroutes": "no",
+    "notes": "planManagementApi.ts::getWorkspaceConsumption(workspaceId). Self route used by /console/workspaces/{workspaceId}; tenantId is resolved from trusted callerContext.actor.tenantId.",
+    "consoleUsed": true
+  },
+  {
+    "operationId": "getWorkspaceConsumption_admin",
     "method": "GET",
     "path": "/v1/tenants/{tenantId}/workspaces/{workspaceId}/consumption",
     "family": "plans",
@@ -532,7 +546,7 @@
     "deps": ["pg"],
     "auth": "superadmin/tenant_owner own; workspace_admin own ws",
     "subroutes": "no",
-    "notes": "planManagementApi.ts::getWorkspaceConsumption. Self variant /v1/workspaces/{workspaceId}/consumption.",
+    "notes": "planManagementApi.ts::getWorkspaceConsumption(workspaceId, tenantId). Explicit tenant route; superadmin/internal may target any tenant and tenant-scoped callers may target only their own tenant.",
     "consoleUsed": true
   },
   {

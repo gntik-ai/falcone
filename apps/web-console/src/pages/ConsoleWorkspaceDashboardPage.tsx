@@ -8,13 +8,23 @@ import * as api from '@/services/planManagementApi'
 export function ConsoleWorkspaceDashboardPage() {
   const { workspaceId = '' } = useParams()
   const [data, setData] = useState<api.WorkspaceConsumptionResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [consumptionUnavailable, setConsumptionUnavailable] = useState(false)
 
   useEffect(() => {
-    api.getWorkspaceConsumption(workspaceId).then(setData).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load workspace consumption'))
+    setData(null)
+    setConsumptionUnavailable(false)
+    api.getWorkspaceConsumption(workspaceId).then(setData).catch(() => setConsumptionUnavailable(true))
   }, [workspaceId])
 
-  if (error) return <ConsolePageState kind="error" title="Workspace consumption unavailable" description={error} />
+  if (consumptionUnavailable) {
+    return (
+      <ConsolePageState
+        kind="empty"
+        title="Consumption data unavailable"
+        description="This workspace does not have consumption data available right now. You can still manage the workspace and check tenant-level quotas from the plan pages."
+      />
+    )
+  }
   if (!data) return <ConsolePageState kind="loading" title="Loading workspace dashboard" description="Fetching workspace consumption and inherited capabilities." />
 
   return (
