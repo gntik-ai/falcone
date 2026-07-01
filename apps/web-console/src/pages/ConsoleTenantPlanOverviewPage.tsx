@@ -2,16 +2,33 @@ import { useEffect, useState } from 'react'
 import { CapabilityStatusGrid } from '@/components/console/CapabilityStatusGrid'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
+import { readConsoleShellSession, type ConsoleShellSession } from '@/lib/console-session'
 import * as api from '@/services/planManagementApi'
 
 export function ConsoleTenantPlanOverviewPage() {
+  const tenantlessPlatformPrincipal = isTenantlessPlatformPrincipal(readConsoleShellSession()?.principal)
   const [summary, setSummary] = useState<api.CurrentEffectiveEntitlementSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getEffectiveEntitlements(undefined, { includeConsumption: true }).then(setSummary).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load plan overview'))
-  }, [])
+    if (tenantlessPlatformPrincipal) {
+      setSummary(null)
+      setError(null)
+      return
+    }
 
+    api.getEffectiveEntitlements(undefined, { includeConsumption: true }).then(setSummary).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load plan overview'))
+  }, [tenantlessPlatformPrincipal])
+
+  if (tenantlessPlatformPrincipal) {
+    return (
+      <ConsolePageState
+        kind="empty"
+        title="No personal plan (platform admin)"
+        description="This platform admin account is not attached to a tenant, so it has no personal tenant plan. Use a tenant plan page to review or manage tenant entitlements."
+      />
+    )
+  }
   if (error) return <ConsolePageState kind="error" title="Plan overview unavailable" description={error} />
   if (!summary) return <ConsolePageState kind="loading" title="Loading plan overview" description="Fetching current effective entitlements." />
   if (summary.noAssignment) return <ConsolePageState kind="empty" title="No plan assigned" description="Your tenant does not currently have a plan assignment. Catalog defaults remain active." />
@@ -30,4 +47,12 @@ export function ConsoleTenantPlanOverviewPage() {
       <CapabilityStatusGrid capabilities={summary.capabilities.map((item) => ({ capabilityKey: item.capabilityKey, displayLabel: item.displayLabel ?? item.capabilityKey, enabled: item.enabled, source: 'plan' }))} />
     </main>
   )
+}
+
+function isTenantlessPlatformPrincipal(principal: ConsoleShellSession['principal'] | undefined): boolean {
+  const roles = Array.isArray(principal?.platformRoles) ? principal.platformRoles : []
+  const tenantIds = Array.isArray(principal?.tenantIds) ? principal.tenantIds.filter(Boolean) : []
+  const isPlatformPrincipal = roles.includes('superadmin') || roles.includes('platform_admin') || roles.includes('platform_operator')
+
+  return isPlatformPrincipal && tenantIds.length === 0
 }
