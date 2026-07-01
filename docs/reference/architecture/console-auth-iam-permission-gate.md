@@ -13,8 +13,9 @@ those routes, the web console treats `/console/auth` as superadmin-only:
 - the page must not be shown to tenant owners as an actionable destination that can only render
   `403 requires superadmin`.
 
-Tenant-owner user and role administration should use the tenant/member-oriented console surfaces
-such as Members and IAM Access where their permissions are explicitly supported. Future scoped IAM
-work can add tenant-owner own-realm role/client management, but it must do so by changing the backend
-authorization model and documenting the new supported route contract rather than reusing the
-superadmin-only platform page unchanged.
+Tenant-owner user and role administration should use tenant/member-oriented surfaces where their
+permissions are explicitly supported, such as Members for tenant realm users and roles and the
+tenant membership/invitation APIs. Do not direct tenant owners to IAM Access as an alternative while
+that console route remains superadmin-gated. Future scoped IAM work can add tenant-owner own-realm
+role/client management, but it must do so by changing the backend authorization model and documenting
+the new supported route contract rather than reusing the superadmin-only platform page unchanged.
