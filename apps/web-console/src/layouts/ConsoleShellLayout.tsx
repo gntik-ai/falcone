@@ -71,7 +71,8 @@ const consoleNavigationItems = [
     label: 'IAM Access',
     to: '/console/iam-access',
     icon: Shield,
-    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm del tenant activo.'
+    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm del tenant activo.',
+    requiresSuperadminAccess: true
   },
   {
     label: 'Members',
@@ -89,7 +90,8 @@ const consoleNavigationItems = [
     label: 'Auth',
     to: '/console/auth',
     icon: Shield,
-    description: 'Superficie Auth/IAM para scopes, clients, providers y aplicaciones externas del contexto activo.'
+    description: 'Superficie Auth/IAM para scopes, clients, providers y aplicaciones externas del contexto activo.',
+    requiresSuperadminAccess: true
   },
   {
     label: 'PostgreSQL',
@@ -431,9 +433,12 @@ function ConsoleNavigation() {
   const { activeWorkspaceId } = useConsoleContext()
   const session = useMemo(() => readConsoleShellSession(), [])
   const canSecrets = canManageWorkspaceSecrets(session, activeWorkspaceId)
+  const isSuperadmin = session?.principal?.platformRoles?.includes('superadmin') ?? false
 
   const items = consoleNavigationItems.filter(
-    (item) => !('requiresWorkspaceSecretsAccess' in item && item.requiresWorkspaceSecretsAccess) || canSecrets
+    (item) =>
+      (!('requiresWorkspaceSecretsAccess' in item && item.requiresWorkspaceSecretsAccess) || canSecrets) &&
+      (!('requiresSuperadminAccess' in item && item.requiresSuperadminAccess) || isSuperadmin)
   )
 
   return (
