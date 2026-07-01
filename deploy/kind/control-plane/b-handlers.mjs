@@ -3,7 +3,7 @@
 // (workflows/wf-con-002.mjs). Each handler: async (ctx) => { statusCode, body }
 // where ctx = { params, query, body, identity, pool, callerContext }.
 import { randomUUID } from 'node:crypto';
-import { kcAdmin, TENANT_REALM_ROLES } from './kc-admin.mjs';
+import { kcAdmin, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { startSaga } from './saga.mjs';
@@ -28,6 +28,13 @@ function slugify(s) {
 }
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
+function statusFromError(error, fallback = 502) {
+  const status = Number(error?.statusCode ?? error?.kcStatus);
+  return status >= 400 && status < 500 ? status : fallback;
+}
+function kcBackedErr(error, code) {
+  return err(statusFromError(error), code, safeKeycloakAdminMessage(error));
+}
 
 // A plan id in the catalog is a UUID; the console CreateTenantWizard sends a SLUG (e.g. "starter").
 // Detect so we can resolve a slug -> id before the real plan-assign action (which keys on the UUID).
@@ -188,7 +195,7 @@ async function createTenant(ctx) {
     if (e?.code === '23505' && (e?.constraint === 'tenants_slug_key' || !e?.constraint)) {
       return err(409, 'SLUG_TAKEN', `tenant slug '${slug}' already exists`);
     }
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'CREATE_TENANT_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'CREATE_TENANT_FAILED');
   }
 }
 
@@ -228,15 +235,16 @@ async function createTenantUser(ctx) {
   const roles = Array.isArray(body.roles) && body.roles.length ? body.roles : ['tenant_developer'];
   const bad = roles.filter((r) => !TENANT_REALM_ROLES.includes(r));
   if (bad.length) return err(400, 'INVALID_ROLE', `unknown realm roles: ${bad.join(', ')}`);
+  const kc = ctx.kcAdmin ?? kcAdmin;
   try {
-    const userId = await kcAdmin.createUser(t.iam_realm, {
+    const userId = await kc.createUser(t.iam_realm, {
       username, email: body.email ?? null, firstName: body.firstName ?? null, lastName: body.lastName ?? null,
       password: body.password ?? null, temporary: !body.password
     });
-    await kcAdmin.assignRealmRoles(t.iam_realm, userId, roles);
+    await kc.assignRealmRoles(t.iam_realm, userId, roles);
     return ok(201, { userId, username, realm: t.iam_realm, roles });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'CREATE_USER_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'CREATE_USER_FAILED');
   }
 }
 
@@ -726,14 +734,15 @@ async function createServiceAccount(ctx) {
   if (!displayName) return err(400, 'VALIDATION_ERROR', 'name is required');
   const saId = randomUUID();
   const clientId = `sa-${r.ws.slug ?? r.ws.id.slice(0, 8)}-${slugify(displayName)}`;
+  const kc = ctx.kcAdmin ?? kcAdmin;
   try {
-    if (await kcAdmin.findClient(r.realm, clientId)) return err(409, 'SA_EXISTS', `service account client ${clientId} already exists`);
-    const uuid = await kcAdmin.createConfidentialClient(r.realm, { clientId, name: displayName, serviceAccountsEnabled: true });
+    if (await kc.findClient(r.realm, clientId)) return err(409, 'SA_EXISTS', `service account client ${clientId} already exists`);
+    const uuid = await kc.createConfidentialClient(r.realm, { clientId, name: displayName, serviceAccountsEnabled: true });
     const rec = await store.insertServiceAccount(pool, { id: saId, workspaceId: r.ws.id, tenantId: r.ws.tenant_id, iamRealm: r.realm, kcClientId: clientId, kcClientUuid: uuid, displayName, createdBy: identity.sub });
     // Top-level serviceAccountId is what the console persists to fetch the SA back.
     return ok(201, { serviceAccountId: rec.id, ...serviceAccountOut({ ...rec, iam_realm: r.realm }), serviceAccount: rec });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'CREATE_SA_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'CREATE_SA_FAILED');
   }
 }
 // GET /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}
@@ -768,9 +777,13 @@ async function issueCredential(ctx) {
   // so any secret returned here could never obtain a token (client_credentials → 401 invalid_client).
   // Reject explicitly instead of returning a misleading 201 carrying an unusable secret (#685).
   if (r.sa.status === 'revoked') return err(409, 'CREDENTIAL_REVOKED', 'service account credential is revoked; re-create the service account to issue a new credential');
-  const secret = await kc.getClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
-  return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
-    clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${kc.base}/realms/${r.sa.iam_realm}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
+  try {
+    const secret = await kc.getClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
+    return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
+      clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${kc.base}/realms/${r.sa.iam_realm}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
+  } catch (e) {
+    return kcBackedErr(e, 'ISSUE_CREDENTIAL_FAILED');
+  }
 }
 // POST .../credential-rotations
 // Rotating the secret blocks NEW client_credentials grants with the old secret. To also cut off
@@ -784,7 +797,9 @@ async function rotateCredential(ctx) {
   // Reject with the same explicit conflict as issuance instead of a misleading 201 (#685). Re-revoking a
   // revoked SA stays idempotent because this guard lives ONLY in issue/rotate, not in revokeCredential.
   if (r.sa.status === 'revoked') return err(409, 'CREDENTIAL_REVOKED', 'service account credential is revoked; re-create the service account to issue a new credential');
-  const secret = await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
+  let secret;
+  try { secret = await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid); }
+  catch (e) { return kcBackedErr(e, 'ROTATE_CREDENTIAL_FAILED'); }
   await st.markServiceAccountCredentialsInvalidated(ctx.pool, r.sa.id);
   return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
     clientId: r.sa.kc_client_id, clientSecret: secret, rotatedAt: new Date().toISOString() });
@@ -797,8 +812,10 @@ async function rotateCredential(ctx) {
 async function revokeCredential(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin; const st = ctx.store ?? store;
   const r = await saForCredential(ctx); if (r.error) return r.error;
-  await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid); // invalidate the old secret
-  await kc.setClientEnabled(r.sa.iam_realm, r.sa.kc_client_uuid, false);
+  try {
+    await kc.regenerateClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid); // invalidate the old secret
+    await kc.setClientEnabled(r.sa.iam_realm, r.sa.kc_client_uuid, false);
+  } catch (e) { return kcBackedErr(e, 'REVOKE_CREDENTIAL_FAILED'); }
   await st.setServiceAccountStatus(ctx.pool, r.sa.id, 'revoked');
   await st.markServiceAccountCredentialsInvalidated(ctx.pool, r.sa.id);
   return ok(200, { serviceAccountId: r.sa.id, status: 'revoked', revokedAt: new Date().toISOString() });
@@ -821,7 +838,7 @@ async function deleteServiceAccount(ctx) {
     // deleteClient already swallows 404 (idempotent); any other KC failure is a downstream error —
     // surface it as a 502 (mirrors createServiceAccount) WITHOUT removing the PG row, so the caller
     // can retry rather than orphan a still-present Keycloak client.
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'DELETE_SA_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'DELETE_SA_FAILED');
   }
   await st.deleteServiceAccount(ctx.pool, r.sa.id);
   return ok(200, { serviceAccountId: r.sa.id, deleted: true, deletedAt: new Date().toISOString() });
@@ -935,10 +952,11 @@ async function iamCreateUser(ctx) {
       requiredActions,
       createdBy: identity?.sub ?? null,
     });
-  } catch (e) { return err(e.kcStatus === 409 ? 409 : (e.statusCode && e.statusCode < 500 ? e.statusCode : 502), 'IAM_CREATE_USER_FAILED', String(e.message ?? e)); }
+  } catch (e) { return kcBackedErr(e, 'IAM_CREATE_USER_FAILED'); }
 }
 async function iamListRoles(ctx) {
-  const roles = await kcAdmin.listRealmRoles(ctx.params.realmId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const roles = await kc.listRealmRoles(ctx.params.realmId);
   const items = roles.map((r) => ({
     id: r.id, name: r.name, roleName: r.name, realmId: ctx.params.realmId,
     description: r.description ?? null, composite: Boolean(r.composite), compositeRoles: [],
@@ -948,20 +966,32 @@ async function iamListRoles(ctx) {
 }
 async function iamCreateRole(ctx) {
   if (!ctx.body.name) return err(400, 'VALIDATION_ERROR', 'name required');
-  await kcAdmin.createRealmRole(ctx.params.realmId, ctx.body.name);
-  return ok(201, { name: ctx.body.name, realm: ctx.params.realmId });
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try {
+    await kc.createRealmRole(ctx.params.realmId, ctx.body.name);
+    return ok(201, { name: ctx.body.name, realm: ctx.params.realmId });
+  } catch (e) {
+    return kcBackedErr(e, 'IAM_CREATE_ROLE_FAILED');
+  }
 }
 async function iamListGroups(ctx) {
-  const groups = await kcAdmin.listGroups(ctx.params.realmId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const groups = await kc.listGroups(ctx.params.realmId);
   return ok(200, { items: groups.map((g) => ({ id: g.id, name: g.name, path: g.path })), total: groups.length });
 }
 async function iamCreateGroup(ctx) {
   if (!ctx.body.name) return err(400, 'VALIDATION_ERROR', 'name required');
-  const id = await kcAdmin.createGroup(ctx.params.realmId, ctx.body.name);
-  return ok(201, { id, name: ctx.body.name, realm: ctx.params.realmId });
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try {
+    const id = await kc.createGroup(ctx.params.realmId, ctx.body.name);
+    return ok(201, { id, name: ctx.body.name, realm: ctx.params.realmId });
+  } catch (e) {
+    return kcBackedErr(e, 'IAM_CREATE_GROUP_FAILED');
+  }
 }
 async function iamListClients(ctx) {
-  const clients = await kcAdmin.listClients(ctx.params.realmId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const clients = await kc.listClients(ctx.params.realmId);
   return ok(200, { items: clients.map((c) => ({ id: c.id, clientId: c.clientId, enabled: c.enabled, publicClient: c.publicClient, serviceAccountsEnabled: c.serviceAccountsEnabled })), total: clients.length });
 }
 
@@ -976,7 +1006,7 @@ async function iamGetUser(ctx) {
   if (az.error) return az.error;
   let u;
   try { u = await kc.getUser(az.realm, ctx.params.userId); }
-  catch (e) { if (e.kcStatus === 404) u = null; else return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GET_USER_FAILED', String(e.message ?? e)); }
+  catch (e) { if (e.kcStatus === 404) u = null; else return kcBackedErr(e, 'IAM_GET_USER_FAILED'); }
   if (!u) return err(404, 'USER_NOT_FOUND', `user ${ctx.params.userId} not found`);
   let realmRoles = [];
   try { realmRoles = (await kc.listUserRealmRoles(az.realm, u.id)).map((r) => r.name).filter((n) => n && !String(n).startsWith('default-roles')); }
@@ -993,7 +1023,7 @@ async function iamGetRole(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
   let r;
   try { r = await kc.getRealmRole(ctx.params.realmId, ctx.params.roleName); }
-  catch (e) { if (e.kcStatus === 404) r = null; else return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GET_ROLE_FAILED', String(e.message ?? e)); }
+  catch (e) { if (e.kcStatus === 404) r = null; else return kcBackedErr(e, 'IAM_GET_ROLE_FAILED'); }
   if (!r) return err(404, 'ROLE_NOT_FOUND', `role ${ctx.params.roleName} not found`);
   return ok(200, {
     id: r.id, name: r.name, roleName: r.name, realmId: ctx.params.realmId,
@@ -1007,7 +1037,7 @@ async function iamDeleteRole(ctx) {
     await kc.deleteRealmRole(ctx.params.realmId, ctx.params.roleName);
     return ok(200, { roleName: ctx.params.roleName, realmId: ctx.params.realmId, deleted: true });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'DELETE_ROLE_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'DELETE_ROLE_FAILED');
   }
 }
 // GET /v1/iam/realms — superadmin lists every tenant realm (route-gated to superadmin).
@@ -1028,7 +1058,7 @@ async function iamGetRealm(ctx) {
   const tenant = az.tenant ?? await store.getTenantByRealm(ctx.pool, az.realm);
   let authConfig = null;
   try { authConfig = await kc.getRealmAuthConfig(az.realm); }
-  catch (e) { if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`); return err(502, 'IAM_GET_REALM_FAILED', String(e.message ?? e)); }
+  catch (e) { if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`); return kcBackedErr(e, 'IAM_GET_REALM_FAILED'); }
   return ok(200, {
     realmId: az.realm, realm: az.realm, tenantId: tenant?.tenant_id ?? null, slug: tenant?.slug ?? null,
     displayName: tenant?.display_name ?? null, status: tenant?.status ?? null, authConfig,
@@ -1045,7 +1075,7 @@ async function iamUpdateRealm(ctx) {
     return ok(200, { realmId: az.realm, realm: az.realm, authConfig });
   } catch (e) {
     if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`);
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_UPDATE_REALM_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'IAM_UPDATE_REALM_FAILED');
   }
 }
 
@@ -1070,7 +1100,7 @@ async function iamDeleteUser(ctx) {
     await kc.deleteUser(az.realm, ctx.params.userId);
     return ok(200, { userId: ctx.params.userId, realmId: az.realm, deleted: true });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'DELETE_USER_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'DELETE_USER_FAILED');
   }
 }
 // PATCH /v1/iam/realms/{realmId}/users/{userId}/status  body: {enabled:bool} | {state:'active'|'suspended'}
@@ -1087,7 +1117,7 @@ async function iamSetUserStatus(ctx) {
     await kc.setUserEnabled(az.realm, ctx.params.userId, enabled);
     return ok(200, { userId: ctx.params.userId, realmId: az.realm, enabled, state: enabled ? 'active' : 'suspended' });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SET_USER_STATUS_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'SET_USER_STATUS_FAILED');
   }
 }
 
@@ -1204,40 +1234,47 @@ async function listFunctionsHandler(ctx) {
 
 // ---- fine-grained IAM: role assignment + group membership ------------------
 async function iamListUserRoles(ctx) {
-  const roles = await kcAdmin.listUserRealmRoles(ctx.params.realmId, ctx.params.userId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const roles = await kc.listUserRealmRoles(ctx.params.realmId, ctx.params.userId);
   return ok(200, { items: roles.map((r) => ({ id: r.id, name: r.name, description: r.description })), total: roles.length });
 }
 async function iamAssignUserRoles(ctx) {
   const roles = Array.isArray(ctx.body.roles) ? ctx.body.roles : [];
   if (!roles.length) return err(400, 'VALIDATION_ERROR', 'roles[] is required');
-  try { await kcAdmin.assignRealmRoles(ctx.params.realmId, ctx.params.userId, roles);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try { await kc.assignRealmRoles(ctx.params.realmId, ctx.params.userId, roles);
     return ok(201, { userId: ctx.params.userId, realm: ctx.params.realmId, assigned: roles }); }
-  catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_ASSIGN_ROLE_FAILED', String(e.message ?? e)); }
+  catch (e) { return kcBackedErr(e, 'IAM_ASSIGN_ROLE_FAILED'); }
 }
 async function iamRemoveUserRoles(ctx) {
   const roles = Array.isArray(ctx.body.roles) ? ctx.body.roles : [];
   if (!roles.length) return err(400, 'VALIDATION_ERROR', 'roles[] is required');
-  try { await kcAdmin.removeRealmRoles(ctx.params.realmId, ctx.params.userId, roles);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try { await kc.removeRealmRoles(ctx.params.realmId, ctx.params.userId, roles);
     return ok(200, { userId: ctx.params.userId, realm: ctx.params.realmId, removed: roles }); }
-  catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_REMOVE_ROLE_FAILED', String(e.message ?? e)); }
+  catch (e) { return kcBackedErr(e, 'IAM_REMOVE_ROLE_FAILED'); }
 }
 async function iamListGroupMembers(ctx) {
-  const members = await kcAdmin.listGroupMembers(ctx.params.realmId, ctx.params.groupId, { max: Number(ctx.query.max ?? 200) });
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const members = await kc.listGroupMembers(ctx.params.realmId, ctx.params.groupId, { max: Number(ctx.query.max ?? 200) });
   return ok(200, { items: members.map((u) => ({ id: u.id, username: u.username, email: u.email, enabled: u.enabled })), total: members.length });
 }
 async function iamListUserGroups(ctx) {
-  const groups = await kcAdmin.listUserGroups(ctx.params.realmId, ctx.params.userId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const groups = await kc.listUserGroups(ctx.params.realmId, ctx.params.userId);
   return ok(200, { items: groups.map((g) => ({ id: g.id, name: g.name, path: g.path })), total: groups.length });
 }
 async function iamAddUserToGroup(ctx) {
-  try { await kcAdmin.addUserToGroup(ctx.params.realmId, ctx.params.userId, ctx.params.groupId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try { await kc.addUserToGroup(ctx.params.realmId, ctx.params.userId, ctx.params.groupId);
     return ok(201, { userId: ctx.params.userId, groupId: ctx.params.groupId, realm: ctx.params.realmId, member: true }); }
-  catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GROUP_ADD_FAILED', String(e.message ?? e)); }
+  catch (e) { return kcBackedErr(e, 'IAM_GROUP_ADD_FAILED'); }
 }
 async function iamRemoveUserFromGroup(ctx) {
-  try { await kcAdmin.removeUserFromGroup(ctx.params.realmId, ctx.params.userId, ctx.params.groupId);
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  try { await kc.removeUserFromGroup(ctx.params.realmId, ctx.params.userId, ctx.params.groupId);
     return ok(200, { userId: ctx.params.userId, groupId: ctx.params.groupId, realm: ctx.params.realmId, member: false }); }
-  catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'IAM_GROUP_REMOVE_FAILED', String(e.message ?? e)); }
+  catch (e) { return kcBackedErr(e, 'IAM_GROUP_REMOVE_FAILED'); }
 }
 
 // ---- project (tenant) auth-config: login methods + social providers (#568) --
@@ -1260,7 +1297,7 @@ async function getAuthConfig(ctx) {
     const cfg = await kc.getRealmAuthConfig(az.realm);
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'AUTH_CONFIG_READ_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'AUTH_CONFIG_READ_FAILED');
   }
 }
 // PUT /v1/tenants/{tenantId}/auth-config — toggle auth methods (registration/email/reset/rememberMe).
@@ -1278,7 +1315,7 @@ async function setAuthConfig(ctx) {
     const cfg = await kc.getRealmAuthConfig(az.realm);
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'AUTH_CONFIG_WRITE_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'AUTH_CONFIG_WRITE_FAILED');
   }
 }
 // PUT /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — create/update a social IdP.
@@ -1298,7 +1335,7 @@ async function setSocialProvider(ctx) {
     const cfg = await kc.getRealmAuthConfig(az.realm);
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, providerId, identityProviders: cfg.identityProviders });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SOCIAL_PROVIDER_WRITE_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'SOCIAL_PROVIDER_WRITE_FAILED');
   }
 }
 // DELETE /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — remove a social IdP.
@@ -1312,7 +1349,7 @@ async function deleteSocialProvider(ctx) {
     await kc.deleteIdentityProvider(az.realm, alias);
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, deleted: true });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'SOCIAL_PROVIDER_DELETE_FAILED', String(e.message ?? e));
+    return kcBackedErr(e, 'SOCIAL_PROVIDER_DELETE_FAILED');
   }
 }
 

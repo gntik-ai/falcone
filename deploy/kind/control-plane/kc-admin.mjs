@@ -11,6 +11,59 @@ const BASE = (process.env.KEYCLOAK_BASE_URL || 'http://falcone-keycloak:8080').r
 const ADMIN_USER = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.KEYCLOAK_ADMIN_PASSWORD || '';
 
+export const KEYCLOAK_ADMIN_SAFE_MESSAGE = 'Identity provider operation failed. Please retry or contact support if the problem continues.';
+
+function diagnosticBody(body) {
+  if (body === undefined || body === null) return '';
+  return typeof body === 'string' ? body : JSON.stringify(body);
+}
+
+function looksLikeRawKeycloakAdminMessage(message) {
+  const text = String(message ?? '');
+  return /^keycloak\s+[A-Z]+\s+\/realms\//i.test(text)
+    || /^keycloak\s+admin\s+token\s+failed\b/i.test(text)
+    || /\bkeycloak\s+[A-Z]+\s+\/admin\/realms\//i.test(text)
+    || /https?:\/\/\S+\/admin\/realms\//i.test(text)
+    || /\/admin\/realms\//i.test(text)
+    || /\/realms\/[^/\s]+\/(?:users|roles|clients|groups|identity-provider|client-scopes|default-default-client-scopes)\b/i.test(text);
+}
+
+export class KeycloakAdminError extends Error {
+  constructor({ method = 'REQUEST', path = '', status = 502, statusCode, body = null, diagnosticMessage } = {}) {
+    super(KEYCLOAK_ADMIN_SAFE_MESSAGE);
+    this.name = 'KeycloakAdminError';
+    this.code = 'KEYCLOAK_ADMIN_REQUEST_FAILED';
+    this.statusCode = statusCode ?? status ?? 502;
+    this.kcStatus = status;
+    this.safeMessage = KEYCLOAK_ADMIN_SAFE_MESSAGE;
+
+    Object.defineProperties(this, {
+      method: { value: method, enumerable: false },
+      path: { value: path, enumerable: false },
+      upstreamStatus: { value: status, enumerable: false },
+      upstreamBody: { value: body, enumerable: false },
+      diagnosticMessage: {
+        value: diagnosticMessage ?? `keycloak ${method} ${path} -> ${status}: ${diagnosticBody(body)}`,
+        enumerable: false
+      }
+    });
+  }
+}
+
+export function isKeycloakAdminError(error) {
+  return error instanceof KeycloakAdminError
+    || error?.code === 'KEYCLOAK_ADMIN_REQUEST_FAILED'
+    || typeof error?.kcStatus === 'number'
+    || looksLikeRawKeycloakAdminMessage(error?.message ?? error);
+}
+
+export function safeKeycloakAdminMessage(error, fallback = KEYCLOAK_ADMIN_SAFE_MESSAGE) {
+  if (isKeycloakAdminError(error)) return error?.safeMessage ?? fallback;
+  const message = String(error?.message ?? error ?? '').trim();
+  if (!message || looksLikeRawKeycloakAdminMessage(message)) return fallback;
+  return message;
+}
+
 // Deployment-configured redirect-URI / web-origin allow-list for per-tenant public app clients
 // (#670). NEVER a wildcard: a `['*']` allow-list makes the authorization endpoint accept an
 // arbitrary attacker-controlled `redirect_uri` (auth-code interception). Parse a comma-separated
@@ -88,7 +141,17 @@ async function adminToken() {
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'password', client_id: 'admin-cli', username: ADMIN_USER, password: ADMIN_PASS })
   });
-  if (!res.ok) throw Object.assign(new Error(`keycloak admin token failed: ${res.status} ${await res.text()}`), { statusCode: 502 });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new KeycloakAdminError({
+      method: 'POST',
+      path: '/realms/master/protocol/openid-connect/token',
+      status: res.status,
+      statusCode: 502,
+      body,
+      diagnosticMessage: `keycloak admin token failed: ${res.status} ${body}`
+    });
+  }
   const data = await res.json();
   cachedToken = { token: data.access_token, exp: now + (data.expires_in ?? 60) };
   return cachedToken.token;
@@ -104,9 +167,7 @@ async function kc(method, path, body) {
   const text = await res.text();
   let json; try { json = text ? JSON.parse(text) : null; } catch { json = text; }
   if (!res.ok) {
-    const err = new Error(`keycloak ${method} ${path} -> ${res.status}: ${typeof json === 'string' ? json : JSON.stringify(json)}`);
-    err.statusCode = res.status; err.kcStatus = res.status; err.body = json;
-    throw err;
+    throw new KeycloakAdminError({ method, path, status: res.status, statusCode: res.status, body: json });
   }
   // Keycloak returns 201 + Location header (no body) on creates; surface the id.
   const loc = res.headers.get('location');

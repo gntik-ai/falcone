@@ -1,0 +1,98 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import {
+  KEYCLOAK_ADMIN_SAFE_MESSAGE,
+  KeycloakAdminError,
+  safeKeycloakAdminMessage,
+} from '../../deploy/kind/control-plane/kc-admin.mjs';
+
+const RAW_BODY_TEXT = 'verbatim upstream body should stay server-side';
+
+function rawKeycloak404(method, path) {
+  const error = new Error(`keycloak ${method} ${path} -> 404: {"error":"${RAW_BODY_TEXT}","realm":"tenant-alpha"}`);
+  error.statusCode = 404;
+  error.kcStatus = 404;
+  error.body = { error: RAW_BODY_TEXT, realm: 'tenant-alpha' };
+  return error;
+}
+
+function assertSafeClientError(response, expectedCode) {
+  assert.equal(response.statusCode, 404);
+  assert.equal(response.body.code, expectedCode);
+  assert.equal(response.body.message, KEYCLOAK_ADMIN_SAFE_MESSAGE);
+  assert.doesNotMatch(response.body.message, /keycloak\s/i);
+  assert.doesNotMatch(response.body.message, /\/realms\//i);
+  assert.doesNotMatch(response.body.message, /tenant-alpha/i);
+  assert.doesNotMatch(response.body.message, new RegExp(RAW_BODY_TEXT, 'i'));
+}
+
+test('KeycloakAdminError keeps upstream diagnostics out of enumerable client-facing fields', () => {
+  const upstreamBody = { error: RAW_BODY_TEXT, realm: 'tenant-alpha' };
+  const error = new KeycloakAdminError({
+    method: 'POST',
+    path: '/realms/tenant-alpha/users/missing-user/role-mappings/realm',
+    status: 404,
+    statusCode: 404,
+    body: upstreamBody,
+  });
+
+  assert.equal(error.message, KEYCLOAK_ADMIN_SAFE_MESSAGE);
+  assert.equal(safeKeycloakAdminMessage(error), KEYCLOAK_ADMIN_SAFE_MESSAGE);
+  assert.match(error.diagnosticMessage, /keycloak POST \/realms\/tenant-alpha\/users/);
+  assert.deepEqual(error.upstreamBody, upstreamBody);
+
+  const serialized = JSON.stringify(error);
+  assert.doesNotMatch(serialized, /\/realms\//);
+  assert.doesNotMatch(serialized, /tenant-alpha/);
+  assert.doesNotMatch(serialized, new RegExp(RAW_BODY_TEXT, 'i'));
+});
+
+test('superadmin IAM role assignment returns a sanitized domain error on upstream Keycloak 404', async () => {
+  const response = await LOCAL_HANDLERS.iamAssignUserRoles({
+    params: { realmId: 'tenant-alpha', userId: 'missing-user' },
+    body: { roles: ['tenant_admin'] },
+    identity: { sub: 'superadmin-1', actorType: 'superadmin' },
+    kcAdmin: {
+      async assignRealmRoles() {
+        throw rawKeycloak404('POST', '/realms/tenant-alpha/users/missing-user/role-mappings/realm');
+      },
+    },
+  });
+
+  assertSafeClientError(response, 'IAM_ASSIGN_ROLE_FAILED');
+});
+
+test('tenant admin own-realm IAM mutation returns a sanitized domain error on upstream Keycloak 404', async () => {
+  const pool = {
+    async query(sql, params) {
+      assert.match(sql, /FROM tenants WHERE iam_realm = \$1/);
+      assert.deepEqual(params, ['tenant-alpha']);
+      return {
+        rows: [{
+          id: 'tenant-alpha',
+          tenant_id: 'tenant-alpha',
+          slug: 'alpha',
+          display_name: 'Tenant Alpha',
+          status: 'active',
+          iam_realm: 'tenant-alpha',
+        }],
+      };
+    },
+  };
+
+  const response = await LOCAL_HANDLERS.iamSetUserStatus({
+    pool,
+    params: { realmId: 'tenant-alpha', userId: 'missing-user' },
+    body: { enabled: false },
+    identity: { sub: 'tenant-admin-1', actorType: 'tenant_admin', tenantId: 'tenant-alpha' },
+    kcAdmin: {
+      async setUserEnabled() {
+        throw rawKeycloak404('PUT', '/realms/tenant-alpha/users/missing-user');
+      },
+    },
+  });
+
+  assertSafeClientError(response, 'SET_USER_STATUS_FAILED');
+});

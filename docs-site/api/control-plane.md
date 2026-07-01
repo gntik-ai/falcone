@@ -108,6 +108,13 @@ Errors are JSON with a stable `code` and a `message`:
 { "code": "IDENTITY_MISSING", "message": "Missing tenant identity" }
 ```
 
+IAM and other Keycloak-admin-backed mutations keep the same stable domain `code`
+(`IAM_ASSIGN_ROLE_FAILED`, `CREATE_SA_FAILED`, and similar) when the upstream identity provider
+rejects an admin request. The client-facing `message` is sanitized and must not include internal
+Keycloak admin URLs, raw `keycloak METHOD /realms/...` request lines, tenant realm path fragments, or
+verbatim upstream Keycloak response bodies. Server-side diagnostics retain method, path, upstream
+status, and response body for logs/debugging without serializing those details into API responses.
+
 | Status | When |
 | --- | --- |
 | `400` | Malformed body/query (`INVALID_JSON`, `INVALID_QUERY_JSON`) |
