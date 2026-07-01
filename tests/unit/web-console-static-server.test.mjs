@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,7 @@ import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const IMMUTABLE = 'public, max-age=31536000, immutable';
+const FAVICON_MAX_BYTES = 10 * 1024;
 
 const staticServers = [
   {
@@ -139,6 +140,45 @@ function assertCompressed(response, encoding, rawBody) {
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+function parseLinkAttributes(tag) {
+  return Object.fromEntries(
+    [...tag.matchAll(/\s([a-zA-Z:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((match) => [
+      match[1].toLowerCase(),
+      match[2] ?? match[3] ?? ''
+    ])
+  );
+}
+
+test('web console declares a lightweight SVG-capable favicon asset', async () => {
+  const indexHtml = await readFile(join(repoRoot, 'apps/web-console/index.html'), 'utf8');
+  const iconLinks = [...indexHtml.matchAll(/<link\b[^>]*>/gi)]
+    .map((match) => parseLinkAttributes(match[0]))
+    .filter((attributes) => (attributes.rel ?? '').split(/\s+/).includes('icon'));
+
+  assert.ok(iconLinks.length > 0, 'index.html declares at least one favicon');
+
+  const primaryIcon = iconLinks.find((attributes) => attributes.type === 'image/svg+xml') ?? iconLinks[0];
+  assert.ok(primaryIcon.href, 'primary favicon declares an href');
+  assert.match(primaryIcon.href, /^\//, 'primary favicon uses an app-root public path');
+
+  const assetPath = join(repoRoot, 'apps/web-console/public', primaryIcon.href.slice(1));
+  const assetStats = await stat(assetPath);
+  assert.ok(
+    assetStats.size <= FAVICON_MAX_BYTES,
+    `expected ${primaryIcon.href} to be <= ${FAVICON_MAX_BYTES} bytes, got ${assetStats.size}`
+  );
+
+  if ((primaryIcon.type ?? '').includes('svg') || primaryIcon.href.endsWith('.svg')) {
+    const faviconSvg = await readFile(assetPath, 'utf8');
+    assert.match(faviconSvg, /<svg\b/i, 'SVG favicon is an SVG document');
+    assert.doesNotMatch(
+      faviconSvg,
+      /href\s*=\s*["']data:image\/(?:png|jpe?g|gif|webp);base64,/i,
+      'SVG favicon must not embed a raster image as a base64 data URL'
+    );
+  }
+});
 
 for (const server of staticServers) {
   test(`${server.name} compresses compressible assets and sets static cache headers`, async (t) => {
