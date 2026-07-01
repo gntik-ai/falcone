@@ -3098,6 +3098,16 @@
             },
             "description": "The login payload is malformed."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The username/password credentials are invalid."
+          },
           "403": {
             "content": {
               "application/json": {
@@ -3106,7 +3116,7 @@
                 }
               }
             },
-            "description": "The credentials are invalid or the account is not allowed to enter the console."
+            "description": "The account is not allowed to enter the console."
           },
           "409": {
             "content": {

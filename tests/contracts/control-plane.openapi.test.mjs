@@ -4,6 +4,16 @@ import assert from 'node:assert/strict';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { OPENAPI_PATH, collectContractViolations, resolveParameters } from '../../scripts/lib/quality-gates.mjs';
 
+function assertUsesErrorResponse(document, response, message) {
+  const schema = response?.content?.['application/json']?.schema;
+  assert.ok(schema, message);
+  if (schema.$ref) {
+    assert.equal(schema.$ref, '#/components/schemas/ErrorResponse');
+    return;
+  }
+  assert.deepEqual(schema, document.components.schemas.ErrorResponse, message);
+}
+
 test('control-plane OpenAPI document remains structurally valid', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
 
@@ -385,6 +395,10 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.equal(createConsoleLoginSession['x-family'], 'auth');
   assert.equal(createConsoleLoginSessionParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
   assert.ok(createConsoleLoginSession.responses['200']);
+  assert.ok(createConsoleLoginSession.responses['401'], 'login invalid-credentials response must be advertised');
+  assertUsesErrorResponse(document, createConsoleLoginSession.responses['401'], 'login 401 must use ErrorResponse');
+  assert.ok(createConsoleLoginSession.responses['403'], 'login account-forbidden response must remain advertised');
+  assertUsesErrorResponse(document, createConsoleLoginSession.responses['403'], 'login 403 must use ErrorResponse');
   assert.ok(createConsoleLoginSession.responses['409']);
   assert.ok(document.components.schemas.ConsoleLoginRequest);
   assert.ok(document.components.schemas.ConsoleLoginSession);

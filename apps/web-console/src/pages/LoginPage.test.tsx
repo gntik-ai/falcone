@@ -107,6 +107,67 @@ describe('LoginPage', () => {
     })
   })
 
+  it('[#727] muestra error de credenciales para 401 INVALID_CREDENTIALS sin usar el aviso de caída', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+      .mockResolvedValueOnce(
+        createJsonResponse(401, {
+          status: 401,
+          code: 'INVALID_CREDENTIALS',
+          message: 'Keycloak says INVALID_CREDENTIALS for realm falcone-console'
+        })
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'wrong-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    const feedback = await screen.findByRole('alert')
+    expect(feedback).toHaveTextContent(/no hemos podido validar tus credenciales/i)
+    expect(feedback).toHaveTextContent(/revisa tu usuario y contraseña e inténtalo de nuevo/i)
+    expect(
+      feedback.compareDocumentPosition(screen.getByLabelText(/usuario/i)) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(screen.getByLabelText(/usuario/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/contraseña/i)).toHaveFocus()
+    expect(
+      screen.queryByRole('heading', { name: /el servicio de acceso no está disponible ahora mismo/i })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/keycloak says invalid_credentials/i)).not.toBeInTheDocument()
+  })
+
+  it('mantiene el aviso de servicio no disponible para errores operativos 503', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+      .mockResolvedValueOnce(
+        createJsonResponse(503, {
+          status: 503,
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Identity provider is unavailable'
+        })
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'wrong-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /el servicio de acceso no está disponible ahora mismo/i })
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: /no hemos podido validar tus credenciales/i })
+    ).not.toBeInTheDocument()
+  })
+
   it('muestra el hint auth consumido desde storage', async () => {
     window.sessionStorage.setItem(
       'in-falcone.console-auth-status-hint',
