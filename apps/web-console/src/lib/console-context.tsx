@@ -274,6 +274,19 @@ export function ConsoleContextProvider({
 
   const selectTenant = useCallback(
     (tenantId: string | null) => {
+      if (tenantId === activeTenantId) {
+        if (tenantId && !workspacesLoading && (workspaces.length === 0 || workspacesError)) {
+          setWorkspacesError(null)
+          setWorkspaceReloadKey((current) => current + 1)
+        }
+
+        setCapabilities({})
+        setCapabilitiesLoading(true)
+        setCapabilityReloadKey((current) => current + 1)
+        persistSelection(tenantId, activeWorkspaceId)
+        return
+      }
+
       setActiveTenantId(tenantId)
       setActiveWorkspaceId(null)
       setWorkspaces([])
@@ -284,7 +297,7 @@ export function ConsoleContextProvider({
       setCapabilityReloadKey((current) => current + 1)
       persistSelection(tenantId, null)
     },
-    [persistSelection]
+    [activeTenantId, activeWorkspaceId, persistSelection, workspaces.length, workspacesError, workspacesLoading]
   )
 
   const selectWorkspace = useCallback(

@@ -7,6 +7,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  RefreshCw,
   Users,
   Settings,
   Shield,
@@ -561,21 +562,21 @@ function ConsoleHeaderContextControls() {
       aria-label="Contexto activo de consola"
       className="hidden min-w-0 flex-1 items-center justify-center xl:flex"
     >
-      <div className="flex w-full max-w-3xl items-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-3 shadow-sm">
+      <div className="flex w-full max-w-3xl items-center gap-2 rounded-xl border border-border bg-card/70 px-3 py-1.5 shadow-sm">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contexto</p>
-          <p className="truncate text-xs text-muted-foreground">{contextHint}</p>
+          <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.18em] text-muted-foreground">Contexto</p>
+          <p className="mt-1 truncate text-xs leading-4 text-muted-foreground">{contextHint}</p>
         </div>
 
-        <label className="flex min-w-[220px] max-w-[260px] flex-1 flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Tenant</span>
+        <label className="flex min-w-[210px] max-w-[240px] flex-1 flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Tenant</span>
           <select
             aria-label="Seleccionar tenant"
             data-testid="console-context-tenant-select"
             value={activeTenantId ?? ''}
             disabled={tenantsLoading || hasNoTenants}
             onChange={(event) => selectTenant(event.target.value || null)}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-8 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
               {tenantsLoading ? 'Cargando tenants…' : hasNoTenants ? 'Sin tenants accesibles' : 'Selecciona un tenant'}
@@ -588,15 +589,15 @@ function ConsoleHeaderContextControls() {
           </select>
         </label>
 
-        <label className="flex min-w-[220px] max-w-[260px] flex-1 flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Workspace</span>
+        <label className="flex min-w-[210px] max-w-[240px] flex-1 flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Workspace</span>
           <select
             aria-label="Seleccionar workspace"
             data-testid="console-context-workspace-select"
             value={activeWorkspaceId ?? ''}
             disabled={workspaceDisabled}
             onChange={(event) => selectWorkspace(event.target.value || null)}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-8 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
               {!activeTenantId
@@ -616,12 +617,28 @@ function ConsoleHeaderContextControls() {
         </label>
 
         {tenantsError ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => void reloadTenants()}>
-            Reintentar tenants
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label="Reintentar tenants"
+            title="Reintentar tenants"
+            onClick={() => void reloadTenants()}
+            className="h-9 w-9 shrink-0 rounded-lg px-0"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
           </Button>
-        ) : workspacesError ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => void reloadWorkspaces()}>
-            Reintentar workspaces
+        ) : workspacesError || hasNoWorkspaces ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label="Reintentar workspaces"
+            title="Reintentar workspaces"
+            onClick={() => void reloadWorkspaces()}
+            className="h-9 w-9 shrink-0 rounded-lg px-0"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
           </Button>
         ) : null}
       </div>
@@ -632,18 +649,21 @@ function ConsoleHeaderContextControls() {
 function ConsoleContextStatusPanel() {
   const {
     activeTenant,
+    activeTenantId,
     activeWorkspace,
     operationalAlerts,
     reloadTenants,
     reloadWorkspaces,
     tenantsError,
     tenantsLoading,
+    workspaces,
     workspacesError,
     workspacesLoading
   } = useConsoleContext()
 
   const tenantStatus = useMemo(() => getConsoleTenantStatusMeta(activeTenant), [activeTenant])
   const workspaceStatus = useMemo(() => getConsoleWorkspaceStatusMeta(activeWorkspace), [activeWorkspace])
+  const hasNoWorkspaces = Boolean(activeTenantId) && !workspacesLoading && !workspacesError && workspaces.length === 0
 
   return (
     <section aria-label="Estado operativo del contexto" className="space-y-4" data-testid="console-context-status-panel">
@@ -687,6 +707,7 @@ function ConsoleContextStatusPanel() {
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <p className="text-sm text-destructive">{tenantsError}</p>
               <Button type="button" variant="outline" size="sm" onClick={() => void reloadTenants()}>
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 Reintentar tenants
               </Button>
             </div>
@@ -721,12 +742,21 @@ function ConsoleContextStatusPanel() {
           </div>
 
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            {workspacesLoading && !activeWorkspace ? 'Cargando el estado del workspace seleccionado…' : workspaceStatus.description}
+            {workspacesLoading && !activeWorkspace
+              ? 'Cargando el estado del workspace seleccionado…'
+              : hasNoWorkspaces
+                ? 'No se encontraron workspaces accesibles para el tenant activo.'
+                : workspaceStatus.description}
           </p>
-          {workspacesError ? (
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="text-sm text-destructive">{workspacesError}</p>
+          {workspacesError || hasNoWorkspaces ? (
+            <div className="mt-3 flex flex-col gap-3 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              {workspacesError ? (
+                <p className="text-sm text-destructive">{workspacesError}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Vuelve a consultar workspaces si el tenant se acaba de aprovisionar.</p>
+              )}
               <Button type="button" variant="outline" size="sm" onClick={() => void reloadWorkspaces()}>
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 Reintentar workspaces
               </Button>
             </div>

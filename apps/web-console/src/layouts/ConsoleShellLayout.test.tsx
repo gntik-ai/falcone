@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter, useParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -344,6 +344,95 @@ describe('ConsoleShellLayout', () => {
     await waitFor(() => {
       expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
       expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('wrk_alpha')
+    })
+  })
+
+  it('[bbx-770-003][fn-console-shell-tenant-selector][Scenario: Re-selecting the already-active tenant] refetches workspaces when the visible tenant select fires after a workspace error', async () => {
+    let workspaceRequestCount = 0
+    const shellApi = createShellApiImplementation({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const parsedUrl = new URL(url, 'http://localhost')
+
+      if (parsedUrl.pathname === '/v1/workspaces') {
+        workspaceRequestCount += 1
+
+        if (workspaceRequestCount === 1) {
+          return createJsonResponse(500, { message: 'Workspaces degradados' })
+        }
+      }
+
+      return shellApi(input)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
+      expect(screen.getAllByText(/workspaces degradados/i).length).toBeGreaterThan(0)
+    })
+
+    const workspaceCallsBeforeReselect = workspaceRequestCount
+
+    fireEvent.change(screen.getByTestId('console-context-tenant-select'), {
+      target: { value: 'ten_alpha' }
+    })
+
+    await waitFor(() => {
+      expect(workspaceRequestCount).toBeGreaterThan(workspaceCallsBeforeReselect)
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('wrk_alpha')
+    })
+  })
+
+  it('[bbx-770-004][fn-console-shell-workspace-retry][Scenario: Cleared workspace list is recoverable] ofrece reintento cuando el tenant activo queda con la lista de workspaces vacía', async () => {
+    let workspaceRequestCount = 0
+    const shellApi = createShellApiImplementation({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: []
+      }
+    })
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const parsedUrl = new URL(url, 'http://localhost')
+
+      if (parsedUrl.pathname === '/v1/workspaces') {
+        workspaceRequestCount += 1
+      }
+
+      return shellApi(input)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    persistConsoleShellSession(baseSession)
+    const user = userEvent.setup()
+
+    renderShell('/console/overview')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveTextContent(/sin workspaces accesibles/i)
+    })
+
+    const retryButtons = screen.getAllByRole('button', { name: /reintentar workspaces/i })
+    expect(retryButtons.length).toBeGreaterThan(0)
+
+    const workspaceCallsBeforeRetry = workspaceRequestCount
+
+    await user.click(retryButtons[0])
+
+    await waitFor(() => {
+      expect(workspaceRequestCount).toBeGreaterThan(workspaceCallsBeforeRetry)
     })
   })
 
