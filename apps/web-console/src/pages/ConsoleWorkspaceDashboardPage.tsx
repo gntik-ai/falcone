@@ -70,8 +70,8 @@ export function ConsoleWorkspaceDashboardPage() {
   return (
     <main className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,34rem)] lg:items-start">
+          <div className="min-w-0 space-y-2">
             <Badge variant="outline">Workspace</Badge>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">Workspace dashboard</h1>
@@ -80,18 +80,18 @@ export function ConsoleWorkspaceDashboardPage() {
               </p>
             </div>
           </div>
-          <dl className="grid gap-4 text-sm sm:grid-cols-3 lg:min-w-[34rem]">
-            <div>
-              <dt className="text-xs font-medium uppercase text-muted-foreground">Workspace</dt>
-              <dd className="mt-1 break-all font-mono text-foreground">{data.workspaceId}</dd>
+          <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-3 lg:gap-4">
+            <div className="min-w-0 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+              <dt className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Workspace</dt>
+              <dd className="mt-1 break-all font-mono text-sm text-foreground">{data.workspaceId}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium uppercase text-muted-foreground">Tenant</dt>
-              <dd className="mt-1 break-all font-mono text-foreground">{data.tenantId}</dd>
+            <div className="min-w-0 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+              <dt className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Tenant</dt>
+              <dd className="mt-1 break-all font-mono text-sm text-foreground">{data.tenantId}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium uppercase text-muted-foreground">Snapshot</dt>
-              <dd className="mt-1 text-foreground">
+            <div className="min-w-0 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+              <dt className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Snapshot</dt>
+              <dd className="mt-1 text-sm text-foreground">
                 <time dateTime={data.snapshotAt}>{formatDateTime(data.snapshotAt)}</time>
               </dd>
             </div>

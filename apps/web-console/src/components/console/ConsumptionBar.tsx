@@ -10,7 +10,7 @@ function getTone(current: number, limit: number) {
 
 export function ConsumptionBar({ current, limit, label }: { current: number | null; limit: number; label?: string }) {
   if (limit === -1) {
-    return <div aria-label={label ?? 'Unlimited usage'} className="text-sm"><span>{current ?? '—'}</span> <span className="text-muted-foreground">/ Unlimited</span></div>
+    return <div aria-label={label ?? 'Unlimited usage'} className="break-words text-sm"><span>{current ?? '—'}</span> <span className="text-muted-foreground">/ Unlimited</span></div>
   }
   if (current === null) {
     return <div aria-label={label ?? 'Usage unavailable'} className="text-sm text-muted-foreground">Data unavailable</div>
@@ -23,7 +23,7 @@ export function ConsumptionBar({ current, limit, label }: { current: number | nu
     : `${current} used with a zero limit`
   return (
     <div className="space-y-2">
-      <div className="text-sm">{current} / {limit}</div>
+      <div className="break-words text-sm">{current} / {limit}</div>
       <div
         role="progressbar"
         aria-label={label ?? 'Consumption progress'}
