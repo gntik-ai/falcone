@@ -182,14 +182,14 @@ export function ConsoleIamAccessPage() {
       ) : null}
 
       {error ? (
-        <Alert variant="destructive" className="border-destructive/30 bg-destructive/5 text-foreground">
-          <div className="flex gap-3">
+        <Alert variant="destructive" className="border-destructive/30 bg-destructive/5 text-foreground shadow-sm">
+          <div className="flex min-w-0 items-start gap-3">
             <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/20 text-destructive">
               <AlertTriangle className="h-4 w-4" aria-hidden="true" />
             </span>
-            <div className="min-w-0">
-              <AlertTitle className="text-base">Acción IAM no completada</AlertTitle>
-              <AlertDescription className="text-muted-foreground">{error}</AlertDescription>
+            <div className="min-w-0 max-w-3xl">
+              <AlertTitle className="text-base text-foreground">Acción IAM no completada</AlertTitle>
+              <AlertDescription className="break-words text-muted-foreground">{error}</AlertDescription>
             </div>
           </div>
         </Alert>
