@@ -126,10 +126,15 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'wrong-secret' } })
     fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
 
+    const feedback = await screen.findByRole('alert')
+    expect(feedback).toHaveTextContent(/no hemos podido validar tus credenciales/i)
+    expect(feedback).toHaveTextContent(/revisa tu usuario y contraseña e inténtalo de nuevo/i)
     expect(
-      await screen.findByRole('heading', { name: /no hemos podido validar tus credenciales/i })
-    ).toBeInTheDocument()
-    expect(screen.getByText(/revisa tu usuario y contraseña e inténtalo de nuevo/i)).toBeInTheDocument()
+      feedback.compareDocumentPosition(screen.getByLabelText(/usuario/i)) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(screen.getByLabelText(/usuario/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/contraseña/i)).toHaveFocus()
     expect(
       screen.queryByRole('heading', { name: /el servicio de acceso no está disponible ahora mismo/i })
     ).not.toBeInTheDocument()

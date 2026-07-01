@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -24,7 +24,12 @@ import {
 import type { ApiError } from '@/lib/http'
 
 type FeedbackState =
-  | { variant: 'default' | 'success' | 'destructive'; title: string; message: string }
+  | {
+      variant: 'default' | 'success' | 'destructive'
+      kind: 'credential' | 'service' | 'status' | 'success'
+      title: string
+      message: string
+    }
   | null
 
 const initialForm = {
@@ -55,6 +60,7 @@ function resolveCredentialErrorMessage(error: ApiError): string {
 export function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const passwordInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState(initialForm)
   const [signupPolicy, setSignupPolicy] = useState<ConsoleSignupPolicy | null>(null)
   const [policyLoading, setPolicyLoading] = useState(true)
@@ -84,6 +90,7 @@ export function LoginPage() {
     if (hint) {
       setFeedback({
         variant: 'default',
+        kind: 'status',
         title: hint.title,
         message: hint.message
       })
@@ -162,6 +169,10 @@ export function LoginPage() {
     return null
   }, [statusView])
   const loginFeedbackId = feedback ? 'login-feedback' : undefined
+  const isCredentialFeedback = feedback?.kind === 'credential'
+  const isDestructiveFeedback = feedback?.variant === 'destructive'
+  const usernameDescription = isCredentialFeedback ? 'login-username-help login-feedback' : 'login-username-help'
+  const passwordDescription = isCredentialFeedback ? 'login-password-help login-feedback' : 'login-password-help'
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -179,6 +190,7 @@ export function LoginPage() {
       persistConsoleShellSession(createdSession)
       setFeedback({
         variant: 'success',
+        kind: 'success',
         title: 'Sesión creada correctamente',
         message: 'Redirigiendo al destino protegido solicitado…'
       })
@@ -190,6 +202,7 @@ export function LoginPage() {
       if (error.status === 409 && inferredStatus) {
         setFeedback({
           variant: 'default',
+          kind: 'status',
           title: inferredStatus.title,
           message: inferredStatus.message
         })
@@ -210,12 +223,15 @@ export function LoginPage() {
       } else if (isCredentialError(error)) {
         setFeedback({
           variant: 'destructive',
+          kind: 'credential',
           title: 'No hemos podido validar tus credenciales',
           message: resolveCredentialErrorMessage(error)
         })
+        passwordInputRef.current?.focus()
       } else {
         setFeedback({
           variant: 'destructive',
+          kind: 'service',
           title: 'El servicio de acceso no está disponible ahora mismo',
           message:
             error.message || 'Ha ocurrido un error operativo. Puedes reintentar en unos instantes sin recargar la consola.'
@@ -248,13 +264,33 @@ export function LoginPage() {
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
           <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId}>
+            {feedback ? (
+              <Alert
+                id="login-feedback"
+                variant={feedback.variant}
+                aria-live="assertive"
+                aria-atomic="true"
+                className={
+                  isDestructiveFeedback ? 'border-destructive/30 bg-destructive/5 text-foreground shadow-sm' : undefined
+                }
+              >
+                <AlertTitle className={isDestructiveFeedback ? 'text-foreground' : undefined}>
+                  {feedback.title}
+                </AlertTitle>
+                <AlertDescription className={isDestructiveFeedback ? 'break-words text-muted-foreground' : undefined}>
+                  {feedback.message}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             <div className="space-y-2">
               <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
               <Input
                 id="username"
                 name="username"
                 autoComplete="username"
-                aria-describedby="login-username-help"
+                aria-describedby={usernameDescription}
+                aria-invalid={isCredentialFeedback || undefined}
                 // Place the caret on the first field so keyboard and assistive-tech users
                 // can start typing their credential immediately on this dedicated login screen.
                 autoFocus
@@ -277,7 +313,9 @@ export function LoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                aria-describedby="login-password-help"
+                aria-describedby={passwordDescription}
+                aria-invalid={isCredentialFeedback || undefined}
+                ref={passwordInputRef}
                 value={form.password}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 placeholder="••••••••••••"
@@ -312,13 +350,6 @@ export function LoginPage() {
                 <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
               </Button>
             </div>
-
-            {feedback ? (
-              <Alert id="login-feedback" variant={feedback.variant} aria-live="assertive">
-                <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription>{feedback.message}</AlertDescription>
-              </Alert>
-            ) : null}
 
             {statusView ? (
               <Alert>
