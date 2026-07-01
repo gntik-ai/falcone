@@ -137,6 +137,30 @@ describe('console-context', () => {
     })
   })
 
+  it('superadmin: resolves capabilities through the active tenant route, never the self-tenant route', async () => {
+    const superadminSession: ConsoleShellSession = {
+      ...baseSession,
+      principal: {
+        ...baseSession.principal!,
+        platformRoles: ['superadmin'],
+        tenantIds: [],
+        workspaceIds: []
+      }
+    }
+    stubContextApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')]
+    })
+
+    renderContextProbe(superadminSession)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tenant')).toHaveTextContent('ten_alpha')
+      expect(fetchPathnames()).toContain('/v1/tenants/ten_alpha/effective-capabilities')
+    })
+
+    expect(fetchPathnames()).not.toContain('/v1/tenant/effective-capabilities')
+  })
+
   it('al cambiar de tenant limpia el workspace previo', async () => {
     stubContextApi({
       tenants: [
@@ -552,4 +576,11 @@ function createJsonResponse(status: number, body: unknown) {
     headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => body
   } as Response
+}
+
+function fetchPathnames() {
+  return fetchMock.mock.calls.map((call) => {
+    const requestUrl = typeof call[0] === 'string' ? call[0] : call[0] instanceof URL ? call[0].toString() : (call[0] as Request).url
+    return new URL(requestUrl, 'http://localhost').pathname
+  })
 }

@@ -13,11 +13,15 @@ other value — including an **absent** key — it returns `{ enabled: false, re
 `<div class="opacity-50 pointer-events-none" data-testid="capability-gate-disabled">` plus an upgrade
 badge, so the surface is visible but inert.
 
-The `capabilities` map comes from `GET /v1/tenant/effective-capabilities`
-(`services/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs`). That handler
-builds the map by iterating **only** over the active rows of the boolean-capability catalog. A key
-that is not in the catalog is therefore **never present** in the response — it is structurally
-`undefined`, not `false`.
+The `capabilities` map comes from the effective-capabilities action
+(`services/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs`). When the
+console has an active tenant context, it calls `GET /v1/tenants/{tenantId}/effective-capabilities`
+with that tenant id. It does **not** call the self-tenant route
+`GET /v1/tenant/effective-capabilities` for tenant-less platform principals such as `superadmin`;
+with no active tenant, the capability map is settled to `{}` and gates fail closed without a
+background self-tenant probe. That handler builds the map by iterating **only** over the active rows
+of the boolean-capability catalog. A key that is not in the catalog is therefore **never present** in
+the response — it is structurally `undefined`, not `false`.
 
 **Consequence:** gating a feature on a key that is not in the catalog makes the gate **impossible to
 satisfy** for any tenant on any plan. The surface is permanently dimmed everywhere. This is always a
