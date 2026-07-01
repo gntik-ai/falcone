@@ -205,7 +205,7 @@ export const appRoutes = [
           },
           {
             path: 'auth',
-            element: <ConsoleAuthPage />
+            element: <RequireSuperadminRoute><ConsoleAuthPage /></RequireSuperadminRoute>
           },
           {
             path: 'postgres',
