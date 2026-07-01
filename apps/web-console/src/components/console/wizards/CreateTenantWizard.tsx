@@ -37,7 +37,7 @@ function PlanStep({ data, onChange, validation, planCatalog, onRetry }: WizardSt
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
+      <div className="max-w-lg space-y-2">
         <Label htmlFor="tenant-plan">Plan</Label>
         <Select
           id="tenant-plan"
@@ -56,19 +56,19 @@ function PlanStep({ data, onChange, validation, planCatalog, onRetry }: WizardSt
         {blockingErrorVisible ? <p id="tenant-plan-blocking-error" className="text-sm text-destructive">{validation.blockingError}</p> : null}
       </div>
       {planCatalog.loading ? (
-        <p id="tenant-plan-catalog-loading" role="status" aria-live="polite" className="text-sm leading-6 text-muted-foreground">Cargando planes activos del catálogo.</p>
+        <p id="tenant-plan-catalog-loading" role="status" aria-live="polite" className="max-w-lg text-sm leading-6 text-muted-foreground">Cargando planes activos del catálogo.</p>
       ) : null}
       {planCatalog.error ? (
-        <Alert id="tenant-plan-catalog-error" variant="destructive">
+        <Alert id="tenant-plan-catalog-error" variant="destructive" className="max-w-lg">
           <AlertTitle>No se pudo cargar el catálogo de planes</AlertTitle>
           <AlertDescription>{planCatalog.error}</AlertDescription>
-          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>
+          <Button type="button" variant="outline" size="sm" className="mt-3 text-foreground" onClick={onRetry}>
             Reintentar
           </Button>
         </Alert>
       ) : null}
       {!planCatalog.loading && !planCatalog.error && planCatalog.items.length === 0 ? (
-        <p id="tenant-plan-catalog-empty" role="status" className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">No hay planes activos en el catálogo. Activa un plan antes de crear tenants con asignación inicial.</p>
+        <p id="tenant-plan-catalog-empty" role="status" className="max-w-lg rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">No hay planes activos en el catálogo. Activa un plan antes de crear tenants con asignación inicial.</p>
       ) : null}
     </div>
   )
