@@ -8,6 +8,7 @@ import { requestJson, type ApiError, type JsonValue } from '@/lib/http'
 const CONSOLE_SHELL_SESSION_STORAGE_KEY = 'in-falcone.console-shell-session'
 const CONSOLE_PROTECTED_ROUTE_STORAGE_KEY = 'in-falcone.console-protected-route'
 const CONSOLE_AUTH_STATUS_HINT_STORAGE_KEY = 'in-falcone.console-auth-status-hint'
+const CONSOLE_SESSION_INVALIDATED_EVENT = 'in-falcone:console-session-invalidated'
 const ACCESS_TOKEN_REFRESH_WINDOW_MS = 60_000
 
 let inFlightSessionRefresh: Promise<ConsoleShellSession | null> | null = null
@@ -81,6 +82,18 @@ export function readConsoleShellSession(): ConsoleShellSession | null {
 
 export function clearConsoleShellSession(): void {
   removeStorage(CONSOLE_SHELL_SESSION_STORAGE_KEY)
+}
+
+export function subscribeConsoleSessionInvalidated(listener: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}
+  }
+
+  const handler: EventListener = () => listener()
+  window.addEventListener(CONSOLE_SESSION_INVALIDATED_EVENT, handler)
+  return () => {
+    window.removeEventListener(CONSOLE_SESSION_INVALIDATED_EVENT, handler)
+  }
 }
 
 export function storeProtectedRouteIntent(path: string): void {
@@ -166,7 +179,7 @@ export async function ensureConsoleSession(): Promise<ConsoleShellSession | null
   }
 
   if (!canRefreshConsoleSession(session)) {
-    clearConsoleShellSession()
+    clearUnusableConsoleShellSession()
     return null
   }
 
@@ -174,8 +187,13 @@ export async function ensureConsoleSession(): Promise<ConsoleShellSession | null
 }
 
 export async function refreshConsoleShellSession(session = readConsoleShellSession()): Promise<ConsoleShellSession | null> {
-  if (!session || !canRefreshConsoleSession(session)) {
+  if (!session) {
     clearConsoleShellSession()
+    return null
+  }
+
+  if (!canRefreshConsoleSession(session)) {
+    clearUnusableConsoleShellSession()
     return null
   }
 
@@ -195,6 +213,7 @@ export async function refreshConsoleShellSession(session = readConsoleShellSessi
         title: 'Tu sesión ha expirado',
         message: 'Vuelve a autenticarte para continuar en la consola.'
       })
+      emitConsoleSessionInvalidated()
       return null
     } finally {
       inFlightSessionRefresh = null
@@ -313,6 +332,19 @@ function isRetryableRefreshError(error: ApiError): boolean {
 
 function resolveAccessTokenExpiry(session: ConsoleShellSession): string {
   return session.tokenSet?.expiresAt || session.expiresAt
+}
+
+function clearUnusableConsoleShellSession(): void {
+  clearConsoleShellSession()
+  emitConsoleSessionInvalidated()
+}
+
+function emitConsoleSessionInvalidated(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.dispatchEvent(new Event(CONSOLE_SESSION_INVALIDATED_EVENT))
 }
 
 function isExpiredAt(value: string | undefined, minimumValidityMs = 0): boolean {

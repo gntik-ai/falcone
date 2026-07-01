@@ -1,27 +1,34 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sessionMocks = vi.hoisted(() => ({
   ensureConsoleSessionMock: vi.fn(),
   readConsoleShellSessionMock: vi.fn(),
-  storeProtectedRouteIntentMock: vi.fn()
+  storeProtectedRouteIntentMock: vi.fn(),
+  subscribeConsoleSessionInvalidatedMock: vi.fn()
 }))
 
 vi.mock('@/lib/console-session', () => ({
   ensureConsoleSession: sessionMocks.ensureConsoleSessionMock,
   readConsoleShellSession: sessionMocks.readConsoleShellSessionMock,
-  storeProtectedRouteIntent: sessionMocks.storeProtectedRouteIntentMock
+  storeProtectedRouteIntent: sessionMocks.storeProtectedRouteIntentMock,
+  subscribeConsoleSessionInvalidated: sessionMocks.subscribeConsoleSessionInvalidatedMock
 }))
 
 import { ProtectedRoute } from './ProtectedRoute'
 
 describe('ProtectedRoute', () => {
+  beforeEach(() => {
+    sessionMocks.subscribeConsoleSessionInvalidatedMock.mockReturnValue(() => {})
+  })
+
   afterEach(() => {
     cleanup()
     sessionMocks.ensureConsoleSessionMock.mockReset()
     sessionMocks.readConsoleShellSessionMock.mockReset()
     sessionMocks.storeProtectedRouteIntentMock.mockReset()
+    sessionMocks.subscribeConsoleSessionInvalidatedMock.mockReset()
   })
 
   it('redirige a login y guarda el destino si no hay sesión', async () => {
