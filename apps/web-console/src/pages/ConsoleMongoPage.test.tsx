@@ -47,7 +47,7 @@ describe('ConsoleMongoPage', () => {
 
     render(<ConsoleMongoPage />)
 
-    expect(screen.getAllByText('Selecciona un tenant para explorar las bases de datos MongoDB.').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Selecciona una organización para explorar las bases de datos MongoDB.').length).toBeGreaterThan(0)
   })
 
   it('T02: muestra estados vacíos de workspace en colecciones y documentos', async () => {
@@ -57,7 +57,7 @@ describe('ConsoleMongoPage', () => {
     render(<ConsoleMongoPage />)
 
     await clickDatabase('catalog')
-    expect(await screen.findByText('Selecciona un workspace para ver las colecciones.')).toBeInTheDocument()
+    expect(await screen.findByText('Selecciona un área de trabajo para ver las colecciones.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Documentos' })).not.toBeInTheDocument()
   })
 
@@ -245,7 +245,7 @@ describe('ConsoleMongoPage', () => {
       expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/mongo/databases/catalog/collections?page[size]=100', expect.anything())
       expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/mongo/databases/catalog/views?page[size]=100', expect.anything())
     })
-    expect(await screen.findByText(/colecciones visibles|Selecciona un workspace para ver las colecciones/)).toBeInTheDocument()
+    expect(await screen.findByText(/colecciones visibles|Selecciona un área de trabajo para ver las colecciones/)).toBeInTheDocument()
   })
 
   it('muestra snippets para la colección seleccionada con placeholder de host', async () => {
@@ -262,7 +262,7 @@ describe('ConsoleMongoPage', () => {
     await clickDatabase('catalog')
     fireEvent.click(await screen.findByText('orders'))
 
-    expect(await screen.findByRole('heading', { name: 'Snippets de conexión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/<RESOURCE_HOST>/).length).toBeGreaterThan(0)
   })
 })

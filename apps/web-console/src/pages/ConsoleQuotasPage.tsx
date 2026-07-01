@@ -5,6 +5,17 @@ import { useConsoleContext } from '@/lib/console-context'
 import { useConsoleQuotas } from '@/lib/console-quotas'
 import { readConsoleShellSession } from '@/lib/console-session'
 
+const policyModeLabels: Record<string, string> = {
+  enforced: 'Aplicada',
+  unbounded: 'Sin límite'
+}
+
+const freshnessStatusLabels: Record<string, string> = {
+  fresh: 'Actual',
+  degraded: 'Degradada',
+  unavailable: 'No disponible'
+}
+
 export function ConsoleQuotasPage() {
   const { activeTenant, activeTenantId, activeWorkspaceId } = useConsoleContext()
   const { posture, workspacePosture, loading, error, reload } = useConsoleQuotas(activeTenantId, activeWorkspaceId)
@@ -12,29 +23,29 @@ export function ConsoleQuotasPage() {
   const isSuperadmin = roles.includes('superadmin') || roles.includes('platform_operator')
 
   if (!activeTenantId) {
-    return <ConsolePageState kind="blocked" title="Cuotas bloqueadas" description="Selecciona un tenant para consultar la postura de cuotas." />
+    return <ConsolePageState kind="blocked" title="Cuotas bloqueadas" description="Selecciona una organización para consultar la postura de cuotas." />
   }
 
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <p className="text-sm text-muted-foreground">{activeTenant?.label ?? 'Tenant activo'}</p>
+        <p className="text-sm text-muted-foreground">{activeTenant?.label ?? 'Organización activa'}</p>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">Quotas</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Cuotas</h1>
           <ConsoleQuotaPostureBadge posture={posture?.overallPosture ?? null} />
         </div>
         <p className="mt-2 text-sm text-muted-foreground">Última evaluación: {posture?.evaluatedAt ?? 'n/a'}</p>
       </header>
 
-      {loading ? <ConsolePageState kind="loading" title="Cargando cuotas" description="Consultando posture y usage overview." /> : null}
+      {loading ? <ConsolePageState kind="loading" title="Cargando cuotas" description="Consultando postura y resumen de uso." /> : null}
       {error ? <ConsolePageState kind="error" title="No se pudieron cargar las cuotas" description={error} actionLabel="Reintentar" onAction={reload} /> : null}
-      {!loading && !error && posture && posture.dimensions.length === 0 ? <ConsolePageState kind="empty" title="Sin dimensiones de cuota" description="No hay cuotas publicadas para este tenant." /> : null}
+      {!loading && !error && posture && posture.dimensions.length === 0 ? <ConsolePageState kind="empty" title="Sin dimensiones de cuota" description="No hay cuotas publicadas para esta organización." /> : null}
 
       {posture ? (
-        <QuotaTable title="Tenant" posture={posture} isSuperadmin={isSuperadmin} />
+        <QuotaTable title="Organización" posture={posture} isSuperadmin={isSuperadmin} />
       ) : null}
       {workspacePosture ? (
-        <QuotaTable title="Workspace" posture={workspacePosture} isSuperadmin={isSuperadmin} />
+        <QuotaTable title="Área de trabajo" posture={workspacePosture} isSuperadmin={isSuperadmin} />
       ) : null}
     </section>
   )
@@ -46,32 +57,34 @@ function QuotaTable({ title, posture, isSuperadmin }: { title: string; posture: 
       <div className="border-b border-border px-4 py-3">
         <h2 className="text-lg font-semibold">{title}</h2>
       </div>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-border">
-            <th className="px-4 py-3">Dimensión</th>
-            <th className="px-4 py-3">Límite</th>
-            <th className="px-4 py-3">Consumo</th>
-            <th className="px-4 py-3">% uso</th>
-            <th className="px-4 py-3">Modo</th>
-            <th className="px-4 py-3">Freshness</th>
-            <th className="px-4 py-3">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {posture.dimensions.map((dimension) => (
-            <tr key={`${title}-${dimension.dimensionId}`} className={dimension.isExceeded ? 'bg-red-500/5' : dimension.isWarning ? 'bg-amber-500/5' : ''}>
-              <td className="px-4 py-3">{dimension.displayName}</td>
-              <td className="px-4 py-3">{dimension.hardLimit ?? 'unbounded'}</td>
-              <td className="px-4 py-3">{dimension.measuredValue}</td>
-              <td className="px-4 py-3">{dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}</td>
-              <td className="px-4 py-3">{dimension.policyMode}</td>
-              <td className="px-4 py-3">{dimension.freshnessStatus}</td>
-              <td className="px-4 py-3">{isSuperadmin ? <Button type="button" variant="outline" size="sm">Ajustar cuota</Button> : '—'}</td>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[52rem] text-left text-sm">
+          <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+            <tr className="border-b border-border">
+              <th scope="col" className="px-4 py-3 font-medium">Dimensión</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">Límite</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">Consumo</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">% uso</th>
+              <th scope="col" className="px-4 py-3 font-medium">Modo</th>
+              <th scope="col" className="px-4 py-3 font-medium">Actualidad</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">Acción</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border/70">
+            {posture.dimensions.map((dimension) => (
+              <tr key={`${title}-${dimension.dimensionId}`} className={dimension.isExceeded ? 'bg-red-500/5' : dimension.isWarning ? 'bg-amber-500/5' : ''}>
+                <td className="max-w-[16rem] whitespace-normal break-words px-4 py-3 font-medium text-foreground">{dimension.displayName}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.hardLimit ?? 'sin límite'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.measuredValue}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{policyModeLabels[dimension.policyMode] ?? dimension.policyMode.replace(/_/g, ' ')}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{freshnessStatusLabels[dimension.freshnessStatus] ?? dimension.freshnessStatus.replace(/_/g, ' ')}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right">{isSuperadmin ? <Button type="button" variant="outline" size="sm" className="whitespace-nowrap">Ajustar cuota</Button> : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {isSuperadmin ? <p className="px-4 py-3 text-sm text-muted-foreground">La edición real de cuotas queda fuera de T01 y depende del panel de plataforma.</p> : null}
     </section>
   )

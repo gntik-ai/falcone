@@ -137,15 +137,15 @@ export function LoginPage() {
     const workspaceId = (searchParams.get('workspaceId') ?? '').trim()
 
     if (tenantId && workspaceId) {
-      return `El alta conservará el tenant ${tenantId} y el workspace ${workspaceId}.`
+      return `El alta conservará la organización ${tenantId} y el área de trabajo ${workspaceId}.`
     }
 
     if (tenantId) {
-      return `El alta conservará el tenant ${tenantId}.`
+      return `El alta conservará la organización ${tenantId}.`
     }
 
     if (workspaceId) {
-      return `El alta conservará el workspace ${workspaceId}; revisa el tenant antes de enviar el registro.`
+      return `El alta conservará el área de trabajo ${workspaceId}; revisa la organización antes de enviar el registro.`
     }
 
     return null
@@ -257,7 +257,7 @@ export function LoginPage() {
             {consoleAuthConfig.headings.subtitle}
           </p>
           <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
-            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · Client ID{' '}
+            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · ID del cliente{' '}
             <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
           </p>
         </div>
@@ -302,7 +302,7 @@ export function LoginPage() {
                 maxLength={120}
               />
               <p id="login-username-help" className="text-xs leading-5 text-muted-foreground">
-                Usa el usuario de consola asociado a tu tenant.
+                Usa el usuario de consola asociado a tu organización.
               </p>
             </div>
 
@@ -395,7 +395,7 @@ export function LoginPage() {
               </Alert>
             )}
             <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
-              Esta iteración ya protege el shell, conserva el destino solicitado y prepara la base para que T06 valide login, logout y navegación por E2E.
+              Esta iteración ya protege la consola, conserva el destino solicitado y prepara la base para que T06 valide login, logout y navegación por E2E.
             </div>
           </aside>
         </div>

@@ -50,7 +50,7 @@ describe('ConsolePrivilegeDomainAuditPage', () => {
 
   it('export button generates csv', async () => {
     render(<ConsolePrivilegeDomainAuditPage />);
-    const link = await screen.findByText('Export CSV');
+    const link = await screen.findByText('Exportar CSV');
     expect(link.getAttribute('href')).toContain('data:text/csv');
   });
 
@@ -58,7 +58,7 @@ describe('ConsolePrivilegeDomainAuditPage', () => {
     vi.mocked(api.queryPrivilegeDomainDenials).mockResolvedValue({ ...response, total: 100 } as any);
     render(<ConsolePrivilegeDomainAuditPage />);
     await screen.findByText('/v1/schemas');
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Siguiente'));
     await waitFor(() => expect(api.queryPrivilegeDomainDenials).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50 })));
   });
 });

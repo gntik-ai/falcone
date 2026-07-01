@@ -26,16 +26,16 @@ export default function ConsoleApiReferencePage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">API Reference</h1>
-        <p>Download the workspace OpenAPI contract and generate SDKs.</p>
+        <h1 className="text-2xl font-semibold">Referencia de API</h1>
+        <p>Descarga el contrato OpenAPI del área de trabajo y genera SDKs.</p>
       </header>
 
       <SpecDownloadButton workspaceId={workspaceId} specVersion={specVersion} lastUpdated={new Date().toISOString()} />
 
       {bannerVisible ? (
         <div role="alert" className="rounded border border-amber-400 bg-amber-50 p-4">
-          <p>{`API contract updated to v${specVersion}`}</p>
-          <button type="button" onClick={() => { window.localStorage.setItem(storageKey, specVersion); setBannerVisible(false) }}>Dismiss</button>
+          <p>{`Contrato API actualizado a v${specVersion}`}</p>
+          <button type="button" onClick={() => { window.localStorage.setItem(storageKey, specVersion); setBannerVisible(false) }}>Descartar</button>
         </div>
       ) : null}
 

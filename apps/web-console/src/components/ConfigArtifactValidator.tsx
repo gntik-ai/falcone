@@ -138,7 +138,7 @@ export default function ConfigArtifactValidator({ tenantId }: Props) {
         onClick={handleValidate}
         disabled={!rawJson.trim() || phase === 'validating'}
       >
-        {phase === 'validating' ? 'Validating…' : 'Validate Artifact'}
+        {phase === 'validating' ? 'Validando…' : 'Validar artefacto'}
       </button>
 
       {/* Error */}
@@ -155,18 +155,18 @@ export default function ConfigArtifactValidator({ tenantId }: Props) {
             <span className={`px-2 py-1 text-xs font-semibold rounded border ${resultBadgeClass(validation.result)}`}>
               {validation.result}
             </span>
-            <span className="text-sm text-gray-500">Format: {validation.format_version}</span>
+            <span className="text-sm text-gray-500">Formato: {validation.format_version}</span>
           </div>
 
           {validation.schema_checksum_match !== null && (
             <p className="text-sm">
-              Schema checksum: {validation.schema_checksum_match ? '✅ match' : '⚠️ mismatch'}
+              Checksum de schema: {validation.schema_checksum_match ? '✅ coincide' : '⚠️ no coincide'}
             </p>
           )}
 
           {validation.errors.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-red-700">Errors ({validation.errors.length})</h4>
+              <h4 className="text-sm font-medium text-red-700">Errores ({validation.errors.length})</h4>
               <ul className="list-disc list-inside text-sm text-red-600">
                 {validation.errors.map((e, i) => (
                   <li key={i}><code>{e.path}</code>: {e.message}</li>
@@ -177,7 +177,7 @@ export default function ConfigArtifactValidator({ tenantId }: Props) {
 
           {validation.warnings.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-yellow-700">Warnings ({validation.warnings.length})</h4>
+              <h4 className="text-sm font-medium text-yellow-700">Advertencias ({validation.warnings.length})</h4>
               <ul className="list-disc list-inside text-sm text-yellow-600">
                 {validation.warnings.map((w, i) => (
                   <li key={i}><code>{w.path}</code>: {w.message}</li>
@@ -189,14 +189,14 @@ export default function ConfigArtifactValidator({ tenantId }: Props) {
           {validation.migration_required && (
             <div className="border-t pt-3">
               <p className="text-sm text-orange-700 font-medium">
-                ⚠️ Migration required — artifact major version differs from platform.
+                ⚠️ Migración requerida — la versión mayor del artefacto difiere de la plataforma.
               </p>
               <button
                 className="mt-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
                 onClick={handleMigrate}
                 disabled={phase === 'migrating'}
               >
-                {phase === 'migrating' ? 'Migrating…' : 'Migrate Artifact'}
+                {phase === 'migrating' ? 'Migrando…' : 'Migrar artefacto'}
               </button>
             </div>
           )}
@@ -206,18 +206,18 @@ export default function ConfigArtifactValidator({ tenantId }: Props) {
       {/* Migration result */}
       {migration && migration.migration_required && (
         <div className="border border-green-300 bg-green-50 rounded p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-green-800">Migration Complete</h3>
+          <h3 className="text-sm font-semibold text-green-800">Migración completa</h3>
 
           {migration._migration_metadata && (
             <p className="text-sm">
               {migration._migration_metadata.migrated_from} → {migration._migration_metadata.migrated_to}
-              {' '}via chain: {migration._migration_metadata.migration_chain.join(' → ')}
+              {' '}vía cadena: {migration._migration_metadata.migration_chain.join(' → ')}
             </p>
           )}
 
           {migration._migration_warnings && migration._migration_warnings.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-yellow-700">Migration Warnings</h4>
+              <h4 className="text-sm font-medium text-yellow-700">Advertencias de migración</h4>
               <ul className="list-disc list-inside text-sm text-yellow-600">
                 {migration._migration_warnings.map((w, i) => (
                   <li key={i}>[{w.step}] {w.message}{w.affected_path ? ` (${w.affected_path})` : ''}</li>
@@ -230,7 +230,7 @@ export default function ConfigArtifactValidator({ tenantId }: Props) {
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             onClick={handleDownloadMigrated}
           >
-            Download Migrated Artifact
+            Descargar artefacto migrado
           </button>
         </div>
       )}

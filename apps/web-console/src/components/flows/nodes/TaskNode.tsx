@@ -11,13 +11,13 @@ export function TaskNode({ data, selected }: NodeProps) {
   const dsl = nodeData.dsl as TaskDslNode
   const badges: string[] = [dsl.taskType]
   if (dsl.retryPolicy?.maxAttempts !== undefined) {
-    badges.push(`retry ×${dsl.retryPolicy.maxAttempts}`)
+    badges.push(`reintento ×${dsl.retryPolicy.maxAttempts}`)
   }
   return (
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Task"
+        typeLabel="Tarea"
         label={nodeData.label}
         icon={Box}
         selected={selected}

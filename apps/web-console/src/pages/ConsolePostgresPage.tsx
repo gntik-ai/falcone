@@ -490,7 +490,7 @@ export function ConsolePostgresPage() {
       if (!activeTenantId || !activeWorkspaceId || !selectedDatabase || !selectedSchema) {
         setDdlPreviewOpen(true)
         setDdlPreviewTarget({ kind, name })
-        setDdlPreview({ ...EMPTY_DDL_PREVIEW, error: 'Selecciona tenant, workspace, base de datos y esquema antes de pedir el preview DDL.' })
+        setDdlPreview({ ...EMPTY_DDL_PREVIEW, error: 'Selecciona organización, área de trabajo, base de datos y esquema antes de pedir el preview DDL.' })
         return
       }
 
@@ -570,7 +570,7 @@ export function ConsolePostgresPage() {
         }
 
         if (!response.ddlPreview) {
-          throw new Error('El backend no devolvió ddlPreview para esta operación en modo preview.')
+          throw new Error('El servidor no devolvió ddlPreview para esta operación en modo preview.')
         }
 
         setDdlPreview({
@@ -826,30 +826,30 @@ export function ConsolePostgresPage() {
 
   const headerDescription = useMemo(() => {
     if (!activeTenantId) {
-      return 'Selecciona un tenant para explorar las bases de datos PostgreSQL.'
+      return 'Selecciona una organización para explorar las bases de datos PostgreSQL.'
     }
 
     if (!activeWorkspaceId) {
-      return 'Selecciona un workspace para ver esquemas, tablas, vistas y la seguridad efectiva del dominio relacional.'
+      return 'Selecciona un área de trabajo para ver esquemas, tablas, vistas y la seguridad efectiva del dominio relacional.'
     }
 
     return 'Explora bases de datos, esquemas, tablas, vistas, políticas RLS y previews DDL sin capacidad de escritura.'
   }, [activeTenantId, activeWorkspaceId])
 
   return (
-    <section className="space-y-6" aria-label="PostgreSQL del tenant activo">
+    <section className="space-y-6" aria-label="PostgreSQL de la organización activa">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <Badge variant="outline">PostgreSQL</Badge>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Inventario relacional del tenant activo</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Inventario relacional de la organización activa</h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{headerDescription}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">Tenant: {activeTenant?.label ?? 'Sin tenant'}</Badge>
-            <Badge variant="secondary">Workspace: {activeWorkspace?.label ?? 'Sin workspace'}</Badge>
+            <Badge variant="secondary">Organización: {activeTenant?.label ?? 'Sin organización'}</Badge>
+            <Badge variant="secondary">Área de trabajo: {activeWorkspace?.label ?? 'Sin área de trabajo'}</Badge>
             <Button type="button" onClick={() => setDatabaseWizardOpen(true)}>Nueva base de datos</Button>
           </div>
         </div>
@@ -897,7 +897,7 @@ export function ConsolePostgresPage() {
       </section>
 
       {!activeTenantId ? (
-        <ConsoleEmptyState message="Selecciona un tenant para explorar las bases de datos PostgreSQL." />
+        <ConsoleEmptyState message="Selecciona una organización para explorar las bases de datos PostgreSQL." />
       ) : null}
 
       {activeTenantId ? (
@@ -907,7 +907,7 @@ export function ConsolePostgresPage() {
               <h2 id="console-postgres-databases-heading" className="text-lg font-semibold text-foreground">
                 Bases de datos
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">Bases de datos PostgreSQL visibles para el tenant activo.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Bases de datos PostgreSQL visibles para la organización activa.</p>
             </div>
             {databases.error ? (
               <Button type="button" variant="outline" size="sm" onClick={() => void reloadDatabases()}>
@@ -921,7 +921,7 @@ export function ConsolePostgresPage() {
             <ConsoleSectionError message={databases.error} actionLabel="Reintentar" onRetry={() => void reloadDatabases()} />
           ) : null}
           {!databases.loading && !databases.error && databases.data.length === 0 ? (
-            <ConsoleSectionEmpty message="No hay bases de datos disponibles para este tenant." />
+            <ConsoleSectionEmpty message="No hay bases de datos disponibles para esta organización." />
           ) : null}
           {!databases.loading && !databases.error && databases.data.length > 0 ? (
             <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
@@ -930,8 +930,8 @@ export function ConsolePostgresPage() {
                   <tr>
                     <th className="px-4 py-3">Base de datos</th>
                     <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Owner</th>
-                    <th className="px-4 py-3">Placement</th>
+                    <th className="px-4 py-3">Propietario</th>
+                    <th className="px-4 py-3">Ubicación</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-background/40">
@@ -979,22 +979,22 @@ export function ConsolePostgresPage() {
             </div>
           </div>
 
-          {!activeWorkspaceId ? <ConsoleSectionEmpty message="Selecciona un workspace para ver esquemas." /> : null}
+          {!activeWorkspaceId ? <ConsoleSectionEmpty message="Selecciona un área de trabajo para ver esquemas." /> : null}
           {activeWorkspaceId && schemas.loading ? <ConsoleSectionLoading label="Cargando esquemas PostgreSQL…" /> : null}
           {activeWorkspaceId && !schemas.loading && schemas.error ? (
             <ConsoleSectionError message={schemas.error} actionLabel="Reintentar" onRetry={() => void reloadSchemas(selectedDatabase)} />
           ) : null}
           {activeWorkspaceId && !schemas.loading && !schemas.error && schemas.data.length === 0 ? (
-            <ConsoleSectionEmpty message="No hay esquemas visibles para el workspace activo en esta base de datos." />
+            <ConsoleSectionEmpty message="No hay esquemas visibles para el área de trabajo activa en esta base de datos." />
           ) : null}
           {activeWorkspaceId && !schemas.loading && !schemas.error && schemas.data.length > 0 ? (
             <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
-              <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de esquemas PostgreSQL del workspace activo">
+              <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de esquemas PostgreSQL del área de trabajo activa">
                 <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Esquema</th>
                     <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Owner</th>
+                    <th className="px-4 py-3">Propietario</th>
                     <th className="px-4 py-3">Conteos</th>
                   </tr>
                 </thead>
@@ -1117,8 +1117,8 @@ export function ConsolePostgresPage() {
                           <th className="px-4 py-3">Vista</th>
                           <th className="px-4 py-3">Estado</th>
                           <th className="px-4 py-3">Columnas</th>
-                          <th className="px-4 py-3">Security barrier</th>
-                          <th className="px-4 py-3 text-right">Preview</th>
+                          <th className="px-4 py-3">Barrera de seguridad</th>
+                          <th className="px-4 py-3 text-right">Vista previa</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background/40">
@@ -1134,7 +1134,7 @@ export function ConsolePostgresPage() {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('view', view.viewName)}>
-                                Preview DDL
+                                Vista previa DDL
                               </Button>
                             </td>
                           </tr>
@@ -1170,10 +1170,10 @@ export function ConsolePostgresPage() {
                         <tr>
                           <th className="px-4 py-3">Vista materializada</th>
                           <th className="px-4 py-3">Estado</th>
-                          <th className="px-4 py-3">With data</th>
-                          <th className="px-4 py-3">Refresh policy</th>
+                          <th className="px-4 py-3">Con datos</th>
+                          <th className="px-4 py-3">Política de refresh</th>
                           <th className="px-4 py-3">Integridad</th>
-                          <th className="px-4 py-3 text-right">Preview</th>
+                          <th className="px-4 py-3 text-right">Vista previa</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background/40">
@@ -1190,7 +1190,7 @@ export function ConsolePostgresPage() {
                             <td className="px-4 py-3 text-muted-foreground">{view.integrityProfile?.populationState || '—'}</td>
                             <td className="px-4 py-3 text-right">
                               <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('matview', view.viewName)}>
-                                Preview DDL
+                                Vista previa DDL
                               </Button>
                             </td>
                           </tr>
@@ -1213,23 +1213,23 @@ export function ConsolePostgresPage() {
                 <h2 id="console-postgres-table-detail-heading" className="text-lg font-semibold text-foreground">
                   Tabla {selectedTable}
                 </h2>
-                <p className="mt-1 text-sm text-muted-foreground">Detalle read-only de columnas, índices, políticas y seguridad efectiva.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Detalle de solo lectura de columnas, índices, políticas y seguridad efectiva.</p>
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant={tableDetailTab === 'columns' ? 'default' : 'outline'} size="sm" onClick={() => setTableDetailTab('columns')}>
-                  Columns
+                  Columnas
                 </Button>
                 <Button type="button" variant={tableDetailTab === 'indexes' ? 'default' : 'outline'} size="sm" onClick={() => setTableDetailTab('indexes')}>
-                  Indexes
+                  Índices
                 </Button>
                 <Button type="button" variant={tableDetailTab === 'policies' ? 'default' : 'outline'} size="sm" onClick={() => setTableDetailTab('policies')}>
-                  Policies
+                  Políticas
                 </Button>
                 <Button type="button" variant={tableDetailTab === 'security' ? 'default' : 'outline'} size="sm" onClick={() => setTableDetailTab('security')}>
-                  Security
+                  Seguridad
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('table', selectedTable)}>
-                  Preview DDL
+                  Vista previa DDL
                 </Button>
               </div>
             </div>
@@ -1267,7 +1267,7 @@ export function ConsolePostgresPage() {
                         {columns.data.map((column) => (
                           <tr key={column.columnName}>
                             <td className="px-4 py-3 font-medium text-foreground">{column.columnName}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{column.dataType?.typeName || 'unknown'}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{column.dataType?.typeName || 'desconocido'}</td>
                             <td className="px-4 py-3">
                               <Badge variant="secondary">{column.nullable ? 'NULL' : 'NOT NULL'}</Badge>
                             </td>
@@ -1401,10 +1401,10 @@ export function ConsolePostgresPage() {
                 ) : null}
                 {!security.loading && !security.error && security.data ? (
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                    <SecurityCard label="RLS enabled" value={security.data.rlsEnabled ? 'Sí' : 'No'} tone={security.data.rlsEnabled ? 'positive' : 'negative'} />
-                    <SecurityCard label="Force RLS" value={security.data.forceRls ? 'Sí' : 'No'} tone={security.data.forceRls ? 'positive' : 'neutral'} />
-                    <SecurityCard label="Policy count" value={String(security.data.policyCount ?? 0)} tone="neutral" />
-                    <SecurityCard label="Shared classification" value={formatLabel(security.data.sharedTableClassification)} tone="neutral" />
+                    <SecurityCard label="RLS habilitado" value={security.data.rlsEnabled ? 'Sí' : 'No'} tone={security.data.rlsEnabled ? 'positive' : 'negative'} />
+                    <SecurityCard label="Forzar RLS" value={security.data.forceRls ? 'Sí' : 'No'} tone={security.data.forceRls ? 'positive' : 'neutral'} />
+                    <SecurityCard label="Cantidad de políticas" value={String(security.data.policyCount ?? 0)} tone="neutral" />
+                    <SecurityCard label="Clasificación compartida" value={formatLabel(security.data.sharedTableClassification)} tone="neutral" />
                     <SecurityCard label="Estado" value={formatLabel(security.data.state)} tone="neutral" />
                   </div>
                 ) : null}
@@ -1419,16 +1419,16 @@ export function ConsolePostgresPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 id="console-postgres-ddl-preview-heading" className="text-lg font-semibold text-foreground">
-                Preview DDL — {ddlPreviewTarget?.name ?? 'recurso'}
+                Vista previa DDL — {ddlPreviewTarget?.name ?? 'recurso'}
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">Panel estrictamente read-only. No existe affordance de ejecución en esta vista.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Panel estrictamente de solo lectura. No existe acción de ejecución en esta vista.</p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => setDdlPreviewOpen(false)}>
               Cerrar
             </Button>
           </div>
 
-          {ddlPreview.loading ? <ConsoleSectionLoading label="Generando preview DDL…" /> : null}
+          {ddlPreview.loading ? <ConsoleSectionLoading label="Generando vista previa DDL…" /> : null}
           {!ddlPreview.loading && ddlPreview.error ? (
             <ConsoleSectionError
               message={ddlPreview.error}
@@ -1447,18 +1447,18 @@ export function ConsolePostgresPage() {
                 <Badge className={getRiskTone(ddlPreview.riskProfile.riskLevel)} variant="outline">
                   {formatLabel(ddlPreview.riskProfile.riskLevel)}
                 </Badge>
-                <Badge variant="secondary">Statements: {ddlPreview.riskProfile.statementCount}</Badge>
-                <Badge variant="secondary">Locks: {ddlPreview.riskProfile.lockTargetCount}</Badge>
-                <Badge variant="secondary">Destructive: {ddlPreview.riskProfile.destructive ? 'Sí' : 'No'}</Badge>
-                <Badge variant="secondary">Blocking likely: {ddlPreview.riskProfile.blockingLikely ? 'Sí' : 'No'}</Badge>
-                <Badge variant="secondary">Ack required: {ddlPreview.riskProfile.acknowledgementRequired ? 'Sí' : 'No'}</Badge>
+                <Badge variant="secondary">Sentencias: {ddlPreview.riskProfile.statementCount}</Badge>
+                <Badge variant="secondary">Bloqueos: {ddlPreview.riskProfile.lockTargetCount}</Badge>
+                <Badge variant="secondary">Destructivo: {ddlPreview.riskProfile.destructive ? 'Sí' : 'No'}</Badge>
+                <Badge variant="secondary">Bloqueo probable: {ddlPreview.riskProfile.blockingLikely ? 'Sí' : 'No'}</Badge>
+                <Badge variant="secondary">Confirmación requerida: {ddlPreview.riskProfile.acknowledgementRequired ? 'Sí' : 'No'}</Badge>
               </div>
             </div>
           ) : null}
 
           {!ddlPreview.loading && !ddlPreview.error && ddlPreview.warnings.length > 0 ? (
             <div className="mt-4 space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Pre-execution warnings</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Advertencias previas a la ejecución</h3>
               {ddlPreview.warnings.map((warning) => (
                 <div
                   key={warning.warningCode}
@@ -1470,7 +1470,7 @@ export function ConsolePostgresPage() {
                       {formatLabel(warning.severity)}
                     </Badge>
                     <Badge variant="secondary">{formatLabel(warning.category)}</Badge>
-                    <Badge variant="secondary">Ack: {warning.requiresAcknowledgement ? 'Sí' : 'No'}</Badge>
+                    <Badge variant="secondary">Confirmación: {warning.requiresAcknowledgement ? 'Sí' : 'No'}</Badge>
                   </div>
                   <p className="mt-3 font-medium text-foreground">{warning.summary}</p>
                   {warning.detail ? <p className="mt-1 text-sm text-muted-foreground">{warning.detail}</p> : null}
@@ -1482,14 +1482,14 @@ export function ConsolePostgresPage() {
           {!ddlPreview.loading && !ddlPreview.error && ddlPreview.data ? (
             <div className="mt-4 space-y-4">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">Execution mode: {formatLabel(ddlPreview.data.executionMode)}</Badge>
-                <Badge variant="secondary">Transaction: {formatLabel(ddlPreview.data.transactionMode)}</Badge>
-                <Badge variant="secondary">Statements: {ddlPreview.data.statementCount}</Badge>
+                <Badge variant="secondary">Modo de ejecución: {formatLabel(ddlPreview.data.executionMode)}</Badge>
+                <Badge variant="secondary">Transacción: {formatLabel(ddlPreview.data.transactionMode)}</Badge>
+                <Badge variant="secondary">Sentencias: {ddlPreview.data.statementCount}</Badge>
               </div>
 
               {ddlPreview.data.safeGuards?.length ? (
                 <div className="rounded-2xl border border-border bg-background/40 p-4">
-                  <h3 className="text-sm font-semibold text-foreground">Safe guards</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Salvaguardas</h3>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                     {ddlPreview.data.safeGuards.map((guard) => (
                       <li key={guard}>{guard}</li>
@@ -1517,7 +1517,7 @@ export function ConsolePostgresPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary">#{statement.ordinal}</Badge>
                       <Badge variant="outline">{formatLabel(statement.category)}</Badge>
-                      <Badge variant="secondary">Destructive: {statement.destructive ? 'Sí' : 'No'}</Badge>
+                      <Badge variant="secondary">Destructivo: {statement.destructive ? 'Sí' : 'No'}</Badge>
                     </div>
                     <pre className="mt-3 overflow-x-auto rounded-xl bg-muted/70 p-4 text-sm">
                       <code className="font-mono text-sm">{statement.sql}</code>

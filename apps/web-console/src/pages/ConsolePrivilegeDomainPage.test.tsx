@@ -30,22 +30,22 @@ describe('ConsolePrivilegeDomainPage', () => {
   it('renders two separate sections', async () => {
     render(<ConsolePrivilegeDomainPage workspaceId="ws-1" memberId="member-1" />);
     expect(screen.getByTestId('loading-skeleton')).toBeTruthy();
-    await screen.findByText('Structural Administration');
-    expect(screen.getByText('Data Access')).toBeTruthy();
+    await screen.findByText('Administración estructural');
+    expect(screen.getByText('Acceso a datos')).toBeTruthy();
   });
 
   it('toggle calls update with correct payload', async () => {
     render(<ConsolePrivilegeDomainPage workspaceId="ws-1" memberId="member-1" />);
-    await screen.findByText('Structural Administration');
-    fireEvent.click(screen.getByText('Revoke Data Access'));
-    fireEvent.click(screen.getByText('Confirm'));
+    await screen.findByText('Administración estructural');
+    fireEvent.click(screen.getByText('Revocar acceso a datos'));
+    fireEvent.click(screen.getByText('Confirmar'));
     await waitFor(() => expect(api.updatePrivilegeDomainAssignment).toHaveBeenCalledWith('ws-1', 'member-1', { structural_admin: true, data_access: false }));
   });
 
   it('shows confirmation dialog before revocation', async () => {
     render(<ConsolePrivilegeDomainPage workspaceId="ws-1" memberId="member-1" memberName="Alice" />);
-    await screen.findByText('Structural Administration');
-    fireEvent.click(screen.getByText('Revoke Structural Administration'));
+    await screen.findByText('Administración estructural');
+    fireEvent.click(screen.getByText('Revocar administración estructural'));
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByText(/Alice/)).toBeTruthy();
   });
@@ -53,9 +53,9 @@ describe('ConsolePrivilegeDomainPage', () => {
   it('last-admin guard shows error alert on API failure', async () => {
     vi.mocked(api.updatePrivilegeDomainAssignment).mockRejectedValue({ error: 'LAST_STRUCTURAL_ADMIN' });
     render(<ConsolePrivilegeDomainPage workspaceId="ws-1" memberId="member-1" />);
-    await screen.findByText('Structural Administration');
-    fireEvent.click(screen.getByText('Revoke Structural Administration'));
-    fireEvent.click(screen.getByText('Confirm'));
+    await screen.findByText('Administración estructural');
+    fireEvent.click(screen.getByText('Revocar administración estructural'));
+    fireEvent.click(screen.getByText('Confirmar'));
     expect(await screen.findByRole('alert')).toBeTruthy();
   });
 

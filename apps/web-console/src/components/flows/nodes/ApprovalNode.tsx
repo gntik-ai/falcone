@@ -10,13 +10,13 @@ export function ApprovalNode({ data, selected }: NodeProps) {
   const nodeData = data as FlowCanvasNodeData
   const dsl = nodeData.dsl as ApprovalDslNode
   const badges: string[] = []
-  if (dsl.approvers?.length) badges.push(`${dsl.approvers.length} approver${dsl.approvers.length === 1 ? '' : 's'}`)
+  if (dsl.approvers?.length) badges.push(`${dsl.approvers.length} aprobador${dsl.approvers.length === 1 ? '' : 'es'}`)
   if (dsl.timeout) badges.push(`timeout ${dsl.timeout}`)
   return (
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Approval"
+        typeLabel="Aprobación"
         label={nodeData.label}
         icon={UserCheck}
         selected={selected}

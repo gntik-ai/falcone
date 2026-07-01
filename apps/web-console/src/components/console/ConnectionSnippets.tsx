@@ -43,7 +43,7 @@ export function ConnectionSnippets({ resourceType, context, entries: entriesProp
   return (
     <section className="rounded-3xl border border-border bg-card/60 p-6 shadow-sm" aria-labelledby="connection-snippets-heading">
       <div className="space-y-2">
-        <h3 id="connection-snippets-heading" className="text-lg font-semibold text-foreground">Snippets de conexión</h3>
+        <h3 id="connection-snippets-heading" className="text-lg font-semibold text-foreground">Fragmentos de conexión</h3>
         <p className="text-sm text-muted-foreground">Ejemplos generados en cliente a partir del contexto visible del recurso activo.</p>
       </div>
 
@@ -65,7 +65,7 @@ export function ConnectionSnippets({ resourceType, context, entries: entriesProp
               <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">Tu navegador no expone Clipboard API aquí; selecciona y copia el bloque manualmente.</p>
             ) : null}
             {copiedId === entry.id ? (
-              <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">Snippet copiado al portapapeles.</p>
+              <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">Fragmento copiado al portapapeles.</p>
             ) : null}
             {entry.notes.length > 0 ? (
               <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">

@@ -93,7 +93,7 @@ export function SignupPage() {
     const minLength = signupPolicy?.passwordPolicy?.minLength
     return typeof minLength === 'number' && Number.isFinite(minLength) && minLength > 0 ? minLength : 8
   }, [signupPolicy])
-  const tenantHasError = feedback?.title === 'Falta el tenant del registro'
+  const tenantHasError = feedback?.title === 'Falta la organización del registro'
   const formFeedbackId = feedback ? 'signup-feedback' : undefined
 
   const policySummary = useMemo(() => {
@@ -126,8 +126,8 @@ export function SignupPage() {
     if (!tenantId) {
       setFeedback({
         variant: 'destructive',
-        title: 'Falta el tenant del registro',
-        message: 'Indica el tenant en el que se creará la cuenta antes de enviar el registro.'
+        title: 'Falta la organización del registro',
+        message: 'Indica la organización en la que se creará la cuenta antes de enviar el registro.'
       })
       return
     }
@@ -217,7 +217,7 @@ export function SignupPage() {
             {consoleAuthConfig.labels.signupSubtitle}
           </p>
           <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
-            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · Client ID{' '}
+            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · ID del cliente{' '}
             <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
           </p>
         </div>
@@ -285,7 +285,7 @@ export function SignupPage() {
 
                 <div className="grid gap-5 rounded-2xl border border-border/70 bg-background/35 p-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="tenantId">Tenant ID requerido</Label>
+                    <Label htmlFor="tenantId">ID de organización requerido</Label>
                     <Input
                       id="tenantId"
                       name="tenantId"
@@ -300,12 +300,12 @@ export function SignupPage() {
                       maxLength={120}
                     />
                     <p id="tenantId-help" className="text-xs leading-5 text-muted-foreground">
-                      Identifica el tenant donde se creará la cuenta; se completa automáticamente cuando el enlace lo incluye.
+                      Identifica la organización donde se creará la cuenta; se completa automáticamente cuando el enlace la incluye.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="workspaceId">Workspace ID opcional</Label>
+                    <Label htmlFor="workspaceId">ID de área de trabajo opcional</Label>
                     <Input
                       id="workspaceId"
                       name="workspaceId"
@@ -317,7 +317,7 @@ export function SignupPage() {
                       maxLength={120}
                     />
                     <p id="workspaceId-help" className="text-xs leading-5 text-muted-foreground">
-                      Añádelo solo si el acceso debe quedar asociado a un workspace concreto desde el alta.
+                      Añádelo solo si el acceso debe quedar asociado a un área de trabajo concreta desde el alta.
                     </p>
                   </div>
                 </div>
@@ -379,10 +379,10 @@ export function SignupPage() {
               <Alert variant="success" role="status" aria-live="polite">
                 <AlertTitle>Resumen del registro</AlertTitle>
                 <AlertDescription>
-                  <span className="block">Registration ID: {registration.registrationId}</span>
+                  <span className="block">ID de registro: {registration.registrationId}</span>
                   <span className="block">Estado: {registration.state}</span>
                   <span className="block">Modo de activación: {registration.activationMode}</span>
-                  <span className="block">Status view: {registration.statusView}</span>
+                  <span className="block">Vista de estado: {registration.statusView}</span>
                   <span className="block">Creado: {new Date(registration.createdAt).toLocaleString('es-ES')}</span>
                   <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={consoleAuthConfig.loginPath}>
                     Continuar hacia login
@@ -408,7 +408,7 @@ export function SignupPage() {
               <AlertDescription>{policySummary}</AlertDescription>
             </Alert>
             <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
-              Esta iteración cubre signup y activación pendiente. El shell autenticado y la gestión robusta de sesión llegarán en T04 y T05.
+              Esta iteración cubre signup y activación pendiente. La consola autenticada y la gestión robusta de sesión llegarán en T04 y T05.
             </div>
           </aside>
         </div>

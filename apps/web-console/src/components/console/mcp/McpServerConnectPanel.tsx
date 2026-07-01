@@ -22,7 +22,7 @@ export function McpServerConnectPanel({ name, slug, endpoint }: McpServerConnect
       <div className="space-y-1">
         <h3 className="text-lg font-semibold text-foreground">Conecta tu cliente</h3>
         <p className="text-sm text-muted-foreground">
-          Transporte HTTP remoto (Streamable HTTP). La autenticación usa el flujo OAuth 2.1 del tenant.
+          Transporte HTTP remoto (Streamable HTTP). La autenticación usa el flujo OAuth 2.1 de la organización.
         </p>
       </div>
       <ConnectionSnippets entries={entries} />

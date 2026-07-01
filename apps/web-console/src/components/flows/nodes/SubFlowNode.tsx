@@ -13,7 +13,7 @@ export function SubFlowNode({ data, selected }: NodeProps) {
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Sub-flow"
+        typeLabel="Subflujo"
         label={nodeData.label}
         icon={Workflow}
         selected={selected}

@@ -18,7 +18,7 @@ export function SequenceNode({ data, selected }: NodeProps) {
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Sequence"
+        typeLabel="Secuencia"
         label={nodeData.label}
         icon={ListOrdered}
         selected={selected}

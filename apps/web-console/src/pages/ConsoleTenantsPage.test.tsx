@@ -11,7 +11,8 @@ describe('ConsoleTenantsPage', () => {
   it('abre el wizard desde el CTA principal', async () => {
     const user = userEvent.setup()
     render(<ConsoleTenantsPage />)
-    await user.click(screen.getByRole('button', { name: /nuevo tenant/i }))
-    expect(screen.getByRole('heading', { name: /nuevo tenant/i })).toBeInTheDocument()
+    expect(screen.getByText('Gobierno de organizaciones')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /nueva organización/i }))
+    expect(screen.getByRole('heading', { name: /nueva organización/i })).toBeInTheDocument()
   })
 })

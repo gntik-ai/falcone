@@ -41,7 +41,7 @@ function describeSecretError(error: unknown, context: 'list' | 'mutate'): string
     case 400:
       return `La solicitud no es válida: revisa el nombre y el valor del secreto.${corr}`
     case 403:
-      return `No tienes permisos para esta acción en este workspace. La autorización la decide el servidor.${corr}`
+      return `No tienes permisos para esta acción en esta área de trabajo. La autorización la decide el servidor.${corr}`
     case 404:
       // Could be SECRET_NOT_FOUND or WORKSPACE_NOT_FOUND — render generically (no existence leak).
       return context === 'mutate' && error.code === 'SECRET_NOT_FOUND'
@@ -54,9 +54,9 @@ function describeSecretError(error: unknown, context: 'list' | 'mutate'): string
     case 429:
       return `Has superado el límite de operaciones. Espera un momento y reintenta.${corr}`
     case 501:
-      return 'El backend de secretos no está disponible en esta instalación.'
+      return 'El servicio de secretos no está disponible en esta instalación.'
     case 502:
-      return `El backend de secretos falló al procesar la operación. Reintenta más tarde.${corr}`
+      return `El servicio de secretos falló al procesar la operación. Reintenta más tarde.${corr}`
     default:
       return `${error.message || 'La operación falló.'}${corr}`
   }
@@ -282,8 +282,8 @@ export function ConsoleWorkspaceSecretsPage() {
     return (
       <ConsolePageState
         kind="blocked"
-        title="Selecciona un workspace"
-        description="Elige un workspace activo para gestionar sus secretos de función. Cada secreto pertenece a un único workspace."
+        title="Selecciona un área de trabajo"
+        description="Elige un área de trabajo activa para gestionar sus secretos de función. Cada secreto pertenece a una única área de trabajo."
       />
     )
   }
@@ -296,14 +296,14 @@ export function ConsoleWorkspaceSecretsPage() {
     return (
       <section className="space-y-6" data-testid="workspace-secrets-backend-disabled">
         <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-          <Badge variant="outline">Workspace secrets</Badge>
-          <p className="mt-2 text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del workspace</h1>
+          <Badge variant="outline">Secretos del área de trabajo</Badge>
+          <p className="mt-2 text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del área de trabajo</h1>
         </header>
         <ConsolePageState
           kind="blocked"
-          title="Backend de secretos no disponible"
-          description="El backend de secretos (OpenBao) no está habilitado en esta instalación. Los secretos de workspace estarán disponibles cuando un operador de plataforma lo habilite."
+          title="Servicio de secretos no disponible"
+          description="El servicio de secretos (OpenBao) no está habilitado en esta instalación. Los secretos de área de trabajo estarán disponibles cuando un operador de plataforma lo habilite."
         />
       </section>
     )
@@ -414,13 +414,13 @@ export function ConsoleWorkspaceSecretsPage() {
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <Badge variant="outline">Workspace secrets</Badge>
+            <Badge variant="outline">Secretos del área de trabajo</Badge>
             <div>
-              <p className="text-sm text-muted-foreground">{header || 'Workspace activo'}</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del workspace</h1>
+              <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del área de trabajo</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Secretos de función del workspace activo. Los valores son de solo escritura: se inyectan en el
-                entorno de las funciones en el deploy y nunca se muestran aquí.
+                Secretos de función del área de trabajo activa. Los valores son de solo escritura: se inyectan en el
+                entorno de las funciones en el despliegue y nunca se muestran aquí.
               </p>
             </div>
           </div>
@@ -443,7 +443,7 @@ export function ConsoleWorkspaceSecretsPage() {
       <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground">Crear secreto</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          El valor se envía cifrado al backend y se elimina del formulario tras crearlo. No hay forma de
+          El valor se envía cifrado al servicio y se elimina del formulario tras crearlo. No hay forma de
           volver a leerlo desde la consola.
         </p>
         <form className="mt-5 space-y-5" onSubmit={(event) => void handleCreate(event)} noValidate>
@@ -522,7 +522,7 @@ export function ConsoleWorkspaceSecretsPage() {
       </section>
 
       {loading ? (
-        <ConsolePageState kind="loading" title="Cargando secretos" description="Consultando los secretos del workspace activo." />
+        <ConsolePageState kind="loading" title="Cargando secretos" description="Consultando los secretos del área de trabajo activa." />
       ) : null}
       {listError ? (
         <ConsolePageState
@@ -536,15 +536,15 @@ export function ConsoleWorkspaceSecretsPage() {
       {isEmpty ? (
         <ConsolePageState
           kind="empty"
-          title="No hay secretos en este workspace"
-          description={`El workspace "${activeWorkspace?.label ?? workspaceId}"${environment ? ` (${environment})` : ''} todavía no tiene secretos. Crea uno con el formulario de arriba.`}
+          title="No hay secretos en esta área de trabajo"
+          description={`El área de trabajo "${activeWorkspace?.label ?? workspaceId}"${environment ? ` (${environment})` : ''} todavía no tiene secretos. Crea uno con el formulario de arriba.`}
         />
       ) : null}
 
       {secrets.length > 0 ? (
         <div className="overflow-x-auto rounded-3xl border border-border bg-card/70 shadow-sm">
           <table className="w-full min-w-[64rem] divide-y divide-border text-left text-sm">
-            <caption className="sr-only">Secretos de función del workspace activo (solo metadatos; los valores no se muestran)</caption>
+            <caption className="sr-only">Secretos de función del área de trabajo activa (solo metadatos; los valores no se muestran)</caption>
             <thead>
               <tr className="bg-muted/40 align-top text-xs uppercase tracking-[0.16em] text-muted-foreground">
                 <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
@@ -552,7 +552,7 @@ export function ConsoleWorkspaceSecretsPage() {
                 <th scope="col" className="px-4 py-3 font-medium">
                   Funciones que lo usan
                   <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-muted-foreground">
-                    Recuento informativo; puede ir por detrás del último deploy.
+                    Recuento informativo; puede ir por detrás del último despliegue.
                   </span>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">Creado</th>
@@ -681,8 +681,8 @@ export function ConsoleWorkspaceSecretsPage() {
               data-testid="workspace-secrets-delete-warning"
             >
               {deleteTarget.resolvedRefCount > 0
-                ? `Atención: ${deleteTarget.resolvedRefCount} función(es) referencian este secreto. Al eliminarlo, la variable de entorno inyectada desaparecerá en su próximo deploy y podría romper su funcionamiento.`
-                : 'Atención: si alguna función referencia este secreto, eliminarlo puede romperla en su próximo deploy (el deploy omite silenciosamente una referencia ausente).'}
+                ? `Atención: ${deleteTarget.resolvedRefCount} función(es) referencian este secreto. Al eliminarlo, la variable de entorno inyectada desaparecerá en su próximo despliegue y podría romper su funcionamiento.`
+                : 'Atención: si alguna función referencia este secreto, eliminarlo puede romperla en su próximo despliegue (el despliegue omite silenciosamente una referencia ausente).'}
             </Alert>
             {deleteError ? (
               <Alert variant="destructive" data-testid="workspace-secrets-delete-error">

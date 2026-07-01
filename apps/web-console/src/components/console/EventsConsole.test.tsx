@@ -27,31 +27,31 @@ beforeEach(() => {
 })
 afterEach(() => cleanup())
 
-describe('EventsConsole — richer UX', () => {
-  it('loads topics, then lists them with a count', async () => {
+describe('EventsConsole — UX enriquecida', () => {
+  it('carga tópicos y los lista con el contador', async () => {
     render1()
-    expect(screen.getByText('Loading topics…')).toBeInTheDocument()
+    expect(screen.getByText('Cargando tópicos…')).toBeInTheDocument()
     expect(await screen.findByText('orders')).toBeInTheDocument()
-    expect(screen.getByText('Topics (1)')).toBeInTheDocument()
+    expect(screen.getByText('Tópicos (1)')).toBeInTheDocument()
   })
 
-  it('shows an empty state with no topics', async () => {
+  it('muestra el empty state sin tópicos', async () => {
     mocked.listTopics.mockResolvedValue({ items: [] })
     render1()
-    expect(await screen.findByText('No topics yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Todavía no hay tópicos.')).toBeInTheDocument()
   })
 
-  it('publishes a message to the selected topic', async () => {
+  it('publica un mensaje en el tópico seleccionado', async () => {
     mocked.publishMessage.mockResolvedValue({ offset: 5 })
     render1()
     await screen.findByText('orders')
-    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Publicar' })).toBeDisabled()
     fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
-    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled()
-    fireEvent.change(screen.getByLabelText(/Message \(JSON/), { target: { value: '{"value":{"a":1}}' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }))
+    expect(screen.getByRole('button', { name: 'Publicar' })).toBeEnabled()
+    fireEvent.change(screen.getByLabelText(/Mensaje \(JSON/), { target: { value: '{"value":{"a":1}}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
     await waitFor(() => expect(mocked.publishMessage).toHaveBeenCalledWith('ws1', 'orders', { value: { a: 1 } }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Published to "orders"')
+    expect(await screen.findByRole('status')).toHaveTextContent('Publicado en "orders"')
   })
 
   it('consumes messages and shows an empty note when none', async () => {
@@ -59,16 +59,16 @@ describe('EventsConsole — richer UX', () => {
     render1()
     await screen.findByText('orders')
     fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Poll messages' }))
-    expect(await screen.findByText('No messages.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar mensajes' }))
+    expect(await screen.findByText('No hay mensajes.')).toBeInTheDocument()
   })
 
-  it('creates a topic and reloads', async () => {
+  it('crea un tópico y recarga', async () => {
     mocked.createTopic.mockResolvedValue({ topic: 'events' })
     render1()
     await screen.findByText('orders')
-    fireEvent.change(screen.getByLabelText('New topic'), { target: { value: 'events' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create topic' }))
+    fireEvent.change(screen.getByLabelText('Nuevo tópico'), { target: { value: 'events' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tópico' }))
     await waitFor(() => expect(mocked.createTopic).toHaveBeenCalledWith('ws1', 'events'))
     expect(mocked.listTopics).toHaveBeenCalledTimes(2)
   })
@@ -76,12 +76,12 @@ describe('EventsConsole — richer UX', () => {
   it('does not offer create or publish actions to non-admin roles', async () => {
     renderReadOnly()
     await screen.findByText('orders')
-    expect(screen.getByText(/Event writes are restricted/)).toBeInTheDocument()
-    expect(screen.queryByLabelText('New topic')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/Message \(JSON/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Create topic' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
-    const pollButton = screen.getByRole('button', { name: 'Poll messages' })
+    expect(screen.getByText(/Las escrituras de eventos están restringidas/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Nuevo tópico')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Mensaje \(JSON/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear tópico' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Publicar' })).not.toBeInTheDocument()
+    const pollButton = screen.getByRole('button', { name: 'Consultar mensajes' })
     expect(pollButton).toBeDisabled()
     fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
     expect(pollButton).toBeEnabled()

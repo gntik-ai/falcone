@@ -26,34 +26,34 @@ export function ConsolePlanCreatePage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     const trimmedDisplayName = displayName.trim()
-    const nextDisplayNameError = trimmedDisplayName ? null : 'Display name is required'
+    const nextDisplayNameError = trimmedDisplayName ? null : 'El nombre visible es obligatorio'
     setError(null)
     setDisplayNameError(nextDisplayNameError)
-    if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) { setError('Slug format is invalid'); return }
+    if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) { setError('El formato del slug no es válido'); return }
     if (nextDisplayNameError) { displayNameInputRef.current?.focus(); return }
     try {
       const created = await api.createPlan({ slug, displayName: trimmedDisplayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
       navigate(`/console/plans/${created.id}`)
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'Unable to create plan')
+      setError(fetchError instanceof Error ? fetchError.message : 'No se pudo crear el plan')
     }
   }
   return (
     <main className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <h1 className="text-2xl font-semibold">Create plan</h1>
+        <h1 className="text-2xl font-semibold">Crear plan</h1>
       </header>
       <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-border bg-card/70 p-6">
         <div className="space-y-2">
           <Label htmlFor="plan-slug">Slug</Label>
-          <Input id="plan-slug" aria-label="slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} />
+          <Input id="plan-slug" aria-label="Slug" value={slug} onChange={(e) => setSlug(e.currentTarget.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="plan-display-name">Display name</Label>
+          <Label htmlFor="plan-display-name">Nombre visible</Label>
           <Input
             ref={displayNameInputRef}
             id="plan-display-name"
-            aria-label="display-name"
+            aria-label="Nombre visible"
             aria-invalid={Boolean(displayNameError) || undefined}
             aria-describedby={displayNameError ? 'display-name-error' : undefined}
             className={displayNameError ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
@@ -67,11 +67,11 @@ export function ConsolePlanCreatePage() {
           ) : null}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="plan-description">Description</Label>
-          <Textarea id="plan-description" aria-label="description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
+          <Label htmlFor="plan-description">Descripción</Label>
+          <Textarea id="plan-description" aria-label="Descripción" value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
         </div>
         {error ? <Alert variant="destructive">{error}</Alert> : null}
-        <Button type="submit">Create</Button>
+        <Button type="submit">Crear</Button>
       </form>
     </main>
   )

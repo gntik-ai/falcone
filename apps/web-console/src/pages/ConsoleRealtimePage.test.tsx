@@ -102,7 +102,7 @@ describe('ConsoleRealtimePage', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Realtime del workspace')).toBeInTheDocument()
+    expect(await screen.findByText('Tiempo real del área de trabajo')).toBeInTheDocument()
     expect(screen.getByText('Realtime panel mock')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(panelSpy).toHaveBeenCalledWith(expect.objectContaining({

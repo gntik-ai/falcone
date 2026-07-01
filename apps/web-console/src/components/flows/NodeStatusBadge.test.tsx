@@ -7,12 +7,12 @@ import type { NodeStatus } from '@/services/flowsMonitoringApi'
 afterEach(cleanup)
 
 const STATUSES: Array<{ status: NodeStatus; label: string }> = [
-  { status: 'scheduled', label: 'Scheduled' },
-  { status: 'started', label: 'Running' },
-  { status: 'retrying', label: 'Retrying' },
-  { status: 'completed', label: 'Completed' },
-  { status: 'failed', label: 'Failed' },
-  { status: 'skipped', label: 'Skipped' }
+  { status: 'scheduled', label: 'Programado' },
+  { status: 'started', label: 'En ejecución' },
+  { status: 'retrying', label: 'Reintentando' },
+  { status: 'completed', label: 'Completado' },
+  { status: 'failed', label: 'Fallido' },
+  { status: 'skipped', label: 'Omitido' }
 ]
 
 describe('NodeStatusBadge', () => {
@@ -38,7 +38,7 @@ describe('NodeStatusBadge', () => {
     const { rerender } = render(<NodeStatusBadge status="retrying" attemptNumber={1} />)
     expect(screen.queryByTestId('node-status-attempt')).toBeNull()
     rerender(<NodeStatusBadge status="retrying" attemptNumber={3} />)
-    expect(screen.getByTestId('node-status-attempt')).toHaveTextContent('attempt 3')
+    expect(screen.getByTestId('node-status-attempt')).toHaveTextContent('intento 3')
   })
 
   it('renders the elapsed duration from start/complete timestamps', () => {

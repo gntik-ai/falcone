@@ -9,9 +9,9 @@ export interface SnippetTemplate {
   secretPlaceholderRef: string | null
 }
 
-const POSTGRES_SECRET_REF = 'Usa la credencial del usuario de base de datos mostrada en la consola del workspace.'
-const MONGO_SECRET_REF = 'Usa la contraseña o API key del usuario Mongo provisionado para este workspace.'
-const STORAGE_SECRET_REF = 'Sustituye los placeholders por tus access keys del workspace o credenciales temporales.'
+const POSTGRES_SECRET_REF = 'Usa la credencial del usuario de base de datos mostrada en la consola del área de trabajo.'
+const MONGO_SECRET_REF = 'Usa la contraseña o API key del usuario Mongo provisionado para esta área de trabajo.'
+const STORAGE_SECRET_REF = 'Sustituye los marcadores temporales por las claves de acceso del área de trabajo o credenciales temporales.'
 const FUNCTION_SECRET_REF = 'Añade tu token/API key real según la política HTTP expuesta por la función.'
 const IAM_SECRET_REF = 'Sustituye <CLIENT_SECRET> por el secreto confidencial generado para este cliente IAM.'
 
@@ -21,7 +21,7 @@ export const SNIPPET_CATALOG: Record<ResourceType, SnippetTemplate[]> = {
       id: 'postgres-uri',
       label: 'URI PostgreSQL',
       codeTemplate: 'postgresql://<PG_USER>:{PASSWORD}@{HOST}:{PORT}/{RESOURCE_NAME}?sslmode=require',
-      fallbackNotes: ['Si el endpoint aún no aparece en la consola, usa el placeholder y actualízalo cuando el host quede disponible.'],
+      fallbackNotes: ['Si el punto de conexión aún no aparece en la consola, usa el marcador temporal y actualízalo cuando la dirección del servidor quede disponible.'],
       secretTokens: ['{PASSWORD}'],
       secretPlaceholderRef: POSTGRES_SECRET_REF
     },
@@ -45,7 +45,7 @@ export const SNIPPET_CATALOG: Record<ResourceType, SnippetTemplate[]> = {
       id: 'mongo-uri',
       label: 'MongoDB URI',
       codeTemplate: 'mongodb://<MONGO_USER>:{PASSWORD}@{HOST}:{PORT}/{RESOURCE_EXTRA_A}?authSource=admin&retryWrites=true&w=majority',
-      fallbackNotes: ['La colección usa como base la base de datos seleccionada; revisa el placeholder del host si aún no hay endpoint público.'],
+      fallbackNotes: ['La colección usa como base la base de datos seleccionada; revisa el marcador temporal del servidor si aún no hay un punto de conexión público.'],
       secretTokens: ['{PASSWORD}'],
       secretPlaceholderRef: MONGO_SECRET_REF
     },
@@ -69,7 +69,7 @@ export const SNIPPET_CATALOG: Record<ResourceType, SnippetTemplate[]> = {
       id: 'storage-aws-cli',
       label: 'AWS CLI — s3',
       codeTemplate: 'aws --endpoint-url {HOST} s3 ls s3://{RESOURCE_NAME} --region {RESOURCE_EXTRA_A}',
-      fallbackNotes: ['El endpoint puede seguir siendo interno; si no está publicado, usa el placeholder y la documentación del workspace.'],
+      fallbackNotes: ['El punto de conexión puede seguir siendo interno; si no está publicado, usa el marcador temporal y la documentación del área de trabajo.'],
       secretTokens: ['<AWS_ACCESS_KEY_ID>', '<AWS_SECRET_ACCESS_KEY>'],
       secretPlaceholderRef: STORAGE_SECRET_REF
     },
@@ -101,7 +101,7 @@ export const SNIPPET_CATALOG: Record<ResourceType, SnippetTemplate[]> = {
       id: 'function-curl',
       label: 'cURL',
       codeTemplate: 'curl -X POST "{RESOURCE_EXTRA_B}" -H "Content-Type: application/json" -H "Authorization: Bearer <API_TOKEN>" -d \'{"ping":true}\'' ,
-      fallbackNotes: ['Si la exposición HTTP está deshabilitada, la URL se mantiene como placeholder hasta activar el endpoint.'],
+      fallbackNotes: ['Si la exposición HTTP está deshabilitada, la URL se mantiene como marcador temporal hasta activar el punto de conexión.'],
       secretTokens: ['<API_TOKEN>'],
       secretPlaceholderRef: FUNCTION_SECRET_REF
     },
@@ -123,8 +123,8 @@ export const SNIPPET_CATALOG: Record<ResourceType, SnippetTemplate[]> = {
   'realtime-subscription': [
     {
       id: 'realtime-js-browser-basic',
-      label: 'JavaScript (browser) — WebSocket subscription',
-      codeTemplate: `// Requires: a valid Keycloak access token for this workspace
+      label: 'JavaScript (navegador) — suscripción WebSocket',
+      codeTemplate: `// Requiere un token de acceso Keycloak válido para esta área de trabajo
 const ENDPOINT = '{REALTIME_ENDPOINT}'
 const WORKSPACE_ID = '{WORKSPACE_ID}'
 const TOKEN = '<YOUR_ACCESS_TOKEN>'  // replace with your token
@@ -153,11 +153,11 @@ ws.addEventListener('message', (event) => {
 ws.addEventListener('error', (err) => console.error('WebSocket error', err))
 ws.addEventListener('close', (e) => console.log('Connection closed', e.code, e.reason))`,
       secretTokens: ['<YOUR_ACCESS_TOKEN>'],
-      secretPlaceholderRef: 'Obtain your access token from Keycloak: POST /realms/<realm>/protocol/openid-connect/token'
+      secretPlaceholderRef: 'Obtén el token de acceso en Keycloak: POST /realms/<realm>/protocol/openid-connect/token'
     },
     {
       id: 'realtime-nodejs-backend-basic',
-      label: 'Node.js (backend) — WebSocket subscription',
+      label: 'Node.js (servidor) — suscripción WebSocket',
       codeTemplate: `// npm install ws
 import WebSocket from 'ws'
 
@@ -188,11 +188,11 @@ ws.on('message', (data) => {
 ws.on('error', (err) => console.error('WS error', err))
 ws.on('close', (code, reason) => console.log('Closed', code, reason.toString()))`,
       secretTokens: ['<YOUR_SERVICE_ACCOUNT_TOKEN>'],
-      secretPlaceholderRef: 'Obtain a service-account token via Keycloak client_credentials grant with your client_id and client_secret.'
+      secretPlaceholderRef: 'Obtén un token de cuenta de servicio con el grant client_credentials de Keycloak y tu client_id/client_secret.'
     },
     {
       id: 'realtime-python-backend-basic',
-      label: 'Python (backend) — WebSocket subscription',
+      label: 'Python (servidor) — suscripción WebSocket',
       codeTemplate: `# pip install websockets
 import asyncio, json, websockets
 
@@ -216,12 +216,12 @@ async def subscribe():
 
 asyncio.run(subscribe())`,
       secretTokens: ['<YOUR_SERVICE_ACCOUNT_TOKEN>'],
-      secretPlaceholderRef: 'Obtain a service-account token via Keycloak client_credentials grant.'
+      secretPlaceholderRef: 'Obtén un token de cuenta de servicio con el grant client_credentials de Keycloak.'
     },
     {
       id: 'realtime-js-browser-filter',
-      label: 'JavaScript (browser) — Filtered subscription',
-      codeTemplate: `// Requires: a valid Keycloak access token for this workspace
+      label: 'JavaScript (navegador) — suscripción filtrada',
+      codeTemplate: `// Requiere un token de acceso Keycloak válido para esta área de trabajo
 const ENDPOINT = '{REALTIME_ENDPOINT}'
 const WORKSPACE_ID = '{WORKSPACE_ID}'
 const TOKEN = '<YOUR_ACCESS_TOKEN>'
@@ -248,11 +248,11 @@ ws.addEventListener('message', (event) => {
   }
 })`,
       secretTokens: ['<YOUR_ACCESS_TOKEN>'],
-      secretPlaceholderRef: 'Obtain your access token from Keycloak: POST /realms/<realm>/protocol/openid-connect/token'
+      secretPlaceholderRef: 'Obtén el token de acceso en Keycloak: POST /realms/<realm>/protocol/openid-connect/token'
     },
     {
       id: 'realtime-nodejs-backend-filter',
-      label: 'Node.js (backend) — Filtered subscription',
+      label: 'Node.js (servidor) — suscripción filtrada',
       codeTemplate: `// npm install ws
 import WebSocket from 'ws'
 
@@ -280,11 +280,11 @@ ws.on('message', (data) => {
   }
 })`,
       secretTokens: ['<YOUR_SERVICE_ACCOUNT_TOKEN>'],
-      secretPlaceholderRef: 'Obtain a service-account token via Keycloak client_credentials grant with your client_id and client_secret.'
+      secretPlaceholderRef: 'Obtén un token de cuenta de servicio con el grant client_credentials de Keycloak y tu client_id/client_secret.'
     },
     {
       id: 'realtime-python-backend-filter',
-      label: 'Python (backend) — Filtered subscription',
+      label: 'Python (servidor) — suscripción filtrada',
       codeTemplate: `# pip install websockets
 import asyncio, json, websockets
 
@@ -308,11 +308,11 @@ async def subscribe():
 
 asyncio.run(subscribe())`,
       secretTokens: ['<YOUR_SERVICE_ACCOUNT_TOKEN>'],
-      secretPlaceholderRef: 'Obtain a service-account token via Keycloak client_credentials grant.'
+      secretPlaceholderRef: 'Obtén un token de cuenta de servicio con el grant client_credentials de Keycloak.'
     },
     {
       id: 'realtime-js-browser-reconnect',
-      label: 'JavaScript (browser) — Reconnection with backoff & token refresh',
+      label: 'JavaScript (navegador) — reconexión con espera exponencial y refresco de token',
       codeTemplate: `const ENDPOINT = '{REALTIME_ENDPOINT}'
 const WORKSPACE_ID = '{WORKSPACE_ID}'
 
@@ -358,11 +358,11 @@ function connect() {
 
 connect()`,
       secretTokens: ['<YOUR_ACCESS_TOKEN>'],
-      secretPlaceholderRef: 'Replace refreshToken() with your Keycloak token-refresh implementation.'
+      secretPlaceholderRef: 'Sustituye refreshToken() por tu implementación de refresco de tokens de Keycloak.'
     },
     {
       id: 'realtime-nodejs-backend-reconnect',
-      label: 'Node.js (backend) — Reconnection with backoff',
+      label: 'Node.js (servidor) — reconexión con espera exponencial',
       codeTemplate: `// npm install ws
 import WebSocket from 'ws'
 
@@ -402,11 +402,11 @@ function connect() {
 
 connect()`,
       secretTokens: ['<YOUR_SERVICE_ACCOUNT_TOKEN>'],
-      secretPlaceholderRef: 'Obtain a service-account token via Keycloak client_credentials grant with your client_id and client_secret.'
+      secretPlaceholderRef: 'Obtén un token de cuenta de servicio con el grant client_credentials de Keycloak y tu client_id/client_secret.'
     },
     {
       id: 'realtime-python-backend-reconnect',
-      label: 'Python (backend) — Reconnection with backoff',
+      label: 'Python (servidor) — reconexión con espera exponencial',
       codeTemplate: `# pip install websockets
 import asyncio, json, websockets
 
@@ -436,7 +436,7 @@ async def connect_forever():
 
 asyncio.run(connect_forever())`,
       secretTokens: ['<YOUR_SERVICE_ACCOUNT_TOKEN>'],
-      secretPlaceholderRef: 'Obtain a service-account token via Keycloak client_credentials grant.'
+      secretPlaceholderRef: 'Obtén un token de cuenta de servicio con el grant client_credentials de Keycloak.'
     }
   ],
   'iam-client': [
@@ -444,7 +444,7 @@ asyncio.run(connect_forever())`,
       id: 'iam-client-credentials-curl',
       label: 'cURL — client_credentials',
       codeTemplate: `curl -X POST '{RESOURCE_EXTRA_B}' \\\n  -H 'content-type: application/x-www-form-urlencoded' \\\n  --data-urlencode 'grant_type=client_credentials' \\\n  --data-urlencode 'client_id={RESOURCE_NAME}' \\\n  --data-urlencode 'client_secret=<CLIENT_SECRET>'`,
-      fallbackNotes: ['El token endpoint depende del realm activo; si no está resuelto en la consola, se muestra como placeholder descriptivo.'],
+      fallbackNotes: ['El punto de conexión de tokens depende del realm activo; si no está resuelto en la consola, se muestra como marcador temporal descriptivo.'],
       secretTokens: ['<CLIENT_SECRET>'],
       secretPlaceholderRef: IAM_SECRET_REF
     }

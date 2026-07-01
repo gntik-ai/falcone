@@ -441,11 +441,11 @@ export function ConsoleMongoPage() {
 
   const headerDescription = useMemo(() => {
     if (!activeTenantId) {
-      return 'Selecciona un tenant para explorar las bases de datos MongoDB.'
+      return 'Selecciona una organización para explorar las bases de datos MongoDB.'
     }
 
     if (!activeWorkspaceId) {
-      return 'Selecciona un workspace para ver colecciones, índices, validación y documentos.'
+      return 'Selecciona un área de trabajo para ver colecciones, índices, validación y documentos.'
     }
 
     return 'Explora bases de datos, colecciones, índices, validación, documentos y vistas del dominio documental.'
@@ -474,15 +474,15 @@ export function ConsoleMongoPage() {
   }, [activeTenant?.secondary, activeTenantId, activeWorkspace?.secondary, activeWorkspaceId, selectedCollection, selectedDatabase])
 
   return (
-    <section aria-label="MongoDB del tenant activo" className="space-y-6">
+    <section aria-label="MongoDB de la organización activa" className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="outline">MongoDB</Badge>
-          <Badge variant="secondary">Tenant: {activeTenant?.label ?? 'Sin tenant'}</Badge>
-          <Badge variant="secondary">Workspace: {activeWorkspace?.label ?? 'Sin workspace'}</Badge>
+          <Badge variant="secondary">Organización: {activeTenant?.label ?? 'Sin organización'}</Badge>
+          <Badge variant="secondary">Área de trabajo: {activeWorkspace?.label ?? 'Sin área de trabajo'}</Badge>
           <Button type="button" onClick={() => setDatabaseWizardOpen(true)}>Nueva base de datos</Button>
         </div>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Inventario documental del tenant activo</h1>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Inventario documental de la organización activa</h1>
         <p className="mt-2 text-sm text-muted-foreground">{headerDescription}</p>
       </header>
 
@@ -511,14 +511,14 @@ export function ConsoleMongoPage() {
         </nav>
       </section>
 
-      {!activeTenantId ? <ConsoleMongoEmptyState message="Selecciona un tenant para explorar las bases de datos MongoDB." /> : null}
+      {!activeTenantId ? <ConsoleMongoEmptyState message="Selecciona una organización para explorar las bases de datos MongoDB." /> : null}
 
       {activeTenantId ? (
         <section className="rounded-3xl border border-border bg-card/50 p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Bases de datos</h2>
-              <p className="text-sm text-muted-foreground">Inventario del dominio documental para el tenant activo.</p>
+              <p className="text-sm text-muted-foreground">Inventario del dominio documental para la organización activa.</p>
             </div>
             <Button type="button" variant="outline" onClick={() => setDatabases((previous) => ({ ...previous, loading: true }))}>
               Actualizar
@@ -534,7 +534,7 @@ export function ConsoleMongoPage() {
             />
           ) : null}
           {!databases.loading && !databases.error && databases.data.length === 0 ? (
-            <ConsoleSectionEmpty message="No hay bases de datos MongoDB disponibles para este tenant." />
+            <ConsoleSectionEmpty message="No hay bases de datos MongoDB disponibles para esta organización." />
           ) : null}
           {!databases.loading && !databases.error && databases.data.length > 0 ? (
             <div className="mt-4 overflow-x-auto">
@@ -591,7 +591,7 @@ export function ConsoleMongoPage() {
 
           {databaseTab === 'collections' ? (
             !activeWorkspaceId ? (
-              <ConsoleSectionEmpty message="Selecciona un workspace para ver las colecciones." />
+              <ConsoleSectionEmpty message="Selecciona un área de trabajo para ver las colecciones." />
             ) : collections.loading ? (
               <ConsoleSectionLoading label="Cargando colecciones…" />
             ) : collections.error ? (
@@ -739,7 +739,7 @@ export function ConsoleMongoPage() {
           ) : null}
 
           {collectionDetailTab === 'documents' ? !activeWorkspaceId ? (
-            <ConsoleSectionEmpty message="Selecciona un workspace para explorar documentos." />
+            <ConsoleSectionEmpty message="Selecciona un área de trabajo para explorar documentos." />
           ) : documents.loading ? (
             <ConsoleSectionLoading label="Cargando documentos…" />
           ) : documents.error ? (

@@ -70,7 +70,15 @@ describe('ConsoleFlowDesignerPage run-history navigation (#792)', () => {
     renderPage()
 
     await waitFor(() => expect(mockGetFlow).toHaveBeenCalledWith('ws1', 'flow-1'))
-    const runHistoryLink = screen.getByRole('link', { name: /view run history for alpha flow/i })
+    expect(screen.getByRole('tablist', { name: /vista del flujo/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /lienzo/i })).toBeInTheDocument()
+    const runHistoryLink = screen.getByRole('link', { name: /ver historial de ejecuciones para alpha flow/i })
     expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-1/runs')
+  })
+
+  it('muestra fallback de carga en español cuando el error no trae mensaje', async () => {
+    mockGetFlow.mockRejectedValueOnce('network-failed')
+    renderPage()
+    expect(await screen.findByText('No se pudo cargar el flujo.')).toBeInTheDocument()
   })
 })

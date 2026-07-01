@@ -12,7 +12,7 @@ describe('TenantNameInput', () => {
   it('matches exactly and case-sensitively', () => {
     const onMatch = vi.fn()
     render(<Wrapper onMatch={onMatch} />)
-    const input = screen.getByLabelText('Tenant name confirmation')
+    const input = screen.getByLabelText('Confirmación del nombre de la organización')
     fireEvent.change(input, { target: { value: 'tenant abc' } })
     expect(onMatch).toHaveBeenLastCalledWith(false)
     fireEvent.change(input, { target: { value: 'Tenant ABC' } })

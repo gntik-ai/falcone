@@ -11,6 +11,17 @@ const tools = [
 ]
 
 describe('McpServerPlayground', () => {
+  it('renders localized test-area labels and the suggested scope helper', async () => {
+    const user = userEvent.setup()
+    render(<McpServerPlayground workspaceId="ws_1" serverId="srv_1" tools={tools} endpoint="https://gw.example.test/mcp/x" invoke={vi.fn()} />)
+
+    expect(screen.getByRole('heading', { name: 'Área de pruebas' })).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Herramienta'), 'create_order')
+    expect(screen.getByText(/Alcance sugerido: mcp:orders:write\./)).toBeInTheDocument()
+    expect(screen.queryByText(/Scope sugerido|^Playground$/)).not.toBeInTheDocument()
+  })
+
   it('invokes the selected tool via the injected OAuth-backed call and shows the structured result', async () => {
     const user = userEvent.setup()
     const invoke = vi.fn().mockResolvedValue({ result: { content: [{ type: 'text', text: 'ok' }] } })
@@ -41,6 +52,13 @@ describe('McpServerPlayground', () => {
   it('disables invocation when the endpoint is not published', () => {
     render(<McpServerPlayground workspaceId="ws_1" serverId="srv_1" tools={tools} endpoint={null} invoke={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Invocar' })).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent('Endpoint no publicado')
+    expect(screen.getByRole('status')).toHaveTextContent('Punto de conexión no publicado')
+  })
+
+  it('renders a localized empty state when no curated tools are published', () => {
+    render(<McpServerPlayground workspaceId="ws_1" serverId="srv_1" tools={[]} endpoint="https://gw.example.test/mcp/x" invoke={vi.fn()} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Área de pruebas no disponible')
+    expect(screen.queryByText('Playground no disponible')).not.toBeInTheDocument()
   })
 })

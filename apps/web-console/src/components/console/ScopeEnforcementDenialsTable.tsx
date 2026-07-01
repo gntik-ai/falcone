@@ -19,22 +19,22 @@ export function ScopeEnforcementDenialsTable({ denials, isLoading, onLoadMore, h
   }
 
   if (!isLoading && denials.length === 0) {
-    return <div className="rounded border bg-white p-4 text-sm text-slate-600">No denial events in this period</div>
+    return <div className="rounded border bg-white p-4 text-sm text-slate-600">No hay eventos denegados en este periodo</div>
   }
 
   return (
     <section className="space-y-3">
       <div className="flex gap-2">
-        <select aria-label="denial_type"><option value="">All denial types</option></select>
-        <input aria-label="actor_id" className="rounded border px-2 py-1" placeholder="Actor ID" />
-        <input aria-label="workspace_id" className="rounded border px-2 py-1" placeholder="Workspace ID" />
+        <select aria-label="denial_type"><option value="">Todos los tipos de denegación</option></select>
+        <input aria-label="actor_id" className="rounded border px-2 py-1" placeholder="ID del actor" />
+        <input aria-label="ID de área de trabajo" className="rounded border px-2 py-1" placeholder="ID del área de trabajo" />
         <input aria-label="from" type="date" className="rounded border px-2 py-1" />
         <input aria-label="to" type="date" className="rounded border px-2 py-1" />
-        <button className="rounded border px-3 py-1" onClick={handleExport}>Export CSV</button>
+        <button className="rounded border px-3 py-1" onClick={handleExport}>Exportar CSV</button>
       </div>
       <div className="overflow-hidden rounded border bg-white">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left"><tr><th className="px-3 py-2">Timestamp</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Actor</th><th className="px-3 py-2">Resource</th><th className="px-3 py-2">Missing</th>{isSuperadmin ? <th className="px-3 py-2">Tenant</th> : null}<th className="px-3 py-2">Source IP</th></tr></thead>
+          <thead className="bg-slate-50 text-left"><tr><th className="px-3 py-2">Marca temporal</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Actor</th><th className="px-3 py-2">Recurso</th><th className="px-3 py-2">Faltante</th>{isSuperadmin ? <th className="px-3 py-2">Organización</th> : null}<th className="px-3 py-2">IP de origen</th></tr></thead>
           <tbody>
             {denials.map((denial) => (
               <tr key={`${denial.correlation_id}-${denial.denied_at}`} className="border-t">
@@ -50,7 +50,7 @@ export function ScopeEnforcementDenialsTable({ denials, isLoading, onLoadMore, h
           </tbody>
         </table>
       </div>
-      {hasMore ? <button className="rounded border px-3 py-1" onClick={onLoadMore}>Load more</button> : null}
+      {hasMore ? <button className="rounded border px-3 py-1" onClick={onLoadMore}>Cargar más</button> : null}
     </section>
   )
 }

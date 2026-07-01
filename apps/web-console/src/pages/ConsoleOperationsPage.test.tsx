@@ -110,7 +110,7 @@ describe('ConsoleOperationsPage', () => {
 
     render(<ConsoleOperationsPage />)
 
-    expect(screen.getByText('No hay operaciones registradas para este tenant.')).toBeInTheDocument()
+    expect(screen.getByText('No hay operaciones registradas para esta organización.')).toBeInTheDocument()
   })
 
   it('renders the operations error state with a manual retry action', () => {

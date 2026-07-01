@@ -28,7 +28,7 @@ beforeEach(() => {
 
 async function advanceToConfigStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /siguiente/i }))
-  await user.type(screen.getByLabelText(/nombre del workspace/i), 'Workspace Nuevo')
+  await user.type(screen.getByLabelText(/nombre del área de trabajo/i), 'Workspace Nuevo')
   await user.click(screen.getByRole('button', { name: /siguiente/i }))
 }
 
@@ -39,7 +39,7 @@ describe('CreateWorkspaceWizard', () => {
     render(<MemoryRouter><CreateWorkspaceWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/nombre del workspace/i), 'Workspace Nuevo')
+    await user.type(screen.getByLabelText(/nombre del área de trabajo/i), 'Workspace Nuevo')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.type(screen.getByLabelText(/descripción/i), 'Workspace principal')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
@@ -87,7 +87,7 @@ describe('CreateWorkspaceWizard', () => {
     render(<MemoryRouter><CreateWorkspaceWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/nombre del workspace/i), 'Workspace Nuevo')
+    await user.type(screen.getByLabelText(/nombre del área de trabajo/i), 'Workspace Nuevo')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
@@ -95,7 +95,7 @@ describe('CreateWorkspaceWizard', () => {
     expect(await screen.findByText(/workspace failed/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /anterior/i }))
     await user.click(screen.getByRole('button', { name: /anterior/i }))
-    expect(screen.getByLabelText(/nombre del workspace/i)).toHaveValue('Workspace Nuevo')
+    expect(screen.getByLabelText(/nombre del área de trabajo/i)).toHaveValue('Workspace Nuevo')
   })
 
   it('[RW-07] cuota excedida bloquea el wizard — RF-UI-025 / T02-AC7', async () => {
@@ -104,7 +104,7 @@ describe('CreateWorkspaceWizard', () => {
     render(<MemoryRouter><CreateWorkspaceWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/nombre del workspace/i), 'Workspace Nuevo')
+    await user.type(screen.getByLabelText(/nombre del área de trabajo/i), 'Workspace Nuevo')
     expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled()
     expect(screen.getByText(/la cuota disponible para este recurso está agotada/i)).toBeInTheDocument()
   })

@@ -82,7 +82,7 @@ export function ConsoleWorkspaceDatabasePage() {
         setRecord(null)
         setNotProvisioned(true)
       } else {
-        setError(errMsg(rawError, 'No se pudo cargar la base de datos del workspace.'))
+        setError(errMsg(rawError, 'No se pudo cargar la base de datos del área de trabajo.'))
       }
     } finally {
       setLoading(false)
@@ -114,7 +114,7 @@ export function ConsoleWorkspaceDatabasePage() {
       setConnection(res.connection)
       setNotProvisioned(false)
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudo aprovisionar la base de datos del workspace.'))
+      setError(errMsg(rawError, 'No se pudo aprovisionar la base de datos del área de trabajo.'))
     } finally {
       setBusy(false)
     }
@@ -138,7 +138,7 @@ export function ConsoleWorkspaceDatabasePage() {
       setRotation(null)
       const fallback =
         (rawError as Partial<ApiError>)?.code === 'DB_SHARED_MODE'
-          ? 'Este workspace usa la credencial compartida de la plataforma; no hay una credencial dedicada que rotar.'
+          ? 'Esta área de trabajo usa la credencial compartida de la plataforma; no hay una credencial dedicada que rotar.'
           : 'No se pudo rotar la credencial de base de datos.'
       setError(errMsg(rawError, fallback))
     } finally {
@@ -151,12 +151,12 @@ export function ConsoleWorkspaceDatabasePage() {
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <Badge variant="outline">Workspace database</Badge>
+            <Badge variant="outline">Base de datos del área de trabajo</Badge>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Base de datos del workspace</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Base de datos del área de trabajo</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 Aprovisiona y gestiona una base de datos PostgreSQL dedicada (aislamiento a nivel de catálogo) para el
-                workspace activo.
+                área de trabajo activa.
               </p>
             </div>
           </div>
@@ -167,14 +167,14 @@ export function ConsoleWorkspaceDatabasePage() {
           ) : null}
         </div>
         <div className="mt-3 text-sm text-muted-foreground">
-          Workspace activo: {activeWorkspace?.label ?? 'Sin workspace seleccionado'}
+          Área de trabajo activa: {activeWorkspace?.label ?? 'Sin área de trabajo seleccionada'}
         </div>
       </header>
 
       {!activeWorkspaceId ? (
         <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
           <p className="text-sm text-muted-foreground">
-            Selecciona un tenant y un workspace en la barra superior para gestionar su base de datos.
+            Selecciona una organización y un área de trabajo en la barra superior para gestionar su base de datos.
           </p>
         </section>
       ) : null}
@@ -195,7 +195,7 @@ export function ConsoleWorkspaceDatabasePage() {
         <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Sin base de datos aprovisionada</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Este workspace todavía no tiene una base de datos. Al aprovisionarla se crea una base PostgreSQL real con
+            Esta área de trabajo todavía no tiene una base de datos. Al aprovisionarla se crea una base PostgreSQL real con
             <code className="mx-1 rounded bg-muted px-1 py-0.5">CONNECT</code> revocado para <code>PUBLIC</code>.
           </p>
           <Button type="button" className="mt-4" disabled={busy} onClick={() => void provision()}>
@@ -215,9 +215,9 @@ export function ConsoleWorkspaceDatabasePage() {
             </div>
           </div>
           <dl className="grid gap-3 sm:grid-cols-2">
-            <Field label="Database" value={record.database_name} mono />
-            <Field label="Host" value={record.host} mono />
-            <Field label="Port" value={String(record.port)} mono />
+            <Field label="Base de datos" value={record.database_name} mono />
+            <Field label="Servidor" value={record.host} mono />
+            <Field label="Puerto" value={String(record.port)} mono />
             <Field label="Usuario" value={record.username} mono />
           </dl>
         </section>

@@ -28,6 +28,13 @@ type AuditExportFeedback =
   | { kind: 'unavailable'; result: ConsoleAuditExportResult; message: string }
   | { kind: 'error'; message: string }
 
+const auditExportStatusLabels: Record<string, string> = {
+  accepted: 'Aceptado',
+  completed: 'Completado',
+  failed: 'Fallido',
+  queued: 'En cola'
+}
+
 function isAuditExportManifest(result: ConsoleAuditExportResult): result is ConsoleAuditExportManifest {
   return Boolean(
     result &&
@@ -51,6 +58,11 @@ function auditExportId(result: ConsoleAuditExportResult): string | null {
     : null
 }
 
+function auditExportStatusLabel(result: ConsoleAuditExportResult): string | null {
+  const status = auditExportStatus(result)
+  return status ? auditExportStatusLabels[status] ?? status : null
+}
+
 function auditExportUnavailableMessage(result: ConsoleAuditExportResult): string {
   if (result && typeof result === 'object' && typeof result.message === 'string' && result.message.trim()) {
     return result.message.trim()
@@ -58,10 +70,10 @@ function auditExportUnavailableMessage(result: ConsoleAuditExportResult): string
 
   const status = auditExportStatus(result)
   if (status) {
-    return `El backend devolvió estado ${status}, pero no incluyó un manifiesto descargable.`
+    return `El servidor devolvió estado ${status}, pero no incluyó un manifiesto descargable.`
   }
 
-  return 'El backend respondió sin un manifiesto descargable para esta solicitud.'
+  return 'El servidor respondió sin un manifiesto descargable para esta solicitud.'
 }
 
 function auditExportErrorMessage(error: unknown): string {
@@ -100,7 +112,7 @@ export function ConsoleObservabilityPage() {
   }, [activeTenant?.label, activeWorkspace?.label])
 
   if (!activeTenantId) {
-    return <ConsolePageState kind="blocked" title="Observabilidad bloqueada" description="Selecciona un tenant para consultar métricas y auditoría." />
+    return <ConsolePageState kind="blocked" title="Observabilidad bloqueada" description="Selecciona una organización para consultar métricas y auditoría." />
   }
 
   const tenantId = activeTenantId
@@ -128,14 +140,14 @@ export function ConsoleObservabilityPage() {
       <header className="space-y-3 rounded-3xl border border-border bg-card/70 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">{headerText || 'Tenant activo'}</p>
-            <h1 className="text-2xl font-semibold tracking-tight">Observability</h1>
+            <p className="text-sm text-muted-foreground">{headerText || 'Organización activa'}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Observabilidad</h1>
           </div>
           {metrics.overview ? <ConsoleQuotaPostureBadge posture={metrics.overview.overallPosture} /> : null}
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant={tab === 'metrics' ? 'default' : 'outline'} onClick={() => setTab('metrics')}>Metrics</Button>
-          <Button type="button" variant={tab === 'audit' ? 'default' : 'outline'} onClick={() => setTab('audit')}>Audit</Button>
+          <Button type="button" variant={tab === 'metrics' ? 'default' : 'outline'} onClick={() => setTab('metrics')}>Métricas</Button>
+          <Button type="button" variant={tab === 'audit' ? 'default' : 'outline'} onClick={() => setTab('audit')}>Auditoría</Button>
         </div>
       </header>
 
@@ -145,9 +157,9 @@ export function ConsoleObservabilityPage() {
             value={metricsRangeApplies ? range : TENANT_SCOPE_METRICS_RANGE}
             onChange={setRange}
             disabled={!metricsRangeApplies}
-            disabledReason={!metricsRangeApplies ? 'El rango temporal no está activo para métricas de tenant. Selecciona un workspace en el contexto de consola para consultar series con ventana temporal.' : undefined}
+            disabledReason={!metricsRangeApplies ? 'El rango temporal no está activo para métricas de organización. Selecciona un área de trabajo en el contexto de consola para consultar series con ventana temporal.' : undefined}
           />
-          {metrics.loading ? <ConsolePageState kind="loading" title="Cargando métricas" description="Consultando overview y snapshot de uso." /> : null}
+          {metrics.loading ? <ConsolePageState kind="loading" title="Cargando métricas" description="Consultando resumen e instantánea de uso." /> : null}
           {metrics.error ? <ConsolePageState kind="error" title="No se pudieron cargar las métricas" description={metrics.error} actionLabel="Reintentar" onAction={metrics.reload} /> : null}
           {!metrics.loading && !metrics.error && metrics.overview && metrics.overview.dimensions.length === 0 ? (
             <ConsolePageState kind="empty" title="Sin métricas en este periodo" description="No hay dimensiones disponibles para el rango temporal seleccionado." />
@@ -177,8 +189,8 @@ export function ConsoleObservabilityPage() {
                 <span className="mb-1 block text-muted-foreground">Resultado</span>
                 <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full rounded-xl border border-input bg-background px-3 py-2">
                   <option value="">Todos</option>
-                  <option value="success">success</option>
-                  <option value="failure">failure</option>
+                  <option value="success">Éxito</option>
+                  <option value="failure">Fallo</option>
                 </select>
               </label>
               <div className="flex md:justify-end">
@@ -208,7 +220,7 @@ export function ConsoleObservabilityPage() {
                     <div className="min-w-0">
                       <h2 className="text-sm font-semibold text-foreground">Solicitando exportación de auditoría</h2>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        Estamos esperando la respuesta del backend para saber si hay un manifiesto JSON descargable.
+                        Estamos esperando la respuesta del servidor para saber si hay un manifiesto JSON descargable.
                       </p>
                     </div>
                   </div>
@@ -224,7 +236,7 @@ export function ConsoleObservabilityPage() {
                       <div className="min-w-0 space-y-1">
                         <h2 className="text-sm font-semibold text-foreground">Manifiesto de auditoría listo</h2>
                         <p className="break-words text-sm leading-6 text-muted-foreground">
-                          Export ID <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{exportFeedback.manifest.exportId}</code>
+                          ID de exportación <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{exportFeedback.manifest.exportId}</code>
                         </p>
                       </div>
                     </div>
@@ -244,7 +256,7 @@ export function ConsoleObservabilityPage() {
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Estado</dt>
-                      <dd className="font-medium">{auditExportStatus(exportFeedback.manifest) ?? 'completed'}</dd>
+                      <dd className="font-medium">{auditExportStatusLabel(exportFeedback.manifest) ?? 'Completado'}</dd>
                     </div>
                   </dl>
                 </section>

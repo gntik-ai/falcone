@@ -37,7 +37,7 @@ const codeBlockClassName = 'overflow-x-auto rounded-lg border border-border/60 b
 
 function errorMessage(error: unknown): string {
   const candidate = error as Partial<ApiError>
-  return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
+  return typeof candidate?.message === 'string' ? candidate.message : 'La solicitud falló'
 }
 
 export function EventsConsole({ workspaceId, canManageEvents = true }: EventsConsoleProps) {
@@ -78,7 +78,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
     try {
       const created = await createTopic(workspaceId, topicName)
       const createdTopic = created.topic || topicName
-      setStatus(`Topic "${createdTopic}" created`)
+      setStatus(`Tópico "${createdTopic}" creado`)
       setNewTopic('')
       await reloadTopics()
       setSelected(createdTopic)
@@ -91,7 +91,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
 
   async function handlePublish() {
     if (selected === '') {
-      setError('Select a topic to publish to')
+      setError('Selecciona un tópico para publicar')
       return
     }
     setError(null)
@@ -100,13 +100,13 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
     try {
       parsed = JSON.parse(messageJson) as { key?: string; value: JsonValue }
     } catch {
-      setError('Message is not valid JSON')
+      setError('El mensaje no es JSON válido')
       return
     }
     setOperation('publish')
     try {
       await publishMessage(workspaceId, selected, parsed)
-      setStatus(`Published to "${selected}"`)
+      setStatus(`Publicado en "${selected}"`)
     } catch (caught) {
       setError(errorMessage(caught))
     } finally {
@@ -116,7 +116,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
 
   async function handleConsume() {
     if (selected === '') {
-      setError('Select a topic to consume from')
+      setError('Selecciona un tópico para consumir')
       return
     }
     setError(null)
@@ -146,10 +146,10 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
   const canPollMessages = !busy && selected !== ''
 
   return (
-    <section aria-label="Events console" aria-busy={loading || busy} className="space-y-4">
+    <section aria-label="Consola de eventos" aria-busy={loading || busy} className="space-y-4">
       {error ? (
         <Alert variant="destructive" aria-live="assertive" className="rounded-sm">
-          <AlertTitle>Events request failed</AlertTitle>
+          <AlertTitle>No se pudo completar la solicitud de eventos</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
@@ -162,7 +162,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
       {!canManageEvents ? (
         <div role="note" className="flex items-start gap-3 rounded-2xl border border-border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground shadow-sm">
           <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
-          <p>Event writes are restricted to workspace or tenant admins. You can still select a topic and poll messages.</p>
+          <p>Las escrituras de eventos están restringidas a administradores del área de trabajo o de la organización. Aún puedes seleccionar un tópico y consultar mensajes.</p>
         </div>
       ) : null}
 
@@ -171,25 +171,25 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
           <div className={panelHeaderClassName}>
             <div>
               <h3 id="events-topics-heading" className={panelTitleClassName}>
-                Topics{topics.length > 0 ? ` (${topics.length})` : ''}
+                Tópicos{topics.length > 0 ? ` (${topics.length})` : ''}
               </h3>
-              <p className={panelDescriptionClassName}>Select a workspace topic before publishing or polling messages.</p>
+              <p className={panelDescriptionClassName}>Selecciona un tópico del área de trabajo antes de publicar o consultar mensajes.</p>
             </div>
             <Badge variant={selectedTopic ? 'secondary' : 'outline'} className="max-w-full truncate px-3 py-1">
-              {selectedTopic ? `Selected: ${selectedTopic.topic}` : 'No topic selected'}
+              {selectedTopic ? `Seleccionado: ${selectedTopic.topic}` : 'Sin tópico seleccionado'}
             </Badge>
           </div>
 
           <div className="mt-4 space-y-3">
             {loading ? (
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Loading topics…</p>
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Cargando tópicos…</p>
             ) : topics.length === 0 ? (
               <div className={emptyStateClassName}>
-                <p>No topics yet.</p>
+                <p>Todavía no hay tópicos.</p>
               </div>
             ) : (
               <fieldset className="space-y-2" aria-describedby="selected-topic-summary">
-                <legend className="sr-only">Available event topics</legend>
+                <legend className="sr-only">Tópicos de eventos disponibles</legend>
                 {topics.map((topic) => {
                   const isSelected = selected === topic.topic
                   return (
@@ -212,10 +212,10 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                       <span className="min-w-0 truncate font-medium text-foreground">{topic.topic}</span>
                       {topic.partitions != null ? (
                         <Badge variant="outline" className="col-start-2 w-fit justify-self-start sm:col-start-3 sm:row-start-1 sm:justify-self-end">
-                          {topic.partitions} partitions
+                          {topic.partitions} particiones
                         </Badge>
                       ) : null}
-                      <span className="col-start-2 text-xs text-muted-foreground sm:col-span-2">Workspace topic</span>
+                      <span className="col-start-2 text-xs text-muted-foreground sm:col-span-2">Tópico del área de trabajo</span>
                     </label>
                   )
                 })}
@@ -223,7 +223,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
             )}
 
             <p id="selected-topic-summary" className="text-sm text-muted-foreground" aria-live="polite">
-              {selectedTopic ? `Selected topic: ${selectedTopic.topic}.` : 'No topic selected.'}
+              {selectedTopic ? `Tópico seleccionado: ${selectedTopic.topic}.` : 'No hay tópico seleccionado.'}
             </p>
           </div>
         </section>
@@ -234,13 +234,13 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
               <section aria-labelledby="events-create-heading" className={panelClassName}>
                 <div className={panelHeaderClassName}>
                   <div>
-                    <h3 id="events-create-heading" className={panelTitleClassName}>Create topic</h3>
-                    <p className={panelDescriptionClassName}>Admin-only structural write for this workspace.</p>
+                    <h3 id="events-create-heading" className={panelTitleClassName}>Crear tópico</h3>
+                    <p className={panelDescriptionClassName}>Escritura estructural solo para administradores de esta área de trabajo.</p>
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor="new-topic">New topic</Label>
+                    <Label htmlFor="new-topic">Nuevo tópico</Label>
                     <Input
                       id="new-topic"
                       value={newTopic}
@@ -250,10 +250,10 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                       disabled={busy}
                     />
                   </div>
-                  <p id="new-topic-help" className="sr-only">Topic name to add to the selected workspace.</p>
+                  <p id="new-topic-help" className="sr-only">Nombre del tópico que se añadirá al área de trabajo seleccionada.</p>
                   <Button type="button" className="w-full sm:w-auto" onClick={() => void handleCreateTopic()} disabled={!canCreateTopic}>
                     <Plus className="h-4 w-4" aria-hidden="true" />
-                    {operation === 'create' ? 'Creating…' : 'Create topic'}
+                    {operation === 'create' ? 'Creando…' : 'Crear tópico'}
                   </Button>
                 </div>
               </section>
@@ -261,25 +261,25 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
               <section aria-labelledby="events-publish-heading" className={panelClassName}>
                 <div className={panelHeaderClassName}>
                   <div>
-                    <h3 id="events-publish-heading" className={panelTitleClassName}>Publish</h3>
-                    <p className={panelDescriptionClassName}>Send a JSON test message to the selected topic.</p>
+                    <h3 id="events-publish-heading" className={panelTitleClassName}>Publicar</h3>
+                    <p className={panelDescriptionClassName}>Envía un mensaje JSON de prueba al tópico seleccionado.</p>
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
-                  <Label htmlFor="message-json">Message (JSON, e.g. {'{ "value": { ... } }'})</Label>
+                  <Label htmlFor="message-json">Mensaje (JSON, por ejemplo {'{ "value": { ... } }'})</Label>
                   <Textarea
                     id="message-json"
                     value={messageJson}
                     onChange={(event) => setMessageJson(event.target.value)}
                     aria-describedby="selected-topic-summary message-json-help"
-                    aria-invalid={error === 'Message is not valid JSON' ? true : undefined}
+                    aria-invalid={error === 'El mensaje no es JSON válido' ? true : undefined}
                     className="min-h-28 rounded-sm font-mono text-xs leading-5"
                     disabled={busy}
                   />
-                  <p id="message-json-help" className="sr-only">JSON object containing a value field and optional key.</p>
+                  <p id="message-json-help" className="sr-only">Objeto JSON con un campo value y una key opcional.</p>
                   <Button type="button" className="w-full sm:w-auto" onClick={() => void handlePublish()} disabled={!canPublishMessage}>
                     <Send className="h-4 w-4" aria-hidden="true" />
-                    {operation === 'publish' ? 'Publishing…' : 'Publish'}
+                    {operation === 'publish' ? 'Publicando…' : 'Publicar'}
                   </Button>
                 </div>
               </section>
@@ -289,31 +289,31 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
           <section aria-labelledby="events-consume-heading" className={panelClassName} aria-live="polite">
             <div className={panelHeaderClassName}>
               <div>
-                <h3 id="events-consume-heading" className={panelTitleClassName}>Consume</h3>
-                <p className={panelDescriptionClassName}>Poll the selected topic without requiring write access.</p>
+                <h3 id="events-consume-heading" className={panelTitleClassName}>Consumir</h3>
+                <p className={panelDescriptionClassName}>Consulta el tópico seleccionado sin requerir acceso de escritura.</p>
               </div>
               <Badge variant="outline" className="px-3 py-1">
-                {messages.length > 0 ? `${messages.length} messages` : 'No messages loaded'}
+                {messages.length > 0 ? `${messages.length} mensajes` : 'Sin mensajes cargados'}
               </Badge>
             </div>
             <div className="mt-4 space-y-4">
               <Button type="button" className="w-full sm:w-auto" onClick={() => void handleConsume()} disabled={!canPollMessages}>
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {operation === 'consume' ? 'Polling…' : 'Poll messages'}
+                {operation === 'consume' ? 'Consultando…' : 'Consultar mensajes'}
               </Button>
 
               {operation === 'consume' ? (
-                <p role="status" className="text-sm text-muted-foreground">Polling messages…</p>
+                <p role="status" className="text-sm text-muted-foreground">Consultando mensajes…</p>
               ) : consumed && messages.length === 0 ? (
-                <p className={emptyStateClassName}>No messages.</p>
+                <p className={emptyStateClassName}>No hay mensajes.</p>
               ) : messages.length > 0 ? (
                 <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
                   {messages.map((message, index) => (
                     <li key={`${String(message.offset ?? index)}-${index}`} className="rounded-xl border border-border/80 bg-background/40 p-3 text-sm shadow-sm">
                       <pre className={codeBlockClassName}>{JSON.stringify(message.value, null, 2)}</pre>
                       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        {message.key != null ? <span>key={message.key}</span> : null}
-                        {message.partition != null ? <span>partition={String(message.partition)}</span> : null}
+                        {message.key != null ? <span>clave={message.key}</span> : null}
+                        {message.partition != null ? <span>partición={String(message.partition)}</span> : null}
                         {message.offset != null ? <span>offset={String(message.offset)}</span> : null}
                         {message.timestamp ? <span>{message.timestamp}</span> : null}
                       </div>
@@ -323,7 +323,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
               ) : (
                 <div className={emptyStateClassName}>
                   <Inbox className="mb-2 h-4 w-4" aria-hidden="true" />
-                  <p>No message poll run yet.</p>
+                  <p>Todavía no se consultaron mensajes.</p>
                 </div>
               )}
             </div>

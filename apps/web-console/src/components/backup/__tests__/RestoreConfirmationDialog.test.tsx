@@ -33,10 +33,10 @@ describe('RestoreConfirmationDialog', () => {
     const button = screen.getByRole('button', { name: 'Confirmar restauración' })
     expect(button).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('Tenant name confirmation'), { target: { value: 'tenant abc' } })
+    fireEvent.change(screen.getByLabelText('Confirmación del nombre de la organización'), { target: { value: 'tenant abc' } })
     expect(button).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('Tenant name confirmation'), { target: { value: 'Tenant ABC' } })
+    fireEvent.change(screen.getByLabelText('Confirmación del nombre de la organización'), { target: { value: 'Tenant ABC' } })
     expect(button).toBeEnabled()
   })
 })

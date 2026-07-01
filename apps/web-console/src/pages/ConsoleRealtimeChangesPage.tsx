@@ -8,13 +8,13 @@ export function ConsoleRealtimeChangesPage() {
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!activeWorkspaceId) {
-    return <p>Select a workspace to use realtime.</p>
+    return <p>Selecciona un área de trabajo para usar tiempo real.</p>
   }
 
   return (
     <div>
-      <h1>Realtime changes</h1>
-      <p>Subscribe to a Mongo collection&apos;s or Postgres table&apos;s tenant-scoped change stream with an anon key and watch changes live.</p>
+      <h1>Cambios en tiempo real</h1>
+      <p>Suscríbete al flujo de cambios de la organización para una colección Mongo o una tabla Postgres con una clave anónima y observa los cambios en vivo.</p>
       <RealtimeConsole workspaceId={activeWorkspaceId} />
     </div>
   )

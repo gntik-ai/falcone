@@ -30,7 +30,7 @@ async function advanceToRuntimeStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /siguiente/i }))
   await user.type(screen.getByLabelText(/^nombre$/i), 'hello')
   await user.click(screen.getByRole('button', { name: /siguiente/i }))
-  await user.selectOptions(screen.getByLabelText(/runtime/i), 'nodejs:20')
+  await user.selectOptions(screen.getByLabelText(/entorno/i), 'nodejs:20')
 }
 
 describe('PublishFunctionWizard', () => {
@@ -43,16 +43,16 @@ describe('PublishFunctionWizard', () => {
 
     expect(screen.queryByText(/acceso bloqueado/i)).not.toBeInTheDocument()
     expect(screen.getByText(/publicar función/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/workspace/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/área de trabajo/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/metadatos/i)).toBeInTheDocument()
-    expect(screen.getByText(/runtime/i)).toBeInTheDocument()
-    expect(screen.getByText(/trigger/i)).toBeInTheDocument()
+    expect(screen.getByText(/entorno/i)).toBeInTheDocument()
+    expect(screen.getByText(/disparador/i)).toBeInTheDocument()
     expect(screen.getByText(/resumen/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.type(screen.getByLabelText(/^nombre$/i), 'hello')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.selectOptions(screen.getByLabelText(/runtime/i), 'nodejs:20')
+    await user.selectOptions(screen.getByLabelText(/entorno/i), 'nodejs:20')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
@@ -83,7 +83,7 @@ describe('PublishFunctionWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.type(screen.getByLabelText(/^nombre$/i), 'hello')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.selectOptions(screen.getByLabelText(/runtime/i), 'nodejs:20')
+    await user.selectOptions(screen.getByLabelText(/entorno/i), 'nodejs:20')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
@@ -99,11 +99,11 @@ describe('PublishFunctionWizard', () => {
     { field: /memoria/i, value: '0', error: /memoria debe estar entre 128 y 2048/i },
     { field: /memoria/i, value: '-1', error: /memoria debe estar entre 128 y 2048/i },
     { field: /memoria/i, value: '2049', error: /memoria debe estar entre 128 y 2048/i },
-    { field: /timeout/i, value: '', error: /timeout es obligatorio/i },
-    { field: /timeout/i, value: 'abc', error: /timeout debe ser un número entero/i },
-    { field: /timeout/i, value: '0', error: /timeout debe estar entre 1 y 900000/i },
-    { field: /timeout/i, value: '-1', error: /timeout debe estar entre 1 y 900000/i },
-    { field: /timeout/i, value: '900001', error: /timeout debe estar entre 1 y 900000/i }
+    { field: /tiempo de espera/i, value: '', error: /tiempo de espera es obligatorio/i },
+    { field: /tiempo de espera/i, value: 'abc', error: /tiempo de espera debe ser un número entero/i },
+    { field: /tiempo de espera/i, value: '0', error: /tiempo de espera debe estar entre 1 y 900000/i },
+    { field: /tiempo de espera/i, value: '-1', error: /tiempo de espera debe estar entre 1 y 900000/i },
+    { field: /tiempo de espera/i, value: '900001', error: /tiempo de espera debe estar entre 1 y 900000/i }
   ])('[RW-09] límites numéricos de función rechazan $value en $field — issue #807', async ({ field, value, error }) => {
     const user = userEvent.setup()
     render(<MemoryRouter><PublishFunctionWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
@@ -118,6 +118,14 @@ describe('PublishFunctionWizard', () => {
     expect(requestMock).not.toHaveBeenCalled()
   })
 
+  it('muestra el límite de tiempo con etiqueta localizada', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><PublishFunctionWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+    await advanceToRuntimeStep(user)
+
+    expect(screen.getByLabelText(/tiempo de espera \(ms\)/i)).toBeInTheDocument()
+  })
+
   it('[RW-06] error backend preserva datos — RF-UI-025 / T02-AC6', async () => {
     const user = userEvent.setup()
     requestMock.mockRejectedValue(new Error('fn failed'))
@@ -125,7 +133,7 @@ describe('PublishFunctionWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.type(screen.getByLabelText(/^nombre$/i), 'hello')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.selectOptions(screen.getByLabelText(/runtime/i), 'nodejs:20')
+    await user.selectOptions(screen.getByLabelText(/entorno/i), 'nodejs:20')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))

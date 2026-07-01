@@ -132,21 +132,21 @@ describe('NodeShell error badge', () => {
   it('renders an error badge with the error count when validationErrors is non-empty', () => {
     render(
       <NodeShell
-        typeLabel="Task"
+        typeLabel="Tarea"
         label="send-email"
         validationErrors={[
-          { code: 'FLW-E006', nodeId: 'notify', message: 'Unknown task type' },
-          { code: 'FLW-E005', nodeId: 'notify', message: 'Bad expression' }
+          { code: 'FLW-E006', nodeId: 'notify', message: 'Tipo de tarea desconocido' },
+          { code: 'FLW-E005', nodeId: 'notify', message: 'Expresión inválida' }
         ]}
-        badges={['retry ×3']}
+        badges={['reintento ×3']}
       />
     )
     expect(screen.getByTestId('flow-node-error-badge')).toHaveTextContent('2')
-    expect(screen.getByTestId('flow-node-badge')).toHaveTextContent('retry ×3')
+    expect(screen.getByTestId('flow-node-badge')).toHaveTextContent('reintento ×3')
   })
 
   it('renders no error badge for a clean node', () => {
-    render(<NodeShell typeLabel="Task" label="send-email" validationErrors={[]} />)
+    render(<NodeShell typeLabel="Tarea" label="send-email" validationErrors={[]} />)
     expect(screen.queryByTestId('flow-node-error-badge')).toBeNull()
   })
 })

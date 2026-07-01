@@ -21,13 +21,13 @@ import type { FlowDefinition } from '@/types/flows'
 import type { NodeStatusSnapshot } from '@/lib/hooks/use-flow-execution'
 
 const TYPE_LABELS: Record<string, string> = {
-  task: 'Task',
-  branch: 'Branch',
-  parallel: 'Parallel',
-  wait: 'Wait',
-  approval: 'Approval',
-  'sub-flow': 'Sub-flow',
-  sequence: 'Sequence'
+  task: 'Tarea',
+  branch: 'Rama',
+  parallel: 'Paralelo',
+  wait: 'Espera',
+  approval: 'Aprobación',
+  'sub-flow': 'Subflujo',
+  sequence: 'Secuencia'
 }
 
 export interface RunCanvasProps {

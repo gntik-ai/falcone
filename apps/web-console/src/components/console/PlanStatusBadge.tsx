@@ -8,6 +8,13 @@ const classNames: Record<PlanStatus, string> = {
   archived: 'bg-zinc-200 text-zinc-900'
 }
 
+const statusLabels: Record<PlanStatus, string> = {
+  draft: 'Borrador',
+  active: 'Activo',
+  deprecated: 'Obsoleto',
+  archived: 'Archivado'
+}
+
 export function PlanStatusBadge({ status }: { status: PlanStatus }) {
-  return <Badge className={classNames[status]}>{status}</Badge>
+  return <Badge className={classNames[status]}>{statusLabels[status]}</Badge>
 }

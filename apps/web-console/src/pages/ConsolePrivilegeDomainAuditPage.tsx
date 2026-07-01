@@ -28,7 +28,7 @@ export default function ConsolePrivilegeDomainAuditPage() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message ?? 'Failed to load denials');
+        setError(err?.message ?? 'No se pudieron cargar las denegaciones');
       })
       .finally(() => {
         if (!active) return;
@@ -44,32 +44,32 @@ export default function ConsolePrivilegeDomainAuditPage() {
 
   return (
     <div>
-      <h1>Privilege Domain Denials</h1>
+      <h1>Denegaciones de dominios de privilegio</h1>
       <div>
         <select aria-label="requiredDomain" value={filters.requiredDomain ?? ''} onChange={(e) => setFilters({ ...filters, requiredDomain: e.target.value || undefined, offset: 0 })}>
-          <option value="">all</option>
+          <option value="">todos</option>
           <option value="structural_admin">structural_admin</option>
           <option value="data_access">data_access</option>
         </select>
-        <input aria-label="tenantId" value={filters.tenantId ?? ''} onChange={(e) => setFilters({ ...filters, tenantId: e.target.value || undefined, offset: 0 })} />
-        <input aria-label="workspaceId" value={filters.workspaceId ?? ''} onChange={(e) => setFilters({ ...filters, workspaceId: e.target.value || undefined, offset: 0 })} />
+        <input aria-label="ID de organización" value={filters.tenantId ?? ''} onChange={(e) => setFilters({ ...filters, tenantId: e.target.value || undefined, offset: 0 })} />
+        <input aria-label="ID de área de trabajo" value={filters.workspaceId ?? ''} onChange={(e) => setFilters({ ...filters, workspaceId: e.target.value || undefined, offset: 0 })} />
         <input aria-label="actorId" value={filters.actorId ?? ''} onChange={(e) => setFilters({ ...filters, actorId: e.target.value || undefined, offset: 0 })} />
       </div>
       <div data-testid="denial-badge">{last24hCount}</div>
-      <a download="privilege-domain-denials.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}>Export CSV</a>
+      <a download="privilege-domain-denials.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}>Exportar CSV</a>
       {error ? <div role="alert">{error}</div> : null}
-      {loading ? <div>Loading…</div> : (
+      {loading ? <div>Cargando…</div> : (
         <table>
-          <thead><tr><th>Denied At</th><th>Actor ID</th><th>Actor Type</th><th>Credential Domain</th><th>Required Domain</th><th>HTTP Method</th><th>Path</th><th>Source IP</th><th>Correlation ID</th></tr></thead>
+          <thead><tr><th>Denegado en</th><th>ID del actor</th><th>Tipo de actor</th><th>Dominio de credencial</th><th>Dominio requerido</th><th>Método HTTP</th><th>Ruta</th><th>IP de origen</th><th>ID de correlación</th></tr></thead>
           <tbody>
-            {rows.length === 0 ? <tr><td colSpan={9}>No denials found.</td></tr> : rows.map((row) => (
+            {rows.length === 0 ? <tr><td colSpan={9}>No se encontraron denegaciones.</td></tr> : rows.map((row) => (
               <tr key={row.id}><td>{row.deniedAt}</td><td>{row.actorId}</td><td>{row.actorType}</td><td>{row.credentialDomain}</td><td>{row.requiredDomain}</td><td>{row.httpMethod}</td><td>{row.requestPath}</td><td>{row.sourceIp}</td><td>{row.correlationId}</td></tr>
             ))}
           </tbody>
         </table>
       )}
-      <button onClick={() => setFilters({ ...filters, offset: Math.max(0, filters.offset - filters.limit) })}>Previous</button>
-      <button onClick={() => setFilters({ ...filters, offset: filters.offset + filters.limit })} disabled={filters.offset + filters.limit >= total}>Next</button>
+      <button onClick={() => setFilters({ ...filters, offset: Math.max(0, filters.offset - filters.limit) })}>Anterior</button>
+      <button onClick={() => setFilters({ ...filters, offset: filters.offset + filters.limit })} disabled={filters.offset + filters.limit >= total}>Siguiente</button>
     </div>
   );
 }

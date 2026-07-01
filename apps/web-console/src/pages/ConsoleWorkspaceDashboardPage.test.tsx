@@ -34,7 +34,7 @@ describe('ConsoleWorkspaceDashboardPage', () => {
 
     renderPage()
 
-    const state = screen.getByRole('status', { name: /loading workspace dashboard/i })
+    const state = screen.getByRole('status', { name: /cargando panel del área de trabajo/i })
     expect(state).toHaveAttribute('aria-busy', 'true')
     expect(state).toHaveTextContent(/ws-prod/i)
   })
@@ -64,16 +64,16 @@ describe('ConsoleWorkspaceDashboardPage', () => {
 
     renderPage()
 
-    expect((await screen.findByRole('heading', { name: /workspace dashboard/i })).textContent).toMatch(/workspace dashboard/i)
-    expect(screen.getAllByText('Workspace').length).toBeGreaterThan(0)
+    expect((await screen.findByRole('heading', { name: /panel del área de trabajo/i })).textContent).toMatch(/panel del área de trabajo/i)
+    expect(screen.getAllByText('Área de trabajo').length).toBeGreaterThan(0)
     expect(screen.getByText('ws-prod')).toBeInTheDocument()
     expect(screen.getByText('pro-corp')).toBeInTheDocument()
-    expect(screen.getByText(/Jul 1, 2026/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 jul 2026/i)).toBeInTheDocument()
     expect(screen.getByText('PostgreSQL databases')).toBeInTheDocument()
-    expect(screen.getByText('Within limit')).toBeInTheDocument()
+    expect(screen.getByText('Dentro del límite')).toBeInTheDocument()
     expect(screen.getByText('Realtime')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /capabilities/i })).toBeInTheDocument()
-    expect(screen.queryByText(/consumption data unavailable/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /capacidades/i })).toBeInTheDocument()
+    expect(screen.queryByText(/datos de consumo no disponibles/i)).not.toBeInTheDocument()
     expect(getWorkspaceConsumptionMock).toHaveBeenCalledWith('ws-prod')
   })
 
@@ -84,8 +84,8 @@ describe('ConsoleWorkspaceDashboardPage', () => {
 
     renderPage()
 
-    const state = await screen.findByRole('status', { name: /consumption data unavailable/i })
-    expect(state).toHaveTextContent(/does not have consumption data available right now/i)
+    const state = await screen.findByRole('status', { name: /datos de consumo no disponibles/i })
+    expect(state).toHaveTextContent(/no tiene datos de consumo disponibles ahora/i)
     expect(screen.queryByText(/NO_ROUTE/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/No action mapped/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -98,7 +98,7 @@ describe('ConsoleWorkspaceDashboardPage', () => {
 
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: /open my plan/i }))
+    await user.click(await screen.findByRole('button', { name: /abrir mi plan/i }))
 
     expect(screen.getByText('My plan route')).toBeInTheDocument()
   })

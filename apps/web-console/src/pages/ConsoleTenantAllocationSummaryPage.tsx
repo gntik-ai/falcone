@@ -17,27 +17,27 @@ export function ConsoleTenantAllocationSummaryPage() {
       return
     }
 
-    api.getTenantAllocationSummary().then(setData).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load allocation summary'))
+    api.getTenantAllocationSummary().then(setData).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el resumen de asignación'))
   }, [tenantlessPlatformPrincipal])
 
   if (tenantlessPlatformPrincipal) {
     return (
       <ConsolePageState
         kind="empty"
-        title="No personal tenant plan"
-        description="This platform-level account is not attached to a tenant, so there are no personal tenant allocations to display."
+        title="Sin plan de organización personal"
+        description="Esta cuenta de plataforma no está asociada a una organización, así que no hay asignaciones personales de organización para mostrar."
       />
     )
   }
-  if (error) return <ConsolePageState kind="error" title="Allocation summary unavailable" description={error} />
-  if (!data) return <ConsolePageState kind="loading" title="Loading allocation summary" description="Fetching workspace sub-quota allocations." />
-  if (data.dimensions.every((item) => item.workspaces.length === 0)) return <ConsolePageState kind="empty" title="No workspace allocations yet" description="All dimensions are currently using the shared tenant pool." />
+  if (error) return <ConsolePageState kind="error" title="Resumen de asignación no disponible" description={error} />
+  if (!data) return <ConsolePageState kind="loading" title="Cargando resumen de asignación" description="Obteniendo subcuotas asignadas a áreas de trabajo." />
+  if (data.dimensions.every((item) => item.workspaces.length === 0)) return <ConsolePageState kind="empty" title="Todavía no hay asignaciones de área de trabajo" description="Todas las dimensiones usan actualmente la reserva compartida de la organización." />
 
   return (
     <main className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <h1 className="text-2xl font-semibold">Allocation summary</h1>
-        <p>Tenant: {data.tenantId}</p>
+        <h1 className="text-2xl font-semibold">Resumen de asignación</h1>
+        <p>Organización: {data.tenantId}</p>
       </header>
       <WorkspaceAllocationSummaryTable rows={data.dimensions} />
     </main>

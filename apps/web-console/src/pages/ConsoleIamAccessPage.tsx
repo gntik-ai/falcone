@@ -42,10 +42,10 @@ const IAM_ACCESS_ERROR_MESSAGES: Record<string, string> = {
   IAM_REMOVE_ROLE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
   IAM_GROUP_ADD_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
   IAM_GROUP_REMOVE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
-  IAM_LIST_USERS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
-  IAM_LIST_ROLES_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
-  IAM_LIST_GROUPS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
-  IAM_LIST_CLIENTS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_USERS_FAILED: 'No se pudo cargar el inventario IAM de la organización activa.',
+  IAM_LIST_ROLES_FAILED: 'No se pudo cargar el inventario IAM de la organización activa.',
+  IAM_LIST_GROUPS_FAILED: 'No se pudo cargar el inventario IAM de la organización activa.',
+  IAM_LIST_CLIENTS_FAILED: 'No se pudo cargar el inventario IAM de la organización activa.',
   IAM_GET_USER_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
   IAM_GET_ROLE_FAILED: 'No se pudo cargar la información de roles IAM.',
   IAM_LIST_USER_ROLES_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
@@ -98,7 +98,7 @@ export function ConsoleIamAccessPage() {
       setRoles(rolesRes.items ?? [])
       setGroups(groupsRes.items ?? [])
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudo cargar el IAM del tenant activo.'))
+      setError(errMsg(rawError, 'No se pudo cargar el IAM de la organización activa.'))
     } finally {
       setLoading(false)
     }
@@ -172,19 +172,19 @@ export function ConsoleIamAccessPage() {
           <Badge variant="outline">IAM</Badge>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Acceso fino (IAM)</h1>
           <p className="text-sm text-muted-foreground">
-            Gestiona usuarios, roles y grupos del realm del tenant activo: asigna o retira roles y administra la
+            Gestiona usuarios, roles y grupos del realm de la organización activa: asigna o retira roles y administra la
             pertenencia a grupos.
           </p>
         </div>
         <div className="mt-3 text-sm text-muted-foreground">
-          Tenant activo: {activeTenant?.label ?? 'Sin tenant seleccionado'}
+          Organización activa: {activeTenant?.label ?? 'Sin organización seleccionada'}
           {realm ? <span className="ml-2 font-mono text-xs">realm {realm}</span> : null}
         </div>
       </header>
 
       {!realm ? (
         <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">Selecciona un tenant en la barra superior para gestionar su IAM.</p>
+          <p className="text-sm text-muted-foreground">Selecciona una organización en la barra superior para gestionar su IAM.</p>
         </section>
       ) : null}
 

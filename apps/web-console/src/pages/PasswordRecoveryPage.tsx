@@ -121,7 +121,7 @@ export function PasswordRecoveryPage() {
             Solicita instrucciones para recuperar una cuenta de consola. Por seguridad, la respuesta no confirma si el usuario existe.
           </p>
           <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
-            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · Client ID{' '}
+            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · ID del cliente{' '}
             <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
           </p>
         </div>

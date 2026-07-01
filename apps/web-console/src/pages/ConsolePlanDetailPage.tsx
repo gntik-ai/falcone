@@ -16,13 +16,13 @@ function limitErrorMessage(error: unknown): string {
   const code = typeof candidate?.code === 'string' ? candidate.code : null
 
   if (code === 'INVALID_LIMIT_VALUE') {
-    return 'INVALID_LIMIT_VALUE: use -1 for unlimited, 0, or a positive whole number.'
+    return 'INVALID_LIMIT_VALUE: usa -1 para indicar sin límite, 0 o un número entero positivo.'
   }
   if (code === 'PLAN_LIMITS_FROZEN') {
-    return 'PLAN_LIMITS_FROZEN: this plan no longer accepts limit changes.'
+    return 'PLAN_LIMITS_FROZEN: este plan ya no acepta cambios de límites.'
   }
 
-  const message = error instanceof Error && error.message ? error.message : 'Request failed.'
+  const message = error instanceof Error && error.message ? error.message : 'La solicitud falló.'
   return code && !message.includes(code) ? `${code}: ${message}` : message
 }
 
@@ -107,7 +107,7 @@ export function ConsolePlanDetailPage() {
         await restorePersistedLimitProfile()
         setLimitFeedback({
           kind: 'error',
-          title: 'Limit was not saved',
+          title: 'El límite no se guardó',
           message: limitErrorMessage(caught)
         })
         return
@@ -121,8 +121,8 @@ export function ConsolePlanDetailPage() {
       }
       setLimitFeedback({
         kind: 'success',
-        title: 'Limit saved',
-        message: `${key} was accepted by the API and the row was reconciled from the saved profile.`
+        title: 'Límite guardado',
+        message: `${key} fue aceptado por la API y la fila se reconcilió con el perfil guardado.`
       })
     } finally {
       setBusyDimensionKey(null)
@@ -141,7 +141,7 @@ export function ConsolePlanDetailPage() {
         await restorePersistedLimitProfile()
         setLimitFeedback({
           kind: 'error',
-          title: 'Limit reset failed',
+          title: 'No se pudo restablecer el límite',
           message: limitErrorMessage(caught)
         })
         return
@@ -155,16 +155,16 @@ export function ConsolePlanDetailPage() {
       }
       setLimitFeedback({
         kind: 'success',
-        title: 'Limit reset',
-        message: `${key} now reflects the default value returned by the API.`
+        title: 'Límite restablecido',
+        message: `${key} ahora refleja el valor predeterminado devuelto por la API.`
       })
     } finally {
       setBusyDimensionKey(null)
     }
   }
 
-  if (error) return <ConsolePageState kind="error" title="Failed to load plan" description={error} />
-  if (!plan) return <ConsolePageState kind="loading" title="Loading plan" description="Fetching plan detail." />
+  if (error) return <ConsolePageState kind="error" title="No se pudo cargar el plan" description={error} />
+  if (!plan) return <ConsolePageState kind="loading" title="Cargando plan" description="Consultando el detalle del plan." />
 
   const limitEditingEnabled = plan.status === 'draft' || plan.status === 'active'
 
@@ -174,10 +174,10 @@ export function ConsolePlanDetailPage() {
         <h1 className="text-2xl font-semibold">{plan.displayName}</h1>
         <PlanStatusBadge status={plan.status} />
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => setTab('info')}>Info</Button>
-          <Button type="button" variant="outline" onClick={() => setTab('capabilities')}>Capabilities</Button>
-          <Button type="button" variant="outline" onClick={() => setTab('limits')}>Limits</Button>
-          <Button type="button" variant="outline" onClick={() => setTab('tenants')}>Tenants</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('info')}>Información</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('capabilities')}>Capacidades</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('limits')}>Límites</Button>
+          <Button type="button" variant="outline" onClick={() => setTab('tenants')}>Asignaciones de organizaciones</Button>
         </div>
       </header>
 
@@ -223,7 +223,7 @@ export function ConsolePlanDetailPage() {
 
       {tab === 'tenants' ? (
         <section className="rounded-3xl border border-border bg-card/70 p-6">
-          Assigned tenant list is available from the tenant plan page.
+          La lista de organizaciones asignadas está disponible desde la página de plan de la organización.
         </section>
       ) : null}
     </main>

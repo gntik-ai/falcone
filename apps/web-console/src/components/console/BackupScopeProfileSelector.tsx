@@ -2,7 +2,7 @@ const PROFILES = [
   { key: 'all-in-one', label: 'All-in-One' },
   { key: 'standard', label: 'Standard' },
   { key: 'ha', label: 'HA' },
-  { key: 'all', label: 'All' }
+  { key: 'all', label: 'Todos' }
 ]
 
 export function BackupScopeProfileSelector({ value, onChange }: { value: string; onChange: (profile: string) => void }) {

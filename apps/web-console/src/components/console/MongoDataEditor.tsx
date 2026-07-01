@@ -29,7 +29,7 @@ export interface MongoDataEditorProps {
 
 function errorMessage(error: unknown): string {
   const candidate = error as Partial<ApiError>
-  return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
+  return typeof candidate?.message === 'string' ? candidate.message : 'La solicitud falló'
 }
 
 function documentId(doc: MongoDocument): string | undefined {
@@ -86,7 +86,7 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
     setError(null)
     const parsed = parseJsonObject(filterJson)
     if (!parsed.ok) {
-      setError(`Filter: ${parsed.error}`)
+      setError(`Filtro: ${parsed.error}`)
       return
     }
     setAppliedFilter(parsed.value)
@@ -159,14 +159,14 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
     setStatus(null)
     const parsed = parseJsonObject(newDocJson)
     if (!parsed.ok) {
-      setError(`New document: ${parsed.error}`)
+      setError(`Documento nuevo: ${parsed.error}`)
       return
     }
     setBusy(true)
     try {
       await insertDocument(workspaceId, databaseName, collectionName, parsed.value)
       setNewDocJson('{}')
-      setStatus('Document inserted')
+      setStatus('Documento insertado')
       await reload()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -178,7 +178,7 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
   function beginEdit(doc: MongoDocument) {
     const id = documentId(doc)
     if (id == null) {
-      setError('Document has no _id to edit by')
+      setError('El documento no tiene _id para editarlo')
       return
     }
     setError(null)
@@ -191,7 +191,7 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
     if (editingId == null) return
     const parsed = parseJsonObject(editJson)
     if (!parsed.ok) {
-      setError(`Edited document: ${parsed.error}`)
+      setError(`Documento editado: ${parsed.error}`)
       return
     }
     const { _id, id, ...update } = parsed.value
@@ -199,7 +199,7 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
     try {
       await updateDocument(workspaceId, databaseName, collectionName, editingId, update)
       setEditingId(null)
-      setStatus('Document updated')
+      setStatus('Documento actualizado')
       await reload()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -211,13 +211,13 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
   async function handleDelete(doc: MongoDocument) {
     const id = documentId(doc)
     if (id == null) {
-      setError('Document has no _id to delete by')
+      setError('El documento no tiene _id para eliminarlo')
       return
     }
     setBusy(true)
     try {
       await deleteDocument(workspaceId, databaseName, collectionName, id)
-      setStatus('Document deleted')
+      setStatus('Documento eliminado')
       await reload()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -227,28 +227,28 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
   }
 
   return (
-    <section aria-label="Mongo data editor">
+    <section aria-label="Editor de datos Mongo">
       <h2>
         {databaseName}.{collectionName}
       </h2>
       {error ? <p role="alert">{error}</p> : null}
       {status ? <p role="status">{status}</p> : null}
 
-      <div aria-label="Filter">
-        <h3>Filter</h3>
-        <label htmlFor="mongo-filter-json">Filter (MongoDB query JSON)</label>
+      <div aria-label="Filtro">
+        <h3>Filtro</h3>
+        <label htmlFor="mongo-filter-json">Filtro (consulta MongoDB en JSON)</label>
         <textarea id="mongo-filter-json" value={filterJson} onChange={(event) => setFilterJson(event.target.value)} />
         <button type="button" onClick={applyFilter}>
-          Apply filter
+          Aplicar filtro
         </button>
         <button type="button" onClick={clearFilter}>
-          Clear
+          Limpiar
         </button>
       </div>
 
-      <h3>Documents{docs.length > 0 ? ` (${docs.length})` : ''}</h3>
-      <div aria-label="Pagination">
-        <label htmlFor="mongo-page-size">Page size</label>
+      <h3>Documentos{docs.length > 0 ? ` (${docs.length})` : ''}</h3>
+      <div aria-label="Paginación">
+        <label htmlFor="mongo-page-size">Tamaño de página</label>
         <select id="mongo-page-size" value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
           {PAGE_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -257,26 +257,26 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
           ))}
         </select>
         <button type="button" onClick={prevPage} disabled={cursorStack.length === 0 || busy}>
-          Previous
+          Anterior
         </button>
         <button type="button" onClick={nextPage} disabled={!nextAfter || busy}>
-          Next
+          Siguiente
         </button>
       </div>
       {loading ? (
-        <p>Loading documents…</p>
+        <p>Cargando documentos…</p>
       ) : docs.length === 0 ? (
-        <p>No documents yet.</p>
+        <p>Todavía no hay documentos.</p>
       ) : (
         <ul>
           {docs.map((doc, index) => (
             <li key={documentId(doc) ?? index}>
               <code>{JSON.stringify(doc)}</code>
               <button type="button" onClick={() => beginEdit(doc)} disabled={busy}>
-                Edit
+                Editar
               </button>
               <button type="button" onClick={() => void handleDelete(doc)} disabled={busy}>
-                Delete
+                Eliminar
               </button>
             </li>
           ))}
@@ -284,48 +284,48 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
       )}
 
       {editingId != null ? (
-        <div aria-label="Edit document">
-          <h3>Edit document {editingId}</h3>
-          <label htmlFor="edit-doc-json">Document (JSON)</label>
+        <div aria-label="Editar documento">
+          <h3>Editar documento {editingId}</h3>
+          <label htmlFor="edit-doc-json">Documento (JSON)</label>
           <textarea id="edit-doc-json" value={editJson} onChange={(event) => setEditJson(event.target.value)} />
           <button type="button" onClick={() => void saveEdit()} disabled={busy}>
-            Save
+            Guardar
           </button>
           <button type="button" onClick={() => setEditingId(null)} disabled={busy}>
-            Cancel
+            Cancelar
           </button>
         </div>
       ) : null}
 
-      <h3>Insert document</h3>
-      <label htmlFor="new-doc-json">New document (JSON)</label>
+      <h3>Insertar documento</h3>
+      <label htmlFor="new-doc-json">Documento nuevo (JSON)</label>
       <textarea id="new-doc-json" value={newDocJson} onChange={(event) => setNewDocJson(event.target.value)} />
       <button type="button" onClick={() => void handleInsert()} disabled={busy}>
-        Insert
+        Insertar
       </button>
 
-      <h3>Anon-key embed</h3>
+      <h3>Embed con clave anónima</h3>
       <button type="button" onClick={() => void handleIssueKey()}>
-        Issue anon key
+        Emitir clave anónima
       </button>
       {issued ? (
-        <div role="status" aria-label="Anon-key embed">
-          <p>Copy this key now — it will not be shown again:</p>
+        <div role="status" aria-label="Embed con clave anónima">
+          <p>Copia esta clave ahora; no volverá a mostrarse:</p>
           <code>{issued.key}</code>
           <button type="button" onClick={() => void handleCopyKey()}>
-            {copied ? 'Copied!' : 'Copy key'}
+            {copied ? 'Copiada' : 'Copiar clave'}
           </button>
-          <h4>Embed (fetch)</h4>
+          <h4>Fragmento fetch</h4>
           <pre>{buildMongoFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}</pre>
-          <h4>Embed (curl)</h4>
+          <h4>Fragmento curl</h4>
           <pre>{buildMongoCurlSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}</pre>
           <button type="button" onClick={() => void handlePreviewEmbed()} disabled={previewBusy}>
-            Run read-only preview
+            Ejecutar vista previa de solo lectura
           </button>
           {previewError ? <p role="alert">{previewError}</p> : null}
           {previewDocs != null ? (
-            <div aria-label="Embed preview">
-              <p>Preview as this key — {previewDocs.length} document(s):</p>
+            <div aria-label="Vista previa de integración">
+              <p>Vista previa con esta clave: {previewDocs.length} documento(s).</p>
               <ul>
                 {previewDocs.map((doc, index) => (
                   <li key={documentId(doc) ?? index}>

@@ -81,7 +81,7 @@ describe('ConsoleWorkspaceSecretsPage', () => {
 
   it('shows a "select a workspace" empty state and issues NO request when no workspace is active', () => {
     renderPage(context({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
     expect(mockListSecrets).not.toHaveBeenCalled()
   })
 
@@ -184,11 +184,11 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     expect(await screen.findByTestId('workspace-secrets-create-error')).toHaveTextContent(/no tienes permisos/i)
   })
 
-  it('renders 501 SECRETS_BACKEND_DISABLED as a first-class backend-unavailable state', async () => {
+  it('renders 501 SECRETS_BACKEND_DISABLED as a first-class service-unavailable state', async () => {
     mockListSecrets.mockRejectedValue(apiError(501, 'SECRETS_BACKEND_DISABLED'))
     renderPage()
     expect(await screen.findByTestId('workspace-secrets-backend-disabled')).toBeInTheDocument()
-    expect(screen.getByText(/backend de secretos no disponible/i)).toBeInTheDocument()
+    expect(screen.getByText(/servicio de secretos no disponible/i)).toBeInTheDocument()
   })
 
   it('shows a production stage badge for a production-environment workspace', async () => {

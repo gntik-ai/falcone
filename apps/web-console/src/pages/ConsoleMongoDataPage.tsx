@@ -13,7 +13,7 @@ export function ConsoleMongoDataPage() {
   const [collectionName, setCollectionName] = useState('')
 
   if (!activeWorkspaceId) {
-    return <p className="text-sm text-muted-foreground">Select a workspace to edit data.</p>
+    return <p className="text-sm text-muted-foreground">Selecciona un área de trabajo para editar datos.</p>
   }
 
   const ready = databaseName.trim() !== '' && collectionName.trim() !== ''
@@ -21,15 +21,15 @@ export function ConsoleMongoDataPage() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Mongo data editor</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Query and edit documents in a collection.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Editor de datos Mongo</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Consulta y edita documentos en una colección.</p>
         <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="mongo-db">Database</Label>
+            <Label htmlFor="mongo-db">Base de datos</Label>
             <Input id="mongo-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} placeholder="catalog" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="mongo-collection">Collection</Label>
+            <Label htmlFor="mongo-collection">Colección</Label>
             <Input id="mongo-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="orders" />
           </div>
         </div>
@@ -41,7 +41,7 @@ export function ConsoleMongoDataPage() {
           collectionName={collectionName.trim()}
         />
       ) : (
-        <p className="text-sm text-muted-foreground">Enter a database and collection to begin.</p>
+        <p className="text-sm text-muted-foreground">Introduce una base de datos y una colección para comenzar.</p>
       )}
     </section>
   )

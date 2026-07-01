@@ -17,7 +17,7 @@ const FUNCTION_MEMORY_MIN_MB = 128
 const FUNCTION_MEMORY_MAX_MB = 2048
 const FUNCTION_TIMEOUT_MIN_MS = 1
 const FUNCTION_TIMEOUT_MAX_MS = 900000
-function WorkspaceStep({ data }: WizardStepProps<FnData>) { return <div><Label>Workspace</Label><p className="mt-2 text-sm">{data.workspaceId || 'Sin workspace activo'}</p></div> }
+function WorkspaceStep({ data }: WizardStepProps<FnData>) { return <div><Label>Área de trabajo</Label><p className="mt-2 text-sm">{data.workspaceId || 'Sin área de trabajo activa'}</p></div> }
 function MetaStep({ data, onChange, validation }: WizardStepProps<FnData>) {
   return (
     <div className="grid gap-4">
@@ -44,7 +44,7 @@ function RuntimeStep({ data, onChange, validation }: WizardStepProps<FnData>) {
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <div className="min-w-0 space-y-2">
-        <Label htmlFor="fn-runtime">Runtime</Label>
+        <Label htmlFor="fn-runtime">Entorno</Label>
         <Select
           id="fn-runtime"
           aria-invalid={Boolean(validation.fieldErrors.runtime) || undefined}
@@ -53,7 +53,7 @@ function RuntimeStep({ data, onChange, validation }: WizardStepProps<FnData>) {
           value={data.runtime ?? ''}
           onChange={(e) => onChange({ runtime: e.target.value })}
         >
-          <option value="">Selecciona runtime</option>
+          <option value="">Selecciona entorno</option>
           <option value="nodejs:18">nodejs:18</option>
           <option value="nodejs:20">nodejs:20</option>
         </Select>
@@ -81,7 +81,7 @@ function RuntimeStep({ data, onChange, validation }: WizardStepProps<FnData>) {
         ) : null}
       </div>
       <div className="min-w-0 space-y-2">
-        <Label htmlFor="fn-timeout">Timeout (ms)</Label>
+        <Label htmlFor="fn-timeout">Tiempo de espera (ms)</Label>
         <Input
           id="fn-timeout"
           inputMode="numeric"
@@ -119,9 +119,9 @@ function TriggerStep({ data, onChange, validation }: WizardStepProps<FnData>) {
 
 function validateRuntimeStep(data: Partial<FnData>) {
   const memoryMb = parseRequiredIntegerField(data.memoryMb, { label: 'Memoria', min: FUNCTION_MEMORY_MIN_MB, max: FUNCTION_MEMORY_MAX_MB })
-  const timeoutMs = parseRequiredIntegerField(data.timeoutMs, { label: 'Timeout', min: FUNCTION_TIMEOUT_MIN_MS, max: FUNCTION_TIMEOUT_MAX_MS })
+  const timeoutMs = parseRequiredIntegerField(data.timeoutMs, { label: 'Tiempo de espera', min: FUNCTION_TIMEOUT_MIN_MS, max: FUNCTION_TIMEOUT_MAX_MS })
   return createValidation({
-    ...(!data.runtime ? { runtime: 'Selecciona un runtime.' } : {}),
+    ...(!data.runtime ? { runtime: 'Selecciona un entorno.' } : {}),
     ...(memoryMb.error ? { memoryMb: memoryMb.error } : {}),
     ...(timeoutMs.error ? { timeoutMs: timeoutMs.error } : {})
   })
@@ -133,4 +133,4 @@ function requireFunctionLimit(value: string | undefined, label: string, min: num
   return parsed.value
 }
 
-export function PublishFunctionWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) { const { activeTenantId, activeWorkspaceId } = useConsoleContext(); const permission = useWizardPermissionCheck('publish_function'); const quota = useWizardQuotaCheck('functions.count', 'workspace', activeTenantId, activeWorkspaceId); if (!permission.allowed) return open ? <ConsolePageState kind="blocked" title="Acceso bloqueado" description={permission.reason ?? 'No permitido.'} /> : null; return <WizardShell<FnData> open={open} onOpenChange={onOpenChange} title="Publicar función" description="Publicación guiada de función serverless." context={{ tenantId: activeTenantId, workspaceId: activeWorkspaceId, principalRoles: [] }} initialData={{ workspaceId: activeWorkspaceId ?? '', memoryMb: '256', timeoutMs: '30000', route: '/fn/new' }} steps={[{ id: 'workspace', label: 'Workspace', component: WorkspaceStep, validate: (data) => createValidation(!data.workspaceId ? { workspaceId: 'Selecciona un workspace.' } : {}) },{ id: 'meta', label: 'Metadatos', component: MetaStep, validate: (data) => createValidation(!data.name?.trim() ? { name: 'El nombre es obligatorio.' } : {}, quota.available ? undefined : quota.reason ?? 'Sin cuota disponible.') },{ id: 'runtime', label: 'Runtime', component: RuntimeStep, validate: validateRuntimeStep },{ id: 'trigger', label: 'Trigger', component: TriggerStep, validate: (data) => createValidation(!(data.route ?? '').startsWith('/') ? { route: 'La ruta debe empezar por /.' } : {}) }]} buildSummary={(data) => [{ label: 'Workspace', value: data.workspaceId ?? '' },{ label: 'Nombre', value: data.name ?? '' },{ label: 'Descripción', value: data.description ?? '' },{ label: 'Runtime', value: data.runtime ?? '' },{ label: 'Memoria', value: data.memoryMb ?? '' },{ label: 'Timeout', value: data.timeoutMs ?? '' },{ label: 'Ruta', value: data.route ?? '' }]} onSubmit={async (data) => { const memoryMb = requireFunctionLimit(data.memoryMb, 'Memoria', FUNCTION_MEMORY_MIN_MB, FUNCTION_MEMORY_MAX_MB); const timeoutMs = requireFunctionLimit(data.timeoutMs, 'Timeout', FUNCTION_TIMEOUT_MIN_MS, FUNCTION_TIMEOUT_MAX_MS); const response = await submitWizardRequest<{ functionId: string }>(`/v1/workspaces/${data.workspaceId ?? activeWorkspaceId}/functions`, { name: data.name ?? '', description: data.description ?? '', runtime: data.runtime ?? '', limits: { memoryMb, timeoutMs }, trigger: { kind: 'http', route: data.route ?? '/fn/new' } }); return { resourceId: response.functionId, resourceUrl: '/console/functions' } }} /> }
+export function PublishFunctionWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) { const { activeTenantId, activeWorkspaceId } = useConsoleContext(); const permission = useWizardPermissionCheck('publish_function'); const quota = useWizardQuotaCheck('functions.count', 'workspace', activeTenantId, activeWorkspaceId); if (!permission.allowed) return open ? <ConsolePageState kind="blocked" title="Acceso bloqueado" description={permission.reason ?? 'No permitido.'} /> : null; return <WizardShell<FnData> open={open} onOpenChange={onOpenChange} title="Publicar función" description="Publicación guiada de función serverless." context={{ tenantId: activeTenantId, workspaceId: activeWorkspaceId, principalRoles: [] }} initialData={{ workspaceId: activeWorkspaceId ?? '', memoryMb: '256', timeoutMs: '30000', route: '/fn/new' }} steps={[{ id: 'workspace', label: 'Área de trabajo', component: WorkspaceStep, validate: (data) => createValidation(!data.workspaceId ? { workspaceId: 'Selecciona un área de trabajo.' } : {}) },{ id: 'meta', label: 'Metadatos', component: MetaStep, validate: (data) => createValidation(!data.name?.trim() ? { name: 'El nombre es obligatorio.' } : {}, quota.available ? undefined : quota.reason ?? 'Sin cuota disponible.') },{ id: 'runtime', label: 'Entorno', component: RuntimeStep, validate: validateRuntimeStep },{ id: 'trigger', label: 'Disparador', component: TriggerStep, validate: (data) => createValidation(!(data.route ?? '').startsWith('/') ? { route: 'La ruta debe empezar por /.' } : {}) }]} buildSummary={(data) => [{ label: 'Área de trabajo', value: data.workspaceId ?? '' },{ label: 'Nombre', value: data.name ?? '' },{ label: 'Descripción', value: data.description ?? '' },{ label: 'Entorno', value: data.runtime ?? '' },{ label: 'Memoria', value: data.memoryMb ?? '' },{ label: 'Tiempo de espera', value: data.timeoutMs ?? '' },{ label: 'Ruta', value: data.route ?? '' }]} onSubmit={async (data) => { const memoryMb = requireFunctionLimit(data.memoryMb, 'Memoria', FUNCTION_MEMORY_MIN_MB, FUNCTION_MEMORY_MAX_MB); const timeoutMs = requireFunctionLimit(data.timeoutMs, 'Tiempo de espera', FUNCTION_TIMEOUT_MIN_MS, FUNCTION_TIMEOUT_MAX_MS); const response = await submitWizardRequest<{ functionId: string }>(`/v1/workspaces/${data.workspaceId ?? activeWorkspaceId}/functions`, { name: data.name ?? '', description: data.description ?? '', runtime: data.runtime ?? '', limits: { memoryMb, timeoutMs }, trigger: { kind: 'http', route: data.route ?? '/fn/new' } }); return { resourceId: response.functionId, resourceUrl: '/console/functions' } }} /> }

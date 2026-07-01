@@ -373,7 +373,7 @@ export function ConsoleContextProvider({
         setActiveTenantId(null)
         setActiveWorkspaceId(null)
         setWorkspaces([])
-        setTenantsError(getConsoleContextErrorMessage(error, 'No se pudieron cargar los tenants accesibles.'))
+        setTenantsError(getConsoleContextErrorMessage(error, 'No se pudieron cargar las organizaciones accesibles.'))
       } finally {
         if (!cancelled) {
           setTenantsLoading(false)
@@ -430,7 +430,7 @@ export function ConsoleContextProvider({
 
         setWorkspaces([])
         setActiveWorkspaceId(null)
-        setWorkspacesError(getConsoleContextErrorMessage(error, 'No se pudieron cargar los workspaces del tenant seleccionado.'))
+        setWorkspacesError(getConsoleContextErrorMessage(error, 'No se pudieron cargar las áreas de trabajo de la organización seleccionada.'))
       } finally {
         if (!cancelled) {
           setWorkspacesLoading(false)
@@ -639,8 +639,8 @@ export function getConsoleTenantStatusMeta(tenant: ConsoleTenantOption | null): 
   if (!tenant) {
     return {
       tone: 'neutral',
-      label: 'Sin tenant activo',
-      description: 'Selecciona un tenant para conocer su estado operativo.'
+      label: 'Sin organización activa',
+      description: 'Selecciona una organización para conocer su estado operativo.'
     }
   }
 
@@ -650,24 +650,24 @@ export function getConsoleTenantStatusMeta(tenant: ConsoleTenantOption | null): 
   if (tenant.state === 'suspended' || tenant.state === 'deleted') {
     return {
       tone: 'restricted',
-      label: formatConsoleEnumLabel(tenant.state),
-      description: 'El tenant activo tiene operaciones restringidas.'
+      label: formatConsoleContextEnumLabel(tenant.state),
+      description: 'La organización activa tiene operaciones restringidas.'
     }
   }
 
   if (tenant.governanceStatus && ['suspended', 'retention', 'purge_pending'].includes(tenant.governanceStatus)) {
     return {
       tone: 'restricted',
-      label: formatConsoleEnumLabel(tenant.governanceStatus),
-      description: 'La gobernanza del tenant requiere atención inmediata.'
+      label: formatConsoleContextEnumLabel(tenant.governanceStatus),
+      description: 'La gobernanza de la organización requiere atención inmediata.'
     }
   }
 
   if (tenant.state === 'pending_activation') {
     return {
       tone: 'warning',
-      label: 'Pending activation',
-      description: 'El tenant todavía no está plenamente operativo.'
+      label: 'Activación pendiente',
+      description: 'La organización todavía no está plenamente operativa.'
     }
   }
 
@@ -675,22 +675,22 @@ export function getConsoleTenantStatusMeta(tenant: ConsoleTenantOption | null): 
     return {
       tone: 'restricted',
       label: 'Cuotas bloqueadas',
-      description: `Hay ${quotaBlocked} cuota${quotaBlocked === 1 ? '' : 's'} agotada${quotaBlocked === 1 ? '' : 's'} en el tenant activo.`
+      description: `Hay ${quotaBlocked} cuota${quotaBlocked === 1 ? '' : 's'} agotada${quotaBlocked === 1 ? '' : 's'} en la organización activa.`
     }
   }
 
   if (tenant.governanceStatus === 'warning' || quotaWarning > 0 || isProvisioningDegraded(tenant.provisioningStatus)) {
     return {
       tone: 'warning',
-      label: tenant.governanceStatus === 'warning' ? 'Warning' : 'Con atención',
-      description: 'El tenant está operativo, pero presenta señales que conviene revisar.'
+      label: tenant.governanceStatus === 'warning' ? 'Advertencia' : 'Con atención',
+      description: 'La organización está operativa, pero presenta señales que conviene revisar.'
     }
   }
 
   return {
     tone: 'healthy',
     label: 'Operativo',
-    description: 'Tenant activo y sin restricciones visibles en la consola.'
+    description: 'Organización activa y sin restricciones visibles en la consola.'
   }
 }
 
@@ -702,24 +702,24 @@ export function getConsoleWorkspaceStatusMeta(workspace: ConsoleWorkspaceOption 
   if (!workspace) {
     return {
       tone: 'neutral',
-      label: 'Sin workspace activo',
-      description: 'Selecciona un workspace para completar el contexto operativo.'
+      label: 'Sin área de trabajo activa',
+      description: 'Selecciona un área de trabajo para completar el contexto operativo.'
     }
   }
 
   if (workspace.state && ['suspended', 'soft_deleted', 'deleted'].includes(workspace.state)) {
     return {
       tone: 'restricted',
-      label: formatConsoleEnumLabel(workspace.state),
-      description: 'El workspace activo tiene operaciones restringidas.'
+      label: formatConsoleContextEnumLabel(workspace.state),
+      description: 'El área de trabajo activa tiene operaciones restringidas.'
     }
   }
 
   if (workspace.provisioningStatus === 'partially_failed') {
     return {
       tone: 'warning',
-      label: 'Provisioning parcial',
-      description: 'Algunos recursos del workspace podrían no estar disponibles.'
+      label: 'Aprovisionamiento parcial',
+      description: 'Algunos recursos del área de trabajo podrían no estar disponibles.'
     }
   }
 
@@ -730,14 +730,14 @@ export function getConsoleWorkspaceStatusMeta(workspace: ConsoleWorkspaceOption 
     return {
       tone: 'warning',
       label: 'Provisionando',
-      description: 'El workspace todavía no está listo para operar con normalidad.'
+      description: 'El área de trabajo todavía no está lista para operar con normalidad.'
     }
   }
 
   return {
     tone: 'healthy',
     label: 'Operativo',
-    description: 'Workspace listo para operar dentro del contexto activo.'
+    description: 'Área de trabajo lista para operar dentro del contexto activo.'
   }
 }
 
@@ -751,8 +751,8 @@ export function getConsoleOperationalAlerts(
     alerts.push({
       key: `tenant-state-${tenant.state}`,
       level: tenant.state === 'pending_activation' ? 'warning' : 'destructive',
-      title: `Tenant ${formatConsoleEnumLabel(tenant.state)}`,
-      description: 'El tenant activo no está completamente operativo y algunas acciones de la consola pueden fallar o quedar limitadas.'
+      title: `Organización ${formatConsoleContextEnumLabel(tenant.state)}`,
+      description: 'La organización activa no está completamente operativa y algunas acciones de la consola pueden fallar o quedar limitadas.'
     })
   }
 
@@ -760,8 +760,8 @@ export function getConsoleOperationalAlerts(
     alerts.push({
       key: `tenant-governance-${tenant.governanceStatus}`,
       level: tenant.governanceStatus === 'warning' ? 'warning' : 'destructive',
-      title: `Gobernanza del tenant: ${formatConsoleEnumLabel(tenant.governanceStatus)}`,
-      description: 'La gobernanza del tenant activo requiere atención antes de continuar con cambios operativos.'
+      title: `Gobernanza de la organización: ${formatConsoleContextEnumLabel(tenant.governanceStatus)}`,
+      description: 'La gobernanza de la organización activa requiere atención antes de continuar con cambios operativos.'
     })
   }
 
@@ -772,10 +772,10 @@ export function getConsoleOperationalAlerts(
     alerts.push({
       key: 'tenant-quota-blocked',
       level: 'destructive',
-      title: 'Cuotas agotadas en el tenant activo',
+      title: 'Cuotas agotadas en la organización activa',
       description: blockedLabel
         ? `Hay cuotas bloqueadas (${blockedLabel}${blockedItems.length > 2 ? ', …' : ''}) y algunas operaciones podrían ser rechazadas.`
-        : 'Al menos una cuota del tenant activo está agotada y puede bloquear operaciones.'
+        : 'Al menos una cuota de la organización activa está agotada y puede bloquear operaciones.'
     })
   }
 
@@ -783,8 +783,8 @@ export function getConsoleOperationalAlerts(
     alerts.push({
       key: `workspace-state-${workspace.state}`,
       level: ['suspended', 'soft_deleted', 'deleted'].includes(workspace.state) ? 'destructive' : 'warning',
-      title: `Workspace ${formatConsoleEnumLabel(workspace.state)}`,
-      description: 'El workspace activo no está plenamente disponible para operar desde la consola.'
+      title: `Área de trabajo ${formatConsoleContextEnumLabel(workspace.state)}`,
+      description: 'El área de trabajo activa no está plenamente disponible para operar desde la consola.'
     })
   }
 
@@ -792,15 +792,15 @@ export function getConsoleOperationalAlerts(
     alerts.push({
       key: 'workspace-provisioning-partially-failed',
       level: 'warning',
-      title: 'Provisioning del workspace incompleto',
-      description: 'El aprovisionamiento del workspace quedó parcialmente fallido y algunos recursos pueden no estar disponibles.'
+      title: 'Aprovisionamiento del área de trabajo incompleto',
+      description: 'El aprovisionamiento del área de trabajo quedó parcialmente fallido y algunos recursos pueden no estar disponibles.'
     })
   } else if (workspace?.provisioningStatus && isProvisioningPending(workspace.provisioningStatus)) {
     alerts.push({
       key: `workspace-provisioning-${workspace.provisioningStatus}`,
       level: 'warning',
-      title: 'Provisioning del workspace en curso',
-      description: 'El workspace activo todavía está terminando de aprovisionarse y puede responder de forma parcial.'
+      title: 'Aprovisionamiento del área de trabajo en curso',
+      description: 'El área de trabajo activa todavía está terminando de aprovisionarse y puede responder de forma parcial.'
     })
   }
 
@@ -814,6 +814,31 @@ export function formatConsoleEnumLabel(value: string | null | undefined): string
 
   const normalized = value.replace(/_/g, ' ')
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
+const consoleContextEnumLabels: Record<string, string> = {
+  active: 'Activo',
+  deleted: 'Eliminado',
+  draft: 'Borrador',
+  failed: 'Fallido',
+  nominal: 'Nominal',
+  partially_failed: 'Parcialmente fallido',
+  pending_activation: 'Activación pendiente',
+  provisioned: 'Aprovisionado',
+  provisioning: 'Aprovisionando',
+  purge_pending: 'Purga pendiente',
+  retention: 'Retención',
+  soft_deleted: 'Eliminado parcialmente',
+  suspended: 'Suspendido',
+  warning: 'Advertencia'
+}
+
+export function formatConsoleContextEnumLabel(value: string | null | undefined): string {
+  if (!value) {
+    return 'No disponible'
+  }
+
+  return consoleContextEnumLabels[value] ?? formatConsoleEnumLabel(value)
 }
 
 // Fetch the list of tenants accessible to the current user.

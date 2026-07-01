@@ -25,7 +25,7 @@ describe('ConnectionSnippets', () => {
   it('renderiza la sección para tipos soportados', () => {
     render(<ConnectionSnippets resourceType="postgres-database" context={SNIPPET_CTX_POSTGRES} />)
 
-    expect(screen.getByRole('heading', { name: 'Snippets de conexión' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getByText('Node.js — pg')).toBeInTheDocument()
   })
 
@@ -90,16 +90,17 @@ describe('ConnectionSnippets', () => {
     expect(screen.getByText(/selecciona y copia el bloque manualmente/i)).toBeInTheDocument()
   })
 
-  it('[RS-05] sin endpoint muestra placeholders y nota — RF-UI-029 / T05-AC5', () => {
+  it('[RS-05] sin punto de conexión muestra marcadores temporales y nota — RF-UI-029 / T05-AC5', () => {
     render(<ConnectionSnippets resourceType="postgres-database" context={SNIPPET_CTX_NO_ENDPOINT} />)
 
-    expect(screen.getByText(/si el endpoint aún no aparece en la consola/i)).toBeInTheDocument()
+    expect(screen.getByText(/si el punto de conexión aún no aparece en la consola/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/marcadores temporales descriptivos/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText((content) => content.includes('<RESOURCE_HOST>') || content.includes('<RESOURCE_PORT>')).length).toBeGreaterThan(0)
   })
 
   it('[RS-06] estado provisioning muestra advertencia — RF-UI-029 / T05-AC6', () => {
     render(<ConnectionSnippets resourceType="postgres-database" context={SNIPPET_CTX_PROVISIONING} />)
-    expect(screen.getAllByText(/recurso sigue provisionando|provisioning|endpoint aún no aparece/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/recurso sigue provisionando|provisioning|punto de conexión aún no aparece/i).length).toBeGreaterThan(0)
   })
 
   it('muestra advertencias y placeholders secretos sin fugas', () => {
@@ -131,7 +132,7 @@ describe('ConnectionSnippets', () => {
   it('aisla el contexto multi-tenant activo', () => {
     render(<ConnectionSnippets resourceType="postgres-database" context={SNIPPET_CTX_POSTGRES} />)
 
-    const section = screen.getByRole('heading', { name: 'Snippets de conexión' }).closest('section')
+    const section = screen.getByRole('heading', { name: 'Fragmentos de conexión' }).closest('section')
     expect(section).not.toBeNull()
     const scoped = within(section as HTMLElement)
     expect(scoped.queryByText(FIXTURE_TENANT_BETA.tenantId)).not.toBeInTheDocument()

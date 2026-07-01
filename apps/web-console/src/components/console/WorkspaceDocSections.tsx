@@ -21,15 +21,15 @@ export function WorkspaceDocSections({ enabledServices }: Props) {
 
   if (enabledServices.length === 0) {
     return (
-      <section aria-label="Workspace services" className="rounded-lg border p-4">
-        <p>No services enabled yet.</p>
-        <a href="/console/settings" className="underline">Ir a workspace settings</a>
+      <section aria-label="Servicios del área de trabajo" className="rounded-lg border p-4">
+        <p>Aún no hay servicios habilitados.</p>
+        <a href="/console/settings" className="underline">Ir a la configuración del área de trabajo</a>
       </section>
     )
   }
 
   return (
-    <section aria-label="Workspace services" className="space-y-4">
+    <section aria-label="Servicios del área de trabajo" className="space-y-4">
       {enabledServices.map((service) => {
         const selected = selectedTabs[service.serviceKey] ?? service.snippets[0]?.id
         const activeSnippet = service.snippets.find((snippet) => snippet.id === selected) ?? service.snippets[0]
@@ -39,7 +39,7 @@ export function WorkspaceDocSections({ enabledServices }: Props) {
             <summary className="cursor-pointer font-semibold">{service.label}</summary>
             <div className="mt-3 space-y-3">
               <p>Categoría: {service.category}</p>
-              <p>Endpoint: {service.endpoint}</p>
+              <p>Punto de conexión: {service.endpoint}</p>
               {service.port ? <p>Puerto: {service.port}</p> : null}
               <div className="flex gap-2 flex-wrap">
                 {service.snippets.map((snippet) => (
@@ -70,7 +70,7 @@ export function WorkspaceDocSections({ enabledServices }: Props) {
                       window.setTimeout(() => setCopiedId((current) => current === activeSnippet.id ? null : current), 2000)
                     }}
                   >
-                    {copiedId === activeSnippet.id ? 'Copied ✓' : 'Copy'}
+                    {copiedId === activeSnippet.id ? 'Copiado ✓' : 'Copiar'}
                   </button>
                   {activeSnippet.secretPlaceholderRef ? <p className="text-sm text-slate-500">{activeSnippet.secretPlaceholderRef}</p> : null}
                 </div>

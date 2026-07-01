@@ -59,14 +59,14 @@ export function evaluateConnection(
 ): ConnectionVerdict {
   const { source, target } = connection
   if (!source || !target) {
-    return { ok: false, code: 'INCOMPLETE', message: 'Connection must have a source and a target node.' }
+    return { ok: false, code: 'INCOMPLETE', message: 'La conexión debe tener un nodo origen y un nodo destino.' }
   }
 
   if (source === target) {
     return {
       ok: false,
       code: 'SELF_LOOP',
-      message: `Node "${source}" cannot connect to itself.`
+      message: `El nodo "${source}" no puede conectarse consigo mismo.`
     }
   }
 
@@ -76,7 +76,7 @@ export function evaluateConnection(
     return {
       ok: false,
       code: 'FLW-E002',
-      message: `Connecting "${source}" to "${target}" would create a cycle; the node graph must be acyclic (FLW-E002).`
+      message: `Conectar "${source}" con "${target}" crearía un ciclo; el grafo de nodos debe ser acíclico (FLW-E002).`
     }
   }
 
@@ -92,7 +92,7 @@ export function evaluateConnection(
       return {
         ok: false,
         code: 'BRANCH_ARM_ARITY',
-        message: `Branch handle "${sourceHandle}" of node "${source}" already has an outgoing connection.`
+        message: `El handle de rama "${sourceHandle}" del nodo "${source}" ya tiene una conexión saliente.`
       }
     }
   }
@@ -104,7 +104,7 @@ export function evaluateConnection(
       return {
         ok: false,
         code: 'NEXT_ARITY',
-        message: `Node "${source}" already has an outgoing connection; its type ("${sourceNode.type}") supports a single next step.`
+        message: `El nodo "${source}" ya tiene una conexión saliente; su tipo ("${sourceNode.type}") admite un solo siguiente paso.`
       }
     }
   }

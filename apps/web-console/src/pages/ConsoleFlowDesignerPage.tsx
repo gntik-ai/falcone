@@ -64,6 +64,13 @@ import {
 } from '@/services/flowsApi'
 import type { FlowDefinition, FlowNode, TaskTypeDescriptor, ValidationError } from '@/types/flows'
 
+const FLOW_STATUS_LABELS: Record<string, string> = {
+  archived: 'Archivado',
+  draft: 'Borrador',
+  failed: 'Fallido',
+  published: 'Publicado'
+}
+
 type DesignerNode = Node<FlowCanvasNodeData>
 
 function emptyDefinition(name: string): FlowDefinition {
@@ -90,6 +97,10 @@ function nodeDisplayLabel(dsl: FlowNode): string {
   if (dsl.type === 'task') return dsl.taskType
   if (dsl.type === 'sub-flow') return `${dsl.flowId}@${dsl.flowVersion}`
   return dsl.type
+}
+
+function formatFlowStatus(status?: string | null): string {
+  return status ? FLOW_STATUS_LABELS[status] ?? status : FLOW_STATUS_LABELS.draft
 }
 
 // Derive the DSL edge kind for a freshly drawn connection from the source node type and
@@ -158,7 +169,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       const loaded = await getFlow(workspaceId, flowId)
       resetFromRecord(loaded)
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Failed to load the flow')
+      setLoadError(error instanceof Error ? error.message : 'No se pudo cargar el flujo.')
     }
   }, [workspaceId, flowId, resetFromRecord])
 
@@ -290,7 +301,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
         // entry so the rejection is explained rather than silent.
         setInteractionProblems((current) => [
           ...current.slice(-4),
-          { code: verdict.code ?? 'CONNECTION_REJECTED', nodeId: connection.source, message: verdict.message ?? 'Connection rejected.' }
+          { code: verdict.code ?? 'CONNECTION_REJECTED', nodeId: connection.source, message: verdict.message ?? 'Conexión rechazada.' }
         ])
         return
       }
@@ -385,7 +396,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       )
       return error.message
     }
-    return error instanceof Error ? error.message : 'Request failed'
+    return error instanceof Error ? error.message : 'La solicitud falló'
   }, [])
 
   // When the YAML editor is the active surface the YAML buffer is the source of truth; resolve
@@ -406,7 +417,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     // invalid document. The stored draft keeps its last-valid value.
     const definitionToSave = resolveDefinitionToSave()
     if (definitionToSave === null) {
-      setLoadError('The YAML document is invalid — fix the highlighted errors before saving.')
+      setLoadError('El documento YAML no es válido; corrige los errores resaltados antes de guardar.')
       return false
     }
     setSaving(true)
@@ -482,7 +493,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
           role="status"
           data-testid="designer-yaml-degraded-banner"
         >
-          The YAML is invalid — the canvas keeps the last valid version and the draft will not be saved until you fix it.
+          El YAML no es válido; el lienzo conserva la última versión válida y el borrador no se guardará hasta que lo corrijas.
         </p>
       ) : null}
       <FlowYamlEditor
@@ -499,7 +510,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       <div className="space-y-2 p-6 text-sm">
         <p className="text-destructive">{loadError}</p>
         <Button size="sm" variant="outline" onClick={() => void load()}>
-          Retry
+          Reintentar
         </Button>
       </div>
     )
@@ -510,32 +521,32 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       <header className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
-            Flows
+            Flujos
           </Link>
           <span className="text-muted-foreground">/</span>
           <span className="max-w-[18rem] truncate text-sm font-semibold sm:max-w-[24rem]" title={record?.name ?? flowId}>
             {record?.name ?? flowId}
           </span>
           <Badge variant="outline" className="text-xs">
-            {record?.status ?? 'draft'}
+            {formatFlowStatus(record?.status)}
           </Badge>
           {publishedVersion !== null ? (
             <Badge className="text-xs" data-testid="published-version-badge">
-              v{publishedVersion} published
+              v{publishedVersion} publicada
             </Badge>
           ) : null}
           {dirty ? (
             <span data-testid="unsaved-changes-indicator" className="text-xs text-amber-600">
-              Unsaved changes
+              Cambios sin guardar
             </span>
           ) : savedAt ? (
             <span data-testid="saved-indicator" className="text-xs text-emerald-600">
-              Saved
+              Guardado
             </span>
           ) : null}
         </div>
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto">
-          <div className="flex w-full items-center gap-1 overflow-x-auto rounded-md border border-border bg-muted/30 p-1 sm:w-auto" role="tablist" aria-label="Flow view" data-testid="flow-view-switcher">
+          <div className="flex w-full items-center gap-1 overflow-x-auto rounded-md border border-border bg-muted/30 p-1 sm:w-auto" role="tablist" aria-label="Vista del flujo" data-testid="flow-view-switcher">
             {(['canvas', 'yaml', 'side-by-side'] as const).map((mode) => (
               <Button
                 key={mode}
@@ -548,28 +559,28 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
                 data-active={String(viewMode === mode)}
                 onClick={() => switchView(mode)}
               >
-                {mode === 'canvas' ? 'Canvas' : mode === 'yaml' ? 'YAML' : 'Side by side'}
+                {mode === 'canvas' ? 'Lienzo' : mode === 'yaml' ? 'YAML' : 'Lado a lado'}
               </Button>
             ))}
           </div>
-          <nav aria-label="Flow run navigation" className="flex w-full items-center sm:w-auto">
+          <nav aria-label="Navegación de ejecuciones del flujo" className="flex w-full items-center sm:w-auto">
             <Button size="sm" variant="secondary" className="w-full justify-start sm:w-auto sm:justify-center" asChild>
               <Link
                 to={`/console/flows/${encodeURIComponent(flowId)}/runs`}
-                aria-label={`View run history for ${record?.name ?? flowId}`}
+                aria-label={`Ver historial de ejecuciones para ${record?.name ?? flowId}`}
               >
                 <History className="h-4 w-4" aria-hidden="true" />
-                Run history
+                Historial de ejecuciones
               </Link>
             </Button>
           </nav>
           <div
             className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:border-l sm:border-border sm:pl-3"
             role="group"
-            aria-label="Draft actions"
+            aria-label="Acciones del borrador"
           >
             <Button size="sm" variant="ghost" className="flex-1 sm:flex-none" onClick={() => void revert()} disabled={saving || publishing}>
-              Revert
+              Revertir
             </Button>
             <Button
               size="sm"
@@ -579,17 +590,17 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
               disabled={saving || publishing}
               data-testid="save-draft-button"
             >
-              {saving ? 'Saving…' : 'Save draft'}
+              {saving ? 'Guardando…' : 'Guardar borrador'}
             </Button>
             <Button
               size="sm"
               className="flex-1 sm:flex-none"
               onClick={() => void publish()}
               disabled={publishing || saving || blockingErrors > 0}
-              title={blockingErrors > 0 ? 'Resolve the validation errors before publishing.' : undefined}
+              title={blockingErrors > 0 ? 'Resuelve los errores de validación antes de publicar.' : undefined}
               data-testid="publish-button"
             >
-              {publishing ? 'Publishing…' : 'Publish'}
+              {publishing ? 'Publicando…' : 'Publicar'}
             </Button>
           </div>
         </div>
@@ -600,7 +611,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       <div className="flex min-h-0 flex-1">
         <aside className="w-56 shrink-0 overflow-y-auto border-r border-border">
           <div className="px-3 pt-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Task types
+            Tipos de tarea
           </div>
           <FlowPalette workspaceId={workspaceId} onCatalogLoaded={setTaskTypes} />
         </aside>
@@ -629,10 +640,10 @@ export function ConsoleFlowDesignerPage() {
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId) {
-    return <p className="p-6 text-sm text-muted-foreground">Missing flow identifier.</p>
+    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo.</p>
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Select a workspace to open the designer.</p>
+    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para abrir el diseñador.</p>
   }
 
   return (

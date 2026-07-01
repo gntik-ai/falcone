@@ -70,7 +70,7 @@ export function ConsoleOperationsPage() {
     <section className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Operaciones</h1>
-        <p className="text-sm text-muted-foreground">Consulta el progreso y el resultado de las operaciones asíncronas del tenant activo.</p>
+        <p className="text-sm text-muted-foreground">Consulta el progreso y el resultado de las operaciones asíncronas de la organización activa.</p>
       </div>
 
       {shouldRenderReconnectSync ? <OperationStatusBanner delta={delta} onDismiss={() => setDelta(null)} /> : null}
@@ -118,9 +118,9 @@ export function ConsoleOperationsPage() {
         </label>
 
         <label className="space-y-2 text-sm">
-          <span className="font-medium text-foreground">Workspace</span>
+          <span className="font-medium text-foreground">Área de trabajo</span>
           <input
-            aria-label="Filtrar por workspace"
+            aria-label="Filtrar por área de trabajo"
             className="w-full rounded-xl border border-input bg-background px-3 py-2"
             placeholder="wrk_demo"
             value={workspaceId}
@@ -165,7 +165,7 @@ export function ConsoleOperationsPage() {
 
       {data && data.items.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-8 text-sm text-muted-foreground">
-          No hay operaciones registradas para este tenant.
+          No hay operaciones registradas para esta organización.
         </p>
       ) : null}
 
@@ -177,7 +177,7 @@ export function ConsoleOperationsPage() {
                 <th className="px-4 py-3 font-medium">Tipo de operación</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium">Actor</th>
-                <th className="px-4 py-3 font-medium">Workspace</th>
+                <th className="px-4 py-3 font-medium">Área de trabajo</th>
                 <th className="px-4 py-3 font-medium">Creada</th>
               </tr>
             </thead>

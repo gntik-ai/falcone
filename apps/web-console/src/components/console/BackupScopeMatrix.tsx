@@ -26,7 +26,7 @@ export function BackupScopeMatrix({ entries, isLoading }: { entries: BackupScope
   }
 
   if (entries.length === 0) {
-    return <div data-testid="matrix-empty" className="text-muted-foreground">No backup scope entries found.</div>
+    return <div data-testid="matrix-empty" className="text-muted-foreground">No se encontraron entradas de alcance de backup.</div>
   }
 
   return (
@@ -34,14 +34,14 @@ export function BackupScopeMatrix({ entries, isLoading }: { entries: BackupScope
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left">
-            <th className="sticky left-0 bg-background px-3 py-2 font-semibold">Component</th>
-            <th className="px-3 py-2 font-semibold">Profile</th>
-            <th className="px-3 py-2 font-semibold">Coverage</th>
-            <th className="px-3 py-2 font-semibold">Granularity</th>
+            <th className="sticky left-0 bg-background px-3 py-2 font-semibold">Componente</th>
+            <th className="px-3 py-2 font-semibold">Perfil</th>
+            <th className="px-3 py-2 font-semibold">Cobertura</th>
+            <th className="px-3 py-2 font-semibold">Granularidad</th>
             <th className="px-3 py-2 font-semibold">RPO</th>
             <th className="px-3 py-2 font-semibold">RTO</th>
-            <th className="px-3 py-2 font-semibold">Limits</th>
-            <th className="px-3 py-2 font-semibold">Status</th>
+            <th className="px-3 py-2 font-semibold">Límites</th>
+            <th className="px-3 py-2 font-semibold">Estado</th>
           </tr>
         </thead>
         <tbody>

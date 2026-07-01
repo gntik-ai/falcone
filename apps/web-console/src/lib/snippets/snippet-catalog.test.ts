@@ -30,6 +30,17 @@ describe('SNIPPET_CATALOG', () => {
     }
   })
 
+  it('mantiene las notas visibles sin términos de marcador en inglés', () => {
+    const visibleCopy = Object.values(SNIPPET_CATALOG)
+      .flat()
+      .flatMap((entry) => [entry.secretPlaceholderRef ?? '', ...(entry.fallbackNotes ?? [])])
+      .join('\n')
+
+    expect(visibleCopy).not.toMatch(/\bplaceholders?\b|\bendpoint\b|\bEndpoint\b|\bshell\b/)
+    expect(visibleCopy).toContain('marcadores temporales')
+    expect(visibleCopy).toContain('punto de conexión')
+  })
+
   it('define nueve snippets realtime completos y seguros', () => {
     const realtime = SNIPPET_CATALOG['realtime-subscription']
 

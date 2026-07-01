@@ -58,12 +58,12 @@ describe('ConsoleTenantPlanOverviewPage', () => {
       </MemoryRouter>
     )
 
-    expect(await screen.findByRole('status', { name: /no personal tenant plan/i })).toBeInTheDocument()
-    expect(screen.getByText(/platform-level account is not attached to a tenant/i)).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: /sin plan personal de organización/i })).toBeInTheDocument()
+    expect(screen.getByText(/cuenta de nivel plataforma no está asociada a una organización/i)).toBeInTheDocument()
     expect(screen.queryByText(/TENANT_NOT_FOUND/)).not.toBeInTheDocument()
     expect(getEffectiveEntitlementsMock).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: /open plan catalog/i }))
+    await user.click(screen.getByRole('button', { name: /abrir catálogo de planes/i }))
 
     expect(screen.getByRole('heading', { name: /plan catalog target/i })).toBeInTheDocument()
   })
@@ -73,9 +73,9 @@ describe('ConsoleTenantPlanOverviewPage', () => {
 
     render(<MemoryRouter><ConsoleTenantPlanOverviewPage /></MemoryRouter>)
 
-    expect(await screen.findByRole('status', { name: /no personal tenant plan/i })).toBeInTheDocument()
-    expect(screen.getByText(/tenant entitlements are reviewed from tenant-specific plan pages/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /open plan catalog/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: /sin plan personal de organización/i })).toBeInTheDocument()
+    expect(screen.getByText(/derechos de la organización se revisan desde páginas específicas/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /abrir catálogo de planes/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/TENANT_NOT_FOUND/)).not.toBeInTheDocument()
     expect(getEffectiveEntitlementsMock).not.toHaveBeenCalled()
   })
