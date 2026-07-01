@@ -23,6 +23,62 @@ const SIGNUP_PASSWORD_MIN_LENGTH = (() => {
 const ok = (statusCode, body) => ({ statusCode, body });
 const errBody = (statusCode, code, message) => ({ statusCode, body: { code, message, statusView: 'login' } });
 
+const CONSOLE_ACCOUNT_STATUS_VIEWS = Object.freeze({
+  login: Object.freeze({
+    statusView: 'login',
+    title: 'Inicia sesión en Falcone',
+    message: 'Usa tus credenciales de consola para acceder a tus tenants y workspaces.',
+    allowedActions: Object.freeze([
+      Object.freeze({ actionId: 'start_login', label: 'Iniciar sesión', target: '/login' }),
+      Object.freeze({ actionId: 'create_account', label: 'Crear cuenta', target: '/signup' })
+    ])
+  }),
+  signup: Object.freeze({
+    statusView: 'signup',
+    title: 'Crea tu cuenta de consola',
+    message: 'Completa el registro para solicitar acceso a Falcone o activar el alta configurada para tu tenant.',
+    allowedActions: Object.freeze([
+      Object.freeze({ actionId: 'create_account', label: 'Crear cuenta', target: '/signup' }),
+      Object.freeze({ actionId: 'start_login', label: 'Iniciar sesión', target: '/login' })
+    ])
+  }),
+  pending_activation: Object.freeze({
+    statusView: 'pending_activation',
+    title: 'Tu registro está pendiente de activación',
+    message: 'Hemos recibido tu solicitud de acceso, pero todavía necesita aprobación o activación antes de entrar en la consola.',
+    allowedActions: Object.freeze([
+      Object.freeze({ actionId: 'return_to_login', label: 'Volver a login', target: '/login' }),
+      Object.freeze({ actionId: 'review_signup', label: 'Revisar signup', target: '/signup' })
+    ])
+  }),
+  account_suspended: Object.freeze({
+    statusView: 'account_suspended',
+    title: 'Tu cuenta está suspendida',
+    message: 'El acceso a la consola está suspendido temporalmente para esta cuenta.',
+    allowedActions: Object.freeze([
+      Object.freeze({ actionId: 'return_to_login', label: 'Volver a login', target: '/login' })
+    ])
+  }),
+  credentials_expired: Object.freeze({
+    statusView: 'credentials_expired',
+    title: 'Tus credenciales han expirado',
+    message: 'Necesitas actualizar o recuperar tus credenciales antes de volver a entrar.',
+    allowedActions: Object.freeze([
+      Object.freeze({ actionId: 'recover_password', label: 'Recuperar contraseña', target: '/password-recovery' }),
+      Object.freeze({ actionId: 'return_to_login', label: 'Volver a login', target: '/login' })
+    ])
+  }),
+  password_recovery: Object.freeze({
+    statusView: 'password_recovery',
+    title: 'Recupera el acceso a tu cuenta',
+    message: 'Solicita instrucciones de recuperación para volver a acceder a la consola.',
+    allowedActions: Object.freeze([
+      Object.freeze({ actionId: 'recover_password', label: 'Recuperar contraseña', target: '/password-recovery' }),
+      Object.freeze({ actionId: 'return_to_login', label: 'Volver a login', target: '/login' })
+    ])
+  })
+});
+
 function decodeJwt(token) {
   try { const p = token.split('.')[1]; return JSON.parse(Buffer.from(p, 'base64url').toString()); } catch { return {}; }
 }
@@ -139,6 +195,29 @@ async function signupPolicy() {
   });
 }
 
+// GET /v1/auth/status-views/{statusViewId} (PUBLIC) — static console copy.
+// This endpoint is deliberately dependency-free: it returns the contract's
+// canonical status-view envelopes without touching Keycloak, the DB, or tenant
+// state, so public auth pages can load before a user has a session.
+async function getConsoleAccountStatusView(ctx) {
+  const statusViewId = ctx.params?.statusViewId;
+  const view = Object.prototype.hasOwnProperty.call(CONSOLE_ACCOUNT_STATUS_VIEWS, statusViewId)
+    ? CONSOLE_ACCOUNT_STATUS_VIEWS[statusViewId]
+    : null;
+  if (!view) {
+    return ok(404, {
+      code: 'STATUS_VIEW_NOT_FOUND',
+      message: `Unknown console account status view: ${statusViewId ?? ''}`
+    });
+  }
+  return ok(200, {
+    statusView: view.statusView,
+    title: view.title,
+    message: view.message,
+    allowedActions: view.allowedActions.map((action) => ({ ...action }))
+  });
+}
+
 // POST /v1/auth/signups  (PUBLIC) — self-service account creation in the
 // tenant's own iam_realm (NOT the shared platform realm). Resolves the tenant
 // by body.tenantId, validates that the tenant has a provisioned iam_realm,
@@ -194,4 +273,4 @@ async function signup(ctx) {
 // security-sensitive context: this id identifies the console session).
 function randomId() { return 'cs_' + randomUUID().replace(/-/g, ''); }
 
-export const AUTH_HANDLERS = { login, refresh, logout, signupPolicy, signup };
+export const AUTH_HANDLERS = { login, refresh, logout, signupPolicy, signup, getConsoleAccountStatusView };
