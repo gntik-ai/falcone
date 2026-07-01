@@ -333,6 +333,21 @@ describe('ConsoleShellLayout', () => {
     expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
   })
 
+  it('[#797] marca solo el destino de despliegue rápido como activo en /console/functions/data', async () => {
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/functions/data')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    const adminLink = within(navigation).getByRole('link', { name: /^funciones: administrar/i })
+    const quickDeployLink = within(navigation).getByRole('link', { name: /^funciones: despliegue rápido/i })
+
+    expect(adminLink).not.toHaveAttribute('aria-current', 'page')
+    expect(quickDeployLink).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { name: 'Funciones: despliegue rápido' })).toBeInTheDocument()
+  })
+
   it('muestra reintento cuando falla la carga de tenants y se recupera al reintentar', async () => {
     let tenantRequestCount = 0
 

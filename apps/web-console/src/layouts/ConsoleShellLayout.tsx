@@ -92,6 +92,7 @@ const consoleNavigationItems = [
     group: 'functions',
     label: 'Funciones: administrar',
     to: '/console/functions',
+    exactActive: true,
     icon: Workflow,
     description: 'Ciclo de vida serverless: inventario, versiones, activaciones, disparadores, despliegue y rollback.'
   },
@@ -516,6 +517,7 @@ function ConsoleNavigation() {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    end={'exactActive' in item ? item.exactActive : undefined}
                     className={({ isActive }) =>
                       cn(
                         'flex items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
