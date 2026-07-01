@@ -70,6 +70,18 @@ describe('router', () => {
     render(<RouterProvider router={realtimeRouter} />)
     expect(await screen.findByRole('heading', { name: /realtime workspace/i })).toBeInTheDocument()
   })
+
+  it('[#726] renderiza /password-recovery como ruta pública real, no como NotFound', async () => {
+    const router = createMemoryRouter(appRoutes, { initialEntries: ['/password-recovery'] })
+    render(<RouterProvider router={router} />)
+
+    expect(
+      await screen.findByRole('heading', { name: /recupera el acceso a in falcone console/i })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /enviar instrucciones/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /volver a login/i })).toHaveAttribute('href', '/login')
+    expect(screen.queryByRole('heading', { name: /página no encontrada/i })).not.toBeInTheDocument()
+  })
 })
 
 

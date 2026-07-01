@@ -293,7 +293,7 @@ export function LoginPage() {
               <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting ? consoleAuthConfig.labels.submitLoading : consoleAuthConfig.labels.submit}
               </Button>
-              <Button asChild type="button" variant="link" className="justify-start px-0 sm:justify-center">
+              <Button asChild variant="link" className="justify-start px-0 sm:justify-center">
                 <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
               </Button>
             </div>

@@ -115,6 +115,29 @@ export interface ConsoleSignupRegistration {
   }
 }
 
+export interface ConsolePasswordRecoveryRequest {
+  usernameOrEmail: string
+  deliveryChannel?: 'email'
+}
+
+export type ConsolePasswordRecoveryStatus = 'pending_delivery' | 'delivered' | 'completed' | 'expired'
+
+export interface HumanCredentialExpirationPolicy {
+  passwordMaxAge: string
+  gracePeriod: string
+  recoveryTokenTtl: string
+}
+
+export interface ConsolePasswordRecoveryTicket {
+  recoveryRequestId: string
+  status: ConsolePasswordRecoveryStatus
+  statusView: ConsoleStatusViewId
+  requestedAt: string
+  expiresAt: string
+  maskedDestination: string
+  credentialPolicy?: HumanCredentialExpirationPolicy
+}
+
 export interface ConsoleSessionTerminationRequest {
   refreshToken: string
 }
@@ -188,6 +211,21 @@ export async function createConsoleSignup(
   return requestJson<ConsoleSignupRegistration>('/v1/auth/signups', {
     method: 'POST',
     body: payload as unknown as Record<string, string>,
+    idempotent: true,
+    signal
+  })
+}
+
+export async function createConsolePasswordRecoveryRequest(
+  payload: ConsolePasswordRecoveryRequest,
+  signal?: AbortSignal
+): Promise<ConsolePasswordRecoveryTicket> {
+  return requestJson<ConsolePasswordRecoveryTicket>('/v1/auth/password-recovery-requests', {
+    method: 'POST',
+    body: {
+      usernameOrEmail: payload.usernameOrEmail,
+      deliveryChannel: payload.deliveryChannel ?? 'email'
+    },
     idempotent: true,
     signal
   })
