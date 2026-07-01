@@ -240,7 +240,9 @@ export function useConsoleMetrics(tenantId: string | null, workspaceId: string |
   const [reloadToken, setReloadToken] = useState(0)
 
   const reload = useCallback(() => setReloadToken((current) => current + 1), [])
-  const rangeKey = useMemo(() => JSON.stringify(range), [range])
+  const serializedRange = useMemo(() => JSON.stringify(range), [range])
+  const rangeKey = workspaceId ? serializedRange : 'tenant-scope'
+  const seriesWindow = workspaceId ? mapRangeToWindow(range) : null
 
   useEffect(() => {
     let cancelled = false
@@ -261,8 +263,8 @@ export function useConsoleMetrics(tenantId: string | null, workspaceId: string |
         const [overviewResponse, usageResponse, seriesResponse] = await Promise.all([
           requestConsoleSessionJson<OverviewResponse>(`${base}/overview`),
           requestConsoleSessionJson<UsageSnapshotResponse>(`${base}/usage`),
-          workspaceId
-            ? requestConsoleSessionJson<MetricSeriesResponse>(`${base}/series?metricKey=api_requests&window=${mapRangeToWindow(range)}`)
+          seriesWindow
+            ? requestConsoleSessionJson<MetricSeriesResponse>(`${base}/series?metricKey=api_requests&window=${seriesWindow}`)
             : Promise.resolve(null)
         ])
 
@@ -281,7 +283,7 @@ export function useConsoleMetrics(tenantId: string | null, workspaceId: string |
     return () => {
       cancelled = true
     }
-  }, [tenantId, workspaceId, rangeKey, reloadToken])
+  }, [tenantId, workspaceId, rangeKey, seriesWindow, reloadToken])
 
   return { overview, loading, error, reload }
 }

@@ -27,14 +27,34 @@ describe('ConsoleObservabilityPage', () => {
     mockExportAuditRecords.mockReset()
   })
 
-  it('renderiza métricas y cambia rango', async () => {
+  it('mantiene activo el rango temporal para métricas workspace', async () => {
     const user = userEvent.setup()
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleMetrics.mockReturnValue({ overview: { generatedAt: 'now', overallPosture: 'within_limit', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10, pctUsed: 50, policyMode: 'enforced', freshnessStatus: 'fresh' }], hasQuotaWarning: false }, loading: false, error: null, reload: vi.fn() })
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
     render(<ConsoleObservabilityPage />)
     expect(screen.getByText('API')).toBeInTheDocument()
+    expect(screen.getByLabelText(/rango temporal/i)).toBeEnabled()
+
     await user.selectOptions(screen.getByLabelText(/rango temporal/i), '7d')
+
+    await waitFor(() => {
+      expect(mockUseConsoleMetrics).toHaveBeenCalledWith('ten_1', 'wrk_1', expect.objectContaining({ preset: '7d' }))
+    })
+  })
+
+  it('marca el rango temporal como no aplicable en métricas tenant', () => {
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+    mockUseConsoleMetrics.mockReturnValue({ overview: { generatedAt: 'now', overallPosture: 'within_limit', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10, pctUsed: 50, policyMode: 'enforced', freshnessStatus: 'fresh' }], hasQuotaWarning: false }, loading: false, error: null, reload: vi.fn() })
+    mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+
+    render(<ConsoleObservabilityPage />)
+
+    const rangeSelect = screen.getByLabelText(/rango temporal/i)
+    expect(rangeSelect).toBeDisabled()
+    expect(screen.getByText(/no aplica al scope tenant/i)).toBeInTheDocument()
+    expect(screen.getByText(/selecciona un workspace/i)).toBeInTheDocument()
+    expect(mockUseConsoleMetrics).toHaveBeenCalledWith('ten_1', null, expect.objectContaining({ preset: '24h' }))
   })
 
   it('renderiza auditoría, detalle y exportación', async () => {

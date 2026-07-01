@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { exportAuditRecords, normalizeAuditRecord, normalizeMetricsOverview, useConsoleAuditRecords, useConsoleMetrics } from './console-metrics'
+import { exportAuditRecords, normalizeAuditRecord, normalizeMetricsOverview, useConsoleAuditRecords, useConsoleMetrics, type ConsoleMetricRange } from './console-metrics'
 
 const mockRequestConsoleSessionJson = vi.fn()
 vi.mock('@/lib/console-session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
@@ -23,12 +23,51 @@ describe('console-metrics', () => {
     expect(record.action.category).toBe('resource_creation')
   })
 
-  it('carga métricas tenant/workspace', async () => {
-    mockRequestConsoleSessionJson.mockResolvedValueOnce({ generatedAt: 'now', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10 }] })
-    mockRequestConsoleSessionJson.mockResolvedValueOnce({ measuredAt: 'now', dimensions: [] })
-    mockRequestConsoleSessionJson.mockResolvedValueOnce({ points: [{ timestamp: 'now', value: 5 }] })
-    const { result } = renderHook(() => useConsoleMetrics('ten_1', 'wrk_1', { preset: '7d' }))
+  it('carga métricas workspace con la ventana seleccionada', async () => {
+    mockRequestConsoleSessionJson.mockImplementation((url: string) => {
+      if (url.includes('/overview')) {
+        return Promise.resolve({ generatedAt: 'now', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10 }] })
+      }
+      if (url.includes('/series')) {
+        return Promise.resolve({ points: [{ timestamp: 'now', value: 5 }] })
+      }
+      return Promise.resolve({ measuredAt: 'now', dimensions: [] })
+    })
+    const { result, rerender } = renderHook(({ range }) => useConsoleMetrics('ten_1', 'wrk_1', range), {
+      initialProps: { range: { preset: '7d' } as ConsoleMetricRange }
+    })
     await waitFor(() => expect(result.current.overview?.dimensions[0]?.displayName).toBe('API'))
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/workspaces/wrk_1/series?metricKey=api_requests&window=7d')
+
+    mockRequestConsoleSessionJson.mockClear()
+    rerender({ range: { preset: '30d' } })
+    await waitFor(() => {
+      expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/metrics/workspaces/wrk_1/series?metricKey=api_requests&window=30d')
+    })
+  })
+
+  it('ignora cambios de rango en métricas tenant sin pedir series ni window', async () => {
+    mockRequestConsoleSessionJson.mockImplementation((url: string) => {
+      if (url.includes('/overview')) {
+        return Promise.resolve({ generatedAt: 'now', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10 }] })
+      }
+      return Promise.resolve({ measuredAt: 'now', dimensions: [] })
+    })
+
+    const { result, rerender } = renderHook(({ range }) => useConsoleMetrics('ten_1', null, range), {
+      initialProps: { range: { preset: '24h' } as ConsoleMetricRange }
+    })
+
+    await waitFor(() => expect(result.current.overview?.dimensions[0]?.displayName).toBe('API'))
+    const initialUrls = mockRequestConsoleSessionJson.mock.calls.map(([url]) => String(url))
+    expect(initialUrls).toEqual(['/v1/metrics/tenants/ten_1/overview', '/v1/metrics/tenants/ten_1/usage'])
+    expect(initialUrls.some((url) => url.includes('/series') || url.includes('window='))).toBe(false)
+
+    mockRequestConsoleSessionJson.mockClear()
+    rerender({ range: { preset: '7d' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mockRequestConsoleSessionJson).not.toHaveBeenCalled()
   })
 
   it('carga auditoría con filtros', async () => {
