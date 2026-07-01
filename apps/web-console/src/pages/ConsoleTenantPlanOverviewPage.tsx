@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { CapabilityStatusGrid } from '@/components/console/CapabilityStatusGrid'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
-import { readConsoleShellSession, type ConsoleShellSession } from '@/lib/console-session'
+import { getConsolePlatformRoles, isTenantlessPlatformPrincipal } from '@/lib/console-principal'
+import { readConsoleShellSession } from '@/lib/console-session'
 import * as api from '@/services/planManagementApi'
 
 export function ConsoleTenantPlanOverviewPage() {
   const navigate = useNavigate()
   const principal = readConsoleShellSession()?.principal
-  const platformRoles = getPlatformRoles(principal)
+  const platformRoles = getConsolePlatformRoles(principal)
   const tenantlessPlatformPrincipal = isTenantlessPlatformPrincipal(principal)
   const canOpenPlanCatalog = platformRoles.includes('superadmin')
   const [summary, setSummary] = useState<api.CurrentEffectiveEntitlementSummary | null>(null)
@@ -56,16 +57,4 @@ export function ConsoleTenantPlanOverviewPage() {
       <CapabilityStatusGrid capabilities={summary.capabilities.map((item) => ({ capabilityKey: item.capabilityKey, displayLabel: item.displayLabel ?? item.capabilityKey, enabled: item.enabled, source: 'plan' }))} />
     </main>
   )
-}
-
-function isTenantlessPlatformPrincipal(principal: ConsoleShellSession['principal'] | undefined): boolean {
-  const roles = getPlatformRoles(principal)
-  const tenantIds = Array.isArray(principal?.tenantIds) ? principal.tenantIds.filter(Boolean) : []
-  const isPlatformPrincipal = roles.includes('superadmin') || roles.includes('platform_admin') || roles.includes('platform_operator')
-
-  return isPlatformPrincipal && tenantIds.length === 0
-}
-
-function getPlatformRoles(principal: ConsoleShellSession['principal'] | undefined): string[] {
-  return Array.isArray(principal?.platformRoles) ? principal.platformRoles : []
 }

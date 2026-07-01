@@ -13,5 +13,7 @@ Capability gates use the selected tenant explicitly:
 
 `/console/my-plan` remains an own-tenant view for tenant users. For tenant-less platform principals it
 shows `No personal tenant plan` and does not call
-`GET /v1/tenant/plan/effective-entitlements`. Platform admins review or change a tenant's plan from
-`/console/tenants/{tenantId}/plan`.
+`GET /v1/tenant/plan/effective-entitlements`. `/console/my-plan/allocation` follows the same rule and
+does not call `GET /v1/tenant/plan/allocation-summary` for tenant-less platform principals. The
+tenant-specific plan page `/console/tenants/{tenantId}/plan` is a superadmin-only route; non-superadmin
+platform roles see the no-personal-plan state without a tenant-plan action.

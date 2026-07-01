@@ -22,6 +22,12 @@ raw backend error code.
 - **THEN** the page shows a clear no-personal-tenant-plan state, not the raw string
   `TENANT_NOT_FOUND`
 
+#### Scenario: Superadmin opens My Plan allocation summary
+
+- **WHEN** a superadmin opens `/console/my-plan/allocation`
+- **THEN** the page shows a clear no-personal-tenant-plan state and does not issue
+  `/v1/tenant/plan/allocation-summary` or show the raw string `TENANT_NOT_FOUND`
+
 #### Scenario: Tenant-less principal
 
 - **WHEN** the active principal has no tenant id

@@ -18,7 +18,9 @@
   no-active-tenant capability state settled to `{}` / not loading.
 - [x] 2.2 Change `/console/my-plan` to detect tenant-less platform principals before loading
   self-entitlements and render `No personal plan (platform admin)`.
-- [x] 2.3 Preserve tenant-user My Plan behavior.
+- [x] 2.3 Change `/console/my-plan/allocation` to use the same tenant-less platform-principal guard
+  before loading self-allocation summary data.
+- [x] 2.4 Preserve tenant-user My Plan behavior.
 
 ## 3. Tests, docs, and OpenSpec
 
@@ -26,9 +28,11 @@
   fetches `/v1/tenant/effective-capabilities`.
 - [x] 3.2 Add a focused My Plan test proving tenant-less platform admins see the no-personal-plan
   state, no raw `TENANT_NOT_FOUND`, and no self-entitlements call.
-- [x] 3.3 Keep tenant My Plan happy-path coverage.
-- [x] 3.4 Add/update docs for console self-tenant behavior and platform-admin My Plan.
-- [x] 3.5 Materialize this OpenSpec change under `openspec/changes/fix-749-superadmin-self-tenant-probes/`.
+- [x] 3.3 Add a focused My Plan allocation test proving tenant-less platform admins see the
+  no-personal-plan state, no raw `TENANT_NOT_FOUND`, and no self-allocation call.
+- [x] 3.4 Keep tenant My Plan happy-path coverage.
+- [x] 3.5 Add/update docs for console self-tenant behavior and platform-admin My Plan.
+- [x] 3.6 Materialize this OpenSpec change under `openspec/changes/fix-749-superadmin-self-tenant-probes/`.
 
 ## 4. Verification
 

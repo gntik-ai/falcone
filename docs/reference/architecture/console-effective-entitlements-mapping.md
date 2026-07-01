@@ -79,5 +79,6 @@ never crashes into the router error boundary.
 `platform_admin`, or `platform_operator` with no `tenantIds` in the console session) has no personal
 tenant plan, so the page must not call `GET /v1/tenant/plan/effective-entitlements`. It renders the
 empty state `No personal tenant plan` instead of surfacing the backend
-`TENANT_NOT_FOUND` code. Platform operators manage a tenant's entitlements from
-`/console/tenants/{tenantId}/plan`, which uses the tenant-id route above.
+`TENANT_NOT_FOUND` code. The tenant-specific plan page
+`/console/tenants/{tenantId}/plan` uses the tenant-id route above and is guarded by the console's
+superadmin route gate; non-superadmin platform roles do not get a link to that page from My Plan.
