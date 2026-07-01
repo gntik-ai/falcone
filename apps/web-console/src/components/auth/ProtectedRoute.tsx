@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
-import { ensureConsoleSession, readConsoleShellSession, storeProtectedRouteIntent } from '@/lib/console-session'
+import {
+  ensureConsoleSession,
+  readConsoleShellSession,
+  storeProtectedRouteIntent,
+  subscribeConsoleSessionInvalidated
+} from '@/lib/console-session'
 
 type GuardState = 'checking' | 'allowed' | 'denied'
 
 export function ProtectedRoute() {
   const location = useLocation()
+  const routeIntent = `${location.pathname}${location.search}${location.hash}`
   const [guardState, setGuardState] = useState<GuardState>('checking')
 
   useEffect(() => {
@@ -14,7 +20,7 @@ export function ProtectedRoute() {
 
     const initialSession = readConsoleShellSession()
     if (!initialSession) {
-      storeProtectedRouteIntent(`${location.pathname}${location.search}${location.hash}`)
+      storeProtectedRouteIntent(routeIntent)
       setGuardState('denied')
       return () => {
         active = false
@@ -32,7 +38,7 @@ export function ProtectedRoute() {
           return
         }
 
-        storeProtectedRouteIntent(`${location.pathname}${location.search}${location.hash}`)
+        storeProtectedRouteIntent(routeIntent)
         setGuardState('denied')
       })
       .catch(() => {
@@ -40,14 +46,21 @@ export function ProtectedRoute() {
           return
         }
 
-        storeProtectedRouteIntent(`${location.pathname}${location.search}${location.hash}`)
+        storeProtectedRouteIntent(routeIntent)
         setGuardState('denied')
       })
 
     return () => {
       active = false
     }
-  }, [location.hash, location.pathname, location.search])
+  }, [routeIntent])
+
+  useEffect(() => {
+    return subscribeConsoleSessionInvalidated(() => {
+      storeProtectedRouteIntent(routeIntent)
+      setGuardState('denied')
+    })
+  }, [routeIntent])
 
   if (guardState === 'checking') {
     return (
