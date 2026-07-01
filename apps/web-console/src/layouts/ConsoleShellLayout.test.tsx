@@ -65,7 +65,6 @@ describe('ConsoleShellLayout', () => {
 
     expect(await screen.findByRole('link', { name: /in falcone console/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /overview/i })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: /auth/i })).toHaveAttribute('href', '/console/auth')
     expect(screen.getByText(/operaciones plataforma/i)).toBeInTheDocument()
     expect(screen.getByTestId('console-shell-avatar')).toHaveTextContent('OP')
     expect(screen.getByLabelText(/contexto activo de consola/i)).toBeInTheDocument()
@@ -176,6 +175,25 @@ describe('ConsoleShellLayout', () => {
 
     const membersLink = await screen.findByRole('link', { name: /members/i })
     expect(membersLink).toHaveAttribute('href', '/console/members')
+  })
+
+  it('[#740] oculta Auth en la navegación para tenant_owner', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('link', { name: /overview/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^auth/i })).not.toBeInTheDocument()
+  })
+
+  it('[#740] mantiene Auth visible para superadmin', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['superadmin']))
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('link', { name: /^auth/i })).toHaveAttribute('href', '/console/auth')
   })
 
   it('renderiza el ítem PostgreSQL en el sidebar', async () => {
@@ -457,6 +475,14 @@ function createShellApiImplementation({
       return createJsonResponse(200, { items: tenants, page: {} })
     }
 
+    if (parsedUrl.pathname.startsWith('/v1/tenants/')) {
+      const tenantId = decodeURIComponent(parsedUrl.pathname.slice('/v1/tenants/'.length))
+      const tenant = tenants.find((item) => item.tenantId === tenantId)
+      return tenant
+        ? createJsonResponse(200, { tenant })
+        : createJsonResponse(404, { message: 'Tenant not found' })
+    }
+
     if (parsedUrl.pathname === '/v1/workspaces') {
       const tenantId = parsedUrl.searchParams.get('filter[tenantId]') ?? ''
       return createJsonResponse(200, { items: workspacesByTenant[tenantId] ?? [], page: {} })
@@ -527,6 +553,20 @@ function createJsonResponse(status: number, body: unknown) {
     headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => body
   } as Response
+}
+
+function createSessionWithRoles(
+  platformRoles: string[],
+  principalOverrides: Partial<typeof baseSession.principal> & { tenantIds?: string[]; workspaceIds?: string[] } = {}
+): typeof baseSession {
+  return {
+    ...baseSession,
+    principal: {
+      ...baseSession.principal,
+      platformRoles,
+      ...principalOverrides
+    }
+  }
 }
 
 
