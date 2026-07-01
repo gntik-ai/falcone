@@ -307,6 +307,34 @@ export const routes = [
     deps: ['db'],
     mergeQueryIntoParams: true,
   },
+
+  // ---- workspace consumption (provisioning-orchestrator) ------------------
+  // SELF: GET /v1/workspaces/{workspaceId}/consumption
+  //   ConsoleWorkspaceDashboardPage calls this route for the active workspace.
+  //   The action derives tenantId from the trusted callerContext actor when the
+  //   path has no tenant segment, matching the deployed kind runtime route map.
+  {
+    name: 'workspace-consumption-self',
+    pathRegex: /^\/v1\/workspaces\/(?<workspaceId>[^/]+)\/consumption\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+  },
+
+  // ADMIN/EXPLICIT: GET /v1/tenants/{tenantId}/workspaces/{workspaceId}/consumption
+  //   Existing explicit-tenant route remains available for superadmin and
+  //   tenant-scoped own-tenant reads; the action rejects cross-tenant attempts.
+  {
+    name: 'workspace-consumption-admin',
+    pathRegex: /^\/v1\/tenants\/(?<tenantId>[^/]+)\/workspaces\/(?<workspaceId>[^/]+)\/consumption\/?$/,
+    methods: ['GET'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+  },
 ];
 
 export function matchRoute(method, path) {

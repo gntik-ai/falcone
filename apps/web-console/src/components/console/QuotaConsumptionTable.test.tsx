@@ -10,6 +10,12 @@ describe('QuotaConsumptionTable', () => {
   it('renders rows and override indicator', () => {
     render(<QuotaConsumptionTable rows={rows} showOverrideDetails />)
     expect(screen.getByText('Workspaces')).toBeInTheDocument()
-    expect(screen.getByText('Override')).toBeInTheDocument()
+    expect(screen.getAllByText('Override').length).toBe(2)
+    expect(screen.getByText('Approaching limit')).toBeInTheDocument()
+  })
+
+  it('renders an empty table state when no quota dimensions are available', () => {
+    render(<QuotaConsumptionTable rows={[]} />)
+    expect(screen.getByText(/no quota dimensions were returned/i)).toBeInTheDocument()
   })
 })

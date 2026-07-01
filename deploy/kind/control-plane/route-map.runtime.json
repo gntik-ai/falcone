@@ -222,6 +222,16 @@
   },
   {
     "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/consumption",
+    "module": "/repo/services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs",
+    "export": "main",
+    "invoke": "callercontext-overrides",
+    "deps": ["db"],
+    "auth": "authenticated",
+    "notes": "self route used by ConsoleWorkspaceDashboardPage; derives tenantId from trusted callerContext.actor.tenantId and reads params.workspaceId"
+  },
+  {
+    "method": "GET",
     "path": "/v1/tenants/{tenantId}/workspaces/{workspaceId}/consumption",
     "module": "/repo/services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs",
     "export": "main",
