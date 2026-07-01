@@ -42,8 +42,15 @@ const IAM_ACCESS_ERROR_MESSAGES: Record<string, string> = {
   IAM_REMOVE_ROLE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
   IAM_GROUP_ADD_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
   IAM_GROUP_REMOVE_FAILED: 'No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.',
+  IAM_LIST_USERS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_ROLES_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_GROUPS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
+  IAM_LIST_CLIENTS_FAILED: 'No se pudo cargar el inventario IAM del tenant activo.',
   IAM_GET_USER_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
-  IAM_GET_ROLE_FAILED: 'No se pudo cargar la información de roles IAM.'
+  IAM_GET_ROLE_FAILED: 'No se pudo cargar la información de roles IAM.',
+  IAM_LIST_USER_ROLES_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
+  IAM_LIST_USER_GROUPS_FAILED: 'No se pudo cargar el detalle del usuario IAM.',
+  IAM_LIST_GROUP_MEMBERS_FAILED: 'No se pudo cargar la información del grupo IAM.'
 }
 
 const RAW_KEYCLOAK_ERROR_PATTERN = /\bkeycloak\s+[A-Z]+\s+\/realms\/|\/admin\/realms\/|\/realms\/|\{[^{}]*(?:"error"|"errorMessage")\s*:/i

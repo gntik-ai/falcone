@@ -21,11 +21,36 @@ function rawKeycloak404(method, path) {
 function assertSafeClientError(response, expectedCode) {
   assert.equal(response.statusCode, 404);
   assert.equal(response.body.code, expectedCode);
+  assert.notEqual(response.body.code, 'KEYCLOAK_ADMIN_REQUEST_FAILED');
   assert.equal(response.body.message, KEYCLOAK_ADMIN_SAFE_MESSAGE);
   assert.doesNotMatch(response.body.message, /keycloak\s/i);
   assert.doesNotMatch(response.body.message, /\/realms\//i);
   assert.doesNotMatch(response.body.message, /tenant-alpha/i);
   assert.doesNotMatch(response.body.message, new RegExp(RAW_BODY_TEXT, 'i'));
+}
+
+function tenantPool() {
+  return {
+    async query(sql, params) {
+      if (/FROM tenants WHERE iam_realm = \$1/.test(sql)) {
+        assert.deepEqual(params, ['tenant-alpha']);
+      } else if (/FROM tenants WHERE id = \$1 OR slug = \$1/.test(sql)) {
+        assert.deepEqual(params, ['tenant-alpha']);
+      } else {
+        assert.fail(`unexpected tenant lookup SQL: ${sql}`);
+      }
+      return {
+        rows: [{
+          id: 'tenant-alpha',
+          tenant_id: 'tenant-alpha',
+          slug: 'alpha',
+          display_name: 'Tenant Alpha',
+          status: 'active',
+          iam_realm: 'tenant-alpha',
+        }],
+      };
+    },
+  };
 }
 
 test('KeycloakAdminError keeps upstream diagnostics out of enumerable client-facing fields', () => {
@@ -65,25 +90,8 @@ test('superadmin IAM role assignment returns a sanitized domain error on upstrea
 });
 
 test('tenant admin own-realm IAM mutation returns a sanitized domain error on upstream Keycloak 404', async () => {
-  const pool = {
-    async query(sql, params) {
-      assert.match(sql, /FROM tenants WHERE iam_realm = \$1/);
-      assert.deepEqual(params, ['tenant-alpha']);
-      return {
-        rows: [{
-          id: 'tenant-alpha',
-          tenant_id: 'tenant-alpha',
-          slug: 'alpha',
-          display_name: 'Tenant Alpha',
-          status: 'active',
-          iam_realm: 'tenant-alpha',
-        }],
-      };
-    },
-  };
-
   const response = await LOCAL_HANDLERS.iamSetUserStatus({
-    pool,
+    pool: tenantPool(),
     params: { realmId: 'tenant-alpha', userId: 'missing-user' },
     body: { enabled: false },
     identity: { sub: 'tenant-admin-1', actorType: 'tenant_admin', tenantId: 'tenant-alpha' },
@@ -95,4 +103,66 @@ test('tenant admin own-realm IAM mutation returns a sanitized domain error on up
   });
 
   assertSafeClientError(response, 'SET_USER_STATUS_FAILED');
+});
+
+test('superadmin IAM role list returns a sanitized domain error on upstream Keycloak 404', async () => {
+  const response = await LOCAL_HANDLERS.iamListRoles({
+    params: { realmId: 'tenant-alpha' },
+    query: {},
+    identity: { sub: 'superadmin-1', actorType: 'superadmin' },
+    kcAdmin: {
+      async listRealmRoles() {
+        throw rawKeycloak404('GET', '/realms/tenant-alpha/roles');
+      },
+    },
+  });
+
+  assertSafeClientError(response, 'IAM_LIST_ROLES_FAILED');
+});
+
+test('tenant admin tenant-user list returns a sanitized domain error on upstream Keycloak 404', async () => {
+  const response = await LOCAL_HANDLERS.listTenantUsers({
+    pool: tenantPool(),
+    params: { tenantId: 'tenant-alpha' },
+    query: {},
+    identity: { sub: 'tenant-admin-1', actorType: 'tenant_admin', tenantId: 'tenant-alpha' },
+    kcAdmin: {
+      async listUsers() {
+        throw rawKeycloak404('GET', '/realms/tenant-alpha/users');
+      },
+    },
+  });
+
+  assertSafeClientError(response, 'IAM_LIST_TENANT_USERS_FAILED');
+});
+
+test('tenant admin own-realm IAM user list returns a sanitized domain error on upstream Keycloak 404', async () => {
+  const response = await LOCAL_HANDLERS.iamListUsers({
+    pool: tenantPool(),
+    params: { realmId: 'tenant-alpha' },
+    query: {},
+    identity: { sub: 'tenant-admin-1', actorType: 'tenant_admin', tenantId: 'tenant-alpha' },
+    kcAdmin: {
+      async listUsers() {
+        throw rawKeycloak404('GET', '/realms/tenant-alpha/users');
+      },
+    },
+  });
+
+  assertSafeClientError(response, 'IAM_LIST_USERS_FAILED');
+});
+
+test('superadmin IAM user-group list returns a sanitized domain error on upstream Keycloak 404', async () => {
+  const response = await LOCAL_HANDLERS.iamListUserGroups({
+    params: { realmId: 'tenant-alpha', userId: 'missing-user' },
+    query: {},
+    identity: { sub: 'superadmin-1', actorType: 'superadmin' },
+    kcAdmin: {
+      async listUserGroups() {
+        throw rawKeycloak404('GET', '/realms/tenant-alpha/users/missing-user/groups');
+      },
+    },
+  });
+
+  assertSafeClientError(response, 'IAM_LIST_USER_GROUPS_FAILED');
 });

@@ -254,7 +254,10 @@ async function listTenantUsers(ctx) {
   const t = await store.getTenant(pool, params.tenantId);
   if (!t) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
   if (!canManageTenant(identity, t)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin of this tenant');
-  const users = await kcAdmin.listUsers(t.iam_realm, { max: Number(params.max ?? ctx.query.max ?? 100) });
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  let users;
+  try { users = await kc.listUsers(t.iam_realm, { max: Number(params.max ?? ctx.query.max ?? 100) }); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_TENANT_USERS_FAILED'); }
   return ok(200, {
     items: users.map((u) => ({ id: u.id, username: u.username, email: u.email, enabled: u.enabled,
       firstName: u.firstName, lastName: u.lastName, createdTimestamp: u.createdTimestamp })),
@@ -858,7 +861,9 @@ async function iamListUsers(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
   const realm = ctx.params.realmId;
   const max = Number(ctx.query['page[size]'] ?? ctx.query.max ?? 200) || 200;
-  const users = await kc.listUsers(realm, { max });
+  let users;
+  try { users = await kc.listUsers(realm, { max }); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_USERS_FAILED'); }
   const items = await Promise.all(users.map(async (u) => {
     let realmRoles = [];
     try {
@@ -956,7 +961,9 @@ async function iamCreateUser(ctx) {
 }
 async function iamListRoles(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
-  const roles = await kc.listRealmRoles(ctx.params.realmId);
+  let roles;
+  try { roles = await kc.listRealmRoles(ctx.params.realmId); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_ROLES_FAILED'); }
   const items = roles.map((r) => ({
     id: r.id, name: r.name, roleName: r.name, realmId: ctx.params.realmId,
     description: r.description ?? null, composite: Boolean(r.composite), compositeRoles: [],
@@ -976,7 +983,9 @@ async function iamCreateRole(ctx) {
 }
 async function iamListGroups(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
-  const groups = await kc.listGroups(ctx.params.realmId);
+  let groups;
+  try { groups = await kc.listGroups(ctx.params.realmId); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_GROUPS_FAILED'); }
   return ok(200, { items: groups.map((g) => ({ id: g.id, name: g.name, path: g.path })), total: groups.length });
 }
 async function iamCreateGroup(ctx) {
@@ -991,7 +1000,9 @@ async function iamCreateGroup(ctx) {
 }
 async function iamListClients(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
-  const clients = await kc.listClients(ctx.params.realmId);
+  let clients;
+  try { clients = await kc.listClients(ctx.params.realmId); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_CLIENTS_FAILED'); }
   return ok(200, { items: clients.map((c) => ({ id: c.id, clientId: c.clientId, enabled: c.enabled, publicClient: c.publicClient, serviceAccountsEnabled: c.serviceAccountsEnabled })), total: clients.length });
 }
 
@@ -1235,7 +1246,9 @@ async function listFunctionsHandler(ctx) {
 // ---- fine-grained IAM: role assignment + group membership ------------------
 async function iamListUserRoles(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
-  const roles = await kc.listUserRealmRoles(ctx.params.realmId, ctx.params.userId);
+  let roles;
+  try { roles = await kc.listUserRealmRoles(ctx.params.realmId, ctx.params.userId); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_USER_ROLES_FAILED'); }
   return ok(200, { items: roles.map((r) => ({ id: r.id, name: r.name, description: r.description })), total: roles.length });
 }
 async function iamAssignUserRoles(ctx) {
@@ -1256,12 +1269,16 @@ async function iamRemoveUserRoles(ctx) {
 }
 async function iamListGroupMembers(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
-  const members = await kc.listGroupMembers(ctx.params.realmId, ctx.params.groupId, { max: Number(ctx.query.max ?? 200) });
+  let members;
+  try { members = await kc.listGroupMembers(ctx.params.realmId, ctx.params.groupId, { max: Number(ctx.query.max ?? 200) }); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_GROUP_MEMBERS_FAILED'); }
   return ok(200, { items: members.map((u) => ({ id: u.id, username: u.username, email: u.email, enabled: u.enabled })), total: members.length });
 }
 async function iamListUserGroups(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
-  const groups = await kc.listUserGroups(ctx.params.realmId, ctx.params.userId);
+  let groups;
+  try { groups = await kc.listUserGroups(ctx.params.realmId, ctx.params.userId); }
+  catch (e) { return kcBackedErr(e, 'IAM_LIST_USER_GROUPS_FAILED'); }
   return ok(200, { items: groups.map((g) => ({ id: g.id, name: g.name, path: g.path })), total: groups.length });
 }
 async function iamAddUserToGroup(ctx) {
