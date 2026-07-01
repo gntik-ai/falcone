@@ -52,7 +52,7 @@ export function QuotaConsumptionTable({ rows, showOverrideDetails = false, title
   return (
     <div className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm sm:p-5">
       <table className="w-full text-left text-sm" aria-label={title}>
-        <caption className="mb-3 block text-left text-base font-semibold tracking-tight text-foreground">{title}</caption>
+        <caption className="mb-3 block text-left text-base font-semibold text-foreground">{title}</caption>
         <thead className="sr-only md:not-sr-only md:table-header-group">
           <tr className="border-b border-border text-xs font-medium uppercase text-muted-foreground">
             <th scope="col" className="px-3 py-2">Dimension</th>
@@ -73,25 +73,25 @@ export function QuotaConsumptionTable({ rows, showOverrideDetails = false, title
           {rows.map((row) => (
             <tr key={row.dimensionKey} className="mb-3 block rounded-2xl border border-border/70 bg-background/50 p-3 align-top last:mb-0 md:mb-0 md:table-row md:rounded-none md:border-t md:border-border md:bg-transparent md:p-0">
               <td className="block min-w-0 px-0 py-2 md:table-cell md:px-3 md:py-3">
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground md:hidden">Dimension</span>
+                <span className="mb-1 block text-[11px] font-medium uppercase text-muted-foreground md:hidden">Dimension</span>
                 <div className="break-words font-medium text-foreground">{row.displayLabel}</div>
                 {showOverrideDetails && row.source === 'override' && row.originalPlanValue !== undefined && row.originalPlanValue !== null ? <div className="mt-2"><OverrideIndicatorBadge overriddenFromValue={row.originalPlanValue} overrideValue={row.effectiveValue} /></div> : null}
               </td>
               <td className="block min-w-0 px-0 py-2 md:table-cell md:px-3 md:py-3">
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground md:hidden">Limit</span>
+                <span className="mb-1 block text-[11px] font-medium uppercase text-muted-foreground md:hidden">Limit</span>
                 <span className="font-mono text-sm text-foreground">{row.effectiveValue === -1 ? 'Unlimited' : row.effectiveValue}</span>
               </td>
               <td className="block min-w-0 px-0 py-2 md:table-cell md:px-3 md:py-3">
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground md:hidden">Source</span>
+                <span className="mb-1 block text-[11px] font-medium uppercase text-muted-foreground md:hidden">Source</span>
                 <div className="flex flex-wrap gap-2"><Badge variant="outline">{sourceLabels[row.source]}</Badge></div>
               </td>
               <td className="block min-w-0 px-0 py-2 md:table-cell md:min-w-[9rem] md:px-3 md:py-3">
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground md:hidden">Consumption</span>
+                <span className="mb-1 block text-[11px] font-medium uppercase text-muted-foreground md:hidden">Consumption</span>
                 <ConsumptionBar current={row.currentUsage} limit={row.effectiveValue} label={`${row.displayLabel} consumption`} />
                 {row.usageStatus === 'unknown' ? <div className="mt-1 text-xs text-muted-foreground">Data unavailable</div> : null}
               </td>
               <td className="block min-w-0 px-0 py-2 md:table-cell md:min-w-[10rem] md:px-3 md:py-3">
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground md:hidden">Status</span>
+                <span className="mb-1 block text-[11px] font-medium uppercase text-muted-foreground md:hidden">Status</span>
                 <div className="flex flex-wrap gap-2"><UsageStatusBadge status={row.usageStatus} label={row.displayLabel} /></div>
               </td>
             </tr>

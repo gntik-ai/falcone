@@ -74,7 +74,7 @@ export function ConsoleWorkspaceDashboardPage() {
           <div className="min-w-0 space-y-2">
             <Badge variant="outline">Workspace</Badge>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Workspace dashboard</h1>
+              <h1 className="text-2xl font-semibold text-foreground">Workspace dashboard</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                 Consumption and inherited capabilities for this workspace.
               </p>
@@ -82,15 +82,15 @@ export function ConsoleWorkspaceDashboardPage() {
           </div>
           <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-3 lg:gap-4">
             <div className="min-w-0 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
-              <dt className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Workspace</dt>
+              <dt className="text-[11px] font-medium uppercase text-muted-foreground">Workspace</dt>
               <dd className="mt-1 break-all font-mono text-sm text-foreground">{data.workspaceId}</dd>
             </div>
             <div className="min-w-0 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
-              <dt className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Tenant</dt>
+              <dt className="text-[11px] font-medium uppercase text-muted-foreground">Tenant</dt>
               <dd className="mt-1 break-all font-mono text-sm text-foreground">{data.tenantId}</dd>
             </div>
             <div className="min-w-0 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
-              <dt className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Snapshot</dt>
+              <dt className="text-[11px] font-medium uppercase text-muted-foreground">Snapshot</dt>
               <dd className="mt-1 text-sm text-foreground">
                 <time dateTime={data.snapshotAt}>{formatDateTime(data.snapshotAt)}</time>
               </dd>

@@ -12,7 +12,7 @@ export function CapabilityStatusGrid({ capabilities }: { capabilities: Array<{ c
 
   return (
     <section className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm sm:p-5" aria-labelledby={headingId}>
-      <h2 id={headingId} className="mb-3 text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+      <h2 id={headingId} className="mb-3 text-base font-semibold text-foreground">Capabilities</h2>
       {capabilities.length === 0 ? (
         <p role="status" className="text-sm text-muted-foreground">No inherited capabilities were returned.</p>
       ) : (
