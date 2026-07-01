@@ -92,6 +92,7 @@ test('fix-728-02: pending_activation status view returns ConsoleAccountStatusVie
   const res = await handler({ params: { statusViewId: 'pending_activation' } });
   assert.equal(res.statusCode, 200);
   assertConsoleStatusViewShape(res.body, 'pending_activation');
+  assert.deepEqual(res.body.allowedActions, [], 'pending_activation lets the web console render page-specific actions');
 });
 
 test('fix-728-03: every contract ConsoleStatusViewId resolves through the public status-view handler', async () => {

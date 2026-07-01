@@ -46,10 +46,9 @@ const CONSOLE_ACCOUNT_STATUS_VIEWS = Object.freeze({
     statusView: 'pending_activation',
     title: 'Tu registro está pendiente de activación',
     message: 'Hemos recibido tu solicitud de acceso, pero todavía necesita aprobación o activación antes de entrar en la consola.',
-    allowedActions: Object.freeze([
-      Object.freeze({ actionId: 'return_to_login', label: 'Volver a login', target: '/login' }),
-      Object.freeze({ actionId: 'review_signup', label: 'Revisar signup', target: '/signup' })
-    ])
+    // PendingActivationPage already owns the login/signup escape actions, and
+    // LoginPage has a pending-state fallback that links to that page.
+    allowedActions: Object.freeze([])
   }),
   account_suspended: Object.freeze({
     statusView: 'account_suspended',

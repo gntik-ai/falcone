@@ -21,15 +21,15 @@ and the response body as `ConsoleAccountStatusView`:
   "statusView": "pending_activation",
   "title": "Tu registro está pendiente de activación",
   "message": "Hemos recibido tu solicitud de acceso, pero todavía necesita aprobación o activación antes de entrar en la consola.",
-  "allowedActions": [
-    {
-      "actionId": "return_to_login",
-      "label": "Volver a login",
-      "target": "/login"
-    }
-  ]
+  "allowedActions": []
 }
 ```
+
+The pending-activation status view intentionally returns no canonical action
+links. `PendingActivationPage` already renders the concrete login/signup escape
+actions for the clean-load page, while `LoginPage` falls back to its
+`/signup/pending-activation` link when a login attempt is rejected because the
+account is still pending activation.
 
 ## Runtime route
 
