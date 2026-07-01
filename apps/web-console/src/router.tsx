@@ -48,6 +48,7 @@ import { ConsoleSecretsPage } from '@/pages/ConsoleSecretsPage'
 import { ConsoleSecretRotationPage } from '@/pages/ConsoleSecretRotationPage'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { SignupPage } from '@/pages/SignupPage'
+import { consoleAuthConfig } from '@/lib/console-config'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
 import { useConsoleContext } from '@/lib/console-context'
@@ -115,7 +116,7 @@ export const appRoutes = [
     element: <LoginPage />
   },
   {
-    path: '/password-recovery',
+    path: consoleAuthConfig.passwordRecoveryPath,
     element: <PasswordRecoveryPage />
   },
   {

@@ -2,12 +2,13 @@
 
 The web console login page exposes the password-recovery entry point configured by
 `consoleAuthConfig.passwordRecoveryPath`, which defaults to `/password-recovery`.
-That route is public and unauthenticated, like `/login` and `/signup`.
+The router registers that same configured path as a public and unauthenticated route,
+like `/login` and `/signup`.
 
 ## Route behavior
 
-`/password-recovery` renders `PasswordRecoveryPage` instead of falling through to
-the root NotFound route. The page provides:
+The configured recovery path renders `PasswordRecoveryPage` instead of falling
+through to the root NotFound route. The page provides:
 
 - A username-or-email field that maps to the published public auth contract field
   `usernameOrEmail`.
