@@ -3,6 +3,7 @@ import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { LoginPage } from './LoginPage'
+import { PasswordRecoveryPage } from './PasswordRecoveryPage'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -24,7 +25,25 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /mantener la sesión abierta/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })).toHaveAttribute('href', '/password-recovery')
+    const recoveryLink = screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })
+    expect(recoveryLink).toHaveAttribute('href', '/password-recovery')
+    expect(recoveryLink).not.toHaveAttribute('type')
+  })
+
+  it('[#726] navega desde el enlace de contraseña olvidada hasta una vista real de recuperación', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+
+    fireEvent.click(await screen.findByRole('link', { name: /¿olvidaste tu contraseña\?/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /recupera el acceso a in falcone console/i })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /enviar instrucciones/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /volver a login/i })).toHaveAttribute('href', '/login')
+    expect(screen.queryByRole('heading', { name: /página no encontrada/i })).not.toBeInTheDocument()
   })
 
   it('muestra el CTA de signup cuando la policy lo permite', async () => {
@@ -165,6 +184,10 @@ function renderLoginPage(initialEntry = '/login') {
       {
         path: '/login',
         element: <LoginPage />
+      },
+      {
+        path: '/password-recovery',
+        element: <PasswordRecoveryPage />
       },
       {
         path: '/console/overview',

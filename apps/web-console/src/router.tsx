@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ConsoleShellLayout } from '@/layouts/ConsoleShellLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { PasswordRecoveryPage } from '@/pages/PasswordRecoveryPage'
 import { PendingActivationPage } from '@/pages/PendingActivationPage'
 import { ConsoleAuthPage } from '@/pages/ConsoleAuthPage'
 import { ConsoleMembersPage } from '@/pages/ConsoleMembersPage'
@@ -47,6 +48,7 @@ import { ConsoleSecretsPage } from '@/pages/ConsoleSecretsPage'
 import { ConsoleSecretRotationPage } from '@/pages/ConsoleSecretRotationPage'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { SignupPage } from '@/pages/SignupPage'
+import { consoleAuthConfig } from '@/lib/console-config'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
 import { useConsoleContext } from '@/lib/console-context'
@@ -112,6 +114,10 @@ export const appRoutes = [
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    path: consoleAuthConfig.passwordRecoveryPath,
+    element: <PasswordRecoveryPage />
   },
   {
     path: '/signup',
