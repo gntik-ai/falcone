@@ -1,0 +1,186 @@
+import { useState } from 'react'
+import { ArrowLeft, Send } from 'lucide-react'
+import { Link } from 'react-router-dom'
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  createConsolePasswordRecoveryRequest,
+  type ConsolePasswordRecoveryTicket
+} from '@/lib/console-auth'
+import { consoleAuthConfig } from '@/lib/console-config'
+import type { ApiError } from '@/lib/http'
+
+type FeedbackState =
+  | { variant: 'default' | 'success' | 'destructive'; title: string; message: string }
+  | null
+
+export function PasswordRecoveryPage() {
+  const [usernameOrEmail, setUsernameOrEmail] = useState('')
+  const [feedback, setFeedback] = useState<FeedbackState>(null)
+  const [ticket, setTicket] = useState<ConsolePasswordRecoveryTicket | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const feedbackId = feedback ? 'password-recovery-feedback' : undefined
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFeedback(null)
+    setTicket(null)
+
+    const normalizedUsernameOrEmail = usernameOrEmail.trim()
+    if (!normalizedUsernameOrEmail) {
+      setFeedback({
+        variant: 'destructive',
+        title: 'Indica tu usuario o correo',
+        message: 'Necesitamos el identificador de la cuenta de consola para iniciar la recuperación.'
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const createdTicket = await createConsolePasswordRecoveryRequest({
+        usernameOrEmail: normalizedUsernameOrEmail,
+        deliveryChannel: 'email'
+      })
+
+      setTicket(createdTicket)
+      setFeedback({
+        variant: 'success',
+        title: 'Solicitud de recuperación recibida',
+        message:
+          'Si la cuenta existe y puede recuperar contraseña, el servicio enviará instrucciones al destino configurado sin exponer si el usuario está registrado.'
+      })
+    } catch (rawError) {
+      const error = rawError as ApiError
+
+      if (error.status === 404) {
+        setFeedback({
+          variant: 'default',
+          title: 'Recuperación no habilitada en este entorno',
+          message:
+            'La consola ya tiene una ruta real de recuperación, pero este runtime no está exponiendo el endpoint de recuperación de contraseña. Vuelve a login o contacta al operador de plataforma.'
+        })
+      } else if (error.status === 400) {
+        setFeedback({
+          variant: 'destructive',
+          title: 'No hemos podido validar la solicitud',
+          message: error.message || 'Revisa el usuario o correo e inténtalo de nuevo.'
+        })
+      } else if (error.status === 403) {
+        setFeedback({
+          variant: 'default',
+          title: 'La recuperación no está disponible para esta cuenta',
+          message: error.message || 'El servicio de acceso no permite iniciar recuperación para ese operador.'
+        })
+      } else if (error.status === 429) {
+        setFeedback({
+          variant: 'default',
+          title: 'Demasiados intentos de recuperación',
+          message: error.message || 'Espera unos minutos antes de volver a solicitar instrucciones.'
+        })
+      } else {
+        setFeedback({
+          variant: 'destructive',
+          title: 'El servicio de recuperación no está disponible ahora mismo',
+          message:
+            error.message || 'Ha ocurrido un error operativo. Puedes reintentar en unos instantes sin recargar la consola.'
+        })
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
+      <section className="w-full max-w-4xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
+        <div className="mb-8 space-y-3 sm:mb-10">
+          <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
+          <Badge variant="secondary" className="w-fit">
+            EP-14 / US-UI-01-T05
+          </Badge>
+          <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+            Recupera el acceso a In Falcone Console
+          </h1>
+          <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+            Solicita instrucciones por correo para una cuenta de consola. Por seguridad, no confirmamos si el usuario existe.
+          </p>
+          <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
+            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · Client ID{' '}
+            <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
+          </p>
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
+          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={feedbackId}>
+            <div className="space-y-2">
+              <Label htmlFor="usernameOrEmail">Usuario o correo de consola</Label>
+              <Input
+                id="usernameOrEmail"
+                name="usernameOrEmail"
+                autoComplete="username email"
+                aria-describedby="password-recovery-username-help"
+                autoFocus
+                value={usernameOrEmail}
+                onChange={(event) => setUsernameOrEmail(event.target.value)}
+                placeholder="operaciones@example.com"
+                required
+                minLength={3}
+                maxLength={255}
+              />
+              <p id="password-recovery-username-help" className="text-xs leading-5 text-muted-foreground">
+                Usa el usuario o el correo asociado a la cuenta de consola.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="w-full sm:w-auto">
+                <Send aria-hidden="true" className="h-4 w-4" />
+                {isSubmitting ? 'Enviando solicitud…' : 'Enviar instrucciones'}
+              </Button>
+              <Button asChild type="button" variant="outline" className="w-full sm:w-auto">
+                <Link to={consoleAuthConfig.loginPath}>
+                  <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                  Volver a login
+                </Link>
+              </Button>
+            </div>
+
+            {feedback ? (
+              <Alert id="password-recovery-feedback" variant={feedback.variant} aria-live="assertive">
+                <AlertTitle>{feedback.title}</AlertTitle>
+                <AlertDescription>{feedback.message}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            {ticket ? (
+              <Alert>
+                <AlertTitle>Estado de la solicitud</AlertTitle>
+                <AlertDescription>
+                  <span className="block">Estado: {ticket.status}</span>
+                  <span className="block">Destino normalizado: {ticket.maskedDestination}</span>
+                  <span className="block">Expira: {new Date(ticket.expiresAt).toLocaleString('es-ES')}</span>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+          </form>
+
+          <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
+            <h2 className="text-lg font-semibold">Recuperación segura</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Si la recuperación está habilitada para este entorno, recibirás las instrucciones en el destino configurado para la cuenta.
+            </p>
+            <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
+              Si no tienes acceso al correo de recuperación, contacta al operador de plataforma.
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  )
+}

@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ConsoleShellLayout } from '@/layouts/ConsoleShellLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { PasswordRecoveryPage } from '@/pages/PasswordRecoveryPage'
 import { PendingActivationPage } from '@/pages/PendingActivationPage'
 import { ConsoleAuthPage } from '@/pages/ConsoleAuthPage'
 import { ConsoleMembersPage } from '@/pages/ConsoleMembersPage'
@@ -112,6 +113,10 @@ export const appRoutes = [
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    path: '/password-recovery',
+    element: <PasswordRecoveryPage />
   },
   {
     path: '/signup',
