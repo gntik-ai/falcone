@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleFunctionsPage } from './ConsoleFunctionsPage'
@@ -108,7 +109,11 @@ function rollbackAccepted(overrides: Record<string, unknown> = {}) {
 
 function renderPage(context = createContext()) {
   mockUseConsoleContext.mockReturnValue(context)
-  return render(<ConsoleFunctionsPage />)
+  return render(
+    <MemoryRouter>
+      <ConsoleFunctionsPage />
+    </MemoryRouter>
+  )
 }
 
 describe('ConsoleFunctionsPage', () => {
@@ -135,6 +140,8 @@ describe('ConsoleFunctionsPage', () => {
     mockRequestConsoleSessionJson.mockResolvedValue(inventory())
     renderPage()
 
+    expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Funciones: despliegue rápido' })).toHaveAttribute('href', '/console/functions/data')
     expect(screen.getByText(/cargando inventario/i)).toBeInTheDocument()
     expect(await screen.findByText('hello-fn')).toBeInTheDocument()
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/workspaces/wrk_alpha/inventory', expect.any(Object))
@@ -552,10 +559,14 @@ describe('ConsoleFunctionsPage', () => {
 
     const { rerender } = renderPage(createContext({ activeWorkspaceId: 'wrk_alpha' }))
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    expect(screen.getByText(/consola de funciones/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
 
     mockUseConsoleContext.mockReturnValue(createContext({ activeWorkspaceId: 'wrk_beta' }))
-    rerender(<ConsoleFunctionsPage />)
+    rerender(
+      <MemoryRouter>
+        <ConsoleFunctionsPage />
+      </MemoryRouter>
+    )
 
     expect(await screen.findByText(/no hay funciones en esta área de trabajo/i)).toBeInTheDocument()
     expect(screen.queryByText('hello-fn')).not.toBeInTheDocument()

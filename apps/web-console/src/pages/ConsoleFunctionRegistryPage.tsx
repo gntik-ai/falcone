@@ -79,11 +79,11 @@ export function ConsoleFunctionRegistryPage() {
   }
 
   return (
-    <main className="space-y-6" data-testid="console-function-registry-page">
+    <section className="space-y-6" aria-labelledby="functions-registry-title" data-testid="console-function-registry-page">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="space-y-2">
           <Badge variant="outline">Funciones</Badge>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Registro de funciones</h1>
+          <h1 id="functions-registry-title" className="text-2xl font-semibold tracking-tight text-foreground">Funciones: registro</h1>
           <p className="text-sm text-muted-foreground">
             Registra funciones serverless para el área de trabajo activa. La ejecución se activa cuando el plano de datos
             OpenWhisk esté desplegado (estado <code className="rounded bg-muted px-1 py-0.5">pending_data_plane</code>).
@@ -174,6 +174,6 @@ export function ConsoleFunctionRegistryPage() {
           )}
         </section>
       ) : null}
-    </main>
+    </section>
   )
 }

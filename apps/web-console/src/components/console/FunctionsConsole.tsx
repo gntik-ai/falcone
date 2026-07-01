@@ -4,13 +4,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Clock3, Play, Rocket } from 'lucide-react'
 
+import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { ApiError, JsonValue } from '@/lib/http'
-import { parseJsonObject } from '@/lib/editor-ux'
+import { parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import { cn } from '@/lib/utils'
 import {
   deployFunction,
@@ -31,10 +32,9 @@ export interface FunctionsConsoleProps {
 
 type FunctionOperation = 'deploy' | 'invoke' | 'activations'
 
-const panelClassName = 'rounded-sm border border-border bg-card/40 p-4 shadow-sm'
+const panelClassName = 'rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6'
 const panelHeaderClassName = 'flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3'
 const panelTitleClassName = 'text-sm font-semibold uppercase tracking-wide text-muted-foreground'
-const emptyStateClassName = 'rounded-sm border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground'
 const codeBlockClassName = 'overflow-x-auto rounded-sm border border-border/60 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground'
 
 function errorMessage(error: unknown): string {
@@ -77,7 +77,7 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
     setStatus(null)
     const parsed = parseJsonObject(deploySpecJson)
     if (!parsed.ok) {
-      setError(`Especificación de despliegue: ${parsed.error}`)
+      setError(`Especificación de despliegue: ${localizedJsonError(parsed.error)}`)
       return
     }
     if (getActionName(parsed.value) === '') {
@@ -154,40 +154,72 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
     setActivationsLoaded(false)
   }
 
+  function handleFormatDeploySpec() {
+    const parsed = parseJsonObject(deploySpecJson)
+    if (!parsed.ok) {
+      setError(`Especificación de despliegue: ${localizedJsonError(parsed.error)}`)
+      return
+    }
+    setError(null)
+    setDeploySpecJson(prettyJson(parsed.value))
+  }
+
+  function handleFormatInputJson() {
+    try {
+      setInputJson(prettyJson(JSON.parse(inputJson) as JsonValue))
+      setError(null)
+    } catch {
+      setError('La entrada no es JSON válido')
+    }
+  }
+
   const selectedFunction = functions.find((fn) => fn.resourceId === selected) ?? null
   const busy = operation != null
+  const selectedFunctionSummary = selectedFunction
+    ? `Función seleccionada: ${formatFunctionLabel(selectedFunction)}.`
+    : 'No hay función seleccionada.'
 
   return (
-    <section aria-label="Consola de funciones" aria-busy={loading || busy} className="space-y-4">
+    <section aria-label="Funciones: despliegue rápido" aria-busy={loading || busy} className="space-y-5">
+      <p id="selected-function-summary" className="sr-only" aria-live="polite">
+        {selectedFunctionSummary}
+      </p>
+
       {error ? (
-        <Alert variant="destructive" aria-live="assertive" className="rounded-sm">
+        <Alert variant="destructive" aria-live="assertive">
           <AlertTitle>No se pudo completar la solicitud de función</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
       {status ? (
-        <Alert variant="success" role="status" aria-live="polite" className="rounded-sm">
+        <Alert variant="success" role="status" aria-live="polite">
           <AlertTitle>{status}</AlertTitle>
         </Alert>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(16rem,0.82fr)_minmax(0,1.18fr)]">
-        <section aria-labelledby="functions-list-heading" className={panelClassName}>
-          <div className={panelHeaderClassName}>
-            <h3 id="functions-list-heading" className="text-base font-semibold text-foreground">
-              Funciones{functions.length > 0 ? ` (${functions.length})` : ''}
-            </h3>
-            {selectedFunction ? <Badge variant="secondary" className="max-w-full truncate">Seleccionada: {selectedFunction.actionName}</Badge> : null}
-          </div>
+        {loading ? (
+          <ConsolePageState
+            kind="loading"
+            title="Cargando funciones…"
+            description="Consultando las funciones desplegadas del área de trabajo activa."
+          />
+        ) : functions.length === 0 ? (
+          <ConsolePageState
+            kind="empty"
+            title="No hay funciones desplegadas todavía."
+            description="Despliega una función con la especificación JSON para poder invocarla desde esta pantalla."
+          />
+        ) : (
+          <section aria-labelledby="functions-list-heading" className={panelClassName}>
+            <div className={panelHeaderClassName}>
+              <h2 id="functions-list-heading" className="text-base font-semibold text-foreground">
+                Funciones{functions.length > 0 ? ` (${functions.length})` : ''}
+              </h2>
+              {selectedFunction ? <Badge variant="secondary" className="max-w-full truncate">Seleccionada: {selectedFunction.actionName}</Badge> : null}
+            </div>
 
-          <div className="mt-4 space-y-3">
-            {loading ? (
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Cargando funciones…</p>
-            ) : functions.length === 0 ? (
-              <div className={emptyStateClassName}>
-                <p>No hay funciones desplegadas todavía.</p>
-              </div>
-            ) : (
+            <div className="mt-4 space-y-3">
               <fieldset className="space-y-2" aria-describedby="selected-function-summary">
                 <legend className="sr-only">Funciones disponibles</legend>
                 {functions.map((fn) => {
@@ -216,19 +248,19 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
                   )
                 })}
               </fieldset>
-            )}
 
-            <p id="selected-function-summary" className="text-sm text-muted-foreground" aria-live="polite">
-              {selectedFunction ? `Función seleccionada: ${formatFunctionLabel(selectedFunction)}.` : 'No hay función seleccionada.'}
-            </p>
-          </div>
-        </section>
+              <p className="text-sm text-muted-foreground" aria-live="polite">
+                {selectedFunctionSummary}
+              </p>
+            </div>
+          </section>
+        )}
 
         <div className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             <section aria-labelledby="functions-deploy-heading" className={panelClassName}>
               <div className={panelHeaderClassName}>
-                <h3 id="functions-deploy-heading" className="text-base font-semibold text-foreground">Desplegar</h3>
+                <h2 id="functions-deploy-heading" className="text-base font-semibold text-foreground">Desplegar</h2>
               </div>
               <div className="mt-4 flex flex-col gap-2">
                 <Label htmlFor="deploy-spec-json">Especificación de función (JSON)</Label>
@@ -242,16 +274,21 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
                   disabled={busy}
                 />
                 <p id="deploy-spec-json-help" className="sr-only">Objeto JSON con actionName o el campo heredado name.</p>
-                <Button type="button" className="mt-1 w-full sm:w-auto sm:self-start" onClick={() => void handleDeploy()} disabled={busy}>
-                  <Rocket className="h-4 w-4" aria-hidden="true" />
-                  {operation === 'deploy' ? 'Desplegando…' : 'Desplegar'}
-                </Button>
+                <div className="mt-1 grid gap-2 sm:flex sm:flex-wrap">
+                  <Button type="button" onClick={() => void handleDeploy()} disabled={busy}>
+                    <Rocket className="h-4 w-4" aria-hidden="true" />
+                    {operation === 'deploy' ? 'Desplegando…' : 'Desplegar'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleFormatDeploySpec} disabled={busy}>
+                    Formatear JSON
+                  </Button>
+                </div>
               </div>
             </section>
 
             <section aria-labelledby="functions-invoke-heading" className={panelClassName}>
               <div className={panelHeaderClassName}>
-                <h3 id="functions-invoke-heading" className="text-base font-semibold text-foreground">Invocar</h3>
+                <h2 id="functions-invoke-heading" className="text-base font-semibold text-foreground">Invocar</h2>
               </div>
               <div className="mt-4 flex flex-col gap-2">
                 <Label htmlFor="input-json">Entrada (JSON)</Label>
@@ -274,49 +311,68 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
                     <Clock3 className="h-4 w-4" aria-hidden="true" />
                     {operation === 'activations' ? 'Cargando activaciones…' : 'Ver activaciones'}
                   </Button>
+                  <Button type="button" variant="outline" onClick={handleFormatInputJson} disabled={busy}>
+                    Formatear JSON
+                  </Button>
                 </div>
               </div>
             </section>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <section aria-labelledby="functions-result-heading" className={panelClassName} aria-live="polite">
-              <div className={panelHeaderClassName}>
-                <h4 id="functions-result-heading" className={panelTitleClassName}>Resultado</h4>
-              </div>
-              <div className="mt-4">
-                {result ? (
+            {result ? (
+              <section aria-labelledby="functions-result-heading" className={panelClassName} aria-live="polite">
+                <div className={panelHeaderClassName}>
+                  <h2 id="functions-result-heading" className={panelTitleClassName}>Resultado</h2>
+                </div>
+                <div className="mt-4">
                   <pre role="status" className={codeBlockClassName}>{JSON.stringify(result.result ?? result, null, 2)}</pre>
-                ) : (
-                  <p className={emptyStateClassName}>Todavía no hay resultado de invocación.</p>
-                )}
-              </div>
-            </section>
+                </div>
+              </section>
+            ) : (
+              <ConsolePageState
+                kind="empty"
+                title="Todavía no hay resultado de invocación."
+                description="Selecciona una función y pulsa Invocar para ver la respuesta del runtime."
+              />
+            )}
 
-            <section aria-labelledby="functions-activations-heading" className={panelClassName} aria-live="polite">
-              <div className={panelHeaderClassName}>
-                <h4 id="functions-activations-heading" className={panelTitleClassName}>Activaciones</h4>
-              </div>
-              <div className="mt-4">
-                {operation === 'activations' ? (
-                  <p role="status" className="text-sm text-muted-foreground">Cargando activaciones…</p>
-                ) : activations.length > 0 ? (
+            {operation === 'activations' ? (
+              <ConsolePageState
+                kind="loading"
+                title="Cargando activaciones…"
+                description="Consultando las activaciones recientes de la función seleccionada."
+              />
+            ) : activations.length > 0 ? (
+              <section aria-labelledby="functions-activations-heading" className={panelClassName} aria-live="polite">
+                <div className={panelHeaderClassName}>
+                  <h2 id="functions-activations-heading" className={panelTitleClassName}>Activaciones</h2>
+                </div>
+                <div className="mt-4">
                   <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
                     {activations.map((activation) => (
                       <li key={activation.activationId} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border border-border/80 bg-background/40 p-3 text-sm">
                         <span className="min-w-0 flex-1 truncate font-medium text-foreground">{activation.activationId}</span>
-                        {activation.status ? <Badge variant="outline">{activation.status}</Badge> : null}
-                        {activation.durationMs != null ? <span className="text-xs text-muted-foreground">({activation.durationMs}ms)</span> : null}
+                        {activation.status ? <Badge variant={statusTone(activation.status)}>{activation.status}</Badge> : null}
+                        {activation.durationMs != null ? <span className="text-xs tabular-nums text-muted-foreground">({activation.durationMs}ms)</span> : null}
                       </li>
                     ))}
                   </ul>
-                ) : activationsLoaded ? (
-                  <p className={emptyStateClassName}>No hay activaciones para esta función.</p>
-                ) : (
-                  <p className={emptyStateClassName}>Todavía no se consultaron activaciones.</p>
-                )}
-              </div>
-            </section>
+                </div>
+              </section>
+            ) : activationsLoaded ? (
+              <ConsolePageState
+                kind="empty"
+                title="No hay activaciones para esta función."
+                description={selectedFunction ? `${selectedFunction.actionName} no tiene activaciones registradas todavía.` : 'La función seleccionada no tiene activaciones registradas todavía.'}
+              />
+            ) : (
+              <ConsolePageState
+                kind="empty"
+                title="Todavía no se consultaron activaciones."
+                description="Selecciona una función y pulsa Ver activaciones para consultar ejecuciones recientes."
+              />
+            )}
           </div>
         </div>
       </div>
@@ -333,4 +389,18 @@ function getActionName(value: Record<string, JsonValue>): string {
   if (typeof actionName === 'string' && actionName.trim() !== '') return actionName
   const legacyName = value.name
   return typeof legacyName === 'string' ? legacyName.trim() : ''
+}
+
+function localizedJsonError(error: string): string {
+  if (error === 'Not valid JSON') return 'JSON no válido'
+  if (error === 'Expected a JSON object') return 'Se esperaba un objeto JSON'
+  return error
+}
+
+function statusTone(value?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  const normalized = value?.toLowerCase()
+  if (normalized === 'success' || normalized === 'succeeded' || normalized === 'completed') return 'secondary'
+  if (normalized === 'failed' || normalized === 'error' || normalized === 'rejected') return 'destructive'
+  if (normalized === 'running' || normalized === 'pending' || normalized === 'accepted') return 'default'
+  return 'outline'
 }
