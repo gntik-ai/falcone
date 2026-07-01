@@ -33,8 +33,23 @@ const initialForm = {
   rememberMe: false
 }
 
+const invalidCredentialsMessage = 'Revisa tu usuario y contraseña e inténtalo de nuevo.'
+
 function resolvePostLoginDestination(): string {
   return consumeProtectedRouteIntent() ?? '/console/overview'
+}
+
+function isCredentialError(error: ApiError): boolean {
+  const code = typeof error.code === 'string' ? error.code.trim().toUpperCase() : ''
+  return error.status === 400 || error.status === 401 || error.status === 403 || code === 'INVALID_CREDENTIALS'
+}
+
+function resolveCredentialErrorMessage(error: ApiError): string {
+  if (error.status === 400 || error.status === 403) {
+    return error.message || invalidCredentialsMessage
+  }
+
+  return invalidCredentialsMessage
 }
 
 export function LoginPage() {
@@ -192,11 +207,11 @@ export function LoginPage() {
             })
           }
         }
-      } else if (error.status === 400 || error.status === 403) {
+      } else if (isCredentialError(error)) {
         setFeedback({
           variant: 'destructive',
           title: 'No hemos podido validar tus credenciales',
-          message: error.message || 'Revisa tu usuario y contraseña e inténtalo de nuevo.'
+          message: resolveCredentialErrorMessage(error)
         })
       } else {
         setFeedback({
