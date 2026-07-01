@@ -12,6 +12,6 @@ authenticated shell.
 
 - **WHEN** an authenticated console request returns `401` and the subsequent silent refresh also
   fails because the refresh token is expired or invalid, or because the session was revoked
-- **THEN** the console clears the session and navigates to `/login`, optionally preserving the
-  intended protected route, and shows the unauthenticated login screen instead of authenticated
-  chrome or protected content.
+- **THEN** the console clears the session, preserves the intended protected route for the known
+  protected URL, navigates to `/login`, and shows the unauthenticated login screen instead of
+  authenticated chrome or protected content.
