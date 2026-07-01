@@ -122,6 +122,12 @@ export interface ConsolePasswordRecoveryRequest {
 
 export type ConsolePasswordRecoveryStatus = 'pending_delivery' | 'delivered' | 'completed' | 'expired'
 
+export interface HumanCredentialExpirationPolicy {
+  passwordMaxAge: string
+  gracePeriod: string
+  recoveryTokenTtl: string
+}
+
 export interface ConsolePasswordRecoveryTicket {
   recoveryRequestId: string
   status: ConsolePasswordRecoveryStatus
@@ -129,7 +135,7 @@ export interface ConsolePasswordRecoveryTicket {
   requestedAt: string
   expiresAt: string
   maskedDestination: string
-  credentialPolicy?: ConsoleSessionExpirationPolicy
+  credentialPolicy?: HumanCredentialExpirationPolicy
 }
 
 export interface ConsoleSessionTerminationRequest {
