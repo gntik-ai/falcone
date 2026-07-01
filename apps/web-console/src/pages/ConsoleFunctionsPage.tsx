@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
 import { CapabilityGate } from '@/components/console/CapabilityGate'
@@ -693,18 +694,21 @@ export function ConsoleFunctionsPage() {
   if (!activeWorkspaceId) return <p role="alert">Selecciona un área de trabajo para ver las funciones.</p>
 
   return (
-    <main className="space-y-6">
+    <section className="space-y-6" aria-labelledby="functions-admin-title">
       <header className="space-y-2">
         <Badge variant="outline">Funciones</Badge>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Funciones: administrar</h1>
+            <h1 id="functions-admin-title" className="text-2xl font-semibold">Funciones: administrar</h1>
             <p className="text-sm text-muted-foreground">Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.</p>
             <p className="mt-2 text-sm text-muted-foreground">
               Para una prueba directa con JSON sin historial operativo, usa{' '}
-              <a className="font-medium text-primary underline-offset-4 hover:underline" href="/console/functions/data">
+              <Link
+                className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                to="/console/functions/data"
+              >
                 Funciones: despliegue rápido
-              </a>.
+              </Link>.
             </p>
           </div>
           <div className="flex gap-2">
@@ -1076,6 +1080,6 @@ export function ConsoleFunctionsPage() {
           )}
         </section>
       </section>
-    </main>
+    </section>
   )
 }

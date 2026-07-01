@@ -1,5 +1,7 @@
 // Console page: Functions console (change: add-console-functions-data-editor).
 // Supplies the active workspace to the FunctionsConsole (list/deploy/invoke).
+import { Link } from 'react-router-dom'
+
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { FunctionsConsole } from '@/components/console/FunctionsConsole'
 import { Badge } from '@/components/ui/badge'
@@ -36,9 +38,12 @@ export function ConsoleFunctionsDataPage() {
         <p className="text-sm leading-6 text-muted-foreground">Despliega funciones e invócalas contra el runtime del área de trabajo.</p>
         <p className="text-sm leading-6 text-muted-foreground">
           Para versiones, rollback y disparadores, usa{' '}
-          <a className="font-medium text-primary underline-offset-4 hover:underline" href="/console/functions">
+          <Link
+            className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            to="/console/functions"
+          >
             Funciones: administrar
-          </a>.
+          </Link>.
         </p>
       </header>
       <FunctionsConsole tenantId={activeTenantId} workspaceId={activeWorkspaceId} />

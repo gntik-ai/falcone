@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleFunctionsPage } from './ConsoleFunctionsPage'
@@ -108,7 +109,11 @@ function rollbackAccepted(overrides: Record<string, unknown> = {}) {
 
 function renderPage(context = createContext()) {
   mockUseConsoleContext.mockReturnValue(context)
-  return render(<ConsoleFunctionsPage />)
+  return render(
+    <MemoryRouter>
+      <ConsoleFunctionsPage />
+    </MemoryRouter>
+  )
 }
 
 describe('ConsoleFunctionsPage', () => {
@@ -557,7 +562,11 @@ describe('ConsoleFunctionsPage', () => {
     expect(screen.getByRole('heading', { name: 'Funciones: administrar' })).toBeInTheDocument()
 
     mockUseConsoleContext.mockReturnValue(createContext({ activeWorkspaceId: 'wrk_beta' }))
-    rerender(<ConsoleFunctionsPage />)
+    rerender(
+      <MemoryRouter>
+        <ConsoleFunctionsPage />
+      </MemoryRouter>
+    )
 
     expect(await screen.findByText(/no hay funciones en esta área de trabajo/i)).toBeInTheDocument()
     expect(screen.queryByText('hello-fn')).not.toBeInTheDocument()

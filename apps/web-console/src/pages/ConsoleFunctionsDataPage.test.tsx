@@ -1,9 +1,18 @@
 import { cleanup, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleFunctionsDataPage } from './ConsoleFunctionsDataPage'
 
 const mockUseConsoleContext = vi.fn()
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <ConsoleFunctionsDataPage />
+    </MemoryRouter>
+  )
+}
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
@@ -29,14 +38,14 @@ describe('ConsoleFunctionsDataPage', () => {
   it('[#797] muestra guards de contexto con ConsolePageState', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: null, activeWorkspaceId: null })
 
-    render(<ConsoleFunctionsDataPage />)
+    renderPage()
 
     expect(screen.getByRole('alert', { name: 'Funciones bloqueadas' })).toHaveTextContent('Selecciona una organización para usar funciones.')
 
     cleanup()
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_alpha', activeWorkspaceId: null })
 
-    render(<ConsoleFunctionsDataPage />)
+    renderPage()
 
     expect(screen.getByRole('alert', { name: 'Funciones bloqueadas' })).toHaveTextContent('Selecciona un área de trabajo para usar funciones.')
   })
@@ -44,7 +53,7 @@ describe('ConsoleFunctionsDataPage', () => {
   it('[#797] alinea el título con la etiqueta de ruta de despliegue rápido', async () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_alpha', activeWorkspaceId: 'wrk_alpha' })
 
-    render(<ConsoleFunctionsDataPage />)
+    renderPage()
 
     expect(screen.getByRole('heading', { name: 'Funciones: despliegue rápido' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Funciones: administrar' })).toHaveAttribute('href', '/console/functions')
