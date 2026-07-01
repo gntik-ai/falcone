@@ -27,6 +27,38 @@ beforeEach(() => {
 })
 
 describe('ProvisionDatabaseWizard', () => {
+  it.each([
+    { route: '/console/postgres', defaultEngine: 'postgresql' as const, configLabel: /extensiones iniciales/i },
+    { route: '/console/mongo', defaultEngine: 'mongodb' as const, configLabel: /colecciones iniciales/i }
+  ])('[#754] tenant_owner abre y completa el wizard de base de datos desde $route', async ({ defaultEngine, configLabel }) => {
+    const user = userEvent.setup()
+    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles: ['tenant_owner'] } })
+    requestMock.mockResolvedValue({ databaseId: `db_${defaultEngine}` })
+
+    render(<MemoryRouter><ProvisionDatabaseWizard open onOpenChange={vi.fn()} defaultEngine={defaultEngine} /></MemoryRouter>)
+
+    expect(screen.queryByText(/acceso bloqueado/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/nueva base de datos/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/workspace/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/motor/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/configuración/i)).toBeInTheDocument()
+    expect(screen.getByText(/resumen/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(screen.getByLabelText(/motor/i)).toHaveValue(defaultEngine)
+    await user.type(screen.getByLabelText(/nombre/i), 'orders')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(screen.getByText(configLabel)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    expect(requestMock).toHaveBeenCalledWith('/v1/workspaces/wrk_a1/databases', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ engine: defaultEngine, name: 'orders' })
+    }))
+    expect(await screen.findByText(/recurso creado correctamente/i)).toBeInTheDocument()
+  })
+
   it('[RW-02] bloqueo por validación — RF-UI-025 / T02-AC2', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><ProvisionDatabaseWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
@@ -73,8 +105,11 @@ describe('ProvisionDatabaseWizard', () => {
     expect(screen.getByText(/la cuota disponible para este recurso está agotada/i)).toBeInTheDocument()
   })
 
-  it('[RW-08] sin permisos muestra mensaje de permisos insuficientes — RF-UI-025 / T02-AC8', () => {
-    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles: ['member'] } })
+  it.each([
+    { label: 'tenant_member', platformRoles: ['tenant_member'] },
+    { label: 'sin roles', platformRoles: [] }
+  ])('[RW-08] $label muestra mensaje de permisos insuficientes — RF-UI-025 / T02-AC8', ({ platformRoles }) => {
+    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles } })
     render(<MemoryRouter><ProvisionDatabaseWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
     expect(screen.getByText(/acceso bloqueado/i)).toBeInTheDocument()
   })
