@@ -6,9 +6,11 @@
 // and strips any client tenantId clause, so these filters can only narrow the result set. Paging
 // uses the continuation token from the list response.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 
+import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { RunStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -46,12 +48,22 @@ const EMPTY_FILTERS: FilterState = {
   startedBefore: ''
 }
 
+interface FlowTriggerLocationState {
+  flowTrigger?: {
+    flowId: string
+    scheduleId: string
+    triggeredAt: string
+  }
+}
+
 function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: string }) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
   const [items, setItems] = useState<ExecutionSummary[]>([])
   const [pageStack, setPageStack] = useState<string[]>([]) // continuation tokens consumed so far
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
 
@@ -78,7 +90,7 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
         setNextPageToken(response.nextPageToken ?? null)
         setLoaded(true)
       } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudieron cargar las ejecuciones')
+        setError(caught instanceof Error ? caught.message : 'No se pudieron cargar las ejecuciones')
       } finally {
         setLoading(false)
       }
@@ -109,6 +121,10 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
   }
 
   const isEmpty = useMemo(() => loaded && !loading && items.length === 0, [loaded, loading, items])
+  const filtersActive = useMemo(() => Object.values(filters).some(Boolean), [filters])
+  const triggerNotice = (location.state as FlowTriggerLocationState | null)?.flowTrigger
+  const showTriggerNotice = triggerNotice?.flowId === flowId
+  const clearFilters = () => setFilters(EMPTY_FILTERS)
 
   return (
     <div className="space-y-4 p-4" data-testid="console-flow-history-page">
@@ -120,6 +136,28 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
         <h1 className="text-base font-semibold">Historial de ejecuciones</h1>
         <span className="text-xs text-muted-foreground">{flowId}</span>
       </header>
+
+      {showTriggerNotice ? (
+        <section
+          className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
+          role="status"
+          data-testid="flow-trigger-success"
+        >
+          <p className="font-medium">Ejecución solicitada.</p>
+          <p className="mt-1 text-emerald-800">
+            El disparo fue aceptado para el schedule <span className="font-mono">{triggerNotice.scheduleId}</span>. Actualiza el historial y abre el detalle cuando aparezca la nueva ejecución.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3 border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100"
+            onClick={() => void fetchPage(pageStack.at(-1))}
+            disabled={loading}
+          >
+            Actualizar historial
+          </Button>
+        </section>
+      ) : null}
 
       <section className="flex flex-wrap items-end gap-2" data-testid="run-history-filters">
         <label className="flex flex-col gap-1 text-xs">
@@ -185,15 +223,35 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
       </section>
 
       {error ? (
-        <p className="text-xs text-destructive" data-testid="run-history-error">
-          {error}
-        </p>
+        <ConsolePageState
+          kind="error"
+          title="No se pudieron cargar las ejecuciones"
+          description={error}
+          actionLabel="Reintentar"
+          onAction={() => void fetchPage(pageStack.at(-1))}
+        />
       ) : null}
 
-      {isEmpty ? (
-        <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground" data-testid="run-history-empty">
-          No hay ejecuciones que coincidan con los filtros aplicados.
-        </p>
+      {error ? null : loading && !loaded ? (
+        <ConsolePageState
+          kind="loading"
+          title="Cargando historial"
+          description="Consultando ejecuciones del flujo seleccionado."
+        />
+      ) : isEmpty ? (
+        <div data-testid="run-history-empty">
+          <ConsolePageState
+            kind="empty"
+            title={filtersActive ? 'No hay ejecuciones con estos filtros' : 'Todavía no hay ejecuciones'}
+            description={
+              filtersActive
+                ? 'No hay ejecuciones que coincidan con los filtros aplicados.'
+                : 'Ejecuta un flujo publicado y actualiza este historial para abrir el detalle de la ejecución cuando aparezca.'
+            }
+            actionLabel={filtersActive ? 'Quitar filtros' : 'Abrir diseñador'}
+            onAction={filtersActive ? clearFilters : () => navigate(`/console/flows/${encodeURIComponent(flowId)}`)}
+          />
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
           <table className="w-full table-fixed border-collapse text-sm sm:min-w-[48rem] sm:table-auto" data-testid="run-history-table">
@@ -214,7 +272,9 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
                   <td className="px-4 py-3 font-mono text-xs" title={item.executionId}>
                     <span className="block max-w-[8rem] truncate sm:max-w-none">{item.executionId.slice(0, 32)}…</span>
                   </td>
-                  <td className="hidden px-4 py-3 sm:table-cell">{item.status ?? '—'}</td>
+                  <td className="hidden px-4 py-3 sm:table-cell">
+                    <RunStatusBadge status={item.status} />
+                  </td>
                   <td className="hidden px-4 py-3 sm:table-cell">{item.triggerType ?? '—'}</td>
                   <td className="hidden px-4 py-3 sm:table-cell">{item.version ?? '—'}</td>
                   <td className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">{item.startedAt ?? '—'}</td>
@@ -262,14 +322,35 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
 }
 
 export function ConsoleFlowHistoryPage() {
+  const navigate = useNavigate()
   const { flowId } = useParams<{ flowId: string }>()
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId) {
-    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Historial bloqueado"
+          description="Falta el identificador del flujo."
+          actionLabel="Volver a Flujos"
+          onAction={() => navigate('/console/flows')}
+        />
+      </section>
+    )
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para ver el historial de ejecuciones.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Historial bloqueado"
+          description="Selecciona un área de trabajo para ver el historial de ejecuciones."
+          actionLabel="Gestionar áreas de trabajo"
+          onAction={() => navigate('/console/workspaces')}
+        />
+      </section>
+    )
   }
 
   return <HistoryList workspaceId={activeWorkspaceId} flowId={flowId} />

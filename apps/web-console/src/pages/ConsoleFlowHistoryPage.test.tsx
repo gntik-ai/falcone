@@ -26,9 +26,9 @@ vi.mock('@/lib/hooks/use-capability-gate', () => ({
   useCapabilityGate: () => ({ enabled: true, loading: false })
 }))
 
-function renderPage() {
+function renderPage(initialEntry: string | { pathname: string; state?: unknown } = '/console/flows/flow1/runs') {
   return render(
-    <MemoryRouter initialEntries={['/console/flows/flow1/runs']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/console/flows/:flowId/runs" element={<ConsoleFlowHistoryPage />} />
       </Routes>
@@ -85,8 +85,34 @@ describe('ConsoleFlowHistoryPage filters', () => {
   it('renders the empty-state message when no executions match', async () => {
     mockListExecutions.mockResolvedValue({ items: [], nextPageToken: null })
     renderPage()
-    expect(await screen.findByTestId('run-history-empty')).toHaveTextContent('No hay ejecuciones que coincidan')
+    expect(await screen.findByTestId('run-history-empty')).toHaveTextContent('Todavía no hay ejecuciones')
     expect(screen.queryByTestId('run-history-row')).toBeNull()
+  })
+
+  it('[#793] shows the trigger success next-step state from navigation state', async () => {
+    mockListExecutions.mockResolvedValue({ items: [], nextPageToken: null })
+    renderPage({
+      pathname: '/console/flows/flow1/runs',
+      state: {
+        flowTrigger: {
+          flowId: 'flow1',
+          scheduleId: 'ten1:ws1:flow1',
+          triggeredAt: '2026-07-01T00:00:00Z'
+        }
+      }
+    })
+
+    expect(await screen.findByTestId('flow-trigger-success')).toHaveTextContent('Ejecución solicitada')
+    expect(screen.getByTestId('flow-trigger-success')).toHaveTextContent('ten1:ws1:flow1')
+    expect(screen.getByRole('button', { name: /actualizar historial/i })).toBeInTheDocument()
+  })
+
+  it('[#793] uses ConsolePageState for load errors with a retry CTA', async () => {
+    mockListExecutions.mockRejectedValueOnce(new Error('Temporal no disponible'))
+    renderPage()
+
+    expect(await screen.findByRole('alert', { name: /no se pudieron cargar las ejecuciones/i })).toHaveTextContent('Temporal no disponible')
+    expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
   })
 
   it('paginates with the continuation token', async () => {

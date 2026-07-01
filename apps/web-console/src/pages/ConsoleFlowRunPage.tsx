@@ -12,7 +12,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { RunCanvas } from '@/components/flows/RunCanvas'
 import { RunActionToolbar, type WaitingApprovalNode } from '@/components/flows/RunActionToolbar'
 import { RunNodeDetailPanel } from '@/components/flows/RunNodeDetailPanel'
-import { Badge } from '@/components/ui/badge'
+import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { RunStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { Input } from '@/components/ui/input'
 import { useConsoleContext } from '@/lib/console-context'
 import { useFlowExecution, type NodeStatusSnapshot } from '@/lib/hooks/use-flow-execution'
@@ -54,11 +55,13 @@ function RunView({
   const navigate = useNavigate()
   const [record, setRecord] = useState<FlowDefinitionRecord | null>(null)
   const [detail, setDetail] = useState<ExecutionDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
 
   const load = useCallback(async () => {
+    setLoading(true)
     setLoadError(null)
     try {
       const [flow, exec] = await Promise.all([
@@ -69,6 +72,8 @@ function RunView({
       setDetail(exec)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la ejecución.')
+    } finally {
+      setLoading(false)
     }
   }, [workspaceId, flowId, executionId])
 
@@ -117,14 +122,27 @@ function RunView({
 
   if (loadError && record === null) {
     return (
-      <div className="space-y-2 p-6 text-sm">
-        <p className="text-destructive" data-testid="run-load-error">
-          {loadError}
-        </p>
-        <button type="button" className="text-xs underline" onClick={() => void load()}>
-          Reintentar
-        </button>
-      </div>
+      <section className="p-6" data-testid="run-load-error">
+        <ConsolePageState
+          kind="error"
+          title="No se pudo cargar la ejecución"
+          description={loadError}
+          actionLabel="Reintentar"
+          onAction={() => void load()}
+        />
+      </section>
+    )
+  }
+
+  if (loading && record === null) {
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="loading"
+          title="Cargando ejecución"
+          description="Consultando la definición del flujo y el detalle de la ejecución."
+        />
+      </section>
     )
   }
 
@@ -143,9 +161,7 @@ function RunView({
           <span className="text-sm font-semibold" title={executionId}>
             {record?.name ?? flowId}
           </span>
-          <Badge variant="outline" className="text-xs" data-testid="run-status-badge">
-            {detail?.status ?? 'desconocido'}
-          </Badge>
+          <RunStatusBadge status={detail?.status} />
           {!terminal ? (
             live.streaming ? (
               <span className="text-xs text-emerald-600" data-testid="run-streaming-indicator">
@@ -191,7 +207,13 @@ function RunView({
             onSelectNode={setSelectedNodeId}
           />
         ) : (
-          <p className="p-6 text-sm text-muted-foreground">No hay definición de flujo disponible para esta ejecución.</p>
+          <div className="w-full p-6">
+            <ConsolePageState
+              kind="empty"
+              title="Sin definición de flujo"
+              description="No hay definición de flujo disponible para esta ejecución."
+            />
+          </div>
         )}
         {selectedNodeId ? (
           <RunNodeDetailPanel
@@ -207,14 +229,35 @@ function RunView({
 }
 
 export function ConsoleFlowRunPage() {
+  const navigate = useNavigate()
   const { flowId, executionId } = useParams<{ flowId: string; executionId: string }>()
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId || !executionId) {
-    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo o de la ejecución.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Ejecución bloqueada"
+          description="Falta el identificador del flujo o de la ejecución."
+          actionLabel="Volver a Flujos"
+          onAction={() => navigate('/console/flows')}
+        />
+      </section>
+    )
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para abrir la vista de ejecución.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Ejecución bloqueada"
+          description="Selecciona un área de trabajo para abrir la vista de ejecución."
+          actionLabel="Gestionar áreas de trabajo"
+          onAction={() => navigate('/console/workspaces')}
+        />
+      </section>
+    )
   }
 
   return (

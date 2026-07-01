@@ -3,22 +3,18 @@
 // Lists the active workspace's flows and creates new drafts, then hands off to the
 // canvas designer at /console/flows/:flowId. Lazy-loaded from router.tsx so the
 // @xyflow/react chunk stays out of the initial shell bundle.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { History, PenLine } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
+import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { useConsoleContext } from '@/lib/console-context'
-import { createFlowDraft, listFlows, type FlowSummary } from '@/services/flowsApi'
-
-const FLOW_STATUS_LABELS: Record<string, string> = {
-  archived: 'Archivado',
-  draft: 'Borrador',
-  failed: 'Fallido',
-  published: 'Publicado'
-}
+import { createFlowDraft, listFlows, type FlowScheduleTriggerAck, type FlowSummary } from '@/services/flowsApi'
 
 function formatTimestamp(value?: string): string {
   if (!value) return '—'
@@ -26,13 +22,20 @@ function formatTimestamp(value?: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
-function formatFlowStatus(status?: string | null): string {
-  return status ? FLOW_STATUS_LABELS[status] ?? status : FLOW_STATUS_LABELS.draft
+function buildTriggerNavigationState(flowId: string, ack: FlowScheduleTriggerAck) {
+  return {
+    flowTrigger: {
+      flowId,
+      scheduleId: ack.scheduleId,
+      triggeredAt: new Date().toISOString()
+    }
+  }
 }
 
 export function ConsoleFlowsPage() {
   const navigate = useNavigate()
   const { activeWorkspaceId } = useConsoleContext()
+  const newFlowInputRef = useRef<HTMLInputElement | null>(null)
   const [flows, setFlows] = useState<FlowSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -73,11 +76,15 @@ export function ConsoleFlowsPage() {
 
   if (!activeWorkspaceId) {
     return (
-      <section className="space-y-2 p-6">
+      <section className="space-y-5 p-6">
         <h1 className="text-xl font-semibold">Flujos</h1>
-        <p className="text-sm text-muted-foreground">
-          Selecciona un área de trabajo para gestionar sus flujos.
-        </p>
+        <ConsolePageState
+          kind="blocked"
+          title="Flujos bloqueados"
+          description="Selecciona un área de trabajo para gestionar, publicar y ejecutar flujos."
+          actionLabel="Gestionar áreas de trabajo"
+          onAction={() => navigate('/console/workspaces')}
+        />
       </section>
     )
   }
@@ -95,6 +102,7 @@ export function ConsoleFlowsPage() {
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <div className="w-full sm:w-64">
             <Input
+              ref={newFlowInputRef}
               aria-label="Nombre del flujo nuevo"
               className="w-full"
               placeholder="Nombre del flujo nuevo"
@@ -112,18 +120,27 @@ export function ConsoleFlowsPage() {
       {createError ? <p className="text-sm text-destructive">{createError}</p> : null}
 
       {loading ? (
-        <div className="h-24 animate-pulse rounded-lg border border-border bg-muted/40" />
+        <ConsolePageState
+          kind="loading"
+          title="Cargando flujos"
+          description="Consultando las definiciones del área de trabajo activa."
+        />
       ) : loadError ? (
-        <div className="space-y-2 rounded-lg border border-destructive/40 p-4 text-sm">
-          <p className="text-destructive">{loadError}</p>
-          <Button size="sm" variant="outline" onClick={() => void load()}>
-            Reintentar
-          </Button>
-        </div>
+        <ConsolePageState
+          kind="error"
+          title="No se pudieron cargar los flujos"
+          description={loadError}
+          actionLabel="Reintentar"
+          onAction={() => void load()}
+        />
       ) : flows.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-          Todavía no hay flujos. Crea el primero para abrir el diseñador.
-        </p>
+        <ConsolePageState
+          kind="empty"
+          title="Todavía no hay flujos"
+          description="Crea el primero para abrir el diseñador, publicarlo y ejecutarlo desde la consola."
+          actionLabel="Crear flujo"
+          onAction={() => newFlowInputRef.current?.focus()}
+        />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
           <table className="w-full table-fixed text-sm sm:min-w-[48rem] sm:table-auto">
@@ -147,9 +164,7 @@ export function ConsoleFlowsPage() {
                       <span className="block max-w-[10rem] truncate sm:max-w-[18rem]" title={flowLabel}>{flowLabel}</span>
                     </th>
                     <td className="hidden px-4 py-3 sm:table-cell">
-                      <Badge variant="outline" className="text-xs">
-                        {formatFlowStatus(flow.status)}
-                      </Badge>
+                      <FlowStatusBadge status={flow.status} />
                     </td>
                     <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
                       {formatTimestamp(flow.updatedAt ?? flow.createdAt)}
@@ -169,6 +184,18 @@ export function ConsoleFlowsPage() {
                             Abrir diseñador
                           </Link>
                         </Button>
+                        <FlowRunTriggerButton
+                          workspaceId={activeWorkspaceId}
+                          flowId={flow.flowId}
+                          flowName={flowLabel}
+                          status={flow.status}
+                          className="justify-start sm:justify-center"
+                          onTriggered={(ack) =>
+                            navigate(`/console/flows/${encodedFlowId}/runs`, {
+                              state: buildTriggerNavigationState(flow.flowId, ack)
+                            })
+                          }
+                        />
                         <Button size="sm" variant="secondary" className="justify-start sm:justify-center" asChild>
                           <Link
                             to={`/console/flows/${encodedFlowId}/runs`}

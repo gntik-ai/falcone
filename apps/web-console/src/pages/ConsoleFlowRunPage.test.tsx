@@ -117,7 +117,7 @@ describe('ConsoleFlowRunPage — completed run rendered from history', () => {
 
   it('shows the terminal status badge and disables Cancel', async () => {
     renderRun()
-    await waitFor(() => expect(screen.getByTestId('run-status-badge')).toHaveTextContent('Completed'))
+    await waitFor(() => expect(screen.getByTestId('run-status-badge')).toHaveTextContent('Completada'))
     expect(screen.getByTestId('run-cancel-button')).toBeDisabled()
     // Retry is available for a terminal run.
     expect(screen.getByTestId('run-retry-button')).toBeInTheDocument()
@@ -147,7 +147,7 @@ describe('ConsoleFlowRunPage — running run', () => {
       nodes: []
     })
     renderRun()
-    await waitFor(() => expect(screen.getByTestId('run-status-badge')).toHaveTextContent('Running'))
+    await waitFor(() => expect(screen.getByTestId('run-status-badge')).toHaveTextContent('En ejecución'))
     expect(screen.getByTestId('run-apikey-input')).toBeInTheDocument()
     expect(screen.queryByTestId('run-static-indicator')).toBeNull()
     // Retry hidden on a non-terminal run; Cancel enabled.
