@@ -44,7 +44,9 @@ describe('PasswordRecoveryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /enviar instrucciones/i }))
 
     expect(await screen.findByText(/solicitud de recuperación recibida/i)).toBeInTheDocument()
-    expect(screen.getByText(/destino normalizado: o\*\*\*@example\.com/i)).toBeInTheDocument()
+    expect(screen.getByText(/destino de envío: o\*\*\*@example\.com/i)).toBeInTheDocument()
+    expect(screen.getByText(/estado: pendiente de envío/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('status')).toHaveLength(2)
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

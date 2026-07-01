@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   createConsolePasswordRecoveryRequest,
+  type ConsolePasswordRecoveryStatus,
   type ConsolePasswordRecoveryTicket
 } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
@@ -18,12 +19,21 @@ type FeedbackState =
   | { variant: 'default' | 'success' | 'destructive'; title: string; message: string }
   | null
 
+const recoveryStatusLabels: Record<ConsolePasswordRecoveryStatus, string> = {
+  pending_delivery: 'Pendiente de envío',
+  delivered: 'Instrucciones enviadas',
+  completed: 'Recuperación completada',
+  expired: 'Solicitud expirada'
+}
+
 export function PasswordRecoveryPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [ticket, setTicket] = useState<ConsolePasswordRecoveryTicket | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const feedbackId = feedback ? 'password-recovery-feedback' : undefined
+  const feedbackRole = feedback?.variant === 'destructive' ? 'alert' : 'status'
+  const feedbackLive = feedback?.variant === 'destructive' ? 'assertive' : 'polite'
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -53,7 +63,7 @@ export function PasswordRecoveryPage() {
         variant: 'success',
         title: 'Solicitud de recuperación recibida',
         message:
-          'Si la cuenta existe y puede recuperar contraseña, el servicio enviará instrucciones al destino configurado sin exponer si el usuario está registrado.'
+          'Si hay una cuenta elegible, enviaremos instrucciones al correo configurado. Revisa tu bandeja de entrada y spam.'
       })
     } catch (rawError) {
       const error = rawError as ApiError
@@ -63,7 +73,7 @@ export function PasswordRecoveryPage() {
           variant: 'default',
           title: 'Recuperación no habilitada en este entorno',
           message:
-            'La consola ya tiene una ruta real de recuperación, pero este runtime no está exponiendo el endpoint de recuperación de contraseña. Vuelve a login o contacta al operador de plataforma.'
+            'Este entorno todavía no tiene habilitado el servicio de recuperación de contraseña. Vuelve a login o contacta al operador de plataforma.'
         })
       } else if (error.status === 400) {
         setFeedback({
@@ -75,7 +85,7 @@ export function PasswordRecoveryPage() {
         setFeedback({
           variant: 'default',
           title: 'La recuperación no está disponible para esta cuenta',
-          message: error.message || 'El servicio de acceso no permite iniciar recuperación para ese operador.'
+          message: error.message || 'No se puede iniciar la recuperación con esos datos. Contacta al operador de plataforma si necesitas acceso.'
         })
       } else if (error.status === 429) {
         setFeedback({
@@ -102,13 +112,13 @@ export function PasswordRecoveryPage() {
         <div className="mb-8 space-y-3 sm:mb-10">
           <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
           <Badge variant="secondary" className="w-fit">
-            EP-14 / US-UI-01-T05
+            Recuperación de acceso
           </Badge>
           <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             Recupera el acceso a In Falcone Console
           </h1>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Solicita instrucciones por correo para una cuenta de consola. Por seguridad, no confirmamos si el usuario existe.
+            Solicita instrucciones para recuperar una cuenta de consola. Por seguridad, la respuesta no confirma si el usuario existe.
           </p>
           <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
             Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · Client ID{' '}
@@ -123,7 +133,8 @@ export function PasswordRecoveryPage() {
               <Input
                 id="usernameOrEmail"
                 name="usernameOrEmail"
-                autoComplete="username email"
+                autoComplete="username"
+                autoCapitalize="none"
                 aria-describedby="password-recovery-username-help"
                 autoFocus
                 value={usernameOrEmail}
@@ -134,7 +145,7 @@ export function PasswordRecoveryPage() {
                 maxLength={255}
               />
               <p id="password-recovery-username-help" className="text-xs leading-5 text-muted-foreground">
-                Usa el usuario o el correo asociado a la cuenta de consola.
+                Introduce el usuario o correo asociado a tu cuenta de consola.
               </p>
             </div>
 
@@ -143,7 +154,7 @@ export function PasswordRecoveryPage() {
                 <Send aria-hidden="true" className="h-4 w-4" />
                 {isSubmitting ? 'Enviando solicitud…' : 'Enviar instrucciones'}
               </Button>
-              <Button asChild type="button" variant="outline" className="w-full sm:w-auto">
+              <Button asChild variant="outline" className="w-full sm:w-auto">
                 <Link to={consoleAuthConfig.loginPath}>
                   <ArrowLeft aria-hidden="true" className="h-4 w-4" />
                   Volver a login
@@ -152,18 +163,23 @@ export function PasswordRecoveryPage() {
             </div>
 
             {feedback ? (
-              <Alert id="password-recovery-feedback" variant={feedback.variant} aria-live="assertive">
+              <Alert
+                id="password-recovery-feedback"
+                variant={feedback.variant}
+                role={feedbackRole}
+                aria-live={feedbackLive}
+              >
                 <AlertTitle>{feedback.title}</AlertTitle>
                 <AlertDescription>{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 
             {ticket ? (
-              <Alert>
+              <Alert role="status" aria-live="polite">
                 <AlertTitle>Estado de la solicitud</AlertTitle>
                 <AlertDescription>
-                  <span className="block">Estado: {ticket.status}</span>
-                  <span className="block">Destino normalizado: {ticket.maskedDestination}</span>
+                  <span className="block">Estado: {recoveryStatusLabels[ticket.status]}</span>
+                  <span className="block">Destino de envío: {ticket.maskedDestination}</span>
                   <span className="block">Expira: {new Date(ticket.expiresAt).toLocaleString('es-ES')}</span>
                 </AlertDescription>
               </Alert>
@@ -173,7 +189,7 @@ export function PasswordRecoveryPage() {
           <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
             <h2 className="text-lg font-semibold">Recuperación segura</h2>
             <p className="text-sm leading-6 text-muted-foreground">
-              Si la recuperación está habilitada para este entorno, recibirás las instrucciones en el destino configurado para la cuenta.
+              Las instrucciones se envían solo al destino configurado para la cuenta y caducan automáticamente.
             </p>
             <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
               Si no tienes acceso al correo de recuperación, contacta al operador de plataforma.

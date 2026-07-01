@@ -25,7 +25,9 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /mantener la sesión abierta/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })).toHaveAttribute('href', '/password-recovery')
+    const recoveryLink = screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })
+    expect(recoveryLink).toHaveAttribute('href', '/password-recovery')
+    expect(recoveryLink).not.toHaveAttribute('type')
   })
 
   it('[#726] navega desde el enlace de contraseña olvidada hasta una vista real de recuperación', async () => {
