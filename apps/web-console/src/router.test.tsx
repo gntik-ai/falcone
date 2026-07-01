@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { appRoutes } from './router'
 
-const { consoleAuthPageRenderMock, readConsoleShellSessionMock } = vi.hoisted(() => ({
+const { consoleAuthPageRenderMock, consoleIamAccessPageRenderMock, readConsoleShellSessionMock } = vi.hoisted(() => ({
   consoleAuthPageRenderMock: vi.fn(),
+  consoleIamAccessPageRenderMock: vi.fn(),
   readConsoleShellSessionMock: vi.fn()
 }))
 
@@ -15,6 +16,12 @@ vi.mock('@/pages/ConsoleAuthPage', () => ({
   ConsoleAuthPage: () => {
     consoleAuthPageRenderMock()
     return <h1>Auth IAM</h1>
+  }
+}))
+vi.mock('@/pages/ConsoleIamAccessPage', () => ({
+  ConsoleIamAccessPage: () => {
+    consoleIamAccessPageRenderMock()
+    return <h1>IAM Access</h1>
   }
 }))
 vi.mock('@/pages/ConsoleObservabilityPage', () => ({ ConsoleObservabilityPage: () => <h1>Observability Real</h1> }))
@@ -33,6 +40,7 @@ vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: readConsoleSh
 beforeEach(() => {
   readConsoleShellSessionMock.mockReturnValue(createRouterSession(['superadmin']))
   consoleAuthPageRenderMock.mockClear()
+  consoleIamAccessPageRenderMock.mockClear()
 })
 
 afterEach(() => {
@@ -90,6 +98,27 @@ it('[#740] permite que superadmin abra /console/auth', async () => {
 
   expect(await screen.findByRole('heading', { name: /auth iam/i })).toBeInTheDocument()
   expect(consoleAuthPageRenderMock).toHaveBeenCalled()
+})
+
+it('[#740] redirige tenant_owner desde /console/iam-access sin renderizar IAM Access', async () => {
+  readConsoleShellSessionMock.mockReturnValue(createRouterSession(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+  const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/iam-access'] })
+  render(<RouterProvider router={router} />)
+
+  expect(await screen.findByRole('heading', { name: /my plan/i })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: /iam access/i })).not.toBeInTheDocument()
+  expect(consoleIamAccessPageRenderMock).not.toHaveBeenCalled()
+})
+
+it('[#740] permite que superadmin abra /console/iam-access', async () => {
+  readConsoleShellSessionMock.mockReturnValue(createRouterSession(['superadmin']))
+
+  const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/iam-access'] })
+  render(<RouterProvider router={router} />)
+
+  expect(await screen.findByRole('heading', { name: /iam access/i })).toBeInTheDocument()
+  expect(consoleIamAccessPageRenderMock).toHaveBeenCalled()
 })
 
 function createRouterSession(

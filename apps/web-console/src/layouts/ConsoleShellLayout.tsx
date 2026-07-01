@@ -71,7 +71,8 @@ const consoleNavigationItems = [
     label: 'IAM Access',
     to: '/console/iam-access',
     icon: Shield,
-    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm del tenant activo.'
+    description: 'Asigna roles y gestiona la pertenencia a grupos en el realm del tenant activo.',
+    requiresSuperadminAccess: true
   },
   {
     label: 'Members',

@@ -11,12 +11,19 @@
   - `ConsoleShellLayout` listed Auth for all sessions.
   - `router.tsx` rendered `/console/auth` directly.
   - `ConsoleAuthPage` loads superadmin-only IAM inventory routes and can surface the resulting 403.
-- [x] Add focused web-console regression coverage for the issue scenario and superadmin controls.
+- [x] Confirm reviewer follow-up root cause:
+  - `ConsoleShellLayout` listed IAM Access for non-superadmin sessions while `/console/iam-access`
+    was already guarded by `RequireSuperadminRoute`.
+- [x] Add focused web-console regression coverage for the issue scenario, IAM Access nav/route
+  alignment, and superadmin controls.
 
 ## 2. Fix
 
 - [x] Hide the Auth navigation item for non-superadmin sessions.
+- [x] Hide the IAM Access navigation item for non-superadmin sessions using the same superadmin
+  navigation gate.
 - [x] Guard direct `/console/auth` access with `RequireSuperadminRoute`.
+- [x] Preserve the existing direct `/console/iam-access` `RequireSuperadminRoute` guard.
 - [x] Leave superadmin behavior unchanged.
 - [x] Do not widen backend IAM privileges or alter IAM routes for this issue.
 
@@ -25,7 +32,8 @@
 - [x] Confirm no backend, OpenAPI/AsyncAPI, generated client, shared type, or wire-shape change is
   required.
 - [x] Materialize the issue's OpenSpec delta under `web-console`.
-- [x] Add a concise architecture docs note for the current `/console/auth` permission model.
+- [x] Add a concise architecture docs note for the current `/console/auth` and `/console/iam-access`
+  permission model.
 
 ## 4. Verification
 

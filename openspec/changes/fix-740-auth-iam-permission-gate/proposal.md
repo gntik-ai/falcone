@@ -12,15 +12,22 @@ open.
 For this fix, `/console/auth` remains a platform/superadmin-only surface. Tenant-owner scoped IAM
 work is not widened in the backend in this change.
 
+Reviewer follow-up found the adjacent `/console/iam-access` surface already guarded by the same
+superadmin route gate, while its shell navigation entry still appeared for non-superadmin sessions.
+That made the broader IAM navigation requirement internally inconsistent even though the original
+issue acceptance remains centered on `/console/auth`.
+
 ## What Changes
 
-- Mark the Auth navigation entry as superadmin-only and hide it for non-superadmin console sessions.
+- Mark the Auth and IAM Access navigation entries as superadmin-only and hide them for
+  non-superadmin console sessions.
 - Guard the direct `/console/auth` route with the existing `RequireSuperadminRoute`, redirecting
   non-superadmin sessions to `/console/my-plan` before `ConsoleAuthPage` mounts.
-- Preserve the existing superadmin behavior for the Auth page.
+- Preserve the existing `/console/iam-access` route guard and superadmin behavior for the Auth and
+  IAM Access pages.
 - Add focused web-console regression tests for tenant-owner nav hiding, tenant-owner direct URL
-  redirect without rendering Auth, and superadmin positive controls.
-- Document that `/console/auth` is currently platform/superadmin-only.
+  redirects without rendering platform IAM pages, and superadmin positive controls.
+- Document that `/console/auth` and `/console/iam-access` are currently platform/superadmin-only.
 
 ## Scope
 
@@ -34,4 +41,5 @@ introduce a separate own-realm model without changing this superadmin-only platf
 ### Added Capabilities
 
 - `web-console`: console navigation and direct routes for IAM pages reflect the caller's effective
-  permissions instead of presenting a fully unusable superadmin-only Auth/IAM page to tenant owners.
+  permissions instead of presenting fully unusable superadmin-only platform IAM pages to tenant
+  owners.

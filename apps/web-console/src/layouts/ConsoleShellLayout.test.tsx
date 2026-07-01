@@ -177,22 +177,24 @@ describe('ConsoleShellLayout', () => {
     expect(membersLink).toHaveAttribute('href', '/console/members')
   })
 
-  it('[#740] oculta Auth en la navegación para tenant_owner', async () => {
+  it('[#740] oculta Auth e IAM Access en la navegación para tenant_owner', async () => {
     stubShellApi()
     persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
 
     renderShell('/console/overview')
 
     expect(await screen.findByRole('link', { name: /overview/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^iam access/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^auth/i })).not.toBeInTheDocument()
   })
 
-  it('[#740] mantiene Auth visible para superadmin', async () => {
+  it('[#740] mantiene Auth e IAM Access visibles para superadmin', async () => {
     stubShellApi()
     persistConsoleShellSession(createSessionWithRoles(['superadmin']))
 
     renderShell('/console/overview')
 
+    expect(await screen.findByRole('link', { name: /^iam access/i })).toHaveAttribute('href', '/console/iam-access')
     expect(await screen.findByRole('link', { name: /^auth/i })).toHaveAttribute('href', '/console/auth')
   })
 
