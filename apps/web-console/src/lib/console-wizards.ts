@@ -57,7 +57,7 @@ export function useWizardPermissionCheck(requiredPermission: WizardPermission) {
     if (requiredPermission === 'create_workspace') return roles.includes('tenant_owner') || roles.includes('workspace_admin')
     if (requiredPermission === 'manage_iam') return roles.includes('workspace_admin')
     if (requiredPermission === 'invite_member') return roles.includes('workspace_admin') || roles.includes('tenant_owner')
-    if (requiredPermission === 'provision_database' || requiredPermission === 'publish_function') return roles.includes('workspace_admin')
+    if (requiredPermission === 'provision_database' || requiredPermission === 'publish_function') return roles.includes('workspace_admin') || roles.includes('tenant_owner')
     return false
   }, [requiredPermission, roles])
 
