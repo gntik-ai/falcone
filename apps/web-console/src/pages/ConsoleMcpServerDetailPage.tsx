@@ -12,13 +12,13 @@ import { toMcpServerDetailViewModel, type McpServerDetailView } from '@/lib/mcp/
 
 /**
  * MCP server detail page (issue #397): endpoint + status + active version + curated tool list,
- * with a Connect tab (client snippets) and an interactive Playground tab.
+ * with a client-snippet tab and an interactive test-area tab.
  */
 type Tab = 'connect' | 'playground'
 
 const tabs: Array<{ value: Tab; label: string }> = [
-  { value: 'connect', label: 'Connect' },
-  { value: 'playground', label: 'Playground' }
+  { value: 'connect', label: 'Conectar' },
+  { value: 'playground', label: 'Área de pruebas' }
 ]
 
 function getTabId(tab: Tab) {
@@ -77,8 +77,8 @@ export function ConsoleMcpServerDetailPage() {
         <div data-testid="mcp-detail-loading">
           <ConsolePageState
             kind="loading"
-            title="Cargando workspace"
-            description="Estamos resolviendo el workspace activo antes de cargar el servidor MCP."
+            title="Cargando área de trabajo"
+            description="Estamos resolviendo el área de trabajo activa antes de cargar el servidor MCP."
           />
         </div>
       )
@@ -87,8 +87,8 @@ export function ConsoleMcpServerDetailPage() {
       <div data-testid="mcp-detail-no-workspace">
         <ConsolePageState
           kind="empty"
-          title="Selecciona un workspace"
-          description="El detalle y el playground del servidor MCP se cargan para el workspace activo. Selecciona un workspace para continuar."
+          title="Selecciona un área de trabajo"
+          description="El detalle y el área de pruebas del servidor MCP se cargan para el área de trabajo activa. Selecciona un área de trabajo para continuar."
         />
       </div>
     )
@@ -109,7 +109,7 @@ export function ConsoleMcpServerDetailPage() {
         <ConsolePageState
           kind="loading"
           title="Cargando servidor MCP"
-          description="Estamos cargando el endpoint, la versión activa y las herramientas curadas."
+          description="Estamos cargando el punto de conexión, la versión activa y las herramientas curadas."
         />
       </div>
     )
@@ -122,12 +122,12 @@ export function ConsoleMcpServerDetailPage() {
           <h2 id="mcp-server-detail-heading" className="break-words text-2xl font-semibold tracking-tight text-foreground">
             {view.name ?? mcpServerId}
           </h2>
-          <p className="text-sm text-muted-foreground">Detalle operativo del servidor MCP en el workspace activo.</p>
+          <p className="text-sm text-muted-foreground">Detalle operativo del servidor MCP en el área de trabajo activa.</p>
         </div>
 
         <dl className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <div className="min-w-0 rounded-2xl border border-border/70 bg-background/60 p-4 md:col-span-2">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Endpoint</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Punto de conexión</dt>
             <dd className="mt-1 break-all text-sm leading-6 text-foreground" data-testid="mcp-detail-endpoint">
               {view.endpoint ?? 'No publicado'}
             </dd>
@@ -167,7 +167,7 @@ export function ConsoleMcpServerDetailPage() {
                   {tool.mutates ? <Badge variant="secondary">Muta estado</Badge> : null}
                   {tool.scope ? (
                     <Badge variant="outline" className="max-w-full whitespace-normal break-all text-left">
-                      Scope: {tool.scope}
+                      Alcance: {tool.scope}
                     </Badge>
                   ) : null}
                 </div>

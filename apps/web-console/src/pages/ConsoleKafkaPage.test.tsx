@@ -199,11 +199,11 @@ describe('ConsoleKafkaPage', () => {
 
   it('muestra los empty states de tenant y workspace', () => {
     renderPage(createContext({ activeTenantId: null, activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un tenant/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
 
     cleanup()
     renderPage(createContext({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
   })
 
   it('carga inventario, muestra quota agotada y carga bridges', async () => {
@@ -221,15 +221,15 @@ describe('ConsoleKafkaPage', () => {
 
     renderPage()
 
-    expect(await screen.findByText(/topics kafka/i)).toBeInTheDocument()
+    expect(await screen.findByText(/tópicos kafka/i)).toBeInTheDocument()
     expect((await screen.findAllByText(/orders.created/i)).length).toBeGreaterThan(0)
     expect(screen.getByText(/broker kraft/i)).toBeInTheDocument()
-    expect(screen.getByText(/quota agotada/i)).toBeInTheDocument()
+    expect(screen.getByText(/cuota agotada/i)).toBeInTheDocument()
     expect(await screen.findByText(/postgres · orders_outbox/i)).toBeInTheDocument()
-    expect(screen.getByText(/degraded/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/degradado/i).length).toBeGreaterThan(0)
   })
 
-  it('selecciona topic y carga detail, access y metadata en paralelo', async () => {
+  it('selecciona tópico y carga detalle, acceso y metadatos en paralelo', async () => {
     queueHappyPath()
     const user = userEvent.setup()
 
@@ -244,25 +244,25 @@ describe('ConsoleKafkaPage', () => {
     })
 
     expect((await screen.findAllByText('evt.ten_alpha.orders.created')).length).toBeGreaterThan(0)
-    expect(screen.getByText(/al menos una vez/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/al menos una vez/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/compactar/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText('12').length).toBeGreaterThan(0)
     expect(screen.getAllByText('168').length).toBeGreaterThan(0)
     expect(screen.getAllByText('3').length).toBeGreaterThan(0)
     expect(screen.getByText(/http_publish, sse/i)).toBeInTheDocument()
-    expect(screen.getByText(/quota agotada/i)).toBeInTheDocument()
-    expect(screen.getByText(/hard/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/prefix/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/cuota agotada/i)).toBeInTheDocument()
+    expect(screen.getByText(/estricto/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/prefijo/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/ten_alpha\./i).length).toBeGreaterThan(0)
   })
 
-  it('muestra Access con bindings y badge rojo para DENY', async () => {
+  it('muestra Acceso con bindings y badge rojo para DENY', async () => {
     queueHappyPath()
     const user = userEvent.setup()
 
     renderPage()
     await user.click(await screen.findByText('orders.created'))
-    await user.click(screen.getByRole('button', { name: 'Access' }))
+    await user.click(screen.getByRole('button', { name: 'Acceso' }))
 
     expect(await screen.findByText(/svc-orders/i)).toBeInTheDocument()
     expect(screen.getByText(/read, write/i)).toBeInTheDocument()
@@ -272,12 +272,12 @@ describe('ConsoleKafkaPage', () => {
     expect(screen.getByText(/^orders$/i)).toBeInTheDocument()
   })
 
-  it('muestra Metadata, limitaciones técnicas y degrada de forma aislada cuando falla', async () => {
+  it('muestra Metadatos, limitaciones técnicas y degrada de forma aislada cuando falla', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url.startsWith('/v1/events/workspaces/wrk_alpha/inventory')) return mockInventory()
       if (url === '/v1/events/topics/res_topic_1') return mockTopicDetail()
       if (url === '/v1/events/topics/res_topic_1/access') return mockAccessPolicy()
-      if (url === '/v1/events/topics/res_topic_1/metadata') throw new Error('Metadata degradada')
+      if (url === '/v1/events/topics/res_topic_1/metadata') throw new Error('Metadatos degradados')
       if (url === '/v1/events/workspaces/wrk_alpha/bridges/evb_orders') return mockBridge()
       throw new Error(`Unexpected URL ${url}`)
     })
@@ -285,11 +285,11 @@ describe('ConsoleKafkaPage', () => {
 
     renderPage()
     await user.click(await screen.findByText('orders.created'))
-    await user.click(screen.getByRole('button', { name: 'Metadata' }))
+    await user.click(screen.getByRole('button', { name: 'Metadatos' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/metadata degradada/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/metadatos degradados/i)
     expect(screen.queryByText(/svc-orders/i)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Detail' }))
+    await user.click(screen.getByRole('button', { name: 'Detalle' }))
     expect((await screen.findAllByText('evt.ten_alpha.orders.created')).length).toBeGreaterThan(0)
 
     cleanup()
@@ -297,23 +297,23 @@ describe('ConsoleKafkaPage', () => {
     renderPage()
     const user2 = userEvent.setup()
     await user2.click(await screen.findByText('orders.created'))
-    await user2.click(screen.getByRole('button', { name: 'Metadata' }))
+    await user2.click(screen.getByRole('button', { name: 'Metadatos' }))
     expect(await screen.findByText(/hace 5 minutos/i)).toBeInTheDocument()
     expect(screen.getByText(/1200/i)).toBeInTheDocument()
     expect(screen.getByText(/900/i)).toBeInTheDocument()
-    expect(screen.getByText(/provider_managed/i)).toBeInTheDocument()
+    expect(screen.getByText(/gestionado por proveedor/i)).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent(/kafka_provider_limit/i)
   })
 
   it('muestra empty states de inventario y bridges sin ids', async () => {
     queueHappyPath({ inventory: { items: [], counts: { total: 0, active: 0, provisioning: 0, degraded: 0 } } })
     renderPage()
-    expect(await screen.findByText(/no hay topics en este workspace/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no hay tópicos en esta área de trabajo/i)).toBeInTheDocument()
 
     cleanup()
     queueHappyPath({ inventory: { items: [{ ...mockInventory().items[0], operationalMetadata: { bridgeCount: 2 } }] } })
     renderPage()
-    expect(await screen.findByText(/la lista de bridges requiere ids expuestos por el inventario/i)).toBeInTheDocument()
+    expect(await screen.findByText(/la lista de puentes requiere ids expuestos por el inventario/i)).toBeInTheDocument()
   })
 
   it('permite reintentar cuando falla el inventario', async () => {
@@ -338,18 +338,18 @@ describe('ConsoleKafkaPage', () => {
     expect((await screen.findAllByText(/orders.created/i)).length).toBeGreaterThan(0)
   })
 
-  it('renderiza Publish, envía POST y mantiene el formulario visible tras error', async () => {
+  it('renderiza Publicar, envía POST y mantiene el formulario visible tras error', async () => {
     queueHappyPath()
     const user = userEvent.setup()
     renderPage()
     await user.click(await screen.findByText('orders.created'))
-    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Publicar' }))
 
-    expect(await screen.findByLabelText(/payload/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/contenido json/i)).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/com.example.event/i)).toBeInTheDocument()
     expect(screen.getByDisplayValue('application/json')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText(/payload/i), { target: { value: '{"ok":true}' } })
+    fireEvent.change(screen.getByLabelText(/contenido json/i), { target: { value: '{"ok":true}' } })
     await user.type(screen.getByPlaceholderText(/com.example.event/i), 'com.example.event')
     await user.click(screen.getByRole('button', { name: /publicar evento/i }))
 
@@ -366,11 +366,11 @@ describe('ConsoleKafkaPage', () => {
       throw new Error(`Unexpected URL ${url}`)
     })
 
-    await user.clear(screen.getByLabelText(/payload/i))
+    await user.clear(screen.getByLabelText(/contenido json/i))
     await user.click(screen.getByRole('button', { name: /publicar evento/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/quota exceeded 429/i)
-    expect(screen.getByLabelText(/payload/i)).toBeInTheDocument()
-    expect(screen.getByText(/detail > quotas/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/contenido json/i)).toBeInTheDocument()
+    expect(screen.getByText(/detalle > cuotas/i)).toBeInTheDocument()
   })
 
   it('inicia stream, parsea eventos SSE y lo detiene', async () => {
@@ -383,16 +383,16 @@ describe('ConsoleKafkaPage', () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(await screen.findByText('orders.created'))
-    await user.click(screen.getByRole('button', { name: 'Stream' }))
-    await user.click(screen.getByRole('button', { name: /iniciar stream/i }))
+    await user.click(screen.getByRole('button', { name: 'Flujo' }))
+    await user.click(screen.getByRole('button', { name: /iniciar flujo/i }))
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/v1/events/topics/res_topic_1/stream', expect.objectContaining({ headers: { Authorization: 'Bearer token-123' } }))
     })
     expect(await screen.findByText(/conexión activa|inactivo/i)).toBeInTheDocument()
-    expect(await screen.findByText(/raw:/i)).toBeInTheDocument()
+    expect(await screen.findByText(/crudo:/i)).toBeInTheDocument()
     expect(await screen.findByText(/"id": 1/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /iniciar stream|detener stream/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /iniciar flujo|detener flujo/i })).toBeInTheDocument()
   })
 
   it('muestra error aislado en stream sin reconexión infinita', async () => {
@@ -402,8 +402,8 @@ describe('ConsoleKafkaPage', () => {
 
     renderPage()
     await user.click(await screen.findByText('orders.created'))
-    await user.click(screen.getByRole('button', { name: 'Stream' }))
-    await user.click(screen.getByRole('button', { name: /iniciar stream/i }))
+    await user.click(screen.getByRole('button', { name: 'Flujo' }))
+    await user.click(screen.getByRole('button', { name: /iniciar flujo/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/sse no disponible/i)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -415,7 +415,7 @@ describe('ConsoleKafkaPage', () => {
     const view = renderPage(createContext({ activeWorkspaceId: 'wrk_alpha' }))
 
     await user.click(await screen.findByText('orders.created'))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Detail' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Detalle' })).toBeInTheDocument())
 
     mockUseConsoleContext.mockReturnValue(createContext({ activeWorkspaceId: 'wrk_beta' }))
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
@@ -428,6 +428,6 @@ describe('ConsoleKafkaPage', () => {
     view.rerender(<ConsoleKafkaPage />)
 
     expect(await screen.findByText(/^payments\.created$/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Detail' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Detalle' })).not.toBeInTheDocument()
   })
 })

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 function defaultFetcher(workspaceId: string) {
   return fetch(`/v1/workspaces/${workspaceId}/capability-catalog`).then((response) => {
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      throw new Error(`La solicitud falló con estado ${response.status}`);
     }
 
     return response.json();
@@ -60,7 +60,7 @@ export function ConsoleCapabilityCatalogPage({
       })
       .catch((fetchError) => {
         if (active) {
-          setError(fetchError instanceof Error ? fetchError : new Error('Unknown error'));
+          setError(fetchError instanceof Error ? fetchError : new Error('Error desconocido'));
         }
       })
       .finally(() => {
@@ -75,14 +75,14 @@ export function ConsoleCapabilityCatalogPage({
   }, [fetcher, workspaceId]);
 
   if (loading) {
-    return <div data-testid="catalog-loading">Loading capability catalog…</div>;
+    return <div data-testid="catalog-loading">Cargando catálogo de capacidades…</div>;
   }
 
   if (error) {
     return (
       <div role="alert">
-        <p>Failed to load capability catalog.</p>
-        <button onClick={() => fetcher(workspaceId).then(setData).catch(setError)}>Retry</button>
+        <p>No se pudo cargar el catálogo de capacidades.</p>
+        <button onClick={() => fetcher(workspaceId).then(setData).catch(setError)}>Reintentar</button>
       </div>
     );
   }
@@ -90,14 +90,14 @@ export function ConsoleCapabilityCatalogPage({
   return (
     <section>
       <header>
-        <h1>Capability Catalog</h1>
+        <h1>Catálogo de capacidades</h1>
         <p>{workspaceName ?? data?.workspaceId ?? workspaceId}</p>
       </header>
       <div>
         {data?.capabilities.map((capability) => (
           <article key={capability.id} data-testid={`capability-${capability.id}`}>
             <h2>{capability.displayName}</h2>
-            <span>{capability.enabled ? 'Enabled' : 'Disabled'}</span>
+            <span>{capability.enabled ? 'Habilitada' : 'Deshabilitada'}</span>
             {capability.status !== 'active' && capability.status !== 'disabled' ? <span>{capability.status}</span> : null}
             {capability.dependencyNote ? <p>{capability.dependencyNote}</p> : null}
             {capability.quota ? (

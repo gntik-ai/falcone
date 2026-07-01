@@ -14,16 +14,16 @@ beforeEach(() => vi.clearAllMocks())
 afterEach(() => cleanup())
 
 function fillForm() {
-  fireEvent.change(screen.getByLabelText('Database'), { target: { value: 'appdb' } })
-  fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'notes' } })
-  fireEvent.change(screen.getByLabelText('Anon key'), { target: { value: 'flc_anon_x' } })
+  fireEvent.change(screen.getByLabelText('Base de datos'), { target: { value: 'appdb' } })
+  fireEvent.change(screen.getByLabelText('Colección'), { target: { value: 'notes' } })
+  fireEvent.change(screen.getByLabelText('Clave anónima'), { target: { value: 'flc_anon_x' } })
 }
 
 describe('RealtimeConsole', () => {
   it('requires database, collection, and an anon key before subscribing', () => {
     render(<RealtimeConsole workspaceId="ws1" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Database, collection, and an anon key are required')
+    fireEvent.click(screen.getByRole('button', { name: 'Suscribirse' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Base de datos, colección y clave anónima son obligatorias')
     expect(mocked).not.toHaveBeenCalled()
   })
 
@@ -35,7 +35,7 @@ describe('RealtimeConsole', () => {
     })
     render(<RealtimeConsole workspaceId="ws1" />)
     fillForm()
-    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Suscribirse' }))
 
     expect(mocked).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -44,7 +44,7 @@ describe('RealtimeConsole', () => {
         target: { source: 'mongo', databaseName: 'appdb', collectionName: 'notes' }
       })
     )
-    expect(screen.getByText(/Listening…/)).toBeInTheDocument()
+    expect(screen.getByText(/Escuchando…/)).toBeInTheDocument()
 
     // a change arrives on the stream
     act(() => onChange?.({ type: 'insert', documentId: 'd1', document: { _id: 'd1', body: 'live' } }))
@@ -55,12 +55,12 @@ describe('RealtimeConsole', () => {
   it('subscribes to a Postgres table when the source is switched', () => {
     mocked.mockReturnValue({ close: vi.fn() })
     render(<RealtimeConsole workspaceId="ws1" />)
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'postgres' } })
-    fireEvent.change(screen.getByLabelText('Database'), { target: { value: 'appdb' } })
-    fireEvent.change(screen.getByLabelText('Schema'), { target: { value: 'public' } })
-    fireEvent.change(screen.getByLabelText('Table'), { target: { value: 'notes' } })
-    fireEvent.change(screen.getByLabelText('Anon key'), { target: { value: 'flc_anon_x' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
+    fireEvent.change(screen.getByLabelText('Origen'), { target: { value: 'postgres' } })
+    fireEvent.change(screen.getByLabelText('Base de datos'), { target: { value: 'appdb' } })
+    fireEvent.change(screen.getByLabelText('Esquema'), { target: { value: 'public' } })
+    fireEvent.change(screen.getByLabelText('Tabla'), { target: { value: 'notes' } })
+    fireEvent.change(screen.getByLabelText('Clave anónima'), { target: { value: 'flc_anon_x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Suscribirse' }))
     expect(mocked).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: 'ws1',
@@ -74,9 +74,9 @@ describe('RealtimeConsole', () => {
     mocked.mockReturnValue({ close })
     render(<RealtimeConsole workspaceId="ws1" />)
     fillForm()
-    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Suscribirse' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Detener' }))
     expect(close).toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Subscribe' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Suscribirse' })).toBeInTheDocument()
   })
 })

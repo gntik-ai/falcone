@@ -50,31 +50,31 @@ describe('PostgresDataEditor', () => {
   it('inserts a row from the JSON editor', async () => {
     render(<PostgresDataEditor {...props} />)
     await screen.findByText('alpha')
-    fireEvent.change(screen.getByLabelText('New row (JSON)'), { target: { value: '{"name":"beta"}' } })
-    fireEvent.click(screen.getByText('Insert'))
+    fireEvent.change(screen.getByLabelText('Fila nueva (JSON)'), { target: { value: '{"name":"beta"}' } })
+    fireEvent.click(screen.getByText('Insertar'))
     await waitFor(() => expect(mocked.insertRow).toHaveBeenCalledWith('ws1', 'appdb', 'app1', 'items', { name: 'beta' }))
   })
 
   it('surfaces invalid JSON without calling the API', async () => {
     render(<PostgresDataEditor {...props} />)
     await screen.findByText('alpha')
-    fireEvent.change(screen.getByLabelText('New row (JSON)'), { target: { value: 'not json' } })
-    fireEvent.click(screen.getByText('Insert'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('New row: Not valid JSON')
+    fireEvent.change(screen.getByLabelText('Fila nueva (JSON)'), { target: { value: 'not json' } })
+    fireEvent.click(screen.getByText('Insertar'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Fila nueva: Not valid JSON')
     expect(mocked.insertRow).not.toHaveBeenCalled()
   })
 
   it('deletes a row by its id primary key', async () => {
     render(<PostgresDataEditor {...props} />)
     await screen.findByText('alpha')
-    fireEvent.click(screen.getByText('Delete'))
+    fireEvent.click(screen.getByText('Eliminar'))
     await waitFor(() => expect(mocked.deleteRow).toHaveBeenCalledWith('ws1', 'appdb', 'app1', 'items', { id: 'r1' }))
   })
 
   it('issues an anon key and shows it once with a copy-paste snippet', async () => {
     render(<PostgresDataEditor {...props} />)
     await screen.findByText('alpha')
-    fireEvent.click(screen.getByText('Issue anon key'))
+    fireEvent.click(screen.getByText('Emitir clave anónima'))
     await waitFor(() => expect(mocked.issueApiKey).toHaveBeenCalledWith('ws1', 'anon'))
     const status = await screen.findByRole('status')
     expect(status).toHaveTextContent('flc_anon_secret123')

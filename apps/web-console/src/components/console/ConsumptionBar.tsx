@@ -10,23 +10,23 @@ function getTone(current: number, limit: number) {
 
 export function ConsumptionBar({ current, limit, label }: { current: number | null; limit: number; label?: string }) {
   if (limit === -1) {
-    return <div aria-label={label ?? 'Unlimited usage'} className="break-words text-sm"><span>{current ?? '—'}</span> <span className="text-muted-foreground">/ Unlimited</span></div>
+    return <div aria-label={label ?? 'Uso sin límite'} className="break-words text-sm"><span>{current ?? '—'}</span> <span className="text-muted-foreground">/ Sin límite</span></div>
   }
   if (current === null) {
-    return <div aria-label={label ?? 'Usage unavailable'} className="text-sm text-muted-foreground">Data unavailable</div>
+    return <div aria-label={label ?? 'Uso no disponible'} className="text-sm text-muted-foreground">Datos no disponibles</div>
   }
   const percentage = limit <= 0 ? 100 : Math.min((current / limit) * 100, 100)
   const ariaMax = limit > 0 ? limit : 100
   const ariaNow = limit > 0 ? Math.min(current, limit) : current > 0 ? 100 : 0
   const ariaValueText = limit > 0
-    ? `${current} of ${limit}${current > limit ? ', over limit' : ''}`
-    : `${current} used with a zero limit`
+    ? `${current} de ${limit}${current > limit ? ', por encima del límite' : ''}`
+    : `${current} usado con límite cero`
   return (
     <div className="space-y-2">
       <div className="break-words text-sm">{current} / {limit}</div>
       <div
         role="progressbar"
-        aria-label={label ?? 'Consumption progress'}
+        aria-label={label ?? 'Progreso de consumo'}
         aria-valuemin={0}
         aria-valuemax={ariaMax}
         aria-valuenow={ariaNow}

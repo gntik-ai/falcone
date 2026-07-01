@@ -20,12 +20,12 @@ export function TenantNameInput({ tenantName, expectedName, value, onChange, onM
   return (
     <div className="space-y-1">
       <label className="block text-sm font-medium text-slate-700">
-        Escribe el nombre exacto del tenant para confirmar
+        Escribe el nombre exacto de la organización para confirmar
       </label>
       <div className="flex items-center gap-2">
         <input
-          aria-label="Tenant name confirmation"
-          placeholder="Escribe el nombre del tenant para confirmar"
+          aria-label="Confirmación del nombre de la organización"
+          placeholder="Escribe el nombre de la organización para confirmar"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}

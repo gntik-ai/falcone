@@ -125,7 +125,7 @@ export function ConsoleTenantConfigReprovisionPage({ tenantId, userRole }: PageP
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6" data-testid="reprovision-page">
       <h1 className="text-xl font-bold text-slate-800">Reaprovisionamiento de configuración</h1>
-      <p className="text-sm text-slate-500">Tenant destino: <span className="font-mono font-medium">{tenantId}</span></p>
+      <p className="text-sm text-slate-500">Organización destino: <span className="font-mono font-medium">{tenantId}</span></p>
 
       {error && (
         <div data-testid="page-error" className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
@@ -251,7 +251,7 @@ export function ConsoleTenantConfigReprovisionPage({ tenantId, userRole }: PageP
           <div className="bg-white rounded-lg p-6 max-w-md shadow-xl space-y-4">
             <h3 className="text-lg font-bold text-red-700">⚠ Confirmar aplicación</h3>
             <p className="text-sm text-slate-600">
-              Esta acción aplicará cambios reales en la configuración del tenant <span className="font-mono font-bold">{tenantId}</span>.
+              Esta acción aplicará cambios reales en la configuración de la organización <span className="font-mono font-bold">{tenantId}</span>.
               Los cambios no se pueden deshacer automáticamente.
             </p>
             <div className="flex gap-3 justify-end">

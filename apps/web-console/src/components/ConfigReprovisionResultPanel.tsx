@@ -129,13 +129,13 @@ export function ConfigReprovisionResultPanel({ result, loading, error }: ConfigR
         </div>
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3">
-          <dt className="text-slate-500">Tenant destino</dt>
+          <dt className="text-slate-500">Organización destino</dt>
           <dd>{result.tenant_id}</dd>
-          <dt className="text-slate-500">Tenant origen</dt>
+          <dt className="text-slate-500">Organización origen</dt>
           <dd>{result.source_tenant_id}</dd>
           <dt className="text-slate-500">Formato</dt>
           <dd>{result.format_version}</dd>
-          <dt className="text-slate-500">Correlation ID</dt>
+          <dt className="text-slate-500">ID de correlación</dt>
           <dd className="font-mono text-[10px]">{result.correlation_id}</dd>
         </dl>
 

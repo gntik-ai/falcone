@@ -14,7 +14,7 @@ interface TenantData { name: string; planId: string; region: string; locale: str
 interface PlanCatalogState { loading: boolean; error: string | null; items: PlanRecord[] }
 
 function NameStep({ data, onChange, validation }: WizardStepProps<TenantData>) {
-  return <div className="space-y-2"><Label htmlFor="tenant-name">Nombre del tenant</Label><Input id="tenant-name" value={data.name ?? ''} onChange={(e) => onChange({ name: e.target.value })} />{validation.fieldErrors.name ? <p className="text-sm text-destructive">{validation.fieldErrors.name}</p> : null}</div>
+  return <div className="space-y-2"><Label htmlFor="tenant-name">Nombre de la organización</Label><Input id="tenant-name" value={data.name ?? ''} onChange={(e) => onChange({ name: e.target.value })} />{validation.fieldErrors.name ? <p className="text-sm text-destructive">{validation.fieldErrors.name}</p> : null}</div>
 }
 function PlanStep({ data, onChange, validation, planCatalog, onRetry }: WizardStepProps<TenantData> & { planCatalog: PlanCatalogState; onRetry: () => void }) {
   const catalogBlocked = planCatalog.loading || Boolean(planCatalog.error) || planCatalog.items.length === 0
@@ -68,7 +68,7 @@ function PlanStep({ data, onChange, validation, planCatalog, onRetry }: WizardSt
         </Alert>
       ) : null}
       {!planCatalog.loading && !planCatalog.error && planCatalog.items.length === 0 ? (
-        <p id="tenant-plan-catalog-empty" role="status" className="max-w-lg rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">No hay planes activos en el catálogo. Activa un plan antes de crear tenants con asignación inicial.</p>
+        <p id="tenant-plan-catalog-empty" role="status" className="max-w-lg rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">No hay planes activos en el catálogo. Activa un plan antes de crear organizaciones con asignación inicial.</p>
       ) : null}
     </div>
   )
@@ -114,8 +114,8 @@ export function CreateTenantWizard({ open, onOpenChange, onCreated }: { open: bo
   return <WizardShell<TenantData>
     open={open}
     onOpenChange={onOpenChange}
-    title="Nuevo tenant"
-    description="Alta guiada de tenant administrativo."
+    title="Nueva organización"
+    description="Alta guiada de organización administrativa."
     context={{ tenantId: null, workspaceId: null, principalRoles: [] }}
     initialData={{ locale: 'es' }}
     steps={[

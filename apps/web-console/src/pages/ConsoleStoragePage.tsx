@@ -154,6 +154,18 @@ function isAbortError(rawError: unknown): boolean {
 
 function formatEnumLabel(value?: string): string {
   if (!value) return '—'
+  const labels: Record<string, string> = {
+    active: 'Activo',
+    cached_snapshot: 'Instantánea en caché',
+    complete: 'Completo',
+    failed: 'Fallido',
+    multipart: 'Multiparte',
+    provider_unavailable: 'Proveedor no disponible',
+    provisioned: 'Aprovisionado',
+    provisioning: 'Aprovisionamiento'
+  }
+  const normalized = value.toLowerCase()
+  if (labels[normalized]) return labels[normalized]
   return value
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase())
@@ -229,10 +241,10 @@ function UnsupportedApiState({ surface }: { surface: 'presigned' | 'multipart' }
   return (
     <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground" role="status">
       <p className="font-medium text-foreground">
-        {surface === 'presigned' ? 'Presigned URLs' : 'Multipart uploads'} no disponible en la API pública actual.
+        {surface === 'presigned' ? 'URLs prefirmadas' : 'Cargas multiparte'} no disponible en la API pública actual.
       </p>
       <p className="mt-2">
-        La familia pública de Storage no expone un endpoint GET de inventario para esta superficie. La consola permanece en modo read-only y no usa endpoints no documentados.
+        La familia pública de almacenamiento no expone una ruta GET de inventario para esta superficie. La consola permanece en modo solo lectura y no usa rutas no documentadas.
       </p>
     </div>
   )
@@ -282,7 +294,7 @@ export function ConsoleStoragePage() {
       setUsage({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setUsage({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el uso del workspace.') })
+      setUsage({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el uso del área de trabajo.') })
     }
   }, [])
 
@@ -322,7 +334,7 @@ export function ConsoleStoragePage() {
       setObjectMeta({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setObjectMeta({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la metadata del objeto.') })
+      setObjectMeta({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los metadatos del objeto.') })
     }
   }, [])
 
@@ -466,18 +478,18 @@ export function ConsoleStoragePage() {
   }, [selectedBucket])
 
   if (!activeTenantId) {
-    return <p role="alert">Selecciona un tenant para continuar.</p>
+    return <p role="alert">Selecciona una organización para continuar.</p>
   }
 
   if (!activeWorkspaceId) {
-    return <p role="alert">Selecciona un workspace para ver los recursos Storage.</p>
+    return <p role="alert">Selecciona un área de trabajo para ver los recursos de almacenamiento.</p>
   }
 
   return (
     <main className="space-y-6" data-testid="console-storage-page">
       <section className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Storage / Objetos</h1>
-        <p className="text-sm text-muted-foreground">Buckets, objetos, metadata y uso del workspace activo usando únicamente endpoints públicos de lectura.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Almacenamiento / objetos</h1>
+        <p className="text-sm text-muted-foreground">Buckets, objetos, metadatos y uso del área de trabajo activa usando únicamente rutas públicas de lectura.</p>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
@@ -486,7 +498,7 @@ export function ConsoleStoragePage() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Buckets</h2>
-                <p className="text-sm text-muted-foreground">Inventario visible para el workspace activo.</p>
+                <p className="text-sm text-muted-foreground">Inventario visible para el área de trabajo activa.</p>
               </div>
               <Badge variant="outline">{buckets.data.length} visibles</Badge>
             </div>
@@ -498,7 +510,7 @@ export function ConsoleStoragePage() {
                 <Button onClick={() => void loadBuckets(activeWorkspaceId)} type="button">Reintentar</Button>
               </div>
             ) : null}
-            {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el workspace seleccionado.</p> : null}
+            {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el área de trabajo seleccionada.</p> : null}
             {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
             {bucketExportNotice ? <p className="mb-3" role="status">{bucketExportNotice}</p> : null}
             {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
@@ -509,7 +521,7 @@ export function ConsoleStoragePage() {
                       <th className="py-2 pr-3">Nombre</th>
                       <th className="py-2 pr-3">Región</th>
                       <th className="py-2 pr-3">Estado</th>
-                      <th className="py-2 pr-3">Provisioning</th>
+                      <th className="py-2 pr-3">Aprovisionamiento</th>
                       <th className="py-2 pr-3">Creado</th>
                       <th className="py-2">Acciones</th>
                     </tr>
@@ -566,8 +578,8 @@ export function ConsoleStoragePage() {
 
           <section aria-busy={usage.loading} className="rounded-xl border border-border p-4">
             <div className="mb-4 space-y-1">
-              <h2 className="text-lg font-semibold">Uso del workspace</h2>
-              <p className="text-sm text-muted-foreground">Snapshot pública de volumen, recuento y distribución por bucket.</p>
+              <h2 className="text-lg font-semibold">Uso del área de trabajo</h2>
+              <p className="text-sm text-muted-foreground">Instantánea pública de volumen, recuento y distribución por bucket.</p>
             </div>
 
             {usage.loading ? <p>Cargando uso…</p> : null}
@@ -575,11 +587,11 @@ export function ConsoleStoragePage() {
             {!usage.loading && !usage.error && usage.data ? (
               <div className="space-y-4">
                 {usage.data.collectionStatus === 'provider_unavailable' ? (
-                  <p role="alert">El proveedor no expone una snapshot de uso disponible en este momento. La consola no interpreta este estado como cero.</p>
+                  <p role="alert">El proveedor no expone una instantánea de uso disponible en este momento. La consola no interpreta este estado como cero.</p>
                 ) : null}
 
                 {usageAgeMinutes !== null && usageAgeMinutes > 15 ? (
-                  <p role="alert">La snapshot de uso tiene {usageAgeMinutes} minutos; los valores pueden estar desactualizados.</p>
+                  <p role="alert">La instantánea de uso tiene {usageAgeMinutes} minutos; los valores pueden estar desactualizados.</p>
                 ) : null}
 
                 <KeyValueGrid items={[
@@ -588,7 +600,7 @@ export function ConsoleStoragePage() {
                   { label: 'Buckets', value: usage.data.dimensions?.bucketCount?.used },
                   { label: 'Método de colección', value: formatEnumLabel(usage.data.collectionMethod) },
                   { label: 'Estado de colección', value: formatEnumLabel(usage.data.collectionStatus) },
-                  { label: 'Snapshot', value: formatRelativeDate(usage.data.cacheSnapshotAt ?? usage.data.snapshotAt) }
+                  { label: 'Instantánea', value: formatRelativeDate(usage.data.cacheSnapshotAt ?? usage.data.snapshotAt) }
                 ]} />
 
                 {typeof quotaPercent === 'number' && quotaLimit !== null ? (
@@ -608,7 +620,7 @@ export function ConsoleStoragePage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">La API pública no expone un límite de cuota para esta snapshot.</p>
+                  <p className="text-sm text-muted-foreground">La API pública no expone un límite de cuota para esta instantánea.</p>
                 )}
 
                 {usage.data.collectionStatus !== 'provider_unavailable' ? (
@@ -636,7 +648,7 @@ export function ConsoleStoragePage() {
                       </table>
                     </div>
                   ) : (
-                    <p>No hay desglose por bucket disponible en la snapshot pública.</p>
+                    <p>No hay desglose por bucket disponible en la instantánea pública.</p>
                   )
                 ) : null}
               </div>
@@ -648,7 +660,7 @@ export function ConsoleStoragePage() {
           {!selectedBucket ? (
             <div className="space-y-2">
               <h2 className="text-lg font-semibold">Detalle del bucket</h2>
-              <p className="text-sm text-muted-foreground">Selecciona un bucket para inspeccionar objetos, metadata y superficies auxiliares disponibles en la API pública.</p>
+              <p className="text-sm text-muted-foreground">Selecciona un bucket para inspeccionar objetos, metadatos y superficies auxiliares disponibles en la API pública.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -662,7 +674,7 @@ export function ConsoleStoragePage() {
               <div className="flex flex-wrap gap-2">
                 {(['objects', 'presigned', 'multipart'] as BucketTab[]).map((tab) => (
                   <Button key={tab} onClick={() => setBucketTab(tab)} type="button" variant={bucketTab === tab ? 'default' : 'outline'}>
-                    {tab === 'objects' ? 'Objetos' : tab === 'presigned' ? 'Presigned URLs' : 'Multipart'}
+                    {tab === 'objects' ? 'Objetos' : tab === 'presigned' ? 'URLs prefirmadas' : 'Multiparte'}
                   </Button>
                 ))}
               </div>
@@ -727,11 +739,11 @@ export function ConsoleStoragePage() {
                   {selectedObjectKey ? (
                     <section className="space-y-3 rounded-xl border border-border p-4">
                       <div>
-                        <h3 className="font-semibold">Metadata del objeto</h3>
-                        <p className="text-sm text-muted-foreground">Detalle read-only obtenido desde el endpoint público de metadata.</p>
+                        <h3 className="font-semibold">Metadatos del objeto</h3>
+                        <p className="text-sm text-muted-foreground">Detalle de solo lectura obtenido desde el punto de conexión público de metadatos.</p>
                       </div>
 
-                      {objectMeta.loading ? <p>Cargando metadata…</p> : null}
+                      {objectMeta.loading ? <p>Cargando metadatos…</p> : null}
                       {!objectMeta.loading && objectMeta.error ? <p role="alert">{objectMeta.error}</p> : null}
                       {!objectMeta.loading && !objectMeta.error && objectMeta.data ? (
                         <div className="space-y-4">
@@ -740,11 +752,11 @@ export function ConsoleStoragePage() {
                             { label: 'Bucket', value: objectMeta.data.bucketName },
                             { label: 'Tamaño', value: formatBytes(objectMeta.data.sizeBytes) },
                             { label: 'Content-Type', value: objectMeta.data.contentType },
-                            { label: 'Storage class', value: objectMeta.data.storageClass },
+                            { label: 'Clase de almacenamiento', value: objectMeta.data.storageClass },
                             { label: 'ETag', value: objectMeta.data.etag },
                             { label: 'Checksum SHA-256', value: objectMeta.data.checksumSha256 },
-                            { label: 'Version ID', value: objectMeta.data.versionId },
-                            { label: 'Provider', value: objectMeta.data.providerType },
+                            { label: 'ID de versión', value: objectMeta.data.versionId },
+                            { label: 'Proveedor', value: objectMeta.data.providerType },
                             { label: 'Aplicación', value: objectMeta.data.applicationId },
                             { label: 'Namespace', value: objectMeta.data.namespace },
                             { label: 'Creado', value: objectMeta.data.timestamps?.createdAt },
@@ -753,7 +765,7 @@ export function ConsoleStoragePage() {
                           ]} />
 
                           <section className="space-y-3">
-                            <h4 className="font-medium">Metadata personalizada</h4>
+                            <h4 className="font-medium">Metadatos personalizados</h4>
                             {objectMeta.data.metadata && Object.keys(objectMeta.data.metadata).length > 0 ? (
                               <div className="overflow-x-auto">
                                 <table className="min-w-full text-left text-sm">
@@ -774,7 +786,7 @@ export function ConsoleStoragePage() {
                                 </table>
                               </div>
                             ) : (
-                              <p>Este objeto no expone metadata personalizada.</p>
+                              <p>Este objeto no expone metadatos personalizados.</p>
                             )}
                           </section>
                         </div>

@@ -38,10 +38,10 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
 
         <section className="mt-4 space-y-2">
           <h3 className="text-sm font-semibold">Objetivo</h3>
-          <p className="text-sm text-slate-700">Tenant: {precheckResponse.target.tenant_name}</p>
+          <p className="text-sm text-slate-700">Organización: {precheckResponse.target.tenant_name}</p>
           <p className="text-sm text-slate-700">Componente: {precheckResponse.target.component_type}</p>
           <p className="text-sm text-slate-700">Instancia: {precheckResponse.target.instance_id}</p>
-          <p className="text-sm text-slate-700">Snapshot: {precheckResponse.target.snapshot_id}</p>
+          <p className="text-sm text-slate-700">Instantánea: {precheckResponse.target.snapshot_id}</p>
           <p className="text-sm text-slate-500">Creado: {new Date(precheckResponse.target.snapshot_created_at).toLocaleString()} · {precheckResponse.target.snapshot_age_hours} horas</p>
         </section>
 

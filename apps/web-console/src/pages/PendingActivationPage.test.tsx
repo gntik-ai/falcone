@@ -33,7 +33,7 @@ describe('PendingActivationPage', () => {
     })
 
     expect(await screen.findByText(/estamos esperando la aprobación final para habilitar el acceso/i)).toBeInTheDocument()
-    expect(screen.getByText(/registration id: reg_pending123/i)).toBeInTheDocument()
+    expect(screen.getByText(/id de registro: reg_pending123/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /volver a login/i })).toHaveAttribute('href', '/login')
   })
 

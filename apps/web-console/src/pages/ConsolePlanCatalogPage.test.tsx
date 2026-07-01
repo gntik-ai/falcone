@@ -28,7 +28,7 @@ describe('ConsolePlanCatalogPage', () => {
     // e.currentTarget is null when the functional setState updater runs, causing
     // TypeError: Cannot read properties of null (reading 'value'), which surfaces
     // as an uncaught error in the React render phase and fails the test.
-    fireEvent.change(screen.getByRole('combobox', { name: 'status-filter' }), { target: { value: 'draft' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filtro de estado' }), { target: { value: 'draft' } })
 
     // The fix reads the value synchronously before entering the updater, so no
     // throw occurs and listPlans is re-invoked with status: 'draft'.

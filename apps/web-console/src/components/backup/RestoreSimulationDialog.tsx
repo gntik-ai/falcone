@@ -37,10 +37,10 @@ export function RestoreSimulationDialog({
           Esta acción ejecuta un drill en un entorno seguro. No toca producción.
         </p>
         <div className="mt-4 space-y-1 text-sm text-slate-700">
-          <p><strong>Tenant:</strong> {tenantId}</p>
+          <p><strong>Organización:</strong> {tenantId}</p>
           <p><strong>Componente:</strong> {componentType}</p>
           <p><strong>Instancia:</strong> {instanceId}</p>
-          <p><strong>Snapshot:</strong> {snapshotId}</p>
+          <p><strong>Instantánea:</strong> {snapshotId}</p>
         </div>
         <div className="mt-6 flex items-center justify-end gap-3">
           <button type="button" className="rounded border px-4 py-2 text-sm" onClick={onClose}>

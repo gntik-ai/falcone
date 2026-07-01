@@ -38,9 +38,9 @@ export interface FlowViewSwitcherProps {
 }
 
 const MODES: Array<{ id: ViewMode; label: string }> = [
-  { id: 'canvas', label: 'Canvas' },
+  { id: 'canvas', label: 'Lienzo' },
   { id: 'yaml', label: 'YAML' },
-  { id: 'side-by-side', label: 'Side by side' }
+  { id: 'side-by-side', label: 'Lado a lado' }
 ]
 
 const deps: ViewSyncDeps = { parse: parseYamlToFlow, serialize: serializeFlowToYaml }
@@ -88,7 +88,7 @@ export function FlowViewSwitcher({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="flow-view-switcher" data-mode={state.mode}>
-      <div className="flex items-center gap-1 border-b border-border px-3 py-1.5" role="tablist" aria-label="Flow view">
+      <div className="flex items-center gap-1 border-b border-border px-3 py-1.5" role="tablist" aria-label="Vista del flujo">
         {MODES.map((mode) => (
           <Button
             key={mode.id}
@@ -128,7 +128,7 @@ export function FlowViewSwitcher({
                 className="bg-amber-100 px-3 py-1 text-xs text-amber-800"
                 role="status"
               >
-                Showing the last valid version. Fix the YAML to resume editing on the canvas.
+                Se muestra la última versión válida. Corrige el YAML para volver a editar en el lienzo.
               </p>
             ) : null}
             {renderCanvas(currentDefinition)}

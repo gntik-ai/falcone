@@ -19,7 +19,15 @@ import {
   type ExecutionSummary
 } from '@/services/flowsMonitoringApi'
 
-const STATUS_OPTIONS = ['', 'Running', 'Completed', 'Failed', 'Canceled', 'Terminated', 'TimedOut']
+const STATUS_OPTIONS = [
+  { value: '', label: 'Cualquier estado' },
+  { value: 'Running', label: 'En ejecución' },
+  { value: 'Completed', label: 'Completada' },
+  { value: 'Failed', label: 'Fallida' },
+  { value: 'Canceled', label: 'Cancelada' },
+  { value: 'Terminated', label: 'Terminada' },
+  { value: 'TimedOut', label: 'Expirada' }
+]
 const TRIGGER_OPTIONS = ['', 'manual', 'cron', 'webhook', 'platform_event']
 
 interface FilterState {
@@ -70,7 +78,7 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
         setNextPageToken(response.nextPageToken ?? null)
         setLoaded(true)
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Failed to load runs')
+      setError(caught instanceof Error ? caught.message : 'No se pudieron cargar las ejecuciones')
       } finally {
         setLoading(false)
       }
@@ -106,26 +114,26 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
     <div className="space-y-4 p-4" data-testid="console-flow-history-page">
       <header className="flex flex-wrap items-center gap-2">
         <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
-          Flows
+          Flujos
         </Link>
         <span className="text-muted-foreground">/</span>
-        <h1 className="text-base font-semibold">Run history</h1>
+        <h1 className="text-base font-semibold">Historial de ejecuciones</h1>
         <span className="text-xs text-muted-foreground">{flowId}</span>
       </header>
 
       <section className="flex flex-wrap items-end gap-2" data-testid="run-history-filters">
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted-foreground">Version</span>
+          <span className="text-muted-foreground">Versión</span>
           <Input
             className="h-9 w-28 text-xs"
             value={filters.flowVersion}
             onChange={(event) => setFilter('flowVersion')(event.target.value)}
             data-testid="filter-flow-version"
-            placeholder="any"
+            placeholder="cualquiera"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted-foreground">Status</span>
+          <span className="text-muted-foreground">Estado</span>
           <Select
             className="h-9 w-36 text-xs"
             value={filters.status}
@@ -133,14 +141,14 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
             data-testid="filter-status"
           >
             {STATUS_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option === '' ? 'Any status' : option}
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </Select>
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted-foreground">Trigger</span>
+          <span className="text-muted-foreground">Disparador</span>
           <Select
             className="h-9 w-36 text-xs"
             value={filters.triggerType}
@@ -149,13 +157,13 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           >
             {TRIGGER_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option === '' ? 'Any trigger' : option}
+                {option === '' ? 'Cualquier disparador' : option}
               </option>
             ))}
           </Select>
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted-foreground">Started after</span>
+          <span className="text-muted-foreground">Iniciada después de</span>
           <Input
             type="datetime-local"
             className="h-9 w-48 text-xs"
@@ -165,7 +173,7 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           />
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted-foreground">Started before</span>
+          <span className="text-muted-foreground">Iniciada antes de</span>
           <Input
             type="datetime-local"
             className="h-9 w-48 text-xs"
@@ -184,20 +192,20 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
 
       {isEmpty ? (
         <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground" data-testid="run-history-empty">
-          No executions match the applied filters.
+          No hay ejecuciones que coincidan con los filtros aplicados.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
           <table className="w-full table-fixed border-collapse text-sm sm:min-w-[48rem] sm:table-auto" data-testid="run-history-table">
-            <caption className="sr-only">Flow run history</caption>
+            <caption className="sr-only">Historial de ejecuciones del flujo</caption>
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th scope="col" className="px-4 py-3 font-medium">Execution</th>
-                <th scope="col" className="hidden w-28 px-4 py-3 font-medium sm:table-cell">Status</th>
-                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Trigger</th>
-                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Version</th>
-                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Started</th>
-                <th scope="col" className="w-36 px-4 py-3 text-right font-medium sm:w-auto">Actions</th>
+                <th scope="col" className="px-4 py-3 font-medium">Ejecución</th>
+                <th scope="col" className="hidden w-28 px-4 py-3 font-medium sm:table-cell">Estado</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Disparador</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Versión</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Inicio</th>
+                <th scope="col" className="w-36 px-4 py-3 text-right font-medium sm:w-auto">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -214,9 +222,9 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
                     <Button size="sm" variant="outline" className="w-full justify-start sm:w-auto sm:justify-center" asChild>
                       <Link
                         to={`/console/flows/${encodeURIComponent(flowId)}/runs/${encodeURIComponent(item.executionId)}`}
-                        aria-label={`Open details for run ${item.executionId}`}
+                        aria-label={`Abrir detalles de ejecución ${item.executionId}`}
                       >
-                        Open details
+                        Abrir detalles
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </Link>
                     </Button>
@@ -236,9 +244,9 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           disabled={loading || pageStack.length === 0}
           data-testid="run-history-prev"
         >
-          Previous
+          Anterior
         </Button>
-        <span className="text-xs text-muted-foreground">{loading ? 'Loading…' : `${items.length} runs`}</span>
+        <span className="text-xs text-muted-foreground">{loading ? 'Cargando…' : `${items.length} ejecuciones`}</span>
         <Button
           size="sm"
           variant="outline"
@@ -246,7 +254,7 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           disabled={loading || !nextPageToken}
           data-testid="run-history-next"
         >
-          Next
+          Siguiente
         </Button>
       </footer>
     </div>
@@ -258,10 +266,10 @@ export function ConsoleFlowHistoryPage() {
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId) {
-    return <p className="p-6 text-sm text-muted-foreground">Missing flow identifier.</p>
+    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo.</p>
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Select a workspace to view run history.</p>
+    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para ver el historial de ejecuciones.</p>
   }
 
   return <HistoryList workspaceId={activeWorkspaceId} flowId={flowId} />

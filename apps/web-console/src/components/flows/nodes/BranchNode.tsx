@@ -20,12 +20,12 @@ export function BranchNode({ data, selected }: NodeProps) {
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Branch"
+        typeLabel="Rama"
         label={nodeData.label}
         icon={GitBranch}
         selected={selected}
         validationErrors={nodeData.validationErrors}
-        badges={[`${arms.length} arm${arms.length === 1 ? '' : 's'}`]}
+        badges={[`${arms.length} ${arms.length === 1 ? 'brazo' : 'brazos'}`]}
       >
         <div className="mt-1 space-y-0.5">
           {arms.map((arm, index) => (

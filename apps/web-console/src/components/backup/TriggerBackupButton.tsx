@@ -45,7 +45,7 @@ export function TriggerBackupButton({
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
             <h2 className="text-lg font-bold mb-2">Confirmar backup</h2>
             <p className="text-sm text-gray-700 mb-4">
-              ¿Iniciar backup bajo demanda para el componente <strong>{componentType}</strong> ({instanceId}) del tenant <strong>{tenantId}</strong>?
+              ¿Iniciar backup bajo demanda para el componente <strong>{componentType}</strong> ({instanceId}) de la organización <strong>{tenantId}</strong>?
             </p>
             {error && <p className="text-red-600 text-sm mb-2">{error.message}</p>}
             <div className="flex gap-2 justify-end">

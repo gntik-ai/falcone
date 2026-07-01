@@ -16,13 +16,13 @@ interface StatusStyle {
 
 // Each status maps to a distinct label + colour so the canvas overlay is legible at a glance.
 const STATUS_STYLES: Record<NodeStatus, StatusStyle> = {
-  scheduled: { label: 'Scheduled', variant: 'outline', className: 'border-slate-400 text-slate-600' },
-  started: { label: 'Running', variant: 'secondary', className: 'bg-sky-100 text-sky-800 border-sky-300' },
-  retrying: { label: 'Retrying', variant: 'secondary', className: 'bg-amber-100 text-amber-800 border-amber-300' },
-  completed: { label: 'Completed', variant: 'secondary', className: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  failed: { label: 'Failed', variant: 'destructive', className: '' },
-  skipped: { label: 'Skipped', variant: 'outline', className: 'border-slate-300 text-slate-400' },
-  'waiting-approval': { label: 'Waiting approval', variant: 'secondary', className: 'bg-violet-100 text-violet-800 border-violet-300' }
+  scheduled: { label: 'Programado', variant: 'outline', className: 'border-slate-400 text-slate-600' },
+  started: { label: 'En ejecución', variant: 'secondary', className: 'bg-sky-100 text-sky-800 border-sky-300' },
+  retrying: { label: 'Reintentando', variant: 'secondary', className: 'bg-amber-100 text-amber-800 border-amber-300' },
+  completed: { label: 'Completado', variant: 'secondary', className: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  failed: { label: 'Fallido', variant: 'destructive', className: '' },
+  skipped: { label: 'Omitido', variant: 'outline', className: 'border-slate-300 text-slate-400' },
+  'waiting-approval': { label: 'Esperando aprobación', variant: 'secondary', className: 'bg-violet-100 text-violet-800 border-violet-300' }
 }
 
 // Human-readable duration between two timestamps (ms → "1.2s" / "340ms" / "2m 5s").
@@ -67,7 +67,7 @@ export function NodeStatusBadge({
       <span>{style.label}</span>
       {attemptNumber && attemptNumber > 1 ? (
         <span data-testid="node-status-attempt" className="opacity-80">
-          · attempt {attemptNumber}
+          · intento {attemptNumber}
         </span>
       ) : null}
       {duration ? (

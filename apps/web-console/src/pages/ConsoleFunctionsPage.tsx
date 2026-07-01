@@ -320,7 +320,7 @@ function getActivationUnavailableMessage(message: string): string {
 function getActivationLogsMessage(message: string): string {
   const normalized = message.toLowerCase()
   if (normalized.includes('403') || normalized.includes('permiso') || normalized.includes('forbidden')) {
-    return 'No tienes permisos para ver los logs de esta activación.'
+    return 'No tienes permisos para ver los registros de esta activación.'
   }
   return getActivationUnavailableMessage(message)
 }
@@ -527,7 +527,7 @@ export function ConsoleFunctionsPage() {
         logs: logsResultData.status === 'fulfilled' ? logsResultData.value : null,
         result: payloadResultData.status === 'fulfilled' ? payloadResultData.value : null,
         activationError: activationResultData.status === 'rejected' ? getApiErrorMessage(activationResultData.reason, 'No se pudo cargar la activación.') : null,
-        logsError: logsResultData.status === 'rejected' ? getApiErrorMessage(logsResultData.reason, 'No se pudieron cargar los logs.') : null,
+        logsError: logsResultData.status === 'rejected' ? getApiErrorMessage(logsResultData.reason, 'No se pudieron cargar los registros.') : null,
         resultError: payloadResultData.status === 'rejected' ? getApiErrorMessage(payloadResultData.reason, 'No se pudo cargar el resultado.') : null
       }
       setActivationDetail({ data: next, loading: false, error: null })
@@ -612,7 +612,7 @@ export function ConsoleFunctionsPage() {
   const handleDeploy = useCallback(async () => {
     if (!activeTenantId || !activeWorkspaceId) return
     if (!deployForm.actionName.trim() || !deployForm.runtime.trim() || !deployForm.entrypoint.trim()) {
-      setDeployResult({ data: null, loading: false, error: 'Completa action name, runtime y entrypoint.' })
+      setDeployResult({ data: null, loading: false, error: 'Completa el nombre de acción, el entorno y el punto de entrada.' })
       return
     }
     if (!/^[a-z][a-z0-9-]{1,62}$/.test(deployForm.actionName.trim())) {
@@ -672,7 +672,7 @@ export function ConsoleFunctionsPage() {
 
     const body: FunctionRollbackWriteRequest = {
       versionId: rollbackTargetVersionId,
-      reason: 'Console-initiated rollback'
+      reason: 'Reversión iniciada desde la consola'
     }
 
     try {
@@ -685,25 +685,25 @@ export function ConsoleFunctionsPage() {
       setRollbackResult({ data, loading: false, error: null })
       await Promise.all([loadActionDetail(selectedActionId), loadVersions(selectedActionId)])
     } catch (error) {
-      setRollbackResult({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo solicitar el rollback.') })
+      setRollbackResult({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo solicitar la reversión.') })
     }
   }, [loadActionDetail, loadVersions, rollbackTargetVersionId, selectedActionId])
 
-  if (!activeTenantId) return <p role="alert">Selecciona un tenant para continuar.</p>
-  if (!activeWorkspaceId) return <p role="alert">Selecciona un workspace para ver las funciones.</p>
+  if (!activeTenantId) return <p role="alert">Selecciona una organización para continuar.</p>
+  if (!activeWorkspaceId) return <p role="alert">Selecciona un área de trabajo para ver las funciones.</p>
 
   return (
     <main className="space-y-6">
       <header className="space-y-2">
-        <Badge variant="outline">Functions</Badge>
+        <Badge variant="outline">Funciones</Badge>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">Consola de funciones</h1>
-            <p className="text-sm text-muted-foreground">Inventario, detalle operativo, activaciones, invocación y despliegue del runtime serverless.</p>
+            <p className="text-sm text-muted-foreground">Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.</p>
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setPublishWizardOpen(true)} type="button" variant="default">Publicar función</Button>
-            <Button onClick={openCreateMode} type="button" variant="outline">Deploy nueva función</Button>
+            <Button onClick={openCreateMode} type="button" variant="outline">Desplegar función nueva</Button>
           </div>
         </div>
       </header>
@@ -717,14 +717,14 @@ export function ConsoleFunctionsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Inventario</h2>
-              {inventory.data?.quotaStatus ? <Badge variant="outline">Quota {formatValue(inventory.data.quotaStatus.remaining)}/{formatValue(inventory.data.quotaStatus.limit)}</Badge> : null}
+              {inventory.data?.quotaStatus ? <Badge variant="outline">Cuota {formatValue(inventory.data.quotaStatus.remaining)}/{formatValue(inventory.data.quotaStatus.limit)}</Badge> : null}
             </div>
             {inventory.data?.counts ? (
               <KeyValueGrid items={[
-                { label: 'Actions', value: inventory.data.counts.actions },
-                { label: 'Packages', value: inventory.data.counts.packages },
-                { label: 'Triggers', value: inventory.data.counts.triggers },
-                { label: 'HTTP exposures', value: inventory.data.counts.httpExposures }
+                { label: 'Acciones', value: inventory.data.counts.actions },
+                { label: 'Paquetes', value: inventory.data.counts.packages },
+                { label: 'Disparadores', value: inventory.data.counts.triggers },
+                { label: 'Exposiciones HTTP', value: inventory.data.counts.httpExposures }
               ]} />
             ) : null}
             {inventory.loading ? <p>Cargando inventario…</p> : null}
@@ -734,7 +734,7 @@ export function ConsoleFunctionsPage() {
                 <Button onClick={() => void loadInventory(activeWorkspaceId)} type="button" variant="outline">Reintentar</Button>
               </div>
             ) : null}
-            {!inventory.loading && !inventory.error && (!inventory.data || inventory.data.actions.length === 0) ? <p>No hay funciones en este workspace.</p> : null}
+            {!inventory.loading && !inventory.error && (!inventory.data || inventory.data.actions.length === 0) ? <p>No hay funciones en esta área de trabajo.</p> : null}
             {!inventory.loading && !inventory.error && inventory.data?.actions.length ? (
               <div className="space-y-2">
                 {inventory.data.actions.map((item) => {
@@ -753,7 +753,7 @@ export function ConsoleFunctionsPage() {
                         <strong>{item.actionName}</strong>
                         <Badge variant={statusTone(item.provisioning?.state ?? item.status)}>{formatEnumLabel(item.provisioning?.state ?? item.status)}</Badge>
                       </div>
-                      <p className="mt-2 text-sm text-muted-foreground">Runtime: {item.execution?.runtime ?? '—'} · Version: {item.activeVersionId ?? '—'}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">Entorno: {item.execution?.runtime ?? '—'} · Versión: {item.activeVersionId ?? '—'}</p>
                     </button>
                   )
                 })}
@@ -773,13 +773,13 @@ export function ConsoleFunctionsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
                 {effectiveAction ? <Badge variant={statusTone(effectiveAction.provisioning?.state ?? effectiveAction.status)}>{formatEnumLabel(effectiveAction.provisioning?.state ?? effectiveAction.status)}</Badge> : null}
-                {effectiveAction?.provisioning?.state ? <Badge variant="outline">Provisioning: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
+                {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {(['detail', 'versions', 'activations', 'triggers', 'invoke', 'deploy'] as FunctionDetailTab[]).map((tab) => (
                   <Button key={tab} onClick={() => setActionDetailTab(tab)} type="button" variant={actionDetailTab === tab ? 'default' : 'outline'}>
-                    {tab === 'detail' ? 'Detail' : tab === 'versions' ? 'Versions' : tab === 'activations' ? 'Activations' : tab === 'triggers' ? 'Triggers' : tab === 'invoke' ? 'Invoke' : 'Deploy'}
+                    {tab === 'detail' ? 'Detalle' : tab === 'versions' ? 'Versiones' : tab === 'activations' ? 'Activaciones' : tab === 'triggers' ? 'Disparadores' : tab === 'invoke' ? 'Invocar' : 'Desplegar'}
                   </Button>
                 ))}
               </div>
@@ -793,43 +793,43 @@ export function ConsoleFunctionsPage() {
                       <section className="space-y-3">
                         <h3 className="font-semibold">Identificación</h3>
                         <KeyValueGrid items={[
-                          { label: 'Action name', value: effectiveAction.actionName },
-                          { label: 'Resource ID', value: effectiveAction.resourceId },
-                          { label: 'Package', value: effectiveAction.packageName },
+                          { label: 'Nombre de acción', value: effectiveAction.actionName },
+                          { label: 'ID de recurso', value: effectiveAction.resourceId },
+                          { label: 'Paquete', value: effectiveAction.packageName },
                           { label: 'Namespace', value: effectiveAction.namespaceName },
-                          { label: 'Active version', value: effectiveAction.activeVersionId },
-                          { label: 'Deployment digest', value: effectiveAction.deploymentDigest }
+                          { label: 'Versión activa', value: effectiveAction.activeVersionId },
+                          { label: 'Digest de despliegue', value: effectiveAction.deploymentDigest }
                         ]} />
                       </section>
                       <section className="space-y-3">
-                        <h3 className="font-semibold">Execution</h3>
+                        <h3 className="font-semibold">Ejecución</h3>
                         <KeyValueGrid items={[
-                          { label: 'Runtime', value: effectiveAction.execution?.runtime },
-                          { label: 'Entrypoint', value: effectiveAction.execution?.entrypoint },
-                          { label: 'Timeout (ms)', value: effectiveAction.execution?.limits?.timeoutMs },
-                          { label: 'Memory (MB)', value: effectiveAction.execution?.limits?.memoryMb },
-                          { label: 'Concurrent invocations', value: effectiveAction.execution?.limits?.concurrentInvocations },
-                          { label: 'Activation retention', value: effectiveAction.activationPolicy?.retentionDays }
+                          { label: 'Entorno', value: effectiveAction.execution?.runtime },
+                          { label: 'Punto de entrada', value: effectiveAction.execution?.entrypoint },
+                          { label: 'Tiempo de espera (ms)', value: effectiveAction.execution?.limits?.timeoutMs },
+                          { label: 'Memoria (MB)', value: effectiveAction.execution?.limits?.memoryMb },
+                          { label: 'Invocaciones concurrentes', value: effectiveAction.execution?.limits?.concurrentInvocations },
+                          { label: 'Retención de activaciones', value: effectiveAction.activationPolicy?.retentionDays }
                         ]} />
                       </section>
                       {functionSnippetContext ? <ConnectionSnippets resourceType="serverless-function" context={functionSnippetContext} /> : null}
                       <section className="space-y-3">
                         <h3 className="font-semibold">Configuración avanzada</h3>
                         <KeyValueGrid items={[
-                          { label: 'Source kind', value: effectiveAction.source?.kind },
-                          { label: 'HTTP enabled', value: effectiveAction.httpExposure?.enabled },
-                          { label: 'HTTP URL', value: effectiveAction.httpExposure?.publicUrl },
-                          { label: 'HTTP auth', value: effectiveAction.httpExposure?.authPolicy },
-                          { label: 'Provisioning state', value: effectiveAction.provisioning?.state },
-                          { label: 'Failure class', value: effectiveAction.provisioning?.failureClass }
+                          { label: 'Tipo de fuente', value: effectiveAction.source?.kind },
+                          { label: 'HTTP habilitado', value: effectiveAction.httpExposure?.enabled },
+                          { label: 'URL HTTP', value: effectiveAction.httpExposure?.publicUrl },
+                          { label: 'Autenticación HTTP', value: effectiveAction.httpExposure?.authPolicy },
+                          { label: 'Estado de aprovisionamiento', value: effectiveAction.provisioning?.state },
+                          { label: 'Clase de fallo', value: effectiveAction.provisioning?.failureClass }
                         ]} />
                         <div className="grid gap-4 lg:grid-cols-2">
                           <div>
-                            <h4 className="mb-2 text-sm font-medium">Environment</h4>
+                            <h4 className="mb-2 text-sm font-medium">Entorno</h4>
                             <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs">{formatJson(effectiveAction.execution?.environment)}</pre>
                           </div>
                           <div>
-                            <h4 className="mb-2 text-sm font-medium">Parameters</h4>
+                            <h4 className="mb-2 text-sm font-medium">Parámetros</h4>
                             <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs">{formatJson(effectiveAction.execution?.parameters)}</pre>
                           </div>
                         </div>
@@ -837,10 +837,10 @@ export function ConsoleFunctionsPage() {
                       <section className="space-y-3">
                         <h3 className="font-semibold">Secretos y timestamps</h3>
                         <KeyValueGrid items={[
-                          { label: 'Secret refs', value: effectiveAction.secretReferences?.map((item) => item.secretName).join(', ') || '—' },
-                          { label: 'Created at', value: effectiveAction.timestamps?.createdAt },
-                          { label: 'Updated at', value: effectiveAction.timestamps?.updatedAt },
-                          { label: 'Rollback available', value: effectiveAction.rollbackAvailable }
+                          { label: 'Referencias de secreto', value: effectiveAction.secretReferences?.map((item) => item.secretName).join(', ') || '—' },
+                          { label: 'Creada en', value: effectiveAction.timestamps?.createdAt },
+                          { label: 'Actualizada en', value: effectiveAction.timestamps?.updatedAt },
+                          { label: 'Reversión disponible', value: effectiveAction.rollbackAvailable }
                         ]} />
                       </section>
                     </>
@@ -865,10 +865,10 @@ export function ConsoleFunctionsPage() {
                           <thead>
                             <tr className="border-b border-border text-muted-foreground">
                               <th className="py-2 pr-3">Versión</th>
-                              <th className="py-2 pr-3">Version ID</th>
-                              <th className="py-2 pr-3">Status</th>
-                              <th className="py-2 pr-3">Origin</th>
-                              <th className="py-2">Created at</th>
+                              <th className="py-2 pr-3">ID de versión</th>
+                              <th className="py-2 pr-3">Estado</th>
+                              <th className="py-2 pr-3">Origen</th>
+                              <th className="py-2">Creada en</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -891,11 +891,11 @@ export function ConsoleFunctionsPage() {
                       </div>
                       <div className="space-y-2">
                         <Button disabled={writeDisabled || eligibleRollbackVersions.length === 0 || !rollbackTargetVersionId || rollbackResult.loading} onClick={() => void handleRollback()} type="button">
-                          {rollbackResult.loading ? 'Solicitando rollback…' : 'Rollback'}
+                          {rollbackResult.loading ? 'Solicitando reversión…' : 'Revertir'}
                         </Button>
-                        {eligibleRollbackVersions.length === 0 ? <p className="text-sm text-muted-foreground">No hay versiones anteriores disponibles para rollback.</p> : null}
+                        {eligibleRollbackVersions.length === 0 ? <p className="text-sm text-muted-foreground">No hay versiones anteriores disponibles para revertir.</p> : null}
                         {rollbackResult.error ? <p role="alert">{rollbackResult.error}</p> : null}
-                        {rollbackResult.data ? <p role="alert">Rollback {rollbackResult.data.status}: {rollbackResult.data.requestedVersionId}</p> : null}
+                        {rollbackResult.data ? <p role="alert">Reversión {rollbackResult.data.status}: {rollbackResult.data.requestedVersionId}</p> : null}
                       </div>
                     </>
                   ) : null}
@@ -925,30 +925,30 @@ export function ConsoleFunctionsPage() {
                     ))}
                   </div>
                   <div className="space-y-3 rounded-lg border border-border p-4">
-                    {!selectedActivationId ? <p>Selecciona una activación para ver metadata, logs y resultado.</p> : null}
+                    {!selectedActivationId ? <p>Selecciona una activación para ver metadatos, registros y resultado.</p> : null}
                     {activationDetail.loading ? <p>Cargando detalle de activación…</p> : null}
                     {activationDetail.data.activation ? (
                       <KeyValueGrid items={[
-                        { label: 'Activation ID', value: activationDetail.data.activation.activationId },
-                        { label: 'Resource ID', value: activationDetail.data.activation.resourceId },
-                        { label: 'Status', value: activationDetail.data.activation.status },
-                        { label: 'Started at', value: activationDetail.data.activation.startedAt },
-                        { label: 'Finished at', value: activationDetail.data.activation.finishedAt },
-                        { label: 'Duration (ms)', value: activationDetail.data.activation.durationMs },
-                        { label: 'Status code', value: activationDetail.data.activation.statusCode },
-                        { label: 'Trigger kind', value: activationDetail.data.activation.triggerKind },
-                        { label: 'Memory (MB)', value: activationDetail.data.activation.memoryMb },
-                        { label: 'Invocation ID', value: activationDetail.data.activation.invocationId },
-                        { label: 'Retention (days)', value: activationDetail.data.activation.policy?.retentionDays }
+                        { label: 'ID de activación', value: activationDetail.data.activation.activationId },
+                        { label: 'ID de recurso', value: activationDetail.data.activation.resourceId },
+                        { label: 'Estado', value: activationDetail.data.activation.status },
+                        { label: 'Iniciada en', value: activationDetail.data.activation.startedAt },
+                        { label: 'Finalizada en', value: activationDetail.data.activation.finishedAt },
+                        { label: 'Duración (ms)', value: activationDetail.data.activation.durationMs },
+                        { label: 'Código de estado', value: activationDetail.data.activation.statusCode },
+                        { label: 'Tipo de disparador', value: activationDetail.data.activation.triggerKind },
+                        { label: 'Memoria (MB)', value: activationDetail.data.activation.memoryMb },
+                        { label: 'ID de invocación', value: activationDetail.data.activation.invocationId },
+                        { label: 'Retención (días)', value: activationDetail.data.activation.policy?.retentionDays }
                       ]} />
                     ) : null}
                     {activationDetail.data.activationError ? <p role="alert">{getActivationUnavailableMessage(activationDetail.data.activationError)}</p> : null}
                     <section className="space-y-2">
-                      <h3 className="font-semibold">Logs</h3>
+                      <h3 className="font-semibold">Registros</h3>
                       {activationDetail.data.logsError ? <p role="alert">{getActivationLogsMessage(activationDetail.data.logsError)}</p> : null}
-                      {!activationDetail.data.logsError && activationDetail.data.logs?.truncated ? <p className="text-xs text-amber-600">Los logs están truncados. Se muestra el contenido disponible.</p> : null}
-                      {!activationDetail.data.logsError && activationDetail.data.activation?.status === 'running' && !activationDetail.data.logs ? <p>La activación sigue en curso. Los logs pueden no estar disponibles aún.</p> : null}
-                      {!activationDetail.data.logsError && activationDetail.data.logs && activationDetail.data.logs.lines.length === 0 ? <p>No hay logs disponibles para esta activación.</p> : null}
+                      {!activationDetail.data.logsError && activationDetail.data.logs?.truncated ? <p className="text-xs text-amber-600">Los registros están truncados. Se muestra el contenido disponible.</p> : null}
+                      {!activationDetail.data.logsError && activationDetail.data.activation?.status === 'running' && !activationDetail.data.logs ? <p>La activación sigue en curso. Los registros pueden no estar disponibles aún.</p> : null}
+                      {!activationDetail.data.logsError && activationDetail.data.logs && activationDetail.data.logs.lines.length === 0 ? <p>No hay registros disponibles para esta activación.</p> : null}
                       {!activationDetail.data.logsError && activationDetail.data.logs && activationDetail.data.logs.lines.length > 0 ? <pre className="max-h-64 overflow-y-auto rounded bg-muted p-3 text-xs">{activationDetail.data.logs.lines.join('\n')}</pre> : null}
                     </section>
                     <section className="space-y-2">
@@ -985,7 +985,7 @@ export function ConsoleFunctionsPage() {
 
               {actionDetailTab === 'triggers' ? (
                 <div className="space-y-4">
-                  {!effectiveAction?.kafkaTriggers?.length && !effectiveAction?.cronTriggers?.length && !effectiveAction?.storageTriggers?.length ? <p>No hay trigger bindings configurados para esta función.</p> : null}
+                  {!effectiveAction?.kafkaTriggers?.length && !effectiveAction?.cronTriggers?.length && !effectiveAction?.storageTriggers?.length ? <p>No hay asociaciones de disparadores configuradas para esta función.</p> : null}
                   {effectiveAction?.kafkaTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Kafka</h3>
@@ -1000,7 +1000,7 @@ export function ConsoleFunctionsPage() {
                   ) : null}
                   {effectiveAction?.storageTriggers?.length ? (
                     <section className="space-y-2">
-                      <h3 className="font-semibold">Storage</h3>
+                      <h3 className="font-semibold">Almacenamiento</h3>
                       {effectiveAction.storageTriggers.map((item) => <p key={item.triggerId ?? item.bucketRef}>{item.bucketRef ?? item.triggerId} · {item.eventTypes?.join(', ') || '—'} · {formatEnumLabel(item.status)}</p>)}
                     </section>
                   ) : null}
@@ -1010,28 +1010,28 @@ export function ConsoleFunctionsPage() {
               {actionDetailTab === 'invoke' ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium" htmlFor="functions-invoke-payload">Payload JSON</label>
+                    <label className="block text-sm font-medium" htmlFor="functions-invoke-payload">Contenido JSON</label>
                     <textarea className="min-h-36 w-full rounded-md border border-input bg-background p-3 text-sm" id="functions-invoke-payload" onChange={(event) => setInvokeForm((current) => ({ ...current, parametersJson: event.target.value }))} value={invokeForm.parametersJson} />
                   </div>
-                  <label className="block text-sm font-medium">Response mode
+                    <label className="block text-sm font-medium">Modo de respuesta
                     <select className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setInvokeForm((current) => ({ ...current, responseMode: event.target.value as 'accepted' | 'wait_for_result' }))} value={invokeForm.responseMode}>
                       <option value="accepted">accepted</option>
                       <option value="wait_for_result">wait_for_result</option>
                     </select>
                   </label>
                   <Button disabled={!selectedActionId || writeDisabled || invokeResult.loading} onClick={() => void handleInvoke()} type="button">{invokeResult.loading ? 'Invocando…' : 'Invocar'}</Button>
-                  {writeDisabled ? <p className="text-sm text-muted-foreground">La función no admite acciones de escritura mientras su provisioning no sea accionable.</p> : null}
+                  {writeDisabled ? <p className="text-sm text-muted-foreground">La función no admite acciones de escritura mientras su aprovisionamiento no sea accionable.</p> : null}
                   {invokeResult.error ? (
                     <div className="rounded-lg border border-destructive/40 p-3 text-sm" role="alert">
                       <p>{invokeResult.error}</p>
-                      {invokeResult.error.includes('quota') || invokeResult.error.includes('429') ? <p className="mt-2 text-muted-foreground">Revisa límites o enforcement antes de reintentar.</p> : null}
+                      {invokeResult.error.includes('quota') || invokeResult.error.includes('429') ? <p className="mt-2 text-muted-foreground">Revisa límites o aplicación de límites antes de reintentar.</p> : null}
                     </div>
                   ) : null}
                   {invokeResult.data ? (
                     <div className="rounded-lg border border-border p-3 text-sm" role="alert">
-                      <p><strong>Invocation ID:</strong> {invokeResult.data.invocationId}</p>
-                      <p><strong>Status:</strong> {invokeResult.data.status}</p>
-                      <p><strong>Accepted at:</strong> {invokeResult.data.acceptedAt}</p>
+                      <p><strong>ID de invocación:</strong> {invokeResult.data.invocationId}</p>
+                      <p><strong>Estado:</strong> {invokeResult.data.status}</p>
+                      <p><strong>Aceptada en:</strong> {invokeResult.data.acceptedAt}</p>
                     </div>
                   ) : null}
                 </div>
@@ -1040,24 +1040,24 @@ export function ConsoleFunctionsPage() {
               {actionDetailTab === 'deploy' ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="block text-sm font-medium">Action name
+                    <label className="block text-sm font-medium">Nombre de acción
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" disabled={deployForm.mode === 'edit'} onChange={(event) => setDeployForm((current) => ({ ...current, actionName: event.target.value }))} type="text" value={deployForm.actionName} />
                     </label>
-                    <label className="block text-sm font-medium">Runtime
+                    <label className="block text-sm font-medium">Entorno
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, runtime: event.target.value }))} type="text" value={deployForm.runtime} />
                     </label>
-                    <label className="block text-sm font-medium">Entrypoint
+                    <label className="block text-sm font-medium">Punto de entrada
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, entrypoint: event.target.value }))} type="text" value={deployForm.entrypoint} />
                     </label>
-                    <label className="block text-sm font-medium">Timeout (ms)
+                    <label className="block text-sm font-medium">Tiempo de espera (ms)
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, timeoutMs: event.target.value }))} type="number" value={deployForm.timeoutMs} />
                     </label>
-                    <label className="block text-sm font-medium">Memory (MB)
+                    <label className="block text-sm font-medium">Memoria (MB)
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, memoryMb: event.target.value }))} type="number" value={deployForm.memoryMb} />
                     </label>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium" htmlFor="functions-inline-code">Inline code</label>
+                    <label className="block text-sm font-medium" htmlFor="functions-inline-code">Código inline</label>
                     <textarea className="min-h-48 w-full rounded-md border border-input bg-background p-3 text-sm" id="functions-inline-code" onChange={(event) => setDeployForm((current) => ({ ...current, inlineCode: event.target.value }))} value={deployForm.inlineCode} />
                   </div>
                   <Button disabled={writeDisabled || deployResult.loading} onClick={() => void handleDeploy()} type="button">{deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}</Button>

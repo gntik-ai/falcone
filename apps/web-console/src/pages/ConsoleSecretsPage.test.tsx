@@ -9,8 +9,8 @@ import { ConsoleSecretsPage, SecretVersionBadge } from './ConsoleSecretsPage'
 describe('ConsoleSecretsPage', () => {
   it('renders secrets table', () => {
     render(<MemoryRouter><ConsoleSecretsPage /></MemoryRouter>)
-    // Relabeled to "Secret Rotation" to disambiguate from the new Workspace Secrets screen (#723).
-    expect(screen.getByText('Secret Rotation')).toBeInTheDocument()
+    // Relabeled to disambiguate from the new Workspace Secrets screen (#723).
+    expect(screen.getByText('Rotación de secretos')).toBeInTheDocument()
     expect(screen.getByText('app-password')).toBeInTheDocument()
   })
 
@@ -21,7 +21,7 @@ describe('ConsoleSecretsPage', () => {
 
   it('opens revoke dialog', () => {
     render(<MemoryRouter><ConsoleSecretsPage /></MemoryRouter>)
-    fireEvent.click(screen.getAllByText('Revoke')[0])
-    expect(screen.getByText('Revoke secret version')).toBeInTheDocument()
+    fireEvent.click(screen.getAllByText('Revocar')[0])
+    expect(screen.getByText('Revocar versión del secreto')).toBeInTheDocument()
   })
 })

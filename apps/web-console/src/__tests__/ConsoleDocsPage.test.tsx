@@ -27,8 +27,9 @@ describe('ConsoleDocsPage', () => {
   it('calls workspace docs through the authenticated console session and renders a 200 response', async () => {
     renderDocsPage()
 
-    expect(await screen.findByRole('heading', { name: /workspace/i })).toBeInTheDocument()
-    expect(screen.getByText(/Base URL: https:\/\/api\.example\.test/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /área de trabajo/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /áreas de trabajo/i })).toBeInTheDocument()
+    expect(screen.getByText(/URL base: https:\/\/api\.example\.test/i)).toBeInTheDocument()
     expect(sessionMocks.requestConsoleSessionJson).toHaveBeenCalledWith('/v1/workspaces/wrk-1/docs')
   })
 
@@ -37,11 +38,11 @@ describe('ConsoleDocsPage', () => {
 
     renderDocsPage()
 
-    expect(await screen.findByLabelText('New note')).toBeInTheDocument()
-    expect(screen.getByLabelText('Edit note-1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add note/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Save/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Nota nueva')).toBeInTheDocument()
+    expect(screen.getByLabelText('Editar note-1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Agregar nota/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Guardar/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Eliminar/i })).toBeInTheDocument()
   })
 
   it('renders docs and notes read-only for roles that cannot manage notes', async () => {
@@ -51,11 +52,11 @@ describe('ConsoleDocsPage', () => {
     renderDocsPage()
 
     expect(await screen.findByText('customer checklist')).toBeInTheDocument()
-    expect(screen.queryByLabelText('New note')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Edit note-1')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Add note/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Save/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Delete/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Nota nueva')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Editar note-1')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Agregar nota/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Guardar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Eliminar/i })).not.toBeInTheDocument()
   })
 })
 

@@ -118,7 +118,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
     <div className="max-w-4xl mx-auto p-6 space-y-6" data-testid="preflight-page">
       <h1 className="text-xl font-bold text-slate-800">Validación previa de conflictos</h1>
       <p className="text-sm text-slate-500">
-        Tenant destino: <span className="font-mono font-medium">{tenantId}</span>
+        Organización destino: <span className="font-mono font-medium">{tenantId}</span>
       </p>
 
       {error && (
@@ -175,7 +175,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
         <div className="space-y-3" data-testid="step-map">
           <h2 className="text-sm font-semibold text-slate-700">Confirmar mapa de identificadores</h2>
           <p className="text-xs text-slate-500">
-            El artefacto proviene de un tenant diferente. Confirma o ajusta el mapa de identificadores antes de ejecutar el análisis.
+            El artefacto proviene de una organización diferente. Confirma o ajusta el mapa de identificadores antes de ejecutar el análisis.
           </p>
           <ConfigIdentifierMapEditor entries={mapEntries} onChange={setMapEntries} />
           <button

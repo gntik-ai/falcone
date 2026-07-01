@@ -52,7 +52,7 @@ describe('ConsoleMembersPage', () => {
 
     renderPage()
 
-    expect(await screen.findByText(/selecciona un tenant para gestionar sus miembros y roles/i)).toBeInTheDocument()
+    expect(await screen.findByText(/selecciona una organización para gestionar sus miembros y roles/i)).toBeInTheDocument()
   })
 
   it('renderiza mensaje sin realm IAM cuando consoleUserRealm es null', async () => {
@@ -88,6 +88,23 @@ describe('ConsoleMembersPage', () => {
     expect(screen.getByText('alice@example.com')).toBeInTheDocument()
     expect(screen.getByText('tenant-owner')).toBeInTheDocument()
     expect(screen.getByText('UPDATE_PASSWORD')).toBeInTheDocument()
+  })
+
+  it('[#803] renderiza la superficie Members en español', async () => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      users: [createIamUser('usr_1', 'alice')],
+      roles: [createIamRole('realm-admin')]
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('region', { name: /miembros de la organización activa/i })).toBeInTheDocument()
+    expect(screen.getByText('Miembros')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /miembros y roles de la organización/i })).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader', { name: /ciclo de vida/i })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /members de la organización activa/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Members$/)).not.toBeInTheDocument()
   })
 
   it('renderiza la lista de roles y marca roles compuestos', async () => {

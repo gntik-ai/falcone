@@ -45,7 +45,7 @@ export function RetryPolicyEditor({ value, onChange }: RetryPolicyEditorProps) {
       return
     }
     if (!/^\d+$/.test(text.trim()) || Number(text) < 1) {
-      setErrors((current) => ({ ...current, maxAttempts: 'maxAttempts must be a positive integer.' }))
+      setErrors((current) => ({ ...current, maxAttempts: 'maxAttempts debe ser un entero positivo.' }))
       return
     }
     setErrors((current) => ({ ...current, maxAttempts: undefined }))
@@ -61,7 +61,7 @@ export function RetryPolicyEditor({ value, onChange }: RetryPolicyEditorProps) {
     }
     const parsed = Number(text)
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setErrors((current) => ({ ...current, backoffCoefficient: 'backoffCoefficient must be a positive decimal.' }))
+      setErrors((current) => ({ ...current, backoffCoefficient: 'backoffCoefficient debe ser un decimal positivo.' }))
       return
     }
     setErrors((current) => ({ ...current, backoffCoefficient: undefined }))
@@ -78,7 +78,7 @@ export function RetryPolicyEditor({ value, onChange }: RetryPolicyEditorProps) {
     if (!ISO8601_DURATION.test(text.trim())) {
       setErrors((current) => ({
         ...current,
-        initialInterval: 'initialInterval must be an ISO 8601 duration (e.g. PT30S).'
+        initialInterval: 'initialInterval debe ser una duración ISO 8601 (por ejemplo, PT30S).'
       }))
       return
     }
@@ -89,10 +89,10 @@ export function RetryPolicyEditor({ value, onChange }: RetryPolicyEditorProps) {
   return (
     <fieldset data-testid="retry-policy-editor" className="space-y-2 rounded-lg border border-border p-3">
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Retry policy
+        Política de reintentos
       </legend>
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-max`}>Max attempts</Label>
+        <Label htmlFor={`${idBase}-max`}>Intentos máximos</Label>
         <Input
           id={`${idBase}-max`}
           inputMode="numeric"
@@ -108,7 +108,7 @@ export function RetryPolicyEditor({ value, onChange }: RetryPolicyEditorProps) {
         ) : null}
       </div>
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-backoff`}>Backoff coefficient</Label>
+        <Label htmlFor={`${idBase}-backoff`}>Coeficiente de backoff</Label>
         <Input
           id={`${idBase}-backoff`}
           inputMode="decimal"
@@ -124,7 +124,7 @@ export function RetryPolicyEditor({ value, onChange }: RetryPolicyEditorProps) {
         ) : null}
       </div>
       <div className="space-y-1">
-        <Label htmlFor={`${idBase}-interval`}>Initial interval (ISO 8601)</Label>
+        <Label htmlFor={`${idBase}-interval`}>Intervalo inicial (ISO 8601)</Label>
         <Input
           id={`${idBase}-interval`}
           placeholder="PT30S"

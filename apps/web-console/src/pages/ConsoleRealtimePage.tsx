@@ -45,7 +45,7 @@ export function ConsoleRealtimePage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'No se pudo cargar la configuración realtime del workspace.')
+          setError(err instanceof Error ? err.message : 'No se pudo cargar la configuración realtime del área de trabajo.')
         }
       } finally {
         if (!cancelled) {
@@ -57,7 +57,7 @@ export function ConsoleRealtimePage() {
     if (workspaceId) {
       void load()
     } else {
-      setError('No workspace selected.')
+      setError('No hay un área de trabajo seleccionada.')
       setLoading(false)
     }
 
@@ -80,10 +80,10 @@ export function ConsoleRealtimePage() {
     return (
       <main className="space-y-4">
         <Alert variant="destructive">
-          <AlertTitle>Error loading realtime workspace metadata</AlertTitle>
+          <AlertTitle>Error al cargar metadatos realtime del área de trabajo</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button type="button" onClick={() => setReloadToken((value) => value + 1)}>Retry</Button>
+        <Button type="button" onClick={() => setReloadToken((value) => value + 1)}>Reintentar</Button>
       </main>
     )
   }
@@ -92,8 +92,8 @@ export function ConsoleRealtimePage() {
     <CapabilityGate capability="realtime" mode="disable">
       <main className="space-y-6">
         <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Realtime del workspace</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Ejemplos de suscripción en tiempo real para browser y backend.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tiempo real del área de trabajo</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Ejemplos de suscripción en tiempo real para navegador y servidor.</p>
         </header>
         <RealtimeSnippetsPanel
           workspaceId={workspaceId}

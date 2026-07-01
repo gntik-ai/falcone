@@ -82,7 +82,7 @@ export function PendingActivationPage() {
             <Alert>
               <AlertTitle>Resumen del registro</AlertTitle>
               <AlertDescription>
-                {navigationState.registrationId ? <span className="block">Registration ID: {navigationState.registrationId}</span> : null}
+                {navigationState.registrationId ? <span className="block">ID de registro: {navigationState.registrationId}</span> : null}
                 {navigationState.state ? <span className="block">Estado: {navigationState.state}</span> : null}
                 {navigationState.activationMode ? (
                   <span className="block">Modo de activación: {navigationState.activationMode}</span>

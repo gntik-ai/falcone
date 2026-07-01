@@ -23,8 +23,8 @@ export interface McpServerConnectInfo {
 }
 
 const ENDPOINT_PLACEHOLDER = '<MCP_ENDPOINT>'
-const OAUTH_NOTE = 'La autenticación usa el flujo OAuth 2.1 del tenant; el cliente la completa al conectar (no se incrusta ningún secreto en la configuración).'
-const ENDPOINT_NOTE = 'El endpoint aún no está publicado en esta vista; usa el placeholder y actualízalo cuando el servidor esté disponible.'
+const OAUTH_NOTE = 'La autenticación usa el flujo OAuth 2.1 de la organización; el cliente la completa al conectar (no se incrusta ningún secreto en la configuración).'
+const ENDPOINT_NOTE = 'El punto de conexión aún no está publicado en esta vista; usa el marcador temporal y actualízalo cuando el servidor esté disponible.'
 
 function slugify(value: string | null | undefined): string {
   const base = String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
@@ -93,7 +93,7 @@ export function generateMcpConnectSnippets(info: McpServerConnectInfo): SnippetE
       id: 'mcp-vscode',
       label: 'VS Code — .vscode/mcp.json',
       code: vscodeConfig,
-      notes: notes(['Guárdalo como .vscode/mcp.json en el workspace para registrar el servidor en VS Code.']),
+      notes: notes(['Guárdalo como .vscode/mcp.json en la carpeta del proyecto para registrar el servidor en VS Code.']),
       hasPlaceholderSecrets: false,
       secretPlaceholderRef: null
     }

@@ -99,7 +99,20 @@ describe('ConsoleAuthPage', () => {
     useConsoleContextMock.mockReturnValue({ activeTenant: null, activeWorkspace: null } as never)
     renderPage()
     expect(screen.getByRole('heading', { name: /gestión auth\/iam/i })).toBeInTheDocument()
-    expect(screen.getByText(/selecciona un tenant para inspeccionar auth\/iam/i)).toBeInTheDocument()
+    expect(screen.getByText(/selecciona una organización para inspeccionar auth\/iam/i)).toBeInTheDocument()
+  })
+
+  it('[#803] mantiene el resumen IAM y el enlace a miembros en español', async () => {
+    mockSuccessfulLoads([])
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: /abrir miembros/i })).toBeInTheDocument()
+    expect(screen.getByText(/los usuarios y roles se resumen aquí/i)).toBeInTheDocument()
+    expect(screen.getByTestId('auth-summary-users')).toHaveTextContent(/usuarios/i)
+    expect(screen.getByTestId('auth-summary-scopes')).toHaveTextContent(/alcances/i)
+    expect(screen.getByTestId('auth-summary-clients')).toHaveTextContent(/clientes/i)
+    expect(screen.queryByRole('link', { name: /abrir members/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Users y roles/i)).not.toBeInTheDocument()
   })
 
   it('crea una aplicación y refresca el inventario', async () => {
@@ -108,12 +121,12 @@ describe('ConsoleAuthPage', () => {
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: /crear aplicación externa/i }))
-    await user.type(screen.getByLabelText(/display name/i), 'Partner Portal')
+    await user.type(screen.getByLabelText(/nombre visible/i), 'Partner Portal')
     await user.type(screen.getByLabelText(/^slug$/i), 'partner-portal')
-    await user.selectOptions(screen.getByLabelText(/protocol/i), 'saml')
-    await user.type(screen.getByLabelText(/redirect uris/i), 'https://partner.example.com/callback')
-    await user.type(screen.getByLabelText(/logout url/i), 'https://partner.example.com/logout')
-    await user.type(screen.getByLabelText(/scopes/i), 'openid, profile')
+    await user.selectOptions(screen.getByLabelText(/protocolo/i), 'saml')
+    await user.type(screen.getByLabelText(/uris de redirección/i), 'https://partner.example.com/callback')
+    await user.type(screen.getByLabelText(/url de cierre de sesión/i), 'https://partner.example.com/logout')
+    await user.type(screen.getByLabelText(/alcances/i), 'openid, profile')
     await user.click(screen.getByLabelText(/saml sp initiated/i))
     await user.click(screen.getByRole('button', { name: /crear aplicación$/i }))
 
@@ -144,12 +157,12 @@ describe('ConsoleAuthPage', () => {
 
     await user.click(await screen.findByRole('button', { name: /crear aplicación externa/i }))
     await user.type(screen.getByLabelText(/^slug$/i), 'slug-inválido')
-    await user.type(screen.getByLabelText(/redirect uris/i), 'nota-url')
+    await user.type(screen.getByLabelText(/uris de redirección/i), 'nota-url')
     await user.click(screen.getByRole('button', { name: /crear aplicación$/i }))
 
     expect(await screen.findByText(/el nombre es obligatorio/i)).toBeInTheDocument()
     expect(screen.getByText(/el slug debe usar minúsculas, números y guiones/i)).toBeInTheDocument()
-    expect(screen.getByText(/todas las redirect uri deben ser válidas/i)).toBeInTheDocument()
+    expect(screen.getByText(/todas las uri de redirección deben ser válidas/i)).toBeInTheDocument()
     expect(requestConsoleSessionJsonMock).not.toHaveBeenCalledWith('/v1/workspaces/wrk_alpha/applications', expect.anything())
   })
 
@@ -159,10 +172,10 @@ describe('ConsoleAuthPage', () => {
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: /editar/i }))
-    const nameInput = screen.getByLabelText(/display name/i)
+    const nameInput = screen.getByLabelText(/nombre visible/i)
     await user.clear(nameInput)
     await user.type(nameInput, 'Portal B2B')
-    const redirects = screen.getByLabelText(/redirect uris/i)
+    const redirects = screen.getByLabelText(/uris de redirección/i)
     await user.clear(redirects)
     await user.type(redirects, 'https://b2b.example.com/callback')
     await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
@@ -183,7 +196,7 @@ describe('ConsoleAuthPage', () => {
     await user.click(await screen.findByRole('button', { name: /eliminar/i }))
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toHaveTextContent(/portal clientes/i)
-    expect(screen.getByRole('alertdialog')).toHaveTextContent(/soft_deleted/i)
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/baja lógica/i)
     await user.click(screen.getByRole('button', { name: /^confirmar$/i }))
 
     await waitFor(() => {
@@ -199,13 +212,13 @@ describe('ConsoleAuthPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: /providers/i }))
-    await user.type(screen.getByLabelText(/provider id/i), 'new-idp')
+    await user.click(await screen.findByRole('button', { name: /proveedores/i }))
+    await user.type(screen.getByLabelText(/id del proveedor/i), 'new-idp')
     await user.type(screen.getByLabelText(/^alias$/i), 'Partner IDP')
-    await user.type(screen.getAllByLabelText(/display name/i)[0], 'Partner Login')
-    await user.type(screen.getByLabelText(/authorization url/i), 'https://partner-idp.example.com/auth')
-    await user.type(screen.getByLabelText(/token url/i), 'https://partner-idp.example.com/token')
-    await user.click(screen.getByRole('button', { name: /crear provider/i }))
+    await user.type(screen.getAllByLabelText(/nombre visible/i)[0], 'Partner Login')
+    await user.type(screen.getByLabelText(/url de autorización/i), 'https://partner-idp.example.com/auth')
+    await user.type(screen.getByLabelText(/url de token/i), 'https://partner-idp.example.com/token')
+    await user.click(screen.getByRole('button', { name: /crear proveedor/i }))
 
     await waitFor(() => {
       expect(requestConsoleSessionJsonMock).toHaveBeenCalledWith(
@@ -220,7 +233,7 @@ describe('ConsoleAuthPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: /providers/i }))
+    await user.click(await screen.findByRole('button', { name: /proveedores/i }))
     await user.click(screen.getByRole('button', { name: /deshabilitar/i }))
 
     await waitFor(() => {
@@ -236,7 +249,7 @@ describe('ConsoleAuthPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: /providers/i }))
+    await user.click(await screen.findByRole('button', { name: /proveedores/i }))
     await user.click(screen.getByRole('button', { name: /desasociar/i }))
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toHaveTextContent(/corp oidc/i)
@@ -259,7 +272,7 @@ describe('ConsoleAuthPage', () => {
     mockSuccessfulLoads([])
     renderPage()
 
-    expect(await screen.findByText(/selecciona un workspace para operar aplicaciones externas y providers/i)).toBeInTheDocument()
+    expect(await screen.findByText(/selecciona un área de trabajo para operar aplicaciones externas y proveedores/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /crear aplicación externa/i })).toBeDisabled()
   })
 
@@ -311,7 +324,7 @@ describe('ConsoleAuthPage', () => {
     renderPage()
     await user.click((await screen.findAllByText('console-web'))[0]!)
 
-    expect(await screen.findByRole('heading', { name: 'Snippets de conexión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getByText(/client_secret=<CLIENT_SECRET>/)).toBeInTheDocument()
     expect(screen.queryByText(/super-secret/i)).not.toBeInTheDocument()
   })

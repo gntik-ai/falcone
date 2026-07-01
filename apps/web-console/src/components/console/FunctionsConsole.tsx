@@ -39,7 +39,7 @@ const codeBlockClassName = 'overflow-x-auto rounded-sm border border-border/60 b
 
 function errorMessage(error: unknown): string {
   const candidate = error as Partial<ApiError>
-  return typeof candidate?.message === 'string' ? candidate.message : 'Request failed'
+  return typeof candidate?.message === 'string' ? candidate.message : 'La solicitud falló'
 }
 
 export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProps) {
@@ -77,17 +77,17 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
     setStatus(null)
     const parsed = parseJsonObject(deploySpecJson)
     if (!parsed.ok) {
-      setError(`Deploy spec: ${parsed.error}`)
+      setError(`Especificación de despliegue: ${parsed.error}`)
       return
     }
     if (getActionName(parsed.value) === '') {
-      setError('Deploy spec must include an "actionName" or legacy "name"')
+      setError('La especificación de despliegue debe incluir "actionName" o el campo heredado "name"')
       return
     }
     setOperation('deploy')
     try {
       const deployed = await deployFunction(workspaceId, parsed.value as LegacyFunctionDeploySpec | FunctionActionWriteRequest, tenantId)
-      setStatus('Function deployed')
+      setStatus('Función desplegada')
       setSelected(deployed.resourceId)
       setResult(null)
       setActivations([])
@@ -102,7 +102,7 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
 
   async function handleInvoke() {
     if (selected === '') {
-      setError('Select a function to invoke')
+      setError('Selecciona una función para invocar')
       return
     }
     setError(null)
@@ -111,14 +111,14 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
     try {
       payload = JSON.parse(inputJson) as JsonValue
     } catch {
-      setError('Input is not valid JSON')
+      setError('La entrada no es JSON válido')
       return
     }
     setOperation('invoke')
     try {
       const invocation = await invokeFunction(selected, payload)
       setResult(invocation)
-      setStatus('Function invoked')
+      setStatus('Función invocada')
     } catch (caught) {
       setError(errorMessage(caught))
     } finally {
@@ -128,7 +128,7 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
 
   async function handleViewActivations() {
     if (selected === '') {
-      setError('Select a function to view activations')
+      setError('Selecciona una función para ver activaciones')
       return
     }
     setError(null)
@@ -158,10 +158,10 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
   const busy = operation != null
 
   return (
-    <section aria-label="Functions console" aria-busy={loading || busy} className="space-y-4">
+    <section aria-label="Consola de funciones" aria-busy={loading || busy} className="space-y-4">
       {error ? (
         <Alert variant="destructive" aria-live="assertive" className="rounded-sm">
-          <AlertTitle>Function request failed</AlertTitle>
+          <AlertTitle>No se pudo completar la solicitud de función</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
@@ -175,21 +175,21 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
         <section aria-labelledby="functions-list-heading" className={panelClassName}>
           <div className={panelHeaderClassName}>
             <h3 id="functions-list-heading" className="text-base font-semibold text-foreground">
-              Functions{functions.length > 0 ? ` (${functions.length})` : ''}
+              Funciones{functions.length > 0 ? ` (${functions.length})` : ''}
             </h3>
-            {selectedFunction ? <Badge variant="secondary" className="max-w-full truncate">Selected: {selectedFunction.actionName}</Badge> : null}
+            {selectedFunction ? <Badge variant="secondary" className="max-w-full truncate">Seleccionada: {selectedFunction.actionName}</Badge> : null}
           </div>
 
           <div className="mt-4 space-y-3">
             {loading ? (
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Loading functions…</p>
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Cargando funciones…</p>
             ) : functions.length === 0 ? (
               <div className={emptyStateClassName}>
-                <p>No functions deployed yet.</p>
+                <p>No hay funciones desplegadas todavía.</p>
               </div>
             ) : (
               <fieldset className="space-y-2" aria-describedby="selected-function-summary">
-                <legend className="sr-only">Available functions</legend>
+                <legend className="sr-only">Funciones disponibles</legend>
                 {functions.map((fn) => {
                   const isSelected = selected === fn.resourceId
                   return (
@@ -219,7 +219,7 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
             )}
 
             <p id="selected-function-summary" className="text-sm text-muted-foreground" aria-live="polite">
-              {selectedFunction ? `Selected function: ${formatFunctionLabel(selectedFunction)}.` : 'No function selected.'}
+              {selectedFunction ? `Función seleccionada: ${formatFunctionLabel(selectedFunction)}.` : 'No hay función seleccionada.'}
             </p>
           </div>
         </section>
@@ -228,51 +228,51 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
           <div className="grid gap-4 lg:grid-cols-2">
             <section aria-labelledby="functions-deploy-heading" className={panelClassName}>
               <div className={panelHeaderClassName}>
-                <h3 id="functions-deploy-heading" className="text-base font-semibold text-foreground">Deploy</h3>
+                <h3 id="functions-deploy-heading" className="text-base font-semibold text-foreground">Desplegar</h3>
               </div>
               <div className="mt-4 flex flex-col gap-2">
-                <Label htmlFor="deploy-spec-json">Function spec (JSON)</Label>
+                <Label htmlFor="deploy-spec-json">Especificación de función (JSON)</Label>
                 <Textarea
                   id="deploy-spec-json"
                   value={deploySpecJson}
                   onChange={(event) => setDeploySpecJson(event.target.value)}
                   aria-describedby="deploy-spec-json-help"
-                  aria-invalid={error?.startsWith('Deploy spec') ? true : undefined}
+                  aria-invalid={error?.startsWith('Especificación de despliegue') ? true : undefined}
                   className="min-h-36 rounded-sm font-mono text-xs leading-5"
                   disabled={busy}
                 />
-                <p id="deploy-spec-json-help" className="sr-only">JSON object containing actionName or legacy name.</p>
+                <p id="deploy-spec-json-help" className="sr-only">Objeto JSON con actionName o el campo heredado name.</p>
                 <Button type="button" className="mt-1 w-full sm:w-auto sm:self-start" onClick={() => void handleDeploy()} disabled={busy}>
                   <Rocket className="h-4 w-4" aria-hidden="true" />
-                  {operation === 'deploy' ? 'Deploying…' : 'Deploy'}
+                  {operation === 'deploy' ? 'Desplegando…' : 'Desplegar'}
                 </Button>
               </div>
             </section>
 
             <section aria-labelledby="functions-invoke-heading" className={panelClassName}>
               <div className={panelHeaderClassName}>
-                <h3 id="functions-invoke-heading" className="text-base font-semibold text-foreground">Invoke</h3>
+                <h3 id="functions-invoke-heading" className="text-base font-semibold text-foreground">Invocar</h3>
               </div>
               <div className="mt-4 flex flex-col gap-2">
-                <Label htmlFor="input-json">Input (JSON)</Label>
+                <Label htmlFor="input-json">Entrada (JSON)</Label>
                 <Textarea
                   id="input-json"
                   value={inputJson}
                   onChange={(event) => setInputJson(event.target.value)}
                   aria-describedby="selected-function-summary input-json-help"
-                  aria-invalid={error === 'Input is not valid JSON' ? true : undefined}
+                  aria-invalid={error === 'La entrada no es JSON válido' ? true : undefined}
                   className="min-h-28 rounded-sm font-mono text-xs leading-5"
                   disabled={busy}
                 />
-                <p id="input-json-help" className="sr-only">JSON value to send as the invocation payload.</p>
+                <p id="input-json-help" className="sr-only">Valor JSON que se enviará como payload de invocación.</p>
                 <div className="mt-1 grid gap-2 sm:flex sm:flex-wrap">
                   <Button type="button" onClick={() => void handleInvoke()} disabled={busy}>
                     <Play className="h-4 w-4" aria-hidden="true" />
-                    {operation === 'invoke' ? 'Invoking…' : 'Invoke'}
+                    {operation === 'invoke' ? 'Invocando…' : 'Invocar'}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => void handleViewActivations()} disabled={busy}>
                     <Clock3 className="h-4 w-4" aria-hidden="true" />
-                    {operation === 'activations' ? 'Loading activations…' : 'View activations'}
+                    {operation === 'activations' ? 'Cargando activaciones…' : 'Ver activaciones'}
                   </Button>
                 </div>
               </div>
@@ -282,24 +282,24 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
           <div className="grid gap-4 lg:grid-cols-2">
             <section aria-labelledby="functions-result-heading" className={panelClassName} aria-live="polite">
               <div className={panelHeaderClassName}>
-                <h4 id="functions-result-heading" className={panelTitleClassName}>Result</h4>
+                <h4 id="functions-result-heading" className={panelTitleClassName}>Resultado</h4>
               </div>
               <div className="mt-4">
                 {result ? (
                   <pre role="status" className={codeBlockClassName}>{JSON.stringify(result.result ?? result, null, 2)}</pre>
                 ) : (
-                  <p className={emptyStateClassName}>No invocation result yet.</p>
+                  <p className={emptyStateClassName}>Todavía no hay resultado de invocación.</p>
                 )}
               </div>
             </section>
 
             <section aria-labelledby="functions-activations-heading" className={panelClassName} aria-live="polite">
               <div className={panelHeaderClassName}>
-                <h4 id="functions-activations-heading" className={panelTitleClassName}>Activations</h4>
+                <h4 id="functions-activations-heading" className={panelTitleClassName}>Activaciones</h4>
               </div>
               <div className="mt-4">
                 {operation === 'activations' ? (
-                  <p role="status" className="text-sm text-muted-foreground">Loading activations…</p>
+                  <p role="status" className="text-sm text-muted-foreground">Cargando activaciones…</p>
                 ) : activations.length > 0 ? (
                   <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
                     {activations.map((activation) => (
@@ -311,9 +311,9 @@ export function FunctionsConsole({ tenantId, workspaceId }: FunctionsConsoleProp
                     ))}
                   </ul>
                 ) : activationsLoaded ? (
-                  <p className={emptyStateClassName}>No activations for this function.</p>
+                  <p className={emptyStateClassName}>No hay activaciones para esta función.</p>
                 ) : (
-                  <p className={emptyStateClassName}>No activation lookup run yet.</p>
+                  <p className={emptyStateClassName}>Todavía no se consultaron activaciones.</p>
                 )}
               </div>
             </section>

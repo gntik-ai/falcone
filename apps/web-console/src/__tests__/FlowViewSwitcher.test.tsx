@@ -78,7 +78,8 @@ describe('FlowViewSwitcher: modes', () => {
 
   it('renders both panes in side-by-side mode', async () => {
     renderSwitcher()
-    await userEvent.click(screen.getByTestId('view-mode-side-by-side'))
+    expect(screen.getByRole('tablist', { name: /vista del flujo/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /lado a lado/i }))
     expect(screen.getByTestId('flow-canvas-pane')).toBeInTheDocument()
     expect(screen.getByTestId('flow-yaml-pane')).toBeInTheDocument()
   })
@@ -114,7 +115,11 @@ describe('FlowViewSwitcher: invalid YAML blocks the switch', () => {
     await userEvent.click(screen.getByTestId('view-mode-canvas'))
     // Switch did not complete; still in YAML; a banner explains why.
     expect(screen.getByTestId('flow-view-switcher')).toHaveAttribute('data-mode', 'yaml')
-    expect(screen.getByTestId('flow-view-banner')).toBeInTheDocument()
+    const banner = screen.getByTestId('flow-view-banner')
+    expect(banner).toHaveTextContent('No se puede cambiar de vista')
+    expect(banner).toHaveTextContent('Corrige primero los errores resaltados')
+    expect(banner).not.toHaveTextContent('Cannot switch views')
+    expect(banner).not.toHaveTextContent('Fix the highlighted errors first')
   })
 
   it('shows the degraded canvas banner in side-by-side while YAML is invalid', async () => {
@@ -124,7 +129,10 @@ describe('FlowViewSwitcher: invalid YAML blocks the switch', () => {
     await userEvent.paste('name: [broken')
     await waitFor(() => {
       expect(screen.getByTestId('flow-canvas-pane')).toHaveAttribute('data-degraded', 'true')
-      expect(screen.getByTestId('flow-canvas-degraded-banner')).toBeInTheDocument()
+      expect(screen.getByTestId('flow-view-banner')).toHaveTextContent('El YAML no es válido')
+      expect(screen.getByTestId('flow-view-banner')).not.toHaveTextContent('YAML is invalid')
+      expect(screen.getByTestId('flow-view-banner')).not.toHaveTextContent('draft will not be saved')
+      expect(screen.getByTestId('flow-canvas-degraded-banner')).toHaveTextContent('Se muestra la última versión válida')
     })
   })
 

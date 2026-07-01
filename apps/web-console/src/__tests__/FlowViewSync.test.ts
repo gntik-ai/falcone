@@ -73,14 +73,18 @@ describe('view-sync: invalid YAML blocks switch', () => {
     let state = initViewSync(baseDef(), deps, 'yaml')
     state = reducer(state, { type: 'EDIT_YAML', yaml: 'name: [broken\nnodes: - x' })
     expect(state.yamlInvalid).toBe(true)
-    expect(state.banner).toBeTruthy()
+    expect(state.banner).toContain('El YAML no es válido')
+    expect(state.banner).not.toContain('YAML is invalid')
+    expect(state.banner).not.toContain('draft will not be saved')
     expect(canSaveDraft(state)).toBe(false)
     // Canvas still shows the last-valid graph (degradation).
     expect(canvasDefinition(state).nodes[0]).toMatchObject({ taskType: 'a' })
 
     const blocked = reducer(state, { type: 'SET_MODE', mode: 'canvas' })
     expect(blocked.mode).toBe('yaml') // switch did NOT complete
-    expect(blocked.banner).toBeTruthy()
+    expect(blocked.banner).toContain('No se puede cambiar de vista')
+    expect(blocked.banner).not.toContain('Cannot switch views')
+    expect(blocked.banner).not.toContain('Fix the highlighted errors first')
   })
 
   it('also blocks the side-by-side switch while invalid', () => {
@@ -88,7 +92,8 @@ describe('view-sync: invalid YAML blocks switch', () => {
     state = reducer(state, { type: 'EDIT_YAML', yaml: ': : :' })
     const blocked = reducer(state, { type: 'SET_MODE', mode: 'side-by-side' })
     expect(blocked.mode).toBe('yaml')
-    expect(blocked.banner).toBeTruthy()
+    expect(blocked.banner).toContain('No se puede cambiar de vista')
+    expect(blocked.banner).not.toContain('Cannot switch views')
   })
 })
 

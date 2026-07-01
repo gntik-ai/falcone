@@ -32,12 +32,17 @@ describe('ConsolePlaceholderPage', () => {
     )
 
     expect(screen.getByTestId('console-tenant-quota-summary')).toBeInTheDocument()
-    expect(screen.getByText(/estado de cuotas del tenant activo/i)).toBeInTheDocument()
+    expect(screen.getByText(/estado de cuotas de la organización activa/i)).toBeInTheDocument()
     expect(screen.getByText(/invocations_per_minute/i)).toBeInTheDocument()
 
     expect(screen.getByTestId('console-tenant-inventory-summary')).toBeInTheDocument()
-    expect(screen.getByText(/composición del tenant activo/i)).toBeInTheDocument()
+    expect(screen.getByText(/composición de la organización activa/i)).toBeInTheDocument()
+    expect(screen.getByText('Áreas de trabajo')).toBeInTheDocument()
+    expect(screen.getByText(/Aplicaciones 5/i)).toBeInTheDocument()
     expect(screen.getByText(/workspace-prod/i)).toBeInTheDocument()
+    expect(screen.getByText(/seleccionadas en la consola/i)).toBeInTheDocument()
+    expect(screen.getByText('Consola base')).toBeInTheDocument()
+    expect(screen.getByText(/pantalla temporal navegable/i)).toBeInTheDocument()
   })
 
   it('oculta las secciones opcionales cuando no hay datos de cuota o inventario', () => {
@@ -78,8 +83,8 @@ describe('ConsolePlaceholderPage', () => {
       />
     )
 
-    expect(screen.getByText(/tenant: tenant alpha/i)).toBeInTheDocument()
-    expect(screen.getByText(/estado workspace: sin workspace activo/i)).toBeInTheDocument()
+    expect(screen.getByText(/organización: tenant alpha/i)).toBeInTheDocument()
+    expect(screen.getByText(/estado de área de trabajo: sin área de trabajo activa/i)).toBeInTheDocument()
   })
 })
 

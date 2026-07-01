@@ -67,9 +67,9 @@ export function useWizardPermissionCheck(requiredPermission: WizardPermission) {
 export function useWizardQuotaCheck(dimensionId: string, scope: 'tenant' | 'workspace', tenantId: string | null, workspaceId: string | null) {
   const { posture, workspacePosture, loading } = useConsoleQuotas(tenantId, workspaceId)
   const target = scope === 'workspace' ? workspacePosture : posture
-  if (scope === 'tenant' && !tenantId) return { available: false, remaining: null, loading: false, reason: 'Selecciona un tenant.' }
+  if (scope === 'tenant' && !tenantId) return { available: false, remaining: null, loading: false, reason: 'Selecciona una organización.' }
   if (tenantId === 'platform') return { available: true, remaining: null, loading: false, reason: null }
-  if (scope === 'workspace' && !workspaceId) return { available: false, remaining: null, loading: false, reason: 'Selecciona un workspace.' }
+  if (scope === 'workspace' && !workspaceId) return { available: false, remaining: null, loading: false, reason: 'Selecciona un área de trabajo.' }
   const dimension = target?.dimensions.find((item) => item.dimensionId === dimensionId)
   const remaining = dimension?.remainingToHardLimit ?? null
   const available = dimension ? !dimension.isExceeded : true

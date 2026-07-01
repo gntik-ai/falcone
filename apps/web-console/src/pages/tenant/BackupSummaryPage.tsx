@@ -36,7 +36,7 @@ export default function BackupSummaryPage({ tenantId, token }: BackupSummaryPage
 
   return (
     <div className="space-y-4 p-6" data-testid="backup-summary-page">
-      <h2 className="text-xl font-bold">Backups del Tenant</h2>
+      <h2 className="text-xl font-bold">Backups de la organización</h2>
       <p className="text-sm text-slate-600">
         Cuando el perfil lo permite, las simulaciones de restore aparecen diferenciadas del flujo operativo.
       </p>

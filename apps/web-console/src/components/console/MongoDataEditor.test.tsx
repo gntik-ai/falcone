@@ -40,23 +40,23 @@ afterEach(() => cleanup())
 describe('MongoDataEditor — richer UX', () => {
   it('shows a loading state, then the documents with a count', async () => {
     renderEditor()
-    expect(screen.getByText('Loading documents…')).toBeInTheDocument()
+    expect(screen.getByText('Cargando documentos…')).toBeInTheDocument()
     expect(await screen.findByText(/"body":"hello"/)).toBeInTheDocument()
-    expect(screen.getByText('Documents (1)')).toBeInTheDocument()
+    expect(screen.getByText('Documentos (1)')).toBeInTheDocument()
   })
 
   it('shows an empty state when there are no documents', async () => {
     mocked.listDocuments.mockResolvedValue({ items: [] })
     renderEditor()
-    expect(await screen.findByText('No documents yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Todavía no hay documentos.')).toBeInTheDocument()
   })
 
   it('validates new-document JSON before inserting', async () => {
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    fireEvent.change(screen.getByLabelText('New document (JSON)'), { target: { value: '[]' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('New document: Expected a JSON object')
+    fireEvent.change(screen.getByLabelText('Documento nuevo (JSON)'), { target: { value: '[]' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Insertar' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Documento nuevo: Expected a JSON object')
     expect(mocked.insertDocument).not.toHaveBeenCalled()
   })
 
@@ -64,8 +64,8 @@ describe('MongoDataEditor — richer UX', () => {
     mocked.insertDocument.mockResolvedValue({ item: {} })
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    fireEvent.change(screen.getByLabelText('New document (JSON)'), { target: { value: '{"body":"new"}' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }))
+    fireEvent.change(screen.getByLabelText('Documento nuevo (JSON)'), { target: { value: '{"body":"new"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Insertar' }))
     await waitFor(() => expect(mocked.insertDocument).toHaveBeenCalledWith('ws1', 'appdb', 'notes', { body: 'new' }))
     expect(mocked.listDocuments).toHaveBeenCalledTimes(2)
   })
@@ -74,10 +74,10 @@ describe('MongoDataEditor — richer UX', () => {
     mocked.updateDocument.mockResolvedValue({ item: {} })
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    const textarea = await screen.findByLabelText('Document (JSON)')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const textarea = await screen.findByLabelText('Documento (JSON)')
     fireEvent.change(textarea, { target: { value: '{"_id":"d1","body":"edited"}' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
     await waitFor(() =>
       expect(mocked.updateDocument).toHaveBeenCalledWith('ws1', 'appdb', 'notes', 'd1', { body: 'edited' })
     )
@@ -86,8 +86,8 @@ describe('MongoDataEditor — richer UX', () => {
   it('applies a JSON filter and requeries', async () => {
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    fireEvent.change(screen.getByLabelText(/Filter \(MongoDB query JSON\)/), { target: { value: '{"status":"active"}' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply filter' }))
+    fireEvent.change(screen.getByLabelText(/Filtro \(consulta MongoDB en JSON\)/), { target: { value: '{"status":"active"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtro' }))
     await waitFor(() =>
       expect(mocked.listDocuments).toHaveBeenLastCalledWith(
         'ws1', 'appdb', 'notes', expect.objectContaining({ filter: { status: 'active' } })
@@ -99,9 +99,9 @@ describe('MongoDataEditor — richer UX', () => {
     renderEditor()
     await screen.findByText(/"body":"hello"/)
     mocked.listDocuments.mockClear()
-    fireEvent.change(screen.getByLabelText(/Filter \(MongoDB query JSON\)/), { target: { value: '{bad' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply filter' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Filter: Not valid JSON')
+    fireEvent.change(screen.getByLabelText(/Filtro \(consulta MongoDB en JSON\)/), { target: { value: '{bad' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtro' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Filtro: Not valid JSON')
     expect(mocked.listDocuments).not.toHaveBeenCalled()
   })
 
@@ -109,7 +109,7 @@ describe('MongoDataEditor — richer UX', () => {
     mocked.listDocuments.mockResolvedValue({ items: [{ _id: 'd1', body: 'hello' }], page: { after: 'CUR1' } })
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    const next = screen.getByRole('button', { name: 'Next' })
+    const next = screen.getByRole('button', { name: 'Siguiente' })
     expect(next).not.toBeDisabled()
     fireEvent.click(next)
     await waitFor(() =>
@@ -121,7 +121,7 @@ describe('MongoDataEditor — richer UX', () => {
     mocked.deleteDocument.mockResolvedValue({ deleted: true })
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
     await waitFor(() => expect(mocked.deleteDocument).toHaveBeenCalledWith('ws1', 'appdb', 'notes', 'd1'))
   })
 
@@ -130,11 +130,11 @@ describe('MongoDataEditor — richer UX', () => {
     mocked.previewDocumentsWithApiKey.mockResolvedValue({ items: [{ _id: 'p1', body: 'as-anon' }] })
     renderEditor()
     await screen.findByText(/"body":"hello"/)
-    fireEvent.click(screen.getByRole('button', { name: 'Issue anon key' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir clave anónima' }))
     expect(await screen.findByText('flc_anon_secret')).toBeInTheDocument()
     expect(screen.getByText('MONGO_FETCH_SNIPPET')).toBeInTheDocument()
     expect(screen.getByText('MONGO_CURL_SNIPPET')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Run read-only preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar vista previa de solo lectura' }))
     await waitFor(() =>
       expect(mocked.previewDocumentsWithApiKey).toHaveBeenCalledWith('flc_anon_secret', 'ws1', 'appdb', 'notes', { pageSize: 10 })
     )

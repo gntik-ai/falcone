@@ -43,8 +43,8 @@ describe('ConsoleCapabilityCatalogPage', () => {
     const fetcher = vi.fn().mockRejectedValue(new Error('boom'));
     render(<ConsoleCapabilityCatalogPage workspaceId="ws-123" fetcher={fetcher} />);
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    expect(screen.getByText('Failed to load capability catalog.')).toBeInTheDocument();
-    expect(screen.getByText('Retry')).toBeInTheDocument();
+    expect(screen.getByText('No se pudo cargar el catálogo de capacidades.')).toBeInTheDocument();
+    expect(screen.getByText('Reintentar')).toBeInTheDocument();
   });
 
   it('renders transitional status badge', async () => {

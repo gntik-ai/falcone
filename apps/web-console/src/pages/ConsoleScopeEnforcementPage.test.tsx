@@ -16,21 +16,21 @@ describe('ConsoleScopeEnforcementPage', () => {
   it('renders summary strip with correct counts', async () => {
     render(<ConsoleScopeEnforcementPage isSuperadmin />)
     await waitFor(() => expect(screen.getAllByText('1').length).toBeGreaterThan(0))
-    expect(screen.getByText(/Scope Enforcement — Denial Events/)).toBeInTheDocument()
+    expect(screen.getByText(/Cumplimiento de scopes — eventos denegados/)).toBeInTheDocument()
   })
 
   it('shows config error banner only for superadmin', async () => {
     const { rerender } = render(<ConsoleScopeEnforcementPage isSuperadmin />)
-    await waitFor(() => expect(screen.getByText(/Unconfigured endpoints detected/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/Puntos de conexión sin configurar detectados/)).toBeInTheDocument())
     rerender(<ConsoleScopeEnforcementPage isSuperadmin={false} />)
-    await waitFor(() => expect(screen.queryByText(/Unconfigured endpoints detected/)).toBeNull())
+    await waitFor(() => expect(screen.queryByText(/Puntos de conexión sin configurar detectados/)).toBeNull())
   })
 
   it('refresh triggers a new fetch', async () => {
     const { fetchDenials } = await import('@/lib/console-scope-enforcement')
     render(<ConsoleScopeEnforcementPage isSuperadmin />)
     await waitFor(() => expect(fetchDenials).toHaveBeenCalledTimes(1))
-    fireEvent.click(screen.getByText('Refresh'))
+    fireEvent.click(screen.getByText('Actualizar'))
     await waitFor(() => expect(fetchDenials).toHaveBeenCalledTimes(2))
   })
 

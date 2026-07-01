@@ -17,7 +17,8 @@ describe('ConsoleTenantPlanPage', () => {
   it('renders current assignment, change action, and quota limits from quantitativeLimits', async () => {
     render(<MemoryRouter initialEntries={['/console/tenants/ten_1/plan']}><Routes><Route path='/console/tenants/:tenantId/plan' element={<ConsoleTenantPlanPage />} /></Routes></MemoryRouter>)
     expect(await screen.findByText('Starter')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /change plan/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /gobierno de organizaciones/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cambiar plan/i })).toBeInTheDocument()
     // Limit row is populated from the API's `quantitativeLimits` (the discriminating guard).
     expect(await screen.findByText('Flow signal rate')).toBeInTheDocument()
   })

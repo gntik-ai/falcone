@@ -13,10 +13,21 @@ import { Input } from '@/components/ui/input'
 import { useConsoleContext } from '@/lib/console-context'
 import { createFlowDraft, listFlows, type FlowSummary } from '@/services/flowsApi'
 
+const FLOW_STATUS_LABELS: Record<string, string> = {
+  archived: 'Archivado',
+  draft: 'Borrador',
+  failed: 'Fallido',
+  published: 'Publicado'
+}
+
 function formatTimestamp(value?: string): string {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function formatFlowStatus(status?: string | null): string {
+  return status ? FLOW_STATUS_LABELS[status] ?? status : FLOW_STATUS_LABELS.draft
 }
 
 export function ConsoleFlowsPage() {
@@ -37,7 +48,7 @@ export function ConsoleFlowsPage() {
       const response = await listFlows(activeWorkspaceId)
       setFlows(response.items ?? [])
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Failed to load flows')
+      setLoadError(error instanceof Error ? error.message : 'No se pudieron cargar los flujos')
     } finally {
       setLoading(false)
     }
@@ -55,7 +66,7 @@ export function ConsoleFlowsPage() {
       const created = await createFlowDraft(activeWorkspaceId, { name: newFlowName.trim() })
       navigate(`/console/flows/${encodeURIComponent(created.flowId)}`)
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Failed to create the flow draft')
+      setCreateError(error instanceof Error ? error.message : 'No se pudo crear el borrador del flujo')
       setCreating(false)
     }
   }
@@ -63,9 +74,9 @@ export function ConsoleFlowsPage() {
   if (!activeWorkspaceId) {
     return (
       <section className="space-y-2 p-6">
-        <h1 className="text-xl font-semibold">Flows</h1>
+        <h1 className="text-xl font-semibold">Flujos</h1>
         <p className="text-sm text-muted-foreground">
-          Select a workspace to manage its flows.
+          Selecciona un área de trabajo para gestionar sus flujos.
         </p>
       </section>
     )
@@ -75,25 +86,25 @@ export function ConsoleFlowsPage() {
     <section className="space-y-5 p-6" data-testid="console-flows-page">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 space-y-1">
-          <Badge variant="outline" className="w-fit">Workflows</Badge>
-          <h1 className="text-2xl font-semibold tracking-tight">Flows</h1>
+          <Badge variant="outline" className="w-fit">Flujos</Badge>
+          <h1 className="text-2xl font-semibold tracking-tight">Flujos</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Visual workflow definitions for workspace <span className="font-mono">{activeWorkspaceId}</span>.
+            Definiciones visuales de flujos de trabajo para el área de trabajo <span className="font-mono">{activeWorkspaceId}</span>.
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <div className="w-full sm:w-64">
             <Input
-              aria-label="New flow name"
+              aria-label="Nombre del flujo nuevo"
               className="w-full"
-              placeholder="New flow name"
+              placeholder="Nombre del flujo nuevo"
               value={newFlowName}
               onChange={(event) => setNewFlowName(event.target.value)}
               data-testid="new-flow-name-input"
             />
           </div>
           <Button className="w-full sm:w-auto" onClick={() => void onCreate()} disabled={creating || newFlowName.trim() === ''}>
-            {creating ? 'Creating…' : 'New flow'}
+            {creating ? 'Creando…' : 'Flujo nuevo'}
           </Button>
         </div>
       </header>
@@ -106,23 +117,23 @@ export function ConsoleFlowsPage() {
         <div className="space-y-2 rounded-lg border border-destructive/40 p-4 text-sm">
           <p className="text-destructive">{loadError}</p>
           <Button size="sm" variant="outline" onClick={() => void load()}>
-            Retry
+            Reintentar
           </Button>
         </div>
       ) : flows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-          No flows yet. Create the first one to open the designer.
+          Todavía no hay flujos. Crea el primero para abrir el diseñador.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
           <table className="w-full table-fixed text-sm sm:min-w-[48rem] sm:table-auto">
-            <caption className="sr-only">Workspace flows</caption>
+            <caption className="sr-only">Flujos del área de trabajo</caption>
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th scope="col" className="px-4 py-3 font-medium">Name</th>
-                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Status</th>
-                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Last modified</th>
-                <th scope="col" className="w-40 px-4 py-3 text-right font-medium sm:w-64">Actions</th>
+                <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Estado</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Última modificación</th>
+                <th scope="col" className="w-40 px-4 py-3 text-right font-medium sm:w-64">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -137,7 +148,7 @@ export function ConsoleFlowsPage() {
                     </th>
                     <td className="hidden px-4 py-3 sm:table-cell">
                       <Badge variant="outline" className="text-xs">
-                        {flow.status ?? 'draft'}
+                        {formatFlowStatus(flow.status)}
                       </Badge>
                     </td>
                     <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
@@ -147,24 +158,24 @@ export function ConsoleFlowsPage() {
                       <div
                         className="inline-flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:justify-end"
                         role="group"
-                        aria-label={`Actions for ${flowLabel}`}
+                        aria-label={`Acciones para ${flowLabel}`}
                       >
                         <Button size="sm" variant="outline" className="justify-start sm:justify-center" asChild>
                           <Link
                             to={`/console/flows/${encodedFlowId}`}
-                            aria-label={`Open designer for ${flowLabel}`}
+                            aria-label={`Abrir diseñador para ${flowLabel}`}
                           >
                             <PenLine className="h-4 w-4" aria-hidden="true" />
-                            Open designer
+                            Abrir diseñador
                           </Link>
                         </Button>
                         <Button size="sm" variant="secondary" className="justify-start sm:justify-center" asChild>
                           <Link
                             to={`/console/flows/${encodedFlowId}/runs`}
-                            aria-label={`View run history for ${flowLabel}`}
+                            aria-label={`Ver historial de ejecuciones para ${flowLabel}`}
                           >
                             <History className="h-4 w-4" aria-hidden="true" />
-                            Run history
+                            Historial de ejecuciones
                           </Link>
                         </Button>
                       </div>

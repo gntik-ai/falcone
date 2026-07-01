@@ -44,7 +44,7 @@ export function ConsoleFunctionRegistryPage() {
       const res = await requestConsoleSessionJson<ListResponse>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/functions`)
       setItems(res.items ?? [])
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudieron cargar las funciones del workspace.'))
+      setError(errMsg(rawError, 'No se pudieron cargar las funciones del área de trabajo.'))
     } finally {
       setLoading(false)
     }
@@ -82,22 +82,22 @@ export function ConsoleFunctionRegistryPage() {
     <main className="space-y-6" data-testid="console-function-registry-page">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="space-y-2">
-          <Badge variant="outline">Functions</Badge>
+          <Badge variant="outline">Funciones</Badge>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Registro de funciones</h1>
           <p className="text-sm text-muted-foreground">
-            Registra funciones serverless para el workspace activo. La ejecución se activa cuando el plano de datos
+            Registra funciones serverless para el área de trabajo activa. La ejecución se activa cuando el plano de datos
             OpenWhisk esté desplegado (estado <code className="rounded bg-muted px-1 py-0.5">pending_data_plane</code>).
           </p>
         </div>
         <div className="mt-3 text-sm text-muted-foreground">
-          Workspace activo: {activeWorkspace?.label ?? 'Sin workspace seleccionado'}
+          Área de trabajo activa: {activeWorkspace?.label ?? 'Sin área de trabajo seleccionada'}
         </div>
       </header>
 
       {!activeWorkspaceId ? (
         <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
           <p className="text-sm text-muted-foreground">
-            Selecciona un tenant y un workspace en la barra superior para gestionar sus funciones.
+            Selecciona una organización y un área de trabajo en la barra superior para gestionar sus funciones.
           </p>
         </section>
       ) : null}
@@ -123,7 +123,7 @@ export function ConsoleFunctionRegistryPage() {
               />
             </label>
             <label className="flex flex-col gap-1 sm:col-span-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Runtime</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Entorno</span>
               <input
                 value={runtime}
                 onChange={(event) => setRuntime(event.target.value)}
@@ -131,7 +131,7 @@ export function ConsoleFunctionRegistryPage() {
               />
             </label>
             <label className="flex flex-col gap-1 sm:col-span-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Handler</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Manejador</span>
               <input
                 value={handler}
                 onChange={(event) => setHandler(event.target.value)}
@@ -153,7 +153,7 @@ export function ConsoleFunctionRegistryPage() {
           {loading ? (
             <p className="mt-2 text-sm text-muted-foreground">Cargando funciones…</p>
           ) : items.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">Aún no hay funciones registradas en este workspace.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Aún no hay funciones registradas en esta área de trabajo.</p>
           ) : (
             <ul className="mt-4 divide-y divide-border">
               {items.map((fn) => (
@@ -161,7 +161,7 @@ export function ConsoleFunctionRegistryPage() {
                   <div className="min-w-0">
                     <p className="font-medium text-foreground">{fn.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {fn.runtime} · handler {fn.handler ?? 'main'}
+                      {fn.runtime} · manejador {fn.handler ?? 'main'}
                     </p>
                   </div>
                   <div className="flex gap-2">

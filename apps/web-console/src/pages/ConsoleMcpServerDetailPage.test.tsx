@@ -44,18 +44,21 @@ describe('ConsoleMcpServerDetailPage', () => {
       slug: 'acme-orders',
       status: 'running',
       endpointUrl: 'https://gw.example.test/mcp/acme-orders',
-      activeVersion: { version: 'v3', source: 'instant', tools: [{ name: 'list_orders', description: 'list', mutates: false }] }
+      activeVersion: { version: 'v3', source: 'instant', tools: [{ name: 'list_orders', description: 'list', mutates: false, scope: 'mcp:orders:read' }] }
     })
     renderPage()
 
     await waitFor(() => expect(screen.getByTestId('mcp-server-detail')).toBeInTheDocument())
     expect(fetchMcpServerDetailMock).toHaveBeenCalledWith('ws_1', 'srv_1', expect.any(AbortSignal))
+    expect(screen.getByText('Punto de conexión')).toBeInTheDocument()
     expect(screen.getByTestId('mcp-detail-endpoint')).toHaveTextContent('https://gw.example.test/mcp/acme-orders')
     expect(screen.getByTestId('mcp-detail-version')).toHaveTextContent('v3')
     expect(screen.getByTestId('mcp-detail-tools')).toHaveTextContent('list_orders')
+    expect(screen.getByTestId('mcp-detail-tools')).toHaveTextContent('Alcance: mcp:orders:read')
+    expect(screen.getByTestId('mcp-detail-tools')).not.toHaveTextContent('Scope:')
   })
 
-  it('renders the Connect tab by default and switches to the Playground tab', async () => {
+  it('renders the localized connect tab by default and switches to the localized test-area tab', async () => {
     fetchMcpServerDetailMock.mockResolvedValue({
       id: 'srv_1',
       name: 'Acme Orders',
@@ -66,11 +69,11 @@ describe('ConsoleMcpServerDetailPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('mcp-connect-panel')).toBeInTheDocument())
     expect(screen.getByText('Cursor — Añadir a Cursor')).toBeInTheDocument()
-    expect(screen.getByRole('tabpanel', { name: 'Connect' })).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel', { name: 'Conectar' })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Playground' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Área de pruebas' }))
     expect(screen.getByTestId('mcp-playground')).toBeInTheDocument()
-    expect(screen.getByRole('tabpanel', { name: 'Playground' })).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel', { name: 'Área de pruebas' })).toBeInTheDocument()
   })
 
   it('does not request a server detail without an active workspace and shows a clear state', () => {
@@ -78,6 +81,6 @@ describe('ConsoleMcpServerDetailPage', () => {
     renderPage()
 
     expect(fetchMcpServerDetailMock).not.toHaveBeenCalled()
-    expect(screen.getByTestId('mcp-detail-no-workspace')).toHaveTextContent('Selecciona un workspace')
+    expect(screen.getByTestId('mcp-detail-no-workspace')).toHaveTextContent('Selecciona un área de trabajo')
   })
 })

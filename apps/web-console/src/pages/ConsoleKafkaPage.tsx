@@ -224,9 +224,50 @@ function isAbortError(rawError: unknown): boolean {
 
 function formatEnumLabel(value?: string): string {
   if (!value) return '—'
+  const normalized = value.toLowerCase()
+  const labels: Record<string, string> = {
+    active: 'Activo',
+    at_least_once: 'Al menos una vez',
+    at_most_once: 'Como máximo una vez',
+    available: 'Disponible',
+    compact: 'Compactar',
+    compact_and_delete: 'Compactar y eliminar',
+    delete: 'Eliminar',
+    degraded: 'Degradado',
+    disabled: 'Deshabilitado',
+    enabled: 'Habilitado',
+    exactly_once: 'Exactamente una vez',
+    failed: 'Fallido',
+    hard: 'Estricto',
+    healthy: 'Saludable',
+    none: 'Ninguno',
+    planned: 'Planificado',
+    prefix: 'Prefijo',
+    provider_managed: 'Gestionado por proveedor',
+    provisioning: 'Aprovisionamiento',
+    shared_cluster: 'Cluster compartido',
+    soft: 'Suave',
+    suspended: 'Suspendido'
+  }
+  if (labels[normalized]) return labels[normalized]
   return value
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function topicTabLabel(tab: TopicTab): string {
+  switch (tab) {
+    case 'detail':
+      return 'Detalle'
+    case 'access':
+      return 'Acceso'
+    case 'metadata':
+      return 'Metadatos'
+    case 'publish':
+      return 'Publicar'
+    case 'stream':
+      return 'Flujo'
+  }
 }
 
 function formatRelativeDate(value?: string): string {
@@ -247,6 +288,7 @@ function formatRelativeDate(value?: string): string {
 function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Sí' : 'No'
+  if (typeof value === 'string' && /^[A-Za-z0-9_.-]+$/.test(value)) return formatEnumLabel(value)
   return String(value)
 }
 
@@ -273,7 +315,7 @@ function formatDeliverySemantics(value?: string): string {
     case 'exactly_once':
       return 'Exactamente una vez'
     case 'exactly_once_candidate':
-      return 'Exactamente una vez (candidate)'
+      return 'Exactamente una vez (candidato)'
     default:
       return formatEnumLabel(value)
   }
@@ -281,8 +323,8 @@ function formatDeliverySemantics(value?: string): string {
 
 function quotaLabel(quota?: KafkaQuotaStatus): string | null {
   if (!quota) return null
-  if (quota.remaining === 0) return 'Quota agotada'
-  if (quota.enforcementMode && quota.enforcementMode !== 'none') return 'Enforced'
+  if (quota.remaining === 0) return 'Cuota agotada'
+  if (quota.enforcementMode && quota.enforcementMode !== 'none') return 'Aplicación de límites activa'
   return null
 }
 
@@ -388,7 +430,7 @@ export function ConsoleKafkaPage() {
       setTopicDetail({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setTopicDetail({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el detalle del topic.') })
+      setTopicDetail({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el detalle del tópico.') })
     }
   }, [])
 
@@ -399,7 +441,7 @@ export function ConsoleKafkaPage() {
       setTopicAccess({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setTopicAccess({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la política de acceso del topic.') })
+      setTopicAccess({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la política de acceso del tópico.') })
     }
   }, [])
 
@@ -431,7 +473,7 @@ export function ConsoleKafkaPage() {
       setTopicMetadata({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setTopicMetadata({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la metadata operacional del topic.') })
+      setTopicMetadata({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los metadatos operacionales del tópico.') })
     }
   }, [])
 
@@ -489,7 +531,7 @@ export function ConsoleKafkaPage() {
       })
 
       if (!response.ok) {
-        let message = 'No se pudo iniciar el stream.'
+        let message = 'No se pudo iniciar el flujo.'
         try {
           const body = (await response.json()) as { message?: string }
           if (typeof body.message === 'string' && body.message.trim()) {
@@ -504,7 +546,7 @@ export function ConsoleKafkaPage() {
       }
 
       if (!response.body) {
-        setStreamError('El stream no devolvió contenido legible.')
+        setStreamError('El flujo no devolvió contenido legible.')
         setStreamActive(false)
         return
       }
@@ -533,7 +575,7 @@ export function ConsoleKafkaPage() {
         streamAbortRef.current = null
         return
       }
-      setStreamError(getApiErrorMessage(error, 'La conexión de stream falló.'))
+      setStreamError(getApiErrorMessage(error, 'La conexión de flujo falló.'))
       setStreamActive(false)
       streamAbortRef.current = null
     }
@@ -610,7 +652,7 @@ export function ConsoleKafkaPage() {
         setBridges({ data: loaded, loading: false, error: null })
       } catch (error) {
         if (isAbortError(error)) return
-        setBridges({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la lista de bridges.') })
+        setBridges({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la lista de puentes.') })
       }
     })()
 
@@ -630,11 +672,11 @@ export function ConsoleKafkaPage() {
   }, [inventory.data])
 
   if (!activeTenantId) {
-    return <p role="alert">Selecciona un tenant para continuar.</p>
+    return <p role="alert">Selecciona una organización para continuar.</p>
   }
 
   if (!activeWorkspaceId) {
-    return <p role="alert">Selecciona un workspace para ver los recursos Kafka.</p>
+    return <p role="alert">Selecciona un área de trabajo para ver los recursos Kafka.</p>
   }
 
   const lagSummary = lagTone(topicMetadata.data?.lag?.totalLag)
@@ -642,24 +684,24 @@ export function ConsoleKafkaPage() {
   return (
     <main className="space-y-6" data-testid="console-kafka-page">
       <section className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Kafka / Events</h1>
-        <p className="text-sm text-muted-foreground">Topics, ACLs, metadata operacional, bridges y helpers de publish/stream para el workspace activo.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Kafka / Eventos</h1>
+        <p className="text-sm text-muted-foreground">Tópicos, ACLs, metadatos operacionales, puentes y herramientas de publicación/flujo para el área de trabajo activa.</p>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
-        <div className="space-y-6">
-          <section className="rounded-xl border border-border p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
+        <div className="min-w-0 space-y-6">
+          <section className="min-w-0 rounded-xl border border-border p-4">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Topics Kafka</h2>
+                <h2 className="text-lg font-semibold">Tópicos Kafka</h2>
                 <p className="text-sm text-muted-foreground">
                   Broker {formatEnumLabel(inventory.data?.brokerMode)} · aislamiento {formatEnumLabel(inventory.data?.isolationMode)}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 text-xs">
+              <div className="flex flex-wrap gap-2 text-xs sm:justify-end">
                 <Badge variant="outline">Total {inventory.data?.counts?.total ?? inventory.data?.counts?.topics ?? inventory.data?.items.length ?? 0}</Badge>
                 <Badge variant="outline">Activos {inventory.data?.counts?.active ?? 0}</Badge>
-                <Badge variant="outline">Provisioning {inventory.data?.counts?.provisioning ?? 0}</Badge>
+                <Badge variant="outline">Aprovisionamiento {inventory.data?.counts?.provisioning ?? 0}</Badge>
                 <Badge variant="outline">Degradados {inventory.data?.counts?.degraded ?? 0}</Badge>
               </div>
             </div>
@@ -671,7 +713,7 @@ export function ConsoleKafkaPage() {
                 <Button onClick={() => void loadInventory(activeWorkspaceId)}>Reintentar</Button>
               </div>
             ) : null}
-            {!inventory.loading && !inventory.error && inventory.data && inventory.data.items.length === 0 ? <p>No hay topics en este workspace.</p> : null}
+            {!inventory.loading && !inventory.error && inventory.data && inventory.data.items.length === 0 ? <p>No hay tópicos en esta área de trabajo.</p> : null}
             {!inventory.loading && !inventory.error && inventory.data && inventory.data.items.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
@@ -682,7 +724,7 @@ export function ConsoleKafkaPage() {
                       <th className="py-2 pr-3">Política</th>
                       <th className="py-2 pr-3">Particiones</th>
                       <th className="py-2 pr-3">Retención (h)</th>
-                      <th className="py-2">Quota</th>
+                      <th className="py-2">Cuota</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -716,25 +758,25 @@ export function ConsoleKafkaPage() {
             ) : null}
           </section>
 
-          <section className="rounded-xl border border-border p-4">
-            <h2 className="text-lg font-semibold">Bridges</h2>
-            {bridges.loading ? <p className="mt-4">Cargando bridges…</p> : null}
+          <section className="min-w-0 rounded-xl border border-border p-4">
+            <h2 className="text-lg font-semibold">Puentes</h2>
+            {bridges.loading ? <p className="mt-4">Cargando puentes…</p> : null}
             {!bridges.loading && bridges.error ? <p className="mt-4" role="alert">{bridges.error}</p> : null}
             {!bridges.loading && !bridges.error && bridgesUnavailableBecauseIdsMissing ? (
-              <p className="mt-4">La lista de bridges requiere IDs expuestos por el inventario.</p>
+              <p className="mt-4">La lista de puentes requiere IDs expuestos por el inventario.</p>
             ) : null}
             {!bridges.loading && !bridges.error && !bridgesUnavailableBecauseIdsMissing && bridges.data.length === 0 ? (
-              <p className="mt-4">No hay bridges configurados en este workspace.</p>
+              <p className="mt-4">No hay puentes configurados en esta área de trabajo.</p>
             ) : null}
             {!bridges.loading && !bridges.error && bridges.data.length > 0 ? (
               <div className="mt-4 overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 pr-3">Source</th>
-                      <th className="py-2 pr-3">Topic destino</th>
+                      <th className="py-2 pr-3">Origen</th>
+                      <th className="py-2 pr-3">Tópico destino</th>
                       <th className="py-2 pr-3">Estado</th>
-                      <th className="py-2 pr-3">Delivery</th>
+                      <th className="py-2 pr-3">Entrega</th>
                       <th className="py-2">Auditoría</th>
                     </tr>
                   </thead>
@@ -755,16 +797,16 @@ export function ConsoleKafkaPage() {
           </section>
         </div>
 
-        <section className="rounded-xl border border-border p-4">
+        <section className="min-w-0 rounded-xl border border-border p-4">
           {!selectedTopicId ? (
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold">Detalle del topic</h2>
-              <p className="text-sm text-muted-foreground">Selecciona un topic del inventario para revisar detalle, acceso, metadata, publicar eventos o abrir un stream SSE.</p>
+              <h2 className="text-lg font-semibold">Detalle del tópico</h2>
+              <p className="text-sm text-muted-foreground">Selecciona un tópico del inventario para revisar detalle, acceso, metadatos, publicar eventos o abrir un flujo SSE.</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold">{topicDetail.data?.topicName ?? selectedTopic?.topicName ?? 'Topic seleccionado'}</h2>
+                <h2 className="text-lg font-semibold">{topicDetail.data?.topicName ?? selectedTopic?.topicName ?? 'Tópico seleccionado'}</h2>
                 <Badge variant={statusTone(topicDetail.data?.provisioning?.state ?? selectedTopic?.provisioning?.state ?? selectedTopic?.status)}>
                   {formatEnumLabel(topicDetail.data?.provisioning?.state ?? selectedTopic?.provisioning?.state ?? selectedTopic?.status)}
                 </Badge>
@@ -776,7 +818,7 @@ export function ConsoleKafkaPage() {
               <div className="flex flex-wrap gap-2">
                 {(['detail', 'access', 'metadata', 'publish', 'stream'] as TopicTab[]).map((tab) => (
                   <Button key={tab} onClick={() => setTopicDetailTab(tab)} type="button" variant={topicDetailTab === tab ? 'default' : 'outline'}>
-                    {tab === 'detail' ? 'Detail' : tab === 'access' ? 'Access' : tab === 'metadata' ? 'Metadata' : tab === 'publish' ? 'Publish' : 'Stream'}
+                    {topicTabLabel(tab)}
                   </Button>
                 ))}
               </div>
@@ -790,44 +832,44 @@ export function ConsoleKafkaPage() {
                       <section className="space-y-3">
                         <h3 className="font-semibold">Identificación</h3>
                         <KeyValueGrid items={[
-                          { label: 'Topic name', value: topicDetail.data.topicName },
-                          { label: 'Physical topic name', value: topicDetail.data.physicalTopicName },
-                          { label: 'Channel prefix', value: topicDetail.data.channelPrefix },
-                          { label: 'Resource ID', value: topicDetail.data.resourceId }
+                          { label: 'Nombre del tópico', value: topicDetail.data.topicName },
+                          { label: 'Nombre físico del tópico', value: topicDetail.data.physicalTopicName },
+                          { label: 'Prefijo de canal', value: topicDetail.data.channelPrefix },
+                          { label: 'ID del recurso', value: topicDetail.data.resourceId }
                         ]} />
                       </section>
                       <section className="space-y-3">
                         <h3 className="font-semibold">Configuración</h3>
                         <KeyValueGrid items={[
-                          { label: 'Partition count', value: topicDetail.data.partitionCount },
-                          { label: 'Replication factor', value: topicDetail.data.replicationFactor },
-                          { label: 'Retention hours', value: topicDetail.data.retentionHours },
-                          { label: 'Cleanup policy', value: formatCleanupPolicy(topicDetail.data.cleanupPolicy) },
-                          { label: 'Delivery semantics', value: formatDeliverySemantics(topicDetail.data.deliverySemantics) },
-                          { label: 'Partition strategy', value: formatEnumLabel(topicDetail.data.partitionStrategy) },
-                          { label: 'Replay window hours', value: topicDetail.data.replayWindowHours }
+                          { label: 'Particiones', value: topicDetail.data.partitionCount },
+                          { label: 'Factor de replicación', value: topicDetail.data.replicationFactor },
+                          { label: 'Retención (horas)', value: topicDetail.data.retentionHours },
+                          { label: 'Política de cleanup', value: formatCleanupPolicy(topicDetail.data.cleanupPolicy) },
+                          { label: 'Semántica de entrega', value: formatDeliverySemantics(topicDetail.data.deliverySemantics) },
+                          { label: 'Estrategia de partición', value: formatEnumLabel(topicDetail.data.partitionStrategy) },
+                          { label: 'Ventana de replay (horas)', value: topicDetail.data.replayWindowHours }
                         ]} />
                       </section>
                       <section className="space-y-3">
                         <h3 className="font-semibold">Políticas</h3>
                         <KeyValueGrid items={[
-                          { label: 'Replay enabled', value: topicDetail.data.replayPolicy?.enabled },
-                          { label: 'Replay backend', value: topicDetail.data.replayPolicy?.storageBackend },
-                          { label: 'Replay max window', value: topicDetail.data.replayPolicy?.maxReplayWindowHours },
-                          { label: 'Payload max bytes', value: topicDetail.data.payloadPolicy?.maxPayloadBytes },
-                          { label: 'Compression', value: topicDetail.data.payloadPolicy?.compressionHint },
-                          { label: 'Schema validation', value: topicDetail.data.payloadPolicy?.schemaValidation },
-                          { label: 'Queues enabled', value: topicDetail.data.notificationPolicy?.queuesEnabled },
-                          { label: 'Max queue depth', value: topicDetail.data.notificationPolicy?.maxQueueDepth },
-                          { label: 'Notification retention', value: topicDetail.data.notificationPolicy?.retentionHours }
+                          { label: 'Replay habilitado', value: topicDetail.data.replayPolicy?.enabled },
+                          { label: 'Servicio de reproducción', value: topicDetail.data.replayPolicy?.storageBackend },
+                          { label: 'Ventana máxima de replay', value: topicDetail.data.replayPolicy?.maxReplayWindowHours },
+                          { label: 'Contenido máximo (bytes)', value: topicDetail.data.payloadPolicy?.maxPayloadBytes },
+                          { label: 'Compresión', value: topicDetail.data.payloadPolicy?.compressionHint },
+                          { label: 'Validación de esquema', value: topicDetail.data.payloadPolicy?.schemaValidation },
+                          { label: 'Colas habilitadas', value: topicDetail.data.notificationPolicy?.queuesEnabled },
+                          { label: 'Profundidad máxima de cola', value: topicDetail.data.notificationPolicy?.maxQueueDepth },
+                          { label: 'Retención de notificaciones', value: topicDetail.data.notificationPolicy?.retentionHours }
                         ]} />
                       </section>
                       <section className="space-y-3">
-                        <h3 className="font-semibold">Transports</h3>
+                        <h3 className="font-semibold">Transportes</h3>
                         <p>{topicDetail.data.allowedTransports?.length ? topicDetail.data.allowedTransports.join(', ') : '—'}</p>
                       </section>
                       <section className="space-y-3">
-                        <h3 className="font-semibold">Quotas</h3>
+                        <h3 className="font-semibold">Cuotas</h3>
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-left text-sm">
                             <thead>
@@ -835,8 +877,8 @@ export function ConsoleKafkaPage() {
                                 <th className="py-2 pr-3">Límite</th>
                                 <th className="py-2 pr-3">Usado</th>
                                 <th className="py-2 pr-3">Restante</th>
-                                <th className="py-2 pr-3">Enforcement</th>
-                                <th className="py-2 pr-3">Publishes/s</th>
+                                <th className="py-2 pr-3">Aplicación de límites</th>
+                                <th className="py-2 pr-3">Publicaciones/s</th>
                                 <th className="py-2">Subscripciones</th>
                               </tr>
                             </thead>
@@ -860,19 +902,19 @@ export function ConsoleKafkaPage() {
                         </div>
                       </section>
                       <section className="space-y-3">
-                        <h3 className="font-semibold">Aislamiento de tenant</h3>
+                        <h3 className="font-semibold">Aislamiento de organización</h3>
                         <KeyValueGrid items={[
-                          { label: 'Mode', value: topicDetail.data.tenantIsolation?.mode },
-                          { label: 'Topic prefix', value: topicDetail.data.tenantIsolation?.topicPrefix },
-                          { label: 'Consumer group prefix', value: topicDetail.data.tenantIsolation?.consumerGroupPrefix },
-                          { label: 'Cross-tenant prevented', value: topicDetail.data.tenantIsolation?.crossTenantAccessPrevented }
+                          { label: 'Modo', value: topicDetail.data.tenantIsolation?.mode },
+                          { label: 'Prefijo de tópico', value: topicDetail.data.tenantIsolation?.topicPrefix },
+                          { label: 'Prefijo de consumer group', value: topicDetail.data.tenantIsolation?.consumerGroupPrefix },
+                          { label: 'Acceso entre organizaciones prevenido', value: topicDetail.data.tenantIsolation?.crossTenantAccessPrevented }
                         ]} />
                       </section>
                       <section className="space-y-3">
-                        <h3 className="font-semibold">Timestamps</h3>
+                        <h3 className="font-semibold">Marcas temporales</h3>
                         <KeyValueGrid items={[
-                          { label: 'Created at', value: topicDetail.data.timestamps?.createdAt },
-                          { label: 'Updated at', value: topicDetail.data.timestamps?.updatedAt }
+                          { label: 'Creado en', value: topicDetail.data.timestamps?.createdAt },
+                          { label: 'Actualizado en', value: topicDetail.data.timestamps?.updatedAt }
                         ]} />
                       </section>
                     </>
@@ -882,16 +924,16 @@ export function ConsoleKafkaPage() {
 
               {topicDetailTab === 'access' ? (
                 <div className="space-y-4">
-                  {topicAccess.loading ? <p>Cargando access policy…</p> : null}
+                  {topicAccess.loading ? <p>Cargando política de acceso…</p> : null}
                   {!topicAccess.loading && topicAccess.error ? <p role="alert">{topicAccess.error}</p> : null}
                   {!topicAccess.loading && !topicAccess.error && topicAccess.data ? (
                     <>
                       <KeyValueGrid items={[
-                        { label: 'Audit mode', value: topicAccess.data.auditMode },
-                        { label: 'Provider', value: topicAccess.data.providerCompatibility?.provider },
-                        { label: 'Native ACL support', value: topicAccess.data.providerCompatibility?.nativeAclSupport }
+                        { label: 'Modo de auditoría', value: topicAccess.data.auditMode },
+                        { label: 'Proveedor', value: topicAccess.data.providerCompatibility?.provider },
+                        { label: 'Soporte ACL nativo', value: topicAccess.data.providerCompatibility?.nativeAclSupport }
                       ]} />
-                      {topicAccess.data.aclBindings.length === 0 ? <p>No hay ACL bindings configurados.</p> : null}
+                      {topicAccess.data.aclBindings.length === 0 ? <p>No hay vinculaciones ACL configuradas.</p> : null}
                       {topicAccess.data.aclBindings.length > 0 ? (
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-left text-sm">
@@ -902,7 +944,7 @@ export function ConsoleKafkaPage() {
                                 <th className="py-2 pr-3">Permiso</th>
                                 <th className="py-2 pr-3">Tipo</th>
                                 <th className="py-2 pr-3">Recurso</th>
-                                <th className="py-2">Workspace-scoped</th>
+                                <th className="py-2">Acotado al área de trabajo</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -927,7 +969,7 @@ export function ConsoleKafkaPage() {
 
               {topicDetailTab === 'metadata' ? (
                 <div className="space-y-4">
-                  {topicMetadata.loading ? <p>Cargando metadata operacional…</p> : null}
+                  {topicMetadata.loading ? <p>Cargando metadatos operacionales…</p> : null}
                   {!topicMetadata.loading && topicMetadata.error ? <p role="alert">{topicMetadata.error}</p> : null}
                   {!topicMetadata.loading && !topicMetadata.error && topicMetadata.data ? (
                     <>
@@ -938,26 +980,26 @@ export function ConsoleKafkaPage() {
                       <section className="space-y-3">
                         <h3 className="font-semibold">Lag</h3>
                         <KeyValueGrid items={[
-                          { label: 'Total lag', value: topicMetadata.data.lag?.totalLag },
-                          { label: 'Max partition lag', value: topicMetadata.data.lag?.maxPartitionLag },
-                          { label: 'Consumer group', value: topicMetadata.data.lag?.consumerGroupId },
-                          { label: 'Active', value: topicMetadata.data.lag?.isActive ?? topicMetadata.data.lag?.available }
+                          { label: 'Retraso total', value: topicMetadata.data.lag?.totalLag },
+                          { label: 'Retraso máximo de partición', value: topicMetadata.data.lag?.maxPartitionLag },
+                          { label: 'Grupo consumidor', value: topicMetadata.data.lag?.consumerGroupId },
+                          { label: 'Activo', value: topicMetadata.data.lag?.isActive ?? topicMetadata.data.lag?.available }
                         ]} />
                       </section>
                       <section className="space-y-3">
                         <h3 className="font-semibold">Retención efectiva</h3>
                         <KeyValueGrid items={[
-                          { label: 'Retention hours', value: topicMetadata.data.retention?.retentionHours },
-                          { label: 'Retention bytes', value: topicMetadata.data.retention?.retentionBytes },
-                          { label: 'Effective policy', value: topicMetadata.data.retention?.effectivePolicy }
+                          { label: 'Horas de retención', value: topicMetadata.data.retention?.retentionHours },
+                          { label: 'Bytes de retención', value: topicMetadata.data.retention?.retentionBytes },
+                          { label: 'Política efectiva', value: topicMetadata.data.retention?.effectivePolicy }
                         ]} />
                       </section>
                       <section className="space-y-3">
                         <h3 className="font-semibold">Compactación</h3>
                         <KeyValueGrid items={[
-                          { label: 'Enabled', value: topicMetadata.data.compaction?.enabled ?? topicMetadata.data.compaction?.available },
-                          { label: 'Last compaction', value: topicMetadata.data.compaction?.lastCompactionTimestamp },
-                          { label: 'Compaction lag', value: topicMetadata.data.compaction?.compactionLag }
+                          { label: 'Habilitada', value: topicMetadata.data.compaction?.enabled ?? topicMetadata.data.compaction?.available },
+                          { label: 'Última compactación', value: topicMetadata.data.compaction?.lastCompactionTimestamp },
+                          { label: 'Retraso de compactación', value: topicMetadata.data.compaction?.compactionLag }
                         ]} />
                       </section>
                       {topicMetadata.data.partitionMetadata && !('available' in topicMetadata.data.partitionMetadata) ? (
@@ -968,10 +1010,10 @@ export function ConsoleKafkaPage() {
                               <thead>
                                 <tr className="border-b border-border text-muted-foreground">
                                   <th className="py-2 pr-3">Partición</th>
-                                  <th className="py-2 pr-3">Lag</th>
+                                  <th className="py-2 pr-3">Retraso</th>
                                   <th className="py-2 pr-3">Offset inicial</th>
                                   <th className="py-2 pr-3">Offset final</th>
-                                  <th className="py-2">In sync</th>
+                                  <th className="py-2">Sincronizada</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1012,17 +1054,17 @@ export function ConsoleKafkaPage() {
               {topicDetailTab === 'publish' ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium" htmlFor="kafka-publish-payload">Payload</label>
+                    <label className="block text-sm font-medium" htmlFor="kafka-publish-payload">Contenido JSON</label>
                     <textarea className="min-h-36 w-full rounded-md border border-input bg-background p-3 text-sm" id="kafka-publish-payload" placeholder="{}" value={publishForm.payload} onChange={(event) => setPublishForm((current) => ({ ...current, payload: event.target.value }))} />
                   </div>
                   <div className="grid gap-4 md:grid-cols-3">
-                    <label className="block text-sm font-medium">Event type
+                    <label className="block text-sm font-medium">Tipo de evento
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="com.example.event" type="text" value={publishForm.eventType} onChange={(event) => setPublishForm((current) => ({ ...current, eventType: event.target.value }))} />
                     </label>
-                    <label className="block text-sm font-medium">Key
+                    <label className="block text-sm font-medium">Clave
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="(opcional)" type="text" value={publishForm.key} onChange={(event) => setPublishForm((current) => ({ ...current, key: event.target.value }))} />
                     </label>
-                    <label className="block text-sm font-medium">Content type
+                    <label className="block text-sm font-medium">Tipo de contenido
                       <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" type="text" value={publishForm.contentType} onChange={(event) => setPublishForm((current) => ({ ...current, contentType: event.target.value }))} />
                     </label>
                   </div>
@@ -1030,14 +1072,14 @@ export function ConsoleKafkaPage() {
                   {publishResult.error ? (
                     <div className="rounded-lg border border-destructive/40 p-3 text-sm" role="alert">
                       <p>{publishResult.error}</p>
-                      {publishResult.error.includes('quota') || publishResult.error.includes('429') ? <p className="mt-2 text-muted-foreground">Revisa el tab Detail &gt; Quotas para validar límites o enforcement.</p> : null}
+                      {publishResult.error.includes('quota') || publishResult.error.includes('429') ? <p className="mt-2 text-muted-foreground">Revisa la pestaña Detalle &gt; Cuotas para validar límites o aplicación de límites.</p> : null}
                     </div>
                   ) : null}
                   {publishResult.data ? (
                     <div className="rounded-lg border border-border p-3 text-sm" role="alert">
-                      <p><strong>Publication ID:</strong> {publishResult.data.publicationId}</p>
-                      <p><strong>Status:</strong> {publishResult.data.status}</p>
-                      <p><strong>Accepted at:</strong> {publishResult.data.acceptedAt ?? '—'}</p>
+                      <p><strong>ID de publicación:</strong> {publishResult.data.publicationId}</p>
+                      <p><strong>Estado:</strong> {publishResult.data.status}</p>
+                      <p><strong>Aceptada en:</strong> {publishResult.data.acceptedAt ?? '—'}</p>
                     </div>
                   ) : null}
                 </div>
@@ -1046,8 +1088,8 @@ export function ConsoleKafkaPage() {
               {topicDetailTab === 'stream' ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <Button aria-label={streamActive ? 'Detener stream' : 'Iniciar stream'} onClick={() => (streamActive ? stopStream() : void startStream(selectedTopicId))} type="button">
-                      {streamActive ? 'Detener stream' : 'Iniciar stream'}
+                    <Button aria-label={streamActive ? 'Detener flujo' : 'Iniciar flujo'} onClick={() => (streamActive ? stopStream() : void startStream(selectedTopicId))} type="button">
+                      {streamActive ? 'Detener flujo' : 'Iniciar flujo'}
                     </Button>
                     {streamActive ? <Badge variant="default">Conexión activa</Badge> : <Badge variant="outline">Inactivo</Badge>}
                   </div>
@@ -1055,15 +1097,15 @@ export function ConsoleKafkaPage() {
                   {streamError ? <p role="alert">{streamError}</p> : null}
                   <div className="max-h-[400px] space-y-3 overflow-y-auto rounded-lg border border-border p-3">
                     {streamEvents.length === 0 && streamActive ? <p>Escuchando eventos…</p> : null}
-                    {streamEvents.length === 0 && !streamActive ? <p>Inicia el stream para recibir eventos.</p> : null}
+                    {streamEvents.length === 0 && !streamActive ? <p>Inicia el flujo para recibir eventos.</p> : null}
                     {streamEvents.map((event, index) => (
                       <article className="rounded-lg border border-border p-3 text-sm" key={`${event.receivedAt}-${index}`}>
                         <div className="mb-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>{event.receivedAt}</span>
-                          {event.key ? <span>key: {event.key}</span> : null}
-                          {event.eventType ? <span>eventType: {event.eventType}</span> : null}
+                          {event.key ? <span>clave: {event.key}</span> : null}
+                          {event.eventType ? <span>tipoEvento: {event.eventType}</span> : null}
                         </div>
-                        <p className="mb-2 text-xs text-muted-foreground">raw: {event.raw}</p>
+                        <p className="mb-2 text-xs text-muted-foreground">crudo: {event.raw}</p>
                         <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">{typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload, null, 2)}</pre>
                       </article>
                     ))}

@@ -18,7 +18,7 @@ export function ConfigIdentifierMapEditor({ entries, onChange, disabled = false 
   if (!entries || entries.length === 0) {
     return (
       <div data-testid="identifier-map-empty" className="rounded-md border border-slate-200 p-4 text-sm text-slate-500">
-        No hay reemplazos de identificadores necesarios (el tenant de origen coincide con el destino).
+        No hay reemplazos de identificadores necesarios (la organización de origen coincide con el destino).
       </div>
     )
   }
@@ -32,7 +32,7 @@ export function ConfigIdentifierMapEditor({ entries, onChange, disabled = false 
       <table className="w-full text-sm border-collapse" role="table">
         <thead>
           <tr className="border-b border-slate-200">
-            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Scope</th>
+            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Alcance</th>
             <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Desde (origen)</th>
             <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Hacia (destino)</th>
           </tr>

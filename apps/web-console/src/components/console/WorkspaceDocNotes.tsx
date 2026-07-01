@@ -71,13 +71,13 @@ export function WorkspaceDocNotes({ notes, workspaceId, canManageNotes, onCreate
       operationId: `delete-workspace-doc-note-${note.noteId}`,
       resourceName: note.noteId,
       resourceType: 'nota personalizada',
-      impactDescription: `La nota se quitará de la documentación del workspace ${workspaceId}.`,
+      impactDescription: `La nota se quitará de la documentación del área de trabajo ${workspaceId}.`,
       onConfirm: () => onDelete(note.noteId)
     })
   }
 
   return (
-    <section aria-label="Workspace notes" className="space-y-4 rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+    <section aria-label="Notas del área de trabajo" className="space-y-4 rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
       <h2 className="text-lg font-semibold tracking-tight">Notas personalizadas</h2>
       {!canManageNotes ? (
         <p className="text-sm text-muted-foreground">Estas notas están en modo solo lectura para tu rol.</p>
@@ -89,10 +89,10 @@ export function WorkspaceDocNotes({ notes, workspaceId, canManageNotes, onCreate
         }} className="space-y-3 rounded-2xl border border-border/70 bg-background/60 p-4"
         >
           <Textarea
-            aria-label="New note"
+            aria-label="Nota nueva"
             aria-describedby={actionError ? 'workspace-doc-note-action-error' : undefined}
             className="min-h-24"
-            placeholder="Agrega una nota para este workspace"
+            placeholder="Agrega una nota para esta área de trabajo"
             value={draft}
             disabled={isInlineBusy}
             onChange={(event) => setDraft(event.target.value)}
@@ -104,7 +104,7 @@ export function WorkspaceDocNotes({ notes, workspaceId, canManageNotes, onCreate
             aria-busy={pendingAction?.type === 'create'}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            {pendingAction?.type === 'create' ? 'Adding...' : 'Add note'}
+            {pendingAction?.type === 'create' ? 'Agregando...' : 'Agregar nota'}
           </Button>
         </form>
       ) : null}
@@ -121,7 +121,7 @@ export function WorkspaceDocNotes({ notes, workspaceId, canManageNotes, onCreate
             <article key={note.noteId} className="space-y-3 rounded-2xl border border-border/70 bg-background/60 p-4">
               {canManageNotes ? (
                 <Textarea
-                  aria-label={`Edit ${note.noteId}`}
+                  aria-label={`Editar ${note.noteId}`}
                   className="min-h-24"
                   value={current}
                   disabled={isInlineBusy}
@@ -145,7 +145,7 @@ export function WorkspaceDocNotes({ notes, workspaceId, canManageNotes, onCreate
                       onClick={() => void handleUpdateNote(note.noteId, current)}
                     >
                       <Save className="h-4 w-4" aria-hidden="true" />
-                      {isUpdatePending ? 'Saving...' : 'Save'}
+                      {isUpdatePending ? 'Guardando...' : 'Guardar'}
                     </Button>
                     <Button
                       type="button"
@@ -156,7 +156,7 @@ export function WorkspaceDocNotes({ notes, workspaceId, canManageNotes, onCreate
                       onClick={() => openDeleteDialog(note)}
                     >
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Delete
+                      Eliminar
                     </Button>
                   </div>
                 ) : null}

@@ -55,8 +55,8 @@ export function RealtimeConsole({ workspaceId }: RealtimeConsoleProps) {
     const target = buildTarget()
     if (!target || apiKey.trim() === '') {
       setError(source === 'mongo'
-        ? 'Database, collection, and an anon key are required'
-        : 'Database, table, and an anon key are required')
+        ? 'Base de datos, colección y clave anónima son obligatorias'
+        : 'Base de datos, tabla y clave anónima son obligatorias')
       return
     }
     stop()
@@ -66,61 +66,61 @@ export function RealtimeConsole({ workspaceId }: RealtimeConsoleProps) {
       target,
       apiKey: apiKey.trim(),
       onChange: (change) => setChanges((prev) => [change, ...prev].slice(0, 100)),
-      onError: () => setError('Stream error — check the key, target, and that the workspace backend supports change streams')
+      onError: () => setError('Error del flujo: revisa la clave, el destino y que el servidor del área de trabajo soporte flujos de cambios')
     })
     setSubscribed(true)
   }
 
   return (
-    <section aria-label="Realtime console" className="space-y-4">
+    <section aria-label="Consola de tiempo real" className="space-y-4">
       {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
 
       <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rt-source">Source</Label>
+          <Label htmlFor="rt-source">Origen</Label>
           <Select id="rt-source" value={source} onChange={(event) => setSource(event.target.value as 'mongo' | 'postgres')}>
-            <option value="mongo">Mongo collection</option>
-            <option value="postgres">Postgres table</option>
+            <option value="mongo">Colección Mongo</option>
+            <option value="postgres">Tabla Postgres</option>
           </Select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rt-db">Database</Label>
+          <Label htmlFor="rt-db">Base de datos</Label>
           <Input id="rt-db" value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} />
         </div>
         {source === 'mongo' ? (
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="rt-collection">Collection</Label>
+            <Label htmlFor="rt-collection">Colección</Label>
             <Input id="rt-collection" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} />
           </div>
         ) : (
           <>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="rt-schema">Schema</Label>
+              <Label htmlFor="rt-schema">Esquema</Label>
               <Input id="rt-schema" value={schemaName} onChange={(event) => setSchemaName(event.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="rt-table">Table</Label>
+              <Label htmlFor="rt-table">Tabla</Label>
               <Input id="rt-table" value={tableName} onChange={(event) => setTableName(event.target.value)} />
             </div>
           </>
         )}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rt-key">Anon key</Label>
+          <Label htmlFor="rt-key">Clave anónima</Label>
           <Input id="rt-key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="flc_anon_…" />
         </div>
       </div>
       {subscribed ? (
         <Button type="button" variant="outline" onClick={stop}>
-          Stop
+          Detener
         </Button>
       ) : (
         <Button type="button" onClick={start}>
-          Subscribe
+          Suscribirse
         </Button>
       )}
 
-      <h3 className="text-base font-semibold text-foreground">Live changes{changes.length > 0 ? ` (${changes.length})` : ''}</h3>
-      {subscribed && changes.length === 0 ? <p>Listening… write to the {source === 'mongo' ? 'collection' : 'table'} to see changes.</p> : null}
+      <h3 className="text-base font-semibold text-foreground">Cambios en vivo{changes.length > 0 ? ` (${changes.length})` : ''}</h3>
+      {subscribed && changes.length === 0 ? <p>Escuchando… escribe en la {source === 'mongo' ? 'colección' : 'tabla'} para ver cambios.</p> : null}
       <ul>
         {changes.map((change, index) => (
           <li key={`${String(change.documentId)}-${index}`}>

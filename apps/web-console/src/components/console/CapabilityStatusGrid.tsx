@@ -12,9 +12,9 @@ export function CapabilityStatusGrid({ capabilities }: { capabilities: Array<{ c
 
   return (
     <section className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm sm:p-5" aria-labelledby={headingId}>
-      <h2 id={headingId} className="mb-3 text-base font-semibold text-foreground">Capabilities</h2>
+      <h2 id={headingId} className="mb-3 text-base font-semibold text-foreground">Capacidades</h2>
       {capabilities.length === 0 ? (
-        <p role="status" className="text-sm text-muted-foreground">No inherited capabilities were returned.</p>
+        <p role="status" className="text-sm text-muted-foreground">No se devolvieron capacidades heredadas.</p>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {capabilities.map((capability) => (
@@ -22,12 +22,14 @@ export function CapabilityStatusGrid({ capabilities }: { capabilities: Array<{ c
               <div className="break-words font-medium text-foreground">{capability.displayLabel}</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge
-                  aria-label={`${capability.displayLabel} capability ${capability.enabled ? 'enabled' : 'disabled'}`}
+                  aria-label={`${capability.displayLabel}: capacidad ${capability.enabled ? 'habilitada' : 'deshabilitada'}`}
                   className={cn('border', capability.enabled ? capabilityBadgeClass.enabled : capabilityBadgeClass.disabled)}
                 >
-                  {capability.enabled ? 'Enabled' : 'Disabled'}
+                  {capability.enabled ? 'Habilitada' : 'Deshabilitada'}
                 </Badge>
-                <Badge variant="outline">{capability.source === 'plan' ? 'Plan' : 'Platform default'}</Badge>
+                <Badge variant="outline" className="max-w-full whitespace-normal text-left leading-5">
+                  {capability.source === 'plan' ? 'Plan' : 'Valor predeterminado de plataforma'}
+                </Badge>
               </div>
             </li>
           ))}

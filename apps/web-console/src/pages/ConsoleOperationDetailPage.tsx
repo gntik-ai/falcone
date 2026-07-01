@@ -36,7 +36,7 @@ export function ConsoleOperationDetailPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Detalle de operación</h1>
           <OperationStatusBadge status={data.status} />
         </div>
-        <p className="text-sm text-muted-foreground">Consulta los metadatos, logs resumidos y resultado final de la operación seleccionada.</p>
+        <p className="text-sm text-muted-foreground">Consulta los metadatos, registros resumidos y resultado final de la operación seleccionada.</p>
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
@@ -44,12 +44,12 @@ export function ConsoleOperationDetailPage() {
           {[
             ['Tipo', data.operationType],
             ['Actor', data.actorId],
-            ['Workspace', data.workspaceId ?? '—'],
-            ['Tenant', data.tenantId],
+            ['Área de trabajo', data.workspaceId ?? '—'],
+            ['Organización', data.tenantId],
             ['Creada', formatDateTime(data.createdAt)],
             ['Actualizada', formatDateTime(data.updatedAt)],
-            ['Correlation ID', data.correlationId ?? '—'],
-            ['Saga ID', data.sagaId ?? '—']
+            ['ID de correlación', data.correlationId ?? '—'],
+            ['ID de saga', data.sagaId ?? '—']
           ].map(([label, value]) => (
             <div key={label} className="bg-card px-4 py-4">
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
@@ -61,7 +61,7 @@ export function ConsoleOperationDetailPage() {
 
       <section className="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-sm">
         <div>
-          <h2 className="text-lg font-semibold">Logs resumidos</h2>
+          <h2 className="text-lg font-semibold">Registros resumidos</h2>
           <p className="text-sm text-muted-foreground">Mensajes orientados al usuario sobre el progreso de la operación.</p>
         </div>
         <OperationLogEntriesList operationId={operationId} />

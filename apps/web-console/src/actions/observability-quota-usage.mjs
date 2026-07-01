@@ -4,15 +4,15 @@ function countByPosture(dimensions = [], posture) {
 
 function headlineForOverview(overview = {}) {
   if ((overview.hardLimitDimensions ?? []).length > 0) {
-    return `${overview.hardLimitDimensions.length} hard-limit breach(es)`;
+    return `${overview.hardLimitDimensions.length} incumplimiento(s) de límite estricto`;
   }
   if ((overview.softLimitDimensions ?? []).length > 0) {
-    return `${overview.softLimitDimensions.length} soft-limit breach(es)`;
+    return `${overview.softLimitDimensions.length} incumplimiento(s) de límite suave`;
   }
   if ((overview.warningDimensions ?? []).length > 0) {
-    return `${overview.warningDimensions.length} warning dimension(s)`;
+    return `${overview.warningDimensions.length} dimensión(es) en advertencia`;
   }
-  return 'Within limits';
+  return 'Dentro de los límites';
 }
 
 function emphasisForOverview(overview = {}) {
@@ -36,24 +36,24 @@ export function buildTenantQuotaUsageCards(overview = {}) {
   return [
     {
       id: 'tenant-overview-status',
-      title: 'Quota posture',
+      title: 'Postura de cuotas',
       value: headlineForOverview(overview),
       emphasis: emphasisForOverview(overview),
-      secondary: `Policies configured: ${overview.policiesConfigured ? 'yes' : 'no'}`
+      secondary: `Políticas configuradas: ${overview.policiesConfigured ? 'sí' : 'no'}`
     },
     {
       id: 'tenant-overview-warning-count',
-      title: 'Warnings',
-      value: `${countByPosture(dimensions, 'warning_threshold_reached')} dimension(s)`,
+      title: 'Advertencias',
+      value: `${countByPosture(dimensions, 'warning_threshold_reached')} dimensión(es)`,
       emphasis: (overview.warningDimensions ?? []).length > 0 ? 'warning' : 'healthy',
-      secondary: `${countByPosture(dimensions, 'evidence_degraded') + countByPosture(dimensions, 'evidence_unavailable')} degraded dimension(s)`
+      secondary: `${countByPosture(dimensions, 'evidence_degraded') + countByPosture(dimensions, 'evidence_unavailable')} dimensión(es) degradadas`
     },
     {
       id: 'tenant-overview-capacity',
-      title: 'Capacity pressure',
-      value: `${(overview.softLimitDimensions ?? []).length} soft / ${(overview.hardLimitDimensions ?? []).length} hard`,
+      title: 'Presión de capacidad',
+      value: `${(overview.softLimitDimensions ?? []).length} suave / ${(overview.hardLimitDimensions ?? []).length} estricto`,
       emphasis: (overview.hardLimitDimensions ?? []).length > 0 ? 'critical' : (overview.softLimitDimensions ?? []).length > 0 ? 'elevated' : 'healthy',
-      secondary: `Generated at ${overview.generatedAt ?? 'n/a'}`
+      secondary: `Generado en ${overview.generatedAt ?? 'n/a'}`
     }
   ];
 }
@@ -62,10 +62,10 @@ export function buildTenantProvisioningBanner(overview = {}) {
   const provisioning = overview.provisioningState ?? {};
   return {
     id: 'tenant-provisioning-banner',
-    title: 'Provisioning state',
-    value: provisioning.state ?? 'unknown',
+    title: 'Estado de aprovisionamiento',
+    value: provisioning.state ?? 'Desconocido',
     emphasis: provisioning.visualState ?? 'unknown',
-    secondary: provisioning.reasonSummary ?? 'No provisioning summary available.',
+    secondary: provisioning.reasonSummary ?? 'No hay resumen de provisioning disponible.',
     degradedComponents: provisioning.degradedComponents ?? []
   };
 }

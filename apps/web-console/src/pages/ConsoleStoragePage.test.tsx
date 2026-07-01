@@ -183,13 +183,13 @@ describe('ConsoleStoragePage', () => {
 
   it('muestra los guards de tenant y workspace sin llamar APIs', () => {
     renderPage(createContext({ activeTenantId: null, activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un tenant/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
     expect(mockRequestConsoleSessionJson).not.toHaveBeenCalled()
 
     cleanup()
 
     renderPage(createContext({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un workspace/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
     expect(mockRequestConsoleSessionJson).not.toHaveBeenCalled()
   })
 
@@ -209,7 +209,7 @@ describe('ConsoleStoragePage', () => {
   it('muestra estados empty y error del inventario de buckets', async () => {
     queueHappyPath({ buckets: { items: [], page: { size: 100 } } })
     renderPage()
-    expect(await screen.findByText(/no hay buckets en el workspace seleccionado/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no hay buckets en el área de trabajo seleccionada/i)).toBeInTheDocument()
 
     cleanup()
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
@@ -242,7 +242,7 @@ describe('ConsoleStoragePage', () => {
     expect(await screen.findByRole('button', { name: 'media/manual.pdf' })).toBeInTheDocument()
   })
 
-  it('carga y renderiza el detalle read-only de metadata del objeto', async () => {
+  it('carga y renderiza el detalle read-only de metadatos del objeto', async () => {
     queueHappyPath()
     const user = userEvent.setup()
 
@@ -254,7 +254,7 @@ describe('ConsoleStoragePage', () => {
       expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/storage/buckets/res_bucket_1/objects/media%2Fhero.png/metadata', expect.any(Object))
     })
 
-    expect(await screen.findByText(/metadata del objeto/i)).toBeInTheDocument()
+    expect(await screen.findByText(/metadatos del objeto/i)).toBeInTheDocument()
     expect(screen.getByText(/abcdef1234567890abcdef1234567890/i)).toBeInTheDocument()
     expect(screen.getByText(/^owner$/i)).toBeInTheDocument()
     expect(screen.getByText(/^design$/i)).toBeInTheDocument()
@@ -274,8 +274,8 @@ describe('ConsoleStoragePage', () => {
 
     renderPage()
 
-    expect(await screen.findByText(/no expone una snapshot de uso disponible/i)).toBeInTheDocument()
-    expect(screen.getByText(/la snapshot de uso tiene 30 minutos/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no expone una instantánea de uso disponible/i)).toBeInTheDocument()
+    expect(screen.getByText(/la instantánea de uso tiene 30 minutos/i)).toBeInTheDocument()
     expect(screen.getByText(/^media-assets$/i)).toBeInTheDocument()
   })
 
@@ -287,14 +287,14 @@ describe('ConsoleStoragePage', () => {
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
 
     // Presigned tab is now an on-demand generator (issuance is wired), not an unsupported state.
-    await user.click(await screen.findByRole('button', { name: /presigned urls/i }))
+    await user.click(await screen.findByRole('button', { name: /urls prefirmadas/i }))
     expect(await screen.findByRole('heading', { name: /urls prefirmadas/i })).toBeInTheDocument()
     // With no object selected yet, it prompts the user to pick one in the Objetos tab.
     expect(screen.getByText(/selecciona un objeto en la pestaña/i)).toBeInTheDocument()
 
-    // Multipart still has no public inventory endpoint, so it stays in the bounded read-only state.
-    await user.click(screen.getByRole('button', { name: /multipart/i }))
-    expect(await screen.findByText(/multipart uploads no disponible en la api pública actual/i)).toBeInTheDocument()
+    // Multiparte still has no public inventory endpoint, so it stays in the bounded solo lectura state.
+    await user.click(screen.getByRole('button', { name: /multiparte/i }))
+    expect(await screen.findByText(/cargas multiparte no disponible en la api pública actual/i)).toBeInTheDocument()
   })
 
   it('genera una URL de descarga prefirmada para el objeto seleccionado (#676)', async () => {
@@ -321,7 +321,7 @@ describe('ConsoleStoragePage', () => {
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
     // Select an object, then switch to the presigned tab and generate.
     await user.click(await screen.findByRole('button', { name: 'media/hero.png' }))
-    await user.click(await screen.findByRole('button', { name: /presigned urls/i }))
+    await user.click(await screen.findByRole('button', { name: /urls prefirmadas/i }))
     await user.click(await screen.findByRole('button', { name: /generar url de descarga prefirmada/i }))
 
     expect(await screen.findByText(/X-Amz-Signature=deadbeef/i)).toBeInTheDocument()
@@ -345,10 +345,10 @@ describe('ConsoleStoragePage', () => {
     await user.click((await screen.findAllByRole('button', { name: /^eliminar$/i }))[0])
 
     await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/storage/buckets/res_bucket_1', expect.objectContaining({ method: 'DELETE' })))
-    expect(await screen.findByText(/no hay buckets en el workspace seleccionado/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no hay buckets en el área de trabajo seleccionada/i)).toBeInTheDocument()
   })
 
-  it('mantiene la página utilizable cuando falla la metadata del objeto', async () => {
+  it('mantiene la página utilizable cuando falla la metadatos del objeto', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url === '/v1/storage/buckets?page[size]=100') return mockBuckets()
       if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage()
@@ -363,7 +363,7 @@ describe('ConsoleStoragePage', () => {
     await user.click(await screen.findByRole('button', { name: 'media/hero.png' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/metadata degradada/i)
-    expect(screen.getByText(/storage \/ objetos/i)).toBeInTheDocument()
+    expect(screen.getByText(/almacenamiento \/ objetos/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Objetos' })).toBeInTheDocument()
   })
 
@@ -374,7 +374,7 @@ describe('ConsoleStoragePage', () => {
     renderPage()
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
 
-    expect(await screen.findByRole('heading', { name: 'Snippets de conexión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/<RESOURCE_HOST>/).length).toBeGreaterThan(0)
   })
 })

@@ -88,7 +88,7 @@ describe('ConsoleFlowRunPage — completed run rendered from history', () => {
       status: 'Completed',
       nodes: [
         { nodeId: 'step-1', status: 'completed', input: { a: 1 }, output: { ok: true }, attempts: [{ status: 'completed', attemptNumber: 1, startedAt: '2026-01-01T00:00:00Z', completedAt: '2026-01-01T00:00:01Z' }] },
-        { nodeId: 'step-2', status: 'failed', error: { message: 'boom', stack: 'at x' }, attempts: [{ status: 'failed', attemptNumber: 1 }] }
+        { nodeId: 'step-2', status: 'failed', input: { payload: 'x'.repeat(4100) }, error: { message: 'boom', stack: 'at x' }, attempts: [{ status: 'failed', attemptNumber: 1 }] }
       ]
     })
   })
@@ -110,6 +110,8 @@ describe('ConsoleFlowRunPage — completed run rendered from history', () => {
     await waitFor(() => expect(screen.getByTestId('probe-node-step-2')).toBeInTheDocument())
     await user.click(screen.getByTestId('probe-node-step-2'))
     expect(await screen.findByTestId('run-node-detail-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('run-node-entrada-truncated')).toHaveTextContent('truncado · límite visual de 4 KB')
+    expect(screen.getByTestId('run-node-detail-close')).toHaveTextContent('Cerrar')
     expect(screen.getByTestId('run-node-error')).toHaveTextContent('boom')
   })
 
@@ -119,6 +121,20 @@ describe('ConsoleFlowRunPage — completed run rendered from history', () => {
     expect(screen.getByTestId('run-cancel-button')).toBeDisabled()
     // Retry is available for a terminal run.
     expect(screen.getByTestId('run-retry-button')).toBeInTheDocument()
+  })
+
+  it('shows the missing-definition fallback in Spanish', async () => {
+    mockGetFlow.mockResolvedValueOnce({ flowId: 'flow1', name: 'demo' })
+    renderRun()
+    expect(await screen.findByText('No hay definición de flujo disponible para esta ejecución.')).toBeInTheDocument()
+  })
+})
+
+describe('ConsoleFlowRunPage — error de carga', () => {
+  it('muestra fallback de carga en español cuando el error no trae mensaje', async () => {
+    mockGetExecution.mockReset().mockRejectedValueOnce('network-failed')
+    renderRun()
+    expect(await screen.findByTestId('run-load-error')).toHaveTextContent('No se pudo cargar la ejecución.')
   })
 })
 

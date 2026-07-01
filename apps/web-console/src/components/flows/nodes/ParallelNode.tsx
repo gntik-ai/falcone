@@ -17,12 +17,12 @@ export function ParallelNode({ data, selected }: NodeProps) {
     <>
       <Handle type="target" position={Position.Top} />
       <NodeShell
-        typeLabel="Parallel"
+        typeLabel="Paralelo"
         label={nodeData.label}
         icon={Layers}
         selected={selected}
         validationErrors={nodeData.validationErrors}
-        badges={[`${branchCount} branch${branchCount === 1 ? '' : 'es'}`]}
+        badges={[`${branchCount} ${branchCount === 1 ? 'rama' : 'ramas'}`]}
       />
       <Handle type="source" position={Position.Bottom} id="branches" />
       <Handle type="source" position={Position.Right} id="next" />

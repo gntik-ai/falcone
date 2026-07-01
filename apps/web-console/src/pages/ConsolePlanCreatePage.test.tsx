@@ -17,19 +17,19 @@ describe('ConsolePlanCreatePage', () => {
   it('validates slug format', async () => {
     render(<MemoryRouter><ConsolePlanCreatePage /></MemoryRouter>)
     await userEvent.type(screen.getByLabelText(/slug/i), 'Bad Slug')
-    await userEvent.type(screen.getByLabelText(/display-name/i), 'Starter')
-    await userEvent.click(screen.getByRole('button', { name: /create/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/slug format/i)
+    await userEvent.type(screen.getByLabelText(/nombre visible/i), 'Starter')
+    await userEvent.click(screen.getByRole('button', { name: /crear/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/formato del slug/i)
     expect(createPlan).not.toHaveBeenCalled()
   })
 
   it('validates required display name inline and does not create a plan — issue #807', async () => {
     render(<MemoryRouter><ConsolePlanCreatePage /></MemoryRouter>)
     await userEvent.type(screen.getByLabelText(/slug/i), 'starter')
-    await userEvent.type(screen.getByLabelText(/display-name/i), '   ')
-    await userEvent.click(screen.getByRole('button', { name: /create/i }))
+    await userEvent.type(screen.getByLabelText(/nombre visible/i), '   ')
+    await userEvent.click(screen.getByRole('button', { name: /crear/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/display name is required/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/nombre visible es obligatorio/i)
     expect(createPlan).not.toHaveBeenCalled()
   })
 
@@ -37,17 +37,17 @@ describe('ConsolePlanCreatePage', () => {
     const user = userEvent.setup()
     render(<MemoryRouter><ConsolePlanCreatePage /></MemoryRouter>)
     await user.type(screen.getByLabelText(/slug/i), 'starter')
-    const displayNameInput = screen.getByLabelText(/display-name/i)
+    const displayNameInput = screen.getByLabelText(/nombre visible/i)
     await user.type(displayNameInput, '   ')
-    await user.click(screen.getByRole('button', { name: /create/i }))
+    await user.click(screen.getByRole('button', { name: /crear/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/display name is required/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/nombre visible es obligatorio/i)
     expect(displayNameInput).toHaveFocus()
     expect(displayNameInput).toHaveClass('border-destructive')
 
     await user.type(displayNameInput, 'Starter')
 
-    expect(screen.queryByText(/display name is required/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/nombre visible es obligatorio/i)).not.toBeInTheDocument()
     expect(displayNameInput).not.toHaveClass('border-destructive')
   })
 })

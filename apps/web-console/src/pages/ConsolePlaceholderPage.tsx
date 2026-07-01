@@ -32,25 +32,25 @@ export function ConsolePlaceholderPage({ title, description, badge }: ConsolePla
           <div className="space-y-3">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Contexto operativo</p>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">Tenant: {activeTenant?.label ?? 'No seleccionado'}</Badge>
-              <Badge variant="outline">Estado tenant: {tenantStatus.label}</Badge>
-              {activeWorkspace ? <Badge variant="outline">Workspace: {activeWorkspace.label}</Badge> : null}
-              <Badge variant="outline">Estado workspace: {workspaceStatus.label}</Badge>
+              <Badge variant="outline">Organización: {activeTenant?.label ?? 'No seleccionada'}</Badge>
+              <Badge variant="outline">Estado de organización: {tenantStatus.label}</Badge>
+              {activeWorkspace ? <Badge variant="outline">Área de trabajo: {activeWorkspace.label}</Badge> : null}
+              <Badge variant="outline">Estado de área de trabajo: {workspaceStatus.label}</Badge>
               {activeWorkspace?.environment ? <Badge variant="outline">Entorno: {formatConsoleEnumLabel(activeWorkspace.environment)}</Badge> : null}
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
               {activeTenant
-                ? 'La página refleja el estado actual del tenant y workspace seleccionados en el shell.'
-                : 'Selecciona un tenant y, si aplica, un workspace para ver el estado contextual completo en esta vista.'}
+                ? 'La página refleja el estado actual de la organización y el área de trabajo seleccionadas en la consola.'
+                : 'Selecciona una organización y, si aplica, un área de trabajo para ver el estado contextual completo en esta vista.'}
             </p>
           </div>
         </div>
 
         <div className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
           <div className="space-y-3 rounded-2xl border border-dashed border-border/70 p-5">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Shell de consola base</p>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Consola base</p>
             <p className="text-sm leading-6 text-muted-foreground">
-              Esta vista sigue siendo un placeholder navegable, pero ahora incorpora señales de estado del contexto activo para reducir operaciones a ciegas dentro del shell.
+              Esta vista sigue siendo una pantalla temporal navegable, pero ahora incorpora señales de estado del contexto activo para reducir operaciones a ciegas dentro de la consola.
             </p>
           </div>
         </div>
@@ -61,12 +61,12 @@ export function ConsolePlaceholderPage({ title, description, badge }: ConsolePla
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Resumen de cuotas</p>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Estado de cuotas del tenant activo</h2>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Estado de cuotas de la organización activa</h2>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">Nominal: {quotaSummary.totals.nominal}</Badge>
-              <Badge variant="outline">Warning: {quotaSummary.totals.warning}</Badge>
-              <Badge variant="outline">Blocked: {quotaSummary.totals.blocked}</Badge>
+              <Badge variant="outline">Advertencia: {quotaSummary.totals.warning}</Badge>
+              <Badge variant="outline">Bloqueadas: {quotaSummary.totals.blocked}</Badge>
             </div>
           </div>
 
@@ -92,7 +92,7 @@ export function ConsolePlaceholderPage({ title, description, badge }: ConsolePla
               </div>
             </details>
           ) : (
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">No hay alertas de cuota visibles para el tenant activo.</p>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">No hay alertas de cuota visibles para la organización activa.</p>
           )}
         </div>
       ) : null}
@@ -102,19 +102,19 @@ export function ConsolePlaceholderPage({ title, description, badge }: ConsolePla
           <div className="space-y-4">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Resumen de inventario</p>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Composición del tenant activo</h2>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Composición de la organización activa</h2>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <InventoryStat label="Workspaces" value={inventorySummary.workspaceCount} />
+              <InventoryStat label="Áreas de trabajo" value={inventorySummary.workspaceCount} />
               <InventoryStat label="Aplicaciones" value={inventorySummary.applicationCount} />
               <InventoryStat label="Recursos gestionados" value={inventorySummary.managedResourceCount} />
-              <InventoryStat label="Service accounts" value={inventorySummary.serviceAccountCount} />
+              <InventoryStat label="Cuentas de servicio" value={inventorySummary.serviceAccountCount} />
             </div>
 
             {inventorySummary.workspaces.length > 0 ? (
               <details className="rounded-2xl border border-border/70 bg-background/60 p-4">
-                <summary className="cursor-pointer text-sm font-medium text-foreground">Ver desglose por workspace</summary>
+                <summary className="cursor-pointer text-sm font-medium text-foreground">Ver desglose por área de trabajo</summary>
                 <div className="mt-4 space-y-3">
                   {inventorySummary.workspaces.map((workspace) => (
                     <div key={workspace.workspaceId} className="rounded-2xl border border-border/60 px-4 py-3">
@@ -124,7 +124,7 @@ export function ConsolePlaceholderPage({ title, description, badge }: ConsolePla
                         {workspace.state ? <Badge variant="outline">{formatConsoleEnumLabel(workspace.state)}</Badge> : null}
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        Apps {formatCount(workspace.applicationCount)} · Service accounts {formatCount(workspace.serviceAccountCount)} · Recursos {formatCount(workspace.managedResourceCount)}
+                        Aplicaciones {formatCount(workspace.applicationCount)} · Cuentas de servicio {formatCount(workspace.serviceAccountCount)} · Recursos {formatCount(workspace.managedResourceCount)}
                       </p>
                     </div>
                   ))}

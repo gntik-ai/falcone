@@ -22,7 +22,7 @@ export function FlowProblemsPanel({ problems, onSelectNode }: FlowProblemsPanelP
     >
       <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-destructive">
         <AlertTriangle aria-hidden className="h-3.5 w-3.5" />
-        Problems ({problems.length})
+        Problemas ({problems.length})
       </div>
       <ul className="space-y-1">
         {problems.map((problem, index) => (

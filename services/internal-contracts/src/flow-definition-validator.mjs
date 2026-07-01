@@ -159,7 +159,7 @@ export function validateFlowDefinition(definition, options = {}) {
     seen.add(id);
   }
   for (const id of duplicates) {
-    errors.push(error('FLW-E001', id, `Duplicate node id "${id}"; node IDs must be unique within the flow.`));
+    errors.push(error('FLW-E001', id, `ID de nodo duplicado "${id}"; los ID de nodo deben ser únicos dentro del flujo.`));
   }
 
   const nodeById = new Map();
@@ -175,7 +175,7 @@ export function validateFlowDefinition(definition, options = {}) {
     for (const { target } of outgoingEdges(node)) {
       if (!nodeById.has(target)) {
         errors.push(
-          error('FLW-E003', node.id, `Node "${node.id}" references unknown node "${target}".`)
+          error('FLW-E003', node.id, `El nodo "${node.id}" referencia el nodo desconocido "${target}".`)
         );
       }
     }
@@ -185,7 +185,7 @@ export function validateFlowDefinition(definition, options = {}) {
   // dangling reference (E003) does not masquerade as a cycle.
   const cycleNodeId = detectCycle(nodes, nodeById);
   if (cycleNodeId) {
-    errors.push(error('FLW-E002', cycleNodeId, `Node graph contains a cycle reachable from node "${cycleNodeId}".`));
+    errors.push(error('FLW-E002', cycleNodeId, `El grafo de nodos contiene un ciclo alcanzable desde el nodo "${cycleNodeId}".`));
   }
 
   // FLW-E009: branch arity.
@@ -196,7 +196,7 @@ export function validateFlowDefinition(definition, options = {}) {
     const sufficient = arms.length >= 2 || (arms.length >= 1 && hasDefault);
     if (!sufficient) {
       errors.push(
-        error('FLW-E009', node.id ?? null, `Branch node "${node.id}" must have at least two arms, or one arm plus a default.`)
+        error('FLW-E009', node.id ?? null, `La rama "${node.id}" necesita al menos dos brazos, o un brazo más una conexión predeterminada.`)
       );
     }
   }
@@ -207,7 +207,7 @@ export function validateFlowDefinition(definition, options = {}) {
       const { ok } = expressionEngine.parse(expression);
       if (!ok) {
         errors.push(
-          error('FLW-E005', node.id ?? null, `Expression "${expression}" is not parseable by the ${expressionEngine.name ?? 'configured'} engine.`)
+          error('FLW-E005', node.id ?? null, `La expresión "${expression}" no puede analizarse con el motor ${expressionEngine.name ?? 'configurado'}.`)
         );
       }
     }
@@ -219,7 +219,7 @@ export function validateFlowDefinition(definition, options = {}) {
       if (node?.type !== 'task') continue;
       if (typeof node.taskType === 'string' && !taskTypeCatalog.has(node.taskType)) {
         errors.push(
-          error('FLW-E006', node.id ?? null, `Unknown taskType "${node.taskType}"; not present in the task-type catalog.`)
+          error('FLW-E006', node.id ?? null, `Tipo de tarea desconocido "${node.taskType}"; no está presente en el catálogo de tipos de tarea.`)
         );
       }
     }
@@ -232,7 +232,7 @@ export function validateFlowDefinition(definition, options = {}) {
       const ref = { flowId: node.flowId, flowVersion: node.flowVersion };
       if (!resolveSubFlow(ref)) {
         errors.push(
-          error('FLW-E004', node.id ?? null, `Sub-flow reference ${node.flowId}@${node.flowVersion} could not be resolved.`)
+          error('FLW-E004', node.id ?? null, `La referencia de subflujo ${node.flowId}@${node.flowVersion} no pudo resolverse.`)
         );
       }
     }
@@ -243,7 +243,7 @@ export function validateFlowDefinition(definition, options = {}) {
     if (node?.type !== 'wait') continue;
     if (!isValidIso8601Duration(node.duration)) {
       errors.push(
-        error('FLW-E008', node.id ?? null, `Wait node "${node.id}" duration "${node.duration}" is not a valid ISO 8601 duration.`)
+        error('FLW-E008', node.id ?? null, `La duración "${node.duration}" del nodo de espera "${node.id}" no es una duración ISO 8601 válida.`)
       );
     }
   }
@@ -254,7 +254,7 @@ export function validateFlowDefinition(definition, options = {}) {
     if (trigger?.kind !== 'cron') return;
     if (!isValidCronExpression(trigger.schedule)) {
       errors.push(
-        error('FLW-E007', `triggers[${index}]`, `Cron trigger schedule "${trigger.schedule}" is not a valid POSIX cron expression (5 or 6 fields).`)
+        error('FLW-E007', `triggers[${index}]`, `La programación cron "${trigger.schedule}" no es una expresión cron POSIX válida (5 o 6 campos).`)
       );
     }
   });

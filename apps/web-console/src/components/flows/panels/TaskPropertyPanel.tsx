@@ -150,11 +150,11 @@ export function TaskPropertyPanel({ node, descriptor, onChange }: TaskPropertyPa
   return (
     <div data-testid="task-property-panel" className="space-y-3">
       <div className="text-xs text-muted-foreground">
-        Task type: <span className="font-mono">{node.taskType}</span>
+        Tipo de tarea: <span className="font-mono">{node.taskType}</span>
       </div>
       {descriptor === undefined ? (
         <p className="text-xs text-destructive">
-          Unknown task type — not present in the task-type catalog (FLW-E006).
+          Tipo de tarea desconocido — no está presente en el catálogo de tipos de tarea (FLW-E006).
         </p>
       ) : null}
       {Object.entries(properties).map(([name, schema]) => (
