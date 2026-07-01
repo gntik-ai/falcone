@@ -2,9 +2,10 @@
 
 The web console login page (`apps/web-console/src/pages/LoginPage.tsx`) submits credentials through
 `createConsoleLoginSession` (`POST /v1/auth/login-sessions`,
-`apps/web-console/src/lib/console-auth.ts`). The endpoint already returns the platform error
-envelope (`status`, `code`, `message`, optional details); this document defines how the console maps
-that envelope into user-facing login feedback.
+`apps/web-console/src/lib/console-auth.ts`). The endpoint returns the platform error envelope
+(`status`, `code`, `message`, optional details), and the public OpenAPI contract advertises the
+wrong-credentials case as HTTP `401` with the shared `ErrorResponse` schema. This document defines
+how the console maps that envelope into user-facing login feedback.
 
 ## Classification rules
 
@@ -30,8 +31,10 @@ Operational failures render the service-unavailable alert:
 
 ## Contract impact
 
-This is a frontend classification rule for an existing wire shape. It does not add or change
-endpoints, status codes, request/response schemas, generated clients, SDKs, or shared types. The API
-continues to report invalid login attempts as HTTP `401` with `code: INVALID_CREDENTIALS`; the
-console is responsible for presenting that as a wrong-credentials outcome rather than a service
-outage.
+This is a frontend classification rule for an existing runtime wire shape. It does not add or
+change endpoints, generated clients, SDKs, or shared types. The public OpenAPI contract for
+`createConsoleLoginSession` documents the existing HTTP `401` invalid-credentials response as an
+`ErrorResponse`, and the generated auth family/public API artifacts are kept in sync with the
+aggregate contract. The API continues to report invalid login attempts as HTTP `401` with
+`code: INVALID_CREDENTIALS`; the console is responsible for presenting that as a wrong-credentials
+outcome rather than a service outage.

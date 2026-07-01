@@ -19,10 +19,16 @@
       `401 INVALID_CREDENTIALS`, the console shows the credentials alert, and the outage heading is
       absent.
 - [x] Add a focused guard that a `503` login failure still shows the service-unavailable alert.
+- [x] Add a control-plane OpenAPI contract assertion that `createConsoleLoginSession` advertises a
+      `401` response using the shared `ErrorResponse` schema.
 
 ## 4. Scope / contract discipline
-- [x] No backend handler, OpenAPI/AsyncAPI artifact, generated client/SDK, or shared wire type is
-      changed; this is a frontend classification fix for an existing response shape.
+- [x] Keep the backend handler and shared wire type unchanged; this is a frontend classification fix
+      for an existing `401 INVALID_CREDENTIALS` response shape.
+- [x] Update the public OpenAPI source and regenerate the auth family/public API artifacts so the
+      documented contract includes the existing `401` invalid-credentials response.
+- [x] Keep generated artifacts in sync by rerunning `npm run generate:public-api` and confirming a
+      second generation pass produces no diff.
 
 ## 5. Docs
 - [x] Document the console login error classification in
