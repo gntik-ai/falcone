@@ -20,6 +20,8 @@ import {
 } from '@/lib/console-metrics'
 import { useConsoleContext } from '@/lib/console-context'
 
+const TENANT_SCOPE_METRICS_RANGE: ConsoleMetricRange = { preset: '24h' }
+
 type AuditExportFeedback =
   | { kind: 'loading' }
   | { kind: 'artifact'; manifest: ConsoleAuditExportManifest }
@@ -91,6 +93,7 @@ export function ConsoleObservabilityPage() {
 
   const metrics = useConsoleMetrics(activeTenantId, activeWorkspaceId, range)
   const audit = useConsoleAuditRecords(activeTenantId, activeWorkspaceId, filters)
+  const metricsRangeApplies = Boolean(activeWorkspaceId)
 
   const headerText = useMemo(() => {
     return [activeTenant?.label, activeWorkspace?.label].filter(Boolean).join(' · ')
@@ -138,7 +141,12 @@ export function ConsoleObservabilityPage() {
 
       {tab === 'metrics' ? (
         <div className="space-y-4">
-          <ConsoleTimeRangeSelector value={range} onChange={setRange} />
+          <ConsoleTimeRangeSelector
+            value={metricsRangeApplies ? range : TENANT_SCOPE_METRICS_RANGE}
+            onChange={setRange}
+            disabled={!metricsRangeApplies}
+            disabledReason={!metricsRangeApplies ? 'El rango temporal no está activo para métricas de tenant. Selecciona un workspace en el contexto de consola para consultar series con ventana temporal.' : undefined}
+          />
           {metrics.loading ? <ConsolePageState kind="loading" title="Cargando métricas" description="Consultando overview y snapshot de uso." /> : null}
           {metrics.error ? <ConsolePageState kind="error" title="No se pudieron cargar las métricas" description={metrics.error} actionLabel="Reintentar" onAction={metrics.reload} /> : null}
           {!metrics.loading && !metrics.error && metrics.overview && metrics.overview.dimensions.length === 0 ? (

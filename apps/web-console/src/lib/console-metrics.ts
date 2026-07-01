@@ -2,12 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { requestConsoleSessionJson } from '@/lib/console-session'
 
-export type ConsoleMetricRangePreset = '24h' | '7d' | '30d' | 'custom'
+export type ConsoleMetricRangePreset = '24h' | '7d' | '30d'
 
 export interface ConsoleMetricRange {
   preset: ConsoleMetricRangePreset
-  from?: string
-  to?: string
 }
 
 export interface ConsoleMetricDimensionView {
@@ -126,17 +124,12 @@ function toErrorMessage(error: unknown) {
   return 'No se pudo cargar la información solicitada.'
 }
 
-function mapRangeToWindow(range: ConsoleMetricRange): string {
-  switch (range.preset) {
-    case '24h':
-      return '24h'
-    case '7d':
-      return '7d'
-    case '30d':
-      return '30d'
-    default:
-      return '24h'
+function mapRangeToWindow(range: ConsoleMetricRange): ConsoleMetricRangePreset | null {
+  if (range.preset === '24h' || range.preset === '7d' || range.preset === '30d') {
+    return range.preset
   }
+
+  return null
 }
 
 function appendDateFilters(searchParams: URLSearchParams, from?: string, to?: string) {
@@ -240,7 +233,8 @@ export function useConsoleMetrics(tenantId: string | null, workspaceId: string |
   const [reloadToken, setReloadToken] = useState(0)
 
   const reload = useCallback(() => setReloadToken((current) => current + 1), [])
-  const rangeKey = useMemo(() => JSON.stringify(range), [range])
+  const seriesWindow = workspaceId ? mapRangeToWindow(range) : null
+  const rangeKey = workspaceId ? seriesWindow ?? 'unsupported-range' : 'tenant-scope'
 
   useEffect(() => {
     let cancelled = false
@@ -261,8 +255,8 @@ export function useConsoleMetrics(tenantId: string | null, workspaceId: string |
         const [overviewResponse, usageResponse, seriesResponse] = await Promise.all([
           requestConsoleSessionJson<OverviewResponse>(`${base}/overview`),
           requestConsoleSessionJson<UsageSnapshotResponse>(`${base}/usage`),
-          workspaceId
-            ? requestConsoleSessionJson<MetricSeriesResponse>(`${base}/series?metricKey=api_requests&window=${mapRangeToWindow(range)}`)
+          seriesWindow
+            ? requestConsoleSessionJson<MetricSeriesResponse>(`${base}/series?metricKey=api_requests&window=${seriesWindow}`)
             : Promise.resolve(null)
         ])
 
@@ -281,7 +275,7 @@ export function useConsoleMetrics(tenantId: string | null, workspaceId: string |
     return () => {
       cancelled = true
     }
-  }, [tenantId, workspaceId, rangeKey, reloadToken])
+  }, [tenantId, workspaceId, rangeKey, seriesWindow, reloadToken])
 
   return { overview, loading, error, reload }
 }
