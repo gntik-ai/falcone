@@ -8,7 +8,7 @@ field the console must read, so the two stay in sync.
 
 The effective-entitlements endpoint
 (`GET /v1/tenants/{tenantId}/plan/effective-entitlements` for superadmins, or
-`GET /v1/tenant/plan/effective-entitlements` for the operator's own tenant) returns the
+`GET /v1/tenant/plan/effective-entitlements` for a tenant operator's own tenant) returns the
 `EffectiveEntitlementProfile` model
 (`services/provisioning-orchestrator/src/models/effective-entitlements.mjs`):
 
@@ -72,3 +72,13 @@ never crashes into the router error boundary.
 > not correspond to anything the API returns; it is retained only because
 > `ConsoleTenantPlanOverviewPage.tsx` still reads it. Aligning that page to
 > `quantitativeLimits` (and removing the legacy field) is tracked separately under issue #735.
+
+## Platform admins and My Plan
+
+`/console/my-plan` is an own-tenant page. A tenant-less platform principal (`superadmin`,
+`platform_admin`, or `platform_operator` with no `tenantIds` in the console session) has no personal
+tenant plan, so the page must not call `GET /v1/tenant/plan/effective-entitlements`. It renders the
+empty state `No personal tenant plan` instead of surfacing the backend
+`TENANT_NOT_FOUND` code. The tenant-specific plan page
+`/console/tenants/{tenantId}/plan` uses the tenant-id route above and is guarded by the console's
+superadmin route gate; non-superadmin platform roles do not get a link to that page from My Plan.

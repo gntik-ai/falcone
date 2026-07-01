@@ -426,11 +426,12 @@ export function ConsoleContextProvider({
       return
     }
     let cancelled = false
+    const currentTenantId = activeTenantId
     setCapabilitiesLoading(true)
 
     async function loadCapabilities() {
       try {
-        const result = await getEffectiveCapabilities()
+        const result = await getEffectiveCapabilities(currentTenantId)
         if (!cancelled) {
           setCapabilities(result.capabilities ?? {})
           setCapabilitiesLoading(false)
