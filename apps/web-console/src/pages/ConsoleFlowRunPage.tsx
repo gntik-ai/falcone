@@ -6,7 +6,7 @@
 // without an open SSE connection (spec "Completed run rendered from history"); a live run opens the
 // SSE stream (the user supplies the anon key, mirroring the realtime console) and transitions to
 // static mode on `stream-end`.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 
 import { RunCanvas } from '@/components/flows/RunCanvas'
@@ -59,6 +59,9 @@ function RunView({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
+  const apiKeyInputId = useId()
+  const apiKeyHelpId = useId()
+  const encodedFlowId = encodeURIComponent(flowId)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -149,16 +152,16 @@ function RunView({
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col" data-testid="console-flow-run-page">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
             Flujos
           </Link>
           <span className="text-muted-foreground">/</span>
-          <Link className="text-sm text-muted-foreground hover:underline" to={`/console/flows/${flowId}/runs`}>
+          <Link className="text-sm text-muted-foreground hover:underline" to={`/console/flows/${encodedFlowId}/runs`}>
             Ejecuciones
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-semibold" title={executionId}>
+          <span className="min-w-0 max-w-[16rem] truncate text-sm font-semibold" title={executionId}>
             {record?.name ?? flowId}
           </span>
           <RunStatusBadge status={detail?.status} />
@@ -168,13 +171,23 @@ function RunView({
                 En vivo
               </span>
             ) : (
-              <Input
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="clave anónima (flc_anon_…) para transmitir en vivo"
-                className="h-8 w-64 text-xs"
-                data-testid="run-apikey-input"
-              />
+              <>
+                <label htmlFor={apiKeyInputId} className="sr-only">
+                  Clave anónima para transmitir la ejecución en vivo
+                </label>
+                <Input
+                  id={apiKeyInputId}
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  placeholder="clave anónima (flc_anon_…) para transmitir en vivo"
+                  className="h-8 w-full min-w-[14rem] text-xs sm:w-64"
+                  aria-describedby={apiKeyHelpId}
+                  data-testid="run-apikey-input"
+                />
+                <span id={apiKeyHelpId} className="sr-only">
+                  Introduce una clave anónima para abrir el stream en vivo; los estados históricos siguen visibles sin la clave.
+                </span>
+              </>
             )
           ) : (
             <span className="text-xs text-muted-foreground" data-testid="run-static-indicator">
@@ -191,7 +204,7 @@ function RunView({
             waitingApproval={waitingApproval}
             onCancelled={() => void load()}
             onSignalSent={() => void load()}
-            onRetried={(newId) => navigate(`/console/flows/${flowId}/runs/${encodeURIComponent(newId)}`)}
+            onRetried={(newId) => navigate(`/console/flows/${encodedFlowId}/runs/${encodeURIComponent(newId)}`)}
           />
         ) : null}
       </header>

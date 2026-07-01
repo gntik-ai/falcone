@@ -63,9 +63,9 @@ const DEFINITION = {
   ]
 }
 
-function renderRun(executionId = 'ten1:ws1:flow1:run-1') {
+function renderRun(executionId = 'ten1:ws1:flow1:run-1', flowId = 'flow1') {
   return render(
-    <MemoryRouter initialEntries={[`/console/flows/flow1/runs/${encodeURIComponent(executionId)}`]}>
+    <MemoryRouter initialEntries={[`/console/flows/${encodeURIComponent(flowId)}/runs/${encodeURIComponent(executionId)}`]}>
       <Routes>
         <Route path="/console/flows/:flowId/runs/:executionId" element={<ConsoleFlowRunPage />} />
       </Routes>
@@ -148,10 +148,31 @@ describe('ConsoleFlowRunPage — running run', () => {
     })
     renderRun()
     await waitFor(() => expect(screen.getByTestId('run-status-badge')).toHaveTextContent('En ejecución'))
-    expect(screen.getByTestId('run-apikey-input')).toBeInTheDocument()
+    const apiKeyInput = screen.getByLabelText(/clave anónima para transmitir la ejecución en vivo/i)
+    expect(apiKeyInput).toBe(screen.getByTestId('run-apikey-input'))
+    expect(apiKeyInput).toHaveAccessibleDescription(/los estados históricos siguen visibles sin la clave/i)
     expect(screen.queryByTestId('run-static-indicator')).toBeNull()
     // Retry hidden on a non-terminal run; Cancel enabled.
     expect(screen.queryByTestId('run-retry-button')).toBeNull()
     expect(screen.getByTestId('run-cancel-button')).not.toBeDisabled()
+  })
+
+  it('keeps the run-history breadcrumb URL-safe for encoded flow ids', async () => {
+    const flowId = 'flow/with spaces'
+    mockGetFlow.mockResolvedValueOnce({ flowId, name: 'Encoded flow', definition: DEFINITION })
+    mockGetExecution.mockResolvedValue({
+      executionId: 'run-1',
+      workflowId: 'run-1',
+      status: 'Running',
+      nodes: []
+    })
+
+    renderRun('run-1', flowId)
+
+    await waitFor(() => expect(mockGetFlow).toHaveBeenCalledWith('ws1', flowId))
+    expect(screen.getByRole('link', { name: /ejecuciones/i })).toHaveAttribute(
+      'href',
+      `/console/flows/${encodeURIComponent(flowId)}/runs`
+    )
   })
 })

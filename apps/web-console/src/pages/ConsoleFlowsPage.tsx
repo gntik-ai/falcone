@@ -150,7 +150,7 @@ export function ConsoleFlowsPage() {
                 <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
                 <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Estado</th>
                 <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Última modificación</th>
-                <th scope="col" className="w-40 px-4 py-3 text-right font-medium sm:w-64">Acciones</th>
+                <th scope="col" className="w-48 px-4 py-3 text-right font-medium sm:w-64">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -202,7 +202,8 @@ export function ConsoleFlowsPage() {
                             aria-label={`Ver historial de ejecuciones para ${flowLabel}`}
                           >
                             <History className="h-4 w-4" aria-hidden="true" />
-                            Historial de ejecuciones
+                            <span className="sm:hidden">Historial</span>
+                            <span className="hidden sm:inline">Historial de ejecuciones</span>
                           </Link>
                         </Button>
                       </div>
