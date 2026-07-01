@@ -8,21 +8,21 @@ interface StatusMeta {
 }
 
 const FLOW_STATUS_META: Record<string, StatusMeta> = {
-  archived: { label: 'Archivado', variant: 'outline', className: 'border-slate-300 text-slate-500' },
-  draft: { label: 'Borrador', variant: 'secondary', className: 'bg-amber-100 text-amber-800 border-amber-300' },
+  archived: { label: 'Archivado', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
+  draft: { label: 'Borrador', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300' },
   failed: { label: 'Fallido', variant: 'destructive', className: '' },
-  published: { label: 'Publicado', variant: 'secondary', className: 'bg-emerald-100 text-emerald-800 border-emerald-300' }
+  published: { label: 'Publicado', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' }
 }
 
 const RUN_STATUS_META: Record<string, StatusMeta> = {
-  Canceled: { label: 'Cancelada', variant: 'outline', className: 'border-slate-300 text-slate-500' },
-  Cancelled: { label: 'Cancelada', variant: 'outline', className: 'border-slate-300 text-slate-500' },
-  Completed: { label: 'Completada', variant: 'secondary', className: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  Canceled: { label: 'Cancelada', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
+  Cancelled: { label: 'Cancelada', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
+  Completed: { label: 'Completada', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
   Failed: { label: 'Fallida', variant: 'destructive', className: '' },
-  Running: { label: 'En ejecución', variant: 'secondary', className: 'bg-sky-100 text-sky-800 border-sky-300' },
-  Terminated: { label: 'Terminada', variant: 'outline', className: 'border-slate-300 text-slate-500' },
-  TimedOut: { label: 'Expirada', variant: 'secondary', className: 'bg-amber-100 text-amber-800 border-amber-300' },
-  unknown: { label: 'Desconocido', variant: 'outline', className: 'border-slate-300 text-slate-600' }
+  Running: { label: 'En ejecución', variant: 'outline', className: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+  Terminated: { label: 'Terminada', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
+  TimedOut: { label: 'Expirada', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  unknown: { label: 'Desconocido', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' }
 }
 
 function normalizeStatus(value?: string | null): string {
@@ -41,7 +41,7 @@ export function FlowStatusBadge({
   className?: string
 }) {
   const key = normalizeStatus(status)
-  const meta = FLOW_STATUS_META[key] ?? { label: key, variant: 'outline', className: 'border-slate-300 text-slate-600' }
+  const meta = FLOW_STATUS_META[key] ?? { label: key, variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' }
 
   return (
     <Badge
@@ -63,7 +63,7 @@ export function RunStatusBadge({
   className?: string
 }) {
   const key = status?.trim() || 'unknown'
-  const meta = RUN_STATUS_META[key] ?? { label: key, variant: 'outline', className: 'border-slate-300 text-slate-600' }
+  const meta = RUN_STATUS_META[key] ?? { label: key, variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' }
 
   return (
     <Badge

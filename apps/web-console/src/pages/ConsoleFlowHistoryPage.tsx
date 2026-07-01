@@ -139,18 +139,18 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
 
       {showTriggerNotice ? (
         <section
-          className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
+          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm shadow-sm"
           role="status"
           data-testid="flow-trigger-success"
         >
-          <p className="font-medium">Ejecución solicitada.</p>
-          <p className="mt-1 text-emerald-800">
+          <p className="font-medium text-foreground">Ejecución solicitada.</p>
+          <p className="mt-1 text-muted-foreground">
             El disparo fue aceptado para el schedule <span className="font-mono">{triggerNotice.scheduleId}</span>. Actualiza el historial y abre el detalle cuando aparezca la nueva ejecución.
           </p>
           <Button
             size="sm"
             variant="outline"
-            className="mt-3 border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100"
+            className="mt-3 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
             onClick={() => void fetchPage(pageStack.at(-1))}
             disabled={loading}
           >
