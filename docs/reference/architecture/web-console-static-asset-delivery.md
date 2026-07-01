@@ -31,6 +31,13 @@ Cache-Control: no-store
 for `index.html`. The Node static servers also apply the same `no-store` policy to SPA fallback
 responses that return `index.html` for client-side routes.
 
+## Icon asset policy
+
+The SVG-capable favicon declared by `apps/web-console/index.html` is part of the console boot path.
+It must remain a lightweight true vector SVG, with a target budget of roughly 10 KB or less. Do not
+embed raster icon artwork as `data:image/*;base64` inside `favicon.svg`; keep raster fallbacks such
+as `favicon.png` as separate small files.
+
 ## Compression policy
 
 Compressible bundle assets are JavaScript, CSS, JSON, and SVG. The Node static servers use only
