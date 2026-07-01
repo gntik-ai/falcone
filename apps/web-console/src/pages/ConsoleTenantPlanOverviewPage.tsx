@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CapabilityStatusGrid } from '@/components/console/CapabilityStatusGrid'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
@@ -6,7 +7,11 @@ import { readConsoleShellSession, type ConsoleShellSession } from '@/lib/console
 import * as api from '@/services/planManagementApi'
 
 export function ConsoleTenantPlanOverviewPage() {
-  const tenantlessPlatformPrincipal = isTenantlessPlatformPrincipal(readConsoleShellSession()?.principal)
+  const navigate = useNavigate()
+  const principal = readConsoleShellSession()?.principal
+  const platformRoles = getPlatformRoles(principal)
+  const tenantlessPlatformPrincipal = isTenantlessPlatformPrincipal(principal)
+  const canOpenPlanCatalog = platformRoles.includes('superadmin')
   const [summary, setSummary] = useState<api.CurrentEffectiveEntitlementSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,8 +29,12 @@ export function ConsoleTenantPlanOverviewPage() {
     return (
       <ConsolePageState
         kind="empty"
-        title="No personal plan (platform admin)"
-        description="This platform admin account is not attached to a tenant, so it has no personal tenant plan. Use a tenant plan page to review or manage tenant entitlements."
+        title="No personal tenant plan"
+        description={canOpenPlanCatalog
+          ? 'This platform-level account is not attached to a tenant, so there is no personal tenant plan to display. Open the plan catalog and choose a tenant plan page to review or manage tenant entitlements.'
+          : 'This platform-level account is not attached to a tenant, so there is no personal tenant plan to display. Tenant entitlements are reviewed from tenant-specific plan pages when your role has access.'}
+        actionLabel={canOpenPlanCatalog ? 'Open plan catalog' : undefined}
+        onAction={canOpenPlanCatalog ? () => navigate('/console/plans') : undefined}
       />
     )
   }
@@ -50,9 +59,13 @@ export function ConsoleTenantPlanOverviewPage() {
 }
 
 function isTenantlessPlatformPrincipal(principal: ConsoleShellSession['principal'] | undefined): boolean {
-  const roles = Array.isArray(principal?.platformRoles) ? principal.platformRoles : []
+  const roles = getPlatformRoles(principal)
   const tenantIds = Array.isArray(principal?.tenantIds) ? principal.tenantIds.filter(Boolean) : []
   const isPlatformPrincipal = roles.includes('superadmin') || roles.includes('platform_admin') || roles.includes('platform_operator')
 
   return isPlatformPrincipal && tenantIds.length === 0
+}
+
+function getPlatformRoles(principal: ConsoleShellSession['principal'] | undefined): string[] {
+  return Array.isArray(principal?.platformRoles) ? principal.platformRoles : []
 }

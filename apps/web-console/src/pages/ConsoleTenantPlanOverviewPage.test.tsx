@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { getEffectiveEntitlementsMock, readConsoleShellSessionMock } = vi.hoisted(() => ({
@@ -43,14 +44,38 @@ describe('ConsoleTenantPlanOverviewPage', () => {
     expect(getEffectiveEntitlementsMock).toHaveBeenCalledWith(undefined, { includeConsumption: true })
   })
 
-  it('renders a platform-admin no-personal-plan state without self-tenant entitlements or raw backend code', async () => {
+  it('renders a superadmin no-personal-plan state with a plan catalog action', async () => {
+    const user = userEvent.setup()
     readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['superadmin'], tenantIds: [] }))
     getEffectiveEntitlementsMock.mockRejectedValue(new Error('TENANT_NOT_FOUND'))
 
+    render(
+      <MemoryRouter initialEntries={['/console/my-plan']}>
+        <Routes>
+          <Route path="/console/my-plan" element={<ConsoleTenantPlanOverviewPage />} />
+          <Route path="/console/plans" element={<h1>Plan catalog target</h1>} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('status', { name: /no personal tenant plan/i })).toBeInTheDocument()
+    expect(screen.getByText(/platform-level account is not attached to a tenant/i)).toBeInTheDocument()
+    expect(screen.queryByText(/TENANT_NOT_FOUND/)).not.toBeInTheDocument()
+    expect(getEffectiveEntitlementsMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /open plan catalog/i }))
+
+    expect(screen.getByRole('heading', { name: /plan catalog target/i })).toBeInTheDocument()
+  })
+
+  it('renders a platform-operator no-personal-plan state without a gated catalog action', async () => {
+    readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['platform_operator'], tenantIds: [] }))
+
     render(<MemoryRouter><ConsoleTenantPlanOverviewPage /></MemoryRouter>)
 
-    expect(await screen.findByText('No personal plan (platform admin)')).toBeInTheDocument()
-    expect(screen.getByText(/not attached to a tenant/i)).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: /no personal tenant plan/i })).toBeInTheDocument()
+    expect(screen.getByText(/tenant entitlements are reviewed from tenant-specific plan pages/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open plan catalog/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/TENANT_NOT_FOUND/)).not.toBeInTheDocument()
     expect(getEffectiveEntitlementsMock).not.toHaveBeenCalled()
   })
