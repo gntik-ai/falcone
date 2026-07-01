@@ -19,7 +19,7 @@ raw backend error code.
 #### Scenario: Superadmin opens My Plan
 
 - **WHEN** a superadmin opens `/console/my-plan`
-- **THEN** the page shows a clear "no personal plan (platform admin)" state, not the raw string
+- **THEN** the page shows a clear no-personal-tenant-plan state, not the raw string
   `TENANT_NOT_FOUND`
 
 #### Scenario: Tenant-less principal

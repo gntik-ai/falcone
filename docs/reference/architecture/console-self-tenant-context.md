@@ -12,6 +12,6 @@ Capability gates use the selected tenant explicitly:
 - it never probes `GET /v1/tenant/effective-capabilities` for a tenant-less platform principal.
 
 `/console/my-plan` remains an own-tenant view for tenant users. For tenant-less platform principals it
-shows `No personal plan (platform admin)` and does not call
+shows `No personal tenant plan` and does not call
 `GET /v1/tenant/plan/effective-entitlements`. Platform admins review or change a tenant's plan from
 `/console/tenants/{tenantId}/plan`.

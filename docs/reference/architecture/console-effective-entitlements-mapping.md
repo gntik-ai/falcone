@@ -78,6 +78,6 @@ never crashes into the router error boundary.
 `/console/my-plan` is an own-tenant page. A tenant-less platform principal (`superadmin`,
 `platform_admin`, or `platform_operator` with no `tenantIds` in the console session) has no personal
 tenant plan, so the page must not call `GET /v1/tenant/plan/effective-entitlements`. It renders the
-empty state `No personal plan (platform admin)` instead of surfacing the backend
+empty state `No personal tenant plan` instead of surfacing the backend
 `TENANT_NOT_FOUND` code. Platform operators manage a tenant's entitlements from
 `/console/tenants/{tenantId}/plan`, which uses the tenant-id route above.
