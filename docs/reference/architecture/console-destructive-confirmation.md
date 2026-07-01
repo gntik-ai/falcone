@@ -1,7 +1,8 @@
 # Console destructive-action confirmation — the hook owns the op lifecycle
 
-Destructive console actions (delete a service account, revoke a credential, detach an identity
-provider, …) are confirmed through the shared `DestructiveConfirmationDialog`
+Destructive console actions (delete a plan, delete a service account, revoke a credential,
+detach an identity provider, …) are confirmed through the shared
+`DestructiveConfirmationDialog`
 (`apps/web-console/src/components/console/DestructiveConfirmationDialog.tsx`). The contract between
 that dialog and its controller hook `useDestructiveOp`
 (`apps/web-console/src/components/console/hooks/useDestructiveOp.ts`) determines when "success"
@@ -48,3 +49,17 @@ follow (issue #780):
 the op and renders the controller's `opState`/`confirmError`; it never awaits the op and never runs
 `config.onSuccess`. Success feedback and the list reload happen once, only when the op resolves
 successfully; a failed op surfaces an error with no success feedback.
+
+## Plan lifecycle usage
+
+The plan detail page uses the shared dialog for destructive plan actions:
+
+- `active -> deprecated`
+- `deprecated -> archived`
+- `DELETE /v1/plans/{planId}`
+
+Plan deletion is `CRITICAL`: the operator must type the plan display name before the API call is
+made. Lifecycle retirement transitions are `WARNING`: they still require confirmation because the
+state machine is forward-only. See
+[`console-plan-lifecycle-removal.md`](./console-plan-lifecycle-removal.md) for the plan-specific
+route semantics and the `PLAN_HAS_ASSIGNMENT_HISTORY` refusal path.

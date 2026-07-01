@@ -15,6 +15,10 @@ export const routes = [
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin', mergeQueryIntoParams: true },
   { method: 'POST', path: '/v1/plans', module: `${PO}/plan-create.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin', mergeBodyIntoParams: true },
+  { method: 'POST', path: '/v1/plans/{planId}/lifecycle', module: `${PO}/plan-lifecycle.mjs`, export: 'main',
+    invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin', mergeBodyIntoParams: true },
+  { method: 'DELETE', path: '/v1/plans/{planId}', module: `${PO}/plan-delete.mjs`, export: 'main',
+    invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin' },
   { method: 'GET',  path: '/v1/plans/change-history', module: `${PO}/plan-change-history-query.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin', mergeQueryIntoParams: true },
 
