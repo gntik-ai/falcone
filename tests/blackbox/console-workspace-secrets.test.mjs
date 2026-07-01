@@ -9,6 +9,7 @@
  *   - POST/PUT/GET-list/GET-meta return EXACTLY the FunctionWorkspaceSecret metadata
  *     ({ secretName, name alias, tenantId, workspaceId, resolvedRefCount, timestamps, description? })
  *     with NO `version` and NO `value` on any response.
+ *   - DELETE existing returns 204 with no response body; DELETE missing returns 404 SECRET_NOT_FOUND.
  *   - The secret value is write-only end to end (no response of any op carries it).
  *   - Isolation/IDOR: a caller whose verified tenant does not own the workspace → 404
  *     WORKSPACE_NOT_FOUND (no existence leak); a body-supplied tenantId/workspaceId cannot redirect
@@ -29,6 +30,7 @@
  *   bbx-723-replace-missing  PUT on a never-created secret → 404 SECRET_NOT_FOUND, nothing is written
  *   bbx-723-meta      GET list / GET meta return ONLY the metadata schema (name alias, no version/value)
  *   bbx-723-writeonly no response body of any op (create/replace/list/meta/delete) carries the value
+ *   bbx-771-delete-contract DELETE existing → 204/no body; missing → 404 SECRET_NOT_FOUND
  *   bbx-723-validate  bad name / empty value / over-length value → 400 / 400 / 413
  *   bbx-723-disabled  every op → 501 SECRETS_BACKEND_DISABLED when no backend is configured
  *   bbx-723-iso-tenant  cross-tenant workspace id → 404 WORKSPACE_NOT_FOUND (+ positive control)
@@ -241,8 +243,26 @@ test('bbx-723-writeonly: no response body of any op (create/replace/list/meta/de
   const meta = await FN_HANDLERS.secretGet(ctx({ vault, params: { workspaceId: 'ws-1', secretName: 'wo' } }));
   const del = await FN_HANDLERS.secretDelete(ctx({ vault, params: { workspaceId: 'ws-1', secretName: 'wo' } }));
   for (const r of [create, replace, list, meta, del]) {
-    assert.ok(!JSON.stringify(r.body).includes(SENTINEL), 'no response body may contain the secret value');
+    assert.ok(!JSON.stringify(r.body ?? null).includes(SENTINEL), 'no response body may contain the secret value');
   }
+});
+
+test('bbx-771-delete-contract: existing secret → 204/no body; missing secret → 404 SECRET_NOT_FOUND', async () => {
+  const vault = vaultStore();
+  const create = await FN_HANDLERS.secretSet(ctx({ vault, params: { workspaceId: 'ws-1' }, body: { secretName: 'delete_me', secretValue: 'v' } }));
+  assert.equal(create.statusCode, 201);
+
+  const deleted = await FN_HANDLERS.secretDelete(ctx({ vault, params: { workspaceId: 'ws-1', secretName: 'delete_me' } }));
+  assert.equal(deleted.statusCode, 204);
+  assert.equal(deleted.body, null);
+
+  const missing = await FN_HANDLERS.secretDelete(ctx({ vault, params: { workspaceId: 'ws-1', secretName: 'delete_me' } }));
+  assert.equal(missing.statusCode, 404);
+  assert.equal(missing.body.code, 'SECRET_NOT_FOUND');
+
+  const invalid = await FN_HANDLERS.secretDelete(ctx({ vault, params: { workspaceId: 'ws-1', secretName: 'UPPER' } }));
+  assert.equal(invalid.statusCode, 400);
+  assert.equal(invalid.body.code, 'VALIDATION_ERROR');
 });
 
 test('bbx-723-validate: bad name / empty value / over-length value → 400 / 400 / 413', async () => {

@@ -16,8 +16,8 @@
 //
 //   uc-798-viewer-denied      tenant_viewer  → POST/PUT/DELETE secrets = 403, vault never written
 //   uc-798-developer-denied   tenant_developer (also tenant_member) → 403, vault never written
-//   uc-798-owner-allowed      tenant_owner  → create 201 / replace 200 / delete 200 (legit preserved)
-//   uc-798-superadmin-allowed superadmin    → create 201 / replace 200 / delete 200 (legit preserved)
+//   uc-798-owner-allowed      tenant_owner  → create 201 / replace 200 / delete 204 (legit preserved)
+//   uc-798-superadmin-allowed superadmin    → create 201 / replace 200 / delete 204 (legit preserved)
 //   uc-798-reads-open         tenant_member → GET list / GET by-name still 200 (reads NOT gated)
 //   uc-798-cross-tenant-404   tenant_member of another tenant → 404 WORKSPACE_NOT_FOUND (404 > 403)
 import test from 'node:test';
@@ -98,7 +98,7 @@ for (const [label, identity] of [['viewer', VIEWER], ['developer', DEVELOPER]]) 
 
 // ---- an admin tenant role (and superadmin) STILL succeeds — legitimate behavior is preserved ------
 for (const [label, identity] of [['owner', OWNER], ['superadmin', SUPERADMIN]]) {
-  test(`uc-798-${label}-allowed: secretSet 201, secretReplace 200, secretDelete 200 (vault written)`, async () => {
+  test(`uc-798-${label}-allowed: secretSet 201, secretReplace 200, secretDelete 204 (vault written)`, async () => {
     const createVault = recordingVault({ exists: false });
     const create = await FN_HANDLERS.secretSet(ctx({ identity, vault: createVault, params: { workspaceId: PROD_WS }, body: { secretName: 'api_key', secretValue: 'v' } }));
     assert.equal(create.statusCode, 201);
@@ -111,7 +111,8 @@ for (const [label, identity] of [['owner', OWNER], ['superadmin', SUPERADMIN]]) 
 
     const deleteVault = recordingVault({ exists: true });
     const del = await FN_HANDLERS.secretDelete(ctx({ identity, vault: deleteVault, params: { workspaceId: PROD_WS, secretName: 'api_key' } }));
-    assert.equal(del.statusCode, 200);
+    assert.equal(del.statusCode, 204);
+    assert.equal(del.body, null);
     assert.ok(deleteVault.calls.some(([m]) => m === 'delete'), 'an authorized delete calls vault.delete');
   });
 }

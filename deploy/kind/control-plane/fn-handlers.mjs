@@ -587,9 +587,14 @@ async function secretDelete(ctx) {
   if (!canManageTenant(ctx.identity, ws.tenant_id)) {
     return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
   }
+  const name = ctx.params.secretName;
+  if (!vault.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
   try {
-    await vault.delete(ws.tenant_id, ws.id, ctx.params.secretName);
-    return ok(200, { name: ctx.params.secretName, deleted: true });
+    if (!(await vault.exists(ws.tenant_id, ws.id, name))) {
+      return err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`);
+    }
+    await vault.delete(ws.tenant_id, ws.id, name);
+    return ok(204, null);
   } catch (e) { return err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)); }
 }
 

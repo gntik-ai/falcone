@@ -136,6 +136,21 @@ describe('console-session', () => {
     expect(headers.get('Authorization')).toBe('Bearer access-token-1234567890')
   })
 
+  it('acepta respuestas 204 autenticadas sin intentar parsear JSON vacío', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-28T19:00:00.000Z'))
+    persistConsoleShellSession(baseSession)
+
+    fetchMock.mockResolvedValueOnce(createEmptyJsonResponse(204))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(requestConsoleSessionJson('/v1/private/resource', { method: 'DELETE' })).resolves.toBeNull()
+
+    const [, requestInit] = fetchMock.mock.calls[0] ?? []
+    expect(requestInit?.method).toBe('DELETE')
+    expect(new Headers(requestInit?.headers).get('Authorization')).toBe('Bearer access-token-1234567890')
+  })
+
   it('reintenta una request tras 401 con refresh único', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-03-28T19:00:00.000Z'))
@@ -213,6 +228,15 @@ describe('console-session', () => {
 
 function createJsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+}
+
+function createEmptyJsonResponse(status: number): Response {
+  return new Response(null, {
     status,
     headers: {
       'Content-Type': 'application/json'
