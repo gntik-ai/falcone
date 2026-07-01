@@ -101,8 +101,8 @@ export function updateSecret(
   })
 }
 
-// DELETE …/secrets/{name} — remove a secret (all versions). The kind runtime returns 200 with
-// { name, deleted:true } while the advertised contract is 204; either is treated as success.
+// DELETE …/secrets/{name} — remove a secret (all versions). The runtime follows the published
+// contract: 204 with no response body when the secret existed; 404 when it did not.
 export function deleteSecret(workspaceId: string, name: string): Promise<unknown> {
   return requestConsoleSessionJson<unknown>(`${secretsBase(workspaceId)}/${enc(name)}`, {
     method: 'DELETE'

@@ -68,7 +68,7 @@ The runtime is brought into agreement with the already-published catalog/OpenAPI
 | POST | `/v1/functions/workspaces/{workspaceId}/secrets` | **Create** a secret. Create-only. | `201` (metadata) |
 | GET | `/v1/functions/workspaces/{workspaceId}/secrets/{secretName}` | Get one secret's metadata. | `200` (`404 SECRET_NOT_FOUND` if absent) |
 | PUT | `/v1/functions/workspaces/{workspaceId}/secrets/{secretName}` | **Replace** the value at the same path. | `200` (metadata) |
-| DELETE | `/v1/functions/workspaces/{workspaceId}/secrets/{secretName}` | Delete the secret (all versions). | `200` (kind runtime) / `204` (contract) |
+| DELETE | `/v1/functions/workspaces/{workspaceId}/secrets/{secretName}` | Delete the secret (all versions). | `204` (`404 SECRET_NOT_FOUND` if absent) |
 
 - **`POST` is create-only.** When a secret of that name already exists in the workspace the
   control-plane returns **`409 SECRET_ALREADY_EXISTS`** and does **not** overwrite the stored value
@@ -76,6 +76,9 @@ The runtime is brought into agreement with the already-published catalog/OpenAPI
   **Replace**.
 - **`PUT` replaces** the value at the same KV path (the prior version is superseded). The response
   carries the metadata with an updated timestamp and **no value**.
+- **`DELETE` is contract-strict.** Deleting an existing secret returns **`204 No Content`** and no
+  metadata body. Deleting a name that is not present in the workspace returns **`404 SECRET_NOT_FOUND`**
+  without calling the delete backend.
 - The secret name must match `^[a-z][a-z0-9_-]{0,62}$`; the value must be a non-empty string of at
   most `65535` characters. The console validates both client-side before submitting.
 

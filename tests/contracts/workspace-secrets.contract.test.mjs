@@ -25,6 +25,9 @@ test('workspace secret OpenAPI contract exposes governed secret routes and write
   assert.equal(resolveParameters(document, createSecret).some((parameter) => parameter.name === 'workspaceId'), true);
   assert.equal(resolveParameters(document, updateSecret).some((parameter) => parameter.name === 'workspaceId'), true);
   assert.equal(resolveParameters(document, deleteSecret).some((parameter) => parameter.name === 'workspaceId'), true);
+  assert.ok(deleteSecret.responses['204'], 'DELETE existing secret is documented as 204 No Content');
+  assert.ok(deleteSecret.responses['404'], 'DELETE missing secret is documented as 404');
+  assert.equal(Object.hasOwn(deleteSecret.responses, '200'), false, 'DELETE must not document a JSON 200 response');
 
   const allResponseSchemas = JSON.stringify({
     listSecrets: listSecrets.responses,

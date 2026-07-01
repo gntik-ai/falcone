@@ -63,7 +63,7 @@ export async function requestJson<T>(url: string, options: JsonRequestOptions = 
 
   const contentType = response.headers.get('content-type') ?? ''
   const hasJsonBody = contentType.includes('application/json')
-  const payload = hasJsonBody ? ((await response.json()) as T | ApiError) : null
+  const payload = hasJsonBody ? await readJsonPayload<T | ApiError>(response) : null
 
   if (!response.ok) {
     const fallbackError: ApiError = {
@@ -76,6 +76,23 @@ export async function requestJson<T>(url: string, options: JsonRequestOptions = 
   }
 
   return payload as T
+}
+
+async function readJsonPayload<T>(response: Response): Promise<T | null> {
+  if (response.status === 204 || response.status === 205) {
+    return null
+  }
+
+  if (typeof response.text === 'function') {
+    const text = await response.text()
+    if (text.trim().length === 0) {
+      return null
+    }
+
+    return JSON.parse(text) as T
+  }
+
+  return (await response.json()) as T
 }
 
 function normalizeApiError(payload: unknown, fallbackError: ApiError): ApiError {
