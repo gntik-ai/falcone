@@ -18,12 +18,12 @@ export function DialogHeader({ className, children }: React.HTMLAttributes<HTMLD
   return <div className={cn('mb-4 space-y-1', className)}>{children}</div>
 }
 
-export function DialogTitle({ className, children }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn('text-xl font-semibold', className)}>{children}</h2>
+export function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return <h2 className={cn('text-xl font-semibold', className)} {...props} />
 }
 
-export function DialogDescription({ className, children }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn('text-sm text-muted-foreground', className)}>{children}</p>
+export function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  return <p className={cn('text-sm text-muted-foreground', className)} {...props} />
 }
 
 export function DialogFooter({ className, children }: React.HTMLAttributes<HTMLDivElement>) {

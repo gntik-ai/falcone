@@ -189,6 +189,33 @@ export const routes = [
     mergeQueryIntoParams: true,
   },
 
+  // LIFECYCLE: POST /v1/plans/{planId}/lifecycle -> plan-lifecycle::main
+  //   Applies the forward-only plan status state machine. Requires superadmin.
+  {
+    name: 'plan-lifecycle',
+    pathRegex: /^\/v1\/plans\/(?<planId>[^/]+)\/lifecycle\/?$/,
+    methods: ['POST'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/plan-lifecycle.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+    mergeBodyIntoParams: true,
+  },
+
+  // DELETE: DELETE /v1/plans/{planId} -> plan-delete::main
+  //   Hard-deletes only plans with no tenant assignment history. Any active or
+  //   historical assignment returns PLAN_HAS_ASSIGNMENT_HISTORY so operators use
+  //   the forward lifecycle archive path instead.
+  {
+    name: 'plan-delete',
+    pathRegex: /^\/v1\/plans\/(?<planId>[^/]+)\/?$/,
+    methods: ['DELETE'],
+    module: '/repo/services/provisioning-orchestrator/src/actions/plan-delete.mjs',
+    exportName: 'main',
+    invoke: 'params-callercontext-overrides',
+    deps: ['db'],
+  },
+
   // ---- quota dimension catalog (provisioning-orchestrator) -----------------
   // LIST: GET /v1/quota-dimensions  -> quota-dimension-catalog-list::main
   //   No params beyond identity; reads the quota_dimension_catalog table

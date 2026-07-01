@@ -88,6 +88,67 @@ export async function transitionStatus(client, id, targetStatus) {
   return { previous: existing, current: mapPlan(rows[0]) };
 }
 
+export async function getAssignmentHistory(client, id) {
+  const { rows } = await client.query(
+    `SELECT tenant_id, superseded_at
+       FROM tenant_plan_assignments
+      WHERE plan_id = $1
+      ORDER BY superseded_at NULLS FIRST, tenant_id`,
+    [id]
+  );
+  return {
+    hasAssignments: rows.length > 0,
+    activeTenantIds: rows.filter((row) => row.superseded_at === null).map((row) => row.tenant_id),
+    historicalTenantIds: rows.map((row) => row.tenant_id)
+  };
+}
+
+export async function deleteNeverAssigned(client, id) {
+  const existing = await findById(client, id);
+  if (!existing) throw Object.assign(new Error('Plan not found'), { code: 'PLAN_NOT_FOUND' });
+  if (existing.status === 'active') throw Object.assign(new Error('Active plans must be retired before deletion'), { code: 'PLAN_ACTIVE', currentStatus: existing.status });
+
+  const assignmentHistory = await getAssignmentHistory(client, id);
+  if (assignmentHistory.hasAssignments) {
+    throw Object.assign(new Error('Plan has assignment history'), {
+      code: 'PLAN_HAS_ASSIGNMENT_HISTORY',
+      activeTenantIds: assignmentHistory.activeTenantIds,
+      historicalTenantIds: assignmentHistory.historicalTenantIds
+    });
+  }
+
+  const { rows } = await client.query(
+    `WITH assignment_history AS (
+        SELECT tenant_id, superseded_at
+          FROM tenant_plan_assignments
+         WHERE plan_id = $1
+      ),
+      detached_audit AS (
+        UPDATE plan_audit_events
+           SET plan_id = NULL
+         WHERE plan_id = $1
+           AND NOT EXISTS (SELECT 1 FROM assignment_history)
+         RETURNING 1
+      )
+      DELETE FROM plans
+      WHERE id = $1
+        AND NOT EXISTS (SELECT 1 FROM assignment_history)
+      RETURNING *`,
+    [id]
+  );
+  if (!rows[0]) {
+    const current = await findById(client, id);
+    if (!current) throw Object.assign(new Error('Plan not found'), { code: 'PLAN_NOT_FOUND' });
+    const currentHistory = await getAssignmentHistory(client, id);
+    throw Object.assign(new Error('Plan has assignment history'), {
+      code: 'PLAN_HAS_ASSIGNMENT_HISTORY',
+      activeTenantIds: currentHistory.activeTenantIds,
+      historicalTenantIds: currentHistory.historicalTenantIds
+    });
+  }
+  return mapPlan(rows[0]);
+}
+
 export async function list(client, { status, page = 1, pageSize = 20 } = {}) {
   const values = [];
   const where = [];
