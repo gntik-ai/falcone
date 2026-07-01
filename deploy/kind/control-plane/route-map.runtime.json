@@ -1,6 +1,13 @@
 [
   {
     "method": "GET",
+    "path": "/v1/auth/status-views/{statusViewId}",
+    "localHandler": "getConsoleAccountStatusView",
+    "auth": "public",
+    "notes": "PendingActivationPage/LoginPage account-status copy endpoint. Returns ConsoleAccountStatusView from a static dependency-free auth handler instead of 404 NO_ROUTE."
+  },
+  {
+    "method": "GET",
     "path": "/v1/plans",
     "module": "/repo/services/provisioning-orchestrator/src/actions/plan-list.mjs",
     "export": "main",
