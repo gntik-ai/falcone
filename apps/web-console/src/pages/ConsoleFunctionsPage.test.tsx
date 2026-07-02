@@ -677,7 +677,8 @@ describe('ConsoleFunctionsPage', () => {
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(/delete failed/i)
     expect(screen.queryByText(/función eliminada/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /hello-fn/i })).toBeInTheDocument()
+    const remainingInventoryRow = screen.getAllByRole('button', { name: /hello-fn/i }).find((button) => button.textContent?.includes('Entorno:'))
+    expect(remainingInventoryRow).toBeInTheDocument()
     expect(screen.getByText('Tiempo de espera (ms)')).toBeInTheDocument()
   })
 
@@ -690,11 +691,34 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    expect(await screen.findByRole('button', { name: /eliminar función/i })).toBeDisabled()
+    const deleteButton = await screen.findByRole('button', { name: /eliminar función hello-fn/i })
+    expect(deleteButton).toBeDisabled()
+    expect(deleteButton).toHaveAttribute('aria-describedby', 'functions-write-disabled-reason')
+    expect(screen.getByText(/termina de aprovisionarse/i)).toHaveAttribute('id', 'functions-write-disabled-reason')
     await openTab('Invocar')
-    expect(await screen.findByRole('button', { name: 'Invocar' })).toBeDisabled()
+    const invokeButton = await screen.findByRole('button', { name: 'Invocar' })
+    expect(invokeButton).toBeDisabled()
+    expect(invokeButton).toHaveAttribute('aria-describedby', 'functions-write-disabled-reason')
     await openTab('Desplegar')
-    expect(screen.getByRole('button', { name: /actualizar función/i })).toBeDisabled()
+    const deployButton = screen.getByRole('button', { name: /actualizar función/i })
+    expect(deployButton).toBeDisabled()
+    expect(deployButton).toHaveAttribute('aria-describedby', 'functions-write-disabled-reason')
+  })
+
+  it('bloquea escrituras cuando sólo status indica provisioning', async () => {
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') {
+        return inventory({ actions: [{ ...inventory().actions[0], provisioning: undefined, status: 'provisioning' }] })
+      }
+      if (url === '/v1/functions/actions/res_fn_1') return detail({ provisioning: undefined, status: 'provisioning' })
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+
+    expect(await screen.findByRole('button', { name: /eliminar función hello-fn/i })).toBeDisabled()
+    expect(screen.getByText(/termina de aprovisionarse/i)).toBeInTheDocument()
   })
 
   it('resetea y recarga al cambiar workspace', async () => {

@@ -390,9 +390,24 @@ function buildIdempotencyKey() {
   return `fn_${Date.now()}`
 }
 
-function canWrite(action: FunctionAction | null): boolean {
-  const state = action?.provisioning?.state?.toLowerCase()
-  return !(state === 'provisioning' || state === 'degraded' || state === 'suspended')
+function getActionWriteState(action: FunctionAction | null): string | null {
+  const provisioningState = action?.provisioning?.state?.toLowerCase().trim()
+  const status = action?.status?.toLowerCase().trim()
+  return provisioningState || status || null
+}
+
+function getWriteDisabledReason(action: FunctionAction | null): string | null {
+  const state = getActionWriteState(action)
+  if (state === 'provisioning') {
+    return 'Las acciones de escritura están deshabilitadas mientras la función termina de aprovisionarse.'
+  }
+  if (state === 'degraded') {
+    return 'Las acciones de escritura están deshabilitadas porque el aprovisionamiento de la función está degradado.'
+  }
+  if (state === 'suspended') {
+    return 'Las acciones de escritura están deshabilitadas porque la función está suspendida.'
+  }
+  return null
 }
 
 function FunctionStatusBadge({ value }: { value?: string | null }) {
@@ -652,7 +667,9 @@ export function ConsoleFunctionsPage() {
   )
 
   const effectiveAction = actionDetail.data ?? selectedAction
-  const writeDisabled = !canWrite(effectiveAction)
+  const writeDisabledReason = getWriteDisabledReason(effectiveAction)
+  const writeDisabled = writeDisabledReason !== null
+  const writeDisabledReasonId = writeDisabledReason ? 'functions-write-disabled-reason' : undefined
   const deleteInFlight = destructiveOp.config?.operationId === 'delete-function' && destructiveOp.opState === 'confirming'
   const eligibleRollbackVersions = versions.data?.items.filter((item) => item.rollbackEligible) ?? []
   const invokeActivationId = invokeResult.data ? resolveActivationIdFromInvocation(invokeResult.data, activations.data) : null
@@ -979,17 +996,27 @@ export function ConsoleFunctionsPage() {
                   {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
                 </div>
                 {effectiveAction && selectedActionId ? (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={openDeleteFunctionDialog}
-                    disabled={writeDisabled || deleteInFlight}
-                    aria-busy={deleteInFlight}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    {deleteInFlight ? 'Eliminando…' : 'Eliminar función'}
-                  </Button>
+                  <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={openDeleteFunctionDialog}
+                      disabled={writeDisabled || deleteInFlight}
+                      aria-busy={deleteInFlight}
+                      aria-describedby={writeDisabledReasonId}
+                      aria-label={`Eliminar función ${effectiveAction.actionName}${deleteInFlight ? ' en curso' : ''}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      {deleteInFlight ? 'Eliminando…' : 'Eliminar función'}
+                    </Button>
+                    {writeDisabledReason ? (
+                      <p id="functions-write-disabled-reason" className="max-w-xs text-sm leading-5 text-muted-foreground sm:text-right">
+                        {writeDisabledReason}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 
@@ -1127,7 +1154,12 @@ export function ConsoleFunctionsPage() {
                         </table>
                       </div>
                       <div className="space-y-2">
-                        <Button disabled={writeDisabled || eligibleRollbackVersions.length === 0 || !rollbackTargetVersionId || rollbackResult.loading} onClick={() => void handleRollback()} type="button">
+                        <Button
+                          disabled={writeDisabled || eligibleRollbackVersions.length === 0 || !rollbackTargetVersionId || rollbackResult.loading}
+                          onClick={() => void handleRollback()}
+                          type="button"
+                          aria-describedby={writeDisabledReasonId}
+                        >
                           <RotateCcw className="h-4 w-4" aria-hidden="true" />
                           {rollbackResult.loading ? 'Solicitando reversión…' : 'Revertir'}
                         </Button>
@@ -1305,12 +1337,17 @@ export function ConsoleFunctionsPage() {
                     </Select>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button disabled={!selectedActionId || writeDisabled || invokeResult.loading} onClick={() => void handleInvoke()} type="button">
+                    <Button
+                      disabled={!selectedActionId || writeDisabled || invokeResult.loading}
+                      onClick={() => void handleInvoke()}
+                      type="button"
+                      aria-describedby={writeDisabledReasonId}
+                    >
                       <Play className="h-4 w-4" aria-hidden="true" />
                       {invokeResult.loading ? 'Invocando…' : 'Invocar'}
                     </Button>
                   </div>
-                  {writeDisabled ? <p className="text-sm text-muted-foreground">La función no admite acciones de escritura mientras su aprovisionamiento no sea accionable.</p> : null}
+                  {writeDisabledReason ? <p className="text-sm text-muted-foreground">{writeDisabledReason}</p> : null}
                   {invokeResult.error ? (
                     <Alert variant="destructive" className="text-foreground">
                       <p>{invokeResult.error}</p>
@@ -1422,12 +1459,17 @@ export function ConsoleFunctionsPage() {
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button disabled={writeDisabled || deployResult.loading} onClick={() => void handleDeploy()} type="button">
+                    <Button
+                      disabled={writeDisabled || deployResult.loading}
+                      onClick={() => void handleDeploy()}
+                      type="button"
+                      aria-describedby={writeDisabledReasonId}
+                    >
                       <Rocket className="h-4 w-4" aria-hidden="true" />
                       {deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}
                     </Button>
                   </div>
-                  {writeDisabled && deployForm.mode === 'edit' ? <p className="text-sm text-muted-foreground">No se permiten cambios mientras la función esté en provisioning, degraded o suspended.</p> : null}
+                  {writeDisabledReason && deployForm.mode === 'edit' ? <p className="text-sm text-muted-foreground">{writeDisabledReason}</p> : null}
                   {deployResult.error ? <Alert variant="destructive">{deployResult.error}</Alert> : null}
                   {deployResult.data ? (
                     <Alert className="space-y-2 text-foreground">
