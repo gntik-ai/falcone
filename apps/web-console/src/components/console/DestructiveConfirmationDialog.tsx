@@ -77,7 +77,7 @@ export function DestructiveConfirmationDialog({
       }}
     >
       <DialogContent className="max-w-2xl overflow-hidden p-0">
-        <div role="alertdialog" aria-labelledby={titleId} aria-describedby={descriptionId}>
+        <div role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
           <DialogHeader className="mb-0 border-b border-border/70 bg-muted/20 p-5 sm:p-6">
             <div className="flex gap-3">
               <span

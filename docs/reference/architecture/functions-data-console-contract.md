@@ -9,6 +9,7 @@ kind control-plane route table.
 | --- | --- | --- |
 | List workspace functions | `GET /v1/functions/workspaces/{workspaceId}/actions` | Returns a `FunctionActionCollection`. Rows are keyed by `resourceId`; display uses `actionName` and `execution.runtime`. |
 | Deploy a function | `POST /v1/functions/actions` | Sends a function action write body containing the active `tenantId`, active `workspaceId`, `actionName`, `source`, `execution`, and `activationPolicy`. Do not post deploys to the workspace list route. |
+| Delete a function | `DELETE /v1/functions/actions/{resourceId}` | Selection must provide the `resourceId` from the list/detail response. The console must require destructive confirmation, send an `Idempotency-Key`, refresh inventory only after the DELETE succeeds, and clear the deleted selection. |
 | Invoke a function | `POST /v1/functions/actions/{resourceId}/invocations` | Selection must provide the `resourceId` from the list response. Plain input JSON is wrapped as `{ "parameters": ... }`; an existing invocation envelope is sent unchanged. |
 | List activations | `GET /v1/functions/actions/{resourceId}/activations` | Uses the same selected `resourceId`. The route is not workspace/name scoped. |
 
@@ -63,3 +64,11 @@ Before the request is sent, the web-console client maps that form to the action 
 Already contract-shaped JSON can be pasted into the editor. The client preserves it and stamps the
 currently selected `tenantId` and `workspaceId` so the body scope matches the active console tenant
 and workspace.
+
+Function deletion is a structural function lifecycle action. The kind control-plane resolves the
+action row through the caller's tenant scope before any authorization decision or teardown side
+effect. Cross-tenant or missing actions return not found without revealing existence. For an owned
+action, the delete path removes the current `fn_actions` row, retained `fn_action_versions`, and
+`fn_activations`, and requests deletion of the associated Knative service when `ksvc_name` is known.
+The Knative delete helper treats an already-absent service as a clean success so retries do not leave
+the console stuck on cluster garbage-collection timing.

@@ -67,7 +67,8 @@ describe('destructive-ops', () => {
       'detach-provider': 'WARNING',
       'revoke-service-account-credential': 'WARNING',
       // Deleting a service account removes its Keycloak client AND its persistence row permanently (#687).
-      'delete-service-account': 'CRITICAL'
+      'delete-service-account': 'CRITICAL',
+      'delete-function': 'CRITICAL'
     })
   })
 })
