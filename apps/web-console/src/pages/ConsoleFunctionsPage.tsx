@@ -1,5 +1,5 @@
 import { type KeyboardEvent, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Play, Rocket, RotateCcw, Trash2 } from 'lucide-react'
+import { Lock, Play, Rocket, RotateCcw, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
@@ -306,6 +306,7 @@ const nestedPanelClassName = 'rounded-2xl border border-border/70 bg-background/
 const emptyStateClassName = 'rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-5 text-sm leading-6 text-muted-foreground'
 const loadingTextClassName = 'text-sm leading-6 text-muted-foreground'
 const rowButtonClassName = 'w-full rounded-2xl border border-border/70 bg-background/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+const writeDisabledNoticeClassName = 'flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-sm leading-5 text-amber-100'
 
 function getFunctionTabId(tab: FunctionDetailTab) {
   return `functions-${tab}-tab`
@@ -415,6 +416,17 @@ function FunctionStatusBadge({ value }: { value?: string | null }) {
     <Badge variant="outline" className={cn('max-w-full whitespace-normal break-words text-left capitalize', statusToneClass(value))}>
       {formatEnumLabel(value)}
     </Badge>
+  )
+}
+
+function WriteDisabledNotice({ id, reason, className }: { id?: string; reason: string; className?: string }) {
+  return (
+    <p className={cn(writeDisabledNoticeClassName, className)}>
+      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+      <span id={id} className="min-w-0">
+        <span className="font-medium text-amber-50">Escritura bloqueada.</span> {reason}
+      </span>
+    </p>
   )
 }
 
@@ -989,19 +1001,19 @@ export function ConsoleFunctionsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <h2 className="text-lg font-semibold text-foreground">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
                   {effectiveAction ? <FunctionStatusBadge value={effectiveAction.provisioning?.state ?? effectiveAction.status} /> : null}
                   {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
                 </div>
                 {effectiveAction && selectedActionId ? (
-                  <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+                  <div className="flex w-full flex-col items-stretch gap-2 sm:w-72">
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
-                      className="w-full sm:w-auto"
+                      className="w-full"
                       onClick={openDeleteFunctionDialog}
                       disabled={writeDisabled || deleteInFlight}
                       aria-busy={deleteInFlight}
@@ -1012,9 +1024,7 @@ export function ConsoleFunctionsPage() {
                       {deleteInFlight ? 'Eliminando…' : 'Eliminar función'}
                     </Button>
                     {writeDisabledReason ? (
-                      <p id="functions-write-disabled-reason" className="max-w-xs text-sm leading-5 text-muted-foreground sm:text-right">
-                        {writeDisabledReason}
-                      </p>
+                      <WriteDisabledNotice id={writeDisabledReasonId} reason={writeDisabledReason} />
                     ) : null}
                   </div>
                 ) : null}
@@ -1347,7 +1357,7 @@ export function ConsoleFunctionsPage() {
                       {invokeResult.loading ? 'Invocando…' : 'Invocar'}
                     </Button>
                   </div>
-                  {writeDisabledReason ? <p className="text-sm text-muted-foreground">{writeDisabledReason}</p> : null}
+                  {writeDisabledReason ? <WriteDisabledNotice reason={writeDisabledReason} className="max-w-xl" /> : null}
                   {invokeResult.error ? (
                     <Alert variant="destructive" className="text-foreground">
                       <p>{invokeResult.error}</p>
@@ -1469,7 +1479,7 @@ export function ConsoleFunctionsPage() {
                       {deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}
                     </Button>
                   </div>
-                  {writeDisabledReason && deployForm.mode === 'edit' ? <p className="text-sm text-muted-foreground">{writeDisabledReason}</p> : null}
+                  {writeDisabledReason && deployForm.mode === 'edit' ? <WriteDisabledNotice reason={writeDisabledReason} className="max-w-xl" /> : null}
                   {deployResult.error ? <Alert variant="destructive">{deployResult.error}</Alert> : null}
                   {deployResult.data ? (
                     <Alert className="space-y-2 text-foreground">
