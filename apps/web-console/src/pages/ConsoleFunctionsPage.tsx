@@ -1,4 +1,5 @@
 import { type KeyboardEvent, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Play, Rocket, RotateCcw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
@@ -296,6 +297,11 @@ const FUNCTION_DETAIL_TABS: Array<{ value: FunctionDetailTab; label: string }> =
 ]
 
 const FUNCTION_RUNTIME_OPTIONS = ['nodejs:20', 'nodejs:18']
+const pagePanelClassName = 'rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6'
+const nestedPanelClassName = 'rounded-2xl border border-border/70 bg-background/50 p-4'
+const emptyStateClassName = 'rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-5 text-sm leading-6 text-muted-foreground'
+const loadingTextClassName = 'text-sm leading-6 text-muted-foreground'
+const rowButtonClassName = 'w-full rounded-2xl border border-border/70 bg-background/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
 function getFunctionTabId(tab: FunctionDetailTab) {
   return `functions-${tab}-tab`
@@ -359,16 +365,16 @@ function statusToneClass(value?: string | null): string {
   const normalized = value?.toLowerCase()
   if (!normalized) return 'border-border text-muted-foreground'
   if (['active', 'succeeded', 'success', 'completed', 'available'].includes(normalized)) {
-    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
+    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
   }
   if (['failed', 'failure', 'error', 'invalid', 'degraded', 'timed_out', 'cancelled'].includes(normalized)) {
-    return 'border-red-500/40 bg-red-500/10 text-red-700'
+    return 'border-red-500/40 bg-red-500/10 text-red-300'
   }
   if (['accepted', 'queued', 'running', 'provisioning', 'deploying'].includes(normalized)) {
-    return 'border-sky-500/40 bg-sky-500/10 text-sky-700'
+    return 'border-sky-500/40 bg-sky-500/10 text-sky-300'
   }
   if (['suspended', 'historical', 'inactive'].includes(normalized)) {
-    return 'border-amber-500/40 bg-amber-500/10 text-amber-700'
+    return 'border-amber-500/40 bg-amber-500/10 text-amber-300'
   }
   return 'border-border bg-muted/40 text-muted-foreground'
 }
@@ -430,9 +436,9 @@ function KeyValueGrid({ items }: { items: Array<{ label: string; value: unknown;
   return (
     <dl className="grid gap-3 md:grid-cols-2">
       {items.map((item) => (
-        <div className="rounded-lg border border-border p-3" key={item.label}>
-          <dt className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</dt>
-          <dd className={cn('mt-1 min-w-0 break-words text-sm', item.mono && 'font-mono')}>
+        <div className={nestedPanelClassName} key={item.label}>
+          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{item.label}</dt>
+          <dd className={cn('mt-1 min-w-0 break-words text-sm leading-6 text-foreground', item.mono && 'break-all font-mono text-xs')}>
             {isValidElement(item.value) ? item.value : formatValue(item.value)}
           </dd>
         </div>
@@ -819,33 +825,40 @@ export function ConsoleFunctionsPage() {
 
   return (
     <section className="space-y-6" aria-labelledby="functions-admin-title">
-      <header className="space-y-2">
-        <Badge variant="outline">Funciones</Badge>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 id="functions-admin-title" className="text-2xl font-semibold">Funciones: administrar</h1>
-            <p className="text-sm text-muted-foreground">Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Para una prueba directa con JSON sin historial operativo, usa{' '}
-              <Link
-                className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                to="/console/functions/data"
-              >
-                Funciones: despliegue rápido
-              </Link>.
-            </p>
+      <header className={pagePanelClassName}>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+          <div className="min-w-0 space-y-2">
+            <Badge variant="outline">Funciones</Badge>
+            <div>
+              <h1 id="functions-admin-title" className="text-2xl font-semibold tracking-tight text-foreground">Funciones: administrar</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Para una prueba directa con JSON sin historial operativo, usa{' '}
+                <Link
+                  className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  to="/console/functions/data"
+                >
+                  Funciones: despliegue rápido
+                </Link>.
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={openCreateMode} type="button" variant="default">Desplegar función</Button>
+            <Button onClick={openCreateMode} type="button" variant="default">
+              <Rocket className="h-4 w-4" aria-hidden="true" />
+              Desplegar función
+            </Button>
           </div>
         </div>
       </header>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
-        <section className="space-y-4 rounded-xl border border-border p-4">
+      <section className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr] xl:items-start">
+        <section className={cn(pagePanelClassName, 'space-y-4')}>
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Inventario</h2>
+              <h2 className="text-lg font-semibold text-foreground">Inventario</h2>
               {inventory.data?.quotaStatus ? <Badge variant="outline">Cuota {formatValue(inventory.data.quotaStatus.remaining)}/{formatValue(inventory.data.quotaStatus.limit)}</Badge> : null}
             </div>
             {inventory.data?.counts ? (
@@ -856,21 +869,21 @@ export function ConsoleFunctionsPage() {
                 { label: 'Exposiciones HTTP', value: inventory.data.counts.httpExposures }
               ]} />
             ) : null}
-            {inventory.loading ? <p>Cargando inventario…</p> : null}
+            {inventory.loading ? <p className={loadingTextClassName}>Cargando inventario…</p> : null}
             {!inventory.loading && inventory.error ? (
               <Alert variant="destructive" className="space-y-3 text-foreground">
                 <p>{inventory.error}</p>
                 <Button onClick={() => void loadInventory(activeWorkspaceId)} type="button" variant="outline">Reintentar</Button>
               </Alert>
             ) : null}
-            {!inventory.loading && !inventory.error && (!inventory.data || inventory.data.actions.length === 0) ? <p>No hay funciones en esta área de trabajo.</p> : null}
+            {!inventory.loading && !inventory.error && (!inventory.data || inventory.data.actions.length === 0) ? <p className={emptyStateClassName}>No hay funciones en esta área de trabajo.</p> : null}
             {!inventory.loading && !inventory.error && inventory.data?.actions.length ? (
               <div className="space-y-2">
                 {inventory.data.actions.map((item) => {
                   const selected = item.resourceId === selectedActionId
                   return (
                     <button
-                      className={`w-full rounded-lg border p-3 text-left ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                      className={cn(rowButtonClassName, selected && 'border-primary/70 bg-primary/10')}
                       key={item.resourceId}
                       onClick={() => {
                         setDeployForm((current) => ({ ...current, mode: 'edit' }))
@@ -878,11 +891,11 @@ export function ConsoleFunctionsPage() {
                       }}
                       type="button"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong>{item.actionName}</strong>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <strong className="min-w-0 truncate text-sm font-semibold text-foreground">{item.actionName}</strong>
                         <FunctionStatusBadge value={item.provisioning?.state ?? item.status} />
                       </div>
-                      <p className="mt-2 text-sm text-muted-foreground">Entorno: {item.execution?.runtime ?? '—'} · Versión: {item.activeVersionId ?? '—'}</p>
+                      <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">Entorno: {item.execution?.runtime ?? '—'} · Versión: {item.activeVersionId ?? '—'}</p>
                     </button>
                   )
                 })}
@@ -891,21 +904,21 @@ export function ConsoleFunctionsPage() {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-xl border border-border p-4">
+        <section className={cn(pagePanelClassName, 'space-y-4')}>
           {!selectedActionId && deployForm.mode !== 'create' ? (
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold">Detalle de la función</h2>
+            <div className={emptyStateClassName}>
+              <h2 className="text-base font-semibold text-foreground">Detalle de la función</h2>
               <p className="text-sm text-muted-foreground">Selecciona una función del inventario para revisar su configuración, activaciones y operaciones disponibles.</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
                 {effectiveAction ? <FunctionStatusBadge value={effectiveAction.provisioning?.state ?? effectiveAction.status} /> : null}
                 {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
               </div>
 
-              <div role="tablist" aria-label="Operaciones de función" className="flex w-full gap-1 overflow-x-auto rounded-2xl border border-border bg-card/60 p-1">
+              <div role="tablist" aria-label="Operaciones de función" className="flex w-full gap-1 overflow-x-auto rounded-2xl border border-border/70 bg-background/50 p-1">
                 {FUNCTION_DETAIL_TABS.map(({ value, label }) => (
                   <Button
                     key={value}
@@ -935,7 +948,7 @@ export function ConsoleFunctionsPage() {
               >
               {actionDetailTab === 'detail' ? (
                 <div className="space-y-4">
-                  {selectedActionId && actionDetail.loading ? <p>Cargando detalle…</p> : null}
+                  {selectedActionId && actionDetail.loading ? <p className={loadingTextClassName}>Cargando detalle…</p> : null}
                   {selectedActionId && !actionDetail.loading && actionDetail.error ? <Alert variant="destructive">{actionDetail.error}</Alert> : null}
                   {effectiveAction ? (
                     <>
@@ -999,40 +1012,40 @@ export function ConsoleFunctionsPage() {
 
               {actionDetailTab === 'versions' ? (
                 <div className="space-y-4">
-                  {versions.loading ? <p>Cargando versiones…</p> : null}
+                  {versions.loading ? <p className={loadingTextClassName}>Cargando versiones…</p> : null}
                   {!versions.loading && versions.error ? (
                     <Alert variant="destructive" className="space-y-2 text-foreground">
                       <p>{versions.error}</p>
                       {selectedActionId ? <Button onClick={() => void loadVersions(selectedActionId)} type="button" variant="outline">Reintentar</Button> : null}
                     </Alert>
                   ) : null}
-                  {!versions.loading && !versions.error && versions.data?.items.length === 0 ? <p>No hay versiones anteriores disponibles.</p> : null}
+                  {!versions.loading && !versions.error && versions.data?.items.length === 0 ? <p className={emptyStateClassName}>No hay versiones anteriores disponibles.</p> : null}
                   {!versions.loading && !versions.error && versions.data?.items.length ? (
                     <>
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto rounded-2xl border border-border/70 bg-background/40">
                         <table className="min-w-full text-left text-sm">
-                          <thead>
+                          <thead className="bg-muted/30">
                             <tr className="border-b border-border text-muted-foreground">
-                              <th className="py-2 pr-3">Versión</th>
-                              <th className="py-2 pr-3">ID de versión</th>
-                              <th className="py-2 pr-3">Estado</th>
-                              <th className="py-2 pr-3">Origen</th>
-                              <th className="py-2">Creada en</th>
+                              <th className="px-3 py-2 font-medium">Versión</th>
+                              <th className="px-3 py-2 font-medium">ID de versión</th>
+                              <th className="px-3 py-2 font-medium">Estado</th>
+                              <th className="px-3 py-2 font-medium">Origen</th>
+                              <th className="px-3 py-2 font-medium">Creada en</th>
                             </tr>
                           </thead>
                           <tbody>
                             {versions.data.items.map((item) => (
-                              <tr className="border-b border-border/60" key={item.versionId}>
-                                <td className="py-2 pr-3">
+                              <tr className="border-b border-border/60 last:border-b-0" key={item.versionId}>
+                                <td className="px-3 py-3">
                                   <label className="flex items-center gap-2">
                                     <input checked={rollbackTargetVersionId === item.versionId} disabled={!item.rollbackEligible || writeDisabled} name="rollback-version" onChange={() => setRollbackTargetVersionId(item.versionId)} type="radio" />
                                     <span>{formatValue(item.versionNumber)}</span>
                                   </label>
                                 </td>
-                                <td className="py-2 pr-3 font-mono text-xs">{item.versionId}</td>
-                                <td className="py-2 pr-3"><FunctionStatusBadge value={item.status} /></td>
-                                <td className="py-2 pr-3">{formatEnumLabel(item.originType)}</td>
-                                <td className="py-2">{formatValue(item.timestamps?.createdAt)}</td>
+                                <td className="break-all px-3 py-3 font-mono text-xs">{item.versionId}</td>
+                                <td className="px-3 py-3"><FunctionStatusBadge value={item.status} /></td>
+                                <td className="px-3 py-3">{formatEnumLabel(item.originType)}</td>
+                                <td className="px-3 py-3 text-muted-foreground">{formatValue(item.timestamps?.createdAt)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1040,6 +1053,7 @@ export function ConsoleFunctionsPage() {
                       </div>
                       <div className="space-y-2">
                         <Button disabled={writeDisabled || eligibleRollbackVersions.length === 0 || !rollbackTargetVersionId || rollbackResult.loading} onClick={() => void handleRollback()} type="button">
+                          <RotateCcw className="h-4 w-4" aria-hidden="true" />
                           {rollbackResult.loading ? 'Solicitando reversión…' : 'Revertir'}
                         </Button>
                         {eligibleRollbackVersions.length === 0 ? <p className="text-sm text-muted-foreground">No hay versiones anteriores disponibles para revertir.</p> : null}
@@ -1059,28 +1073,28 @@ export function ConsoleFunctionsPage() {
               {actionDetailTab === 'activations' ? (
                 <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
                   <div className="space-y-3">
-                    {activations.loading ? <p>Cargando activaciones…</p> : null}
+                    {activations.loading ? <p className={loadingTextClassName}>Cargando activaciones…</p> : null}
                     {!activations.loading && activations.error ? (
                       <Alert variant="destructive" className="space-y-2 text-foreground">
                         <p>{activations.error}</p>
                         {selectedActionId ? <Button onClick={() => void loadActivations(selectedActionId)} type="button" variant="outline">Reintentar</Button> : null}
                       </Alert>
                     ) : null}
-                    {!activations.loading && !activations.error && activations.data?.items.length === 0 ? <p>Esta función no tiene activaciones registradas.</p> : null}
+                    {!activations.loading && !activations.error && activations.data?.items.length === 0 ? <p className={emptyStateClassName}>Esta función no tiene activaciones registradas.</p> : null}
                     {activations.data?.items.map((item) => (
-                      <button className={`w-full rounded-lg border p-3 text-left ${selectedActivationId === item.activationId ? 'border-primary bg-primary/5' : 'border-border'}`} key={item.activationId} onClick={() => setSelectedActivationId(item.activationId)} type="button">
-                        <div className="flex items-center gap-2">
+                      <button className={cn(rowButtonClassName, selectedActivationId === item.activationId && 'border-primary/70 bg-primary/10')} key={item.activationId} onClick={() => setSelectedActivationId(item.activationId)} type="button">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <FunctionStatusBadge value={item.status} />
-                          <span className="font-mono text-xs text-muted-foreground">{item.activationId}</span>
+                          <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{item.activationId}</span>
                         </div>
-                        <p className="mt-2 text-sm">{item.durationMs} ms · {item.triggerKind}</p>
+                        <p className="mt-2 text-sm text-foreground">{item.durationMs} ms · {item.triggerKind}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{formatValue(item.startedAt)}</p>
                       </button>
                     ))}
                   </div>
-                  <div className="space-y-3 rounded-lg border border-border p-4">
-                    {!selectedActivationId ? <p>Selecciona una activación para ver metadatos, registros y resultado.</p> : null}
-                    {activationDetail.loading ? <p>Cargando detalle de activación…</p> : null}
+                  <div className={cn(nestedPanelClassName, 'space-y-3')}>
+                    {!selectedActivationId ? <p className={loadingTextClassName}>Selecciona una activación para ver metadatos, registros y resultado.</p> : null}
+                    {activationDetail.loading ? <p className={loadingTextClassName}>Cargando detalle de activación…</p> : null}
                     {activationDetail.data.activation ? (
                       <KeyValueGrid items={[
                         { label: 'ID de activación', value: activationDetail.data.activation.activationId, mono: true },
@@ -1145,23 +1159,44 @@ export function ConsoleFunctionsPage() {
 
               {actionDetailTab === 'triggers' ? (
                 <div className="space-y-4">
-                  {!effectiveAction?.kafkaTriggers?.length && !effectiveAction?.cronTriggers?.length && !effectiveAction?.storageTriggers?.length ? <p>No hay asociaciones de disparadores configuradas para esta función.</p> : null}
+                  {!effectiveAction?.kafkaTriggers?.length && !effectiveAction?.cronTriggers?.length && !effectiveAction?.storageTriggers?.length ? <p className={emptyStateClassName}>No hay asociaciones de disparadores configuradas para esta función.</p> : null}
                   {effectiveAction?.kafkaTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Kafka</h3>
-                      {effectiveAction.kafkaTriggers.map((item) => <p key={item.triggerId ?? item.topicRef}>{item.topicRef ?? item.triggerId} · {formatEnumLabel(item.deliveryMode)} · {formatEnumLabel(item.status)}</p>)}
+                      <div className="space-y-2">
+                        {effectiveAction.kafkaTriggers.map((item) => (
+                          <div className={cn(nestedPanelClassName, 'text-sm leading-6')} key={item.triggerId ?? item.topicRef}>
+                            <span className="font-mono text-xs text-foreground">{item.topicRef ?? item.triggerId}</span>
+                            <span className="text-muted-foreground"> · {formatEnumLabel(item.deliveryMode)} · {formatEnumLabel(item.status)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </section>
                   ) : null}
                   {effectiveAction?.cronTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Cron</h3>
-                      {effectiveAction.cronTriggers.map((item) => <p key={item.triggerId ?? item.schedule}>{item.schedule ?? item.triggerId} · {formatValue(item.timezone)} · {formatEnumLabel(item.status)}</p>)}
+                      <div className="space-y-2">
+                        {effectiveAction.cronTriggers.map((item) => (
+                          <div className={cn(nestedPanelClassName, 'text-sm leading-6')} key={item.triggerId ?? item.schedule}>
+                            <span className="font-mono text-xs text-foreground">{item.schedule ?? item.triggerId}</span>
+                            <span className="text-muted-foreground"> · {formatValue(item.timezone)} · {formatEnumLabel(item.status)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </section>
                   ) : null}
                   {effectiveAction?.storageTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Almacenamiento</h3>
-                      {effectiveAction.storageTriggers.map((item) => <p key={item.triggerId ?? item.bucketRef}>{item.bucketRef ?? item.triggerId} · {item.eventTypes?.join(', ') || '—'} · {formatEnumLabel(item.status)}</p>)}
+                      <div className="space-y-2">
+                        {effectiveAction.storageTriggers.map((item) => (
+                          <div className={cn(nestedPanelClassName, 'text-sm leading-6')} key={item.triggerId ?? item.bucketRef}>
+                            <span className="font-mono text-xs text-foreground">{item.bucketRef ?? item.triggerId}</span>
+                            <span className="text-muted-foreground"> · {item.eventTypes?.join(', ') || '—'} · {formatEnumLabel(item.status)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </section>
                   ) : null}
                 </div>
@@ -1194,7 +1229,12 @@ export function ConsoleFunctionsPage() {
                       <option value="wait_for_result">wait_for_result</option>
                     </Select>
                   </div>
-                  <Button disabled={!selectedActionId || writeDisabled || invokeResult.loading} onClick={() => void handleInvoke()} type="button">{invokeResult.loading ? 'Invocando…' : 'Invocar'}</Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button disabled={!selectedActionId || writeDisabled || invokeResult.loading} onClick={() => void handleInvoke()} type="button">
+                      <Play className="h-4 w-4" aria-hidden="true" />
+                      {invokeResult.loading ? 'Invocando…' : 'Invocar'}
+                    </Button>
+                  </div>
                   {writeDisabled ? <p className="text-sm text-muted-foreground">La función no admite acciones de escritura mientras su aprovisionamiento no sea accionable.</p> : null}
                   {invokeResult.error ? (
                     <Alert variant="destructive" className="text-foreground">
@@ -1306,7 +1346,12 @@ export function ConsoleFunctionsPage() {
                       value={deployForm.inlineCode}
                     />
                   </div>
-                  <Button disabled={writeDisabled || deployResult.loading} onClick={() => void handleDeploy()} type="button">{deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}</Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button disabled={writeDisabled || deployResult.loading} onClick={() => void handleDeploy()} type="button">
+                      <Rocket className="h-4 w-4" aria-hidden="true" />
+                      {deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}
+                    </Button>
+                  </div>
                   {writeDisabled && deployForm.mode === 'edit' ? <p className="text-sm text-muted-foreground">No se permiten cambios mientras la función esté en provisioning, degraded o suspended.</p> : null}
                   {deployResult.error ? <Alert variant="destructive">{deployResult.error}</Alert> : null}
                   {deployResult.data ? (
