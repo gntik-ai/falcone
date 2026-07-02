@@ -5,7 +5,7 @@ vi.mock('@/lib/console-session', () => ({
 }))
 
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import { deployFunction, getFunction, invokeFunction, listActivations, listFunctions } from './functionsApi'
+import { deleteFunction, deployFunction, getFunction, invokeFunction, listActivations, listFunctions } from './functionsApi'
 
 const mock = requestConsoleSessionJson as unknown as ReturnType<typeof vi.fn>
 const lastCall = () => mock.mock.calls[mock.mock.calls.length - 1]
@@ -102,6 +102,14 @@ describe('functionsApi — functions contract routes', () => {
   it('getFunction → GET actions/{resourceId}', async () => {
     await getFunction('res_fn_1')
     expect(lastCall()).toEqual([action])
+  })
+
+  it('deleteFunction → DELETE actions/{resourceId} with an idempotency key', async () => {
+    await deleteFunction('res_fn_1', 'idem-delete-1')
+    expect(lastCall()).toEqual([
+      action,
+      { method: 'DELETE', headers: { 'Idempotency-Key': 'idem-delete-1' } }
+    ])
   })
 
   it('invokeFunction → POST actions/{resourceId}/invocations with a parameters envelope', async () => {

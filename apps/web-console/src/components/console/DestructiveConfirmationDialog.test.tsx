@@ -75,6 +75,7 @@ describe('DestructiveConfirmationDialog', () => {
 
   it('pone el foco inicial en cancelar', async () => {
     render(<DestructiveConfirmationDialog open config={buildConfig({ level: 'WARNING' })} opState="ready" confirmError={null} onConfirm={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole('alertdialog')).toHaveAttribute('aria-modal', 'true')
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /cancelar/i })).toHaveFocus()
     })

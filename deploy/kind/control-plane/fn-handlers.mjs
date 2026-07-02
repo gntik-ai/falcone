@@ -7,7 +7,7 @@
 // FunctionInvocationAccepted / GatewayMutationAccepted).
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { deployKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
+import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
 import { vaultStoreFromEnv } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 
@@ -327,6 +327,34 @@ async function fnActionDetail(ctx) {
     await store.latestFnActivation(ctx.pool, r.resource_id),
     await store.getFnActionVersionSummary(ctx.pool, r)
   ));
+}
+// DELETE /v1/functions/actions/{actionId}
+async function fnDelete(ctx) {
+  const actionId = ctx.params.actionId ?? ctx.params.resourceId;
+  const r = await store.getFnAction(ctx.pool, actionId, callerTenantId(ctx.identity));
+  if (!r) return err(404, 'ACTION_NOT_FOUND', `action ${actionId} not found`);
+  if (!canManageTenant(ctx.identity, r.tenant_id)) {
+    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  }
+
+  if (r.ksvc_name) {
+    try {
+      await (ctx.deleteKnativeService ?? deleteKnativeService)(r.ksvc_name);
+    } catch (e) {
+      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DELETE_FAILED', String(e.message ?? e));
+    }
+  }
+
+  const deleted = await store.deleteFnAction(ctx.pool, r);
+  if (!deleted) return err(404, 'ACTION_NOT_FOUND', `action ${actionId} not found`);
+
+  return ok(202, {
+    requestId: randomUUID(),
+    correlationId: ctx.callerContext?.correlationId ?? randomUUID(),
+    resourceId: deleted.resource_id,
+    status: 'accepted',
+    acceptedAt: new Date().toISOString()
+  });
 }
 // POST /v1/functions/actions/{actionId}/invocations  — REAL execution
 async function fnInvoke(ctx) {
@@ -725,7 +753,7 @@ async function fnDefinitionImport(ctx) { return importDefinitions(ctx, { expectP
 async function fnPackageDefinitionImport(ctx) { return importDefinitions(ctx, { expectPackage: true }); }
 
 export const FN_HANDLERS = {
-  fnDeploy, fnInventory, fnListActions, fnActionDetail, fnInvoke,
+  fnDeploy, fnInventory, fnListActions, fnActionDetail, fnDelete, fnInvoke,
   fnActivations, fnActivation, fnActivationLogs, fnActivationResult, fnVersions, fnRollback,
   secretSet, secretReplace, secretList, secretGet, secretDelete,
   fnDefinitionExport, fnPackageDefinitionExport, fnDefinitionImport, fnPackageDefinitionImport
