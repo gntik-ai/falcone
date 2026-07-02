@@ -55,6 +55,14 @@ export interface FunctionRecord {
   }
 }
 
+export interface GatewayMutationAccepted {
+  requestId?: string
+  correlationId?: string
+  resourceId?: string
+  status?: string
+  acceptedAt?: string
+}
+
 export interface InvocationResult {
   result?: JsonValue
   activationId?: string
@@ -119,6 +127,13 @@ export function deployFunction(
 
 export function getFunction(resourceId: string): Promise<FunctionRecord> {
   return requestConsoleSessionJson<FunctionRecord>(actionResourceBase(resourceId))
+}
+
+export function deleteFunction(resourceId: string, idempotencyKey?: string): Promise<GatewayMutationAccepted> {
+  return requestConsoleSessionJson<GatewayMutationAccepted>(actionResourceBase(resourceId), {
+    method: 'DELETE',
+    ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {})
+  })
 }
 
 export function invokeFunction(

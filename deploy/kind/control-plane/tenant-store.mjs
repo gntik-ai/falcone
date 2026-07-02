@@ -546,6 +546,19 @@ export async function getFnActionVersionSummary(pool, action) {
     hasHistory: true
   };
 }
+export async function deleteFnAction(pool, action) {
+  if (!action?.resource_id || !action?.tenant_id || !action?.workspace_id) return null;
+  await pool.query(
+    'DELETE FROM fn_activations WHERE resource_id=$1 AND workspace_id=$2',
+    [action.resource_id, action.workspace_id]);
+  await pool.query(
+    'DELETE FROM fn_action_versions WHERE resource_id=$1 AND tenant_id=$2',
+    [action.resource_id, action.tenant_id]);
+  const { rows } = await pool.query(
+    'DELETE FROM fn_actions WHERE resource_id=$1 AND tenant_id=$2 RETURNING *',
+    [action.resource_id, action.tenant_id]);
+  return rows[0] ?? null;
+}
 export async function activateFnActionVersion(pool, action, version) {
   if (!action || !version || action.resource_id !== version.resource_id || action.tenant_id !== version.tenant_id) {
     return null;

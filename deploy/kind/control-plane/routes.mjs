@@ -299,6 +299,7 @@ export const routes = [
   { method: 'POST', path: '/v1/functions/actions', localHandler: 'fnDeploy', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/actions/{actionId}', localHandler: 'fnActionDetail', auth: 'authenticated' },
   { method: 'PATCH', path: '/v1/functions/actions/{actionId}', localHandler: 'fnDeploy', auth: 'authenticated' },
+  { method: 'DELETE', path: '/v1/functions/actions/{actionId}', localHandler: 'fnDelete', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions/{actionId}/invocations', localHandler: 'fnInvoke', auth: 'authenticated' },
   { method: 'POST', path: '/v1/functions/actions/{actionId}/rollback', localHandler: 'fnRollback', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/functions/actions/{actionId}/versions', localHandler: 'fnVersions', auth: 'authenticated' },

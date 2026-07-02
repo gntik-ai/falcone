@@ -1,8 +1,10 @@
 import { type KeyboardEvent, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Play, Rocket, RotateCcw } from 'lucide-react'
+import { Play, Rocket, RotateCcw, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
+import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
+import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,9 +14,11 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
+import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
 import { parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 import { cn } from '@/lib/utils'
+import { deleteFunction } from '@/services/functionsApi'
 
 type FunctionExecutionLimits = {
   timeoutMs?: number
@@ -463,9 +467,12 @@ export function ConsoleFunctionsPage() {
   const [deployResult, setDeployResult] = useState<SectionState<FunctionAction | GatewayMutationAccepted | null>>(EMPTY_DEPLOY_RESULT_STATE)
   const [rollbackTargetVersionId, setRollbackTargetVersionId] = useState<string | null>(null)
   const [rollbackResult, setRollbackResult] = useState<SectionState<FunctionRollbackAccepted | null>>(EMPTY_ROLLBACK_RESULT_STATE)
+  const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null)
+  const destructiveOp = useDestructiveOp()
   const invokeIdempotencyKeyRef = useRef(buildIdempotencyKey())
   const deployIdempotencyKeyRef = useRef(buildIdempotencyKey())
   const rollbackIdempotencyKeyRef = useRef(buildIdempotencyKey())
+  const deleteIdempotencyKeyRef = useRef(buildIdempotencyKey())
 
   const resetActionState = useCallback(() => {
     setActionDetail(EMPTY_ACTION_DETAIL_STATE)
@@ -548,6 +555,8 @@ export function ConsoleFunctionsPage() {
   }, [resetActionState])
 
   useEffect(() => {
+    destructiveOp.handleCancel()
+    setDeleteFeedback(null)
     setInventory(EMPTY_INVENTORY_STATE)
     setSelectedActionId(null)
     resetActionState()
@@ -557,7 +566,7 @@ export function ConsoleFunctionsPage() {
     const controller = new AbortController()
     void loadInventory(activeWorkspaceId, controller.signal)
     return () => controller.abort()
-  }, [activeTenantId, activeWorkspaceId, loadInventory, resetActionState])
+  }, [activeTenantId, activeWorkspaceId, destructiveOp.handleCancel, loadInventory, resetActionState])
 
   useEffect(() => {
     if (!selectedActionId) {
@@ -644,6 +653,7 @@ export function ConsoleFunctionsPage() {
 
   const effectiveAction = actionDetail.data ?? selectedAction
   const writeDisabled = !canWrite(effectiveAction)
+  const deleteInFlight = destructiveOp.config?.operationId === 'delete-function' && destructiveOp.opState === 'confirming'
   const eligibleRollbackVersions = versions.data?.items.filter((item) => item.rollbackEligible) ?? []
   const invokeActivationId = invokeResult.data ? resolveActivationIdFromInvocation(invokeResult.data, activations.data) : null
 
@@ -808,6 +818,49 @@ export function ConsoleFunctionsPage() {
     }
   }, [loadActionDetail, loadVersions, rollbackTargetVersionId, selectedActionId])
 
+  const handleDeleteFunction = useCallback(async (action: FunctionAction) => {
+    try {
+      await deleteFunction(action.resourceId, deleteIdempotencyKeyRef.current)
+      deleteIdempotencyKeyRef.current = buildIdempotencyKey()
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'No se pudo eliminar la función.')
+      throw Object.assign(error instanceof Error ? error : new Error(message), { message })
+    }
+  }, [])
+
+  const openDeleteFunctionDialog = useCallback(() => {
+    if (!effectiveAction || !activeWorkspaceId || !selectedActionId || writeDisabled) return
+    const action = effectiveAction
+    setDeleteFeedback(null)
+    destructiveOp.openDialog({
+      level: DESTRUCTIVE_OP_LEVELS['delete-function'],
+      operationId: 'delete-function',
+      resourceName: action.actionName,
+      resourceType: 'función',
+      resourceId: action.resourceId,
+      impactDescription: 'Se eliminarán el registro de la función, su historial de versiones, sus activaciones y el servicio Knative asociado.',
+      onConfirm: () => handleDeleteFunction(action),
+      onSuccess: () => {
+        setSelectedActionId(null)
+        resetActionState()
+        setInventory((current) => {
+          if (!current.data) return current
+          const actions = current.data.actions.filter((item) => item.resourceId !== action.resourceId)
+          return {
+            ...current,
+            data: {
+              ...current.data,
+              actions,
+              counts: current.data.counts ? { ...current.data.counts, actions: actions.length } : current.data.counts
+            }
+          }
+        })
+        setDeleteFeedback(`Función ${action.actionName} eliminada.`)
+        void loadInventory(activeWorkspaceId)
+      }
+    })
+  }, [activeWorkspaceId, destructiveOp, effectiveAction, handleDeleteFunction, loadInventory, resetActionState, selectedActionId, writeDisabled])
+
   if (!activeTenantId) {
     return (
       <Alert variant="destructive">
@@ -853,6 +906,13 @@ export function ConsoleFunctionsPage() {
           </div>
         </div>
       </header>
+
+      {deleteFeedback ? (
+        <Alert variant="success" className="text-foreground">
+          <AlertTitle>Función eliminada</AlertTitle>
+          <p>{deleteFeedback}</p>
+        </Alert>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr] xl:items-start">
         <section className={cn(pagePanelClassName, 'space-y-4')}>
@@ -912,10 +972,25 @@ export function ConsoleFunctionsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
-                {effectiveAction ? <FunctionStatusBadge value={effectiveAction.provisioning?.state ?? effectiveAction.status} /> : null}
-                {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
+                  {effectiveAction ? <FunctionStatusBadge value={effectiveAction.provisioning?.state ?? effectiveAction.status} /> : null}
+                  {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
+                </div>
+                {effectiveAction && selectedActionId ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={openDeleteFunctionDialog}
+                    disabled={writeDisabled || deleteInFlight}
+                    aria-busy={deleteInFlight}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {deleteInFlight ? 'Eliminando…' : 'Eliminar función'}
+                  </Button>
+                ) : null}
               </div>
 
               <div role="tablist" aria-label="Operaciones de función" className="flex w-full gap-1 overflow-x-auto rounded-2xl border border-border/70 bg-background/50 p-1">
@@ -1370,6 +1445,15 @@ export function ConsoleFunctionsPage() {
           )}
         </section>
       </section>
+
+      <DestructiveConfirmationDialog
+        open={destructiveOp.isOpen}
+        config={destructiveOp.config}
+        opState={destructiveOp.opState}
+        confirmError={destructiveOp.confirmError}
+        onConfirm={() => void destructiveOp.handleConfirm()}
+        onCancel={destructiveOp.handleCancel}
+      />
     </section>
   )
 }
