@@ -1,14 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type KeyboardEvent, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Play, Rocket, RotateCcw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
-import { CapabilityGate } from '@/components/console/CapabilityGate'
-import { PublishFunctionWizard } from '@/components/console/wizards/PublishFunctionWizard'
+import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
+import { parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
+import { cn } from '@/lib/utils'
 
 type FunctionExecutionLimits = {
   timeoutMs?: number
@@ -207,6 +213,11 @@ type FunctionInvocationAccepted = {
   resourceId: string
   status: string
   acceptedAt: string
+  activationId?: string
+  result?: unknown
+  contentType?: string
+  logs?: string[]
+  durationMs?: number
   activationPolicy?: FunctionActivationPolicy
 }
 
@@ -276,6 +287,30 @@ const EMPTY_DEPLOY_FORM: DeployFormState = {
   memoryMb: ''
 }
 
+const FUNCTION_DETAIL_TABS: Array<{ value: FunctionDetailTab; label: string }> = [
+  { value: 'detail', label: 'Detalle' },
+  { value: 'versions', label: 'Versiones' },
+  { value: 'activations', label: 'Activaciones' },
+  { value: 'triggers', label: 'Disparadores' },
+  { value: 'invoke', label: 'Invocar' },
+  { value: 'deploy', label: 'Desplegar' }
+]
+
+const FUNCTION_RUNTIME_OPTIONS = ['nodejs:20', 'nodejs:18']
+const pagePanelClassName = 'rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6'
+const nestedPanelClassName = 'rounded-2xl border border-border/70 bg-background/50 p-4'
+const emptyStateClassName = 'rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-5 text-sm leading-6 text-muted-foreground'
+const loadingTextClassName = 'text-sm leading-6 text-muted-foreground'
+const rowButtonClassName = 'w-full rounded-2xl border border-border/70 bg-background/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+
+function getFunctionTabId(tab: FunctionDetailTab) {
+  return `functions-${tab}-tab`
+}
+
+function getFunctionPanelId(tab: FunctionDetailTab) {
+  return `functions-${tab}-panel`
+}
+
 function getApiErrorMessage(rawError: unknown, fallback: string): string {
   if (rawError && typeof rawError === 'object') {
     const maybeMessage = 'message' in rawError ? rawError.message : undefined
@@ -307,7 +342,7 @@ function formatValue(value: unknown): string {
 
 function formatJson(value: unknown): string {
   if (value === null || value === undefined) return '—'
-  return JSON.stringify(value, null, 2)
+  return prettyJson(value)
 }
 
 function getActivationUnavailableMessage(message: string): string {
@@ -326,14 +361,22 @@ function getActivationLogsMessage(message: string): string {
   return getActivationUnavailableMessage(message)
 }
 
-function statusTone(value?: string | null): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusToneClass(value?: string | null): string {
   const normalized = value?.toLowerCase()
-  if (!normalized) return 'outline'
-  if (['active', 'succeeded', 'accepted', 'queued'].includes(normalized)) return 'default'
-  if (['failed', 'invalid', 'degraded', 'timed_out', 'cancelled'].includes(normalized)) return 'destructive'
-  if (['provisioning', 'deploying'].includes(normalized)) return 'secondary'
-  if (normalized === 'running') return 'outline'
-  return 'outline'
+  if (!normalized) return 'border-border text-muted-foreground'
+  if (['active', 'succeeded', 'success', 'completed', 'available'].includes(normalized)) {
+    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+  }
+  if (['failed', 'failure', 'error', 'invalid', 'degraded', 'timed_out', 'cancelled'].includes(normalized)) {
+    return 'border-red-500/40 bg-red-500/10 text-red-300'
+  }
+  if (['accepted', 'queued', 'running', 'provisioning', 'deploying'].includes(normalized)) {
+    return 'border-sky-500/40 bg-sky-500/10 text-sky-300'
+  }
+  if (['suspended', 'historical', 'inactive'].includes(normalized)) {
+    return 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+  }
+  return 'border-border bg-muted/40 text-muted-foreground'
 }
 
 function buildIdempotencyKey() {
@@ -348,13 +391,56 @@ function canWrite(action: FunctionAction | null): boolean {
   return !(state === 'provisioning' || state === 'degraded' || state === 'suspended')
 }
 
-function KeyValueGrid({ items }: { items: Array<{ label: string; value: unknown }> }) {
+function FunctionStatusBadge({ value }: { value?: string | null }) {
+  return (
+    <Badge variant="outline" className={cn('max-w-full whitespace-normal break-words text-left capitalize', statusToneClass(value))}>
+      {formatEnumLabel(value)}
+    </Badge>
+  )
+}
+
+function ConsoleBlock({ children, className, testId }: { children: string; className?: string; testId?: string }) {
+  return (
+    <pre
+      className={cn('max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground', className)}
+      data-testid={testId}
+      spellCheck={false}
+    >
+      {children}
+    </pre>
+  )
+}
+
+function formatResultForDisplay(result: unknown): string {
+  if (result === null) return 'null'
+  return typeof result === 'string' ? result : prettyJson(result)
+}
+
+function resolveActivationIdFromInvocation(
+  invocation: FunctionInvocationAccepted,
+  collection: FunctionActivationCollection | null
+): string | null {
+  if (invocation.activationId) return invocation.activationId
+  const matchingActivation = collection?.items.find((item) => item.invocationId === invocation.invocationId)
+  if (matchingActivation) return matchingActivation.activationId
+  if (invocation.invocationId?.startsWith('act_')) return invocation.invocationId
+  return collection?.items[0]?.activationId ?? null
+}
+
+function runtimeOptionsFor(value: string): string[] {
+  if (!value || FUNCTION_RUNTIME_OPTIONS.includes(value)) return FUNCTION_RUNTIME_OPTIONS
+  return [value, ...FUNCTION_RUNTIME_OPTIONS]
+}
+
+function KeyValueGrid({ items }: { items: Array<{ label: string; value: unknown; mono?: boolean }> }) {
   return (
     <dl className="grid gap-3 md:grid-cols-2">
       {items.map((item) => (
-        <div className="rounded-lg border border-border p-3" key={item.label}>
-          <dt className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</dt>
-          <dd className="mt-1 text-sm">{formatValue(item.value)}</dd>
+        <div className={nestedPanelClassName} key={item.label}>
+          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{item.label}</dt>
+          <dd className={cn('mt-1 min-w-0 break-words text-sm leading-6 text-foreground', item.mono && 'break-all font-mono text-xs')}>
+            {isValidElement(item.value) ? item.value : formatValue(item.value)}
+          </dd>
         </div>
       ))}
     </dl>
@@ -371,13 +457,12 @@ export function ConsoleFunctionsPage() {
   const [activations, setActivations] = useState<SectionState<FunctionActivationCollection | null>>(EMPTY_ACTIVATIONS_STATE)
   const [selectedActivationId, setSelectedActivationId] = useState<string | null>(null)
   const [activationDetail, setActivationDetail] = useState<SectionState<FunctionActivationDetail>>(EMPTY_ACTIVATION_DETAIL)
-  const [invokeForm, setInvokeForm] = useState<{ parametersJson: string; responseMode: 'accepted' | 'wait_for_result' }>({ parametersJson: '{}', responseMode: 'accepted' })
+  const [invokeForm, setInvokeForm] = useState<{ parametersJson: string; responseMode: 'accepted' | 'wait_for_result' }>({ parametersJson: prettyJson({}), responseMode: 'accepted' })
   const [invokeResult, setInvokeResult] = useState<SectionState<FunctionInvocationAccepted | null>>(EMPTY_INVOKE_RESULT_STATE)
   const [deployForm, setDeployForm] = useState<DeployFormState>(EMPTY_DEPLOY_FORM)
   const [deployResult, setDeployResult] = useState<SectionState<FunctionAction | GatewayMutationAccepted | null>>(EMPTY_DEPLOY_RESULT_STATE)
   const [rollbackTargetVersionId, setRollbackTargetVersionId] = useState<string | null>(null)
   const [rollbackResult, setRollbackResult] = useState<SectionState<FunctionRollbackAccepted | null>>(EMPTY_ROLLBACK_RESULT_STATE)
-  const [publishWizardOpen, setPublishWizardOpen] = useState(false)
   const invokeIdempotencyKeyRef = useRef(buildIdempotencyKey())
   const deployIdempotencyKeyRef = useRef(buildIdempotencyKey())
   const rollbackIdempotencyKeyRef = useRef(buildIdempotencyKey())
@@ -447,9 +532,11 @@ export function ConsoleFunctionsPage() {
     try {
       const data = await requestConsoleSessionJson<FunctionActivationCollection>(`/v1/functions/actions/${resourceId}/activations?page[size]=50`, { signal })
       setActivations({ data, loading: false, error: null })
+      return data
     } catch (error) {
-      if (isAbortError(error)) return
+      if (isAbortError(error)) return null
       setActivations({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar las activaciones.') })
+      return null
     }
   }, [])
 
@@ -558,6 +645,7 @@ export function ConsoleFunctionsPage() {
   const effectiveAction = actionDetail.data ?? selectedAction
   const writeDisabled = !canWrite(effectiveAction)
   const eligibleRollbackVersions = versions.data?.items.filter((item) => item.rollbackEligible) ?? []
+  const invokeActivationId = invokeResult.data ? resolveActivationIdFromInvocation(invokeResult.data, activations.data) : null
 
   const functionSnippetContext = useMemo<SnippetContext | null>(() => {
     if (!effectiveAction) {
@@ -579,20 +667,44 @@ export function ConsoleFunctionsPage() {
     }
   }, [activeTenantId, activeWorkspaceId, effectiveAction])
 
+  const handleActionTabKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>, value: FunctionDetailTab) => {
+    const currentIndex = FUNCTION_DETAIL_TABS.findIndex((item) => item.value === value)
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % FUNCTION_DETAIL_TABS.length
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + FUNCTION_DETAIL_TABS.length) % FUNCTION_DETAIL_TABS.length
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = FUNCTION_DETAIL_TABS.length - 1
+
+    if (nextIndex === null) return
+    event.preventDefault()
+    const nextTab = FUNCTION_DETAIL_TABS[nextIndex].value
+    setActionDetailTab(nextTab)
+    const focusNextTab = () => document.getElementById(getFunctionTabId(nextTab))?.focus()
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(focusNextTab)
+    } else {
+      setTimeout(focusNextTab, 0)
+    }
+  }, [])
+
   const handleInvoke = useCallback(async () => {
     if (!selectedActionId) return
     setInvokeResult({ data: null, loading: true, error: null })
 
-    let parameters: Record<string, unknown> = {}
-    try {
-      parameters = invokeForm.parametersJson.trim() ? JSON.parse(invokeForm.parametersJson) as Record<string, unknown> : {}
-    } catch {
-      setInvokeResult({ data: null, loading: false, error: 'El payload debe ser JSON válido.' })
+    const parsedParameters = invokeForm.parametersJson.trim()
+      ? parseJsonObject(invokeForm.parametersJson)
+      : { ok: true as const, value: {} }
+    if (!parsedParameters.ok) {
+      const message = parsedParameters.error === 'Expected a JSON object'
+        ? 'El payload debe ser un objeto JSON.'
+        : 'El payload debe ser JSON válido.'
+      setInvokeResult({ data: null, loading: false, error: message })
       return
     }
 
     const body: FunctionInvocationWriteRequest = {
-      parameters,
+      parameters: parsedParameters.value,
       responseMode: invokeForm.responseMode,
       idempotencyScope: 'request'
     }
@@ -605,10 +717,16 @@ export function ConsoleFunctionsPage() {
       })
       invokeIdempotencyKeyRef.current = buildIdempotencyKey()
       setInvokeResult({ data, loading: false, error: null })
+      const refreshedActivations = await loadActivations(selectedActionId)
+      const activationId = resolveActivationIdFromInvocation(data, refreshedActivations)
+      if (activationId) {
+        setSelectedActivationId(activationId)
+        setActionDetailTab('activations')
+      }
     } catch (error) {
       setInvokeResult({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo invocar la función.') })
     }
-  }, [invokeForm, selectedActionId])
+  }, [invokeForm, loadActivations, selectedActionId])
 
   const handleDeploy = useCallback(async () => {
     if (!activeTenantId || !activeWorkspaceId) return
@@ -690,43 +808,57 @@ export function ConsoleFunctionsPage() {
     }
   }, [loadActionDetail, loadVersions, rollbackTargetVersionId, selectedActionId])
 
-  if (!activeTenantId) return <p role="alert">Selecciona una organización para continuar.</p>
-  if (!activeWorkspaceId) return <p role="alert">Selecciona un área de trabajo para ver las funciones.</p>
+  if (!activeTenantId) {
+    return (
+      <Alert variant="destructive">
+        Selecciona una organización para continuar.
+      </Alert>
+    )
+  }
+  if (!activeWorkspaceId) {
+    return (
+      <Alert variant="destructive">
+        Selecciona un área de trabajo para ver las funciones.
+      </Alert>
+    )
+  }
 
   return (
     <section className="space-y-6" aria-labelledby="functions-admin-title">
-      <header className="space-y-2">
-        <Badge variant="outline">Funciones</Badge>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 id="functions-admin-title" className="text-2xl font-semibold">Funciones: administrar</h1>
-            <p className="text-sm text-muted-foreground">Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Para una prueba directa con JSON sin historial operativo, usa{' '}
-              <Link
-                className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                to="/console/functions/data"
-              >
-                Funciones: despliegue rápido
-              </Link>.
-            </p>
+      <header className={pagePanelClassName}>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+          <div className="min-w-0 space-y-2">
+            <Badge variant="outline">Funciones</Badge>
+            <div>
+              <h1 id="functions-admin-title" className="text-2xl font-semibold tracking-tight text-foreground">Funciones: administrar</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Inventario, detalle operativo, activaciones, invocación y despliegue del entorno serverless.
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Para una prueba directa con JSON sin historial operativo, usa{' '}
+                <Link
+                  className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  to="/console/functions/data"
+                >
+                  Funciones: despliegue rápido
+                </Link>.
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => setPublishWizardOpen(true)} type="button" variant="default">Publicar función</Button>
-            <Button onClick={openCreateMode} type="button" variant="outline">Desplegar función nueva</Button>
+            <Button onClick={openCreateMode} type="button" variant="default">
+              <Rocket className="h-4 w-4" aria-hidden="true" />
+              Desplegar función
+            </Button>
           </div>
         </div>
       </header>
 
-      <CapabilityGate capability="public_functions" mode="disable">
-        {publishWizardOpen ? <PublishFunctionWizard open={publishWizardOpen} onOpenChange={setPublishWizardOpen} /> : null}
-      </CapabilityGate>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
-        <section className="space-y-4 rounded-xl border border-border p-4">
+      <section className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr] xl:items-start">
+        <section className={cn(pagePanelClassName, 'space-y-4')}>
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Inventario</h2>
+              <h2 className="text-lg font-semibold text-foreground">Inventario</h2>
               {inventory.data?.quotaStatus ? <Badge variant="outline">Cuota {formatValue(inventory.data.quotaStatus.remaining)}/{formatValue(inventory.data.quotaStatus.limit)}</Badge> : null}
             </div>
             {inventory.data?.counts ? (
@@ -737,21 +869,21 @@ export function ConsoleFunctionsPage() {
                 { label: 'Exposiciones HTTP', value: inventory.data.counts.httpExposures }
               ]} />
             ) : null}
-            {inventory.loading ? <p>Cargando inventario…</p> : null}
+            {inventory.loading ? <p className={loadingTextClassName}>Cargando inventario…</p> : null}
             {!inventory.loading && inventory.error ? (
-              <div className="space-y-3" role="alert">
+              <Alert variant="destructive" className="space-y-3 text-foreground">
                 <p>{inventory.error}</p>
                 <Button onClick={() => void loadInventory(activeWorkspaceId)} type="button" variant="outline">Reintentar</Button>
-              </div>
+              </Alert>
             ) : null}
-            {!inventory.loading && !inventory.error && (!inventory.data || inventory.data.actions.length === 0) ? <p>No hay funciones en esta área de trabajo.</p> : null}
+            {!inventory.loading && !inventory.error && (!inventory.data || inventory.data.actions.length === 0) ? <p className={emptyStateClassName}>No hay funciones en esta área de trabajo.</p> : null}
             {!inventory.loading && !inventory.error && inventory.data?.actions.length ? (
               <div className="space-y-2">
                 {inventory.data.actions.map((item) => {
                   const selected = item.resourceId === selectedActionId
                   return (
                     <button
-                      className={`w-full rounded-lg border p-3 text-left ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                      className={cn(rowButtonClassName, selected && 'border-primary/70 bg-primary/10')}
                       key={item.resourceId}
                       onClick={() => {
                         setDeployForm((current) => ({ ...current, mode: 'edit' }))
@@ -759,11 +891,11 @@ export function ConsoleFunctionsPage() {
                       }}
                       type="button"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong>{item.actionName}</strong>
-                        <Badge variant={statusTone(item.provisioning?.state ?? item.status)}>{formatEnumLabel(item.provisioning?.state ?? item.status)}</Badge>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <strong className="min-w-0 truncate text-sm font-semibold text-foreground">{item.actionName}</strong>
+                        <FunctionStatusBadge value={item.provisioning?.state ?? item.status} />
                       </div>
-                      <p className="mt-2 text-sm text-muted-foreground">Entorno: {item.execution?.runtime ?? '—'} · Versión: {item.activeVersionId ?? '—'}</p>
+                      <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">Entorno: {item.execution?.runtime ?? '—'} · Versión: {item.activeVersionId ?? '—'}</p>
                     </button>
                   )
                 })}
@@ -772,43 +904,63 @@ export function ConsoleFunctionsPage() {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-xl border border-border p-4">
+        <section className={cn(pagePanelClassName, 'space-y-4')}>
           {!selectedActionId && deployForm.mode !== 'create' ? (
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold">Detalle de la función</h2>
+            <div className={emptyStateClassName}>
+              <h2 className="text-base font-semibold text-foreground">Detalle de la función</h2>
               <p className="text-sm text-muted-foreground">Selecciona una función del inventario para revisar su configuración, activaciones y operaciones disponibles.</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
-                {effectiveAction ? <Badge variant={statusTone(effectiveAction.provisioning?.state ?? effectiveAction.status)}>{formatEnumLabel(effectiveAction.provisioning?.state ?? effectiveAction.status)}</Badge> : null}
+                <h2 className="text-lg font-semibold text-foreground">{deployForm.mode === 'create' && !selectedActionId ? 'Nueva función' : effectiveAction?.actionName ?? 'Función seleccionada'}</h2>
+                {effectiveAction ? <FunctionStatusBadge value={effectiveAction.provisioning?.state ?? effectiveAction.status} /> : null}
                 {effectiveAction?.provisioning?.state ? <Badge variant="outline">Aprovisionamiento: {formatEnumLabel(effectiveAction.provisioning.state)}</Badge> : null}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {(['detail', 'versions', 'activations', 'triggers', 'invoke', 'deploy'] as FunctionDetailTab[]).map((tab) => (
-                  <Button key={tab} onClick={() => setActionDetailTab(tab)} type="button" variant={actionDetailTab === tab ? 'default' : 'outline'}>
-                    {tab === 'detail' ? 'Detalle' : tab === 'versions' ? 'Versiones' : tab === 'activations' ? 'Activaciones' : tab === 'triggers' ? 'Disparadores' : tab === 'invoke' ? 'Invocar' : 'Desplegar'}
+              <div role="tablist" aria-label="Operaciones de función" className="flex w-full gap-1 overflow-x-auto rounded-2xl border border-border/70 bg-background/50 p-1">
+                {FUNCTION_DETAIL_TABS.map(({ value, label }) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    id={getFunctionTabId(value)}
+                    aria-controls={getFunctionPanelId(value)}
+                    aria-selected={actionDetailTab === value}
+                    tabIndex={actionDetailTab === value ? 0 : -1}
+                    onClick={() => setActionDetailTab(value)}
+                    onKeyDown={(event) => handleActionTabKeyDown(event, value)}
+                    variant={actionDetailTab === value ? 'default' : 'ghost'}
+                    size="sm"
+                    className="flex-none"
+                  >
+                    {label}
                   </Button>
                 ))}
               </div>
 
+              <section
+                role="tabpanel"
+                id={getFunctionPanelId(actionDetailTab)}
+                aria-labelledby={getFunctionTabId(actionDetailTab)}
+                tabIndex={0}
+                className="outline-none"
+              >
               {actionDetailTab === 'detail' ? (
                 <div className="space-y-4">
-                  {selectedActionId && actionDetail.loading ? <p>Cargando detalle…</p> : null}
-                  {selectedActionId && !actionDetail.loading && actionDetail.error ? <p role="alert">{actionDetail.error}</p> : null}
+                  {selectedActionId && actionDetail.loading ? <p className={loadingTextClassName}>Cargando detalle…</p> : null}
+                  {selectedActionId && !actionDetail.loading && actionDetail.error ? <Alert variant="destructive">{actionDetail.error}</Alert> : null}
                   {effectiveAction ? (
                     <>
                       <section className="space-y-3">
                         <h3 className="font-semibold">Identificación</h3>
                         <KeyValueGrid items={[
                           { label: 'Nombre de acción', value: effectiveAction.actionName },
-                          { label: 'ID de recurso', value: effectiveAction.resourceId },
+                          { label: 'ID de recurso', value: effectiveAction.resourceId, mono: true },
                           { label: 'Paquete', value: effectiveAction.packageName },
                           { label: 'Namespace', value: effectiveAction.namespaceName },
-                          { label: 'Versión activa', value: effectiveAction.activeVersionId },
-                          { label: 'Digest de despliegue', value: effectiveAction.deploymentDigest }
+                          { label: 'Versión activa', value: effectiveAction.activeVersionId, mono: true },
+                          { label: 'Digest de despliegue', value: effectiveAction.deploymentDigest, mono: true }
                         ]} />
                       </section>
                       <section className="space-y-3">
@@ -836,11 +988,11 @@ export function ConsoleFunctionsPage() {
                         <div className="grid gap-4 lg:grid-cols-2">
                           <div>
                             <h4 className="mb-2 text-sm font-medium">Entorno</h4>
-                            <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs">{formatJson(effectiveAction.execution?.environment)}</pre>
+                            <ConsoleBlock>{formatJson(effectiveAction.execution?.environment)}</ConsoleBlock>
                           </div>
                           <div>
                             <h4 className="mb-2 text-sm font-medium">Parámetros</h4>
-                            <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs">{formatJson(effectiveAction.execution?.parameters)}</pre>
+                            <ConsoleBlock>{formatJson(effectiveAction.execution?.parameters)}</ConsoleBlock>
                           </div>
                         </div>
                       </section>
@@ -860,40 +1012,40 @@ export function ConsoleFunctionsPage() {
 
               {actionDetailTab === 'versions' ? (
                 <div className="space-y-4">
-                  {versions.loading ? <p>Cargando versiones…</p> : null}
+                  {versions.loading ? <p className={loadingTextClassName}>Cargando versiones…</p> : null}
                   {!versions.loading && versions.error ? (
-                    <div className="space-y-2" role="alert">
+                    <Alert variant="destructive" className="space-y-2 text-foreground">
                       <p>{versions.error}</p>
                       {selectedActionId ? <Button onClick={() => void loadVersions(selectedActionId)} type="button" variant="outline">Reintentar</Button> : null}
-                    </div>
+                    </Alert>
                   ) : null}
-                  {!versions.loading && !versions.error && versions.data?.items.length === 0 ? <p>No hay versiones anteriores disponibles.</p> : null}
+                  {!versions.loading && !versions.error && versions.data?.items.length === 0 ? <p className={emptyStateClassName}>No hay versiones anteriores disponibles.</p> : null}
                   {!versions.loading && !versions.error && versions.data?.items.length ? (
                     <>
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto rounded-2xl border border-border/70 bg-background/40">
                         <table className="min-w-full text-left text-sm">
-                          <thead>
+                          <thead className="bg-muted/30">
                             <tr className="border-b border-border text-muted-foreground">
-                              <th className="py-2 pr-3">Versión</th>
-                              <th className="py-2 pr-3">ID de versión</th>
-                              <th className="py-2 pr-3">Estado</th>
-                              <th className="py-2 pr-3">Origen</th>
-                              <th className="py-2">Creada en</th>
+                              <th className="px-3 py-2 font-medium">Versión</th>
+                              <th className="px-3 py-2 font-medium">ID de versión</th>
+                              <th className="px-3 py-2 font-medium">Estado</th>
+                              <th className="px-3 py-2 font-medium">Origen</th>
+                              <th className="px-3 py-2 font-medium">Creada en</th>
                             </tr>
                           </thead>
                           <tbody>
                             {versions.data.items.map((item) => (
-                              <tr className="border-b border-border/60" key={item.versionId}>
-                                <td className="py-2 pr-3">
+                              <tr className="border-b border-border/60 last:border-b-0" key={item.versionId}>
+                                <td className="px-3 py-3">
                                   <label className="flex items-center gap-2">
                                     <input checked={rollbackTargetVersionId === item.versionId} disabled={!item.rollbackEligible || writeDisabled} name="rollback-version" onChange={() => setRollbackTargetVersionId(item.versionId)} type="radio" />
                                     <span>{formatValue(item.versionNumber)}</span>
                                   </label>
                                 </td>
-                                <td className="py-2 pr-3">{item.versionId}</td>
-                                <td className="py-2 pr-3"><Badge variant={statusTone(item.status)}>{formatEnumLabel(item.status)}</Badge></td>
-                                <td className="py-2 pr-3">{formatEnumLabel(item.originType)}</td>
-                                <td className="py-2">{formatValue(item.timestamps?.createdAt)}</td>
+                                <td className="break-all px-3 py-3 font-mono text-xs">{item.versionId}</td>
+                                <td className="px-3 py-3"><FunctionStatusBadge value={item.status} /></td>
+                                <td className="px-3 py-3">{formatEnumLabel(item.originType)}</td>
+                                <td className="px-3 py-3 text-muted-foreground">{formatValue(item.timestamps?.createdAt)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -901,11 +1053,17 @@ export function ConsoleFunctionsPage() {
                       </div>
                       <div className="space-y-2">
                         <Button disabled={writeDisabled || eligibleRollbackVersions.length === 0 || !rollbackTargetVersionId || rollbackResult.loading} onClick={() => void handleRollback()} type="button">
+                          <RotateCcw className="h-4 w-4" aria-hidden="true" />
                           {rollbackResult.loading ? 'Solicitando reversión…' : 'Revertir'}
                         </Button>
                         {eligibleRollbackVersions.length === 0 ? <p className="text-sm text-muted-foreground">No hay versiones anteriores disponibles para revertir.</p> : null}
-                        {rollbackResult.error ? <p role="alert">{rollbackResult.error}</p> : null}
-                        {rollbackResult.data ? <p role="alert">Reversión {rollbackResult.data.status}: {rollbackResult.data.requestedVersionId}</p> : null}
+                        {rollbackResult.error ? <Alert variant="destructive">{rollbackResult.error}</Alert> : null}
+                        {rollbackResult.data ? (
+                          <Alert className="text-foreground">
+                            <AlertTitle>Reversión {rollbackResult.data.status}</AlertTitle>
+                            <p className="mt-1 font-mono text-xs">{rollbackResult.data.requestedVersionId}</p>
+                          </Alert>
+                        ) : null}
                       </div>
                     </>
                   ) : null}
@@ -915,55 +1073,61 @@ export function ConsoleFunctionsPage() {
               {actionDetailTab === 'activations' ? (
                 <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
                   <div className="space-y-3">
-                    {activations.loading ? <p>Cargando activaciones…</p> : null}
+                    {activations.loading ? <p className={loadingTextClassName}>Cargando activaciones…</p> : null}
                     {!activations.loading && activations.error ? (
-                      <div className="space-y-2" role="alert">
+                      <Alert variant="destructive" className="space-y-2 text-foreground">
                         <p>{activations.error}</p>
                         {selectedActionId ? <Button onClick={() => void loadActivations(selectedActionId)} type="button" variant="outline">Reintentar</Button> : null}
-                      </div>
+                      </Alert>
                     ) : null}
-                    {!activations.loading && !activations.error && activations.data?.items.length === 0 ? <p>Esta función no tiene activaciones registradas.</p> : null}
+                    {!activations.loading && !activations.error && activations.data?.items.length === 0 ? <p className={emptyStateClassName}>Esta función no tiene activaciones registradas.</p> : null}
                     {activations.data?.items.map((item) => (
-                      <button className={`w-full rounded-lg border p-3 text-left ${selectedActivationId === item.activationId ? 'border-primary bg-primary/5' : 'border-border'}`} key={item.activationId} onClick={() => setSelectedActivationId(item.activationId)} type="button">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={statusTone(item.status)}>{formatEnumLabel(item.status)}</Badge>
-                          <span className="text-xs text-muted-foreground">{item.activationId}</span>
+                      <button className={cn(rowButtonClassName, selectedActivationId === item.activationId && 'border-primary/70 bg-primary/10')} key={item.activationId} onClick={() => setSelectedActivationId(item.activationId)} type="button">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <FunctionStatusBadge value={item.status} />
+                          <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{item.activationId}</span>
                         </div>
-                        <p className="mt-2 text-sm">{item.durationMs} ms · {item.triggerKind}</p>
+                        <p className="mt-2 text-sm text-foreground">{item.durationMs} ms · {item.triggerKind}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{formatValue(item.startedAt)}</p>
                       </button>
                     ))}
                   </div>
-                  <div className="space-y-3 rounded-lg border border-border p-4">
-                    {!selectedActivationId ? <p>Selecciona una activación para ver metadatos, registros y resultado.</p> : null}
-                    {activationDetail.loading ? <p>Cargando detalle de activación…</p> : null}
+                  <div className={cn(nestedPanelClassName, 'space-y-3')}>
+                    {!selectedActivationId ? <p className={loadingTextClassName}>Selecciona una activación para ver metadatos, registros y resultado.</p> : null}
+                    {activationDetail.loading ? <p className={loadingTextClassName}>Cargando detalle de activación…</p> : null}
                     {activationDetail.data.activation ? (
                       <KeyValueGrid items={[
-                        { label: 'ID de activación', value: activationDetail.data.activation.activationId },
-                        { label: 'ID de recurso', value: activationDetail.data.activation.resourceId },
-                        { label: 'Estado', value: activationDetail.data.activation.status },
+                        { label: 'ID de activación', value: activationDetail.data.activation.activationId, mono: true },
+                        { label: 'ID de recurso', value: activationDetail.data.activation.resourceId, mono: true },
+                        { label: 'Estado', value: <FunctionStatusBadge value={activationDetail.data.activation.status} /> },
                         { label: 'Iniciada en', value: activationDetail.data.activation.startedAt },
                         { label: 'Finalizada en', value: activationDetail.data.activation.finishedAt },
                         { label: 'Duración (ms)', value: activationDetail.data.activation.durationMs },
                         { label: 'Código de estado', value: activationDetail.data.activation.statusCode },
                         { label: 'Tipo de disparador', value: activationDetail.data.activation.triggerKind },
                         { label: 'Memoria (MB)', value: activationDetail.data.activation.memoryMb },
-                        { label: 'ID de invocación', value: activationDetail.data.activation.invocationId },
+                        { label: 'ID de invocación', value: activationDetail.data.activation.invocationId, mono: true },
                         { label: 'Retención (días)', value: activationDetail.data.activation.policy?.retentionDays }
                       ]} />
                     ) : null}
-                    {activationDetail.data.activationError ? <p role="alert">{getActivationUnavailableMessage(activationDetail.data.activationError)}</p> : null}
+                    {activationDetail.data.activationError ? <Alert variant="destructive">{getActivationUnavailableMessage(activationDetail.data.activationError)}</Alert> : null}
                     <section className="space-y-2">
                       <h3 className="font-semibold">Registros</h3>
-                      {activationDetail.data.logsError ? <p role="alert">{getActivationLogsMessage(activationDetail.data.logsError)}</p> : null}
-                      {!activationDetail.data.logsError && activationDetail.data.logs?.truncated ? <p className="text-xs text-amber-600">Los registros están truncados. Se muestra el contenido disponible.</p> : null}
+                      {activationDetail.data.logsError ? <Alert variant="destructive">{getActivationLogsMessage(activationDetail.data.logsError)}</Alert> : null}
+                      {!activationDetail.data.logsError && activationDetail.data.logs?.truncated ? (
+                        <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
+                          Los registros están truncados. Se muestra el contenido disponible.
+                        </Alert>
+                      ) : null}
                       {!activationDetail.data.logsError && activationDetail.data.activation?.status === 'running' && !activationDetail.data.logs ? <p>La activación sigue en curso. Los registros pueden no estar disponibles aún.</p> : null}
                       {!activationDetail.data.logsError && activationDetail.data.logs && activationDetail.data.logs.lines.length === 0 ? <p>No hay registros disponibles para esta activación.</p> : null}
-                      {!activationDetail.data.logsError && activationDetail.data.logs && activationDetail.data.logs.lines.length > 0 ? <pre className="max-h-64 overflow-y-auto rounded bg-muted p-3 text-xs">{activationDetail.data.logs.lines.join('\n')}</pre> : null}
+                      {!activationDetail.data.logsError && activationDetail.data.logs && activationDetail.data.logs.lines.length > 0 ? (
+                        <ConsoleBlock testId="functions-activation-logs">{activationDetail.data.logs.lines.join('\n')}</ConsoleBlock>
+                      ) : null}
                     </section>
                     <section className="space-y-2">
                       <h3 className="font-semibold">Resultado</h3>
-                      {activationDetail.data.resultError ? <p role="alert">{getActivationUnavailableMessage(activationDetail.data.resultError)}</p> : null}
+                      {activationDetail.data.resultError ? <Alert variant="destructive">{getActivationUnavailableMessage(activationDetail.data.resultError)}</Alert> : null}
                       {!activationDetail.data.resultError && activationDetail.data.result ? (() => {
                         const res = activationDetail.data.result
                         const ct = res.contentType ?? ''
@@ -974,12 +1138,12 @@ export function ConsoleFunctionsPage() {
                           return <p>Sin resultado disponible.</p>
                         }
                         if (ct.includes('text/plain') && typeof res.result === 'string') {
-                          return <pre className="max-h-64 overflow-y-auto rounded bg-muted p-3 text-xs">{res.result}</pre>
+                          return <ConsoleBlock testId="functions-activation-result">{res.result}</ConsoleBlock>
                         }
                         return (
-                          <pre className="max-h-64 overflow-y-auto rounded bg-muted p-3 text-xs">
-                            {typeof res.result === 'string' ? res.result : JSON.stringify(res.result, null, 2)}
-                          </pre>
+                          <ConsoleBlock testId="functions-activation-result">
+                            {typeof res.result === 'string' ? res.result : prettyJson(res.result)}
+                          </ConsoleBlock>
                         )
                       })() : null}
                       {!activationDetail.data.resultError && !activationDetail.data.result && activationDetail.data.activation?.status === 'running' && selectedActivationId && !activationDetail.loading ? (
@@ -995,23 +1159,44 @@ export function ConsoleFunctionsPage() {
 
               {actionDetailTab === 'triggers' ? (
                 <div className="space-y-4">
-                  {!effectiveAction?.kafkaTriggers?.length && !effectiveAction?.cronTriggers?.length && !effectiveAction?.storageTriggers?.length ? <p>No hay asociaciones de disparadores configuradas para esta función.</p> : null}
+                  {!effectiveAction?.kafkaTriggers?.length && !effectiveAction?.cronTriggers?.length && !effectiveAction?.storageTriggers?.length ? <p className={emptyStateClassName}>No hay asociaciones de disparadores configuradas para esta función.</p> : null}
                   {effectiveAction?.kafkaTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Kafka</h3>
-                      {effectiveAction.kafkaTriggers.map((item) => <p key={item.triggerId ?? item.topicRef}>{item.topicRef ?? item.triggerId} · {formatEnumLabel(item.deliveryMode)} · {formatEnumLabel(item.status)}</p>)}
+                      <div className="space-y-2">
+                        {effectiveAction.kafkaTriggers.map((item) => (
+                          <div className={cn(nestedPanelClassName, 'text-sm leading-6')} key={item.triggerId ?? item.topicRef}>
+                            <span className="font-mono text-xs text-foreground">{item.topicRef ?? item.triggerId}</span>
+                            <span className="text-muted-foreground"> · {formatEnumLabel(item.deliveryMode)} · {formatEnumLabel(item.status)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </section>
                   ) : null}
                   {effectiveAction?.cronTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Cron</h3>
-                      {effectiveAction.cronTriggers.map((item) => <p key={item.triggerId ?? item.schedule}>{item.schedule ?? item.triggerId} · {formatValue(item.timezone)} · {formatEnumLabel(item.status)}</p>)}
+                      <div className="space-y-2">
+                        {effectiveAction.cronTriggers.map((item) => (
+                          <div className={cn(nestedPanelClassName, 'text-sm leading-6')} key={item.triggerId ?? item.schedule}>
+                            <span className="font-mono text-xs text-foreground">{item.schedule ?? item.triggerId}</span>
+                            <span className="text-muted-foreground"> · {formatValue(item.timezone)} · {formatEnumLabel(item.status)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </section>
                   ) : null}
                   {effectiveAction?.storageTriggers?.length ? (
                     <section className="space-y-2">
                       <h3 className="font-semibold">Almacenamiento</h3>
-                      {effectiveAction.storageTriggers.map((item) => <p key={item.triggerId ?? item.bucketRef}>{item.bucketRef ?? item.triggerId} · {item.eventTypes?.join(', ') || '—'} · {formatEnumLabel(item.status)}</p>)}
+                      <div className="space-y-2">
+                        {effectiveAction.storageTriggers.map((item) => (
+                          <div className={cn(nestedPanelClassName, 'text-sm leading-6')} key={item.triggerId ?? item.bucketRef}>
+                            <span className="font-mono text-xs text-foreground">{item.bucketRef ?? item.triggerId}</span>
+                            <span className="text-muted-foreground"> · {item.eventTypes?.join(', ') || '—'} · {formatEnumLabel(item.status)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </section>
                   ) : null}
                 </div>
@@ -1020,29 +1205,73 @@ export function ConsoleFunctionsPage() {
               {actionDetailTab === 'invoke' ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium" htmlFor="functions-invoke-payload">Contenido JSON</label>
-                    <textarea className="min-h-36 w-full rounded-md border border-input bg-background p-3 text-sm" id="functions-invoke-payload" onChange={(event) => setInvokeForm((current) => ({ ...current, parametersJson: event.target.value }))} value={invokeForm.parametersJson} />
+                    <Label htmlFor="functions-invoke-payload">Contenido JSON</Label>
+                    <Textarea
+                      autoCapitalize="off"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      className="min-h-36 font-mono text-xs leading-5"
+                      id="functions-invoke-payload"
+                      onChange={(event) => setInvokeForm((current) => ({ ...current, parametersJson: event.target.value }))}
+                      spellCheck={false}
+                      style={{ tabSize: 2 }}
+                      value={invokeForm.parametersJson}
+                    />
                   </div>
-                    <label className="block text-sm font-medium">Modo de respuesta
-                    <select className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setInvokeForm((current) => ({ ...current, responseMode: event.target.value as 'accepted' | 'wait_for_result' }))} value={invokeForm.responseMode}>
+                  <div className="space-y-2">
+                    <Label htmlFor="functions-response-mode">Modo de respuesta</Label>
+                    <Select
+                      id="functions-response-mode"
+                      onChange={(event) => setInvokeForm((current) => ({ ...current, responseMode: event.target.value as 'accepted' | 'wait_for_result' }))}
+                      value={invokeForm.responseMode}
+                    >
                       <option value="accepted">accepted</option>
                       <option value="wait_for_result">wait_for_result</option>
-                    </select>
-                  </label>
-                  <Button disabled={!selectedActionId || writeDisabled || invokeResult.loading} onClick={() => void handleInvoke()} type="button">{invokeResult.loading ? 'Invocando…' : 'Invocar'}</Button>
+                    </Select>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button disabled={!selectedActionId || writeDisabled || invokeResult.loading} onClick={() => void handleInvoke()} type="button">
+                      <Play className="h-4 w-4" aria-hidden="true" />
+                      {invokeResult.loading ? 'Invocando…' : 'Invocar'}
+                    </Button>
+                  </div>
                   {writeDisabled ? <p className="text-sm text-muted-foreground">La función no admite acciones de escritura mientras su aprovisionamiento no sea accionable.</p> : null}
                   {invokeResult.error ? (
-                    <div className="rounded-lg border border-destructive/40 p-3 text-sm" role="alert">
+                    <Alert variant="destructive" className="text-foreground">
                       <p>{invokeResult.error}</p>
                       {invokeResult.error.includes('quota') || invokeResult.error.includes('429') ? <p className="mt-2 text-muted-foreground">Revisa límites o aplicación de límites antes de reintentar.</p> : null}
-                    </div>
+                    </Alert>
                   ) : null}
                   {invokeResult.data ? (
-                    <div className="rounded-lg border border-border p-3 text-sm" role="alert">
-                      <p><strong>ID de invocación:</strong> {invokeResult.data.invocationId}</p>
-                      <p><strong>Estado:</strong> {invokeResult.data.status}</p>
-                      <p><strong>Aceptada en:</strong> {invokeResult.data.acceptedAt}</p>
-                    </div>
+                    <Alert className="space-y-3 text-foreground">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AlertTitle>Invocación aceptada</AlertTitle>
+                        <FunctionStatusBadge value={invokeResult.data.status} />
+                      </div>
+                      <div className="grid gap-2 text-sm sm:grid-cols-2">
+                        <p><strong>ID de invocación:</strong> <span className="font-mono text-xs">{invokeResult.data.invocationId}</span></p>
+                        {invokeActivationId ? <p><strong>Activación:</strong> <span className="font-mono text-xs">{invokeActivationId}</span></p> : null}
+                        <p><strong>Aceptada en:</strong> {invokeResult.data.acceptedAt}</p>
+                      </div>
+                      {invokeActivationId ? (
+                        <Button
+                          onClick={() => {
+                            setSelectedActivationId(invokeActivationId)
+                            setActionDetailTab('activations')
+                          }}
+                          type="button"
+                          variant="outline"
+                        >
+                          Ver activación
+                        </Button>
+                      ) : null}
+                      {invokeResult.data.result !== undefined ? (
+                        <ConsoleBlock testId="functions-invoke-inline-result">{formatResultForDisplay(invokeResult.data.result)}</ConsoleBlock>
+                      ) : null}
+                      {invokeResult.data.logs?.length ? (
+                        <ConsoleBlock testId="functions-invoke-inline-logs">{invokeResult.data.logs.join('\n')}</ConsoleBlock>
+                      ) : null}
+                    </Alert>
                   ) : null}
                 </div>
               ) : null}
@@ -1050,32 +1279,93 @@ export function ConsoleFunctionsPage() {
               {actionDetailTab === 'deploy' ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="block text-sm font-medium">Nombre de acción
-                      <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" disabled={deployForm.mode === 'edit'} onChange={(event) => setDeployForm((current) => ({ ...current, actionName: event.target.value }))} type="text" value={deployForm.actionName} />
-                    </label>
-                    <label className="block text-sm font-medium">Entorno
-                      <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, runtime: event.target.value }))} type="text" value={deployForm.runtime} />
-                    </label>
-                    <label className="block text-sm font-medium">Punto de entrada
-                      <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, entrypoint: event.target.value }))} type="text" value={deployForm.entrypoint} />
-                    </label>
-                    <label className="block text-sm font-medium">Tiempo de espera (ms)
-                      <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, timeoutMs: event.target.value }))} type="number" value={deployForm.timeoutMs} />
-                    </label>
-                    <label className="block text-sm font-medium">Memoria (MB)
-                      <input className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => setDeployForm((current) => ({ ...current, memoryMb: event.target.value }))} type="number" value={deployForm.memoryMb} />
-                    </label>
+                    <div className="space-y-2">
+                      <Label htmlFor="functions-action-name">Nombre de acción</Label>
+                      <Input
+                        className="font-mono"
+                        disabled={deployForm.mode === 'edit'}
+                        id="functions-action-name"
+                        onChange={(event) => setDeployForm((current) => ({ ...current, actionName: event.target.value }))}
+                        type="text"
+                        value={deployForm.actionName}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="functions-runtime">Entorno</Label>
+                      <Select
+                        id="functions-runtime"
+                        onChange={(event) => setDeployForm((current) => ({ ...current, runtime: event.target.value }))}
+                        value={deployForm.runtime}
+                      >
+                        <option value="">Selecciona un entorno</option>
+                        {runtimeOptionsFor(deployForm.runtime).map((runtime) => (
+                          <option key={runtime} value={runtime}>{runtime}</option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="functions-entrypoint">Punto de entrada</Label>
+                      <Input
+                        className="font-mono"
+                        id="functions-entrypoint"
+                        onChange={(event) => setDeployForm((current) => ({ ...current, entrypoint: event.target.value }))}
+                        type="text"
+                        value={deployForm.entrypoint}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="functions-timeout-ms">Tiempo de espera (ms)</Label>
+                      <Input
+                        id="functions-timeout-ms"
+                        onChange={(event) => setDeployForm((current) => ({ ...current, timeoutMs: event.target.value }))}
+                        type="number"
+                        value={deployForm.timeoutMs}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="functions-memory-mb">Memoria (MB)</Label>
+                      <Input
+                        id="functions-memory-mb"
+                        onChange={(event) => setDeployForm((current) => ({ ...current, memoryMb: event.target.value }))}
+                        type="number"
+                        value={deployForm.memoryMb}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium" htmlFor="functions-inline-code">Código inline</label>
-                    <textarea className="min-h-48 w-full rounded-md border border-input bg-background p-3 text-sm" id="functions-inline-code" onChange={(event) => setDeployForm((current) => ({ ...current, inlineCode: event.target.value }))} value={deployForm.inlineCode} />
+                    <Label htmlFor="functions-inline-code">Código inline</Label>
+                    <Textarea
+                      autoCapitalize="off"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      className="min-h-48 font-mono text-xs leading-5"
+                      id="functions-inline-code"
+                      onChange={(event) => setDeployForm((current) => ({ ...current, inlineCode: event.target.value }))}
+                      spellCheck={false}
+                      style={{ tabSize: 2 }}
+                      value={deployForm.inlineCode}
+                    />
                   </div>
-                  <Button disabled={writeDisabled || deployResult.loading} onClick={() => void handleDeploy()} type="button">{deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}</Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button disabled={writeDisabled || deployResult.loading} onClick={() => void handleDeploy()} type="button">
+                      <Rocket className="h-4 w-4" aria-hidden="true" />
+                      {deployResult.loading ? 'Desplegando…' : deployForm.mode === 'create' ? 'Crear función' : 'Actualizar función'}
+                    </Button>
+                  </div>
                   {writeDisabled && deployForm.mode === 'edit' ? <p className="text-sm text-muted-foreground">No se permiten cambios mientras la función esté en provisioning, degraded o suspended.</p> : null}
-                  {deployResult.error ? <p role="alert">{deployResult.error}</p> : null}
-                  {deployResult.data ? <p role="alert">Solicitud aceptada{deployResult.data.resourceId ? ` para ${deployResult.data.resourceId}` : ''}.</p> : null}
+                  {deployResult.error ? <Alert variant="destructive">{deployResult.error}</Alert> : null}
+                  {deployResult.data ? (
+                    <Alert className="space-y-2 text-foreground">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AlertTitle>Solicitud aceptada</AlertTitle>
+                        {'status' in deployResult.data ? <FunctionStatusBadge value={deployResult.data.status} /> : null}
+                      </div>
+                      {deployResult.data.resourceId ? <p>Recurso <span className="font-mono text-xs">{deployResult.data.resourceId}</span>.</p> : null}
+                    </Alert>
+                  ) : null}
                 </div>
               ) : null}
+              </section>
             </div>
           )}
         </section>
