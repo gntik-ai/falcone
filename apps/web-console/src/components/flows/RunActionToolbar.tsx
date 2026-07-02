@@ -87,7 +87,7 @@ export function RunActionToolbar({
   }
 
   return (
-    <div className="flex items-center gap-2" data-testid="run-action-toolbar">
+    <div className="flex flex-wrap items-center justify-end gap-2" data-testid="run-action-toolbar">
       {/* Cancel — always present, disabled on a terminal execution. */}
       <Button
         size="sm"

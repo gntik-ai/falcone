@@ -6,13 +6,14 @@
 // without an open SSE connection (spec "Completed run rendered from history"); a live run opens the
 // SSE stream (the user supplies the anon key, mirroring the realtime console) and transitions to
 // static mode on `stream-end`.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 
 import { RunCanvas } from '@/components/flows/RunCanvas'
 import { RunActionToolbar, type WaitingApprovalNode } from '@/components/flows/RunActionToolbar'
 import { RunNodeDetailPanel } from '@/components/flows/RunNodeDetailPanel'
-import { Badge } from '@/components/ui/badge'
+import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { RunStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { Input } from '@/components/ui/input'
 import { useConsoleContext } from '@/lib/console-context'
 import { useFlowExecution, type NodeStatusSnapshot } from '@/lib/hooks/use-flow-execution'
@@ -54,11 +55,16 @@ function RunView({
   const navigate = useNavigate()
   const [record, setRecord] = useState<FlowDefinitionRecord | null>(null)
   const [detail, setDetail] = useState<ExecutionDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
+  const apiKeyInputId = useId()
+  const apiKeyHelpId = useId()
+  const encodedFlowId = encodeURIComponent(flowId)
 
   const load = useCallback(async () => {
+    setLoading(true)
     setLoadError(null)
     try {
       const [flow, exec] = await Promise.all([
@@ -69,6 +75,8 @@ function RunView({
       setDetail(exec)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la ejecución.')
+    } finally {
+      setLoading(false)
     }
   }, [workspaceId, flowId, executionId])
 
@@ -117,48 +125,69 @@ function RunView({
 
   if (loadError && record === null) {
     return (
-      <div className="space-y-2 p-6 text-sm">
-        <p className="text-destructive" data-testid="run-load-error">
-          {loadError}
-        </p>
-        <button type="button" className="text-xs underline" onClick={() => void load()}>
-          Reintentar
-        </button>
-      </div>
+      <section className="p-6" data-testid="run-load-error">
+        <ConsolePageState
+          kind="error"
+          title="No se pudo cargar la ejecución"
+          description={loadError}
+          actionLabel="Reintentar"
+          onAction={() => void load()}
+        />
+      </section>
+    )
+  }
+
+  if (loading && record === null) {
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="loading"
+          title="Cargando ejecución"
+          description="Consultando la definición del flujo y el detalle de la ejecución."
+        />
+      </section>
     )
   }
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col" data-testid="console-flow-run-page">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <Link className="text-sm text-muted-foreground hover:underline" to="/console/flows">
             Flujos
           </Link>
           <span className="text-muted-foreground">/</span>
-          <Link className="text-sm text-muted-foreground hover:underline" to={`/console/flows/${flowId}/runs`}>
+          <Link className="text-sm text-muted-foreground hover:underline" to={`/console/flows/${encodedFlowId}/runs`}>
             Ejecuciones
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-semibold" title={executionId}>
+          <span className="min-w-0 max-w-[16rem] truncate text-sm font-semibold" title={executionId}>
             {record?.name ?? flowId}
           </span>
-          <Badge variant="outline" className="text-xs" data-testid="run-status-badge">
-            {detail?.status ?? 'desconocido'}
-          </Badge>
+          <RunStatusBadge status={detail?.status} />
           {!terminal ? (
             live.streaming ? (
-              <span className="text-xs text-emerald-600" data-testid="run-streaming-indicator">
+              <span className="text-xs text-emerald-700 dark:text-emerald-300" data-testid="run-streaming-indicator">
                 En vivo
               </span>
             ) : (
-              <Input
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="clave anónima (flc_anon_…) para transmitir en vivo"
-                className="h-8 w-64 text-xs"
-                data-testid="run-apikey-input"
-              />
+              <>
+                <label htmlFor={apiKeyInputId} className="sr-only">
+                  Clave anónima para transmitir la ejecución en vivo
+                </label>
+                <Input
+                  id={apiKeyInputId}
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  placeholder="clave anónima (flc_anon_…) para transmitir en vivo"
+                  className="h-8 w-full min-w-[14rem] text-xs sm:w-64"
+                  aria-describedby={apiKeyHelpId}
+                  data-testid="run-apikey-input"
+                />
+                <span id={apiKeyHelpId} className="sr-only">
+                  Introduce una clave anónima para abrir el stream en vivo; los estados históricos siguen visibles sin la clave.
+                </span>
+              </>
             )
           ) : (
             <span className="text-xs text-muted-foreground" data-testid="run-static-indicator">
@@ -175,7 +204,7 @@ function RunView({
             waitingApproval={waitingApproval}
             onCancelled={() => void load()}
             onSignalSent={() => void load()}
-            onRetried={(newId) => navigate(`/console/flows/${flowId}/runs/${encodeURIComponent(newId)}`)}
+            onRetried={(newId) => navigate(`/console/flows/${encodedFlowId}/runs/${encodeURIComponent(newId)}`)}
           />
         ) : null}
       </header>
@@ -191,7 +220,13 @@ function RunView({
             onSelectNode={setSelectedNodeId}
           />
         ) : (
-          <p className="p-6 text-sm text-muted-foreground">No hay definición de flujo disponible para esta ejecución.</p>
+          <div className="w-full p-6">
+            <ConsolePageState
+              kind="empty"
+              title="Sin definición de flujo"
+              description="No hay definición de flujo disponible para esta ejecución."
+            />
+          </div>
         )}
         {selectedNodeId ? (
           <RunNodeDetailPanel
@@ -207,14 +242,35 @@ function RunView({
 }
 
 export function ConsoleFlowRunPage() {
+  const navigate = useNavigate()
   const { flowId, executionId } = useParams<{ flowId: string; executionId: string }>()
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId || !executionId) {
-    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo o de la ejecución.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Ejecución bloqueada"
+          description="Falta el identificador del flujo o de la ejecución."
+          actionLabel="Volver a Flujos"
+          onAction={() => navigate('/console/flows')}
+        />
+      </section>
+    )
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para abrir la vista de ejecución.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Ejecución bloqueada"
+          description="Selecciona un área de trabajo para abrir la vista de ejecución."
+          actionLabel="Gestionar áreas de trabajo"
+          onAction={() => navigate('/console/workspaces')}
+        />
+      </section>
+    )
   }
 
   return (

@@ -1,12 +1,14 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 import { ConsoleFlowsPage } from './ConsoleFlowsPage'
 
 const mockUseConsoleContext = vi.fn()
 const mockListFlows = vi.fn()
 const mockCreateFlowDraft = vi.fn()
+const mockTriggerFlowSchedule = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
@@ -14,7 +16,8 @@ vi.mock('@/lib/console-context', () => ({
 
 vi.mock('@/services/flowsApi', () => ({
   listFlows: (...args: unknown[]) => mockListFlows(...args),
-  createFlowDraft: (...args: unknown[]) => mockCreateFlowDraft(...args)
+  createFlowDraft: (...args: unknown[]) => mockCreateFlowDraft(...args),
+  triggerFlowSchedule: (...args: unknown[]) => mockTriggerFlowSchedule(...args)
 }))
 
 // IMPORTANT: `@/lib/hooks/use-capability-gate` is intentionally NOT mocked here. This test
@@ -24,10 +27,21 @@ vi.mock('@/services/flowsApi', () => ({
 // `CapabilityGate capability="workflows"`, the real gate would resolve to disabled and the
 // content would render inside `[data-testid="capability-gate-disabled"]`. (#790)
 
+function LocationProbe() {
+  const location = useLocation()
+  return (
+    <>
+      <div data-testid="current-path">{location.pathname}</div>
+      <div data-testid="current-state">{JSON.stringify(location.state)}</div>
+    </>
+  )
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/console/flows']}>
       <ConsoleFlowsPage />
+      <LocationProbe />
     </MemoryRouter>
   )
 }
@@ -50,6 +64,10 @@ beforeEach(() => {
   })
   mockListFlows.mockReset().mockResolvedValue({ items: [] })
   mockCreateFlowDraft.mockReset()
+  mockTriggerFlowSchedule.mockReset().mockResolvedValue({
+    status: 'triggered',
+    scheduleId: 'ten_alpha:wrk_alpha:flow-alpha'
+  })
 })
 afterEach(cleanup)
 
@@ -97,5 +115,66 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     expect(openDesignerLink).toHaveAttribute('href', '/console/flows/flow-alpha')
     const runHistoryLink = within(row).getByRole('link', { name: /ver historial de ejecuciones para alpha flow/i })
     expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-alpha/runs')
+  })
+
+  it('[#793] triggers a published flow and navigates to its run history with next-step state', async () => {
+    mockListFlows.mockResolvedValue({
+      items: [
+        {
+          flowId: 'flow-alpha',
+          name: 'Alpha flow',
+          status: 'published',
+          updatedAt: '2026-06-30T12:00:00Z'
+        }
+      ]
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    const row = await screen.findByTestId('flow-row')
+    await user.click(within(row).getByRole('button', { name: /ejecutar ahora alpha flow/i }))
+    expect(mockTriggerFlowSchedule).not.toHaveBeenCalled()
+
+    const dialog = screen.getByTestId('confirm-action-dialog')
+    expect(dialog).toHaveTextContent(/ejecutar flujo ahora/i)
+    await user.click(within(dialog).getByTestId('confirm-action-confirm'))
+
+    await waitFor(() => expect(mockTriggerFlowSchedule).toHaveBeenCalledWith('wrk_alpha', 'flow-alpha'))
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/console/flows/flow-alpha/runs'))
+    expect(screen.getByTestId('current-state')).toHaveTextContent('ten_alpha:wrk_alpha:flow-alpha')
+  })
+
+  it('[#793] disables Run now for draft flows and does not call the trigger API', async () => {
+    mockListFlows.mockResolvedValue({
+      items: [
+        {
+          flowId: 'flow-draft',
+          name: 'Draft flow',
+          status: 'draft',
+          updatedAt: '2026-06-30T12:00:00Z'
+        }
+      ]
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    const row = await screen.findByTestId('flow-row')
+    const runButton = within(row).getByRole('button', { name: /ejecutar ahora no disponible para draft flow/i })
+    expect(runButton).toBeDisabled()
+    expect(runButton).toHaveAttribute('title', 'Publica este flujo antes de ejecutarlo.')
+    await user.click(runButton)
+    expect(mockTriggerFlowSchedule).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('confirm-action-dialog')).not.toBeInTheDocument()
+  })
+
+  it('[#793] uses ConsolePageState for the no-workspace blocked state', () => {
+    mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: null, capabilities: {}, capabilitiesLoading: false })
+
+    renderPage()
+
+    expect(screen.getByRole('alert', { name: /flujos bloqueados/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /gestionar áreas de trabajo/i })).toBeInTheDocument()
   })
 })

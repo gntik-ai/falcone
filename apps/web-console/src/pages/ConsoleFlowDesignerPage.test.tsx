@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 import { ConsoleFlowDesignerPage } from './ConsoleFlowDesignerPage'
 
 const mockUseConsoleContext = vi.fn()
 const mockGetFlow = vi.fn()
+const mockTriggerFlowSchedule = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
@@ -16,6 +18,7 @@ vi.mock('@/services/flowsApi', () => ({
   getFlow: (...args: unknown[]) => mockGetFlow(...args),
   isFlowApiError: () => false,
   publishFlow: vi.fn(),
+  triggerFlowSchedule: (...args: unknown[]) => mockTriggerFlowSchedule(...args),
   updateFlowDraft: vi.fn()
 }))
 
@@ -40,11 +43,30 @@ vi.mock('@/components/flows/FlowPalette', () => ({
   FlowPalette: () => <div data-testid="flow-palette-stub" />
 }))
 
+function LocationProbe() {
+  const location = useLocation()
+  return (
+    <>
+      <div data-testid="current-path">{location.pathname}</div>
+      <div data-testid="current-state">{JSON.stringify(location.state)}</div>
+    </>
+  )
+}
+
 function renderPage(flowId = 'flow-1') {
   return render(
     <MemoryRouter initialEntries={[`/console/flows/${flowId}`]}>
       <Routes>
-        <Route path="/console/flows/:flowId" element={<ConsoleFlowDesignerPage />} />
+        <Route
+          path="/console/flows/:flowId"
+          element={(
+            <>
+              <ConsoleFlowDesignerPage />
+              <LocationProbe />
+            </>
+          )}
+        />
+        <Route path="/console/flows/:flowId/runs" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>
   )
@@ -61,6 +83,10 @@ beforeEach(() => {
       name: 'Alpha flow',
       nodes: []
     }
+  })
+  mockTriggerFlowSchedule.mockReset().mockResolvedValue({
+    status: 'triggered',
+    scheduleId: 'ten1:ws1:flow-1'
   })
 })
 afterEach(cleanup)
@@ -80,5 +106,31 @@ describe('ConsoleFlowDesignerPage run-history navigation (#792)', () => {
     mockGetFlow.mockRejectedValueOnce('network-failed')
     renderPage()
     expect(await screen.findByText('No se pudo cargar el flujo.')).toBeInTheDocument()
+  })
+
+  it('[#793] triggers a published flow from the designer and navigates to run history', async () => {
+    mockGetFlow.mockResolvedValueOnce({
+      flowId: 'flow-1',
+      name: 'Alpha flow',
+      status: 'published',
+      definition: {
+        apiVersion: 'v1.0',
+        name: 'Alpha flow',
+        nodes: []
+      }
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await waitFor(() => expect(mockGetFlow).toHaveBeenCalledWith('ws1', 'flow-1'))
+    await user.click(screen.getByRole('button', { name: /ejecutar ahora alpha flow/i }))
+
+    const dialog = screen.getByTestId('confirm-action-dialog')
+    await user.click(within(dialog).getByTestId('confirm-action-confirm'))
+
+    await waitFor(() => expect(mockTriggerFlowSchedule).toHaveBeenCalledWith('ws1', 'flow-1'))
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/console/flows/flow-1/runs'))
+    expect(screen.getByTestId('current-state')).toHaveTextContent('ten1:ws1:flow-1')
   })
 })

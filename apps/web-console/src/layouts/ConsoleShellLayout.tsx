@@ -83,6 +83,13 @@ const consoleNavigationItems = [
   },
   {
     group: 'functions',
+    label: 'Flujos / workflows',
+    to: '/console/flows',
+    icon: Workflow,
+    description: 'Diseña, publica, ejecuta y revisa ejecuciones de flujos del área de trabajo activa.'
+  },
+  {
+    group: 'functions',
     label: 'Funciones: registro',
     to: '/console/functions-registry',
     icon: Settings,
