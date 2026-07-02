@@ -12,7 +12,7 @@
 //   - server-side: 422 errors from validate/publish are merged per nodeId onto the
 //     canvas nodes; errors without nodeId show as flow-level Problems entries.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { History } from 'lucide-react'
 import {
   applyEdgeChanges,
@@ -34,6 +34,8 @@ import '@xyflow/react/dist/style.css'
 import { FlowYamlEditor, type FlowEditorValidity } from '@/components/flows/FlowYamlEditor'
 import { FLOW_PALETTE_DRAG_MIME, FlowPalette } from '@/components/flows/FlowPalette'
 import { FlowProblemsPanel } from '@/components/flows/FlowProblemsPanel'
+import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
+import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { evaluateConnection } from '@/components/flows/connectionRules'
 import {
   definitionToEdges,
@@ -52,6 +54,7 @@ import {
 } from '@/components/flows/semanticValidation'
 import { parseYamlToFlow, serializeFlowToYaml } from '@/lib/flows/yaml-serialiser'
 import type { ViewMode } from '@/lib/flows/view-sync'
+import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
@@ -60,16 +63,10 @@ import {
   isFlowApiError,
   publishFlow,
   updateFlowDraft,
+  type FlowScheduleTriggerAck,
   type FlowDefinitionRecord
 } from '@/services/flowsApi'
 import type { FlowDefinition, FlowNode, TaskTypeDescriptor, ValidationError } from '@/types/flows'
-
-const FLOW_STATUS_LABELS: Record<string, string> = {
-  archived: 'Archivado',
-  draft: 'Borrador',
-  failed: 'Fallido',
-  published: 'Publicado'
-}
 
 type DesignerNode = Node<FlowCanvasNodeData>
 
@@ -99,8 +96,14 @@ function nodeDisplayLabel(dsl: FlowNode): string {
   return dsl.type
 }
 
-function formatFlowStatus(status?: string | null): string {
-  return status ? FLOW_STATUS_LABELS[status] ?? status : FLOW_STATUS_LABELS.draft
+function buildTriggerNavigationState(flowId: string, ack: FlowScheduleTriggerAck) {
+  return {
+    flowTrigger: {
+      flowId,
+      scheduleId: ack.scheduleId,
+      triggeredAt: new Date().toISOString()
+    }
+  }
 }
 
 // Derive the DSL edge kind for a freshly drawn connection from the source node type and
@@ -122,10 +125,12 @@ function connectionKind(
 }
 
 function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId: string }) {
+  const navigate = useNavigate()
   const { screenToFlowPosition } = useReactFlow()
   const canvasRef = useRef<HTMLDivElement | null>(null)
 
   const [record, setRecord] = useState<FlowDefinitionRecord | null>(null)
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [nodes, setNodes] = useState<DesignerNode[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
@@ -164,12 +169,15 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
   }, [])
 
   const load = useCallback(async () => {
+    setLoading(true)
     setLoadError(null)
     try {
       const loaded = await getFlow(workspaceId, flowId)
       resetFromRecord(loaded)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'No se pudo cargar el flujo.')
+    } finally {
+      setLoading(false)
     }
   }, [workspaceId, flowId, resetFromRecord])
 
@@ -451,6 +459,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       if (!saved) return
       const result = await publishFlow(workspaceId, flowId)
       setPublishedVersion(result.version)
+      setRecord((current) => (current ? { ...current, status: 'published' } : current))
       setServerErrors([])
     } catch (error) {
       setLoadError(applyServerRejection(error))
@@ -489,7 +498,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     <div className="min-w-0 flex-1 border-l border-border" data-testid="designer-yaml-pane">
       {viewMode !== 'canvas' && !yamlValidity.parseable ? (
         <p
-          className="bg-amber-100 px-3 py-1 text-xs text-amber-800"
+          className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-700 dark:text-amber-300"
           role="status"
           data-testid="designer-yaml-degraded-banner"
         >
@@ -507,12 +516,27 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 
   if (loadError && record === null) {
     return (
-      <div className="space-y-2 p-6 text-sm">
-        <p className="text-destructive">{loadError}</p>
-        <Button size="sm" variant="outline" onClick={() => void load()}>
-          Reintentar
-        </Button>
-      </div>
+      <section className="p-6">
+        <ConsolePageState
+          kind="error"
+          title="No se pudo cargar el flujo"
+          description={loadError}
+          actionLabel="Reintentar"
+          onAction={() => void load()}
+        />
+      </section>
+    )
+  }
+
+  if (loading && record === null) {
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="loading"
+          title="Cargando diseñador"
+          description="Consultando la definición del flujo antes de abrir el lienzo."
+        />
+      </section>
     )
   }
 
@@ -527,20 +551,18 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
           <span className="max-w-[18rem] truncate text-sm font-semibold sm:max-w-[24rem]" title={record?.name ?? flowId}>
             {record?.name ?? flowId}
           </span>
-          <Badge variant="outline" className="text-xs">
-            {formatFlowStatus(record?.status)}
-          </Badge>
+          <FlowStatusBadge status={record?.status} />
           {publishedVersion !== null ? (
             <Badge className="text-xs" data-testid="published-version-badge">
               v{publishedVersion} publicada
             </Badge>
           ) : null}
           {dirty ? (
-            <span data-testid="unsaved-changes-indicator" className="text-xs text-amber-600">
+            <span data-testid="unsaved-changes-indicator" className="text-xs text-amber-700 dark:text-amber-300">
               Cambios sin guardar
             </span>
           ) : savedAt ? (
-            <span data-testid="saved-indicator" className="text-xs text-emerald-600">
+            <span data-testid="saved-indicator" className="text-xs text-emerald-700 dark:text-emerald-300">
               Guardado
             </span>
           ) : null}
@@ -563,7 +585,19 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
               </Button>
             ))}
           </div>
-          <nav aria-label="Navegación de ejecuciones del flujo" className="flex w-full items-center sm:w-auto">
+          <nav aria-label="Navegación de ejecuciones del flujo" className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <FlowRunTriggerButton
+              workspaceId={workspaceId}
+              flowId={flowId}
+              flowName={record?.name ?? flowId}
+              status={record?.status}
+              className="w-full justify-start sm:w-auto sm:justify-center"
+              onTriggered={(ack) =>
+                navigate(`/console/flows/${encodeURIComponent(flowId)}/runs`, {
+                  state: buildTriggerNavigationState(flowId, ack)
+                })
+              }
+            />
             <Button size="sm" variant="secondary" className="w-full justify-start sm:w-auto sm:justify-center" asChild>
               <Link
                 to={`/console/flows/${encodeURIComponent(flowId)}/runs`}
@@ -636,14 +670,35 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 }
 
 export function ConsoleFlowDesignerPage() {
+  const navigate = useNavigate()
   const { flowId } = useParams<{ flowId: string }>()
   const { activeWorkspaceId } = useConsoleContext()
 
   if (!flowId) {
-    return <p className="p-6 text-sm text-muted-foreground">Falta el identificador del flujo.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Diseñador bloqueado"
+          description="Falta el identificador del flujo que se debe abrir."
+          actionLabel="Volver a Flujos"
+          onAction={() => navigate('/console/flows')}
+        />
+      </section>
+    )
   }
   if (!activeWorkspaceId) {
-    return <p className="p-6 text-sm text-muted-foreground">Selecciona un área de trabajo para abrir el diseñador.</p>
+    return (
+      <section className="p-6">
+        <ConsolePageState
+          kind="blocked"
+          title="Diseñador bloqueado"
+          description="Selecciona un área de trabajo para abrir el diseñador."
+          actionLabel="Gestionar áreas de trabajo"
+          onAction={() => navigate('/console/workspaces')}
+        />
+      </section>
+    )
   }
 
   return (

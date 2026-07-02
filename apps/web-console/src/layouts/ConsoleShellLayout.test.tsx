@@ -67,6 +67,7 @@ describe('ConsoleShellLayout', () => {
 
     expect(await screen.findByRole('link', { name: /consola in falcone/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /vista general/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /flujos \/ workflows/i })).toHaveAttribute('href', '/console/flows')
     expect(screen.getByText(/operaciones plataforma/i)).toBeInTheDocument()
     expect(screen.getByTestId('console-shell-avatar')).toHaveTextContent('OP')
     expect(screen.getByLabelText(/contexto activo de consola/i)).toBeInTheDocument()
