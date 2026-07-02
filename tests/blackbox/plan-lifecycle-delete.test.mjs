@@ -7,15 +7,15 @@
  *
  * Scenario coverage:
  *   bbx-802-01 | fn-plan-lifecycle-console-route, fn-plan-delete-retire-console-route
- *     OpenSpec #### Scenario: Superadmin manages plan lifecycle and obsolete plan deletion through the console-served API
+ *     Scenario: Superadmin manages plan lifecycle and obsolete plan deletion through the console-served API
  *   bbx-802-02 | fn-plan-lifecycle-transition
- *     OpenSpec #### Scenario: Superadmin transitions draft -> active -> deprecated -> archived through the console-served API
+ *     Scenario: Superadmin transitions draft -> active -> deprecated -> archived through the console-served API
  *   bbx-802-03 | fn-plan-delete-retire-authz
- *     OpenSpec #### Scenario: Plan deletion/retirement is superadmin-only
+ *     Scenario: Plan deletion/retirement is superadmin-only
  *   bbx-802-04 | fn-plan-delete-retire-guard
- *     OpenSpec #### Scenario: Active, in-use, or assigned plans cannot be deleted/retired
+ *     Scenario: Active, in-use, or assigned plans cannot be deleted/retired
  *   bbx-802-05 | fn-plan-delete-retire-safe-obsolete
- *     OpenSpec #### Scenario: A never-assigned obsolete/draft plan can be removed or retired
+ *     Scenario: A never-assigned obsolete/draft plan can be removed or retired
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -174,7 +174,7 @@ function assertSafeDeleteOrRetireAccepted(result, store, planId) {
 }
 
 // bbx-802-01 | fn-plan-lifecycle-console-route, fn-plan-delete-retire-console-route
-// OpenSpec #### Scenario: Superadmin manages plan lifecycle and obsolete plan deletion through the console-served API
+// Scenario: Superadmin manages plan lifecycle and obsolete plan deletion through the console-served API
 test('bbx-802-01: console-served plan lifecycle and delete/retire routes are registered as superadmin actions', () => {
   assertActionRoute(findRoute('POST', LIFECYCLE_PATH), {
     method: 'POST',
@@ -190,7 +190,7 @@ test('bbx-802-01: console-served plan lifecycle and delete/retire routes are reg
 });
 
 // bbx-802-02 | fn-plan-lifecycle-transition
-// OpenSpec #### Scenario: Superadmin transitions draft -> active -> deprecated -> archived through the console-served API
+// Scenario: Superadmin transitions draft -> active -> deprecated -> archived through the console-served API
 test('bbx-802-02: superadmin can transition draft -> active -> deprecated -> archived via the served lifecycle action', async () => {
   const action = await loadActionFor('POST', LIFECYCLE_PATH);
   const planId = 'pln-802-lifecycle';
@@ -212,7 +212,7 @@ test('bbx-802-02: superadmin can transition draft -> active -> deprecated -> arc
 });
 
 // bbx-802-03 | fn-plan-delete-retire-authz
-// OpenSpec #### Scenario: Plan deletion/retirement is superadmin-only
+// Scenario: Plan deletion/retirement is superadmin-only
 test('bbx-802-03: plan delete/retire action rejects non-superadmin callers', async () => {
   const action = await loadActionFor('DELETE', DELETE_PATH);
   const planId = 'pln-802-authz';
@@ -227,7 +227,7 @@ test('bbx-802-03: plan delete/retire action rejects non-superadmin callers', asy
 });
 
 // bbx-802-04 | fn-plan-delete-retire-guard
-// OpenSpec #### Scenario: Active, in-use, or assigned plans cannot be deleted/retired
+// Scenario: Active, in-use, or assigned plans cannot be deleted/retired
 test('bbx-802-04: plan delete/retire refuses active or assigned plans server-side', async () => {
   const action = await loadActionFor('DELETE', DELETE_PATH);
   const planId = 'pln-802-assigned';
@@ -256,7 +256,7 @@ test('bbx-802-04: plan delete/retire refuses active or assigned plans server-sid
 });
 
 // bbx-802-05 | fn-plan-delete-retire-safe-obsolete
-// OpenSpec #### Scenario: A never-assigned obsolete/draft plan can be removed or retired
+// Scenario: A never-assigned obsolete/draft plan can be removed or retired
 test('bbx-802-05: plan delete/retire accepts never-assigned obsolete and draft plans', async () => {
   const lifecycleAction = await loadActionFor('POST', LIFECYCLE_PATH);
   const deleteAction = await loadActionFor('DELETE', DELETE_PATH);

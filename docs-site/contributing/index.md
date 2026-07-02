@@ -34,17 +34,11 @@ npm run lint        # validate:repo + lint:md + validate:openapi
 
 `validate:repo` runs a battery of structural/contract validators (domain model, public API, gateway policy, deployment chart/topology, authorization model, and the `observability-*` schema checks). CI runs `lint` plus the unit/adapter/contract suites in its `quality` job.
 
-## Spec-driven changes (OpenSpec)
+## Spec-driven changes
 
-Every bug fix or feature is an OpenSpec **change**, following `propose → apply → verify → archive`:
+Every bug fix or feature starts from a written spec delta, following `propose → apply → verify → archive`.
 
-```bash
-openspec list                 # see active changes
-openspec show <change-id>
-openspec validate <change-id> --strict
-```
-
-Changes are scaffolded and worked through with the native OpenSpec tooling rather than hand-written. Work test-first: a failing black-box test reproduces a bug (or covers a scenario) before the fix; never edit tests just to make them pass.
+Work test-first: a failing black-box test reproduces a bug (or covers a scenario) before the fix; never edit tests just to make them pass.
 
 > [!TIP]
 > Generated change proposals can drift from the code — verify route paths against `public-route-catalog.json` and event-schema reuse before implementing a backlog change.

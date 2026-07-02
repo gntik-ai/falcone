@@ -1,4 +1,4 @@
-// Real-stack test for OpenSpec change fix-ferretdb-gateway-authentication (finding F2).
+// Real-stack test for spec change fix-ferretdb-gateway-authentication (finding F2).
 //
 // Exercises the live FerretDB gateway over the DocumentDB engine in tests/env (docker-compose):
 // FerretDB v2 delegates authentication to its DocumentDB Postgres backend, so a Mongo client must

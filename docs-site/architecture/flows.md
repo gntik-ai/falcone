@@ -4,8 +4,8 @@ The **flows** capability is a durable workflow engine layered over **Temporal**.
 a flow as a YAML DSL; the platform stores immutable versions, starts executions as Temporal
 workflows, and runs each one through a single **generic interpreter** that translates DSL nodes to
 Temporal primitives. This page documents the implementation as merged on `main`. For the decision
-record see [ADR-11](/architecture/adrs#adr-11-temporal-for-the-durable-workflow-flows-engine); for
-the normative spec see `openspec/specs/workflows/spec.md`. The tenant-facing guide is
+record see [ADR-11](/architecture/adrs#adr-11-temporal-for-the-durable-workflow-flows-engine).
+The tenant-facing guide is
 [Flows](/guide/flows); the operator procedures are in the
 [Flows Runbook](/architecture/flows-runbook).
 
@@ -228,5 +228,4 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
 ## Links
 
 - [ADR-11 — Temporal for the durable workflow (flows) engine](/architecture/adrs#adr-11-temporal-for-the-durable-workflow-flows-engine)
-- Normative spec: `openspec/specs/workflows/spec.md`
 - Tenant guide: [Flows](/guide/flows) · Operations: [Flows Runbook](/architecture/flows-runbook)

@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-console-operator-tenant-context
+ * Black-box regression suite for spec change fix-console-operator-tenant-context
  * (live E2E campaign 2026-06-18, finding #27 / GitHub issue #569, epic #546).
  *
  * Reproduces the two root causes:

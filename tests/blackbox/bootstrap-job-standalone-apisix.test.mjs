@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-bootstrap-job-standalone-apisix
+ * Black-box regression suite for spec change fix-bootstrap-job-standalone-apisix
  * (live E2E campaign 2026-06-17, finding D2).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` as a child process, extracts the

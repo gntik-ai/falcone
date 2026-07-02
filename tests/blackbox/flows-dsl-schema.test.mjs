@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change add-flows-dsl-schema.
+ * Black-box test suite for spec change add-flows-dsl-schema.
  *
  * Drives the PUBLIC surface ONLY: the schema artifact and validator API exported from
  * `@in-falcone/internal-contracts` (services/internal-contracts/src/index.mjs). No

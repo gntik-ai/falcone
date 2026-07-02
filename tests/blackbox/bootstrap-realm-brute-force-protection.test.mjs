@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change add-brute-force-protection (#668).
+ * Black-box regression suite for spec change add-brute-force-protection (#668).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` as a child process and asserts:
  *  - the rendered bootstrap PAYLOAD realm.json carries `bruteForceProtected: true` + sane thresholds

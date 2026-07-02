@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change fix-flows-create-validate-schema
+ * Black-box test suite for spec change fix-flows-create-validate-schema
  * (live E2E campaign, GitHub issue #625).
  *
  * Drives the PUBLIC HTTP surface of the control-plane flows API (the routes the gateway fronts at

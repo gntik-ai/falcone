@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-bootstrap-job-coldstart-retry
+ * Black-box regression suite for spec change fix-bootstrap-job-coldstart-retry
  * (live E2E campaign 2026-06-18, finding #558, epic #542).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` as a child process; no internal

@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-campaign-image-pull-policy
+ * Black-box regression suite for spec change fix-campaign-image-pull-policy
  * (live E2E campaign 2026-06-18, finding #561, epic #542).
  *
  * Parses the campaign harness files as plain text (no execution, no cluster) and asserts the

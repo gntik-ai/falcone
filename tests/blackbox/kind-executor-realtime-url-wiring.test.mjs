@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-kind-executor-realtime-url
+ * Black-box regression suite for spec change fix-kind-executor-realtime-url
  * (live E2E campaign, GitHub issue #621).
  *
  * Parses the deploy manifests as data (no execution, no cluster) and asserts that the executor

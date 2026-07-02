@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change add-flows-dsl-interpreter-worker.
+ * Black-box test suite for spec change add-flows-dsl-interpreter-worker.
  *
  * Drives the PUBLIC surface of the workflow-worker service ONLY — no live Temporal
  * server is required here (live-Temporal behaviours: durable resume, version pinning,

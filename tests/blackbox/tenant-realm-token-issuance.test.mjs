@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-tenant-realm-token-issuance (finding A3),
+ * Black-box regression suite for spec change fix-tenant-realm-token-issuance (finding A3),
  * executor multi-realm JWKS verification half.
  *
  * Drives the executor's public JWT verifier (apps/control-plane/src/runtime/jwt-verify.mjs).

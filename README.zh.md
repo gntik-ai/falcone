@@ -253,7 +253,6 @@ services/        gateway-config、realtime-gateway、webhook-engine、cdc-bridge
 charts/ helm/    Kubernetes / Helm 部署（含 temporal、workflowWorker、mcp 组件）
 deploy/          APISIX 路由、kind/OpenShift 引导
 tests/           blackbox（契约）· e2e（Playwright，含 mcp 规格）· env（Compose 栈）
-openspec/        规格驱动的变更工作流
 ```
 
 ---

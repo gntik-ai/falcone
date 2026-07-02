@@ -16,7 +16,7 @@
 //      blocks cross-tenant writes
 //   4. (D6) flow_versions is IMMUTABLE for falcone_app: UPDATE and DELETE are denied (no grant)
 //
-// Maps to openspec/changes/add-flows-control-plane-api/specs/workflows/spec.md scenarios:
+// Maps to the add-flows-control-plane-api workflows spec scenarios:
 //   "Create a new flow definition … inaccessible to any other tenant under falcone_app"
 //   "List flow definitions returns only the requesting tenant's flows"
 //   "Published version is immutable … falcone_app cannot UPDATE or DELETE it"

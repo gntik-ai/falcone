@@ -2,7 +2,7 @@
 // URLs, multipart/resumable upload, HTTP range/partial reads, and per-bucket delete. This suite
 // drives the PUBLIC storage runtime (routes.mjs route table + STORAGE_HANDLERS) and the gateway-config
 // route catalog only — no real S3/SeaweedFS. It encodes the four acceptance scenarios from the
-// OpenSpec change AND the cardinal tenant-isolation guarantee (every new route is ownership-gated;
+// spec change AND the cardinal tenant-isolation guarantee (every new route is ownership-gated;
 // a cross-tenant caller gets 404 with no existence leak).
 //
 // NOTE: a fake S3 fetch seam cannot prove that real SeaweedFS honors Range / multipart / presign —

@@ -1,5 +1,5 @@
 {
-  "source": "spikes/add-seaweedfs-storage-adr-spike/compatibility-matrix.md (OpenSpec add-seaweedfs-storage-adr-spike, GitHub #431)",
+  "source": "spikes/add-seaweedfs-storage-adr-spike/compatibility-matrix.md (spec add-seaweedfs-storage-adr-spike, GitHub #431)",
   "configTypes": ["lifecycle", "policy", "cors", "versioning"],
   "defaultVersion": "4.33",
   "versions": {

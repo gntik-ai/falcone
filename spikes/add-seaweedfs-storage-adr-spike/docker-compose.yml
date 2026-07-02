@@ -1,4 +1,4 @@
-# SeaweedFS S3-compatibility + filer-on-PostgreSQL spike stack (OpenSpec: add-seaweedfs-storage-adr-spike).
+# SeaweedFS S3-compatibility + filer-on-PostgreSQL spike stack (spec: add-seaweedfs-storage-adr-spike).
 # Pinned by digest so the compatibility matrix is reproducible against an exact image.
 #   chrislusf/seaweedfs:latest @ 2026-06-14 self-reports `version 30GB 4.33 55010be19 linux amd64`.
 # Only the S3 gateway (8333) is published to the host; the volume server (8080) stays internal

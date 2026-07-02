@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-666-control-plane-null-body-400
+ * Black-box regression suite for spec change fix-666-control-plane-null-body-400
  * (GitHub issue #666, P18 error-semantics · capability control-plane-runtime).
  *
  * Defect (reproduced on live kind head-20260620): a syntactically-valid JSON literal `null` request

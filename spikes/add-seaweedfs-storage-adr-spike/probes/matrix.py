@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SeaweedFS S3 bucket-management compatibility matrix (OpenSpec add-seaweedfs-storage-adr-spike).
+"""SeaweedFS S3 bucket-management compatibility matrix (spec add-seaweedfs-storage-adr-spike).
 
 Drives every S3 operation Falcone issues today against the running SeaweedFS S3 gateway and
 classifies each SUPPORTED / PARTIAL / UNSUPPORTED with the observed HTTP status as evidence.

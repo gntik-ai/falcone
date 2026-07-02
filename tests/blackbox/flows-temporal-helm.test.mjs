@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change add-flows-temporal-helm.
+ * Black-box test suite for spec change add-flows-temporal-helm.
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` / `helm lint` as a child
  * process. No internal knowledge of the Go templates is used — assertions inspect exit

@@ -9,7 +9,7 @@
  *   - The cryptographic round-trip (mint a local keypair, sign a real JWT, verify)
  *     requires jose APIs that are only available once the service deps are installed.
  *
- * Covered scenarios (matching OpenSpec change verify-backup-status-jwt-signature):
+ * Covered scenarios (matching spec change verify-backup-status-jwt-signature):
  *   T1: TEST_MODE=true, non-production → forged payload parsed, claims returned
  *   T2: TEST_MODE=true, NODE_ENV=production → must throw (mis-config guard)
  *   T3: Non-TEST_MODE, KEYCLOAK_JWKS_URL set, forged token → throws AuthError(401)

@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-plans-list-500
+ * Black-box regression suite for spec change fix-plans-list-500
  * (live E2E campaign 2026-06-17, finding F3).
  *
  * Drives the control-plane runtime schema setup (deploy/kind/control-plane/tenant-store.mjs) and the

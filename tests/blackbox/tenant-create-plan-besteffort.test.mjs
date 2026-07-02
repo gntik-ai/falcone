@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-console-create-tenant-plan.
+ * Black-box regression suite for spec change fix-console-create-tenant-plan.
  *
  * Drives the control-plane tenant-create plan-resolution contract through its public helpers
  * (deploy/kind/control-plane/b-handlers.mjs). Deterministic: loaders are injected, no DB / no /repo.

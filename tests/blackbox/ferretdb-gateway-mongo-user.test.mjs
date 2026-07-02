@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-ferretdb-gateway-authentication
+ * Black-box regression suite for spec change fix-ferretdb-gateway-authentication
  * (live E2E campaign 2026-06-17, finding F2).
  *
  * Drives the PUBLIC chart surface via `helm template` over the deploy overlays and asserts the
