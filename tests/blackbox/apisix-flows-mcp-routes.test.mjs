@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change add-apisix-flows-mcp-routes
+ * Black-box regression suite for spec change add-apisix-flows-mcp-routes
  * (live E2E campaign 2026-06-18, finding #560, epic #542).
  *
  * Parses the standalone APISIX route table (deploy/kind/apisix/apisix.yaml) as plain text and

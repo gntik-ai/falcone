@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change add-kind-profile-advanced-capabilities
+ * Black-box regression suite for spec change add-kind-profile-advanced-capabilities
  * (live E2E campaign 2026-06-17).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`, layering the advanced kind overlay on

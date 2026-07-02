@@ -6,8 +6,7 @@ platform rather than adding new infrastructure: the Knative per-tenant runtime, 
 and the realm-per-tenant Keycloak. For the decision record see
 [ADR-12](/architecture/adrs#adr-12-mcp-server-hosting-runtime-gateway-oauth-and-isolation); the
 tenant-facing guide is [MCP Server Hosting](/guide/mcp); operator procedures are in the
-[MCP Runbook](/architecture/mcp-runbook). The normative spec deltas live under
-`openspec/changes/add-mcp-*/specs/mcp/`.
+[MCP Runbook](/architecture/mcp-runbook).
 
 ## Component map
 

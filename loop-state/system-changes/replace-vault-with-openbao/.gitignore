@@ -1,4 +1,0 @@
-# NEVER commit the migration backup: it contains exported secret VALUES (KV JSON),
-# the TLS Secret, and rendered manifests. backup.sh writes only here; the operator
-# keeps it under their own control. Keep the whole backup/ tree out of git.
-backup/

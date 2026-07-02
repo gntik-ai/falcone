@@ -49,6 +49,7 @@ tests/live-campaign/.fixtures.json
 /CLAUDE.md
 /AGENTS.md
 /openspec/
+/loop-state/
 /audit/
 /tests/live-campaign/
 /tests/live-audit/

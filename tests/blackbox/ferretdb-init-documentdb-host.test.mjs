@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-ferretdb-init-documentdb-host
+ * Black-box regression suite for spec change fix-ferretdb-init-documentdb-host
  * (live E2E campaign 2026-06-17, finding D1).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` as a child process. No internal

@@ -29,7 +29,7 @@
  *   source tests/env/env.sh && \
  *     node --test tests/e2e/issues/fix-executor-apikey-cross-tenant-idor.realstack.test.mjs
  *
- * OpenSpec change: fix-executor-apikey-cross-tenant-idor (GitHub issue #517)
+ * Spec change: fix-executor-apikey-cross-tenant-idor (GitHub issue #517)
  * Scenarios covered:
  *   S-IDOR  tenant-A admin → POST api-keys on a tenant-B workspace → 403 CROSS_TENANT_VIOLATION,
  *           and NO row is persisted in workspace_api_keys for the foreign workspace.

@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-apisix-gateway-shared-secret-provisioning
+ * Black-box regression suite for spec change fix-apisix-gateway-shared-secret-provisioning
  * (live E2E campaign 2026-06-17, finding D3).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` as a child process. No internal

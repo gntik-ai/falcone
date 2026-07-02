@@ -18,7 +18,7 @@
  * beyond the public function signatures. No `jose` (kept out of the pre-existing
  * failing optional-dep surface).
  *
- * Scenario coverage (spec delta openspec/changes/add-data-residency-pinning):
+ * Scenario coverage (spec delta add-data-residency-pinning):
  *   valid region accepted + persisted + read back            (Tenant provisioned with a valid residency region)
  *   unsupported region rejected, no record created           (Tenant provisioned with an unsupported region is rejected)
  *   two tenants' regions isolated                            (Region selection is isolated per tenant)

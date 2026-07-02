@@ -1,6 +1,6 @@
 # SeaweedFS spike findings — filer-on-PostgreSQL, port, identities
 
-**OpenSpec change:** `add-seaweedfs-storage-adr-spike` · **GitHub:** #431 · SeaweedFS **4.33**
+**Spec change:** `add-seaweedfs-storage-adr-spike` · **GitHub:** #431 · SeaweedFS **4.33**
 (`chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`).
 
 Companion to `compatibility-matrix.md`. Evidence under `evidence/`.

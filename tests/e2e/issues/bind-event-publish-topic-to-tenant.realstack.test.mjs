@@ -19,7 +19,7 @@
  *   bash tests/e2e/stack.sh up && source tests/env/env.sh \
  *     && node --test tests/e2e/issues/bind-event-publish-topic-to-tenant.realstack.test.mjs
  *
- * Acceptance scenarios (issue #214 / openspec bind-event-publish-topic-to-tenant):
+ * Acceptance scenarios (issue #214 / spec bind-event-publish-topic-to-tenant):
  *   S1 cross-tenant topic            -> 403 EVT_GATEWAY_FORBIDDEN, 0 messages
  *   S2 cross-workspace topic         -> 403 EVT_GATEWAY_FORBIDDEN, 0 messages
  *   S3 spoofed request-body tenantId -> 403 EVT_GATEWAY_FORBIDDEN, 0 messages

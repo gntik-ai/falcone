@@ -274,7 +274,6 @@ services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
 charts/ helm/    Kubernetes / Helm deployment (incl. temporal, workflowWorker, mcp components)
 deploy/          APISIX routes, kind/OpenShift bootstrap
 tests/           blackbox (contract) · e2e (Playwright, incl. mcp specs) · env (Compose stack)
-openspec/        spec-driven change workflow
 ```
 
 ---

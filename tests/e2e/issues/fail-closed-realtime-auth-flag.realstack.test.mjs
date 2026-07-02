@@ -33,7 +33,7 @@
  *   source tests/env/env.sh && \
  *     node --test tests/e2e/issues/fail-closed-realtime-auth-flag.realstack.test.mjs
  *
- * OpenSpec change: fail-closed-realtime-auth-flag  (GitHub issue #221)
+ * Spec change: fail-closed-realtime-auth-flag  (GitHub issue #221)
  * Scenarios covered:
  *   S-A    loadEnv throws when REALTIME_AUTH_ENABLED=false + NODE_ENV=production
  *   S-A'   loadEnv succeeds with REALTIME_AUTH_ENABLED=true + NODE_ENV=production

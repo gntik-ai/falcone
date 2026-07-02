@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-platform-client-default-scopes
+ * Black-box regression suite for spec change fix-platform-client-default-scopes
  * (live E2E campaign 2026-06-17, finding A2).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`, extracts the rendered Keycloak client

@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change fix-temporal-secret-password-substitution
+ * Black-box test suite for spec change fix-temporal-secret-password-substitution
  * (live E2E campaign, GitHub issue #623).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template` / `helm lint` as a child process.

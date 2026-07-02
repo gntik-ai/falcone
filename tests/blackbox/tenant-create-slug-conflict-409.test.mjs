@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-tenant-create-slug-conflict-409 (GitHub issue
+ * Black-box regression suite for spec change fix-tenant-create-slug-conflict-409 (GitHub issue
  * #665, P18 data-layer consistency / uniqueness race · capability tenant-lifecycle).
  *
  * Defect (reproduced on live kind: N concurrent POST /v1/tenants with the SAME fresh slug ->

@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-helm-wait-documentdb-hook-ordering
+ * Black-box regression suite for spec change fix-helm-wait-documentdb-hook-ordering
  * (live E2E campaign 2026-06-17, finding C.4 / D4).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`, inspects the rendered ferretdb

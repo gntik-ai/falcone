@@ -12,7 +12,7 @@
 //
 // It first proves the LEAK exists without RLS (red), then applies the shipped RLS
 // migration and proves isolation (green) — mapping to the spec scenarios in
-// openspec/changes/add-rls-enforced-tenant-migrations/specs/tenant-isolation/spec.md.
+// the add-rls-enforced-tenant-migrations tenant-isolation spec delta.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

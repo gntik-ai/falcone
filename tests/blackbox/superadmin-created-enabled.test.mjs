@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-superadmin-created-disabled
+ * Black-box regression suite for spec change fix-superadmin-created-disabled
  * (live E2E campaign 2026-06-17, finding A1).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`, extracts the rendered Keycloak

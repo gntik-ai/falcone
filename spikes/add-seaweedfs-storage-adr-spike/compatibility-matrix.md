@@ -1,6 +1,6 @@
 # SeaweedFS S3-compatibility matrix — version-pinned
 
-**OpenSpec change:** `add-seaweedfs-storage-adr-spike` · **GitHub:** #431 (epic #430)
+**Spec change:** `add-seaweedfs-storage-adr-spike` · **GitHub:** #431 (epic #430)
 
 **SeaweedFS version under test:** `4.33` (build `55010be19`, `linux/amd64`, volume-size-limit build `30GB`)
 **Image pin (reproducible):** `chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`

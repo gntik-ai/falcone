@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change fix-kind-control-plane-multirealm-jwt
+ * Black-box test suite for spec change fix-kind-control-plane-multirealm-jwt
  * (live E2E campaign, GitHub issue #622).
  *
  * Drives the PUBLIC verifier surface of the kind control-plane runtime — the dependency-free

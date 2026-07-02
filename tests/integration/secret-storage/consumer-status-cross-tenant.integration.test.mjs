@@ -1,4 +1,4 @@
-// Real-Postgres integration verification for OpenSpec change
+// Real-Postgres integration verification for spec change
 // `scope-secret-consumer-status-to-tenant` (GitHub issue #209, bug-006).
 //
 // Unlike the action-layer black-box test (which uses fake repos), this exercises

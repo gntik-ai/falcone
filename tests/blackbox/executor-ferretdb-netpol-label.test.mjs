@@ -1,5 +1,5 @@
 /**
- * Black-box manifest-contract suite for OpenSpec change
+ * Black-box manifest-contract suite for spec change
  * fix-executor-ferretdb-netpol-labels (live E2E campaign 2026-06-18, #559 / BUG-MONGO-NP).
  *
  * Defect: the kind executor Deployment (deploy/kind/executor-demo.yaml) labelled the pod

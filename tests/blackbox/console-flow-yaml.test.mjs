@@ -1,5 +1,5 @@
 /**
- * Black-box test suite for OpenSpec change add-console-flow-yaml-editor.
+ * Black-box test suite for spec change add-console-flow-yaml-editor.
  *
  * Drives the PUBLIC surface ONLY — browserless, node-side checks that do NOT mount
  * React or Monaco. The DOM-heavy editor/view-switcher behaviour is covered by the

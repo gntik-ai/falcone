@@ -1,6 +1,6 @@
 # EPHEMERAL SPIKE — not production code
 
-De-risking spikes for OpenSpec change `add-flows-adr-temporal-spikes` (flows epic #355,
+De-risking spikes for spec change `add-flows-adr-temporal-spikes` (flows epic #355,
 issue #356). Nothing in this directory is imported by `apps/`, `services/`, or `charts/`.
 It exists only to convert two architectural assumptions into evidence before the Temporal
 adoption ADR (`docs-site/architecture/adrs.md`, ADR-11) is finalized.

@@ -10,7 +10,7 @@
  *   - These tests use vi.mock to stub the deep service layer so the action handler's
  *     tenant binding guard can be tested without DB or JWKS calls.
  *
- * Covered scenarios (matching OpenSpec change scope-restore-to-authenticated-tenant):
+ * Covered scenarios (matching spec change scope-restore-to-authenticated-tenant):
  *   A1: JWT tenant A + body.tenant_id=B on initiate → 403, initiate() NOT called
  *   A2: JWT tenant A + body.tenant_id=A on initiate → proceeds (scope gate still applies)
  *   A3: superadmin scope can initiate for a different tenant (platform privilege)

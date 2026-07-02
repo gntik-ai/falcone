@@ -1,6 +1,6 @@
 /**
  * Black-box regression suite for the kind secret-store provisioning path
- * (OpenSpec change fix-vault-secrets-backend-on-kind, finding C.6 / D7; backend switched
+ * (spec change fix-vault-secrets-backend-on-kind, finding C.6 / D7; backend switched
  * Vault -> OpenBao in replace-vault-with-openbao).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`, inspecting the rendered OpenBao TLS

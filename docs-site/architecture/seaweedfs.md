@@ -136,8 +136,7 @@ Provisioning path and isolation guarantees:
 - **Fail-closed scoping.** If `workspace_buckets` returns no bucket for the workspace,
   provisioning **throws** rather than writing a wildcard identity. An empty/wildcard `buckets`
   field is explicitly prohibited — a wildcard would grant cross-tenant bucket access (a critical
-  isolation failure). This mirrors the RLS fail-closed posture in
-  `openspec/specs/tenant-isolation/spec.md`.
+  isolation failure). This mirrors the platform-wide RLS fail-closed posture for tenant isolation.
 - **Rotation** adds the new key pair to the identity's `credentials` list and removes the
   expired pair after the grace window (multiple credentials per identity are supported natively),
   driven by the rotation policy + expiry sweep. **Revocation** deletes the whole identity. Both

@@ -1,5 +1,5 @@
 /**
- * Black-box regression guard for OpenSpec change fix-stale-migration-components-in-running-release
+ * Black-box regression guard for spec change fix-stale-migration-components-in-running-release
  * (live E2E campaign 2026-06-17, finding D8).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`. This is the CI guard the change adds:

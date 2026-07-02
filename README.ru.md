@@ -280,7 +280,6 @@ services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
 charts/ helm/    Развёртывание Kubernetes / Helm (вкл. компоненты temporal, workflowWorker, mcp)
 deploy/          Маршруты APISIX, bootstrap для kind/OpenShift
 tests/           blackbox (контракт) · e2e (Playwright, вкл. спеки mcp) · env (стек Compose)
-openspec/        Рабочий процесс изменений, управляемый спецификациями
 ```
 
 ---

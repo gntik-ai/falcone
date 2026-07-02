@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-platform-user-profile-unmanaged-attributes
+ * Black-box regression suite for spec change fix-platform-user-profile-unmanaged-attributes
  * (live E2E campaign 2026-06-17, finding A4).
  *
  * Drives the PUBLIC chart surface ONLY via `helm template`, extracts the rendered platform-realm

@@ -1,7 +1,7 @@
 # SeaweedFS storage ADR spike
 
 De-risks the MinIO → SeaweedFS object-storage migration (epic #430) and backs **ADR-13**.
-OpenSpec change: `add-seaweedfs-storage-adr-spike` (GitHub #431).
+Spec change: `add-seaweedfs-storage-adr-spike` (GitHub #431).
 
 **Pinned target:** SeaweedFS `4.33` —
 `chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`.

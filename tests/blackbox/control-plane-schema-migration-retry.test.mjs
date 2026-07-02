@@ -1,5 +1,5 @@
 /**
- * Black-box regression suite for OpenSpec change fix-control-plane-schema-migration-retry
+ * Black-box regression suite for spec change fix-control-plane-schema-migration-retry
  * (live E2E campaign 2026-06-17, finding D5).
  *
  * Drives the control-plane boot retry helper through its public interface
