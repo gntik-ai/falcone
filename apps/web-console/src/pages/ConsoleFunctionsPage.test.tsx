@@ -116,6 +116,10 @@ function renderPage(context = createContext()) {
   )
 }
 
+async function openTab(name: string | RegExp) {
+  await userEvent.click(screen.getByRole('tab', { name }))
+}
+
 describe('ConsoleFunctionsPage', () => {
   beforeEach(() => {
     mockUseConsoleContext.mockReset()
@@ -167,6 +171,47 @@ describe('ConsoleFunctionsPage', () => {
     expect((await screen.findAllByText(/https:\/\/example.test\/fn/i)).length).toBeGreaterThan(0)
   })
 
+  it('alinea authoring y tabs con primitivas accesibles del console', async () => {
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_1/versions?page[size]=50') return versions()
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+
+    const primaryDeploy = screen.getByRole('button', { name: /desplegar función/i })
+    expect(primaryDeploy).toHaveClass('bg-primary')
+    expect(screen.queryByRole('button', { name: /publicar función/i })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('capability-gate-badge')).not.toBeInTheDocument()
+
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    expect(await screen.findByText('Tiempo de espera (ms)')).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: /operaciones de función/i })).toBeInTheDocument()
+
+    const activeTone = screen.getAllByText('active').find((element) => (element as HTMLElement).className.includes('emerald'))
+    expect(activeTone).toBeDefined()
+
+    const detailTab = screen.getByRole('tab', { name: 'Detalle' })
+    expect(detailTab).toHaveAttribute('aria-selected', 'true')
+    detailTab.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Versiones' })).toHaveAttribute('aria-selected', 'true'))
+    expect(await screen.findByText('fnv_1')).toBeInTheDocument()
+
+    await openTab('Invocar')
+    const payloadEditor = screen.getByLabelText(/contenido json/i)
+    expect(payloadEditor).toHaveClass('font-mono')
+    expect(payloadEditor).toHaveAttribute('spellcheck', 'false')
+
+    await openTab('Desplegar')
+    const codeEditor = screen.getByLabelText(/código inline/i)
+    expect(codeEditor).toHaveClass('font-mono')
+    expect(codeEditor).toHaveAttribute('spellcheck', 'false')
+    expect(screen.getByRole('button', { name: /actualizar función/i })).toHaveClass('bg-primary')
+  })
+
   it('abre lazy versions y rollback deshabilitado sin elegibles', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
@@ -177,7 +222,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Versiones' }))
+    await openTab('Versiones')
     expect(await screen.findByText(/no hay versiones anteriores disponibles para revertir/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /revertir/i })).toBeDisabled()
   })
@@ -195,7 +240,7 @@ describe('ConsoleFunctionsPage', () => {
     expect(await screen.findByText('Reversión disponible')).toBeInTheDocument()
     expect(screen.getAllByText('Sí').length).toBeGreaterThan(0)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Versiones' }))
+    await openTab('Versiones')
     expect(await screen.findByText('fnv_1')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: '1' })).toBeEnabled()
     expect(screen.getByRole('button', { name: /revertir/i })).toBeEnabled()
@@ -214,7 +259,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/registros están truncados/i)).toBeInTheDocument()
@@ -236,7 +281,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/no hay registros disponibles/i)).toBeInTheDocument()
@@ -262,7 +307,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/id de recurso/i)).toBeInTheDocument()
@@ -290,7 +335,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/id de recurso/i)).toBeInTheDocument()
@@ -311,7 +356,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/no se puede mostrar en texto/i)).toBeInTheDocument()
@@ -327,7 +372,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
 
     expect(await screen.findByText(/no tiene activaciones registradas/i)).toBeInTheDocument()
   })
@@ -345,7 +390,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/sin resultado disponible/i)).toBeInTheDocument()
@@ -365,7 +410,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText('done')).toBeInTheDocument()
@@ -386,7 +431,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/registros pueden no estar disponibles aún/i)).toBeInTheDocument()
@@ -406,7 +451,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/no tienes permisos para ver los registros/i)).toBeInTheDocument()
@@ -425,7 +470,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Activaciones' }))
+    await openTab('Activaciones')
     await userEvent.click(await screen.findByRole('button', { name: /act_1/i }))
 
     expect(await screen.findByText(/esta activación ya no está disponible/i)).toBeInTheDocument()
@@ -440,7 +485,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Disparadores' }))
+    await openTab('Disparadores')
 
     expect(await screen.findByText('Kafka')).toBeInTheDocument()
     expect(screen.getByText('Cron')).toBeInTheDocument()
@@ -459,12 +504,54 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await openTab('Invocar')
     await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
-    await userEvent.click(screen.getAllByRole('button', { name: 'Invocar' })[1])
 
     expect(await screen.findByText(/inv_1/i)).toBeInTheDocument()
     const [, options] = mockRequestConsoleSessionJson.mock.calls.find((call: unknown[]) => call[0] === '/v1/functions/actions/res_fn_1/invocations') as [string, { headers: Record<string, string> }]
     expect(options.headers['Idempotency-Key']).toBeTruthy()
+  })
+
+  it('invoca wait_for_result, refetch activaciones, selecciona la activación y renderiza resultado', async () => {
+    const awaitedActivation = {
+      activationId: 'act_2',
+      resourceId: 'res_fn_1',
+      status: 'succeeded',
+      startedAt: '2026-03-29T07:45:00.000Z',
+      finishedAt: '2026-03-29T07:45:01.000Z',
+      durationMs: 1000,
+      triggerKind: 'direct',
+      invocationId: 'inv_2'
+    }
+
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string }) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_1/invocations' && options?.method === 'POST') {
+        return invokeAccepted({ invocationId: 'inv_2', activationId: 'act_2', status: 'accepted' })
+      }
+      if (url === '/v1/functions/actions/res_fn_1/activations?page[size]=50') {
+        return activations({ items: [awaitedActivation], page: { total: 1 } })
+      }
+      if (url === '/v1/functions/actions/res_fn_1/activations/act_2') return awaitedActivation
+      if (url === '/v1/functions/actions/res_fn_1/activations/act_2/logs') return activationLogs({ activationId: 'act_2', lines: ['awaited log'], truncated: false })
+      if (url === '/v1/functions/actions/res_fn_1/activations/act_2/result') return activationResult({ activationId: 'act_2', result: { awaited: true } })
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await openTab('Invocar')
+    await userEvent.selectOptions(screen.getByLabelText(/modo de respuesta/i), 'wait_for_result')
+    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
+
+    const [, invokeOptions] = mockRequestConsoleSessionJson.mock.calls.find((call: unknown[]) => call[0] === '/v1/functions/actions/res_fn_1/invocations') as [string, { body: { responseMode: string }; headers: Record<string, string> }]
+    expect(invokeOptions.body.responseMode).toBe('wait_for_result')
+    expect(invokeOptions.headers['Idempotency-Key']).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Activaciones' })).toHaveAttribute('aria-selected', 'true'))
+    expect(await screen.findByText(/"awaited": true/)).toBeInTheDocument()
+    expect(screen.getByText('awaited log')).toBeInTheDocument()
+    expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/actions/res_fn_1/activations?page[size]=50', expect.any(Object))
   })
 
   it('muestra error de invoke', async () => {
@@ -477,8 +564,8 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await openTab('Invocar')
     await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
-    await userEvent.click(screen.getAllByRole('button', { name: 'Invocar' })[1])
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/quota exceeded/i)
   })
@@ -493,9 +580,9 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await screen.findByText('hello-fn')
-    await userEvent.click(screen.getByRole('button', { name: /desplegar función nueva/i }))
+    await userEvent.click(screen.getByRole('button', { name: /desplegar función/i }))
     await userEvent.type(screen.getByLabelText(/nombre de acción/i), 'new-fn')
-    await userEvent.type(screen.getByLabelText(/entorno/i), 'nodejs:20')
+    await userEvent.selectOptions(screen.getByLabelText(/entorno/i), 'nodejs:20')
     await userEvent.type(screen.getByLabelText(/punto de entrada/i), 'index.main')
     expect(screen.getByLabelText(/tiempo de espera \(ms\)/i)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /crear función/i }))
@@ -512,7 +599,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Desplegar' }))
+    await openTab('Desplegar')
     expect(await screen.findByDisplayValue('hello-fn')).toBeDisabled()
     expect(screen.getByDisplayValue('nodejs:20')).toBeInTheDocument()
   })
@@ -528,7 +615,7 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Versiones' }))
+    await openTab('Versiones')
     await screen.findByText('fnv_1')
     await userEvent.click(screen.getByRole('button', { name: /revertir/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/fnv_1/i)
@@ -543,9 +630,9 @@ describe('ConsoleFunctionsPage', () => {
 
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
-    expect((await screen.findAllByRole('button', { name: 'Invocar' }))[1]).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Desplegar' }))
+    await openTab('Invocar')
+    expect(await screen.findByRole('button', { name: 'Invocar' })).toBeDisabled()
+    await openTab('Desplegar')
     expect(screen.getByRole('button', { name: /actualizar función/i })).toBeDisabled()
   })
 
