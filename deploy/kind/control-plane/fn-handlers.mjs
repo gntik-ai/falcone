@@ -258,8 +258,12 @@ async function fnDeploy(ctx) {
   const workspaceId = b.workspaceId ?? ctx.params.workspaceId;
   const actionName = b.actionName ?? b.name;
   if (!workspaceId || !actionName) return err(400, 'VALIDATION_ERROR', 'workspaceId and actionName are required');
-  const ws = await store.getWorkspace(ctx.pool, workspaceId);
-  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  // Tenant isolation (#869, the write twin of #784): resolve + own-check the workspace BEFORE any
+  // write or Knative deploy side effect. ownedWorkspace returns null for a foreign or unknown
+  // workspace (no existence oracle) → 403; the check is skipped for superadmin/internal callers
+  // (callerTenantId → null), preserving the cross-tenant deploy bypass.
+  const ws = await ownedWorkspace(ctx, workspaceId);
+  if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   const code = b.source?.inlineCode ?? b.source?.code;
   if (!code) return err(400, 'VALIDATION_ERROR', 'source.inlineCode is required');
   const existing = ctx.params.actionId ? await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity)) : null;
