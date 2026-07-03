@@ -170,6 +170,86 @@ describe('SignupPage', () => {
 
     expect(await screen.findByText(/el username o email ya existe/i)).toBeInTheDocument()
   })
+
+  it('[#729] el formulario desactiva la validación nativa del navegador', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByRole('button', { name: /crear solicitud de acceso/i })
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const form = screen.getByLabelText(/usuario/i).closest('form')
+    expect(form).toHaveAttribute('novalidate')
+  })
+
+  it('[#729] muestra mensajes de validación en español al enviar campos requeridos vacíos, sin llamar a la red', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByRole('button', { name: /crear solicitud de acceso/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
+
+    const alerts = await screen.findAllByRole('alert')
+    const requiredAlerts = alerts.filter((alert) => /este campo es obligatorio/i.test(alert.textContent ?? ''))
+    // username, displayName, primaryEmail, tenantId, password
+    expect(requiredAlerts).toHaveLength(5)
+
+    expect(screen.getByLabelText(/usuario/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/nombre visible/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/correo principal/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/ID de organización/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('aria-invalid', 'true')
+
+    // Focus lands on the first invalid field in DOM order (username).
+    expect(screen.getByLabelText(/usuario/i)).toHaveFocus()
+
+    // Only the initial signup-policy fetch on mount happened — no signup attempt was submitted.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalledWith('/v1/auth/signups', expect.anything())
+  })
+
+  it('[#729] cuando solo falta la organización, el foco va a ese campo y el resto se envía', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByRole('button', { name: /crear solicitud de acceso/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
+    fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
+    fireEvent.change(screen.getByLabelText(/ID de organización/i), { target: { value: '   ' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'Abcd1234' } })
+    fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
+
+    expect(await screen.findByText(/este campo es obligatorio/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/ID de organización/i)).toHaveFocus()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('[#729] el error de un campo se limpia al editarlo', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByRole('button', { name: /crear solicitud de acceso/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
+    await screen.findAllByRole('alert')
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/usuario/i)).not.toHaveAttribute('aria-invalid', 'true')
+    })
+    // The other 4 field errors (independent) are still shown; only username's is gone.
+    expect(
+      screen.getAllByRole('alert').filter((el) => /este campo es obligatorio/i.test(el.textContent ?? ''))
+    ).toHaveLength(4)
+  })
 })
 
 function renderPage(initialEntry = '/signup') {

@@ -46,7 +46,10 @@ export const consoleAuthConfig = {
     pendingActivationTitle: readEnv(
       'VITE_CONSOLE_PENDING_ACTIVATION_TITLE',
       'Tu registro está pendiente de activación'
-    )
+    ),
+    // Localized inline replacement for the browser-native "required" validation popup (which
+    // renders in the browser locale, not Spanish) on the console auth forms (#729).
+    requiredField: readEnv('VITE_CONSOLE_AUTH_REQUIRED_FIELD_LABEL', 'Este campo es obligatorio.')
   }
 } as const
 

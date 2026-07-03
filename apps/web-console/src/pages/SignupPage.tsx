@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -26,6 +26,21 @@ interface SignupFormState {
   password: string
   tenantId: string
   workspaceId: string
+}
+
+interface SignupFieldErrors {
+  username?: string
+  displayName?: string
+  primaryEmail?: string
+  tenantId?: string
+  password?: string
+}
+
+// Joins description ids, dropping any falsy entries — used to compose aria-describedby chains
+// that grow/shrink as static help text and per-field required errors come and go.
+function describedBy(...ids: Array<string | null | undefined | false>): string | undefined {
+  const list = ids.filter((id): id is string => Boolean(id))
+  return list.length > 0 ? list.join(' ') : undefined
 }
 
 const initialForm: SignupFormState = {
@@ -61,6 +76,12 @@ export function SignupPage() {
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [registration, setRegistration] = useState<ConsoleSignupRegistration | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
+  const usernameInputRef = useRef<HTMLInputElement>(null)
+  const displayNameInputRef = useRef<HTMLInputElement>(null)
+  const primaryEmailInputRef = useRef<HTMLInputElement>(null)
+  const tenantIdInputRef = useRef<HTMLInputElement>(null)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -93,7 +114,6 @@ export function SignupPage() {
     const minLength = signupPolicy?.passwordPolicy?.minLength
     return typeof minLength === 'number' && Number.isFinite(minLength) && minLength > 0 ? minLength : 8
   }, [signupPolicy])
-  const tenantHasError = feedback?.title === 'Falta la organización del registro'
   const formFeedbackId = feedback ? 'signup-feedback' : undefined
 
   const policySummary = useMemo(() => {
@@ -122,24 +142,61 @@ export function SignupPage() {
     setFeedback(null)
     setRegistration(null)
 
+    // Localized inline required-field validation, in lieu of the browser-native "required" popup
+    // (which renders in the browser locale, not Spanish). `noValidate` on the <form> disables the
+    // native popup; this check runs BEFORE any network call. (#729)
+    const trimmedUsername = form.username.trim()
+    const trimmedDisplayName = form.displayName.trim()
+    const trimmedPrimaryEmail = form.primaryEmail.trim()
     const tenantId = form.tenantId.trim()
+
+    const nextFieldErrors: SignupFieldErrors = {}
+    if (!trimmedUsername) {
+      nextFieldErrors.username = consoleAuthConfig.labels.requiredField
+    }
+    if (!trimmedDisplayName) {
+      nextFieldErrors.displayName = consoleAuthConfig.labels.requiredField
+    }
+    if (!trimmedPrimaryEmail) {
+      nextFieldErrors.primaryEmail = consoleAuthConfig.labels.requiredField
+    }
     if (!tenantId) {
-      setFeedback({
-        variant: 'destructive',
-        title: 'Falta la organización del registro',
-        message: 'Indica la organización en la que se creará la cuenta antes de enviar el registro.'
-      })
+      nextFieldErrors.tenantId = consoleAuthConfig.labels.requiredField
+    }
+    if (!form.password) {
+      nextFieldErrors.password = consoleAuthConfig.labels.requiredField
+    }
+
+    if (
+      nextFieldErrors.username ||
+      nextFieldErrors.displayName ||
+      nextFieldErrors.primaryEmail ||
+      nextFieldErrors.tenantId ||
+      nextFieldErrors.password
+    ) {
+      setFieldErrors(nextFieldErrors)
+      const firstInvalidInput = nextFieldErrors.username
+        ? usernameInputRef.current
+        : nextFieldErrors.displayName
+          ? displayNameInputRef.current
+          : nextFieldErrors.primaryEmail
+            ? primaryEmailInputRef.current
+            : nextFieldErrors.tenantId
+              ? tenantIdInputRef.current
+              : passwordInputRef.current
+      firstInvalidInput?.focus()
       return
     }
 
+    setFieldErrors({})
     setIsSubmitting(true)
 
     try {
       const workspaceId = form.workspaceId.trim()
       const createdRegistration = await createConsoleSignup({
-        username: form.username.trim(),
-        displayName: form.displayName.trim(),
-        primaryEmail: form.primaryEmail.trim(),
+        username: trimmedUsername,
+        displayName: trimmedDisplayName,
+        primaryEmail: trimmedPrimaryEmail,
         password: form.password,
         tenantId,
         ...(workspaceId ? { workspaceId } : {})
@@ -230,16 +287,24 @@ export function SignupPage() {
                 <AlertDescription>{policySummary}</AlertDescription>
               </Alert>
             ) : signupAllowed ? (
-              <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={formFeedbackId}>
+              <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={formFeedbackId} noValidate>
                 <div className="space-y-2">
                   <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
                   <Input
                     id="username"
                     name="username"
                     autoComplete="username"
-                    aria-describedby="username-help"
+                    aria-describedby={describedBy('username-help', fieldErrors.username ? 'username-required' : null)}
+                    aria-invalid={Boolean(fieldErrors.username) || undefined}
+                    ref={usernameInputRef}
                     value={form.username}
-                    onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setForm((current) => ({ ...current, username: value }))
+                      if (fieldErrors.username) {
+                        setFieldErrors((current) => ({ ...current, username: undefined }))
+                      }
+                    }}
                     placeholder="operaciones"
                     required
                     minLength={3}
@@ -249,6 +314,11 @@ export function SignupPage() {
                   <p id="username-help" className="text-xs leading-5 text-muted-foreground">
                     3-63 caracteres: minúsculas, números y guiones; empieza y termina con letra o número.
                   </p>
+                  {fieldErrors.username ? (
+                    <p id="username-required" role="alert" className="text-sm font-medium text-destructive">
+                      {fieldErrors.username}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-2">
@@ -258,13 +328,27 @@ export function SignupPage() {
                       id="displayName"
                       name="displayName"
                       autoComplete="name"
+                      aria-describedby={fieldErrors.displayName ? 'displayName-required' : undefined}
+                      aria-invalid={Boolean(fieldErrors.displayName) || undefined}
+                      ref={displayNameInputRef}
                       value={form.displayName}
-                      onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setForm((current) => ({ ...current, displayName: value }))
+                        if (fieldErrors.displayName) {
+                          setFieldErrors((current) => ({ ...current, displayName: undefined }))
+                        }
+                      }}
                       placeholder="Operaciones Plataforma"
                       required
                       minLength={1}
                       maxLength={120}
                     />
+                    {fieldErrors.displayName ? (
+                      <p id="displayName-required" role="alert" className="text-sm font-medium text-destructive">
+                        {fieldErrors.displayName}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -274,12 +358,26 @@ export function SignupPage() {
                       name="primaryEmail"
                       type="email"
                       autoComplete="email"
+                      aria-describedby={fieldErrors.primaryEmail ? 'primaryEmail-required' : undefined}
+                      aria-invalid={Boolean(fieldErrors.primaryEmail) || undefined}
+                      ref={primaryEmailInputRef}
                       value={form.primaryEmail}
-                      onChange={(event) => setForm((current) => ({ ...current, primaryEmail: event.target.value }))}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setForm((current) => ({ ...current, primaryEmail: value }))
+                        if (fieldErrors.primaryEmail) {
+                          setFieldErrors((current) => ({ ...current, primaryEmail: undefined }))
+                        }
+                      }}
                       placeholder="ops@example.com"
                       required
                       maxLength={160}
                     />
+                    {fieldErrors.primaryEmail ? (
+                      <p id="primaryEmail-required" role="alert" className="text-sm font-medium text-destructive">
+                        {fieldErrors.primaryEmail}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -290,10 +388,17 @@ export function SignupPage() {
                       id="tenantId"
                       name="tenantId"
                       autoComplete="organization"
-                      aria-describedby="tenantId-help"
-                      aria-invalid={tenantHasError || undefined}
+                      aria-describedby={describedBy('tenantId-help', fieldErrors.tenantId ? 'tenantId-required' : null)}
+                      aria-invalid={Boolean(fieldErrors.tenantId) || undefined}
+                      ref={tenantIdInputRef}
                       value={form.tenantId}
-                      onChange={(event) => setForm((current) => ({ ...current, tenantId: event.target.value }))}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setForm((current) => ({ ...current, tenantId: value }))
+                        if (fieldErrors.tenantId) {
+                          setFieldErrors((current) => ({ ...current, tenantId: undefined }))
+                        }
+                      }}
                       placeholder="ten_demo"
                       required
                       minLength={3}
@@ -302,6 +407,11 @@ export function SignupPage() {
                     <p id="tenantId-help" className="text-xs leading-5 text-muted-foreground">
                       Identifica la organización donde se creará la cuenta; se completa automáticamente cuando el enlace la incluye.
                     </p>
+                    {fieldErrors.tenantId ? (
+                      <p id="tenantId-required" role="alert" className="text-sm font-medium text-destructive">
+                        {fieldErrors.tenantId}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -329,9 +439,17 @@ export function SignupPage() {
                     name="password"
                     type="password"
                     autoComplete="new-password"
-                    aria-describedby="password-help"
+                    aria-describedby={describedBy('password-help', fieldErrors.password ? 'password-required' : null)}
+                    aria-invalid={Boolean(fieldErrors.password) || undefined}
+                    ref={passwordInputRef}
                     value={form.password}
-                    onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setForm((current) => ({ ...current, password: value }))
+                      if (fieldErrors.password) {
+                        setFieldErrors((current) => ({ ...current, password: undefined }))
+                      }
+                    }}
                     placeholder="••••••••••••"
                     required
                     minLength={passwordMinLength}
@@ -340,6 +458,11 @@ export function SignupPage() {
                   <p id="password-help" className="text-xs leading-5 text-muted-foreground">
                     Mínimo {passwordMinLength} caracteres según la policy de este entorno.
                   </p>
+                  {fieldErrors.password ? (
+                    <p id="password-required" role="alert" className="text-sm font-medium text-destructive">
+                      {fieldErrors.password}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">

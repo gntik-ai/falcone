@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeft, Send } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -31,25 +31,34 @@ export function PasswordRecoveryPage() {
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [ticket, setTicket] = useState<ConsolePasswordRecoveryTicket | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [fieldError, setFieldError] = useState<string | null>(null)
+  const usernameOrEmailInputRef = useRef<HTMLInputElement>(null)
   const feedbackId = feedback ? 'password-recovery-feedback' : undefined
   const feedbackRole = feedback?.variant === 'destructive' ? 'alert' : 'status'
   const feedbackLive = feedback?.variant === 'destructive' ? 'assertive' : 'polite'
+  const usernameOrEmailDescription = [
+    'password-recovery-username-help',
+    fieldError ? 'password-recovery-username-required' : null
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setFeedback(null)
     setTicket(null)
 
+    // Localized inline required-field validation, in lieu of the browser-native "required" popup
+    // (which renders in the browser locale, not Spanish). `noValidate` on the <form> disables the
+    // native popup; this check runs BEFORE any network call. (#729)
     const normalizedUsernameOrEmail = usernameOrEmail.trim()
     if (!normalizedUsernameOrEmail) {
-      setFeedback({
-        variant: 'destructive',
-        title: 'Indica tu usuario o correo',
-        message: 'Necesitamos el identificador de la cuenta de consola para iniciar la recuperación.'
-      })
+      setFieldError(consoleAuthConfig.labels.requiredField)
+      usernameOrEmailInputRef.current?.focus()
       return
     }
 
+    setFieldError(null)
     setIsSubmitting(true)
 
     try {
@@ -127,7 +136,7 @@ export function PasswordRecoveryPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
-          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={feedbackId}>
+          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={feedbackId} noValidate>
             <div className="space-y-2">
               <Label htmlFor="usernameOrEmail">Usuario o correo de consola</Label>
               <Input
@@ -135,10 +144,17 @@ export function PasswordRecoveryPage() {
                 name="usernameOrEmail"
                 autoComplete="username"
                 autoCapitalize="none"
-                aria-describedby="password-recovery-username-help"
+                aria-describedby={usernameOrEmailDescription}
+                aria-invalid={Boolean(fieldError) || undefined}
                 autoFocus
+                ref={usernameOrEmailInputRef}
                 value={usernameOrEmail}
-                onChange={(event) => setUsernameOrEmail(event.target.value)}
+                onChange={(event) => {
+                  setUsernameOrEmail(event.target.value)
+                  if (fieldError) {
+                    setFieldError(null)
+                  }
+                }}
                 placeholder="operaciones@example.com"
                 required
                 minLength={3}
@@ -147,6 +163,11 @@ export function PasswordRecoveryPage() {
               <p id="password-recovery-username-help" className="text-xs leading-5 text-muted-foreground">
                 Introduce el usuario o correo asociado a tu cuenta de consola.
               </p>
+              {fieldError ? (
+                <p id="password-recovery-username-required" role="alert" className="text-sm font-medium text-destructive">
+                  {fieldError}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
