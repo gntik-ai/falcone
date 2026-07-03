@@ -300,7 +300,14 @@ async function fnDeploy(ctx) {
 
 // GET /v1/functions/workspaces/{workspaceId}/inventory
 async function fnInventory(ctx) {
-  const rows = await store.listFnActions(ctx.pool, ctx.params.workspaceId);
+  // Tenant isolation (#784): resolve + own-check the workspace before listing. ownedWorkspace returns
+  // null for a foreign or unknown workspace (the caller's tenant does not own it) → 403, with no body
+  // that distinguishes "not yours" from "does not exist" (no existence oracle). For superadmin/internal
+  // callers callerTenantId is null, so the ownership check is skipped and the workspace IS returned,
+  // preserving the cross-tenant read. The tenant predicate on listFnActions is defense-in-depth.
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
+  const rows = await store.listFnActions(ctx.pool, ws.id, callerTenantId(ctx.identity));
   const actions = [];
   for (const r of rows) {
     actions.push(actionOut(
@@ -309,11 +316,13 @@ async function fnInventory(ctx) {
       await store.getFnActionVersionSummary(ctx.pool, r)
     ));
   }
-  return ok(200, { workspaceId: ctx.params.workspaceId, actions, counts: { actions: actions.length, packages: 0, rules: 0, triggers: 0, httpExposures: 0 } });
+  return ok(200, { workspaceId: ws.id, actions, counts: { actions: actions.length, packages: 0, rules: 0, triggers: 0, httpExposures: 0 } });
 }
 // GET /v1/functions/workspaces/{workspaceId}/actions
 async function fnListActions(ctx) {
-  const rows = await store.listFnActions(ctx.pool, ctx.params.workspaceId);
+  const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
+  if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
+  const rows = await store.listFnActions(ctx.pool, ws.id, callerTenantId(ctx.identity));
   const items = [];
   for (const r of rows) items.push(actionOut(r, null, await store.getFnActionVersionSummary(ctx.pool, r)));
   return ok(200, { items, page: { total: rows.length } });
