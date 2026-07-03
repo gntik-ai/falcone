@@ -83,6 +83,51 @@ describe('PasswordRecoveryPage', () => {
     expect(screen.getByRole('link', { name: /volver a login/i })).toHaveAttribute('href', '/login')
     expect(screen.queryByRole('heading', { name: /página no encontrada/i })).not.toBeInTheDocument()
   })
+
+  it('[#729] el formulario desactiva la validación nativa del navegador', () => {
+    renderPasswordRecoveryPage()
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const form = screen.getByLabelText(/usuario o correo de consola/i).closest('form')
+    expect(form).toHaveAttribute('novalidate')
+  })
+
+  it('[#729] muestra un mensaje de validación en español al enviar el campo requerido vacío, sin llamar a la red', () => {
+    renderPasswordRecoveryPage()
+
+    const input = screen.getByLabelText(/usuario o correo de consola/i)
+    fireEvent.click(screen.getByRole('button', { name: /enviar instrucciones/i }))
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(/este campo es obligatorio/i)
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveFocus()
+    expect(input.getAttribute('aria-describedby')).toContain('password-recovery-username-required')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('[#729] un valor de solo espacios se trata como vacío', () => {
+    renderPasswordRecoveryPage()
+
+    const input = screen.getByLabelText(/usuario o correo de consola/i)
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: /enviar instrucciones/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/este campo es obligatorio/i)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('[#729] el error de campo se limpia al editarlo', () => {
+    renderPasswordRecoveryPage()
+
+    fireEvent.click(screen.getByRole('button', { name: /enviar instrucciones/i }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/este campo es obligatorio/i)
+
+    fireEvent.change(screen.getByLabelText(/usuario o correo de consola/i), { target: { value: 'operaciones' } })
+
+    expect(screen.queryByText(/este campo es obligatorio/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/usuario o correo de consola/i)).not.toHaveAttribute('aria-invalid', 'true')
+  })
 })
 
 function renderPasswordRecoveryPage(initialEntry = '/password-recovery') {

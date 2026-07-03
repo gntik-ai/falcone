@@ -15,6 +15,7 @@ import {
   type ConsoleSignupPolicy
 } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
+import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
 import {
   consumeConsoleAuthStatusHint,
   consumeProtectedRouteIntent,
@@ -31,6 +32,18 @@ type FeedbackState =
       message: string
     }
   | null
+
+interface LoginFieldErrors {
+  username?: string
+  password?: string
+}
+
+// Joins description ids, dropping any falsy entries — used to compose aria-describedby chains
+// that grow/shrink as feedback, per-field required errors, and static help text come and go.
+function describedBy(...ids: Array<string | null | undefined | false>): string | undefined {
+  const list = ids.filter((id): id is string => Boolean(id))
+  return list.length > 0 ? list.join(' ') : undefined
+}
 
 const initialForm = {
   username: '',
@@ -60,6 +73,7 @@ function resolveCredentialErrorMessage(error: ApiError): string {
 export function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const usernameInputRef = useRef<HTMLInputElement>(null)
   const passwordInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState(initialForm)
   const [signupPolicy, setSignupPolicy] = useState<ConsoleSignupPolicy | null>(null)
@@ -67,6 +81,7 @@ export function LoginPage() {
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [statusView, setStatusView] = useState<ConsoleAccountStatusView | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
 
   useEffect(() => {
     const controller = new AbortController()
@@ -171,18 +186,49 @@ export function LoginPage() {
   const loginFeedbackId = feedback ? 'login-feedback' : undefined
   const isCredentialFeedback = feedback?.kind === 'credential'
   const isDestructiveFeedback = feedback?.variant === 'destructive'
-  const usernameDescription = isCredentialFeedback ? 'login-username-help login-feedback' : 'login-username-help'
-  const passwordDescription = isCredentialFeedback ? 'login-password-help login-feedback' : 'login-password-help'
+  const usernameDescription = describedBy(
+    'login-username-help',
+    fieldErrors.username ? 'login-username-required' : null,
+    isCredentialFeedback ? 'login-feedback' : null
+  )
+  const passwordDescription = describedBy(
+    'login-password-help',
+    fieldErrors.password ? 'login-password-required' : null,
+    isCredentialFeedback ? 'login-feedback' : null
+  )
+  const usernameInvalid = isCredentialFeedback || Boolean(fieldErrors.username)
+  const passwordInvalid = isCredentialFeedback || Boolean(fieldErrors.password)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setFeedback(null)
     setStatusView(null)
+
+    // Localized inline required-field validation, in lieu of the browser-native "required" popup
+    // (which renders in the browser locale, not Spanish). `noValidate` on the <form> disables the
+    // native popup; this check runs BEFORE any network call. (#729)
+    const trimmedUsername = form.username.trim()
+    const nextFieldErrors: LoginFieldErrors = {}
+    if (!trimmedUsername) {
+      nextFieldErrors.username = consoleAuthConfig.labels.requiredField
+    }
+    if (!form.password) {
+      nextFieldErrors.password = consoleAuthConfig.labels.requiredField
+    }
+
+    if (nextFieldErrors.username || nextFieldErrors.password) {
+      setFieldErrors(nextFieldErrors)
+      const firstInvalidInput = nextFieldErrors.username ? usernameInputRef.current : passwordInputRef.current
+      firstInvalidInput?.focus()
+      return
+    }
+
+    setFieldErrors({})
     setIsSubmitting(true)
 
     try {
       const createdSession = await createConsoleLoginSession({
-        username: form.username.trim(),
+        username: trimmedUsername,
         password: form.password,
         rememberMe: form.rememberMe
       })
@@ -263,7 +309,7 @@ export function LoginPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
-          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId}>
+          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId} noValidate>
             {feedback ? (
               <Alert
                 id="login-feedback"
@@ -290,12 +336,20 @@ export function LoginPage() {
                 name="username"
                 autoComplete="username"
                 aria-describedby={usernameDescription}
-                aria-invalid={isCredentialFeedback || undefined}
+                aria-invalid={usernameInvalid || undefined}
+                className={usernameInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                 // Place the caret on the first field so keyboard and assistive-tech users
                 // can start typing their credential immediately on this dedicated login screen.
                 autoFocus
+                ref={usernameInputRef}
                 value={form.username}
-                onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setForm((current) => ({ ...current, username: value }))
+                  if (fieldErrors.username) {
+                    setFieldErrors((current) => ({ ...current, username: undefined }))
+                  }
+                }}
                 placeholder="operaciones"
                 required
                 minLength={3}
@@ -304,6 +358,11 @@ export function LoginPage() {
               <p id="login-username-help" className="text-xs leading-5 text-muted-foreground">
                 Usa el usuario de consola asociado a tu organización.
               </p>
+              {fieldErrors.username ? (
+                <p id="login-username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                  {fieldErrors.username}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -314,10 +373,17 @@ export function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 aria-describedby={passwordDescription}
-                aria-invalid={isCredentialFeedback || undefined}
+                aria-invalid={passwordInvalid || undefined}
+                className={passwordInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                 ref={passwordInputRef}
                 value={form.password}
-                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setForm((current) => ({ ...current, password: value }))
+                  if (fieldErrors.password) {
+                    setFieldErrors((current) => ({ ...current, password: undefined }))
+                  }
+                }}
                 placeholder="••••••••••••"
                 required
                 // No client-side minLength on login: this form authenticates an EXISTING
@@ -330,6 +396,11 @@ export function LoginPage() {
               <p id="login-password-help" className="text-xs leading-5 text-muted-foreground">
                 La policy de contraseña se valida en el servicio de acceso.
               </p>
+              {fieldErrors.password ? (
+                <p id="login-password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                  {fieldErrors.password}
+                </p>
+              ) : null}
             </div>
 
             <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground transition-colors hover:bg-accent/40">

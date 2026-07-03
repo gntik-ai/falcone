@@ -239,6 +239,81 @@ describe('LoginPage', () => {
       )
     })
   })
+
+  it('[#729] el formulario desactiva la validación nativa del navegador', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const form = screen.getByLabelText(/usuario/i).closest('form')
+    expect(form).toHaveAttribute('novalidate')
+  })
+
+  it('[#729] muestra mensajes de validación en español al enviar campos requeridos vacíos, sin llamar a la red', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    const usernameInput = screen.getByLabelText(/usuario/i)
+    const passwordInput = screen.getByLabelText(/contraseña/i)
+
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    const alerts = await screen.findAllByRole('alert')
+    const alertMessages = alerts.map((alert) => alert.textContent ?? '')
+    expect(alertMessages.filter((text) => /este campo es obligatorio/i.test(text))).toHaveLength(2)
+
+    expect(usernameInput).toHaveAttribute('aria-invalid', 'true')
+    expect(passwordInput).toHaveAttribute('aria-invalid', 'true')
+    expect(usernameInput).toHaveFocus()
+    expect(usernameInput.getAttribute('aria-describedby')).toContain('login-username-required')
+    expect(passwordInput.getAttribute('aria-describedby')).toContain('login-password-required')
+
+    // Only the initial signup-policy fetch on mount happened — no login attempt was submitted.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalledWith('/v1/auth/login-sessions', expect.anything())
+  })
+
+  it('[#729] usuario con solo espacios se trata como vacío y el foco va al primer campo inválido', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: '   ' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    const alert = await screen.findByText(/este campo es obligatorio/i)
+    expect(alert).toBeInTheDocument()
+    expect(screen.getByLabelText(/usuario/i)).toHaveFocus()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('[#729] el error de un campo se limpia al editarlo', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+    await screen.findAllByRole('alert')
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/usuario/i)).not.toHaveAttribute('aria-invalid', 'true')
+    })
+    // The password field error (independent) is still shown; the username one is gone.
+    expect(screen.getAllByRole('alert').filter((el) => /este campo es obligatorio/i.test(el.textContent ?? ''))).toHaveLength(1)
+  })
 })
 
 function renderLoginPage(initialEntry = '/login') {
