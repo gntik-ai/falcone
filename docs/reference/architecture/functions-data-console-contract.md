@@ -84,3 +84,14 @@ superadmin/internal caller (no bound tenant) may read any workspace's functions.
 backing these routes also carries the caller's tenant as a predicate (`fn_actions.tenant_id`) as
 defense-in-depth. No public route or response field changes — the `403` response is already declared
 for both routes, so the runtime is brought into agreement with the published contract.
+
+Workspace function deploy/update is also tenant-scoped. `POST /v1/functions/actions` (create) and
+`PATCH /v1/functions/actions/{actionId}` (update) share one handler, which resolves the body
+`workspaceId` against the caller's verified tenant before any create/deploy/update side effect. When
+the caller's tenant does not own the workspace, or the workspace does not exist, the control-plane
+returns a uniform `403` and performs no write — it never creates or overwrites an `fn_actions` row
+and never deploys a Knative service into another tenant's workspace, and (as with the LIST routes)
+the response does not distinguish a foreign workspace from a non-existent one. A superadmin/internal
+caller (no bound tenant) may deploy into any workspace. No public route or response field changes —
+the `403` response is already declared for both the POST and PATCH routes, so the runtime is brought
+into agreement with the published contract.
