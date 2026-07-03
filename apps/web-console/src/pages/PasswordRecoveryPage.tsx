@@ -13,6 +13,7 @@ import {
   type ConsolePasswordRecoveryTicket
 } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
+import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
 import type { ApiError } from '@/lib/http'
 
 type FeedbackState =
@@ -146,6 +147,7 @@ export function PasswordRecoveryPage() {
                 autoCapitalize="none"
                 aria-describedby={usernameOrEmailDescription}
                 aria-invalid={Boolean(fieldError) || undefined}
+                className={fieldError ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                 autoFocus
                 ref={usernameOrEmailInputRef}
                 value={usernameOrEmail}
@@ -164,7 +166,7 @@ export function PasswordRecoveryPage() {
                 Introduce el usuario o correo asociado a tu cuenta de consola.
               </p>
               {fieldError ? (
-                <p id="password-recovery-username-required" role="alert" className="text-sm font-medium text-destructive">
+                <p id="password-recovery-username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                   {fieldError}
                 </p>
               ) : null}

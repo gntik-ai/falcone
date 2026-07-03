@@ -13,6 +13,7 @@ import {
   type ConsoleSignupRegistration
 } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
+import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
 import type { ApiError } from '@/lib/http'
 
 type FeedbackState =
@@ -296,6 +297,7 @@ export function SignupPage() {
                     autoComplete="username"
                     aria-describedby={describedBy('username-help', fieldErrors.username ? 'username-required' : null)}
                     aria-invalid={Boolean(fieldErrors.username) || undefined}
+                    className={fieldErrors.username ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                     ref={usernameInputRef}
                     value={form.username}
                     onChange={(event) => {
@@ -315,7 +317,7 @@ export function SignupPage() {
                     3-63 caracteres: minúsculas, números y guiones; empieza y termina con letra o número.
                   </p>
                   {fieldErrors.username ? (
-                    <p id="username-required" role="alert" className="text-sm font-medium text-destructive">
+                    <p id="username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                       {fieldErrors.username}
                     </p>
                   ) : null}
@@ -330,6 +332,7 @@ export function SignupPage() {
                       autoComplete="name"
                       aria-describedby={fieldErrors.displayName ? 'displayName-required' : undefined}
                       aria-invalid={Boolean(fieldErrors.displayName) || undefined}
+                      className={fieldErrors.displayName ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                       ref={displayNameInputRef}
                       value={form.displayName}
                       onChange={(event) => {
@@ -345,7 +348,7 @@ export function SignupPage() {
                       maxLength={120}
                     />
                     {fieldErrors.displayName ? (
-                      <p id="displayName-required" role="alert" className="text-sm font-medium text-destructive">
+                      <p id="displayName-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                         {fieldErrors.displayName}
                       </p>
                     ) : null}
@@ -360,6 +363,7 @@ export function SignupPage() {
                       autoComplete="email"
                       aria-describedby={fieldErrors.primaryEmail ? 'primaryEmail-required' : undefined}
                       aria-invalid={Boolean(fieldErrors.primaryEmail) || undefined}
+                      className={fieldErrors.primaryEmail ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                       ref={primaryEmailInputRef}
                       value={form.primaryEmail}
                       onChange={(event) => {
@@ -374,7 +378,7 @@ export function SignupPage() {
                       maxLength={160}
                     />
                     {fieldErrors.primaryEmail ? (
-                      <p id="primaryEmail-required" role="alert" className="text-sm font-medium text-destructive">
+                      <p id="primaryEmail-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                         {fieldErrors.primaryEmail}
                       </p>
                     ) : null}
@@ -390,6 +394,7 @@ export function SignupPage() {
                       autoComplete="organization"
                       aria-describedby={describedBy('tenantId-help', fieldErrors.tenantId ? 'tenantId-required' : null)}
                       aria-invalid={Boolean(fieldErrors.tenantId) || undefined}
+                      className={fieldErrors.tenantId ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                       ref={tenantIdInputRef}
                       value={form.tenantId}
                       onChange={(event) => {
@@ -408,7 +413,7 @@ export function SignupPage() {
                       Identifica la organización donde se creará la cuenta; se completa automáticamente cuando el enlace la incluye.
                     </p>
                     {fieldErrors.tenantId ? (
-                      <p id="tenantId-required" role="alert" className="text-sm font-medium text-destructive">
+                      <p id="tenantId-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                         {fieldErrors.tenantId}
                       </p>
                     ) : null}
@@ -441,6 +446,7 @@ export function SignupPage() {
                     autoComplete="new-password"
                     aria-describedby={describedBy('password-help', fieldErrors.password ? 'password-required' : null)}
                     aria-invalid={Boolean(fieldErrors.password) || undefined}
+                    className={fieldErrors.password ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                     ref={passwordInputRef}
                     value={form.password}
                     onChange={(event) => {
@@ -459,7 +465,7 @@ export function SignupPage() {
                     Mínimo {passwordMinLength} caracteres según la policy de este entorno.
                   </p>
                   {fieldErrors.password ? (
-                    <p id="password-required" role="alert" className="text-sm font-medium text-destructive">
+                    <p id="password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                       {fieldErrors.password}
                     </p>
                   ) : null}

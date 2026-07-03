@@ -15,6 +15,7 @@ import {
   type ConsoleSignupPolicy
 } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
+import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
 import {
   consumeConsoleAuthStatusHint,
   consumeProtectedRouteIntent,
@@ -336,6 +337,7 @@ export function LoginPage() {
                 autoComplete="username"
                 aria-describedby={usernameDescription}
                 aria-invalid={usernameInvalid || undefined}
+                className={usernameInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                 // Place the caret on the first field so keyboard and assistive-tech users
                 // can start typing their credential immediately on this dedicated login screen.
                 autoFocus
@@ -357,7 +359,7 @@ export function LoginPage() {
                 Usa el usuario de consola asociado a tu organización.
               </p>
               {fieldErrors.username ? (
-                <p id="login-username-required" role="alert" className="text-sm font-medium text-destructive">
+                <p id="login-username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                   {fieldErrors.username}
                 </p>
               ) : null}
@@ -372,6 +374,7 @@ export function LoginPage() {
                 autoComplete="current-password"
                 aria-describedby={passwordDescription}
                 aria-invalid={passwordInvalid || undefined}
+                className={passwordInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
                 ref={passwordInputRef}
                 value={form.password}
                 onChange={(event) => {
@@ -394,7 +397,7 @@ export function LoginPage() {
                 La policy de contraseña se valida en el servicio de acceso.
               </p>
               {fieldErrors.password ? (
-                <p id="login-password-required" role="alert" className="text-sm font-medium text-destructive">
+                <p id="login-password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
                   {fieldErrors.password}
                 </p>
               ) : null}
