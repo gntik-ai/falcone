@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CapabilityStatusGrid } from '@/components/console/CapabilityStatusGrid'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
 import { getConsolePlatformRoles, isTenantlessPlatformPrincipal } from '@/lib/console-principal'
 import { readConsoleShellSession } from '@/lib/console-session'
@@ -59,16 +60,19 @@ export function ConsoleTenantPlanOverviewPage() {
   const overLimitDimensionCount = limits.filter((item) => item.usageStatus === 'over_limit').length
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-border bg-card/70 p-6">
+      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Mi plan</h1>
         <p className="mt-1 text-sm text-muted-foreground">Estos son los derechos efectivos y el consumo actual de tu organización.</p>
         <dl className="mt-4 space-y-1">
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan actual</dt>
-          <dd className="text-lg font-semibold text-foreground">{summary.planSlug ?? 'Sin plan asignado'}</dd>
+          <dd className="flex flex-wrap items-center gap-2.5">
+            <span className={summary.planSlug ? 'text-lg font-semibold leading-none text-foreground' : 'text-lg font-medium leading-none text-muted-foreground'}>{summary.planSlug ?? 'Sin plan asignado'}</span>
+            {summary.planStatus ? <PlanStatusBadge status={summary.planStatus} /> : null}
+          </dd>
         </dl>
       </header>
       {overLimitDimensionCount > 0 ? (
-        <p role="status" className="rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
+        <p role="status" className="rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 shadow-sm dark:text-amber-200">
           {overLimitDimensionCount === 1
             ? '1 dimensión está actualmente por encima del límite.'
             : `${overLimitDimensionCount} dimensiones están actualmente por encima del límite.`}
