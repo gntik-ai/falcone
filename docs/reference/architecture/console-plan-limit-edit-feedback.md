@@ -45,3 +45,12 @@ requiring a page reload.
 This behavior does not change the public API contract. It aligns the web console with the
 existing plan-limit write/read responses and requires no OpenAPI, route catalog, generated
 SDK, or shared-contract regeneration.
+
+## Other consumers of this write path
+
+The Quotas page (`/console/quotas`) also edits a plan limit through this same
+`setPlanLimit` write path — its "Ajustar cuota" action resolves the active tenant's
+current plan and edits that plan's limit for the clicked dimension, honestly disclosing
+that the change affects every tenant on that plan. See
+[console-quotas-adjustment.md](./console-quotas-adjustment.md) for that flow, including
+its no-plan and frozen-plan (`PLAN_LIMITS_FROZEN`) actionable states.

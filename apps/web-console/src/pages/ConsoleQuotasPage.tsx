@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostureBadge'
+import { QuotaAdjustDialog, type QuotaAdjustTarget } from '@/components/console/QuotaAdjustDialog'
 import { useConsoleContext } from '@/lib/console-context'
-import { useConsoleQuotas } from '@/lib/console-quotas'
+import { useConsoleQuotas, type ConsoleQuotaDimensionView } from '@/lib/console-quotas'
 import { readConsoleShellSession } from '@/lib/console-session'
 
 const policyModeLabels: Record<string, string> = {
@@ -21,9 +23,15 @@ export function ConsoleQuotasPage() {
   const { posture, workspacePosture, loading, error, reload } = useConsoleQuotas(activeTenantId, activeWorkspaceId)
   const roles = readConsoleShellSession()?.principal?.platformRoles ?? []
   const isSuperadmin = roles.includes('superadmin') || roles.includes('platform_operator')
+  const [adjustTarget, setAdjustTarget] = useState<QuotaAdjustTarget | null>(null)
 
   if (!activeTenantId) {
     return <ConsolePageState kind="blocked" title="Cuotas bloqueadas" description="Selecciona una organización para consultar la postura de cuotas." />
+  }
+
+  function openAdjustDialog(tableKey: string, dimension: ConsoleQuotaDimensionView) {
+    if (!activeTenantId) return
+    setAdjustTarget({ tenantId: activeTenantId, dimension, tableKey: `${tableKey}-${dimension.dimensionId}` })
   }
 
   return (
@@ -42,16 +50,18 @@ export function ConsoleQuotasPage() {
       {!loading && !error && posture && posture.dimensions.length === 0 ? <ConsolePageState kind="empty" title="Sin dimensiones de cuota" description="No hay cuotas publicadas para esta organización." /> : null}
 
       {posture ? (
-        <QuotaTable title="Organización" posture={posture} isSuperadmin={isSuperadmin} />
+        <QuotaTable title="Organización" posture={posture} isSuperadmin={isSuperadmin} onAdjust={(dimension) => openAdjustDialog('Organización', dimension)} />
       ) : null}
       {workspacePosture ? (
-        <QuotaTable title="Área de trabajo" posture={workspacePosture} isSuperadmin={isSuperadmin} />
+        <QuotaTable title="Área de trabajo" posture={workspacePosture} isSuperadmin={isSuperadmin} onAdjust={(dimension) => openAdjustDialog('Área de trabajo', dimension)} />
       ) : null}
+
+      <QuotaAdjustDialog target={adjustTarget} onClose={() => setAdjustTarget(null)} onAdjusted={reload} />
     </section>
   )
 }
 
-function QuotaTable({ title, posture, isSuperadmin }: { title: string; posture: { dimensions: Array<{ dimensionId: string; displayName: string; hardLimit: number | null; measuredValue: number; pctUsed: number | null; policyMode: string; freshnessStatus: string; isWarning: boolean; isExceeded: boolean }> }; isSuperadmin: boolean }) {
+function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string; posture: { dimensions: ConsoleQuotaDimensionView[] }; isSuperadmin: boolean; onAdjust: (dimension: ConsoleQuotaDimensionView) => void }) {
   return (
     <section className="overflow-hidden rounded-3xl border border-border bg-card/70">
       <div className="border-b border-border px-4 py-3">
@@ -79,13 +89,26 @@ function QuotaTable({ title, posture, isSuperadmin }: { title: string; posture: 
                 <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{policyModeLabels[dimension.policyMode] ?? dimension.policyMode.replace(/_/g, ' ')}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{freshnessStatusLabels[dimension.freshnessStatus] ?? dimension.freshnessStatus.replace(/_/g, ' ')}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right">{isSuperadmin ? <Button type="button" variant="outline" size="sm" className="whitespace-nowrap">Ajustar cuota</Button> : '—'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right">
+                  {isSuperadmin ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="whitespace-nowrap"
+                      data-quota-adjust-trigger={`${title}-${dimension.dimensionId}`}
+                      aria-label={`Ajustar cuota de ${dimension.displayName}`}
+                      onClick={() => onAdjust(dimension)}
+                    >
+                      Ajustar cuota
+                    </Button>
+                  ) : '—'}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {isSuperadmin ? <p className="px-4 py-3 text-sm text-muted-foreground">La edición real de cuotas queda fuera de T01 y depende del panel de plataforma.</p> : null}
     </section>
   )
 }
