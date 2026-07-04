@@ -709,6 +709,26 @@ function renderShell(initialPath = '/console/overview') {
             path: 'plans',
             element: <h1>Planes</h1>,
             handle: { platformGlobal: true }
+          },
+          {
+            path: 'my-plan',
+            element: <h1>Mi plan</h1>
+          },
+          {
+            path: 'my-plan/allocation',
+            element: <h1>Resumen de asignación</h1>
+          },
+          {
+            path: 'iam-access',
+            element: <h1>Acceso IAM</h1>
+          },
+          {
+            path: 'auth',
+            element: <h1>Autenticación</h1>
+          },
+          {
+            path: 'flows',
+            element: <h1>Flujos</h1>
           }
         ]
       }
@@ -866,9 +886,107 @@ function createSessionWithRoles(
 }
 
 
-it('renderiza el ítem Plans en el sidebar', async () => {
+it('[#741] renderiza el ítem Planes en el sidebar para superadmin', async () => {
   stubShellApi()
-  persistConsoleShellSession(baseSession)
+  persistConsoleShellSession(createSessionWithRoles(['superadmin']))
   renderShell('/console/overview')
-  expect(await screen.findByRole('link', { name: /planes/i })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: /^planes/i })).toHaveAttribute('href', '/console/plans')
+})
+
+describe('[#741] navegación de consola consciente del rol', () => {
+  afterEach(() => {
+    cleanup()
+    fetchMock.mockReset()
+    vi.unstubAllGlobals()
+    clearConsoleShellSession()
+    window.localStorage.clear()
+  })
+
+  it('[Scenario: Tenant owner views the console nav] oculta Tenants/IAM Access/Plans/Auth y muestra Mi plan/Asignación/Flujos para tenant_owner sin roles de plataforma', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    await screen.findByRole('link', { name: /vista general/i })
+
+    expect(screen.queryByRole('link', { name: /gestión de organizaciones/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^planes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+
+    expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
+    expect(screen.getByRole('link', { name: /^resumen de asignación/i })).toHaveAttribute('href', '/console/my-plan/allocation')
+    expect(screen.getByRole('link', { name: /^flujos \/ workflows/i })).toHaveAttribute('href', '/console/flows')
+  })
+
+  it('mantiene Tenants/IAM Access/Plans/Auth/Mi plan visibles para superadmin (sin regresión)', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['superadmin']))
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
+    expect(screen.getByRole('link', { name: /^acceso iam/i })).toHaveAttribute('href', '/console/iam-access')
+    expect(screen.getByRole('link', { name: /^planes/i })).toHaveAttribute('href', '/console/plans')
+    expect(screen.getByRole('link', { name: /^autenticación/i })).toHaveAttribute('href', '/console/auth')
+    expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
+    expect(screen.getByRole('link', { name: /^resumen de asignación/i })).toHaveAttribute('href', '/console/my-plan/allocation')
+  })
+
+  it('platform_operator ve Tenants (inventario de plataforma real) pero no las entradas exclusivas de superadmin', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['platform_operator']))
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
+    expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^planes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
+  })
+
+  it('platform_admin ve Tenants igual que platform_operator (mismo fork de plataforma), no las entradas de superadmin', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['platform_admin']))
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
+    expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^planes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
+  })
+
+  it('[Scenario: Active state on the plan parent route] marca solo "Mi plan" como página actual en /console/my-plan', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/my-plan')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    const planLink = within(navigation).getByRole('link', { name: /^mi plan/i })
+    const allocationLink = within(navigation).getByRole('link', { name: /^resumen de asignación/i })
+
+    expect(planLink).toHaveAttribute('aria-current', 'page')
+    expect(allocationLink).not.toHaveAttribute('aria-current', 'page')
+  })
+
+  it('[Scenario: Active state on the allocation child route] marca solo "Resumen de asignación" como página actual en /console/my-plan/allocation', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/my-plan/allocation')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    const planLink = within(navigation).getByRole('link', { name: /^mi plan/i })
+    const allocationLink = within(navigation).getByRole('link', { name: /^resumen de asignación/i })
+
+    // Without exactActive on "Mi plan", the parent NavLink would also match the child route and
+    // both entries would claim aria-current="page" — the child page must have exactly one current entry.
+    expect(planLink).not.toHaveAttribute('aria-current', 'page')
+    expect(allocationLink).toHaveAttribute('aria-current', 'page')
+  })
 })
