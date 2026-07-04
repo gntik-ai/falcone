@@ -96,6 +96,33 @@ describe('ConsoleTenantPlanOverviewPage', () => {
     expect(await screen.findByRole('alert', { name: /resumen del plan no disponible/i })).toBeInTheDocument()
   })
 
+  // The error state must be actionable, not a dead-end (this is the default landing page):
+  // the "Reintentar" action re-runs the same effective-entitlements fetch and recovers the
+  // loaded view. A recovery to the mocked plan slug proves the retry actually re-fetched
+  // (the first call rejected, so only a second call can surface "starter").
+  it('recovers from the error state when the retry action is used', async () => {
+    const user = userEvent.setup()
+    readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['tenant_owner'], tenantIds: ['ten_alpha'] }))
+    getEffectiveEntitlementsMock
+      .mockRejectedValueOnce(new Error('NETWORK_ERROR'))
+      .mockResolvedValueOnce({
+        tenantId: 'ten_alpha',
+        planSlug: 'starter',
+        planStatus: 'active',
+        quantitativeLimits: [],
+        capabilities: []
+      })
+
+    render(<MemoryRouter><ConsoleTenantPlanOverviewPage /></MemoryRouter>)
+
+    expect(await screen.findByRole('alert', { name: /resumen del plan no disponible/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    expect(await screen.findByText('starter')).toBeInTheDocument()
+    expect(getEffectiveEntitlementsMock).toHaveBeenCalledTimes(2)
+  })
+
   it('renders a superadmin no-personal-plan state with a plan catalog action', async () => {
     const user = userEvent.setup()
     readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['superadmin'], tenantIds: [] }))
