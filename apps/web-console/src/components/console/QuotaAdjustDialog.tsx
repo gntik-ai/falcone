@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -52,6 +52,19 @@ function quotaAdjustTriggerSelector(tableKey: string): string {
   return `[data-quota-adjust-trigger="${tableKey}"]`
 }
 
+// Both the posture view (`null` = unbounded/unset) and the plan-limit API (`-1` sentinel) can mean
+// "no upper bound"; render both as the same human phrase the quotas table already uses.
+function formatLimit(value: number | null): string {
+  return value === null || value === -1 ? 'sin límite' : String(value)
+}
+
+// Seed the editable field with the current limit as an integer so the input is never mysteriously
+// blank: an unbounded dimension seeds as "-1", round-tripping with the "usa -1 para indicar sin
+// límite" helper instead of forcing the user to guess.
+function limitInputSeed(value: number | null): string {
+  return value === null ? '-1' : String(value)
+}
+
 export function QuotaAdjustDialog({
   target,
   onClose,
@@ -64,24 +77,38 @@ export function QuotaAdjustDialog({
   const isOpen = target !== null
   const titleId = useId()
   const descriptionId = useId()
+  const scopeId = useId()
+  const helpId = useId()
+  const errorId = useId()
+  const valueInputId = useId()
+  // Fresh per open (the parent remounts this via `key`), so the seed reflects the row that was
+  // clicked without a stale-state flash on reopen.
   const [resolution, setResolution] = useState<PlanResolution>({ status: 'loading' })
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(() => (target ? limitInputSeed(target.dimension.hardLimit) : ''))
   const [validationError, setValidationError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<AdjustFeedback>(null)
   const [busy, setBusy] = useState(false)
+  const [resolveNonce, setResolveNonce] = useState(0)
+
+  const valueInputRef = useRef<HTMLInputElement>(null)
+  const successCloseRef = useRef<HTMLButtonElement>(null)
+  // Frozen at open time so the close-time `resolveReturnFocus` can still re-locate the triggering
+  // row button by data-attribute even though `target` is already null by the time this instance is
+  // unmounting — and even though a success reload may have replaced that button with a fresh DOM
+  // node (a node reference captured at open time would be detached; #783).
+  const triggerTableKeyRef = useRef<string | null>(target ? target.tableKey : null)
+  if (target) triggerTableKeyRef.current = target.tableKey
 
   const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(isOpen, {
-    resolveReturnFocus: () => (target ? document.querySelector<HTMLElement>(quotaAdjustTriggerSelector(target.tableKey)) : null)
+    resolveReturnFocus: () => {
+      const key = triggerTableKeyRef.current
+      return key ? document.querySelector<HTMLElement>(quotaAdjustTriggerSelector(key)) : null
+    }
   })
 
   useEffect(() => {
     if (!target) return
     let cancelled = false
-    setResolution({ status: 'loading' })
-    setFeedback(null)
-    setValidationError(null)
-    setValue(target.dimension.hardLimit !== null ? String(target.dimension.hardLimit) : '')
-    setBusy(false)
 
     api.getTenantCurrentPlan(target.tenantId).then((data) => {
       if (cancelled) return
@@ -106,7 +133,25 @@ export function QuotaAdjustDialog({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target?.tenantId, target?.dimension.dimensionId, target?.tableKey])
+  }, [target?.tenantId, target?.dimension.dimensionId, target?.tableKey, resolveNonce])
+
+  // Move focus onto the editable field as soon as the form is ready (fires once per open, since the
+  // status only transitions loading -> ready). A later inline error keeps the status 'ready', so
+  // focus is NOT yanked off the button the user just pressed.
+  useEffect(() => {
+    if (isOpen && resolution.status === 'ready') {
+      valueInputRef.current?.focus()
+    }
+  }, [resolution.status, isOpen])
+
+  // A successful save swaps the form (and its focused "Guardar" button) for the confirmation panel;
+  // move focus to the confirmation's "Cerrar" so it never drops to <body>, which would break the
+  // Tab-trap and the Escape handler that live on the panel.
+  useEffect(() => {
+    if (isOpen && feedback?.kind === 'success') {
+      successCloseRef.current?.focus()
+    }
+  }, [feedback?.kind, isOpen])
 
   if (!target) {
     return null
@@ -126,11 +171,12 @@ export function QuotaAdjustDialog({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (resolution.status !== 'ready') return
+    if (busy || resolution.status !== 'ready') return
     const trimmed = value.trim()
     const parsed = Number(trimmed)
     if (trimmed === '' || !Number.isInteger(parsed) || parsed < -1) {
       setValidationError('Ingresa un número entero mayor o igual a -1 (usa -1 para indicar sin límite).')
+      valueInputRef.current?.focus()
       return
     }
     setValidationError(null)
@@ -147,7 +193,14 @@ export function QuotaAdjustDialog({
     }
   }
 
+  function retryResolution() {
+    setFeedback(null)
+    setResolution({ status: 'loading' })
+    setResolveNonce((current) => current + 1)
+  }
+
   const planDisplayName = resolution.status === 'ready' || resolution.status === 'frozen' ? resolution.planDisplayName : null
+  const readyDescribedBy = [scopeId, helpId, validationError ? errorId : null].filter(Boolean).join(' ')
 
   return (
     <Dialog open={isOpen} onOpenChange={(next) => { if (!next && !busy) onClose() }}>
@@ -174,11 +227,11 @@ export function QuotaAdjustDialog({
               <Alert variant="success" role="status" aria-live="polite">
                 <AlertTitle>Límite guardado</AlertTitle>
                 <AlertDescription>
-                  {dimension.displayName} ahora es {feedback.newValue === -1 ? 'sin límite' : feedback.newValue} en el plan «{planDisplayName}». La tabla de cuotas se está actualizando.
+                  {dimension.displayName} ahora es {feedback.newValue === -1 ? 'sin límite' : feedback.newValue} en el plan «{planDisplayName}». Cierra este panel para ver la tabla de cuotas actualizada.
                 </AlertDescription>
               </Alert>
               <DialogFooter>
-                <Button type="button" onClick={onClose}>Cerrar</Button>
+                <Button ref={successCloseRef} type="button" onClick={onClose}>Cerrar</Button>
               </DialogFooter>
             </div>
           ) : null}
@@ -195,8 +248,9 @@ export function QuotaAdjustDialog({
                 <AlertTitle>No se pudo resolver el plan</AlertTitle>
                 <AlertDescription>{resolution.message}</AlertDescription>
               </Alert>
-              <DialogFooter>
+              <DialogFooter className="sm:justify-between">
                 <Button type="button" variant="outline" onClick={onClose}>Cerrar</Button>
+                <Button type="button" onClick={retryResolution}>Reintentar</Button>
               </DialogFooter>
             </div>
           ) : null}
@@ -233,26 +287,39 @@ export function QuotaAdjustDialog({
 
           {feedback?.kind !== 'success' && resolution.status === 'ready' ? (
             <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)} noValidate>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Este control edita el límite de <strong>{dimension.displayName}</strong> en el plan «{resolution.planDisplayName}»
-                asignado a esta organización. El cambio se aplica a TODAS las organizaciones que usan ese plan, no solo a la activa.
-              </p>
+              <Alert variant="default" role="note" id={scopeId}>
+                <AlertDescription>
+                  <strong className="font-semibold text-foreground">Este cambio afecta a todo el plan, no solo a esta organización.</strong>{' '}
+                  Editas el límite de {dimension.displayName} en el plan «{resolution.planDisplayName}»; se aplica a todas las
+                  organizaciones que usan ese plan.
+                </AlertDescription>
+              </Alert>
+              <div className="flex items-baseline justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Valor actual</span>
+                <span className="font-medium tabular-nums text-foreground">{formatLimit(dimension.hardLimit)}</span>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor={`${titleId}-value`}>Nuevo límite de {dimension.displayName}</Label>
+                <Label htmlFor={valueInputId}>Nuevo límite de {dimension.displayName}</Label>
                 <Input
-                  id={`${titleId}-value`}
+                  ref={valueInputRef}
+                  id={valueInputId}
                   type="number"
                   inputMode="numeric"
                   min={-1}
                   step={1}
+                  autoComplete="off"
                   value={value}
                   disabled={busy}
-                  onChange={(event) => setValue(event.currentTarget.value)}
-                  aria-describedby={`${titleId}-help`}
+                  aria-invalid={validationError ? true : undefined}
+                  aria-describedby={readyDescribedBy}
+                  onChange={(event) => {
+                    setValue(event.currentTarget.value)
+                    if (validationError) setValidationError(null)
+                  }}
                 />
-                <p id={`${titleId}-help`} className="text-xs text-muted-foreground">Usa -1 para indicar sin límite.</p>
+                <p id={helpId} className="text-xs text-muted-foreground">Usa -1 para indicar sin límite.</p>
               </div>
-              {validationError ? <p role="alert" className="text-sm text-destructive">{validationError}</p> : null}
+              {validationError ? <p id={errorId} role="alert" className="text-sm text-destructive">{validationError}</p> : null}
               {feedback?.kind === 'error' ? (
                 <Alert variant="destructive" role="alert">
                   <AlertTitle>El límite no se guardó</AlertTitle>

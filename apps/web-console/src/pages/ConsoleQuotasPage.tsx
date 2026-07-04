@@ -56,7 +56,7 @@ export function ConsoleQuotasPage() {
         <QuotaTable title="Área de trabajo" posture={workspacePosture} isSuperadmin={isSuperadmin} onAdjust={(dimension) => openAdjustDialog('Área de trabajo', dimension)} />
       ) : null}
 
-      <QuotaAdjustDialog target={adjustTarget} onClose={() => setAdjustTarget(null)} onAdjusted={reload} />
+      <QuotaAdjustDialog key={adjustTarget?.tableKey ?? 'closed'} target={adjustTarget} onClose={() => setAdjustTarget(null)} onAdjusted={reload} />
     </section>
   )
 }
@@ -69,6 +69,7 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[52rem] text-left text-sm">
+          <caption className="sr-only">Postura de cuotas: {title}</caption>
           <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
               <th scope="col" className="px-4 py-3 font-medium">Dimensión</th>
@@ -77,20 +78,20 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
               <th scope="col" className="px-4 py-3 text-right font-medium">% uso</th>
               <th scope="col" className="px-4 py-3 font-medium">Modo</th>
               <th scope="col" className="px-4 py-3 font-medium">Actualidad</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">Acción</th>
+              {isSuperadmin ? <th scope="col" className="px-4 py-3 text-right font-medium">Acción</th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/70">
             {posture.dimensions.map((dimension) => (
               <tr key={`${title}-${dimension.dimensionId}`} className={dimension.isExceeded ? 'bg-red-500/5' : dimension.isWarning ? 'bg-amber-500/5' : ''}>
-                <td className="max-w-[16rem] whitespace-normal break-words px-4 py-3 font-medium text-foreground">{dimension.displayName}</td>
+                <th scope="row" className="max-w-[16rem] whitespace-normal break-words px-4 py-3 text-left font-medium text-foreground">{dimension.displayName}</th>
                 <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.hardLimit ?? 'sin límite'}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.measuredValue}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{policyModeLabels[dimension.policyMode] ?? dimension.policyMode.replace(/_/g, ' ')}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{freshnessStatusLabels[dimension.freshnessStatus] ?? dimension.freshnessStatus.replace(/_/g, ' ')}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right">
-                  {isSuperadmin ? (
+                {isSuperadmin ? (
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
                     <Button
                       type="button"
                       variant="outline"
@@ -102,8 +103,8 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
                     >
                       Ajustar cuota
                     </Button>
-                  ) : '—'}
-                </td>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

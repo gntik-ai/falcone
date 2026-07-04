@@ -129,4 +129,41 @@ describe('QuotaAdjustDialog', () => {
     expect(await screen.findByText(/entero mayor o igual a -1/i)).toBeInTheDocument()
     expect(planApi.setPlanLimit).not.toHaveBeenCalled()
   })
+
+  it('marks the field invalid and associates the validation message with it for screen readers', async () => {
+    planApi.getTenantCurrentPlan.mockResolvedValue({ assignment: { planId: 'plan_1' }, plan: { id: 'plan_1', displayName: 'Starter', status: 'active' } })
+    renderDialog()
+
+    const input = await screen.findByLabelText(/nuevo límite de maximum workspaces/i)
+    await userEvent.clear(input)
+    await userEvent.type(input, '-5')
+    await userEvent.click(screen.getByRole('button', { name: /^guardar$/i }))
+
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    const message = screen.getByText(/entero mayor o igual a -1/i)
+    expect((input.getAttribute('aria-describedby') ?? '').split(' ')).toContain(message.id)
+  })
+
+  it('shows the current value and seeds an unbounded dimension as -1 (never a blank field)', async () => {
+    planApi.getTenantCurrentPlan.mockResolvedValue({ assignment: { planId: 'plan_1' }, plan: { id: 'plan_1', displayName: 'Starter', status: 'active' } })
+    renderDialog(makeTarget({ dimension: dimension({ hardLimit: null }) }))
+
+    const input = await screen.findByLabelText(/nuevo límite de maximum workspaces/i)
+    expect(input).toHaveValue(-1)
+    expect(screen.getByText('Valor actual')).toBeInTheDocument()
+    expect(screen.getByText('sin límite')).toBeInTheDocument()
+  })
+
+  it('lets the user retry plan resolution after a transient failure instead of dead-ending', async () => {
+    planApi.getTenantCurrentPlan
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce({ assignment: { planId: 'plan_1' }, plan: { id: 'plan_1', displayName: 'Starter', status: 'active' } })
+    renderDialog()
+
+    expect(await screen.findByText(/no se pudo resolver el plan/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    expect(await screen.findByLabelText(/nuevo límite de maximum workspaces/i)).toBeInTheDocument()
+    expect(planApi.getTenantCurrentPlan).toHaveBeenCalledTimes(2)
+  })
 })
