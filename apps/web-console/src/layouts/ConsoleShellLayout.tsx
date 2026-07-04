@@ -4,10 +4,12 @@ import {
   ChevronDown,
   Database,
   FolderKanban,
+  Gauge,
   KeyRound,
   KeySquare,
   LayoutDashboard,
   LogOut,
+  PieChart,
   Rocket,
   RefreshCw,
   Users,
@@ -31,6 +33,7 @@ import {
   getConsoleWorkspaceStatusMeta,
   useConsoleContext
 } from '@/lib/console-context'
+import { hasPlatformInventoryAccess } from '@/lib/console-principal'
 import {
   clearConsoleShellSession,
   getConsolePrincipalInitials,
@@ -64,10 +67,29 @@ const consoleNavigationItems = [
   },
   {
     group: 'main',
+    label: 'Mi plan',
+    to: '/console/my-plan',
+    icon: Gauge,
+    description: 'Derechos efectivos y consumo actual de la cuota de tu organización.'
+  },
+  {
+    group: 'main',
+    label: 'Resumen de asignación',
+    to: '/console/my-plan/allocation',
+    icon: PieChart,
+    description: 'Reparto de límites por área de trabajo dentro de tu organización.'
+  },
+  {
+    group: 'main',
     label: 'Gestión de organizaciones',
     to: '/console/tenants',
     icon: Shield,
-    description: 'Gestión del dominio multiorganización y su navegación principal.'
+    description: 'Gestión del dominio multiorganización y su navegación principal.',
+    // The collection endpoint behind this page (GET /v1/tenants) 403s for tenant operators —
+    // only superadmin/platform_admin/platform_operator can see a real inventory here
+    // (ConsoleTenantsPage.tsx's `hasPlatformInventoryAccess`, #752). Hiding the entry for
+    // tenant_owner/tenant_admin avoids a dead-end "blocked" page reachable only from the sidebar (#741).
+    requiresPlatformInventoryAccess: true
   },
   {
     group: 'main',
@@ -132,7 +154,11 @@ const consoleNavigationItems = [
     label: 'Planes',
     to: '/console/plans',
     icon: FolderKanban,
-    description: 'Gestión del catálogo de planes, límites base y asignaciones por organización.'
+    description: 'Gestión del catálogo de planes, límites base y asignaciones por organización.',
+    // `/console/plans*` is superadmin-gated at the route level (RequireSuperadminRoute in
+    // router.tsx). Gate the nav entry on the SAME predicate so non-superadmins are never
+    // offered a link that silently bounces them to /console/my-plan (#741).
+    requiresSuperadminAccess: true
   },
   {
     group: 'administration',
@@ -506,11 +532,16 @@ function ConsoleNavigation() {
   const session = useMemo(() => readConsoleShellSession(), [])
   const canSecrets = canManageWorkspaceSecrets(session, activeWorkspaceId)
   const isSuperadmin = session?.principal?.platformRoles?.includes('superadmin') ?? false
+  // Same predicate as ConsoleTenantsPage.tsx's `canViewInventory` (#752) — kept in sync via the
+  // shared `hasPlatformInventoryAccess` helper so the "Gestión de organizaciones" nav entry never
+  // drifts from what the page itself renders for a role (#741).
+  const canViewTenantInventory = hasPlatformInventoryAccess(session?.principal?.platformRoles)
 
   const items = consoleNavigationItems.filter(
     (item) =>
       (!('requiresWorkspaceSecretsAccess' in item && item.requiresWorkspaceSecretsAccess) || canSecrets) &&
-      (!('requiresSuperadminAccess' in item && item.requiresSuperadminAccess) || isSuperadmin)
+      (!('requiresSuperadminAccess' in item && item.requiresSuperadminAccess) || isSuperadmin) &&
+      (!('requiresPlatformInventoryAccess' in item && item.requiresPlatformInventoryAccess) || canViewTenantInventory)
   )
   const groupedItems = consoleNavigationGroupOrder
     .map((group) => ({

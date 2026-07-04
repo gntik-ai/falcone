@@ -102,3 +102,34 @@ empty state "Sin plan personal de organización" instead of surfacing the backen
 `TENANT_NOT_FOUND` code. The tenant-specific plan page
 `/console/tenants/{tenantId}/plan` uses the tenant-id route above and is guarded by the console's
 superadmin route gate; non-superadmin platform roles do not get a link to that page from My Plan.
+
+## Sidebar navigation (issue #741)
+
+`/console/my-plan` and `/console/my-plan/allocation` (`ConsoleTenantAllocationSummaryPage.tsx`,
+which reads the per-workspace breakdown of the same `EffectiveEntitlementProfile` limits via
+`GET /v1/tenant/plan/allocation-summary`) each have a sidebar entry — **Mi plan** and **Resumen
+de asignación** — in `ConsoleShellLayout.tsx`'s `main` navigation group. Neither entry carries a
+role gate: both routes have no route guard, and both pages already degrade honestly for a
+tenant-less platform principal (the "Platform admins and My Plan" section above, and the
+equivalent "Sin plan de organización personal" empty state in
+`ConsoleTenantAllocationSummaryPage.tsx`), so showing the entries to every signed-in role —
+platform or tenant-scoped — never produces a new dead end.
+
+The full sidebar role matrix, after #741:
+
+| Entry | superadmin | platform_admin / platform_operator | tenant_owner / other tenant roles |
+| --- | --- | --- | --- |
+| Mi plan (`/console/my-plan`) | shown | shown | shown |
+| Resumen de asignación (`/console/my-plan/allocation`) | shown | shown | shown |
+| Gestión de organizaciones (`/console/tenants`) | shown | shown (real inventory) | **hidden** |
+| Acceso IAM (`/console/iam-access`) | shown | **hidden** | **hidden** |
+| Planes (`/console/plans`) | shown | **hidden** | **hidden** |
+| Autenticación (`/console/auth`) | shown | **hidden** | **hidden** |
+
+`Gestión de organizaciones` is gated on the shared `hasPlatformInventoryAccess` predicate
+(`apps/web-console/src/lib/console-principal.ts`) — the same predicate that decides whether
+`ConsoleTenantsPage.tsx` renders a real cross-tenant inventory or an honest blocked state (see
+`docs/reference/architecture/console-tenant-inventory.md`). `Acceso IAM`, `Planes`, and
+`Autenticación` are gated on `requiresSuperadminAccess`, matching their `RequireSuperadminRoute`
+route guard in `router.tsx` exactly, so the sidebar never offers a link that silently redirects
+the operator elsewhere.

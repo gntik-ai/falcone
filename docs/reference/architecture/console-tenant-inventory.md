@@ -82,3 +82,20 @@ showing the cards.
 This is a frontend-only change: it consumes the already-public, already-generated
 `GET /v1/tenants` collection endpoint exactly as the shell's tenant selector already does.
 `npm run generate:public-api` and `npm run validate:public-api` produce no diff.
+
+## Sidebar entry is gated to the roles the page actually serves (issue #741)
+
+Before #741, `ConsoleShellLayout.tsx`'s "Gestión de organizaciones" sidebar entry (linking to
+`/console/tenants`) had no role gate at all — it was shown to every signed-in principal,
+including a bare `tenant_owner`/`tenant_admin` who, per the role-awareness section above, never
+sees anything but the "Inventario no disponible para tu rol" blocked state described above.
+
+The entry now carries `requiresPlatformInventoryAccess: true`, checked against the shared
+`hasPlatformInventoryAccess(roles)` predicate (`apps/web-console/src/lib/console-principal.ts`
+— the same predicate `ConsoleTenantsPage.tsx` uses for `canViewInventory`, so the sidebar entry
+and the page's own role fork cannot drift apart): the entry is shown for `superadmin`,
+`platform_admin`, and `platform_operator` (who all reach a real inventory), and hidden for
+every other role. See
+`docs/reference/architecture/console-effective-entitlements-mapping.md`'s "Sidebar navigation"
+section for the full sidebar role matrix, including the new `Mi plan` / `Resumen de asignación`
+entries added by the same change.

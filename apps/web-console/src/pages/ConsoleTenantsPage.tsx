@@ -12,17 +12,9 @@ import {
   useConsoleContext,
   type ConsoleTenantOption
 } from '@/lib/console-context'
+import { hasPlatformInventoryAccess } from '@/lib/console-principal'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { cn } from '@/lib/utils'
-
-// Platform roles that can call the superadmin tenant collection endpoint (GET /v1/tenants)
-// without a 403 — mirrors console-context.tsx's own `isTenantOperator` predicate (#569).
-// A tenant_owner/tenant_admin can still land on this route (it is not superadmin-gated),
-// but cannot see a cross-tenant inventory, so the page shows an honest, non-crashing state
-// instead of an empty or partially-broken table (#752).
-function hasPlatformInventoryAccess(roles: string[]): boolean {
-  return roles.includes('superadmin') || roles.includes('platform_admin') || roles.includes('platform_operator')
-}
 
 export function ConsoleTenantsPage() {
   const [wizardOpen, setWizardOpen] = useState(false)
