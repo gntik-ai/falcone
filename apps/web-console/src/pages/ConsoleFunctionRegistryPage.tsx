@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { ApiError } from '@/lib/http'
@@ -112,32 +114,24 @@ export function ConsoleFunctionRegistryPage() {
         <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Registrar función</h2>
           <form className="mt-4 grid gap-4 sm:grid-cols-3" onSubmit={register}>
-            <label className="flex flex-col gap-1 sm:col-span-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Nombre</span>
-              <input
+            <div className="flex flex-col gap-1.5 sm:col-span-1">
+              <Label htmlFor="function-registry-name">Nombre</Label>
+              <Input
+                id="function-registry-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="on-user-created"
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 required
               />
-            </label>
-            <label className="flex flex-col gap-1 sm:col-span-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Entorno</span>
-              <input
-                value={runtime}
-                onChange={(event) => setRuntime(event.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </label>
-            <label className="flex flex-col gap-1 sm:col-span-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Manejador</span>
-              <input
-                value={handler}
-                onChange={(event) => setHandler(event.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </label>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-1">
+              <Label htmlFor="function-registry-runtime">Entorno</Label>
+              <Input id="function-registry-runtime" value={runtime} onChange={(event) => setRuntime(event.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-1">
+              <Label htmlFor="function-registry-handler">Manejador</Label>
+              <Input id="function-registry-handler" value={handler} onChange={(event) => setHandler(event.target.value)} />
+            </div>
             <div className="sm:col-span-3">
               <Button type="submit" disabled={busy || !name.trim()}>
                 {busy ? 'Registrando…' : 'Registrar función'}

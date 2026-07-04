@@ -127,6 +127,20 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     expect(runHistoryLink).toHaveAttribute('href', '/console/flows/flow-alpha/runs')
   })
 
+  // #757: converge the hand-rolled <table> markup onto the shared Table primitive so the header
+  // style matches every other data-plane grid (same th classes, one `data-slot="table"` idiom).
+  it('renders the flows table via the shared Table primitive (#757)', async () => {
+    mockListFlows.mockResolvedValue({
+      items: [{ flowId: 'flow-alpha', name: 'Alpha flow', status: 'published', updatedAt: '2026-06-30T12:00:00Z' }]
+    })
+
+    const { container } = renderPage()
+    await screen.findByTestId('flow-row')
+
+    expect(container.querySelector('[data-slot="table"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
+  })
+
   it('[#793] triggers a published flow and navigates to its run history with next-step state', async () => {
     mockListFlows.mockResolvedValue({
       items: [

@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import { exportBucketObjects } from '@/services/dataExportImportApi'
@@ -494,46 +497,46 @@ export function ConsoleStoragePage() {
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
         <div className="space-y-6">
-          <section aria-busy={buckets.loading} className="rounded-xl border border-border p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+          <Card aria-busy={buckets.loading}>
+            <CardHeader>
               <div>
-                <h2 className="text-lg font-semibold">Buckets</h2>
-                <p className="text-sm text-muted-foreground">Inventario visible para el área de trabajo activa.</p>
+                <CardTitle>Buckets</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Inventario visible para el área de trabajo activa.</p>
               </div>
               <Badge variant="outline">{buckets.data.length} visibles</Badge>
-            </div>
-
-            {buckets.loading ? <p>Cargando buckets…</p> : null}
-            {!buckets.loading && buckets.error ? (
-              <div className="space-y-3">
-                <p role="alert">{buckets.error}</p>
-                <Button onClick={() => void loadBuckets(activeWorkspaceId)} type="button">Reintentar</Button>
-              </div>
-            ) : null}
-            {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el área de trabajo seleccionada.</p> : null}
-            {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
-            {bucketExportNotice ? <p className="mb-3" role="status">{bucketExportNotice}</p> : null}
-            {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 pr-3">Nombre</th>
-                      <th className="py-2 pr-3">Región</th>
-                      <th className="py-2 pr-3">Estado</th>
-                      <th className="py-2 pr-3">Aprovisionamiento</th>
-                      <th className="py-2 pr-3">Creado</th>
-                      <th className="py-2">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            </CardHeader>
+            <CardContent>
+              {buckets.loading ? <p>Cargando buckets…</p> : null}
+              {!buckets.loading && buckets.error ? (
+                <div className="space-y-3">
+                  <p role="alert">{buckets.error}</p>
+                  <Button onClick={() => void loadBuckets(activeWorkspaceId)} type="button">Reintentar</Button>
+                </div>
+              ) : null}
+              {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el área de trabajo seleccionada.</p> : null}
+              {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
+              {bucketExportNotice ? <p className="mb-3" role="status">{bucketExportNotice}</p> : null}
+              {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
+                <Table aria-label="Listado de buckets del área de trabajo activa">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Región</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Aprovisionamiento</TableHead>
+                      <TableHead>Creado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {buckets.data.map((bucket) => {
                       const selected = bucket.resourceId === selectedBucketId
                       return (
-                        <tr className={`border-b border-border/60 ${selected ? 'bg-primary/10' : ''}`} key={bucket.resourceId}>
-                          <td className="py-3 pr-3 align-top">
-                            <button
-                              className="max-w-full text-left font-medium underline-offset-4 hover:underline"
+                        <TableRow className={selected ? 'bg-primary/10' : ''} key={bucket.resourceId}>
+                          <TableCell className="align-top">
+                            <Button
+                              variant="link"
+                              className="h-auto max-w-full justify-start p-0 text-left font-medium"
                               onClick={() => {
                                 setSelectedBucketId(bucket.resourceId)
                                 setBucketTab('objects')
@@ -541,122 +544,126 @@ export function ConsoleStoragePage() {
                               type="button"
                             >
                               {bucket.bucketName}
-                            </button>
+                            </Button>
                             <div className="text-xs text-muted-foreground">{bucket.resourceId}</div>
-                          </td>
-                          <td className="py-3 pr-3 align-top">{formatValue(bucket.region)}</td>
-                          <td className="py-3 pr-3 align-top"><Badge variant={statusTone(bucket.status)}>{formatEnumLabel(bucket.status)}</Badge></td>
-                          <td className="py-3 pr-3 align-top">{bucket.provisioning?.state ? <Badge variant={statusTone(bucket.provisioning.state)}>{formatEnumLabel(bucket.provisioning.state)}</Badge> : '—'}</td>
-                          <td className="py-3 pr-3 align-top">{formatRelativeDate(bucket.timestamps?.createdAt)}</td>
-                          <td className="py-3 align-top">
-                            <Button
-                              className="mr-2"
-                              disabled={exportingBucketId === bucket.resourceId}
-                              onClick={() => void exportBucketAction(bucket.resourceId, bucket.workspaceId)}
-                              type="button"
-                              variant="outline"
-                            >
-                              {exportingBucketId === bucket.resourceId ? 'Exportando…' : 'Exportar'}
-                            </Button>
-                            <Button
-                              disabled={deletingBucketId === bucket.resourceId}
-                              onClick={() => void deleteBucketAction(bucket.resourceId, bucket.workspaceId)}
-                              type="button"
-                              variant="destructive"
-                            >
-                              {deletingBucketId === bucket.resourceId ? 'Eliminando…' : 'Eliminar'}
-                            </Button>
-                          </td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className="align-top">{formatValue(bucket.region)}</TableCell>
+                          <TableCell className="align-top"><Badge variant={statusTone(bucket.status)}>{formatEnumLabel(bucket.status)}</Badge></TableCell>
+                          <TableCell className="align-top">{bucket.provisioning?.state ? <Badge variant={statusTone(bucket.provisioning.state)}>{formatEnumLabel(bucket.provisioning.state)}</Badge> : '—'}</TableCell>
+                          <TableCell className="align-top">{formatRelativeDate(bucket.timestamps?.createdAt)}</TableCell>
+                          <TableCell className="align-top">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                disabled={exportingBucketId === bucket.resourceId}
+                                onClick={() => void exportBucketAction(bucket.resourceId, bucket.workspaceId)}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                              >
+                                {exportingBucketId === bucket.resourceId ? 'Exportando…' : 'Exportar'}
+                              </Button>
+                              <Button
+                                disabled={deletingBucketId === bucket.resourceId}
+                                onClick={() => void deleteBucketAction(bucket.resourceId, bucket.workspaceId)}
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                              >
+                                {deletingBucketId === bucket.resourceId ? 'Eliminando…' : 'Eliminar'}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card aria-busy={usage.loading}>
+            <CardHeader>
+              <div>
+                <CardTitle>Uso del área de trabajo</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Instantánea pública de volumen, recuento y distribución por bucket.</p>
               </div>
-            ) : null}
-          </section>
+            </CardHeader>
+            <CardContent>
+              {usage.loading ? <p>Cargando uso…</p> : null}
+              {!usage.loading && usage.error ? <p role="alert">{usage.error}</p> : null}
+              {!usage.loading && !usage.error && usage.data ? (
+                <div className="space-y-4">
+                  {usage.data.collectionStatus === 'provider_unavailable' ? (
+                    <p role="alert">El proveedor no expone una instantánea de uso disponible en este momento. La consola no interpreta este estado como cero.</p>
+                  ) : null}
 
-          <section aria-busy={usage.loading} className="rounded-xl border border-border p-4">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-lg font-semibold">Uso del área de trabajo</h2>
-              <p className="text-sm text-muted-foreground">Instantánea pública de volumen, recuento y distribución por bucket.</p>
-            </div>
+                  {usageAgeMinutes !== null && usageAgeMinutes > 15 ? (
+                    <p role="alert">La instantánea de uso tiene {usageAgeMinutes} minutos; los valores pueden estar desactualizados.</p>
+                  ) : null}
 
-            {usage.loading ? <p>Cargando uso…</p> : null}
-            {!usage.loading && usage.error ? <p role="alert">{usage.error}</p> : null}
-            {!usage.loading && !usage.error && usage.data ? (
-              <div className="space-y-4">
-                {usage.data.collectionStatus === 'provider_unavailable' ? (
-                  <p role="alert">El proveedor no expone una instantánea de uso disponible en este momento. La consola no interpreta este estado como cero.</p>
-                ) : null}
+                  <KeyValueGrid items={[
+                    { label: 'Volumen total', value: formatBytes(usage.data.dimensions?.totalBytes?.used) },
+                    { label: 'Objetos totales', value: usage.data.dimensions?.objectCount?.used },
+                    { label: 'Buckets', value: usage.data.dimensions?.bucketCount?.used },
+                    { label: 'Método de colección', value: formatEnumLabel(usage.data.collectionMethod) },
+                    { label: 'Estado de colección', value: formatEnumLabel(usage.data.collectionStatus) },
+                    { label: 'Instantánea', value: formatRelativeDate(usage.data.cacheSnapshotAt ?? usage.data.snapshotAt) }
+                  ]} />
 
-                {usageAgeMinutes !== null && usageAgeMinutes > 15 ? (
-                  <p role="alert">La instantánea de uso tiene {usageAgeMinutes} minutos; los valores pueden estar desactualizados.</p>
-                ) : null}
-
-                <KeyValueGrid items={[
-                  { label: 'Volumen total', value: formatBytes(usage.data.dimensions?.totalBytes?.used) },
-                  { label: 'Objetos totales', value: usage.data.dimensions?.objectCount?.used },
-                  { label: 'Buckets', value: usage.data.dimensions?.bucketCount?.used },
-                  { label: 'Método de colección', value: formatEnumLabel(usage.data.collectionMethod) },
-                  { label: 'Estado de colección', value: formatEnumLabel(usage.data.collectionStatus) },
-                  { label: 'Instantánea', value: formatRelativeDate(usage.data.cacheSnapshotAt ?? usage.data.snapshotAt) }
-                ]} />
-
-                {typeof quotaPercent === 'number' && quotaLimit !== null ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span>Cuota usada</span>
-                      <span>{Math.round(quotaPercent)}% · {formatBytes(usage.data.dimensions?.totalBytes?.used)} / {formatBytes(quotaLimit)}</span>
-                    </div>
-                    <div
-                      aria-valuemax={100}
-                      aria-valuemin={0}
-                      aria-valuenow={Math.max(0, Math.min(100, Math.round(quotaPercent)))}
-                      className="h-3 overflow-hidden rounded-full bg-muted"
-                      role="progressbar"
-                    >
-                      <div className={`h-full ${quotaPercent >= 90 ? 'bg-destructive' : quotaPercent >= 75 ? 'bg-yellow-500' : 'bg-primary'}`} style={{ width: `${Math.max(0, Math.min(100, quotaPercent))}%` }} />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">La API pública no expone un límite de cuota para esta instantánea.</p>
-                )}
-
-                {usage.data.collectionStatus !== 'provider_unavailable' ? (
-                  usage.data.buckets?.length ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-left text-sm">
-                        <thead>
-                          <tr className="border-b border-border text-muted-foreground">
-                            <th className="py-2 pr-3">Bucket</th>
-                            <th className="py-2 pr-3">Volumen</th>
-                            <th className="py-2 pr-3">Objetos</th>
-                            <th className="py-2">Objeto mayor</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {usage.data.buckets.map((bucket) => (
-                            <tr className="border-b border-border/60" key={bucket.bucketId}>
-                              <td className="py-2 pr-3">{bucketNameById.get(bucket.bucketId) ?? bucket.bucketId}</td>
-                              <td className="py-2 pr-3">{formatBytes(bucket.totalBytes)}</td>
-                              <td className="py-2 pr-3">{formatValue(bucket.objectCount)}</td>
-                              <td className="py-2">{formatBytes(bucket.largestObjectSizeBytes)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {typeof quotaPercent === 'number' && quotaLimit !== null ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span>Cuota usada</span>
+                        <span>{Math.round(quotaPercent)}% · {formatBytes(usage.data.dimensions?.totalBytes?.used)} / {formatBytes(quotaLimit)}</span>
+                      </div>
+                      <div
+                        aria-valuemax={100}
+                        aria-valuemin={0}
+                        aria-valuenow={Math.max(0, Math.min(100, Math.round(quotaPercent)))}
+                        className="h-3 overflow-hidden rounded-full bg-muted"
+                        role="progressbar"
+                      >
+                        <div className={`h-full ${quotaPercent >= 90 ? 'bg-destructive' : quotaPercent >= 75 ? 'bg-yellow-500' : 'bg-primary'}`} style={{ width: `${Math.max(0, Math.min(100, quotaPercent))}%` }} />
+                      </div>
                     </div>
                   ) : (
-                    <p>No hay desglose por bucket disponible en la instantánea pública.</p>
-                  )
-                ) : null}
-              </div>
-            ) : null}
-          </section>
+                    <p className="text-sm text-muted-foreground">La API pública no expone un límite de cuota para esta instantánea.</p>
+                  )}
+
+                  {usage.data.collectionStatus !== 'provider_unavailable' ? (
+                    usage.data.buckets?.length ? (
+                      <Table aria-label="Desglose de uso por bucket">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Bucket</TableHead>
+                            <TableHead>Volumen</TableHead>
+                            <TableHead>Objetos</TableHead>
+                            <TableHead>Objeto mayor</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {usage.data.buckets.map((bucket) => (
+                            <TableRow key={bucket.bucketId}>
+                              <TableCell>{bucketNameById.get(bucket.bucketId) ?? bucket.bucketId}</TableCell>
+                              <TableCell>{formatBytes(bucket.totalBytes)}</TableCell>
+                              <TableCell>{formatValue(bucket.objectCount)}</TableCell>
+                              <TableCell>{formatBytes(bucket.largestObjectSizeBytes)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p>No hay desglose por bucket disponible en la instantánea pública.</p>
+                    )
+                  ) : null}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
 
-        <section className="rounded-xl border border-border p-4">
+        <Card>
           {!selectedBucket ? (
             <div className="space-y-2">
               <h2 className="text-lg font-semibold">Detalle del bucket</h2>
@@ -671,16 +678,16 @@ export function ConsoleStoragePage() {
                 {selectedBucket.provisioning?.state ? <Badge variant={statusTone(selectedBucket.provisioning.state)}>{formatEnumLabel(selectedBucket.provisioning.state)}</Badge> : null}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {(['objects', 'presigned', 'multipart'] as BucketTab[]).map((tab) => (
-                  <Button key={tab} onClick={() => setBucketTab(tab)} type="button" variant={bucketTab === tab ? 'default' : 'outline'}>
-                    {tab === 'objects' ? 'Objetos' : tab === 'presigned' ? 'URLs prefirmadas' : 'Multiparte'}
-                  </Button>
-                ))}
-              </div>
+              <Tabs value={bucketTab} onValueChange={(value) => setBucketTab(value as BucketTab)}>
+                <TabsList aria-label={`Secciones del bucket ${selectedBucket.bucketName}`}>
+                  {(['objects', 'presigned', 'multipart'] as BucketTab[]).map((tab) => (
+                    <TabsTrigger key={tab} value={tab}>
+                      {tab === 'objects' ? 'Objetos' : tab === 'presigned' ? 'URLs prefirmadas' : 'Multiparte'}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-              {bucketTab === 'objects' ? (
-                <div className="space-y-4">
+                <TabsContent value="objects" className="space-y-4">
                   {objects.loading ? <p>Cargando objetos…</p> : null}
                   {!objects.loading && objects.error ? (
                     <div className="space-y-3">
@@ -691,42 +698,41 @@ export function ConsoleStoragePage() {
                   {!objects.loading && !objects.error && objects.data && objects.data.items.length === 0 ? <p>Este bucket está vacío.</p> : null}
                   {!objects.error && objects.data && objects.data.items.length > 0 ? (
                     <>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-left text-sm">
-                          <thead>
-                            <tr className="border-b border-border text-muted-foreground">
-                              <th className="py-2 pr-3">Clave</th>
-                              <th className="py-2 pr-3">Tamaño</th>
-                              <th className="py-2 pr-3">Content-Type</th>
-                              <th className="py-2 pr-3">Última modificación</th>
-                              <th className="py-2">ETag</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {objects.data.items.map((item) => {
-                              const selected = item.objectKey === selectedObjectKey
-                              return (
-                                <tr className={`border-b border-border/60 ${selected ? 'bg-primary/10' : ''}`} key={item.resourceId ?? item.objectKey}>
-                                  <td className="py-3 pr-3 align-top">
-                                    <button
-                                      className="max-w-[22rem] truncate text-left font-medium underline-offset-4 hover:underline"
-                                      onClick={() => setSelectedObjectKey(item.objectKey)}
-                                      title={item.objectKey}
-                                      type="button"
-                                    >
-                                      {item.objectKey}
-                                    </button>
-                                  </td>
-                                  <td className="py-3 pr-3 align-top">{formatBytes(item.sizeBytes)}</td>
-                                  <td className="py-3 pr-3 align-top">{formatValue(item.contentType)}</td>
-                                  <td className="py-3 pr-3 align-top">{formatRelativeDate(item.timestamps?.lastModifiedAt)}</td>
-                                  <td className="py-3 align-top">{formatValue(item.etag)}</td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                      <Table aria-label="Listado de objetos del bucket seleccionado">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Clave</TableHead>
+                            <TableHead>Tamaño</TableHead>
+                            <TableHead>Content-Type</TableHead>
+                            <TableHead>Última modificación</TableHead>
+                            <TableHead>ETag</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {objects.data.items.map((item) => {
+                            const selected = item.objectKey === selectedObjectKey
+                            return (
+                              <TableRow className={selected ? 'bg-primary/10' : ''} key={item.resourceId ?? item.objectKey}>
+                                <TableCell className="align-top">
+                                  <Button
+                                    variant="link"
+                                    className="h-auto max-w-[22rem] justify-start truncate p-0 text-left font-medium"
+                                    onClick={() => setSelectedObjectKey(item.objectKey)}
+                                    title={item.objectKey}
+                                    type="button"
+                                  >
+                                    {item.objectKey}
+                                  </Button>
+                                </TableCell>
+                                <TableCell className="align-top">{formatBytes(item.sizeBytes)}</TableCell>
+                                <TableCell className="align-top">{formatValue(item.contentType)}</TableCell>
+                                <TableCell className="align-top">{formatRelativeDate(item.timestamps?.lastModifiedAt)}</TableCell>
+                                <TableCell className="align-top">{formatValue(item.etag)}</TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
 
                       {nextObjectCursor ? (
                         <Button disabled={objects.loading} onClick={() => void loadObjects(selectedBucket.resourceId, nextObjectCursor)} type="button">
@@ -737,7 +743,7 @@ export function ConsoleStoragePage() {
                   ) : null}
 
                   {selectedObjectKey ? (
-                    <section className="space-y-3 rounded-xl border border-border p-4">
+                    <Card className="space-y-3 rounded-2xl bg-background/40 p-4 shadow-none">
                       <div>
                         <h3 className="font-semibold">Metadatos del objeto</h3>
                         <p className="text-sm text-muted-foreground">Detalle de solo lectura obtenido desde el punto de conexión público de metadatos.</p>
@@ -764,40 +770,36 @@ export function ConsoleStoragePage() {
                             { label: 'Última modificación', value: objectMeta.data.timestamps?.lastModifiedAt }
                           ]} />
 
-                          <section className="space-y-3">
+                          <div className="space-y-3">
                             <h4 className="font-medium">Metadatos personalizados</h4>
                             {objectMeta.data.metadata && Object.keys(objectMeta.data.metadata).length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full text-left text-sm">
-                                  <thead>
-                                    <tr className="border-b border-border text-muted-foreground">
-                                      <th className="py-2 pr-3">Clave</th>
-                                      <th className="py-2">Valor</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {Object.entries(objectMeta.data.metadata).map(([key, value]) => (
-                                      <tr className="border-b border-border/60" key={key}>
-                                        <td className="py-2 pr-3">{key}</td>
-                                        <td className="py-2">{value}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                              <Table aria-label="Metadatos personalizados del objeto">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Clave</TableHead>
+                                    <TableHead>Valor</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {Object.entries(objectMeta.data.metadata).map(([key, value]) => (
+                                    <TableRow key={key}>
+                                      <TableCell>{key}</TableCell>
+                                      <TableCell>{value}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
                             ) : (
                               <p>Este objeto no expone metadatos personalizados.</p>
                             )}
-                          </section>
+                          </div>
                         </div>
                       ) : null}
-                    </section>
+                    </Card>
                   ) : null}
-                </div>
-              ) : null}
+                </TabsContent>
 
-              {bucketTab === 'presigned' ? (
-                <div className="space-y-4">
+                <TabsContent value="presigned" className="space-y-4">
                   <div>
                     <h3 className="font-semibold">URLs prefirmadas</h3>
                     <p className="text-sm text-muted-foreground">
@@ -833,16 +835,19 @@ export function ConsoleStoragePage() {
                       ) : null}
                     </div>
                   )}
-                </div>
-              ) : null}
-              {bucketTab === 'multipart'
-                ? STORAGE_MULTIPART_READ_API_AVAILABLE
-                  ? <p>Inventario público de sesiones multipart pendiente de implementación.</p>
-                  : <UnsupportedApiState surface="multipart" />
-                : null}
+                </TabsContent>
+
+                <TabsContent value="multipart">
+                  {STORAGE_MULTIPART_READ_API_AVAILABLE ? (
+                    <p>Inventario público de sesiones multipart pendiente de implementación.</p>
+                  ) : (
+                    <UnsupportedApiState surface="multipart" />
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           )}
-        </section>
+        </Card>
       </section>
     </main>
   )

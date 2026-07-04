@@ -287,13 +287,13 @@ describe('ConsoleStoragePage', () => {
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
 
     // Presigned tab is now an on-demand generator (issuance is wired), not an unsupported state.
-    await user.click(await screen.findByRole('button', { name: /urls prefirmadas/i }))
+    await user.click(await screen.findByRole('tab', { name: /urls prefirmadas/i }))
     expect(await screen.findByRole('heading', { name: /urls prefirmadas/i })).toBeInTheDocument()
     // With no object selected yet, it prompts the user to pick one in the Objetos tab.
     expect(screen.getByText(/selecciona un objeto en la pestaña/i)).toBeInTheDocument()
 
     // Multiparte still has no public inventory endpoint, so it stays in the bounded solo lectura state.
-    await user.click(screen.getByRole('button', { name: /multiparte/i }))
+    await user.click(screen.getByRole('tab', { name: /multiparte/i }))
     expect(await screen.findByText(/cargas multiparte no disponible en la api pública actual/i)).toBeInTheDocument()
   })
 
@@ -321,7 +321,7 @@ describe('ConsoleStoragePage', () => {
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
     // Select an object, then switch to the presigned tab and generate.
     await user.click(await screen.findByRole('button', { name: 'media/hero.png' }))
-    await user.click(await screen.findByRole('button', { name: /urls prefirmadas/i }))
+    await user.click(await screen.findByRole('tab', { name: /urls prefirmadas/i }))
     await user.click(await screen.findByRole('button', { name: /generar url de descarga prefirmada/i }))
 
     expect(await screen.findByText(/X-Amz-Signature=deadbeef/i)).toBeInTheDocument()
@@ -364,7 +364,7 @@ describe('ConsoleStoragePage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/metadata degradada/i)
     expect(screen.getByText(/almacenamiento \/ objetos/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Objetos' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Objetos' })).toBeInTheDocument()
   })
 
   it('muestra snippets del bucket seleccionado con placeholders cuando falta endpoint', async () => {
@@ -376,5 +376,23 @@ describe('ConsoleStoragePage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/<RESOURCE_HOST>/).length).toBeGreaterThan(0)
+  })
+
+  // #757: converge on the shared Card/Table/Tabs primitives — the page previously used flat
+  // `rounded-xl border` panels (no bg-card) and raw <table> markup, and the object/presigned/
+  // multipart switcher is semantically a tab strip.
+  it('uses the shared Card/Table/Tabs primitives', async () => {
+    queueHappyPath()
+    const user = userEvent.setup()
+
+    const { container } = renderPage()
+    await screen.findByRole('button', { name: 'media-assets' })
+
+    expect(container.querySelectorAll('[data-slot="card"]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-slot="table"]').length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: 'media-assets' }))
+    expect(await screen.findByRole('tablist', { name: /bucket/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Objetos' })).toBeInTheDocument()
   })
 })

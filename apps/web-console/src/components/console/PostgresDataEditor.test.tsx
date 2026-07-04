@@ -171,3 +171,37 @@ describe('PostgresDataEditor — richer UX', () => {
     expect(screen.getByText(/Vista previa con esta clave: 1 fila/)).toBeInTheDocument()
   })
 })
+
+// #757: the editor must render every control via the shared design-system primitives
+// (Button/Input/Select/Textarea/Table) — no native/unstyled <button>/<input>/<select>/<table>.
+describe('PostgresDataEditor — design system (#757)', () => {
+  it('renders every button, field and table via the shared design-system primitives', async () => {
+    mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
+    mocked.previewRowsWithApiKey.mockResolvedValue({ items: [{ id: 'r9', body: 'as-anon' }] })
+    const { container } = renderEditor()
+    await screen.findByText('hello')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir clave anónima' }))
+    await screen.findByText('flc_anon_secret')
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar vista previa de solo lectura' }))
+    await screen.findByText('as-anon')
+
+    const buttons = container.querySelectorAll('button')
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of Array.from(buttons)) {
+      expect(button.className).toMatch(/focus-visible:ring-offset-background/)
+    }
+
+    const fields = container.querySelectorAll('input, select, textarea')
+    expect(fields.length).toBeGreaterThan(0)
+    for (const field of Array.from(fields)) {
+      expect(field.className).toMatch(/rounded-xl border border-input/)
+    }
+
+    const tables = container.querySelectorAll('table')
+    expect(tables.length).toBeGreaterThan(0)
+    for (const table of Array.from(tables)) {
+      expect(table.getAttribute('data-slot')).toBe('table')
+    }
+  })
+})

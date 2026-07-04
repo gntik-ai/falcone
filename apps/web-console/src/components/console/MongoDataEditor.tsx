@@ -1,8 +1,16 @@
-// MongoDB document editor (changes: add-console-mongo-data-editor, add-console-richer-data-editors).
+// MongoDB document editor (changes: add-console-mongo-data-editor, add-console-richer-data-editors,
+// add-757-console-dataplane-design-system).
 // Lists/inserts/EDITS/deletes documents in a collection via the control-plane executor
 // (@/services/mongoApi), with loading + empty states.
+// #757: every control renders via the shared design-system primitives (Button/Textarea/Label/Card)
+// — this component previously had zero className usage anywhere.
 import { useCallback, useEffect, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import type { ApiError } from '@/lib/http'
 import { copyToClipboard, parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import {
@@ -227,116 +235,183 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
   }
 
   return (
-    <section aria-label="Editor de datos Mongo">
-      <h2>
-        {databaseName}.{collectionName}
-      </h2>
-      {error ? <p role="alert">{error}</p> : null}
-      {status ? <p role="status">{status}</p> : null}
-
-      <div aria-label="Filtro">
-        <h3>Filtro</h3>
-        <label htmlFor="mongo-filter-json">Filtro (consulta MongoDB en JSON)</label>
-        <textarea id="mongo-filter-json" value={filterJson} onChange={(event) => setFilterJson(event.target.value)} />
-        <button type="button" onClick={applyFilter}>
-          Aplicar filtro
-        </button>
-        <button type="button" onClick={clearFilter}>
-          Limpiar
-        </button>
+    <section aria-label="Editor de datos Mongo" className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-foreground">
+          {databaseName}.{collectionName}
+        </h2>
       </div>
+      {error ? (
+        <p role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      {status ? (
+        <p role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+          {status}
+        </p>
+      ) : null}
 
-      <h3>Documentos{docs.length > 0 ? ` (${docs.length})` : ''}</h3>
-      <div aria-label="Paginación">
-        <label htmlFor="mongo-page-size">Tamaño de página</label>
-        <select id="mongo-page-size" value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={prevPage} disabled={cursorStack.length === 0 || busy}>
-          Anterior
-        </button>
-        <button type="button" onClick={nextPage} disabled={!nextAfter || busy}>
-          Siguiente
-        </button>
-      </div>
-      {loading ? (
-        <p>Cargando documentos…</p>
-      ) : docs.length === 0 ? (
-        <p>Todavía no hay documentos.</p>
-      ) : (
-        <ul>
-          {docs.map((doc, index) => (
-            <li key={documentId(doc) ?? index}>
-              <code>{JSON.stringify(doc)}</code>
-              <button type="button" onClick={() => beginEdit(doc)} disabled={busy}>
-                Editar
-              </button>
-              <button type="button" onClick={() => void handleDelete(doc)} disabled={busy}>
-                Eliminar
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Card aria-label="Filtro">
+        <CardHeader>
+          <CardTitle>Filtro</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mongo-filter-json">Filtro (consulta MongoDB en JSON)</Label>
+            <Textarea id="mongo-filter-json" value={filterJson} onChange={(event) => setFilterJson(event.target.value)} />
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" onClick={applyFilter}>
+              Aplicar filtro
+            </Button>
+            <Button type="button" variant="outline" onClick={clearFilter}>
+              Limpiar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Documentos{docs.length > 0 ? ` (${docs.length})` : ''}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div aria-label="Paginación" className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="mongo-page-size">Tamaño de página</Label>
+              <Select id="mongo-page-size" className="w-28" value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
+                {PAGE_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button type="button" variant="outline" onClick={prevPage} disabled={cursorStack.length === 0 || busy}>
+              Anterior
+            </Button>
+            <Button type="button" variant="outline" onClick={nextPage} disabled={!nextAfter || busy}>
+              Siguiente
+            </Button>
+          </div>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Cargando documentos…</p>
+          ) : docs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Todavía no hay documentos.</p>
+          ) : (
+            <ul className="space-y-2">
+              {docs.map((doc, index) => (
+                <li
+                  key={documentId(doc) ?? index}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm"
+                >
+                  <code className="min-w-0 flex-1 truncate">{JSON.stringify(doc)}</code>
+                  <div className="flex shrink-0 gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => beginEdit(doc)} disabled={busy}>
+                      Editar
+                    </Button>
+                    <Button type="button" variant="destructive" size="sm" onClick={() => void handleDelete(doc)} disabled={busy}>
+                      Eliminar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {editingId != null ? (
-        <div aria-label="Editar documento">
-          <h3>Editar documento {editingId}</h3>
-          <label htmlFor="edit-doc-json">Documento (JSON)</label>
-          <textarea id="edit-doc-json" value={editJson} onChange={(event) => setEditJson(event.target.value)} />
-          <button type="button" onClick={() => void saveEdit()} disabled={busy}>
-            Guardar
-          </button>
-          <button type="button" onClick={() => setEditingId(null)} disabled={busy}>
-            Cancelar
-          </button>
-        </div>
+        <Card aria-label="Editar documento">
+          <CardHeader>
+            <CardTitle>Editar documento {editingId}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-doc-json">Documento (JSON)</Label>
+              <Textarea id="edit-doc-json" value={editJson} onChange={(event) => setEditJson(event.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" onClick={() => void saveEdit()} disabled={busy}>
+                Guardar
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setEditingId(null)} disabled={busy}>
+                Cancelar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
-      <h3>Insertar documento</h3>
-      <label htmlFor="new-doc-json">Documento nuevo (JSON)</label>
-      <textarea id="new-doc-json" value={newDocJson} onChange={(event) => setNewDocJson(event.target.value)} />
-      <button type="button" onClick={() => void handleInsert()} disabled={busy}>
-        Insertar
-      </button>
+      <Card>
+        <CardHeader>
+          <CardTitle>Insertar documento</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-doc-json">Documento nuevo (JSON)</Label>
+            <Textarea id="new-doc-json" value={newDocJson} onChange={(event) => setNewDocJson(event.target.value)} />
+          </div>
+          <Button type="button" onClick={() => void handleInsert()} disabled={busy}>
+            Insertar
+          </Button>
+        </CardContent>
+      </Card>
 
-      <h3>Embed con clave anónima</h3>
-      <button type="button" onClick={() => void handleIssueKey()}>
-        Emitir clave anónima
-      </button>
-      {issued ? (
-        <div role="status" aria-label="Embed con clave anónima">
-          <p>Copia esta clave ahora; no volverá a mostrarse:</p>
-          <code>{issued.key}</code>
-          <button type="button" onClick={() => void handleCopyKey()}>
-            {copied ? 'Copiada' : 'Copiar clave'}
-          </button>
-          <h4>Fragmento fetch</h4>
-          <pre>{buildMongoFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}</pre>
-          <h4>Fragmento curl</h4>
-          <pre>{buildMongoCurlSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}</pre>
-          <button type="button" onClick={() => void handlePreviewEmbed()} disabled={previewBusy}>
-            Ejecutar vista previa de solo lectura
-          </button>
-          {previewError ? <p role="alert">{previewError}</p> : null}
-          {previewDocs != null ? (
-            <div aria-label="Vista previa de integración">
-              <p>Vista previa con esta clave: {previewDocs.length} documento(s).</p>
-              <ul>
-                {previewDocs.map((doc, index) => (
-                  <li key={documentId(doc) ?? index}>
-                    <code>{JSON.stringify(doc)}</code>
-                  </li>
-                ))}
-              </ul>
+      <Card>
+        <CardHeader>
+          <CardTitle>Embed con clave anónima</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button type="button" onClick={() => void handleIssueKey()}>
+            Emitir clave anónima
+          </Button>
+          {issued ? (
+            <div role="status" aria-label="Embed con clave anónima" className="space-y-4 rounded-2xl border border-border bg-background/40 p-4">
+              <p className="text-sm text-muted-foreground">Copia esta clave ahora; no volverá a mostrarse:</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded-lg bg-muted px-2 py-1 text-sm">{issued.key}</code>
+                <Button type="button" variant="outline" size="sm" onClick={() => void handleCopyKey()}>
+                  {copied ? 'Copiada' : 'Copiar clave'}
+                </Button>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">Fragmento fetch</h4>
+                <pre className="mt-2 overflow-x-auto rounded-xl bg-muted/70 p-4 text-xs">
+                  {buildMongoFrontendSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}
+                </pre>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">Fragmento curl</h4>
+                <pre className="mt-2 overflow-x-auto rounded-xl bg-muted/70 p-4 text-xs">
+                  {buildMongoCurlSnippet({ apiKey: issued.key, workspaceId, databaseName, collectionName, origin: embedOrigin })}
+                </pre>
+              </div>
+              <Button type="button" variant="outline" onClick={() => void handlePreviewEmbed()} disabled={previewBusy}>
+                Ejecutar vista previa de solo lectura
+              </Button>
+              {previewError ? (
+                <p role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {previewError}
+                </p>
+              ) : null}
+              {previewDocs != null ? (
+                <div aria-label="Vista previa de integración" className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Vista previa con esta clave: {previewDocs.length} documento(s).</p>
+                  <ul className="space-y-2">
+                    {previewDocs.map((doc, index) => (
+                      <li key={documentId(doc) ?? index} className="rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm">
+                        <code>{JSON.stringify(doc)}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           ) : null}
-        </div>
-      ) : null}
+        </CardContent>
+      </Card>
     </section>
   )
 }

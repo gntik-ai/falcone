@@ -4,6 +4,7 @@ import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
 import { ProvisionDatabaseWizard } from '@/components/console/wizards/ProvisionDatabaseWizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
@@ -537,37 +538,35 @@ export function ConsoleMongoPage() {
             <ConsoleSectionEmpty message="No hay bases de datos MongoDB disponibles para esta organización." />
           ) : null}
           {!databases.loading && !databases.error && databases.data.length > 0 ? (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Base de datos</th>
-                    <th className="px-3 py-2 font-medium">Tamaño datos</th>
-                    <th className="px-3 py-2 font-medium">Tamaño almacenamiento</th>
-                    <th className="px-3 py-2 font-medium">Colecciones</th>
-                    <th className="px-3 py-2 font-medium">Índices</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {databases.data.map((database) => (
-                    <tr
-                      key={database.databaseName}
-                      className={isActiveRow(selectedDatabase === database.databaseName)}
-                      onClick={() => {
-                        setSelectedDatabase(database.databaseName)
-                        setDatabaseTab('collections')
-                      }}
-                    >
-                      <td className="px-3 py-3 font-medium">{database.databaseName}</td>
-                      <td className="px-3 py-3">{formatBytes(database.stats?.dataSize)}</td>
-                      <td className="px-3 py-3">{formatBytes(database.stats?.storageSize)}</td>
-                      <td className="px-3 py-3">{database.stats?.collections ?? '—'}</td>
-                      <td className="px-3 py-3">{database.stats?.indexes ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table containerClassName="mt-4" aria-label="Listado de bases de datos MongoDB">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Base de datos</TableHead>
+                  <TableHead>Tamaño datos</TableHead>
+                  <TableHead>Tamaño almacenamiento</TableHead>
+                  <TableHead>Colecciones</TableHead>
+                  <TableHead>Índices</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {databases.data.map((database) => (
+                  <TableRow
+                    key={database.databaseName}
+                    className={isActiveRow(selectedDatabase === database.databaseName)}
+                    onClick={() => {
+                      setSelectedDatabase(database.databaseName)
+                      setDatabaseTab('collections')
+                    }}
+                  >
+                    <TableCell className="font-medium">{database.databaseName}</TableCell>
+                    <TableCell>{formatBytes(database.stats?.dataSize)}</TableCell>
+                    <TableCell>{formatBytes(database.stats?.storageSize)}</TableCell>
+                    <TableCell>{database.stats?.collections ?? '—'}</TableCell>
+                    <TableCell>{database.stats?.indexes ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : null}
         </section>
       ) : null}
@@ -599,34 +598,32 @@ export function ConsoleMongoPage() {
             ) : collections.data.length === 0 ? (
               <ConsoleSectionEmpty message="La base seleccionada no tiene colecciones visibles." />
             ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-muted-foreground">
-                      <th className="px-3 py-2 font-medium">Colección</th>
-                      <th className="px-3 py-2 font-medium">Tipo</th>
-                      <th className="px-3 py-2 font-medium">Documentos</th>
-                      <th className="px-3 py-2 font-medium">Tamaño</th>
-                      <th className="px-3 py-2 font-medium">Validación</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {collections.data.map((collection) => (
-                      <tr
-                        key={collection.collectionName}
-                        className={isActiveRow(selectedCollection === collection.collectionName)}
-                        onClick={() => setSelectedCollection(collection.collectionName)}
-                      >
-                        <td className="px-3 py-3 font-medium">{collection.collectionName}</td>
-                        <td className="px-3 py-3"><CollectionTypeBadge type={collection.collectionType} /></td>
-                        <td className="px-3 py-3">{collection.documentCount ?? '—'}</td>
-                        <td className="px-3 py-3">{formatBytes(collection.estimatedSize)}</td>
-                        <td className="px-3 py-3"><ValidationPresenceBadge present={Boolean(collection.validation?.validator)} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table containerClassName="mt-4" aria-label="Listado de colecciones MongoDB de la base seleccionada">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Colección</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Documentos</TableHead>
+                    <TableHead>Tamaño</TableHead>
+                    <TableHead>Validación</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {collections.data.map((collection) => (
+                    <TableRow
+                      key={collection.collectionName}
+                      className={isActiveRow(selectedCollection === collection.collectionName)}
+                      onClick={() => setSelectedCollection(collection.collectionName)}
+                    >
+                      <TableCell className="font-medium">{collection.collectionName}</TableCell>
+                      <TableCell><CollectionTypeBadge type={collection.collectionType} /></TableCell>
+                      <TableCell>{collection.documentCount ?? '—'}</TableCell>
+                      <TableCell>{formatBytes(collection.estimatedSize)}</TableCell>
+                      <TableCell><ValidationPresenceBadge present={Boolean(collection.validation?.validator)} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )
           ) : views.loading ? (
             <ConsoleSectionLoading label="Cargando vistas…" />
@@ -635,28 +632,26 @@ export function ConsoleMongoPage() {
           ) : views.data.length === 0 ? (
             <ConsoleSectionEmpty message="La base seleccionada no tiene vistas MongoDB." />
           ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Vista</th>
-                    <th className="px-3 py-2 font-medium">Fuente</th>
-                    <th className="px-3 py-2 font-medium">Pipeline</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {views.data.map((view) => (
-                    <tr key={view.viewName} className="align-top border-b border-border/60">
-                      <td className="px-3 py-3 font-medium">{view.viewName}</td>
-                      <td className="px-3 py-3">{view.viewOn ?? '—'}</td>
-                      <td className="px-3 py-3">
-                        <pre className="max-h-40 overflow-y-auto overflow-x-auto rounded-xl bg-muted/40 p-3 text-xs">{safeJson(view.pipeline ?? [])}</pre>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table containerClassName="mt-4" aria-label="Listado de vistas MongoDB de la base seleccionada">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vista</TableHead>
+                  <TableHead>Fuente</TableHead>
+                  <TableHead>Pipeline</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {views.data.map((view) => (
+                  <TableRow key={view.viewName} className="align-top">
+                    <TableCell className="font-medium">{view.viewName}</TableCell>
+                    <TableCell>{view.viewOn ?? '—'}</TableCell>
+                    <TableCell>
+                      <pre className="max-h-40 overflow-y-auto overflow-x-auto rounded-xl bg-muted/40 p-3 text-xs">{safeJson(view.pipeline ?? [])}</pre>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </section>
       ) : null}
@@ -690,36 +685,34 @@ export function ConsoleMongoPage() {
           ) : indexes.data.length === 0 || selectedCollectionHasOnlyDefaultIndex ? (
             <ConsoleSectionEmpty message={selectedCollectionHasOnlyDefaultIndex ? 'Solo índice _id_ — no hay índices adicionales.' : 'No hay índices visibles para esta colección.'} />
           ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Índice</th>
-                    <th className="px-3 py-2 font-medium">Campos</th>
-                    <th className="px-3 py-2 font-medium">Tipo</th>
-                    <th className="px-3 py-2 font-medium">Unique</th>
-                    <th className="px-3 py-2 font-medium">Sparse</th>
-                    <th className="px-3 py-2 font-medium">TTL</th>
-                    <th className="px-3 py-2 font-medium">Partial filter</th>
-                    <th className="px-3 py-2 font-medium">Estado rebuild</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {indexes.data.map((index) => (
-                    <tr key={index.indexName} className="align-top border-b border-border/60">
-                      <td className="px-3 py-3 font-medium">{index.indexName}</td>
-                      <td className="px-3 py-3">{(index.keys ?? []).map((key) => `${key.fieldName}: ${String(key.direction ?? '—')}`).join(', ') || '—'}</td>
-                      <td className="px-3 py-3">{index.indexType ?? '—'}</td>
-                      <td className="px-3 py-3">{index.unique ? 'Sí' : 'No'}</td>
-                      <td className="px-3 py-3">{index.sparse ? 'Sí' : 'No'}</td>
-                      <td className="px-3 py-3">{index.ttlSeconds ?? '—'}</td>
-                      <td className="px-3 py-3"><pre className="max-h-32 overflow-auto rounded-xl bg-muted/40 p-3 text-xs">{index.partialFilterExpression ? safeJson(index.partialFilterExpression) : '—'}</pre></td>
-                      <td className="px-3 py-3"><RebuildStateBadge state={index.rebuildState} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table containerClassName="mt-4" aria-label="Listado de índices de la colección seleccionada">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Índice</TableHead>
+                  <TableHead>Campos</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Unique</TableHead>
+                  <TableHead>Sparse</TableHead>
+                  <TableHead>TTL</TableHead>
+                  <TableHead>Partial filter</TableHead>
+                  <TableHead>Estado rebuild</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {indexes.data.map((index) => (
+                  <TableRow key={index.indexName} className="align-top">
+                    <TableCell className="font-medium">{index.indexName}</TableCell>
+                    <TableCell>{(index.keys ?? []).map((key) => `${key.fieldName}: ${String(key.direction ?? '—')}`).join(', ') || '—'}</TableCell>
+                    <TableCell>{index.indexType ?? '—'}</TableCell>
+                    <TableCell>{index.unique ? 'Sí' : 'No'}</TableCell>
+                    <TableCell>{index.sparse ? 'Sí' : 'No'}</TableCell>
+                    <TableCell>{index.ttlSeconds ?? '—'}</TableCell>
+                    <TableCell><pre className="max-h-32 overflow-auto rounded-xl bg-muted/40 p-3 text-xs">{index.partialFilterExpression ? safeJson(index.partialFilterExpression) : '—'}</pre></TableCell>
+                    <TableCell><RebuildStateBadge state={index.rebuildState} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : null}
 
           {collectionDetailTab === 'validation' ? collectionDetail.loading ? (

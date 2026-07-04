@@ -365,6 +365,18 @@ describe('ConsolePostgresPage', () => {
 
     expect(screen.queryByRole('heading', { name: 'Fragmentos de conexión' })).not.toBeInTheDocument()
   })
+
+  // #757: converge the hand-rolled <table> markup onto the shared Table primitive so the header
+  // style matches every other data-plane grid (same th classes, one `data-slot="table"` idiom).
+  it('renders the databases table via the shared Table primitive (#757)', async () => {
+    mockConsoleApi()
+
+    const { container } = renderPage()
+
+    const table = await screen.findByRole('table', { name: /listado de bases de datos postgresql/i })
+    expect(table.getAttribute('data-slot')).toBe('table')
+    expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
+  })
 })
 
 function renderUi() {

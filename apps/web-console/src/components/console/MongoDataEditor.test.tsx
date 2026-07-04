@@ -141,3 +141,31 @@ describe('MongoDataEditor — richer UX', () => {
     expect(await screen.findByText(/"body":"as-anon"/)).toBeInTheDocument()
   })
 })
+
+// #757: the editor must render every control via the shared design-system primitives
+// (Button/Input/Select/Textarea) — no native/unstyled <button>/<input>/<select>/<textarea>.
+describe('MongoDataEditor — design system (#757)', () => {
+  it('renders every button and field via the shared design-system primitives', async () => {
+    mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
+    mocked.previewDocumentsWithApiKey.mockResolvedValue({ items: [{ _id: 'p1', body: 'as-anon' }] })
+    const { container } = renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir clave anónima' }))
+    await screen.findByText('flc_anon_secret')
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar vista previa de solo lectura' }))
+    await screen.findByText(/"body":"as-anon"/)
+
+    const buttons = container.querySelectorAll('button')
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of Array.from(buttons)) {
+      expect(button.className).toMatch(/focus-visible:ring-offset-background/)
+    }
+
+    const fields = container.querySelectorAll('input, select, textarea')
+    expect(fields.length).toBeGreaterThan(0)
+    for (const field of Array.from(fields)) {
+      expect(field.className).toMatch(/rounded-xl border border-input/)
+    }
+  })
+})

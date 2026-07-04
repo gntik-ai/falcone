@@ -334,6 +334,37 @@ describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () =>
   })
 })
 
+describe('ConsoleMembersPage — design system (#757)', () => {
+  afterEach(() => {
+    cleanup()
+    fetchMock.mockReset()
+    vi.unstubAllGlobals()
+    clearConsoleShellSession()
+    window.localStorage.clear()
+  })
+
+  it('renders the create-user fields via the shared Input/Select primitives and the tables via the shared Table primitive', async () => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      users: [createIamUser('usr_1', 'alice')],
+      roles: [createIamRole('realm-admin')]
+    })
+    const user = userEvent.setup()
+
+    const { container } = renderPage(sessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    await user.click(await screen.findByRole('button', { name: /crear usuario/i }))
+
+    const fields = container.querySelectorAll('input, select')
+    expect(fields.length).toBeGreaterThan(0)
+    for (const field of Array.from(fields)) {
+      expect(field.className).toMatch(/rounded-xl border border-input/)
+    }
+
+    expect(container.querySelectorAll('[data-slot="table"]').length).toBeGreaterThan(0)
+  })
+})
+
 function sessionWithRoles(
   platformRoles: string[],
   principalOverrides: Record<string, unknown> = {}

@@ -265,4 +265,19 @@ describe('ConsoleMongoPage', () => {
     expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/<RESOURCE_HOST>/).length).toBeGreaterThan(0)
   })
+
+  // #757: converge the hand-rolled <table> markup onto the shared Table primitive so the header
+  // style matches the Postgres inventory page (same th classes, one `data-slot="table"` idiom).
+  it('renders the databases table via the shared Table primitive (#757)', async () => {
+    mockUseConsoleContext.mockReturnValue(buildContext({ activeTenantId: 'tenant-a' }))
+    mockRequestConsoleSessionJson.mockResolvedValueOnce({
+      items: [{ databaseName: 'catalog', stats: { dataSize: 2048, storageSize: 4096, collections: 4, indexes: 7 } }]
+    })
+
+    const { container } = render(<ConsoleMongoPage />)
+    await screen.findByText('catalog')
+
+    expect(container.querySelector('[data-slot="table"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
+  })
 })
