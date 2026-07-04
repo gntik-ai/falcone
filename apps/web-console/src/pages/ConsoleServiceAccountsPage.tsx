@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
@@ -61,6 +61,27 @@ function formatTableTimestamp(value: string | null | undefined): string {
   return Number.isNaN(parsed) ? value : new Date(parsed).toLocaleString()
 }
 
+// Stable per-row/per-action DOM hook (also set on the Revelar/Rotar buttons below) so the dialog's
+// close-time focus-return can re-locate the LIVE trigger element even if the row it belongs to was
+// unmounted-then-remounted while the modal was open (#783 — see `credentialTriggerFallback` below).
+function credentialTriggerSelector(mode: 'reveal' | 'rotate', serviceAccountId: string): string {
+  return `[data-credential-trigger="${mode}-${serviceAccountId}"]`
+}
+
+// Resolves the element focus should return to when the credential-disclosure modal closes: the
+// SAME action button that opened it if it is still present and enabled (issuing/rotating a
+// credential triggers a background `reload()` of the accounts list — see `useConsoleServiceAccounts`
+// — which unmounts and remounts every row, including the trigger, as brand-new DOM nodes while the
+// modal may still be open), or the page heading if the account/action is gone entirely (e.g. the
+// account was deleted, or its credential was concurrently revoked so the button is now disabled).
+function credentialTriggerFallback(mode: 'reveal' | 'rotate', serviceAccountId: string): HTMLElement | null {
+  const trigger = document.querySelector<HTMLButtonElement>(credentialTriggerSelector(mode, serviceAccountId))
+  if (trigger && !trigger.disabled) {
+    return trigger
+  }
+  return document.querySelector<HTMLElement>('[data-testid="service-accounts-heading"]')
+}
+
 // A true, action-anchored MODAL for the one-time credential disclosure (#783): built on the shared
 // Dialog/DialogContent primitive (backdrop + click-outside-to-close) plus the same
 // `useModalFocusTrap` hook used by DestructiveConfirmationDialog and
@@ -71,7 +92,7 @@ function CredentialDisclosureDialog({
   disclosure,
   onClose
 }: {
-  disclosure: { mode: 'reveal' | 'rotate'; credential: ConsoleIssuedCredential } | null
+  disclosure: { mode: 'reveal' | 'rotate'; serviceAccountId: string; credential: ConsoleIssuedCredential } | null
   onClose: () => void
 }) {
   const titleId = useId()
@@ -79,7 +100,22 @@ function CredentialDisclosureDialog({
   const secretId = useId()
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const isOpen = disclosure !== null
-  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(isOpen, { initialFocus: 'panel' })
+  // Frozen at open time (and only then — never cleared while `disclosure` is null) so the
+  // close-time `resolveReturnFocus` below can still identify which button to re-locate even though
+  // `disclosure` has already flipped back to null by the time the dialog is actually closing.
+  const triggerInfoRef = useRef<{ mode: 'reveal' | 'rotate'; serviceAccountId: string } | null>(null)
+  useEffect(() => {
+    if (disclosure) {
+      triggerInfoRef.current = { mode: disclosure.mode, serviceAccountId: disclosure.serviceAccountId }
+    }
+  }, [disclosure])
+  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(isOpen, {
+    initialFocus: 'panel',
+    resolveReturnFocus: () => {
+      const info = triggerInfoRef.current
+      return info ? credentialTriggerFallback(info.mode, info.serviceAccountId) : null
+    }
+  })
 
   useEffect(() => {
     setCopyFeedback(null)
@@ -191,7 +227,7 @@ export function ConsoleServiceAccountsPage() {
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null)
   const [createBusy, setCreateBusy] = useState(false)
-  const [credentialDisclosure, setCredentialDisclosure] = useState<{ mode: 'reveal' | 'rotate'; credential: ConsoleIssuedCredential } | null>(null)
+  const [credentialDisclosure, setCredentialDisclosure] = useState<{ mode: 'reveal' | 'rotate'; serviceAccountId: string; credential: ConsoleIssuedCredential } | null>(null)
   const destructiveOp = useDestructiveOp()
   const displayNameId = useId()
   const session = readConsoleShellSession()
@@ -256,7 +292,7 @@ export function ConsoleServiceAccountsPage() {
     setErrorFeedback(null)
     try {
       const credential = await issueServiceAccountCredential(workspaceId, serviceAccountId, { requestedByUserId: principalUserId })
-      setCredentialDisclosure({ mode: 'reveal', credential })
+      setCredentialDisclosure({ mode: 'reveal', serviceAccountId, credential })
       reload()
     } catch (rawError) {
       // The control plane rejects revealing a credential for a revoked service account (409
@@ -295,7 +331,7 @@ export function ConsoleServiceAccountsPage() {
     setErrorFeedback(null)
     try {
       const credential = await rotateServiceAccountCredential(workspaceId, serviceAccountId, { reason: 'Console rotate' })
-      setCredentialDisclosure({ mode: 'rotate', credential })
+      setCredentialDisclosure({ mode: 'rotate', serviceAccountId, credential })
       reload()
     } catch (rawError) {
       // Rotation of a revoked service account is rejected with 409 CREDENTIAL_REVOKED; surface it.
@@ -329,7 +365,16 @@ export function ConsoleServiceAccountsPage() {
           <Badge variant="outline">Cuentas de servicio</Badge>
           <div>
             <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cuentas de servicio</h1>
+            {/* tabIndex={-1} + data-testid: a programmatic-focus-only fallback target for the
+                credential-disclosure modal's close-time focus-return (#783) when the row that
+                triggered it is gone (deleted, or its credential was concurrently revoked). */}
+            <h1
+              data-testid="service-accounts-heading"
+              tabIndex={-1}
+              className="text-2xl font-semibold tracking-tight text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Cuentas de servicio
+            </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               Identidades programáticas del área de trabajo activa y sus credenciales de cliente. Revelar muestra el
               secreto actual, Rotar genera uno nuevo e invalida el anterior, y Revocar desactiva la credencial de forma
@@ -427,6 +472,7 @@ export function ConsoleServiceAccountsPage() {
                           aria-describedby={credentialActionsHelpId}
                           title={credentialRevoked ? 'La credencial revocada no se puede revelar.' : 'Muestra el secreto de cliente actual; puede mostrarse de nuevo.'}
                           disabled={writesBlocked || credentialRevoked}
+                          data-credential-trigger={`reveal-${account.serviceAccountId}`}
                           onClick={() => void handleIssue(account.serviceAccountId)}
                         >
                           Revelar
@@ -439,6 +485,7 @@ export function ConsoleServiceAccountsPage() {
                           aria-describedby={credentialActionsHelpId}
                           title={credentialRevoked ? 'La credencial revocada no se puede rotar.' : 'Genera un secreto nuevo y reemplaza el anterior.'}
                           disabled={writesBlocked || credentialRevoked}
+                          data-credential-trigger={`rotate-${account.serviceAccountId}`}
                           onClick={() => void handleRotate(account.serviceAccountId)}
                         >
                           Rotar

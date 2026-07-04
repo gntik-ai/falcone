@@ -14,6 +14,15 @@ export interface UseModalFocusTrapOptions {
   // of its focusable descendants — used where the panel is the accessible-name-bearing element and
   // callers rely on it (not a specific child) receiving focus on open.
   initialFocus?: 'first' | 'panel'
+  // Resolves the element focus should return to when the modal closes, evaluated LAZILY AT CLOSE
+  // TIME (not captured once when the modal opened). Use this when the original trigger may be
+  // unmounted/remounted while the modal is open — e.g. a background list reload triggered by the
+  // action that opened the modal (issuing/rotating a credential) can unmount-then-remount the
+  // triggering row as a brand-new DOM node. A node reference captured at open time would then be
+  // detached by close time, and calling `.focus()` on a detached node is a silent no-op (#783).
+  // Return `null`/`undefined` (or omit this option) to fall back to the node that had focus when
+  // the modal opened, as before.
+  resolveReturnFocus?: () => HTMLElement | null | undefined
 }
 
 // Moves focus into the panel on open, keeps it cycling between the panel's focusable descendants
@@ -26,6 +35,12 @@ export function useModalFocusTrap<T extends HTMLElement = HTMLDivElement>(
   const initialFocus = options.initialFocus ?? 'first'
   const panelRef = useRef<T | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
+  // Kept current on every render (not just when `open` changes) so the close-time cleanup below
+  // always calls the LATEST `resolveReturnFocus` closure — which itself reads whatever live
+  // identifying state (e.g. a ref set at open time) it needs at the moment it is invoked, not at
+  // the moment this ref was last written.
+  const resolveReturnFocusRef = useRef<UseModalFocusTrapOptions['resolveReturnFocus']>(options.resolveReturnFocus)
+  resolveReturnFocusRef.current = options.resolveReturnFocus
 
   useEffect(() => {
     if (!open) {
@@ -40,7 +55,9 @@ export function useModalFocusTrap<T extends HTMLElement = HTMLDivElement>(
       ;(first ?? panel)?.focus()
     }
     return () => {
-      restoreFocusRef.current?.focus?.()
+      const dynamicTarget = resolveReturnFocusRef.current?.()
+      const target = dynamicTarget ?? restoreFocusRef.current
+      target?.focus?.()
     }
   }, [open, initialFocus])
 

@@ -1,8 +1,29 @@
+import { useCallback, useState } from 'react'
+
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleServiceAccountsPage } from './ConsoleServiceAccountsPage'
+
+// Simulates the REAL `useConsoleServiceAccounts` hook's `reload()`: it calls `setAccounts([])`
+// synchronously — which unmounts the accounts table entirely, since the page only renders it while
+// `accounts.length > 0` — then an async refetch resolves and remounts it with a freshly-fetched
+// (referentially NEW) collection, i.e. every row's action buttons become brand-new DOM nodes. A
+// no-op `reload: vi.fn()` stub (used by simpler tests in this file) hides this and would let a
+// stale-focus-target regression pass artificially (#783 — the live checker caught exactly this: a
+// unit test whose `reload` stub never actually remounts anything cannot exercise a bug that only
+// exists because the real reload does).
+function useReloadableServiceAccountsFixture(initial: Record<string, unknown>[]) {
+  const [accounts, setAccounts] = useState(initial)
+  const reload = useCallback(() => {
+    setAccounts([])
+    setTimeout(() => {
+      setAccounts(initial.map((account) => ({ ...account })))
+    }, 0)
+  }, [initial])
+  return { accounts, loading: false, error: null, reload, knownIds: [] }
+}
 
 const mockUseConsoleContext = vi.fn()
 const mockUseConsoleServiceAccounts = vi.fn()
@@ -108,7 +129,15 @@ describe('ConsoleServiceAccountsPage', () => {
     // rejecting one — navigator.clipboard itself is undefined.
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
-    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    // A REACTIVE fixture (not a static `reload: vi.fn()` no-op) so `handleIssue`'s real `reload()`
+    // call actually unmounts-then-remounts the accounts table while the modal is open — the live
+    // defect trigger (#783). A no-op reload would leave the original button attached throughout and
+    // make a focus-return regression pass artificially.
+    mockUseConsoleServiceAccounts.mockImplementation(() =>
+      useReloadableServiceAccountsFixture([
+        { serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }
+      ])
+    )
     mockIssueServiceAccountCredential.mockResolvedValue({ credentialId: 'cred_abc123', secret: 'secret-value', expiresAt: '2027-01-01T00:00:00.000Z' })
     render(<ConsoleServiceAccountsPage />)
 
@@ -137,8 +166,21 @@ describe('ConsoleServiceAccountsPage', () => {
     await user.click(screen.getByRole('button', { name: /copiar secreto/i }))
     expect(screen.getByRole('status')).toHaveTextContent(/no se pudo copiar automáticamente/i)
 
+    // Wait for the background reload (triggered by handleIssue) to unmount-then-remount the row —
+    // the "Revelar" button is now a brand-new DOM node, distinct from the one captured above, while
+    // the modal is STILL open. This is the exact live sequence the checker isolated on 0.6.6-783.
+    await waitFor(() => {
+      const current = screen.queryByRole('button', { name: /revelar secreto actual de ops sa/i })
+      expect(current).not.toBeNull()
+      expect(current).not.toBe(revealButton)
+    })
+
     await user.keyboard('{Escape}')
-    expect(revealButton).toHaveFocus()
+    // Focus must land on the LIVE (remounted) trigger, not the stale/detached node captured at
+    // open time — resolved dynamically at close time, not from a captured reference (#783).
+    const revealButtonAfterReload = screen.getByRole('button', { name: /revelar secreto actual de ops sa/i })
+    expect(revealButtonAfterReload).toHaveFocus()
+    expect(document.body).not.toHaveFocus()
   })
 
   it('muestra la rotación como generación de un nuevo secreto', async () => {
