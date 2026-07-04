@@ -48,6 +48,11 @@ COPY services/provisioning-orchestrator /repo/services/provisioning-orchestrator
 COPY services/internal-contracts        /repo/services/internal-contracts
 COPY services/scheduling-engine         /repo/services/scheduling-engine
 COPY services/webhook-engine            /repo/services/webhook-engine
+# workspace-docs-service supplies migration 087 in the boot schema/recovery set
+# (governance-schema.mjs GOVERNANCE_MIGRATIONS). Without this dir the CP boot
+# ENOENTs on 087-workspace-doc-notes.sql, permanently fails schema/recovery and
+# exits (server.mjs) -> CrashLoopBackOff on any build after v0.6.3.
+COPY services/workspace-docs-service    /repo/services/workspace-docs-service
 COPY apps/control-plane                 /repo/apps/control-plane
 
 # Fail the BUILD if the route map references a handler module the image did not COPY
