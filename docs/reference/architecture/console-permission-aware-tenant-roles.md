@@ -58,7 +58,11 @@ write-capable role.
   `provision_database`, `publish_function`) onto a `PermissionAction` and delegates — see
   `docs/reference/architecture/console-wizard-permission-gates.md`.
 - `apps/web-console/src/lib/structural-write-access.ts::canPerformStructuralWrites` delegates to the
-  exported `WORKSPACE_WRITE_CAPABLE_ROLES` set.
+  dedicated, exported `STRUCTURAL_WRITE_ADMIN_ROLES` set (not the broader
+  `WORKSPACE_WRITE_CAPABLE_ROLES`) — a backend-parity set that mirrors
+  `apps/control-plane/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES` exactly, so it excludes
+  `platform_operator`/`platform_team` (the two roles `WORKSPACE_WRITE_CAPABLE_ROLES` treats as a
+  console-wide bypass but the backend does not authorize for a structural write).
 - `ConsoleQuotasPage.tsx` sources its `platformRoles` array from `useConsolePermissions()` instead of
   a second, independent `readConsoleShellSession()` call.
 

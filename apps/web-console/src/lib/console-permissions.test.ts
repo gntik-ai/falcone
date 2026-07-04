@@ -1,6 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { getConsolePermissions, useConsolePermissions } from './console-permissions'
+import { getConsolePermissions, STRUCTURAL_WRITE_ADMIN_ROLES, useConsolePermissions } from './console-permissions'
+
+// A real cross-package import of apps/control-plane/src/runtime/auth-roles.mjs (the pattern already
+// used by src/actions/*.mjs, e.g. tenant-management.mjs) resolves fine under vitest, but `tsc
+// -p tsconfig.app.json` (the console's strict typecheck gate, run outside vite) has no declaration
+// for a plain cross-package .mjs and reports TS7016 for it — there is no ambient-module workaround for
+// a relative specifier that does not also touch the tsc baseline. So this stays a literal, INLINE
+// mirror of that module's `WRITE_CAPABLE_ADMIN_ROLES` (round-2 review, #761) rather than a real
+// import: it still fails the instant either set drifts, it just can't point tsc/vitest at the same
+// file. Keep this literal byte-for-byte identical to
+// apps/control-plane/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES if that set ever changes.
+const BACKEND_WRITE_CAPABLE_ADMIN_ROLES = new Set([
+  'tenant_owner',
+  'tenant_admin',
+  'workspace_owner',
+  'workspace_admin',
+  'platform_admin',
+  'superadmin'
+])
 
 const readConsoleShellSessionMock = vi.fn()
 
@@ -124,6 +142,12 @@ describe('getConsolePermissions — matrix (#761)', () => {
 
     expect(permissions.highestRoleLabel).toBe('Propietario')
     expect(permissions.isReadOnly).toBe(false)
+  })
+})
+
+describe('STRUCTURAL_WRITE_ADMIN_ROLES — backend parity (#761 round-2)', () => {
+  it('matches apps/control-plane/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES exactly', () => {
+    expect(new Set(STRUCTURAL_WRITE_ADMIN_ROLES)).toEqual(BACKEND_WRITE_CAPABLE_ADMIN_ROLES)
   })
 })
 

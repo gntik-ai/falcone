@@ -77,7 +77,7 @@ const ROLE_CATALOG_BY_ID = new Map(ROLE_CATALOG.map((entry) => [entry.id, entry]
 // console-principal.ts::hasPlatformInventoryAccess exactly. `platform_team` is NOT part of that
 // function (nor does it appear anywhere in
 // services/internal-contracts/src/authorization-model.json) — its only precedent in this codebase is
-// workspace-secrets-access.ts::SECRETS_PRIVILEGED_ROLES (line 21), which already treats it as a
+// workspace-secrets-access.ts::SECRETS_PRIVILEGED_ROLES, which already treats it as a
 // tenant-admin-equivalent platform role for the Workspace Secrets gate. Included here for consistency
 // with that precedent; behavior for the other three roles is unchanged.
 const PLATFORM_BYPASS_ROLES = new Set(['superadmin', 'platform_admin', 'platform_operator', 'platform_team'])
@@ -127,9 +127,9 @@ const ACTION_ALLOWED_ROLES: Record<PermissionAction, Set<string>> = {
   // `tenant.members.manage` — allowed for tenant_owner/tenant_admin in the model.
   'tenant.members.manage': new Set(['tenant_owner', 'tenant_admin', 'workspace_owner', 'workspace_admin']),
   // IAM client management (Auth surface) — narrower than the other tenant-tier actions: the route
-  // itself is superadmin-gated (RequireSuperadminRoute in router.tsx), so this mirrors the ORIGINAL
+  // itself is superadmin-gated (RequireSuperadminRoute in router.tsx), so this extends the ORIGINAL
   // `useWizardPermissionCheck('manage_iam')` behavior (workspace_owner/workspace_admin only;
-  // tenant_owner/tenant_admin excluded).
+  // tenant_owner/tenant_admin excluded) — behavior unchanged.
   'iam.clients.manage': new Set(['workspace_owner', 'workspace_admin']),
   // Workspace runtime writes — `database.write/admin`, `bucket.write/admin`, `topic.publish`,
   // `function.deploy/invoke`, `service_account.rotate/credentials.issue/revoke`, and (until flows
