@@ -835,9 +835,9 @@ function ConsoleSectionError({
 function CollectionTypeBadge({ type }: { type?: string }) {
   const className =
     type === 'capped'
-      ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+      ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
       : type === 'time-series'
-        ? 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+        ? 'border-sky-500/30 bg-sky-500/10 text-sky-300'
         : undefined
 
   return (
@@ -850,9 +850,9 @@ function CollectionTypeBadge({ type }: { type?: string }) {
 function RebuildStateBadge({ state }: { state?: string }) {
   const className =
     state === 'in_progress'
-      ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+      ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
       : state === 'failed'
-        ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
+        ? 'border-red-500/30 bg-red-500/10 text-red-300'
         : undefined
 
   return (
@@ -866,7 +866,7 @@ function ValidationPresenceBadge({ present }: { present: boolean }) {
   return (
     <Badge
       variant={present ? 'outline' : 'secondary'}
-      className={present ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : undefined}
+      className={present ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : undefined}
     >
       {present ? 'Activa' : 'Sin validación'}
     </Badge>

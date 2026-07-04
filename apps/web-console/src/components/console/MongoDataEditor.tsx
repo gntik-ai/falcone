@@ -247,7 +247,7 @@ export function MongoDataEditor({ workspaceId, databaseName, collectionName }: M
         </p>
       ) : null}
       {status ? (
-        <p role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+        <p role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-300">
           {status}
         </p>
       ) : null}

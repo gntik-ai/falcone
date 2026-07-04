@@ -212,4 +212,19 @@ describe('PostgresDataEditor — design system (#757)', () => {
       expect(table.getAttribute('data-slot')).toBe('table')
     }
   })
+
+  it('authors the insert-success status for the dark root (text-emerald-300, not the light-mode -700 pair)', async () => {
+    // The console never mounts `.dark` — dark IS the `:root` — so a `text-emerald-700 dark:text-emerald-300`
+    // pair renders its light-mode `-700` tone (~3.5:1 on the dark background, below WCAG AA 4.5:1). The
+    // status tone must be authored directly for the dark root.
+    mocked.insertRow.mockResolvedValue({ item: {} })
+    renderEditor()
+    await screen.findByText('hello')
+    fireEvent.change(screen.getByLabelText('Fila nueva (JSON)'), { target: { value: '{"body":"new"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Insertar' }))
+    const status = await screen.findByText('Fila insertada')
+    expect(status.className).toMatch(/text-emerald-300/)
+    expect(status.className).not.toMatch(/text-emerald-700/)
+    expect(status.className).not.toMatch(/dark:/)
+  })
 })

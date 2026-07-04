@@ -270,13 +270,13 @@ function formatLabel(value?: string | null): string {
 function getRiskTone(value?: string | null): string {
   switch (value) {
     case 'critical':
-      return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
+      return 'border-red-500/40 bg-red-500/10 text-red-300'
     case 'high':
-      return 'border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300'
+      return 'border-orange-500/40 bg-orange-500/10 text-orange-300'
     case 'medium':
-      return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
+      return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-300'
     case 'low':
-      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
     default:
       return 'border-border bg-muted text-foreground'
   }
@@ -1544,7 +1544,7 @@ function ConsoleSectionError({
   onRetry: () => void
 }) {
   return (
-    <div role="alert" className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
+    <div role="alert" className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
       <p>{message}</p>
       <div className="mt-3">
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>
