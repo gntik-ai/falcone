@@ -244,7 +244,7 @@ export function QuotaAdjustDialog({
 
           {feedback?.kind !== 'success' && resolution.status === 'error' ? (
             <div className="space-y-4">
-              <Alert variant="destructive" role="alert">
+              <Alert variant="destructive" role="alert" className="text-foreground">
                 <AlertTitle>No se pudo resolver el plan</AlertTitle>
                 <AlertDescription>{resolution.message}</AlertDescription>
               </Alert>
@@ -287,16 +287,16 @@ export function QuotaAdjustDialog({
 
           {feedback?.kind !== 'success' && resolution.status === 'ready' ? (
             <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)} noValidate>
-              <Alert variant="default" role="note" id={scopeId}>
+              <Alert variant="warning" role="note" id={scopeId}>
                 <AlertDescription>
                   <strong className="font-semibold text-foreground">Este cambio afecta a todo el plan, no solo a esta organización.</strong>{' '}
                   Editas el límite de {dimension.displayName} en el plan «{resolution.planDisplayName}»; se aplica a todas las
                   organizaciones que usan ese plan.
                 </AlertDescription>
               </Alert>
-              <div className="flex items-baseline justify-between gap-4 text-sm">
+              <div className="flex items-baseline justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
                 <span className="text-muted-foreground">Valor actual</span>
-                <span className="font-medium tabular-nums text-foreground">{formatLimit(dimension.hardLimit)}</span>
+                <span className="font-semibold tabular-nums text-foreground">{formatLimit(dimension.hardLimit)}</span>
               </div>
               <div className="space-y-2">
                 <Label htmlFor={valueInputId}>Nuevo límite de {dimension.displayName}</Label>
@@ -319,9 +319,9 @@ export function QuotaAdjustDialog({
                 />
                 <p id={helpId} className="text-xs text-muted-foreground">Usa -1 para indicar sin límite.</p>
               </div>
-              {validationError ? <p id={errorId} role="alert" className="text-sm text-destructive">{validationError}</p> : null}
+              {validationError ? <p id={errorId} role="alert" className="text-sm font-medium text-red-300">{validationError}</p> : null}
               {feedback?.kind === 'error' ? (
-                <Alert variant="destructive" role="alert">
+                <Alert variant="destructive" role="alert" className="text-foreground">
                   <AlertTitle>El límite no se guardó</AlertTitle>
                   <AlertDescription>{feedback.message}</AlertDescription>
                 </Alert>
