@@ -108,6 +108,7 @@ export function ConsoleMembersPage() {
   // "Crear usuario" affordance is gated.
   const { can, denyReason, highestRoleLabel } = useConsolePermissions()
   const canManageMembers = can('tenant.members.manage')
+  const membersManageDenyReason = denyReason('tenant.members.manage')
   const realmId = activeTenant?.consoleUserRealm ?? null
   const [users, setUsers] = useState<IamUser[]>([])
   const [roles, setRoles] = useState<IamRole[]>([])
@@ -249,10 +250,13 @@ export function ConsoleMembersPage() {
                 variant="outline"
                 data-testid="members-read-only-indicator"
                 className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
-                title={denyReason('tenant.members.manage') ?? undefined}
+                title={membersManageDenyReason ?? undefined}
               >
                 <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
                 Solo lectura · tu rol ({highestRoleLabel}) no puede crear usuarios
+                {/* #761 UX pass: expose the `denyReason` recourse to screen-reader users, not just
+                    the mouse-only `title`. */}
+                {membersManageDenyReason ? <span className="sr-only"> {membersManageDenyReason}</span> : null}
               </Badge>
             )}
           </div>

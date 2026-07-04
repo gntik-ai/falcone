@@ -218,6 +218,33 @@ describe('ConsoleFlowsPage permission-aware "Flujo nuevo" CTA (#761)', () => {
     expect(screen.queryByTestId('flows-read-only-indicator')).not.toBeInTheDocument()
   })
 
+  it('read-only empty state omits the dead "Crear flujo" action and the indicator exposes the accessible recourse text', async () => {
+    // Regression for the UX pass: the empty state used to render a "Crear flujo" action whose
+    // onAction focused the (now-hidden) name input ref → a dead button that also contradicted the
+    // read-only indicator. It must be gone for a read-only role, and the recourse text must reach
+    // screen-reader users (not just the mouse-only `title`).
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_viewer'] } })
+    mockListFlows.mockResolvedValue({ items: [] })
+
+    renderPage()
+
+    await screen.findByTestId('console-flows-page')
+    expect(screen.queryByRole('button', { name: /crear flujo/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /flujo nuevo/i })).not.toBeInTheDocument()
+
+    const indicator = screen.getByTestId('flows-read-only-indicator')
+    expect(indicator).toHaveTextContent(/contacta con un administrador/i)
+  })
+
+  it('keeps the actionable "Crear flujo" empty-state CTA for a write-capable role', async () => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_owner'] } })
+    mockListFlows.mockResolvedValue({ items: [] })
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: /crear flujo/i })).toBeInTheDocument()
+  })
+
   it('renders a shared PermissionDeniedNotice — not the raw backend error — when a create request still 403s (defense-in-depth)', async () => {
     // Simulates a stale-session race (role revoked mid-session): the CTA is enabled for the
     // moment of render, but the backend still rejects with 403.

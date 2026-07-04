@@ -292,6 +292,18 @@ describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () =>
     expect(screen.queryByTestId('members-read-only-indicator')).not.toBeInTheDocument()
   })
 
+  it('exposes the role-aware recourse text in the read-only indicator, not just a mouse-only title', async () => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      users: [createIamUser('usr_1', 'alice')]
+    })
+
+    renderPage(sessionWithRoles(['tenant_viewer']))
+
+    const indicator = await screen.findByTestId('members-read-only-indicator')
+    expect(indicator).toHaveTextContent(/contacta con un administrador/i)
+  })
+
   it('renders a shared PermissionDeniedNotice — not the raw backend error — when user creation still 403s (defense-in-depth)', async () => {
     const tenant = createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })
     stubMembersApi({ tenants: [tenant], roles: [createIamRole('realm-admin')] })

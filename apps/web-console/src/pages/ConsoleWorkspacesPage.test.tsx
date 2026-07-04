@@ -45,4 +45,11 @@ describe('ConsoleWorkspacesPage permission-aware "Nueva área de trabajo" CTA (#
     expect(screen.getByRole('button', { name: /nueva área de trabajo/i })).toBeInTheDocument()
     expect(screen.queryByTestId('workspaces-read-only-indicator')).not.toBeInTheDocument()
   })
+
+  it('exposes the role-aware recourse text in the read-only indicator, not just a mouse-only title', () => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_viewer'] } })
+    render(<ConsoleWorkspacesPage />)
+
+    expect(screen.getByTestId('workspaces-read-only-indicator')).toHaveTextContent(/contacta con un administrador/i)
+  })
 })

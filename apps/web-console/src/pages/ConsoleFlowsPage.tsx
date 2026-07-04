@@ -43,6 +43,7 @@ export function ConsoleFlowsPage() {
   // does not fix that, it only stops advertising a capability the role does not have).
   const { can, denyReason, highestRoleLabel } = useConsolePermissions()
   const canCreateFlow = can('workspace.write')
+  const workspaceWriteDenyReason = denyReason('workspace.write')
   const newFlowInputRef = useRef<HTMLInputElement | null>(null)
   const [flows, setFlows] = useState<FlowSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -141,10 +142,14 @@ export function ConsoleFlowsPage() {
             variant="outline"
             data-testid="flows-read-only-indicator"
             className="w-fit border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
-            title={denyReason('workspace.write') ?? undefined}
+            title={workspaceWriteDenyReason ?? undefined}
           >
             <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Solo lectura · tu rol ({highestRoleLabel}) no puede crear flujos
+            {/* #761 UX pass: the "contact an admin" recourse in `denyReason` was only in the
+                mouse-only `title`. Mirror it into an sr-only child so screen-reader users get the
+                same guidance the ServiceAccounts read-only indicator already shows visibly. */}
+            {workspaceWriteDenyReason ? <span className="sr-only"> {workspaceWriteDenyReason}</span> : null}
           </Badge>
         )}
       </header>
@@ -170,13 +175,24 @@ export function ConsoleFlowsPage() {
           onAction={() => void load()}
         />
       ) : flows.length === 0 ? (
-        <ConsolePageState
-          kind="empty"
-          title="Todavía no hay flujos"
-          description="Crea el primero para abrir el diseñador, publicarlo y ejecutarlo desde la consola."
-          actionLabel="Crear flujo"
-          onAction={() => newFlowInputRef.current?.focus()}
-        />
+        canCreateFlow ? (
+          <ConsolePageState
+            kind="empty"
+            title="Todavía no hay flujos"
+            description="Crea el primero para abrir el diseñador, publicarlo y ejecutarlo desde la consola."
+            actionLabel="Crear flujo"
+            onAction={() => newFlowInputRef.current?.focus()}
+          />
+        ) : (
+          // #761 UX pass: a read-only role has no create input, so the "Crear flujo" action would
+          // focus a null ref (a dead button) and contradict the read-only indicator above. Show an
+          // honest empty state without a CTA, and describe what the role CAN do once flows exist.
+          <ConsolePageState
+            kind="empty"
+            title="Todavía no hay flujos"
+            description="Aún no hay flujos en esta área de trabajo. Cuando un administrador cree uno, podrás abrir el diseñador y revisar su historial de ejecuciones."
+          />
+        )
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
           <table className="w-full table-fixed text-sm sm:min-w-[48rem] sm:table-auto">

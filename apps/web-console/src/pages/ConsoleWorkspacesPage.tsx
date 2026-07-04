@@ -17,6 +17,7 @@ export function ConsoleWorkspacesPage() {
   // matrix via `useWizardPermissionCheck`).
   const { can, denyReason, highestRoleLabel } = useConsolePermissions()
   const canCreateWorkspace = can('tenant.workspaces.create')
+  const workspacesCreateDenyReason = denyReason('tenant.workspaces.create')
 
   return (
     <main className="space-y-6">
@@ -36,10 +37,13 @@ export function ConsoleWorkspacesPage() {
               variant="outline"
               data-testid="workspaces-read-only-indicator"
               className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
-              title={denyReason('tenant.workspaces.create') ?? undefined}
+              title={workspacesCreateDenyReason ?? undefined}
             >
               <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
               Solo lectura · tu rol ({highestRoleLabel}) no puede crear áreas de trabajo
+              {/* #761 UX pass: expose the `denyReason` recourse to screen-reader users, not just
+                  the mouse-only `title`. */}
+              {workspacesCreateDenyReason ? <span className="sr-only"> {workspacesCreateDenyReason}</span> : null}
             </Badge>
           )}
         </div>
