@@ -302,6 +302,36 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(createButton).toBeEnabled()
   })
 
+  // #783 (UX pass): the create controls now live in a real <form>, so pressing Enter in the name
+  // field submits — keyboard parity with the gold-standard ConsoleWorkspaceSecretsPage. Before, the
+  // "Crear" control was a plain button with onClick and Enter did nothing.
+  it('[#783] Enter en el campo de nombre envía el formulario de creación', async () => {
+    const user = userEvent.setup()
+    mockCreateServiceAccount.mockResolvedValue({ serviceAccountId: 'sa_9' })
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />)
+
+    await user.type(screen.getByLabelText(/nombre de cuenta de servicio/i), 'Nueva SA{Enter}')
+
+    await waitFor(() =>
+      expect(mockCreateServiceAccount).toHaveBeenCalledWith('wrk_1', {
+        displayName: 'Nueva SA',
+        entityType: 'service_account',
+        desiredState: 'active'
+      })
+    )
+  })
+
+  // #783 (UX pass): the no-organization block is action-oriented ("Selecciona una organización")
+  // instead of the alarming, terse "Cuentas de servicio bloqueadas".
+  it('[#783] muestra un bloqueo accionable cuando no hay organización activa', () => {
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: null, activeWorkspaceId: null })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
+  })
+
   it('[#803] renderiza los encabezados de cuentas de servicio en español', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
