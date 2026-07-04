@@ -250,6 +250,104 @@ describe('ConsoleMembersPage', () => {
   })
 })
 
+describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () => {
+  afterEach(() => {
+    cleanup()
+    fetchMock.mockReset()
+    vi.unstubAllGlobals()
+    clearConsoleShellSession()
+    window.localStorage.clear()
+  })
+
+  it.each([
+    { label: 'tenant_viewer', platformRoles: ['tenant_viewer'] },
+    { label: 'tenant_developer', platformRoles: ['tenant_developer'] }
+  ])('hides "Crear usuario" for $label and shows a read-only indicator instead — directory stays readable', async ({ platformRoles }) => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      users: [createIamUser('usr_1', 'alice')]
+    })
+
+    renderPage(sessionWithRoles(platformRoles))
+
+    expect(await screen.findByText('alice')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /crear usuario/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('members-read-only-indicator')).toBeInTheDocument()
+  })
+
+  it.each([
+    { label: 'tenant_owner', platformRoles: ['tenant_owner'] },
+    { label: 'tenant_admin', platformRoles: ['tenant_admin'] }
+  ])('keeps "Crear usuario" available for $label', async ({ platformRoles }) => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })]
+    })
+
+    // tenant_owner/tenant_admin are tenant OPERATORS (#569's `isTenantOperator`): they resolve
+    // their tenant via the own-scope singular endpoint using `principal.tenantIds`, not the
+    // superadmin collection endpoint — so the session needs `tenantIds` for this fixture.
+    renderPage(sessionWithRoles(platformRoles, { tenantIds: ['ten_alpha'] }))
+
+    expect(await screen.findByRole('button', { name: /crear usuario/i })).toBeInTheDocument()
+    expect(screen.queryByTestId('members-read-only-indicator')).not.toBeInTheDocument()
+  })
+
+  it('exposes the role-aware recourse text in the read-only indicator, not just a mouse-only title', async () => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      users: [createIamUser('usr_1', 'alice')]
+    })
+
+    renderPage(sessionWithRoles(['tenant_viewer']))
+
+    const indicator = await screen.findByTestId('members-read-only-indicator')
+    expect(indicator).toHaveTextContent(/contacta con un administrador/i)
+  })
+
+  it('renders a shared PermissionDeniedNotice — not the raw backend error — when user creation still 403s (defense-in-depth)', async () => {
+    const tenant = createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })
+    stubMembersApi({ tenants: [tenant], roles: [createIamRole('realm-admin')] })
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const parsedUrl = new URL(url, 'http://localhost')
+      if (init?.method === 'POST' && parsedUrl.pathname === '/v1/tenants/ten_alpha/users') {
+        return createJsonResponse(403, { message: 'Forbidden by RLS policy' })
+      }
+      if (parsedUrl.pathname === '/v1/tenants') return createJsonResponse(200, { items: [tenant], page: {} })
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha') return createJsonResponse(200, { tenant })
+      if (parsedUrl.pathname === '/v1/workspaces') return createJsonResponse(200, { items: [], page: {} })
+      if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/users') return createJsonResponse(200, { items: [], page: { size: 100 }, compatibility: createCompatibility() })
+      if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/roles') return createJsonResponse(200, { items: [createIamRole('realm-admin')], page: { size: 100 }, compatibility: createCompatibility() })
+      return createJsonResponse(404, { message: 'Not found' })
+    })
+    const user = userEvent.setup()
+
+    renderPage(sessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    await user.click(await screen.findByRole('button', { name: /crear usuario/i }))
+    await user.type(screen.getByLabelText(/^usuario$/i), 'jdoe')
+    await user.type(screen.getByLabelText(/^contraseña$/i), 'super-secret-1')
+    await user.click(screen.getByRole('button', { name: /^crear usuario$/i }))
+
+    expect(await screen.findByRole('alert', { name: /acción restringida/i })).toBeInTheDocument()
+    expect(screen.queryByText(/forbidden by rls policy/i)).not.toBeInTheDocument()
+  })
+})
+
+function sessionWithRoles(
+  platformRoles: string[],
+  principalOverrides: Record<string, unknown> = {}
+): ConsoleShellSession {
+  return {
+    ...baseSession,
+    principal: {
+      ...baseSession.principal,
+      platformRoles,
+      ...principalOverrides
+    } as NonNullable<ConsoleShellSession['principal']>
+  }
+}
+
 function renderPage(session: ConsoleShellSession | null = baseSession) {
   vi.stubGlobal('fetch', fetchMock)
 
@@ -283,6 +381,14 @@ function stubMembersApi({
 
     if (parsedUrl.pathname === '/v1/tenants') {
       return createJsonResponse(200, { items: tenants, page: {} })
+    }
+
+    // Own-scope singular lookup used by tenant OPERATORS (tenant_owner/tenant_admin — #569's
+    // `isTenantOperator`), which cannot call the superadmin collection endpoint above.
+    if (parsedUrl.pathname.startsWith('/v1/tenants/')) {
+      const tenantId = decodeURIComponent(parsedUrl.pathname.slice('/v1/tenants/'.length))
+      const tenant = tenants.find((item) => item.tenantId === tenantId)
+      return tenant ? createJsonResponse(200, { tenant }) : createJsonResponse(404, { message: 'Tenant not found' })
     }
 
     if (parsedUrl.pathname === '/v1/workspaces') {

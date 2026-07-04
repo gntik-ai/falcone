@@ -57,7 +57,10 @@ vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockRea
 
 describe('ConsoleServiceAccountsPage', () => {
   beforeEach(() => {
-    mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1' } })
+    // #761: writesBlocked now also considers the console permission matrix — default to a
+    // write-capable role (tenant_owner) so every pre-existing test below keeps exercising the
+    // "writes allowed" path unless a test explicitly overrides this to a read-only role.
+    mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1', platformRoles: ['tenant_owner'] } })
   })
 
   afterEach(() => {
@@ -384,5 +387,38 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(screen.getByRole('heading', { name: 'Crear cuenta de servicio' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Service Accounts' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Service accounts del workspace activo/i)).not.toBeInTheDocument()
+  })
+
+  describe('permission-aware writes (#761)', () => {
+    it.each([
+      { label: 'tenant_viewer', platformRoles: ['tenant_viewer'] },
+      { label: 'tenant_developer', platformRoles: ['tenant_developer'] }
+    ])('disables create/issue/rotate/revoke for $label and shows a role-aware reason, reusing the existing writesBlocked mechanism', ({ platformRoles }) => {
+      mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1', platformRoles } })
+      mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+      mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+
+      render(<ConsoleServiceAccountsPage />)
+
+      expect(screen.getByRole('button', { name: /^crear$/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /revelar secreto actual de ops sa/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /rotar secreto de ops sa/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /revocar credencial de ops sa/i })).toBeDisabled()
+      expect(screen.getByTestId('service-accounts-read-only-indicator')).toHaveTextContent(/solo lectura/i)
+    })
+
+    it('keeps writes enabled for tenant_owner (default fixture) — no regression from the permission gate', () => {
+      mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+      mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+
+      render(<ConsoleServiceAccountsPage />)
+
+      // The "Crear" submit is also gated on a non-empty name — assert via the reveal/rotate/revoke
+      // row actions, which are gated on `writesBlocked` alone.
+      expect(screen.getByRole('button', { name: /revelar secreto actual de ops sa/i })).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: /rotar secreto de ops sa/i })).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: /revocar credencial de ops sa/i })).not.toBeDisabled()
+      expect(screen.queryByTestId('service-accounts-read-only-indicator')).not.toBeInTheDocument()
+    })
   })
 })

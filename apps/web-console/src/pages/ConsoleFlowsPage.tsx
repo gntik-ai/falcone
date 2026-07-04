@@ -11,9 +11,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
+import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { useConsoleContext } from '@/lib/console-context'
+import { useConsolePermissions } from '@/lib/console-permissions'
 import { createFlowDraft, listFlows, type FlowScheduleTriggerAck, type FlowSummary } from '@/services/flowsApi'
 
 function formatTimestamp(value?: string): string {
@@ -35,6 +38,13 @@ function buildTriggerNavigationState(flowId: string, ack: FlowScheduleTriggerAck
 export function ConsoleFlowsPage() {
   const navigate = useNavigate()
   const { activeWorkspaceId } = useConsoleContext()
+  // #761: flow drafting is a workspace write. authorization-model.json denies it to
+  // tenant_viewer/tenant_developer entirely — hide the create affordance for them instead of
+  // letting it dead-end (companion bug #760 tracks the still-missing BACKEND gate; this UI change
+  // does not fix that, it only stops advertising a capability the role does not have).
+  const { can, denyReason, highestRoleLabel } = useConsolePermissions()
+  const canCreateFlow = can('workspace.write')
+  const workspaceWriteDenyReason = denyReason('workspace.write')
   const newFlowInputRef = useRef<HTMLInputElement | null>(null)
   const [flows, setFlows] = useState<FlowSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +52,7 @@ export function ConsoleFlowsPage() {
   const [newFlowName, setNewFlowName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [createDenied, setCreateDenied] = useState(false)
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return
@@ -62,14 +73,23 @@ export function ConsoleFlowsPage() {
   }, [load])
 
   const onCreate = async () => {
-    if (!activeWorkspaceId || !newFlowName.trim()) return
+    if (!activeWorkspaceId || !newFlowName.trim() || !canCreateFlow) return
     setCreating(true)
     setCreateError(null)
+    setCreateDenied(false)
     try {
       const created = await createFlowDraft(activeWorkspaceId, { name: newFlowName.trim() })
       navigate(`/console/flows/${encodeURIComponent(created.flowId)}`)
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'No se pudo crear el borrador del flujo')
+      // Defense-in-depth (#761): the create CTA below is hidden for read-only roles, but a stale
+      // session (role revoked mid-session) could still reach this catch — route a real 403 to the
+      // shared, role-aware notice instead of echoing whatever the backend returned.
+      const status = (error as { status?: number } | null)?.status
+      if (status === 403) {
+        setCreateDenied(true)
+      } else {
+        setCreateError(error instanceof Error ? error.message : 'No se pudo crear el borrador del flujo')
+      }
       setCreating(false)
     }
   }
@@ -99,25 +119,43 @@ export function ConsoleFlowsPage() {
             Definiciones visuales de flujos de trabajo para el área de trabajo <span className="font-mono">{activeWorkspaceId}</span>.
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <div className="w-full sm:w-64">
-            <Input
-              ref={newFlowInputRef}
-              aria-label="Nombre del flujo nuevo"
-              className="w-full"
-              placeholder="Nombre del flujo nuevo"
-              value={newFlowName}
-              onChange={(event) => setNewFlowName(event.target.value)}
-              data-testid="new-flow-name-input"
-            />
+        {canCreateFlow ? (
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="w-full sm:w-64">
+              <Input
+                ref={newFlowInputRef}
+                aria-label="Nombre del flujo nuevo"
+                className="w-full"
+                placeholder="Nombre del flujo nuevo"
+                value={newFlowName}
+                onChange={(event) => setNewFlowName(event.target.value)}
+                data-testid="new-flow-name-input"
+              />
+            </div>
+            <Button className="w-full sm:w-auto" onClick={() => void onCreate()} disabled={creating || newFlowName.trim() === ''}>
+              {creating ? 'Creando…' : 'Flujo nuevo'}
+            </Button>
           </div>
-          <Button className="w-full sm:w-auto" onClick={() => void onCreate()} disabled={creating || newFlowName.trim() === ''}>
-            {creating ? 'Creando…' : 'Flujo nuevo'}
-          </Button>
-        </div>
+        ) : (
+          // Page-level create CTA is HIDDEN (not disabled) for a role that can never use it (#761) —
+          // reserve inline disable-with-reason for row actions that sit beside readable data. The
+          // shared ReadOnlyActionBadge carries the design-system amber tone + Lock cue + sr-only
+          // recourse so this and the Members/Workspaces indicators stay one visual language.
+          <ReadOnlyActionBadge
+            testId="flows-read-only-indicator"
+            roleLabel={highestRoleLabel}
+            deniedAction="crear flujos"
+            reason={workspaceWriteDenyReason}
+            className="w-fit"
+          />
+        )}
       </header>
 
-      {createError ? <p className="text-sm text-destructive">{createError}</p> : null}
+      {createDenied ? (
+        <PermissionDeniedNotice reason={denyReason('workspace.write') ?? 'No tienes permisos para crear flujos en esta área de trabajo.'} />
+      ) : createError ? (
+        <p className="text-sm text-destructive">{createError}</p>
+      ) : null}
 
       {loading ? (
         <ConsolePageState
@@ -134,13 +172,24 @@ export function ConsoleFlowsPage() {
           onAction={() => void load()}
         />
       ) : flows.length === 0 ? (
-        <ConsolePageState
-          kind="empty"
-          title="Todavía no hay flujos"
-          description="Crea el primero para abrir el diseñador, publicarlo y ejecutarlo desde la consola."
-          actionLabel="Crear flujo"
-          onAction={() => newFlowInputRef.current?.focus()}
-        />
+        canCreateFlow ? (
+          <ConsolePageState
+            kind="empty"
+            title="Todavía no hay flujos"
+            description="Crea el primero para abrir el diseñador, publicarlo y ejecutarlo desde la consola."
+            actionLabel="Crear flujo"
+            onAction={() => newFlowInputRef.current?.focus()}
+          />
+        ) : (
+          // #761 UX pass: a read-only role has no create input, so the "Crear flujo" action would
+          // focus a null ref (a dead button) and contradict the read-only indicator above. Show an
+          // honest empty state without a CTA, and describe what the role CAN do once flows exist.
+          <ConsolePageState
+            kind="empty"
+            title="Todavía no hay flujos"
+            description="Aún no hay flujos en esta área de trabajo. Cuando un administrador cree uno, podrás abrir el diseñador y revisar su historial de ejecuciones."
+          />
+        )
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
           <table className="w-full table-fixed text-sm sm:min-w-[48rem] sm:table-auto">

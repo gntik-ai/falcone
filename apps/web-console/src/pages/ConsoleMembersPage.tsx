@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
+import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
+import { useConsolePermissions } from '@/lib/console-permissions'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 
 interface PageInfo {
@@ -65,6 +68,12 @@ interface IamRoleCollectionResponse {
   compatibility: IamProviderCompatibility
 }
 
+function getApiErrorStatus(rawError: unknown): number | undefined {
+  return typeof rawError === 'object' && rawError !== null && 'status' in rawError && typeof (rawError as { status?: unknown }).status === 'number'
+    ? (rawError as { status: number }).status
+    : undefined
+}
+
 function getApiErrorMessage(rawError: unknown, fallback: string): string {
   if (typeof rawError === 'object' && rawError !== null) {
     if ('message' in rawError && typeof rawError.message === 'string' && rawError.message.trim()) {
@@ -94,6 +103,12 @@ async function listRealmRoles(realmId: string): Promise<IamRoleCollectionRespons
 
 export function ConsoleMembersPage() {
   const { activeTenant } = useConsoleContext()
+  // #761: tenant.members.manage is denied to tenant_viewer/tenant_developer in
+  // authorization-model.json — the directory (users/roles list) stays readable for them, only the
+  // "Crear usuario" affordance is gated.
+  const { can, denyReason, highestRoleLabel } = useConsolePermissions()
+  const canManageMembers = can('tenant.members.manage')
+  const membersManageDenyReason = denyReason('tenant.members.manage')
   const realmId = activeTenant?.consoleUserRealm ?? null
   const [users, setUsers] = useState<IamUser[]>([])
   const [roles, setRoles] = useState<IamRole[]>([])
@@ -225,14 +240,26 @@ export function ConsoleMembersPage() {
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">Organización: {activeTenant.label}</Badge>
             <Badge variant="secondary">Realm: {realmId}</Badge>
-            <Button type="button" onClick={() => setCreateOpen((current) => !current)}>
-              {createOpen ? 'Cerrar' : 'Crear usuario'}
-            </Button>
+            {canManageMembers ? (
+              <Button type="button" onClick={() => setCreateOpen((current) => !current)}>
+                {createOpen ? 'Cerrar' : 'Crear usuario'}
+              </Button>
+            ) : (
+              // Page-level create CTA hidden (not disabled) for a role that can never use it (#761).
+              // Shared ReadOnlyActionBadge keeps the amber tone + Lock cue + sr-only recourse aligned
+              // with the Flows/Workspaces indicators.
+              <ReadOnlyActionBadge
+                testId="members-read-only-indicator"
+                roleLabel={highestRoleLabel}
+                deniedAction="crear usuarios"
+                reason={membersManageDenyReason}
+              />
+            )}
           </div>
         </div>
       </header>
 
-      {createOpen ? (
+      {createOpen && canManageMembers ? (
         <CreateUserPanel
           tenantId={activeTenant.tenantId}
           roles={roles}
@@ -303,6 +330,8 @@ function CreateUserPanel({
   const [role, setRole] = useState('tenant_developer')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
+  const { denyReason } = useConsolePermissions()
 
   const assignableRoles = roles.map((entry) => entry.roleName).filter((name) => name && !name.startsWith('default-roles'))
 
@@ -311,6 +340,7 @@ function CreateUserPanel({
     if (!username.trim() || !password.trim()) return
     setBusy(true)
     setError(null)
+    setPermissionDenied(false)
     try {
       await requestConsoleSessionJson(`/v1/tenants/${encodeURIComponent(tenantId)}/users`, {
         method: 'POST',
@@ -326,7 +356,14 @@ function CreateUserPanel({
       setPassword('')
       onCreated()
     } catch (rawError) {
-      setError(getApiErrorMessage(rawError, 'No se pudo crear el usuario en el realm de la organización.'))
+      // #761: a 403 gets the shared, role-aware PermissionDeniedNotice instead of the raw backend
+      // message — this is defense-in-depth (the CTA above is already hidden for roles denied
+      // `tenant.members.manage`), reached only by a stale-session race.
+      if (getApiErrorStatus(rawError) === 403) {
+        setPermissionDenied(true)
+      } else {
+        setError(getApiErrorMessage(rawError, 'No se pudo crear el usuario en el realm de la organización.'))
+      }
     } finally {
       setBusy(false)
     }
@@ -338,7 +375,11 @@ function CreateUserPanel({
       <p className="mt-1 text-sm text-muted-foreground">
         Crea un usuario directamente en el realm de la organización (Keycloak) y asígnale un rol inicial.
       </p>
-      {error ? (
+      {permissionDenied ? (
+        <div className="mt-3">
+          <PermissionDeniedNotice reason={denyReason('tenant.members.manage') ?? 'No tienes permisos para crear usuarios en esta organización.'} />
+        </div>
+      ) : error ? (
         <div role="alert" className="mt-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>

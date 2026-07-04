@@ -49,6 +49,7 @@ import { ConsoleSecretRotationPage } from '@/pages/ConsoleSecretRotationPage'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { SignupPage } from '@/pages/SignupPage'
 import { consoleAuthConfig } from '@/lib/console-config'
+import { getConsolePermissions } from '@/lib/console-permissions'
 import { readConsoleShellSession } from '@/lib/console-session'
 import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
 import { useConsoleContext } from '@/lib/console-context'
@@ -93,6 +94,17 @@ function RequireSuperadminRoute({ children }: { children: JSX.Element }) {
   const session = readConsoleShellSession()
   const roles = session?.principal?.platformRoles ?? []
   return roles.includes('superadmin') ? children : <Navigate replace to="/console/my-plan" />
+}
+
+// #761 (F2c-5, observer-first IA): the bare `/console` index previously always redirected to the
+// operator `overview` placeholder. A read-only tenant role has no use for it — land it on a read
+// destination instead (mirrors LoginPage.tsx's `resolvePostLoginDestination`, used for the initial
+// post-login navigation; this covers the OTHER path — a fresh load of `/console` on an existing
+// session, e.g. after a hard refresh or a bookmark).
+function ConsoleIndexRedirect() {
+  const session = readConsoleShellSession()
+  const permissions = getConsolePermissions(session?.principal?.platformRoles)
+  return <Navigate replace to={permissions.isReadOnly ? 'observability' : 'overview'} />
 }
 
 // Fail-safe, coarse gate for the Workspace Secrets screen (#723): an operator who is neither a
@@ -144,7 +156,7 @@ export const appRoutes = [
             children: [
           {
             index: true,
-            element: <Navigate replace to="overview" />
+            element: <ConsoleIndexRedirect />
           },
           {
             path: 'overview',

@@ -19,6 +19,7 @@ import {
   type ConsoleMetricRange
 } from '@/lib/console-metrics'
 import { useConsoleContext } from '@/lib/console-context'
+import { useConsolePermissions } from '@/lib/console-permissions'
 
 const TENANT_SCOPE_METRICS_RANGE: ConsoleMetricRange = { preset: '24h' }
 
@@ -102,9 +103,23 @@ export function ConsoleObservabilityPage() {
   const [filters, setFilters] = useState<ConsoleAuditFilter>({})
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null)
   const [exportFeedback, setExportFeedback] = useState<AuditExportFeedback | null>(null)
+  // #761: `tenant_developer` is the one tenant-tier role denied `tenant.audit.read` in
+  // authorization-model.json (the viewer IS allowed it — that asymmetry is the entire point of the
+  // developer role's "directory read, no audit" intent). Don't offer an audit destination that
+  // would 403 for them (Observer-first IA, scenario 5).
+  const { can } = useConsolePermissions()
+  const canReadAudit = can('tenant.audit.read')
 
   const metrics = useConsoleMetrics(activeTenantId, activeWorkspaceId, range)
-  const audit = useConsoleAuditRecords(activeTenantId, activeWorkspaceId, filters)
+  // Round-2 review (#761): `useConsoleAuditRecords` was called unconditionally regardless of
+  // `canReadAudit`, so a `tenant_developer` (denied `tenant.audit.read`, and whose default landing
+  // is now this page — Observer-first IA) fired a background GET .../audit-records that 403s on
+  // every visit, even though the "Auditoría" tab is already hidden for them. `useConsoleAuditRecords`
+  // already no-ops on a falsy `tenantId` (see its `if (!tenantId) { ...; return }` guard in
+  // console-metrics.ts), so passing `null` here — the same gate-by-null-id pattern the hook itself
+  // uses — suppresses the fetch without a conditional hook call. Behavior for a role that CAN read
+  // audit is unchanged (the real `activeTenantId`/`activeWorkspaceId` still flow through).
+  const audit = useConsoleAuditRecords(canReadAudit ? activeTenantId : null, canReadAudit ? activeWorkspaceId : null, filters)
   const metricsRangeApplies = Boolean(activeWorkspaceId)
 
   const headerText = useMemo(() => {
@@ -147,7 +162,9 @@ export function ConsoleObservabilityPage() {
         </div>
         <div className="flex gap-2">
           <Button type="button" variant={tab === 'metrics' ? 'default' : 'outline'} onClick={() => setTab('metrics')}>Métricas</Button>
-          <Button type="button" variant={tab === 'audit' ? 'default' : 'outline'} onClick={() => setTab('audit')}>Auditoría</Button>
+          {canReadAudit ? (
+            <Button type="button" variant={tab === 'audit' ? 'default' : 'outline'} onClick={() => setTab('audit')}>Auditoría</Button>
+          ) : null}
         </div>
       </header>
 

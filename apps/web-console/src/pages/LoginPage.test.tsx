@@ -109,6 +109,38 @@ describe('LoginPage', () => {
     })
   })
 
+  it('[#761] envía el login y redirige a un destino de solo lectura (Observabilidad) para tenant_viewer, sin intent protegido', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+      .mockResolvedValueOnce(createJsonResponse(200, readOnlyConsoleSession()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'viewer' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    expect(await screen.findByText('Observability target')).toBeInTheDocument()
+  })
+
+  it('[#761] sigue redirigiendo un write-capable role (platform_operator) a Vista general', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+      .mockResolvedValueOnce(createJsonResponse(200, activeConsoleSession()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'super-secret-123' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    expect(await screen.findByText('Overview target')).toBeInTheDocument()
+  })
+
   it('[#727] muestra error de credenciales para 401 INVALID_CREDENTIALS sin usar el aviso de caída', async () => {
     fetchMock
       .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
@@ -334,6 +366,10 @@ function renderLoginPage(initialEntry = '/login') {
       {
         path: '/console/workspaces',
         element: <div>Workspace target</div>
+      },
+      {
+        path: '/console/observability',
+        element: <div>Observability target</div>
       }
     ],
     {
@@ -386,6 +422,19 @@ function activeConsoleSession() {
       primaryEmail: 'ops@example.com',
       state: 'active',
       platformRoles: ['platform_operator']
+    }
+  }
+}
+
+function readOnlyConsoleSession() {
+  return {
+    ...activeConsoleSession(),
+    principal: {
+      ...activeConsoleSession().principal,
+      userId: 'usr_viewer1',
+      username: 'viewer',
+      displayName: 'Tenant Viewer',
+      platformRoles: ['tenant_viewer']
     }
   }
 }

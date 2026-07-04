@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConsoleCredentialStatusBadge } from '@/components/console/ConsoleCredentialStatusBadge'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { READ_ONLY_AFFORDANCE_TEXT_TONE } from '@/components/console/ReadOnlyActionBadge'
 import {
   consoleServiceAccountsErrorMessage,
   createServiceAccount,
@@ -24,6 +25,7 @@ import {
 } from '@/lib/console-service-accounts'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
+import { useConsolePermissions } from '@/lib/console-permissions'
 import { readConsoleShellSession } from '@/lib/console-session'
 
 const credentialActionsHelpId = 'service-account-credential-actions-help'
@@ -232,7 +234,14 @@ export function ConsoleServiceAccountsPage() {
   const displayNameId = useId()
   const session = readConsoleShellSession()
   const principalUserId = session?.principal?.userId ?? 'unknown-user'
-  const writesBlocked = activeTenant?.state !== 'active'
+  // #761: service-account create/issue/reveal/rotate/revoke/delete are workspace runtime writes,
+  // denied to tenant_viewer/tenant_developer in authorization-model.json. Reuse the EXISTING
+  // `writesBlocked` disable-with-reason mechanism (already wired to every mutating control on this
+  // page for the "tenant not active" case) instead of adding a second, parallel gate.
+  const { can, denyReason, highestRoleLabel } = useConsolePermissions()
+  const tenantInactive = activeTenant?.state !== 'active'
+  const permissionDenied = !can('workspace.write')
+  const writesBlocked = tenantInactive || permissionDenied
   const isEmpty = !loading && !error && accounts.length === 0
 
   const header = useMemo(() => [activeTenant?.label, activeWorkspace?.label].filter(Boolean).join(' · '), [activeTenant?.label, activeWorkspace?.label])
@@ -382,9 +391,14 @@ export function ConsoleServiceAccountsPage() {
             </p>
           </div>
         </div>
-        {writesBlocked ? (
-          <p role="status" className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+        {tenantInactive ? (
+          <p role="status" className={`mt-3 text-sm ${READ_ONLY_AFFORDANCE_TEXT_TONE}`}>
             La organización no está activa; las acciones de escritura están deshabilitadas.
+          </p>
+        ) : permissionDenied ? (
+          <p role="status" data-testid="service-accounts-read-only-indicator" className={`mt-3 text-sm ${READ_ONLY_AFFORDANCE_TEXT_TONE}`}>
+            Solo lectura · tu rol ({highestRoleLabel}) no puede crear, rotar ni revocar cuentas de servicio.{' '}
+            {denyReason('workspace.write')}
           </p>
         ) : null}
       </header>

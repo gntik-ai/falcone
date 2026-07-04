@@ -5,7 +5,7 @@ import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostu
 import { QuotaAdjustDialog, type QuotaAdjustTarget } from '@/components/console/QuotaAdjustDialog'
 import { useConsoleContext } from '@/lib/console-context'
 import { useConsoleQuotas, type ConsoleQuotaDimensionView } from '@/lib/console-quotas'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { useConsolePermissions } from '@/lib/console-permissions'
 import { cn } from '@/lib/utils'
 
 const policyModeLabels: Record<string, string> = {
@@ -22,7 +22,9 @@ const freshnessStatusLabels: Record<string, string> = {
 export function ConsoleQuotasPage() {
   const { activeTenant, activeTenantId, activeWorkspaceId } = useConsoleContext()
   const { posture, workspacePosture, loading, error, reload } = useConsoleQuotas(activeTenantId, activeWorkspaceId)
-  const roles = readConsoleShellSession()?.principal?.platformRoles ?? []
+  // Delegates the raw `platformRoles` read to the single console permission source (#761) instead
+  // of re-reading the session directly — same boolean, one fewer place that inspects roles.
+  const { roles } = useConsolePermissions()
   const isSuperadmin = roles.includes('superadmin') || roles.includes('platform_operator')
   const [adjustTarget, setAdjustTarget] = useState<QuotaAdjustTarget | null>(null)
 

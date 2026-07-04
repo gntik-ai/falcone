@@ -2,6 +2,7 @@ import type * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import * as consoleSession from '@/lib/console-session'
+import { getConsolePermissions, type PermissionAction } from '@/lib/console-permissions'
 import { useConsoleQuotas } from '@/lib/console-quotas'
 import { createRequestId, type ApiError, type JsonValue } from '@/lib/http'
 
@@ -39,6 +40,21 @@ export type WizardSubmitState =
 
 export type WizardPermission = 'create_tenant' | 'create_workspace' | 'manage_iam' | 'invite_member' | 'provision_database' | 'publish_function'
 
+// Maps each wizard's coarse permission key onto the shared `PermissionAction` matrix
+// (@/lib/console-permissions.ts) so there is ONE role→permission source, not a second one
+// hand-rolled per wizard (#761). Behavior for every role tested so far (superadmin,
+// platform_operator, tenant_owner, tenant_admin, workspace_admin) is unchanged or extended to align
+// with `authorization-model.json` (tenant_admin gained `create_workspace`/`invite_member` parity
+// with tenant_owner, matching the model's `tenant.workspaces.create`/`tenant.members.manage`).
+const WIZARD_PERMISSION_ACTIONS: Record<WizardPermission, PermissionAction> = {
+  create_tenant: 'tenant.create',
+  create_workspace: 'tenant.workspaces.create',
+  manage_iam: 'iam.clients.manage',
+  invite_member: 'tenant.members.manage',
+  provision_database: 'workspace.write',
+  publish_function: 'workspace.write'
+}
+
 export function createValidation(fieldErrors: Record<string, string> = {}, blockingError?: string): WizardStepValidation {
   return { valid: Object.keys(fieldErrors).length === 0 && !blockingError, fieldErrors, blockingError }
 }
@@ -52,16 +68,11 @@ export function useWizardPermissionCheck(requiredPermission: WizardPermission) {
     session = { principal: { platformRoles: ['superadmin'] } }
   }
   const roles: string[] = Array.isArray(session?.principal?.platformRoles) ? [...session.principal.platformRoles] : []
-  const allowed = useMemo(() => {
-    if (roles.includes('superadmin') || roles.includes('platform_operator')) return true
-    if (requiredPermission === 'create_workspace') return roles.includes('tenant_owner') || roles.includes('workspace_admin')
-    if (requiredPermission === 'manage_iam') return roles.includes('workspace_admin')
-    if (requiredPermission === 'invite_member') return roles.includes('workspace_admin') || roles.includes('tenant_owner')
-    if (requiredPermission === 'provision_database' || requiredPermission === 'publish_function') return roles.includes('workspace_admin') || roles.includes('tenant_owner')
-    return false
-  }, [requiredPermission, roles])
+  const action = WIZARD_PERMISSION_ACTIONS[requiredPermission]
+  const permissions = useMemo(() => getConsolePermissions(roles), [roles])
+  const allowed = permissions.can(action)
 
-  return { allowed, reason: allowed ? null : 'Tu sesión actual no tiene permisos suficientes para completar este wizard.' }
+  return { allowed, reason: allowed ? null : permissions.denyReason(action) }
 }
 
 export function useWizardQuotaCheck(dimensionId: string, scope: 'tenant' | 'workspace', tenantId: string | null, workspaceId: string | null) {

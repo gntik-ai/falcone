@@ -8,6 +8,7 @@ import {
   KeyRound,
   KeySquare,
   LayoutDashboard,
+  Lock,
   LogOut,
   PieChart,
   Rocket,
@@ -21,6 +22,7 @@ import {
 import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom'
 
 import { ActiveOperationsIndicator } from '@/components/console/ActiveOperationsIndicator'
+import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyActionBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { terminateConsoleLoginSession } from '@/lib/console-auth'
@@ -34,6 +36,7 @@ import {
   useConsoleContext
 } from '@/lib/console-context'
 import { hasPlatformInventoryAccess } from '@/lib/console-principal'
+import { useConsolePermissions, type PermissionAction } from '@/lib/console-permissions'
 import {
   clearConsoleShellSession,
   getConsolePrincipalInitials,
@@ -50,7 +53,13 @@ const consoleNavigationGroupLabels = {
   functions: 'Funciones',
   administration: 'Administración',
   dataPlane: 'Plano de datos',
-  operations: 'Operaciones'
+  operations: 'Operaciones',
+  // #761 (F2c-5, observer-first IA): destinations that are write-ONLY for a read-only tenant role
+  // (tenant_viewer / tenant_developer — nothing readable renders there for them) are regrouped
+  // under this heading instead of appearing as live destinations in their normal group. This is
+  // ADDITIVE to #741's nav visibility gating: it never hides an item a write-capable role can see —
+  // it only changes WHICH heading a read-only role sees it under.
+  restricted: 'Administración (requiere permisos)'
 } as const
 
 type ConsoleNavigationGroup = keyof typeof consoleNavigationGroupLabels
@@ -102,14 +111,19 @@ const consoleNavigationItems = [
     label: 'Gestión de áreas de trabajo',
     to: '/console/workspaces',
     icon: FolderKanban,
-    description: 'Gestión de la organización por áreas de trabajo.'
+    description: 'Gestión de la organización por áreas de trabajo.',
+    // The page renders NOTHING readable beyond the "Nueva área de trabajo" wizard trigger (#761) —
+    // for a read-only tenant role it is a dead end, so subordinate it under "Administración
+    // (requiere permisos)" instead of presenting it as a live destination (F2c-5).
+    restrictedForAction: 'tenant.workspaces.create'
   },
   {
     group: 'workspace',
     label: 'DB del área de trabajo',
     to: '/console/database',
     icon: Database,
-    description: 'Aprovisiona y rota la base de datos PostgreSQL dedicada del área de trabajo activa.'
+    description: 'Aprovisiona y rota la base de datos PostgreSQL dedicada del área de trabajo activa.',
+    restrictedForAction: 'workspace.write'
   },
   {
     group: 'functions',
@@ -123,7 +137,8 @@ const consoleNavigationItems = [
     label: 'Funciones: registro',
     to: '/console/functions-registry',
     icon: Settings,
-    description: 'Registra funciones del área de trabajo activa (ejecución pendiente del plano de datos).'
+    description: 'Registra funciones del área de trabajo activa (ejecución pendiente del plano de datos).',
+    restrictedForAction: 'workspace.write'
   },
   {
     group: 'functions',
@@ -131,14 +146,16 @@ const consoleNavigationItems = [
     to: '/console/functions',
     exactActive: true,
     icon: Workflow,
-    description: 'Ciclo de vida serverless: inventario, versiones, activaciones, disparadores, despliegue y rollback.'
+    description: 'Ciclo de vida serverless: inventario, versiones, activaciones, disparadores, despliegue y rollback.',
+    restrictedForAction: 'workspace.write'
   },
   {
     group: 'functions',
     label: 'Funciones: despliegue rápido',
     to: '/console/functions/data',
     icon: Rocket,
-    description: 'Editor JSON para desplegar, invocar y consultar activaciones sobre el ejecutor del área de trabajo.'
+    description: 'Editor JSON para desplegar, invocar y consultar activaciones sobre el ejecutor del área de trabajo.',
+    restrictedForAction: 'workspace.write'
   },
   {
     group: 'administration',
@@ -251,7 +268,8 @@ const consoleNavigationItems = [
     // Credential-semantic icon (#783) — distinct from the `KeyRound` used by "Secretos del área de
     // trabajo" below, since these are two different credential surfaces in the same nav group.
     icon: KeySquare,
-    description: 'Credenciales programáticas y service accounts del área de trabajo activa.'
+    description: 'Credenciales programáticas y service accounts del área de trabajo activa.',
+    restrictedForAction: 'workspace.write'
   },
   {
     group: 'operations',
@@ -259,7 +277,8 @@ const consoleNavigationItems = [
     to: '/console/workspace-secrets',
     icon: KeyRound,
     description: 'Secretos de función del área de trabajo activa (valores de solo escritura, inyectados en el despliegue).',
-    requiresWorkspaceSecretsAccess: true
+    requiresWorkspaceSecretsAccess: true,
+    restrictedForAction: 'workspace.write'
   },
   {
     group: 'operations',
@@ -303,6 +322,10 @@ export function ConsoleShellLayout() {
   const principalSecondary = useMemo(() => getConsolePrincipalSecondary(session), [session])
   const principalInitials = useMemo(() => getConsolePrincipalInitials(session), [session])
   const principalRoles = session?.principal?.platformRoles ?? []
+  // #761: always-visible, humanized role indicator — the roles were previously only shown as raw
+  // tokens buried inside the opened avatar dropdown (see below), with no resting signal that a
+  // read-only role's write actions are unavailable.
+  const permissions = useConsolePermissions()
 
   useEffect(() => {
     setSession(readConsoleShellSession())
@@ -424,6 +447,8 @@ export function ConsoleShellLayout() {
             </div>
 
             <div className="relative flex items-center gap-3">
+              <RoleBadge permissions={permissions} />
+
               <div className="hidden text-right md:block">
                 <p className="text-sm font-medium text-foreground">{principalLabel}</p>
                 <p className="text-xs text-muted-foreground">{principalSecondary}</p>
@@ -530,6 +555,33 @@ export function ConsoleShellLayout() {
   )
 }
 
+// Always-visible, humanized role indicator (#761 — F2c-3). Lives in the identity zone's
+// ALWAYS-rendered wrapper (`relative flex items-center gap-3`, next to the avatar button), not the
+// `hidden … md:block` name/email column — that zone disappears below `md` while the avatar (and
+// this badge) survive every breakpoint (#745's responsive dead-zone). Collapses to icon-only below
+// `sm` to stay within a cramped mobile header; the label re-appears at `sm` and up.
+function RoleBadge({ permissions }: { permissions: ReturnType<typeof useConsolePermissions> }) {
+  const { highestRoleLabel, highestRoleTone } = permissions
+  const isReadOnlyTone = highestRoleTone === 'read-only' || highestRoleTone === 'unknown'
+  const ariaLabel = isReadOnlyTone
+    ? `Rol actual: ${highestRoleLabel}. Puedes consultar, pero las acciones de creación, edición y eliminación están deshabilitadas.`
+    : `Rol actual: ${highestRoleLabel}.`
+
+  return (
+    <Badge
+      variant={isReadOnlyTone ? 'outline' : 'secondary'}
+      data-testid="console-role-badge"
+      role="status"
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      className={cn('shrink-0 gap-1.5', isReadOnlyTone && READ_ONLY_AFFORDANCE_BADGE_TONE)}
+    >
+      {isReadOnlyTone ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+      <span className="hidden sm:inline">{highestRoleLabel}</span>
+    </Badge>
+  )
+}
+
 function ConsoleNavigation() {
   // The Workspace Secrets entry is shown only when the same coarse, fail-safe gate that guards the
   // route is satisfied (workspace membership / tenant-admin / platform role). This runs inside the
@@ -542,6 +594,10 @@ function ConsoleNavigation() {
   // shared `hasPlatformInventoryAccess` helper so the "Gestión de organizaciones" nav entry never
   // drifts from what the page itself renders for a role (#741).
   const canViewTenantInventory = hasPlatformInventoryAccess(session?.principal?.platformRoles)
+  // #761: read-only tenant roles (tenant_viewer/tenant_developer) get select write-ONLY nav entries
+  // regrouped under "Administración (requiere permisos)" (F2c-5) — this NEVER hides an item a
+  // write-capable role can see, it only changes which heading a read-only role sees it under.
+  const { can, isReadOnly } = useConsolePermissions()
 
   const items = consoleNavigationItems.filter(
     (item) =>
@@ -549,10 +605,23 @@ function ConsoleNavigation() {
       (!('requiresSuperadminAccess' in item && item.requiresSuperadminAccess) || isSuperadmin) &&
       (!('requiresPlatformInventoryAccess' in item && item.requiresPlatformInventoryAccess) || canViewTenantInventory)
   )
+
+  function resolvedGroup(item: (typeof consoleNavigationItems)[number]): ConsoleNavigationGroup {
+    if (
+      isReadOnly &&
+      'restrictedForAction' in item &&
+      item.restrictedForAction &&
+      !can(item.restrictedForAction as PermissionAction)
+    ) {
+      return 'restricted'
+    }
+    return item.group
+  }
+
   const groupedItems = consoleNavigationGroupOrder
     .map((group) => ({
       group,
-      items: items.filter((item) => item.group === group)
+      items: items.filter((item) => resolvedGroup(item) === group)
     }))
     .filter((group) => group.items.length > 0)
 
