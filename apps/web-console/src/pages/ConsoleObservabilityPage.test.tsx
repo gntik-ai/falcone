@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleObservabilityPage } from './ConsoleObservabilityPage'
 
@@ -8,6 +8,7 @@ const mockUseConsoleContext = vi.fn()
 const mockUseConsoleMetrics = vi.fn()
 const mockUseConsoleAuditRecords = vi.fn()
 const mockExportAuditRecords = vi.fn()
+const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => mockUseConsoleContext() }))
 vi.mock('@/lib/console-metrics', () => ({
@@ -15,8 +16,16 @@ vi.mock('@/lib/console-metrics', () => ({
   useConsoleAuditRecords: (...args: unknown[]) => mockUseConsoleAuditRecords(...args),
   exportAuditRecords: (...args: unknown[]) => mockExportAuditRecords(...args)
 }))
+vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
 
 describe('ConsoleObservabilityPage', () => {
+  beforeEach(() => {
+    // #761: the "Auditoría" tab is now gated on the console permission matrix (tenant_developer is
+    // denied `tenant.audit.read`) — default to a role that CAN read audit so every pre-existing
+    // test below keeps exercising the tab unless it explicitly overrides this.
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_owner'] } })
+  })
+
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
@@ -25,6 +34,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleMetrics.mockReset()
     mockUseConsoleAuditRecords.mockReset()
     mockExportAuditRecords.mockReset()
+    mockReadConsoleShellSession.mockReset()
   })
 
   it('mantiene activo el rango temporal para métricas workspace', async () => {
@@ -189,5 +199,34 @@ describe('ConsoleObservabilityPage', () => {
     expect(alert).toHaveTextContent('Audit export unavailable')
     expect(screen.queryByText('Exportación iniciada correctamente.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /descargar json/i })).not.toBeInTheDocument()
+  })
+
+  describe('permission-aware Audit tab (#761)', () => {
+    it('does not offer the Auditoría tab to tenant_developer (denied tenant.audit.read in the model)', () => {
+      mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_developer'] } })
+      mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+      mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+      mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+
+      render(<ConsoleObservabilityPage />)
+
+      expect(screen.getByRole('button', { name: 'Métricas' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Auditoría' })).not.toBeInTheDocument()
+    })
+
+    it('keeps the Auditoría tab for tenant_viewer (allowed tenant.audit.read — the one asymmetry vs. tenant_developer)', async () => {
+      mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_viewer'] } })
+      mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+      mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+      mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+      const user = userEvent.setup()
+
+      render(<ConsoleObservabilityPage />)
+
+      const auditTab = screen.getByRole('button', { name: 'Auditoría' })
+      expect(auditTab).toBeInTheDocument()
+      await user.click(auditTab)
+      expect(screen.getByLabelText('Categoría')).toBeInTheDocument()
+    })
   })
 })

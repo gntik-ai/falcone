@@ -10,8 +10,14 @@ const mockListFlows = vi.fn()
 const mockCreateFlowDraft = vi.fn()
 const mockTriggerFlowSchedule = vi.fn()
 
+const mockReadConsoleShellSession = vi.fn()
+
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
+}))
+
+vi.mock('@/lib/console-session', () => ({
+  readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 
 vi.mock('@/services/flowsApi', () => ({
@@ -47,6 +53,10 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  // #761: ConsoleFlowsPage now reads the console permission matrix — default to a write-capable
+  // role (tenant_owner) so the pre-existing tests below continue to exercise the "can write" path
+  // unless a test explicitly overrides this to a read-only role.
+  mockReadConsoleShellSession.mockReset().mockReturnValue({ principal: { platformRoles: ['tenant_owner'] } })
   mockUseConsoleContext.mockReset().mockReturnValue({
     activeWorkspaceId: 'wrk_alpha',
     // The real, universal capabilities map: NO `workflows` key (Flows is not plan-gated).
@@ -176,5 +186,50 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
 
     expect(screen.getByRole('alert', { name: /flujos bloqueados/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /gestionar áreas de trabajo/i })).toBeInTheDocument()
+  })
+})
+
+describe('ConsoleFlowsPage permission-aware "Flujo nuevo" CTA (#761)', () => {
+  it.each([
+    { label: 'tenant_viewer', platformRoles: ['tenant_viewer'] },
+    { label: 'tenant_developer', platformRoles: ['tenant_developer'] }
+  ])('hides the create CTA and the name input for $label, showing a read-only indicator instead', async ({ platformRoles }) => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles } })
+
+    renderPage()
+
+    await screen.findByTestId('console-flows-page')
+    expect(screen.queryByTestId('new-flow-name-input')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /flujo nuevo/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('flows-read-only-indicator')).toBeInTheDocument()
+  })
+
+  it.each([
+    { label: 'tenant_owner', platformRoles: ['tenant_owner'] },
+    { label: 'tenant_admin', platformRoles: ['tenant_admin'] },
+    { label: 'superadmin', platformRoles: ['superadmin'] }
+  ])('keeps the create CTA enabled for $label', async ({ platformRoles }) => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles } })
+
+    renderPage()
+
+    expect(await screen.findByTestId('new-flow-name-input')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /flujo nuevo/i })).toBeInTheDocument()
+    expect(screen.queryByTestId('flows-read-only-indicator')).not.toBeInTheDocument()
+  })
+
+  it('renders a shared PermissionDeniedNotice — not the raw backend error — when a create request still 403s (defense-in-depth)', async () => {
+    // Simulates a stale-session race (role revoked mid-session): the CTA is enabled for the
+    // moment of render, but the backend still rejects with 403.
+    mockCreateFlowDraft.mockReset().mockRejectedValue(Object.assign(new Error('Forbidden'), { status: 403 }))
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await user.type(await screen.findByTestId('new-flow-name-input'), 'orders-flow')
+    await user.click(screen.getByRole('button', { name: /flujo nuevo/i }))
+
+    expect(await screen.findByRole('alert', { name: /acción restringida/i })).toBeInTheDocument()
+    expect(screen.queryByText('Forbidden')).not.toBeInTheDocument()
   })
 })

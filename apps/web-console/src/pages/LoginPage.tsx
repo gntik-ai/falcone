@@ -16,11 +16,13 @@ import {
 } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
 import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
+import { getConsolePermissions } from '@/lib/console-permissions'
 import {
   consumeConsoleAuthStatusHint,
   consumeProtectedRouteIntent,
   ensureConsoleSession,
-  persistConsoleShellSession
+  persistConsoleShellSession,
+  readConsoleShellSession
 } from '@/lib/console-session'
 import type { ApiError } from '@/lib/http'
 
@@ -53,8 +55,19 @@ const initialForm = {
 
 const invalidCredentialsMessage = 'Revisa tu usuario y contraseña e inténtalo de nuevo.'
 
+// #761 (F2c-5, observer-first IA): a read-only tenant role (tenant_viewer/tenant_developer) has no
+// use for the operator `overview` placeholder — land it on a read destination
+// (metrics/audit) instead. An explicit deep-link intent (e.g. a bookmarked protected route) always
+// wins over this default for every role.
 function resolvePostLoginDestination(): string {
-  return consumeProtectedRouteIntent() ?? '/console/overview'
+  const intent = consumeProtectedRouteIntent()
+  if (intent) {
+    return intent
+  }
+
+  const session = readConsoleShellSession()
+  const permissions = getConsolePermissions(session?.principal?.platformRoles)
+  return permissions.isReadOnly ? '/console/observability' : '/console/overview'
 }
 
 function isCredentialError(error: ApiError): boolean {

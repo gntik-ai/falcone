@@ -139,3 +139,11 @@ The full sidebar role matrix, after #741:
 `Autenticación` are gated on `requiresSuperadminAccess`, matching their `RequireSuperadminRoute`
 route guard in `router.tsx` exactly, so the sidebar never offers a link that silently redirects
 the operator elsewhere.
+
+> Issue #761 adds a second, additive nav treatment on top of the visibility gating above: for a
+> read-only tenant role (`tenant_viewer`/`tenant_developer`), a further set of write-only entries
+> (`Gestión de áreas de trabajo`, `DB del área de trabajo`, the `Funciones: *` family, `Cuentas de
+> servicio`, `Secretos del área de trabajo`) is *regrouped* — not hidden — under an "Administración
+> (requiere permisos)" heading, and the post-login/`/console` index landing destination changes to
+> `/console/observability`. See
+> `docs/reference/architecture/console-permission-aware-tenant-roles.md`.

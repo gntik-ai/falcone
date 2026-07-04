@@ -990,3 +990,88 @@ describe('[#741] navegación de consola consciente del rol', () => {
     expect(allocationLink).toHaveAttribute('aria-current', 'page')
   })
 })
+
+describe('[#761] role badge in the chrome + observer-first nav grouping', () => {
+  afterEach(() => {
+    cleanup()
+    fetchMock.mockReset()
+    vi.unstubAllGlobals()
+    clearConsoleShellSession()
+    window.localStorage.clear()
+  })
+
+  it('shows an always-visible, humanized, amber role badge with a Lock cue for tenant_viewer', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_viewer'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    const badge = await screen.findByTestId('console-role-badge')
+    expect(badge).toHaveTextContent('Viewer · solo lectura')
+    expect(badge).toHaveAttribute('aria-label', expect.stringMatching(/viewer · solo lectura/i))
+    expect(badge.querySelector('svg')).not.toBeNull()
+  })
+
+  it('shows the "Developer · solo lectura" badge for tenant_developer', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_developer'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByTestId('console-role-badge')).toHaveTextContent('Developer · solo lectura')
+  })
+
+  it('shows a neutral, non-amber badge (no Lock icon) for a write-capable role (tenant_owner)', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    const badge = await screen.findByTestId('console-role-badge')
+    expect(badge).toHaveTextContent('Propietario')
+    expect(badge.querySelector('svg')).toBeNull()
+    expect(badge.className).not.toMatch(/amber/)
+  })
+
+  it('the role badge is present regardless of viewport width (always in the non-collapsing identity zone)', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['superadmin']))
+
+    renderShell('/console/overview')
+
+    // No `hidden`/`md:block`/`xl:flex` classes gating visibility — only the label text collapses
+    // to icon-only below `sm` via an inner `hidden sm:inline` span (#745's responsive dead-zone).
+    const badge = await screen.findByTestId('console-role-badge')
+    expect(badge.className).not.toMatch(/\bhidden\b/)
+  })
+
+  it('regroups write-only nav entries under "Administración (requiere permisos)" for tenant_viewer', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_viewer'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    const restrictedHeading = within(navigation).getByText('Administración (requiere permisos)')
+    const restrictedSection = restrictedHeading.closest('section')
+    expect(restrictedSection).not.toBeNull()
+
+    // Purely write-only destinations move into the restricted group…
+    expect(within(restrictedSection!).getByRole('link', { name: /gestión de áreas de trabajo/i })).toBeInTheDocument()
+    expect(within(restrictedSection!).getByRole('link', { name: /^cuentas de servicio/i })).toBeInTheDocument()
+
+    // …but the item is NOT hidden — it is still reachable, just regrouped (additive to #741).
+    expect(within(navigation).getByRole('link', { name: /gestión de áreas de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+  })
+
+  it('does NOT regroup nav entries for a write-capable role (tenant_owner) — no "Administración (requiere permisos)" heading', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/overview')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    await within(navigation).findByRole('link', { name: /gestión de áreas de trabajo/i })
+    expect(within(navigation).queryByText('Administración (requiere permisos)')).not.toBeInTheDocument()
+  })
+})

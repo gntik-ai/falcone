@@ -71,6 +71,22 @@ describe('router', () => {
     expect(await screen.findByRole('heading', { name: /realtime workspace/i })).toBeInTheDocument()
   })
 
+  it('[#761] /console redirige a Vista general para un rol write-capable (superadmin, por defecto)', async () => {
+    const router = createMemoryRouter(appRoutes, { initialEntries: ['/console'] })
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { name: /vista general de la consola/i })).toBeInTheDocument()
+  })
+
+  it('[#761] /console redirige a Observabilidad para un rol de solo lectura (tenant_viewer)', async () => {
+    readConsoleShellSessionMock.mockReturnValue(createRouterSession(['tenant_viewer'], { tenantIds: ['ten_alpha'] }))
+
+    const router = createMemoryRouter(appRoutes, { initialEntries: ['/console'] })
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { name: /observability real/i })).toBeInTheDocument()
+  })
+
   it('[#726] renderiza /password-recovery como ruta pública real, no como NotFound', async () => {
     const router = createMemoryRouter(appRoutes, { initialEntries: ['/password-recovery'] })
     render(<RouterProvider router={router} />)
