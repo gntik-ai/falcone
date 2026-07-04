@@ -34,3 +34,7 @@ does not allow the operator to continue until a real active plan is selectable.
 No wire contract changed for this behavior. The frontend still calls `GET /v1/plans` and
 `POST /v1/tenants`, and the tenant create body still uses `planId`; the fix is that `planId` now comes
 from a real catalog record ID instead of a synthetic UI value.
+
+Once the wizard succeeds, the operator lands on the created tenant's plan page rather than a
+static placeholder, and the tenant becomes visible in the `/console/tenants` inventory — see
+[console-tenant-inventory.md](./console-tenant-inventory.md).

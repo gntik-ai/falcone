@@ -142,7 +142,10 @@ export function CreateTenantWizard({ open, onOpenChange, onCreated }: { open: bo
       // /v1/admin/tenants path is not routed (404 NO_ROUTE) — fix-console-tenant-create-path (#504).
       const response = await submitWizardRequest<{ tenantId: string; tenantSlug?: string }>('/v1/tenants', { name: data.name ?? '', planId: data.planId ?? '', region: data.region ?? '', preferences: { locale: data.locale ?? 'es' } })
       onCreated?.()
-      return { resourceId: response.tenantId, resourceUrl: '/console/tenants' }
+      // #752: link straight into the created tenant's plan page instead of the generic
+      // /console/tenants list — the wizard success step must be navigable to the actual
+      // new resource, not a static placeholder.
+      return { resourceId: response.tenantId, resourceUrl: `/console/tenants/${response.tenantId}/plan` }
     }}
   />
 }

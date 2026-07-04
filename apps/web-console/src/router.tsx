@@ -182,16 +182,21 @@ export const appRoutes = [
           },
 
           {
+            // Platform-global surface (not scoped to an active tenant/workspace) — see
+            // ConsoleShellLayout's `isPlatformGlobalRoute` predicate (#752).
             path: 'plans',
-            element: <RequireSuperadminRoute><ConsolePlanCatalogPage /></RequireSuperadminRoute>
+            element: <RequireSuperadminRoute><ConsolePlanCatalogPage /></RequireSuperadminRoute>,
+            handle: { platformGlobal: true }
           },
           {
             path: 'plans/new',
-            element: <RequireSuperadminRoute><ConsolePlanCreatePage /></RequireSuperadminRoute>
+            element: <RequireSuperadminRoute><ConsolePlanCreatePage /></RequireSuperadminRoute>,
+            handle: { platformGlobal: true }
           },
           {
             path: 'plans/:planId',
-            element: <RequireSuperadminRoute><ConsolePlanDetailPage /></RequireSuperadminRoute>
+            element: <RequireSuperadminRoute><ConsolePlanDetailPage /></RequireSuperadminRoute>,
+            handle: { platformGlobal: true }
           },
           {
             path: 'tenants/:tenantId/plan',

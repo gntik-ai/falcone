@@ -121,6 +121,35 @@ describe('console-context', () => {
     })
   })
 
+  it('[#752] expone el cursor de paginación de GET /v1/tenants para que los consumidores no trunquen en silencio', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input) => {
+      const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url
+      const parsedUrl = new URL(requestUrl, 'http://localhost')
+
+      if (parsedUrl.pathname === '/v1/tenants') {
+        return createJsonResponse(200, { items: [createTenant('ten_alpha', 'Tenant Alpha')], page: { after: 'cursor-101' } })
+      }
+
+      if (parsedUrl.pathname === '/v1/workspaces') {
+        return createJsonResponse(200, { items: [], page: {} })
+      }
+
+      return createJsonResponse(404, { message: 'Not found' })
+    }))
+    persistConsoleShellSession(baseSession as never)
+
+    render(
+      <ConsoleContextProvider session={baseSession}>
+        <ContextProbe />
+      </ConsoleContextProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tenants-count')).toHaveTextContent('1')
+      expect(screen.getByTestId('tenants-page-after')).toHaveTextContent('cursor-101')
+    })
+  })
+
   it('no autoselecciona tenant cuando hay múltiples opciones sin contexto previo', async () => {
     stubContextApi({
       tenants: [
@@ -485,6 +514,7 @@ function ContextProbe() {
       <div data-testid="active-tenant">{context.activeTenantId ?? 'none'}</div>
       <div data-testid="active-workspace">{context.activeWorkspaceId ?? 'none'}</div>
       <div data-testid="tenants-count">{context.tenants.length}</div>
+      <div data-testid="tenants-page-after">{context.tenantsPageInfo?.after ?? 'none'}</div>
       <div data-testid="workspaces-count">{context.workspaces.length}</div>
       <div data-testid="tenant-governance">{context.activeTenant?.governanceStatus ?? 'none'}</div>
       <div data-testid="tenant-console-user-realm">{context.activeTenant?.consoleUserRealm ?? 'none'}</div>
