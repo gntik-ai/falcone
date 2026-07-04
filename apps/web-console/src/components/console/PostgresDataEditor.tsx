@@ -513,7 +513,7 @@ export function PostgresDataEditor({ workspaceId, databaseName, schemaName, tabl
                   </span>
                   {key.status === 'active' ? (
                     <Button type="button" variant="destructive" size="sm" onClick={() => void handleRevoke(key.id)}>
-                      Revoke
+                      Revocar
                     </Button>
                   ) : null}
                 </li>

@@ -53,6 +53,35 @@ describe('Tabs', () => {
     expect(screen.queryByText('Panel A')).not.toBeInTheDocument()
   })
 
+  it('associates the active tab with its panel (aria-controls/labelledby) and keeps the panel focusable', () => {
+    render(<ControlledTabs />)
+
+    const tabA = screen.getByRole('tab', { name: 'Tab A' })
+    const panelA = screen.getByRole('tabpanel')
+
+    // Round-trip WAI-ARIA association: the tab points at the panel and the panel back at the tab.
+    expect(tabA.id).toBeTruthy()
+    expect(panelA.id).toBeTruthy()
+    expect(tabA).toHaveAttribute('aria-controls', panelA.id)
+    expect(panelA).toHaveAttribute('aria-labelledby', tabA.id)
+
+    // The panel is reachable by keyboard even with no focusable child.
+    expect(panelA).toHaveAttribute('tabindex', '0')
+  })
+
+  it('re-associates aria wiring when the active tab changes', async () => {
+    const user = userEvent.setup()
+    render(<ControlledTabs />)
+
+    await user.click(screen.getByRole('tab', { name: 'Tab B' }))
+
+    const tabB = screen.getByRole('tab', { name: 'Tab B' })
+    const panelB = screen.getByRole('tabpanel')
+    expect(panelB).toHaveTextContent('Panel B')
+    expect(tabB).toHaveAttribute('aria-controls', panelB.id)
+    expect(panelB).toHaveAttribute('aria-labelledby', tabB.id)
+  })
+
   it('supports ArrowRight/ArrowLeft/Home/End roving-tabindex keyboard navigation', async () => {
     const user = userEvent.setup()
     render(<ControlledTabs />)

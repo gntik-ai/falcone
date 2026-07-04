@@ -102,6 +102,14 @@ describe('PostgresDataEditor — richer UX', () => {
     await waitFor(() => expect(mocked.deleteRow).toHaveBeenCalledWith('ws1', 'appdb', 'public', 'notes', { id: 'r1' }))
   })
 
+  it('labels the key-revocation action in Spanish, consistent with the rest of the console', async () => {
+    mocked.listApiKeys.mockResolvedValue({ items: [{ id: 'k1', key_prefix: 'flc_anon_a', key_type: 'anon', status: 'active' }] })
+    renderEditor()
+    await screen.findByText('hello')
+    expect(await screen.findByRole('button', { name: 'Revocar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument()
+  })
+
   it('adds a filter and requeries the rows with it', async () => {
     renderEditor()
     await screen.findByText('hello')

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 interface TabsContextValue {
   value: string
   setValue: (value: string) => void
+  baseId: string
 }
 
 const TabsContext = React.createContext<TabsContextValue | null>(null)
@@ -22,18 +23,29 @@ function useTabsContext(component: string): TabsContextValue {
   return ctx
 }
 
+// Deterministic ids that keep a trigger and its panel in lockstep so `aria-controls` (trigger→panel)
+// and `aria-labelledby` (panel→trigger) resolve. `aria-controls`/`aria-labelledby` are
+// space-separated IDREF lists, so any whitespace in a tab `value` (e.g. a table/collection name)
+// would corrupt the reference — collapse it to a hyphen on both sides.
+function tabsItemId(baseId: string, part: 'trigger' | 'panel', value: string): string {
+  return `${baseId}-${part}-${value.replace(/\s+/g, '-')}`
+}
+
 export interface TabsProps extends Omit<React.ComponentProps<'div'>, 'onChange'> {
   value: string
   onValueChange: (value: string) => void
 }
 
-const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(({ value, onValueChange, className, children, ...props }, ref) => (
-  <TabsContext.Provider value={{ value, setValue: onValueChange }}>
-    <div ref={ref} data-slot="tabs" className={cn('flex flex-col gap-4', className)} {...props}>
-      {children}
-    </div>
-  </TabsContext.Provider>
-))
+const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(({ value, onValueChange, className, children, ...props }, ref) => {
+  const baseId = React.useId()
+  return (
+    <TabsContext.Provider value={{ value, setValue: onValueChange, baseId }}>
+      <div ref={ref} data-slot="tabs" className={cn('flex flex-col gap-4', className)} {...props}>
+        {children}
+      </div>
+    </TabsContext.Provider>
+  )
+})
 Tabs.displayName = 'Tabs'
 
 const TabsList = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ className, onKeyDown, ...props }, ref) => {
@@ -106,7 +118,7 @@ export interface TabsTriggerProps extends React.ComponentProps<'button'> {
 }
 
 const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ value, className, children, onClick, ...props }, ref) => {
-  const { value: activeValue, setValue } = useTabsContext('TabsTrigger')
+  const { value: activeValue, setValue, baseId } = useTabsContext('TabsTrigger')
   const active = activeValue === value
 
   return (
@@ -116,6 +128,8 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ val
       role="tab"
       data-slot="tabs-trigger"
       data-state={active ? 'active' : 'inactive'}
+      id={tabsItemId(baseId, 'trigger', value)}
+      aria-controls={tabsItemId(baseId, 'panel', value)}
       aria-selected={active}
       tabIndex={active ? 0 : -1}
       className={cn(
@@ -142,11 +156,22 @@ export interface TabsContentProps extends React.ComponentProps<'div'> {
 }
 
 const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(({ value, className, children, ...props }, ref) => {
-  const { value: activeValue } = useTabsContext('TabsContent')
+  const { value: activeValue, baseId } = useTabsContext('TabsContent')
   if (activeValue !== value) return null
 
   return (
-    <div ref={ref} data-slot="tabs-content" role="tabpanel" className={className} {...props}>
+    <div
+      ref={ref}
+      data-slot="tabs-content"
+      role="tabpanel"
+      id={tabsItemId(baseId, 'panel', value)}
+      aria-labelledby={tabsItemId(baseId, 'trigger', value)}
+      // Keep the panel in the tab sequence so keyboard users can reach its content even when it
+      // holds no focusable element (e.g. the Storage "Multiparte" read-only notice).
+      tabIndex={0}
+      className={className}
+      {...props}
+    >
       {children}
     </div>
   )
