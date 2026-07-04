@@ -197,7 +197,7 @@ export function ConsoleFlowsPage() {
           containerClassName="rounded-lg bg-card"
           aria-label="Flujos del área de trabajo"
         >
-          <TableHeader className="bg-muted/40 text-xs uppercase tracking-wide">
+          <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead className="hidden sm:table-cell">Estado</TableHead>

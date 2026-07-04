@@ -141,6 +141,26 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
   })
 
+  // Round-2 live-check fix (#757): a `className` override on <TableHeader> was colliding with
+  // (and losing to) the canonical header idiom via tailwind-merge — bg-muted/40 replaced
+  // bg-muted/50 and tracking-wide replaced tracking-[0.2em]. Pin the canonical classes so this
+  // listed screen keeps Scenario B's "one table-header style".
+  it('keeps the canonical shared table-header idiom — no className override collision (#757 round 2)', async () => {
+    mockListFlows.mockResolvedValue({
+      items: [{ flowId: 'flow-alpha', name: 'Alpha flow', status: 'published', updatedAt: '2026-06-30T12:00:00Z' }]
+    })
+
+    const { container } = renderPage()
+    await screen.findByTestId('flow-row')
+
+    const header = container.querySelector('[data-slot="table-header"]')
+    expect(header).not.toBeNull()
+    expect(header?.className).toMatch(/bg-muted\/50/)
+    expect(header?.className).toMatch(/tracking-\[0\.2em\]/)
+    expect(header?.className).not.toMatch(/bg-muted\/40/)
+    expect(header?.className).not.toMatch(/tracking-wide/)
+  })
+
   it('[#793] triggers a published flow and navigates to its run history with next-step state', async () => {
     mockListFlows.mockResolvedValue({
       items: [

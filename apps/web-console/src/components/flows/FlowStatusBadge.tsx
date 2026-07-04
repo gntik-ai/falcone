@@ -9,9 +9,9 @@ interface StatusMeta {
 
 const FLOW_STATUS_META: Record<string, StatusMeta> = {
   archived: { label: 'Archivado', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
-  draft: { label: 'Borrador', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  draft: { label: 'Borrador', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
   failed: { label: 'Fallido', variant: 'destructive', className: '' },
-  published: { label: 'Publicado', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' }
+  published: { label: 'Publicado', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }
 }
 
 const RUN_STATUS_META: Record<string, StatusMeta> = {
