@@ -13,9 +13,25 @@ const CREDENTIAL_STATUS_TONE: Record<string, string> = {
   expired: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
 }
 
+// Localized, human labels for the known lifecycle states. Parity with `ConsoleAuditResultBadge`,
+// which maps its raw enum to Spanish copy instead of rendering the technical token: keeps the badge
+// coherent with the Spanish, title-cased columns it sits beside (Estado del cliente, Acceso) rather
+// than showing a lowercase English word like "active". Unknown/future states fall back to the raw
+// token so the badge never hides an unexpected value.
+const CREDENTIAL_STATUS_LABEL: Record<string, string> = {
+  active: 'Activa',
+  rotated: 'Rotada',
+  revoked: 'Revocada',
+  expired: 'Expirada'
+}
+
 const NEUTRAL_TONE = 'border-border bg-background text-muted-foreground'
 
 export function ConsoleCredentialStatusBadge({ status }: { status: string | null | undefined }) {
-  const tone = status ? (CREDENTIAL_STATUS_TONE[status] ?? NEUTRAL_TONE) : NEUTRAL_TONE
-  return <Badge variant="outline" className={cn(tone)}>{status ?? 'Desconocido'}</Badge>
+  if (!status) {
+    return <Badge variant="outline" className={cn(NEUTRAL_TONE)}>Desconocido</Badge>
+  }
+  const tone = CREDENTIAL_STATUS_TONE[status] ?? NEUTRAL_TONE
+  const label = CREDENTIAL_STATUS_LABEL[status] ?? status
+  return <Badge variant="outline" className={cn(tone)}>{label}</Badge>
 }

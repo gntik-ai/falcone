@@ -4,6 +4,7 @@ import { DestructiveConfirmationDialog } from '@/components/console/DestructiveC
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
 import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { Alert } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -324,13 +325,18 @@ export function ConsoleServiceAccountsPage() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-        <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cuentas de servicio</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Identidades programáticas del área de trabajo activa y sus credenciales de cliente. Revelar muestra el
-          secreto actual, Rotar genera uno nuevo e invalida el anterior, y Revocar desactiva la credencial de forma
-          permanente.
-        </p>
+        <div className="space-y-2">
+          <Badge variant="outline">Cuentas de servicio</Badge>
+          <div>
+            <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cuentas de servicio</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Identidades programáticas del área de trabajo activa y sus credenciales de cliente. Revelar muestra el
+              secreto actual, Rotar genera uno nuevo e invalida el anterior, y Revocar desactiva la credencial de forma
+              permanente.
+            </p>
+          </div>
+        </div>
         {writesBlocked ? (
           <p role="status" className="mt-3 text-sm text-amber-700 dark:text-amber-300">
             La organización no está activa; las acciones de escritura están deshabilitadas.
@@ -381,7 +387,7 @@ export function ConsoleServiceAccountsPage() {
             <thead>
               <tr className="bg-muted/40 align-top text-xs uppercase tracking-[0.16em] text-muted-foreground">
                 <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
-                <th scope="col" className="px-4 py-3 font-medium">Cliente</th>
+                <th scope="col" className="px-4 py-3 font-medium">Estado del cliente</th>
                 <th scope="col" className="px-4 py-3 font-medium">Credencial</th>
                 <th scope="col" className="px-4 py-3 font-medium">Acceso</th>
                 <th scope="col" className="px-4 py-3 font-medium">Expira</th>
@@ -399,7 +405,16 @@ export function ConsoleServiceAccountsPage() {
                   <tr key={account.serviceAccountId} className="transition-colors hover:bg-muted/30">
                     <th scope="row" className="max-w-[18rem] break-words px-4 py-4 text-left font-medium text-foreground">{accountName}</th>
                     <td className="px-4 py-4 text-muted-foreground">{formatConsoleEnumLabel(account.accessProjection?.clientState ?? account.desiredState ?? null)}</td>
-                    <td className="px-4 py-4"><ConsoleCredentialStatusBadge status={account.credentialStatus?.state} /></td>
+                    <td className="px-4 py-4">
+                      <ConsoleCredentialStatusBadge status={account.credentialStatus?.state} />
+                      {credentialRevoked ? (
+                        // Surface the reason Revelar/Rotar are disabled beyond the buttons' hover
+                        // title, which is invisible to keyboard/touch users. Subtle muted caption
+                        // (same idiom as the secrets table's sub-labels) so it explains without
+                        // competing with the tone badge above it.
+                        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">No se puede revelar ni rotar.</p>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-4 text-muted-foreground">{formatAccessProjection(account.accessProjection?.effectiveAccess)}</td>
                     <td className="px-4 py-4 text-muted-foreground">{formatTableTimestamp(account.expiresAt)}</td>
                     <td className="px-4 py-4">
