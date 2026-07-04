@@ -363,6 +363,34 @@ describe('ConsoleMembersPage — design system (#757)', () => {
 
     expect(container.querySelectorAll('[data-slot="table"]').length).toBeGreaterThan(0)
   })
+
+  // Round-3 review fix (#757): both tables passed `mt-4` as the Table `className`, which lands
+  // on the inner <table> — INSIDE the bordered rounded-2xl container (blank strip inside the
+  // border) — instead of on the container itself (the outer separation from the preceding
+  // heading). Pin the margin on `[data-slot="table-container"]`, not on `[data-slot="table"]`.
+  it('puts the table top margin on the container, not on the inner <table> (#757 round 3)', async () => {
+    stubMembersApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+      users: [createIamUser('usr_1', 'alice')],
+      roles: [createIamRole('realm-admin')]
+    })
+
+    const { container } = renderPage(sessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    await screen.findByText('alice')
+
+    const containers = container.querySelectorAll('[data-slot="table-container"]')
+    expect(containers.length).toBeGreaterThan(0)
+    for (const tableContainer of Array.from(containers)) {
+      expect(tableContainer.className).toMatch(/\bmt-4\b/)
+    }
+
+    const tables = container.querySelectorAll('[data-slot="table"]')
+    expect(tables.length).toBeGreaterThan(0)
+    for (const table of Array.from(tables)) {
+      expect(table.className).not.toMatch(/\bmt-4\b/)
+    }
+  })
 })
 
 function sessionWithRoles(

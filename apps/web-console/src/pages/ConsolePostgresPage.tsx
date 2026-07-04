@@ -868,23 +868,41 @@ export function ConsolePostgresPage() {
           </div>
 
           <nav aria-label="Navegación PostgreSQL" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <button type="button" className="rounded-md px-2 py-1 hover:bg-muted" onClick={() => setSelectedDatabase(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto rounded-md px-2 py-1 font-normal hover:bg-muted"
+              onClick={() => setSelectedDatabase(null)}
+            >
               Bases de datos
-            </button>
+            </Button>
             {selectedDatabase ? (
               <>
                 <span aria-hidden="true">›</span>
-                <button type="button" className="rounded-md px-2 py-1 hover:bg-muted" onClick={() => setSelectedSchema(null)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto rounded-md px-2 py-1 font-normal hover:bg-muted"
+                  onClick={() => setSelectedSchema(null)}
+                >
                   {selectedDatabase}
-                </button>
+                </Button>
               </>
             ) : null}
             {selectedSchema ? (
               <>
                 <span aria-hidden="true">›</span>
-                <button type="button" className="rounded-md px-2 py-1 hover:bg-muted" onClick={() => setSelectedTable(null)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto rounded-md px-2 py-1 font-normal hover:bg-muted"
+                  onClick={() => setSelectedTable(null)}
+                >
                   {selectedSchema}
-                </button>
+                </Button>
               </>
             ) : null}
             {selectedTable ? (

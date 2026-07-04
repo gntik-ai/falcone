@@ -280,4 +280,28 @@ describe('ConsoleMongoPage', () => {
     expect(container.querySelector('[data-slot="table"]')).toBeInTheDocument()
     expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
   })
+
+  // Round-3 review fix (#757): the breadcrumb entries were bare <button>s bypassing the shared
+  // Button primitive. Pin that they render via Button (role stays "button" — no accessible-name
+  // or behavior regression) and that clicking still resets the drill-down state.
+  it('renders the breadcrumb entries via the shared Button primitive and preserves their click behavior (#757 round 3)', async () => {
+    mockUseConsoleContext.mockReturnValue(buildContext({ activeTenantId: 'tenant-a', activeWorkspaceId: 'ws-1' }))
+    mockRequestConsoleSessionJson
+      .mockResolvedValueOnce({ items: [{ databaseName: 'catalog' }] })
+      .mockResolvedValueOnce({ items: [{ collectionName: 'orders' }] })
+      .mockResolvedValueOnce({ items: [] })
+
+    render(<ConsoleMongoPage />)
+    await clickDatabase('catalog')
+    await screen.findByText('orders')
+
+    const databasesCrumb = screen.getByRole('button', { name: 'Bases de datos' })
+    expect(databasesCrumb.className).toMatch(/focus-visible:ring-offset-background/)
+    const databaseCrumb = screen.getByRole('button', { name: 'catalog' })
+    expect(databaseCrumb.className).toMatch(/focus-visible:ring-offset-background/)
+
+    fireEvent.click(databasesCrumb)
+    expect(screen.queryByText('orders')).not.toBeInTheDocument()
+    expect(await screen.findAllByText('catalog')).not.toHaveLength(0)
+  })
 })

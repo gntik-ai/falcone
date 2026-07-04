@@ -51,6 +51,15 @@ before — migrating to the primitive does not change what `getByRole('table', {
 resolves to; it only changes which component the accessible-name-and-styling implementation
 lives in.
 
+**Sanctioned exception — `ConsoleFlowsPage.tsx`:** the flow-list table renders through `Table`
+(one component, one `data-slot="table"`), but deliberately overrides the container to
+`containerClassName="rounded-lg bg-card"` (not the canonical `rounded-2xl`, and adding a
+background the canonical container doesn't specify) and `TableBody` to
+`className="divide-y-0 bg-transparent"` (not the canonical `divide-y divide-border
+bg-background/40`), preserving this table's pre-#757 look intentionally. The header row
+(`TableHeader`, unmodified) still uses the canonical `bg-muted/50` uppercase style, so "one
+header style" holds; "one container/body idiom" does not, for this one screen, by design.
+
 ## Tabs (`@/components/ui/tabs`)
 
 `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` provide an accessible tab strip for the

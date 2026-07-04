@@ -492,15 +492,25 @@ export function ConsoleMongoPage() {
       <section aria-labelledby="console-mongo-breadcrumb-heading" className="rounded-3xl border border-border bg-card/50 p-4 shadow-sm">
         <h2 id="console-mongo-breadcrumb-heading" className="sr-only">Ruta de navegación MongoDB</h2>
         <nav aria-label="Navegación MongoDB" className="flex flex-wrap items-center gap-2 text-sm">
-          <button className="font-medium text-foreground underline-offset-4 hover:underline" type="button" onClick={() => setSelectedDatabase(null)}>
+          <Button
+            variant="link"
+            className="h-auto p-0 font-medium text-foreground"
+            type="button"
+            onClick={() => setSelectedDatabase(null)}
+          >
             Bases de datos
-          </button>
+          </Button>
           {selectedDatabase ? (
             <>
               <span aria-hidden="true">›</span>
-              <button className="font-medium text-foreground underline-offset-4 hover:underline" type="button" onClick={() => setSelectedCollection(null)}>
+              <Button
+                variant="link"
+                className="h-auto p-0 font-medium text-foreground"
+                type="button"
+                onClick={() => setSelectedCollection(null)}
+              >
                 {selectedDatabase}
-              </button>
+              </Button>
             </>
           ) : null}
           {selectedCollection ? (

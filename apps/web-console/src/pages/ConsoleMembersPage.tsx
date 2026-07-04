@@ -483,7 +483,7 @@ function ConsoleSectionError({
 
 function UsersTable({ users }: { users: IamUser[] }) {
   return (
-    <Table className="mt-4" aria-label="Listado de usuarios IAM del realm activo">
+    <Table containerClassName="mt-4" aria-label="Listado de usuarios IAM del realm activo">
       <TableHeader>
         <TableRow>
           <TableHead>Usuario</TableHead>
@@ -534,7 +534,7 @@ function UsersTable({ users }: { users: IamUser[] }) {
 
 function RolesTable({ roles }: { roles: IamRole[] }) {
   return (
-    <Table className="mt-4" aria-label="Listado de roles IAM del realm activo">
+    <Table containerClassName="mt-4" aria-label="Listado de roles IAM del realm activo">
       <TableHeader>
         <TableRow>
           <TableHead>Rol</TableHead>

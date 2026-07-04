@@ -377,6 +377,30 @@ describe('ConsolePostgresPage', () => {
     expect(table.getAttribute('data-slot')).toBe('table')
     expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
   })
+
+  // Round-3 review fix (#757): the breadcrumb entries were bare <button>s bypassing the shared
+  // Button primitive. Pin that they render via Button (role stays "button" — no accessible-name
+  // or behavior regression) and that clicking still resets the drill-down state.
+  it('renders the breadcrumb entries via the shared Button primitive and preserves their click behavior (#757 round 3)', async () => {
+    mockConsoleApi()
+    const user = userEvent.setup()
+
+    renderPage()
+    await selectSchema(user)
+
+    const databasesCrumb = screen.getByRole('button', { name: 'Bases de datos' })
+    expect(databasesCrumb.className).toMatch(/focus-visible:ring-offset-background/)
+    const schemaCrumb = screen.getByRole('button', { name: 'app_db' })
+    expect(schemaCrumb.className).toMatch(/focus-visible:ring-offset-background/)
+
+    await user.click(schemaCrumb)
+    expect(screen.queryByText('accounts')).not.toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /listado de esquemas postgresql/i })).toBeInTheDocument()
+
+    await user.click(databasesCrumb)
+    expect(screen.queryByText('public')).not.toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /listado de bases de datos postgresql/i })).toBeInTheDocument()
+  })
 })
 
 function renderUi() {
