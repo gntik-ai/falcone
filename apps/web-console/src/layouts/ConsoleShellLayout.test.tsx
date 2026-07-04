@@ -83,6 +83,39 @@ describe('ConsoleShellLayout', () => {
     expect(screen.queryByTestId('console-context-operational-alert')).not.toBeInTheDocument()
   })
 
+  it('[#752][fn-console-context-panel][Scenario: context cards suppressed on platform-global routes] oculta el panel de contexto en una ruta global de plataforma (plans)', async () => {
+    stubShellApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/plans')
+
+    expect(await screen.findByRole('heading', { name: /planes/i })).toBeInTheDocument()
+    expect(screen.queryByTestId('console-context-status-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('console-context-tenant-status')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('console-context-workspace-status')).not.toBeInTheDocument()
+  })
+
+  it('[#752][fn-console-context-panel][Scenario: context cards present on tenant-scoped routes] mantiene el panel de contexto en una ruta con alcance de organización (overview)', async () => {
+    stubShellApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByTestId('console-context-status-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('console-context-tenant-status')).toBeInTheDocument()
+    expect(screen.getByTestId('console-context-workspace-status')).toBeInTheDocument()
+  })
+
   it('abre el dropdown y lo cierra con escape', async () => {
     stubShellApi()
     persistConsoleShellSession(baseSession)
@@ -669,6 +702,13 @@ function renderShell(initialPath = '/console/overview') {
           {
             path: 'quotas',
             element: <h1>Cuotas</h1>
+          },
+          {
+            // Platform-global route probe (#752): mirrors router.tsx's `handle: { platformGlobal:
+            // true }` on the real /console/plans* routes, without depending on router.tsx itself.
+            path: 'plans',
+            element: <h1>Planes</h1>,
+            handle: { platformGlobal: true }
           }
         ]
       }

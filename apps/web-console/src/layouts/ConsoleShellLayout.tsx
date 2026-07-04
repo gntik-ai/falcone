@@ -26,6 +26,7 @@ import {
   ConsoleContextProvider,
   formatConsoleContextEnumLabel,
   formatConsoleEnumLabel,
+  getConsoleContextStatusBadgeClasses,
   getConsoleTenantStatusMeta,
   getConsoleWorkspaceStatusMeta,
   useConsoleContext
@@ -251,6 +252,15 @@ export function ConsoleShellLayout() {
 
     return null
   }, [routeMatches])
+  // Platform-global routes (e.g. the plan catalog under /console/plans*) are not scoped to
+  // an active tenant/workspace — showing "Organización activa" / "Área de trabajo activa"
+  // there implies a context dependency that doesn't exist (#752). Routes opt in via
+  // `handle: { platformGlobal: true }` in router.tsx rather than a pathname string check
+  // here, so the predicate stays principled as new platform-global surfaces are added.
+  const isPlatformGlobalRoute = useMemo(
+    () => routeMatches.some((match) => (match.handle as { platformGlobal?: boolean } | undefined)?.platformGlobal === true),
+    [routeMatches]
+  )
   const [session, setSession] = useState(() => readConsoleShellSession())
   const [menuOpen, setMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -474,7 +484,7 @@ export function ConsoleShellLayout() {
 
           <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto lg:px-8 lg:py-8">
             <div className="mx-auto max-w-5xl space-y-6">
-              <ConsoleContextStatusPanel />
+              {isPlatformGlobalRoute ? null : <ConsoleContextStatusPanel />}
               <Outlet />
             </div>
           </main>
@@ -750,7 +760,7 @@ function ConsoleContextStatusPanel() {
               <h2 className="text-xl font-semibold tracking-tight text-foreground">{activeTenant?.label ?? 'Sin organización seleccionada'}</h2>
               <p className="text-sm text-muted-foreground">{activeTenant?.secondary ?? 'Selecciona una organización para ver su estado operativo.'}</p>
             </div>
-            <Badge variant="outline" className={getStatusBadgeClasses(tenantStatus.tone)}>
+            <Badge variant="outline" className={getConsoleContextStatusBadgeClasses(tenantStatus.tone)}>
               {tenantStatus.label}
             </Badge>
           </div>
@@ -798,7 +808,7 @@ function ConsoleContextStatusPanel() {
                 {activeWorkspace?.secondary ?? 'Selecciona un área de trabajo para completar el contexto operativo.'}
               </p>
             </div>
-            <Badge variant="outline" className={getStatusBadgeClasses(workspaceStatus.tone)}>
+            <Badge variant="outline" className={getConsoleContextStatusBadgeClasses(workspaceStatus.tone)}>
               {workspaceStatus.label}
             </Badge>
           </div>
@@ -858,20 +868,4 @@ function ConsoleContextStatusPanel() {
       ) : null}
     </section>
   )
-}
-
-function getStatusBadgeClasses(tone: 'healthy' | 'warning' | 'restricted' | 'neutral') {
-  if (tone === 'healthy') {
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-  }
-
-  if (tone === 'warning') {
-    return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-  }
-
-  if (tone === 'restricted') {
-    return 'border-destructive/30 bg-destructive/10 text-destructive'
-  }
-
-  return 'border-border bg-background text-muted-foreground'
 }

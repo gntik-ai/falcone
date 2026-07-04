@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { useWizardPermissionCheck, useWizardQuotaCheck, createValidation, submitWizardRequest, type WizardStepProps } from '@/lib/console-wizards'
+import { readConsoleShellSession } from '@/lib/console-session'
 import { listPlans, type PlanRecord } from '@/services/planManagementApi'
 
 interface TenantData { name: string; planId: string; region: string; locale: string }
@@ -142,7 +143,13 @@ export function CreateTenantWizard({ open, onOpenChange, onCreated }: { open: bo
       // /v1/admin/tenants path is not routed (404 NO_ROUTE) — fix-console-tenant-create-path (#504).
       const response = await submitWizardRequest<{ tenantId: string; tenantSlug?: string }>('/v1/tenants', { name: data.name ?? '', planId: data.planId ?? '', region: data.region ?? '', preferences: { locale: data.locale ?? 'es' } })
       onCreated?.()
-      return { resourceId: response.tenantId, resourceUrl: '/console/tenants' }
+      // #752: the wizard success step must be navigable to the actual new resource, not a static
+      // placeholder. The per-tenant plan page is superadmin-gated (RequireSuperadminRoute), so send
+      // superadmins straight there; any other role allowed to create a tenant (e.g. platform_operator)
+      // would be bounced off that route — take them to the inventory, where the just-created tenant
+      // now appears after the onCreated reload above, instead of to a page they cannot open.
+      const canReachTenantPlan = readConsoleShellSession()?.principal?.platformRoles?.includes('superadmin') ?? false
+      return { resourceId: response.tenantId, resourceUrl: canReachTenantPlan ? `/console/tenants/${response.tenantId}/plan` : '/console/tenants' }
     }}
   />
 }

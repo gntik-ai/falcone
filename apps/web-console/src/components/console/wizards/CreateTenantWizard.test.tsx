@@ -70,6 +70,62 @@ describe('CreateTenantWizard', () => {
     expect(requestMock).toHaveBeenCalledWith('/v1/tenants', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ name: 'Tenant Nuevo', planId: '11111111-1111-4111-8111-111111111111', region: 'eu-west' }) }))
   })
 
+  it('[#752] tras una creación exitosa, invoca onCreated para que ConsoleTenantsPage refresque el inventario sin recarga manual', async () => {
+    // ConsoleTenantsPage.tsx wires <CreateTenantWizard onCreated={() => void reloadTenants()} />.
+    // Pin the wizard's half of that contract: a successful submit must call onCreated exactly
+    // once, which is what makes the newly created tenant appear in the inventory without the
+    // operator having to manually refresh the page.
+    const onCreated = vi.fn()
+    const user = userEvent.setup()
+    render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} onCreated={onCreated} /></MemoryRouter>)
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/^plan$/i), '11111111-1111-4111-8111-111111111111')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/región/i), 'eu-west')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    await screen.findByRole('link', { name: /abrir recurso/i })
+    expect(onCreated).toHaveBeenCalledTimes(1)
+  })
+
+  it('[#752][fn-console-tenant-inventory][Scenario: Wizard success is navigable] el resumen de éxito enlaza al plan de la organización recién creada, no a la lista genérica', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/^plan$/i), '11111111-1111-4111-8111-111111111111')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/región/i), 'eu-west')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    const openResourceLink = await screen.findByRole('link', { name: /abrir recurso/i })
+    // The mocked POST /v1/tenants above resolves { tenantId: 'ten_new' } — the success step
+    // must be navigable to THAT tenant's plan page, not the static /console/tenants list.
+    expect(openResourceLink).toHaveAttribute('href', '/console/tenants/ten_new/plan')
+  })
+
+  it('[#752][fn-console-tenant-inventory][role-aware] para un creador sin superadmin, el éxito enlaza al inventario (no a un plan que le rebotaría)', async () => {
+    // platform_operator is allowed to create a tenant but cannot open the superadmin-gated plan
+    // route — the success link must point to /console/tenants, where the new tenant now appears,
+    // instead of bouncing them off /console/tenants/:id/plan (#752).
+    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles: ['platform_operator'] } })
+    const user = userEvent.setup()
+    render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/^plan$/i), '11111111-1111-4111-8111-111111111111')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/región/i), 'eu-west')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    const openResourceLink = await screen.findByRole('link', { name: /abrir recurso/i })
+    expect(openResourceLink).toHaveAttribute('href', '/console/tenants')
+  })
+
   it('bloquea la selección cuando no hay planes activos del catálogo', async () => {
     requestMock.mockImplementation((url: string) => {
       if (url.startsWith('/v1/plans')) return Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 })

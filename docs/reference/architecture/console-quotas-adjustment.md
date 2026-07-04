@@ -62,7 +62,9 @@ silently:
 
 - If the active tenant has no plan assigned (`getTenantCurrentPlan` returns
   `{ noAssignment: true }`), the dialog explains that there is no plan limit to adjust
-  here and offers a CTA link to `/console/tenants/{tenantId}/plan` to assign one.
+  here and offers a CTA link to `/console/tenants/{tenantId}/plan` to assign one — the
+  same per-tenant plan destination the `/console/tenants` inventory rows link to (see
+  [console-tenant-inventory.md](./console-tenant-inventory.md)).
 - If the assigned plan's status is `archived` or `deprecated` (limits are frozen — see
   `PLAN_LIMITS_FROZEN` in
   [console-plan-limit-edit-feedback.md](./console-plan-limit-edit-feedback.md)), the

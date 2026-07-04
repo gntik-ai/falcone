@@ -179,6 +179,12 @@ export interface ConsoleContextValue {
   workspacesLoading: boolean
   tenantsError: string | null
   workspacesError: string | null
+  // Raw pagination cursor from the last successful GET /v1/tenants (or the per-tenant-id
+  // fallback for tenant operators, which is always a single unpaginated page). Consumers
+  // that render the full `tenants` collection (e.g. the /console/tenants inventory) use
+  // `after` to disclose truncation honestly instead of silently dropping tenants beyond
+  // the first page (#752).
+  tenantsPageInfo: { after: string | null } | null
   selectTenant: (tenantId: string | null) => void
   selectWorkspace: (workspaceId: string | null) => void
   reloadTenants: () => Promise<void>
@@ -202,6 +208,7 @@ const emptyConsoleContextValue: ConsoleContextValue = {
   workspacesLoading: false,
   tenantsError: null,
   workspacesError: null,
+  tenantsPageInfo: null,
   selectTenant: () => undefined,
   selectWorkspace: () => undefined,
   reloadTenants: async () => undefined,
@@ -250,6 +257,7 @@ export function ConsoleContextProvider({
   const [workspacesLoading, setWorkspacesLoading] = useState(false)
   const [tenantsError, setTenantsError] = useState<string | null>(null)
   const [workspacesError, setWorkspacesError] = useState<string | null>(null)
+  const [tenantsPageInfo, setTenantsPageInfo] = useState<{ after: string | null } | null>(null)
   const [tenantReloadKey, setTenantReloadKey] = useState(0)
   const [workspaceReloadKey, setWorkspaceReloadKey] = useState(0)
   const [capabilities, setCapabilities] = useState<Record<string, boolean>>({})
@@ -326,6 +334,7 @@ export function ConsoleContextProvider({
       setWorkspacesLoading(false)
       setTenantsError(null)
       setWorkspacesError(null)
+      setTenantsPageInfo(null)
       return
     }
 
@@ -352,6 +361,7 @@ export function ConsoleContextProvider({
         }
 
         setTenants(options)
+        setTenantsPageInfo({ after: collection.page?.after ?? null })
         setActiveTenantId(nextTenantId)
         setActiveWorkspaceId(nextWorkspaceId)
         setWorkspaces(routeWorkspaceContext?.workspaces ?? [])
@@ -370,6 +380,7 @@ export function ConsoleContextProvider({
         }
 
         setTenants([])
+        setTenantsPageInfo(null)
         setActiveTenantId(null)
         setActiveWorkspaceId(null)
         setWorkspaces([])
@@ -503,6 +514,7 @@ export function ConsoleContextProvider({
       workspacesLoading,
       tenantsError,
       workspacesError,
+      tenantsPageInfo,
       selectTenant,
       selectWorkspace,
       reloadTenants,
@@ -527,6 +539,7 @@ export function ConsoleContextProvider({
       tenants,
       tenantsError,
       tenantsLoading,
+      tenantsPageInfo,
       workspaces,
       workspacesError,
       workspacesLoading
@@ -629,6 +642,31 @@ export function resolveInitialWorkspaceId(
   }
 
   return allowFallback && options.length === 1 ? options[0].workspaceId : null
+}
+
+// Shared tone -> Tailwind class mapping for the tenant/workspace status tone returned by
+// getConsoleTenantStatusMeta / getConsoleWorkspaceStatusMeta. Exported so both the shell's
+// context-status cards and the /console/tenants inventory row badges (#752) render the
+// same tone visually instead of each page inventing its own status color scale.
+//
+// Tones are authored directly for the dark `:root` (the console never toggles `.dark`, so a
+// `dark:` variant would be dead code): light `-300` text on a `/10` tint stays legible on the
+// near-black card, whereas the old `-700` / `text-destructive` text rendered dark-on-dark. This
+// mirrors the dark-safe posture-badge treatment shipped in #750.
+export function getConsoleContextStatusBadgeClasses(tone: 'healthy' | 'warning' | 'restricted' | 'neutral'): string {
+  if (tone === 'healthy') {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+  }
+
+  if (tone === 'warning') {
+    return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+  }
+
+  if (tone === 'restricted') {
+    return 'border-destructive/40 bg-destructive/10 text-red-300'
+  }
+
+  return 'border-border bg-muted/40 text-muted-foreground'
 }
 
 export function getConsoleTenantStatusMeta(tenant: ConsoleTenantOption | null): {

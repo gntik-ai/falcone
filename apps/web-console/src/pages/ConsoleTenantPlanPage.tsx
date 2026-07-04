@@ -39,7 +39,7 @@ export function ConsoleTenantPlanPage() {
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="tenant-plan-heading">
         <nav aria-label="Ruta de navegación" className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
           <Link className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" to="/console/tenants">
-            Gobierno de organizaciones
+            Gestión de organizaciones
           </Link>
           <span aria-hidden="true" className="text-muted-foreground/60">/</span>
           <span className="text-foreground" aria-current="page">Plan de la organización</span>
