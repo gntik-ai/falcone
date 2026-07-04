@@ -22,6 +22,7 @@ import {
 import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom'
 
 import { ActiveOperationsIndicator } from '@/components/console/ActiveOperationsIndicator'
+import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyActionBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { terminateConsoleLoginSession } from '@/lib/console-auth'
@@ -573,10 +574,7 @@ function RoleBadge({ permissions }: { permissions: ReturnType<typeof useConsoleP
       role="status"
       aria-label={ariaLabel}
       title={ariaLabel}
-      className={cn(
-        'shrink-0 gap-1.5',
-        isReadOnlyTone && 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300'
-      )}
+      className={cn('shrink-0 gap-1.5', isReadOnlyTone && READ_ONLY_AFFORDANCE_BADGE_TONE)}
     >
       {isReadOnlyTone ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
       <span className="hidden sm:inline">{highestRoleLabel}</span>

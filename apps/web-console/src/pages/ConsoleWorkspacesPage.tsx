@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Lock } from 'lucide-react'
 
 import { CreateWorkspaceWizard } from '@/components/console/wizards/CreateWorkspaceWizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { useConsoleContext } from '@/lib/console-context'
 import { useConsolePermissions } from '@/lib/console-permissions'
 
@@ -33,18 +33,14 @@ export function ConsoleWorkspacesPage() {
           {canCreateWorkspace ? (
             <Button type="button" onClick={() => setWizardOpen(true)}>Nueva área de trabajo</Button>
           ) : (
-            <Badge
-              variant="outline"
-              data-testid="workspaces-read-only-indicator"
-              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
-              title={workspacesCreateDenyReason ?? undefined}
-            >
-              <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Solo lectura · tu rol ({highestRoleLabel}) no puede crear áreas de trabajo
-              {/* #761 UX pass: expose the `denyReason` recourse to screen-reader users, not just
-                  the mouse-only `title`. */}
-              {workspacesCreateDenyReason ? <span className="sr-only"> {workspacesCreateDenyReason}</span> : null}
-            </Badge>
+            // Shared ReadOnlyActionBadge keeps the amber tone + Lock cue + sr-only recourse aligned
+            // with the Flows/Members indicators.
+            <ReadOnlyActionBadge
+              testId="workspaces-read-only-indicator"
+              roleLabel={highestRoleLabel}
+              deniedAction="crear áreas de trabajo"
+              reason={workspacesCreateDenyReason}
+            />
           )}
         </div>
         <div className="mt-3 text-sm text-muted-foreground">Organización activa: {activeTenant?.label ?? 'Sin organización seleccionada'}</div>

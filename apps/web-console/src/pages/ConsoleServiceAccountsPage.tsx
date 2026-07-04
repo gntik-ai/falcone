@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConsoleCredentialStatusBadge } from '@/components/console/ConsoleCredentialStatusBadge'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { READ_ONLY_AFFORDANCE_TEXT_TONE } from '@/components/console/ReadOnlyActionBadge'
 import {
   consoleServiceAccountsErrorMessage,
   createServiceAccount,
@@ -391,11 +392,11 @@ export function ConsoleServiceAccountsPage() {
           </div>
         </div>
         {tenantInactive ? (
-          <p role="status" className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+          <p role="status" className={`mt-3 text-sm ${READ_ONLY_AFFORDANCE_TEXT_TONE}`}>
             La organización no está activa; las acciones de escritura están deshabilitadas.
           </p>
         ) : permissionDenied ? (
-          <p role="status" data-testid="service-accounts-read-only-indicator" className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+          <p role="status" data-testid="service-accounts-read-only-indicator" className={`mt-3 text-sm ${READ_ONLY_AFFORDANCE_TEXT_TONE}`}>
             Solo lectura · tu rol ({highestRoleLabel}) no puede crear, rotar ni revocar cuentas de servicio.{' '}
             {denyReason('workspace.write')}
           </p>

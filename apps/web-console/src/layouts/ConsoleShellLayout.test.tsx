@@ -1010,6 +1010,12 @@ describe('[#761] role badge in the chrome + observer-first nav grouping', () => 
     expect(badge).toHaveTextContent('Viewer · solo lectura')
     expect(badge).toHaveAttribute('aria-label', expect.stringMatching(/viewer · solo lectura/i))
     expect(badge.querySelector('svg')).not.toBeNull()
+    // Dark-root amber tone (the console never toggles `.dark`) sourced from the shared
+    // READ_ONLY_AFFORDANCE_BADGE_TONE — pin it so the badge cannot regress to the dark-on-dark
+    // `text-amber-700` base of the legacy pattern.
+    expect(badge.className).toMatch(/\btext-amber-300\b/)
+    expect(badge.className).not.toMatch(/amber-700/)
+    expect(badge.className).not.toMatch(/dark:/)
   })
 
   it('shows the "Developer · solo lectura" badge for tenant_developer', async () => {

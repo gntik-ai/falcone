@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Lock } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
+import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { useConsolePermissions } from '@/lib/console-permissions'
 import { requestConsoleSessionJson } from '@/lib/console-session'
@@ -246,18 +246,14 @@ export function ConsoleMembersPage() {
               </Button>
             ) : (
               // Page-level create CTA hidden (not disabled) for a role that can never use it (#761).
-              <Badge
-                variant="outline"
-                data-testid="members-read-only-indicator"
-                className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
-                title={membersManageDenyReason ?? undefined}
-              >
-                <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                Solo lectura · tu rol ({highestRoleLabel}) no puede crear usuarios
-                {/* #761 UX pass: expose the `denyReason` recourse to screen-reader users, not just
-                    the mouse-only `title`. */}
-                {membersManageDenyReason ? <span className="sr-only"> {membersManageDenyReason}</span> : null}
-              </Badge>
+              // Shared ReadOnlyActionBadge keeps the amber tone + Lock cue + sr-only recourse aligned
+              // with the Flows/Workspaces indicators.
+              <ReadOnlyActionBadge
+                testId="members-read-only-indicator"
+                roleLabel={highestRoleLabel}
+                deniedAction="crear usuarios"
+                reason={membersManageDenyReason}
+              />
             )}
           </div>
         </div>

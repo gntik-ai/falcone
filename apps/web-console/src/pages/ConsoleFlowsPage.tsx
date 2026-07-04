@@ -5,13 +5,14 @@
 // @xyflow/react chunk stays out of the initial shell bundle.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { History, Lock, PenLine } from 'lucide-react'
+import { History, PenLine } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
+import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { useConsoleContext } from '@/lib/console-context'
@@ -137,20 +138,16 @@ export function ConsoleFlowsPage() {
           </div>
         ) : (
           // Page-level create CTA is HIDDEN (not disabled) for a role that can never use it (#761) —
-          // reserve inline disable-with-reason for row actions that sit beside readable data.
-          <Badge
-            variant="outline"
-            data-testid="flows-read-only-indicator"
-            className="w-fit border-amber-500/40 bg-amber-500/10 text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
-            title={workspaceWriteDenyReason ?? undefined}
-          >
-            <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Solo lectura · tu rol ({highestRoleLabel}) no puede crear flujos
-            {/* #761 UX pass: the "contact an admin" recourse in `denyReason` was only in the
-                mouse-only `title`. Mirror it into an sr-only child so screen-reader users get the
-                same guidance the ServiceAccounts read-only indicator already shows visibly. */}
-            {workspaceWriteDenyReason ? <span className="sr-only"> {workspaceWriteDenyReason}</span> : null}
-          </Badge>
+          // reserve inline disable-with-reason for row actions that sit beside readable data. The
+          // shared ReadOnlyActionBadge carries the design-system amber tone + Lock cue + sr-only
+          // recourse so this and the Members/Workspaces indicators stay one visual language.
+          <ReadOnlyActionBadge
+            testId="flows-read-only-indicator"
+            roleLabel={highestRoleLabel}
+            deniedAction="crear flujos"
+            reason={workspaceWriteDenyReason}
+            className="w-fit"
+          />
         )}
       </header>
 
