@@ -959,4 +959,34 @@ describe('[#741] navegación de consola consciente del rol', () => {
     expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
   })
+
+  it('[Scenario: Active state on the plan parent route] marca solo "Mi plan" como página actual en /console/my-plan', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/my-plan')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    const planLink = within(navigation).getByRole('link', { name: /^mi plan/i })
+    const allocationLink = within(navigation).getByRole('link', { name: /^resumen de asignación/i })
+
+    expect(planLink).toHaveAttribute('aria-current', 'page')
+    expect(allocationLink).not.toHaveAttribute('aria-current', 'page')
+  })
+
+  it('[Scenario: Active state on the allocation child route] marca solo "Resumen de asignación" como página actual en /console/my-plan/allocation', async () => {
+    stubShellApi()
+    persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+    renderShell('/console/my-plan/allocation')
+
+    const navigation = await screen.findByRole('navigation', { name: /navegación principal de consola/i })
+    const planLink = within(navigation).getByRole('link', { name: /^mi plan/i })
+    const allocationLink = within(navigation).getByRole('link', { name: /^resumen de asignación/i })
+
+    // Without exactActive on "Mi plan", the parent NavLink would also match the child route and
+    // both entries would claim aria-current="page" — the child page must have exactly one current entry.
+    expect(planLink).not.toHaveAttribute('aria-current', 'page')
+    expect(allocationLink).toHaveAttribute('aria-current', 'page')
+  })
 })

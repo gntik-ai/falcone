@@ -115,6 +115,12 @@ equivalent "Sin plan de organización personal" empty state in
 `ConsoleTenantAllocationSummaryPage.tsx`), so showing the entries to every signed-in role —
 platform or tenant-scoped — never produces a new dead end.
 
+Because `/console/my-plan/allocation` is a child path of `/console/my-plan`, the **Mi plan**
+entry matches its route exactly (`exactActive`, i.e. the `NavLink` `end` prop). Without it the
+parent entry would also match the child route and both entries would carry `aria-current="page"`
+at once; with it, exactly one of the two entries is the current page on each route — the same
+convention the `Funciones: administrar` entry uses for its own `…/data` child (#797).
+
 The full sidebar role matrix, after #741:
 
 | Entry | superadmin | platform_admin / platform_operator | tenant_owner / other tenant roles |

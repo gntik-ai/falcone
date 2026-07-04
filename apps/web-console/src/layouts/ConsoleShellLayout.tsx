@@ -69,6 +69,12 @@ const consoleNavigationItems = [
     group: 'main',
     label: 'Mi plan',
     to: '/console/my-plan',
+    // `/console/my-plan/allocation` ("Resumen de asignación" below) is a child path of
+    // `/console/my-plan`, so without `end` this NavLink also matches the allocation route and
+    // TWO entries would carry aria-current="page" at once. Match exactly — mirroring the
+    // "Funciones: administrar" entry, whose child is `/console/functions/data` (#797) — so
+    // exactly one plan entry is the current page on each of the two routes (#741).
+    exactActive: true,
     icon: Gauge,
     description: 'Derechos efectivos y consumo actual de la cuota de tu organización.'
   },
