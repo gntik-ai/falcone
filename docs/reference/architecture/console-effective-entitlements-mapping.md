@@ -66,19 +66,39 @@ The `?? []` guard means an absent or empty `quantitativeLimits` renders an empty
 table rather than throwing — the page renders the assign/change-plan control either way and
 never crashes into the router error boundary.
 
+The tenant "My Plan" page
+(`apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.tsx`, route `/console/my-plan` —
+the default landing page for non-superadmin console principals) reads the same
+`quantitativeLimits` collection from the tenant-scoped
+`GET /v1/tenant/plan/effective-entitlements` call, with the same defensive guard:
+
+```jsx
+const limits = summary.quantitativeLimits ?? []
+```
+
+An empty or absent `quantitativeLimits` renders a `ConsolePageState kind="empty"` "Sin
+cuotas" message instead of the `QuotaConsumptionTable`, so the page never throws on a
+tenant with no populated quota dimensions. The page's header shows the real `planSlug`
+field only — it previously also displayed fictitious `planDisplayName` /
+`latestHistoryEntryId` fields and gated on a `noAssignment` field, none of which this
+endpoint (or the `EffectiveEntitlementProfile` model backing it) ever returns; those were
+removed as part of fixing this page (issue #735).
+
 > Note: the shared TypeScript type `CurrentEffectiveEntitlementSummary`
 > (`apps/web-console/src/services/planManagementApi.ts`) still declares a legacy
 > `quotaDimensions` field alongside the correct `quantitativeLimits`. That legacy field does
-> not correspond to anything the API returns; it is retained only because
-> `ConsoleTenantPlanOverviewPage.tsx` still reads it. Aligning that page to
-> `quantitativeLimits` (and removing the legacy field) is tracked separately under issue #735.
+> not correspond to anything the API returns. As of issue #735, no page reads it anymore —
+> it is retained only because `PlanQuotaImpactTable.tsx` structurally types its `items`
+> prop against this shape (that component is, in practice, only ever invoked with the
+> unrelated, real `PlanQuotaImpact[]` history-impact shape, never with `quotaDimensions`
+> data). Removing the field entirely requires also updating that component's type union.
 
 ## Platform admins and My Plan
 
 `/console/my-plan` is an own-tenant page. A tenant-less platform principal (`superadmin`,
 `platform_admin`, or `platform_operator` with no `tenantIds` in the console session) has no personal
 tenant plan, so the page must not call `GET /v1/tenant/plan/effective-entitlements`. It renders the
-empty state `No personal tenant plan` instead of surfacing the backend
+empty state "Sin plan personal de organización" instead of surfacing the backend
 `TENANT_NOT_FOUND` code. The tenant-specific plan page
 `/console/tenants/{tenantId}/plan` uses the tenant-id route above and is guarded by the console's
 superadmin route gate; non-superadmin platform roles do not get a link to that page from My Plan.

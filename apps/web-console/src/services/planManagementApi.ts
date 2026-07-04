@@ -174,14 +174,11 @@ export interface CurrentEffectiveEntitlementSummary {
   tenantId: string
   planId?: string
   planSlug?: string
-  planDisplayName?: string
-  effectiveFrom?: string
-  latestHistoryEntryId?: string | null
-  latestPlanChangeAt?: string | null
+  planStatus?: PlanStatus
   // The effective-entitlements API (services/provisioning-orchestrator
   // EffectiveEntitlementProfile) returns per-tenant quota limits under
   // `quantitativeLimits` with a per-item `currentUsage`. This is the real backend
-  // field and is what ConsoleTenantPlanPage reads.
+  // field and is what ConsoleTenantPlanPage and ConsoleTenantPlanOverviewPage read.
   quantitativeLimits?: Array<{
     dimensionKey: string
     displayLabel?: string
@@ -193,10 +190,12 @@ export interface CurrentEffectiveEntitlementSummary {
     usageStatus: UsageStatus
     usageUnknownReason?: string | null
   }>
-  // Legacy/incorrect field name (the API does not return `quotaDimensions`/`observedUsage`).
-  // Still read by ConsoleTenantPlanOverviewPage.tsx, whose fix is tracked separately under
-  // issue #735; kept here so that file keeps compiling. The real API field is
-  // `quantitativeLimits` above.
+  // Legacy/incorrect field name — the effective-entitlements API does NOT return
+  // `quotaDimensions`/`effectiveValueKind`/`observedUsage` (see `quantitativeLimits`
+  // above, which is the real field). No page reads this anymore as of issue #735;
+  // kept only because `PlanQuotaImpactTable.tsx` structurally types its (unused at
+  // runtime — it is only ever invoked with `PlanQuotaImpact[]`) `items` union against
+  // this shape. Safe to delete once that union arm is also removed.
   quotaDimensions: Array<{
     dimensionKey: string
     displayLabel?: string
@@ -212,7 +211,6 @@ export interface CurrentEffectiveEntitlementSummary {
     displayLabel?: string
     enabled: boolean
   }>
-  noAssignment?: boolean
 }
 
 export class PlanApiError extends Error {
