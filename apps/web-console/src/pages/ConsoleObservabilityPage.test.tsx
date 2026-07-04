@@ -214,6 +214,28 @@ describe('ConsoleObservabilityPage', () => {
       expect(screen.queryByRole('button', { name: 'Auditoría' })).not.toBeInTheDocument()
     })
 
+    it('does not fire the background audit-records fetch for tenant_developer (round-2 review #761: the hook was called unconditionally, eagerly firing a GET .../audit-records that 403s on every visit for the role whose default landing is this page)', () => {
+      mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_developer'] } })
+      mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+      mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+      mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+
+      render(<ConsoleObservabilityPage />)
+
+      expect(mockUseConsoleAuditRecords).toHaveBeenCalledWith(null, null, {})
+    })
+
+    it('keeps firing the audit-records fetch for tenant_viewer (allowed tenant.audit.read)', () => {
+      mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_viewer'] } })
+      mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+      mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+      mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
+
+      render(<ConsoleObservabilityPage />)
+
+      expect(mockUseConsoleAuditRecords).toHaveBeenCalledWith('ten_1', 'wrk_1', {})
+    })
+
     it('keeps the Auditoría tab for tenant_viewer (allowed tenant.audit.read — the one asymmetry vs. tenant_developer)', async () => {
       mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['tenant_viewer'] } })
       mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })

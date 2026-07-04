@@ -111,7 +111,15 @@ export function ConsoleObservabilityPage() {
   const canReadAudit = can('tenant.audit.read')
 
   const metrics = useConsoleMetrics(activeTenantId, activeWorkspaceId, range)
-  const audit = useConsoleAuditRecords(activeTenantId, activeWorkspaceId, filters)
+  // Round-2 review (#761): `useConsoleAuditRecords` was called unconditionally regardless of
+  // `canReadAudit`, so a `tenant_developer` (denied `tenant.audit.read`, and whose default landing
+  // is now this page — Observer-first IA) fired a background GET .../audit-records that 403s on
+  // every visit, even though the "Auditoría" tab is already hidden for them. `useConsoleAuditRecords`
+  // already no-ops on a falsy `tenantId` (see its `if (!tenantId) { ...; return }` guard in
+  // console-metrics.ts), so passing `null` here — the same gate-by-null-id pattern the hook itself
+  // uses — suppresses the fetch without a conditional hook call. Behavior for a role that CAN read
+  // audit is unchanged (the real `activeTenantId`/`activeWorkspaceId` still flow through).
+  const audit = useConsoleAuditRecords(canReadAudit ? activeTenantId : null, canReadAudit ? activeWorkspaceId : null, filters)
   const metricsRangeApplies = Boolean(activeWorkspaceId)
 
   const headerText = useMemo(() => {

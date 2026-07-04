@@ -72,9 +72,14 @@ const ROLE_CATALOG: RoleCatalogEntry[] = [
 const ROLE_CATALOG_BY_ID = new Map(ROLE_CATALOG.map((entry) => [entry.id, entry]))
 
 // Platform-tier roles bypass every `PermissionAction` below — they already have unrestricted
-// console-level nav access (console-principal.ts::hasPlatformInventoryAccess,
-// workspace-secrets-access.ts::SECRETS_PRIVILEGED_ROLES) so gating them narrower here would just be
-// a second, drifting source of truth.
+// console-level nav access so gating them narrower here would just be a second, drifting source of
+// truth. `superadmin`/`platform_admin`/`platform_operator` mirror
+// console-principal.ts::hasPlatformInventoryAccess exactly. `platform_team` is NOT part of that
+// function (nor does it appear anywhere in
+// services/internal-contracts/src/authorization-model.json) — its only precedent in this codebase is
+// workspace-secrets-access.ts::SECRETS_PRIVILEGED_ROLES (line 21), which already treats it as a
+// tenant-admin-equivalent platform role for the Workspace Secrets gate. Included here for consistency
+// with that precedent; behavior for the other three roles is unchanged.
 const PLATFORM_BYPASS_ROLES = new Set(['superadmin', 'platform_admin', 'platform_operator', 'platform_team'])
 
 // Tenant/workspace-tier roles that are write-capable at the console's coarse granularity. A
@@ -87,6 +92,27 @@ export const WORKSPACE_WRITE_CAPABLE_ROLES = new Set([
   'tenant_admin',
   'workspace_owner',
   'workspace_admin'
+])
+
+// The console's `structural-write-access.ts::canPerformStructuralWrites` gate — used by pages that
+// mirror a genuine BACKEND role gate (e.g. `ConsoleEventsDataPage`'s create-topic/publish controls) —
+// must match the backend's role set EXACTLY, not the broader `WORKSPACE_WRITE_CAPABLE_ROLES` above.
+// `WORKSPACE_WRITE_CAPABLE_ROLES` includes `platform_operator`/`platform_team` (platform-tier roles
+// treated as a console-wide bypass everywhere else — see `PLATFORM_BYPASS_ROLES`), but the backend's
+// `WRITE_CAPABLE_ADMIN_ROLES` (`apps/control-plane/src/runtime/auth-roles.mjs`) does NOT: a
+// `platform_operator`/`platform_team` caller gets a real `403` from a structural write there. Round-2
+// review (#761): reusing `WORKSPACE_WRITE_CAPABLE_ROLES` for this gate caused the console to enable
+// controls the backend then 403s for those two roles — the exact "enabled-then-403" anti-pattern this
+// change exists to remove. Kept as a literal, explicit list (not derived from
+// `WORKSPACE_WRITE_CAPABLE_ROLES` minus platform roles) so it stays trivially diffable against
+// `auth-roles.mjs` if that set ever changes.
+export const STRUCTURAL_WRITE_ADMIN_ROLES = new Set([
+  'tenant_owner',
+  'tenant_admin',
+  'workspace_owner',
+  'workspace_admin',
+  'platform_admin',
+  'superadmin'
 ])
 
 // Per-action allow-lists beyond the platform bypass. Each maps to leaf actions in
@@ -102,7 +128,8 @@ const ACTION_ALLOWED_ROLES: Record<PermissionAction, Set<string>> = {
   'tenant.members.manage': new Set(['tenant_owner', 'tenant_admin', 'workspace_owner', 'workspace_admin']),
   // IAM client management (Auth surface) — narrower than the other tenant-tier actions: the route
   // itself is superadmin-gated (RequireSuperadminRoute in router.tsx), so this mirrors the ORIGINAL
-  // `useWizardPermissionCheck('manage_iam')` behavior (workspace_admin only; tenant_owner excluded).
+  // `useWizardPermissionCheck('manage_iam')` behavior (workspace_owner/workspace_admin only;
+  // tenant_owner/tenant_admin excluded).
   'iam.clients.manage': new Set(['workspace_owner', 'workspace_admin']),
   // Workspace runtime writes — `database.write/admin`, `bucket.write/admin`, `topic.publish`,
   // `function.deploy/invoke`, `service_account.rotate/credentials.issue/revoke`, and (until flows

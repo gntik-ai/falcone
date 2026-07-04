@@ -68,8 +68,11 @@ write-capable role.
 avatar button — the one wrapper that survives every breakpoint (unlike the `md:block` name/email
 column or the `xl:flex` context controls). It shows the humanized `highestRoleLabel`:
 
-- read-only or unknown role → amber tone with a leading `Lock` icon (`border-amber-500/40
-  bg-amber-500/10 text-amber-700`)
+- read-only or unknown role → the shared `READ_ONLY_AFFORDANCE_BADGE_TONE`
+  (`ReadOnlyActionBadge.tsx`) with a leading `Lock` icon: `border-amber-500/40 bg-amber-500/10
+  text-amber-300`. The tone is authored for the console's dark `:root` directly (no `dark:`
+  variant) — a bare `text-amber-700` renders dark-on-dark at ~3.4:1, below WCAG AA, whereas
+  `text-amber-300` reads at ~11:1 on the near-black background.
 - write-capable role → neutral `Badge` (no icon)
 
 The label collapses to icon-only below the `sm` breakpoint (an inner `hidden sm:inline` span); the
@@ -136,7 +139,11 @@ each wizard's own render code.
   rápido), `Cuentas de servicio`, and `Secretos del área de trabajo`.
 - **Audit tab.** `ConsoleObservabilityPage`'s "Auditoría" tab button is hidden when
   `!can('tenant.audit.read')` — true for `tenant_developer` only among the tenant-tier roles. A
-  `tenant_viewer` keeps the tab (the model's one asymmetry between the two read-only roles).
+  `tenant_viewer` keeps the tab (the model's one asymmetry between the two read-only roles). The
+  page also withholds the `activeTenantId`/`activeWorkspaceId` it passes to `useConsoleAuditRecords`
+  (passing `null`/`null` instead) when `!can('tenant.audit.read')`, so a `tenant_developer` — whose
+  default landing is this page — never fires a background `GET .../audit-records` that would 403
+  before the user even opens the (hidden) tab.
 
 ## Related docs
 

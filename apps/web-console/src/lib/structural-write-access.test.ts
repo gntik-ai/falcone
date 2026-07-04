@@ -17,4 +17,9 @@ describe('canPerformStructuralWrites', () => {
     expect(canPerformStructuralWrites([])).toBe(false)
     expect(canPerformStructuralWrites(undefined)).toBe(false)
   })
+
+  it('denies platform_operator and platform_team (round-2 review #761: these are NOT in the backend WRITE_CAPABLE_ADMIN_ROLES set — auth-roles.mjs — so granting them structural-write affordances here would enable a control the backend 403s)', () => {
+    expect(canPerformStructuralWrites(['platform_operator'])).toBe(false)
+    expect(canPerformStructuralWrites(['platform_team'])).toBe(false)
+  })
 })

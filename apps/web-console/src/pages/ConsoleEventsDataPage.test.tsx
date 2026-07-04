@@ -56,6 +56,22 @@ describe('ConsoleEventsDataPage', () => {
     expect(mockEventsConsole).toHaveBeenCalledWith({ workspaceId: 'ws1', canManageEvents: false })
   })
 
+  it('withholds Events create/publish access for platform_operator (round-2 review #761: not in the backend WRITE_CAPABLE_ADMIN_ROLES set — the backend 403s a create-topic/publish from this role)', () => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['platform_operator'] } })
+    render(<ConsoleEventsDataPage />)
+    expect(screen.getByText('Solo lectura')).toBeInTheDocument()
+    expect(screen.getByTestId('events-console')).toHaveTextContent('false')
+    expect(mockEventsConsole).toHaveBeenCalledWith({ workspaceId: 'ws1', canManageEvents: false })
+  })
+
+  it('withholds Events create/publish access for platform_team (round-2 review #761: not in the backend WRITE_CAPABLE_ADMIN_ROLES set — the backend 403s a create-topic/publish from this role)', () => {
+    mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['platform_team'] } })
+    render(<ConsoleEventsDataPage />)
+    expect(screen.getByText('Solo lectura')).toBeInTheDocument()
+    expect(screen.getByTestId('events-console')).toHaveTextContent('false')
+    expect(mockEventsConsole).toHaveBeenCalledWith({ workspaceId: 'ws1', canManageEvents: false })
+  })
+
   it('shows a workspace selection state before rendering the Events console', () => {
     mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: '' })
     render(<ConsoleEventsDataPage />)
