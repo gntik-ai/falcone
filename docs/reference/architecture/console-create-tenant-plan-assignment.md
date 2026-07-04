@@ -35,6 +35,11 @@ No wire contract changed for this behavior. The frontend still calls `GET /v1/pl
 `POST /v1/tenants`, and the tenant create body still uses `planId`; the fix is that `planId` now comes
 from a real catalog record ID instead of a synthetic UI value.
 
-Once the wizard succeeds, the operator lands on the created tenant's plan page rather than a
-static placeholder, and the tenant becomes visible in the `/console/tenants` inventory — see
-[console-tenant-inventory.md](./console-tenant-inventory.md).
+Once the wizard succeeds, its summary step renders an "Abrir recurso" link — a link to follow,
+not an automatic redirect — to the created tenant, and the tenant becomes visible in the
+`/console/tenants` inventory. That link's destination is role-aware: a `superadmin` creator gets
+a link straight to the new tenant's plan page (`/console/tenants/{tenantId}/plan`, which is
+`RequireSuperadminRoute`-gated); any other role allowed to create a tenant (e.g.
+`platform_operator`) gets a link to the `/console/tenants` inventory instead, where the new
+tenant already appears — see
+[console-tenant-inventory.md](./console-tenant-inventory.md) for the full role breakdown.

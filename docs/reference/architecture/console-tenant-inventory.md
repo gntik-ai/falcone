@@ -16,10 +16,14 @@ reuses the context's tenant list and its `reloadTenants()`/`tenantsLoading`/`ten
 state, so it stays in sync with the rest of the shell and follows the console's established
 loading/error/empty idioms (`ConsolePageState`, matching `ConsoleQuotasPage`).
 
-Each row's "Abrir plan" action is a real `<Link>` to `/console/tenants/{tenantId}/plan`
-(keyboard accessible, no synthetic click handlers) and also calls `selectTenant(tenantId)` so
-the tenant becomes the shell's active context — the operator never has to type a tenant UUID
-into the URL bar to reach a tenant's plan, quotas, or IAM surfaces.
+Each row's action is role-forked, because `/console/tenants/{tenantId}/plan` is itself
+superadmin-gated (`RequireSuperadminRoute` in `router.tsx`): a `superadmin` gets an "Abrir plan"
+`<Link>` to that route (keyboard accessible, no synthetic click handlers) that also calls
+`selectTenant(tenantId)` so the tenant becomes the shell's active context — no need to type a
+tenant UUID into the URL bar. `platform_admin` / `platform_operator` — who can see the inventory
+but would be bounced off the plan route — instead get a "Usar como activa" `<Button>` that only
+calls `selectTenant(tenantId)`, with no plan link, so the row never offers a destination it can't
+actually reach.
 
 ### Pagination honesty
 
@@ -38,13 +42,29 @@ table or an empty-looking list, the page checks the caller's platform roles and 
 honest `ConsolePageState kind="blocked"` explaining that the inventory is a platform-level
 view, with a CTA to `/console/my-plan` (the tenant-scoped equivalent) instead.
 
+Within the platform tier, role-awareness goes one level deeper than "can view the inventory or
+not" (`ConsoleTenantsPage.tsx`'s `canOpenTenantPlan` check, gated on the same predicate as
+`RequireSuperadminRoute`):
+
+- `superadmin` — sees the inventory and gets the "Abrir plan" link on every row.
+- `platform_admin` / `platform_operator` — see the same inventory, but each row instead offers
+  "Usar como activa" only, because the per-tenant plan route is superadmin-only and a link to it
+  would silently bounce them back to `/console/my-plan`.
+- Tenant operators (`tenant_owner`, `tenant_admin`, …) — never reach the table at all; they get
+  the "Inventario no disponible para tu rol" blocked state described above.
+
 ## Wizard success is navigable
 
 The create-tenant wizard's success step (`WizardSummaryStep`) used to link back to the
-generic, then-static `/console/tenants` list. It now links to
-`/console/tenants/{tenantId}/plan` for the tenant that was just created
-(`CreateTenantWizard.tsx`'s `onSubmit` return value), and calls `onCreated` (wired to
-`reloadTenants()`) so the new tenant is visible in the inventory without a manual refresh.
+generic, then-static `/console/tenants` list. It now renders an "Abrir recurso" link — a link
+on the success step, not an automatic redirect — whose destination is role-aware, for the same
+reason the row action above is: `/console/tenants/{tenantId}/plan` is superadmin-gated.
+`CreateTenantWizard.tsx`'s `onSubmit` return value sends a `superadmin` straight to
+`/console/tenants/{tenantId}/plan` for the tenant that was just created; any other role allowed
+to create a tenant (e.g. `platform_operator`) is sent to `/console/tenants` instead, where the
+new tenant now appears because `onSubmit` also calls `onCreated` (wired by `ConsoleTenantsPage`
+to `reloadTenants()`) — so the inventory reflects the new tenant without a manual refresh,
+whichever destination the operator's role resolves to.
 
 ## Context status cards on platform-global pages
 
