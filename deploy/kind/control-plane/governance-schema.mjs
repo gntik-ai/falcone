@@ -81,7 +81,14 @@ export async function applyGovernanceSchema(pool, opts = {}) {
   const applied = [];
   for (const rel of GOVERNANCE_MIGRATIONS) {
     const sql = await read(resolve(repoRoot, rel), 'utf8');
-    await pool.query(forwardMigration(sql));
+    // Reset search_path before every migration, on the SAME connection as the migration
+    // (one query call), so a migration that sets its own search_path can never leak it to the
+    // next one. Concretely: 087-workspace-doc-notes.sql does `SET search_path TO
+    // workspace_docs_service` and never restores it; the following migration
+    // (114-backup-scope-deployment-profiles) then resolved its unqualified
+    // `set_updated_at_timestamp()` against workspace_docs_service instead of public and boot
+    // died with "function set_updated_at_timestamp() does not exist" -> CrashLoopBackOff.
+    await pool.query('RESET search_path;\n' + forwardMigration(sql));
     applied.push(rel);
   }
   log.log?.(`[control-plane] provisioning-orchestrator schema ready (${applied.length} migrations)`);
