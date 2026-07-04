@@ -1,9 +1,10 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
+import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { Button } from '@/components/ui/button'
-import { DialogFooter, DialogHeader } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ConsoleCredentialStatusBadge } from '@/components/console/ConsoleCredentialStatusBadge'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
@@ -38,6 +39,20 @@ function formatAccessProjection(value: string | null | undefined): string {
   return labels[value] ?? formatConsoleEnumLabel(value)
 }
 
+function formatCredentialExpiry(value: string | null | undefined): string {
+  if (!value) {
+    return 'Sin expiración'
+  }
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? value : new Date(parsed).toLocaleString()
+}
+
+// A true, action-anchored MODAL for the one-time credential disclosure (#783): built on the shared
+// Dialog/DialogContent primitive (backdrop + click-outside-to-close) plus the same
+// `useModalFocusTrap` hook used by DestructiveConfirmationDialog and
+// ConsoleWorkspaceSecretsPage's SecretDialog, so Tab never escapes it and focus returns to the
+// triggering row action (Revelar/Rotar) on close. `initialFocus: 'panel'` preserves the existing
+// behavior of moving focus onto the dialog container itself (not a specific control inside it).
 function CredentialDisclosureDialog({
   disclosure,
   onClose
@@ -45,24 +60,12 @@ function CredentialDisclosureDialog({
   disclosure: { mode: 'reveal' | 'rotate'; credential: ConsoleIssuedCredential } | null
   onClose: () => void
 }) {
-  const panelRef = useRef<HTMLDivElement | null>(null)
-  const restoreFocusRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
   const descriptionId = useId()
   const secretId = useId()
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const isOpen = disclosure !== null
-
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-    restoreFocusRef.current = (document.activeElement as HTMLElement | null) ?? null
-    panelRef.current?.focus()
-    return () => {
-      restoreFocusRef.current?.focus?.()
-    }
-  }, [isOpen])
+  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(isOpen, { initialFocus: 'panel' })
 
   useEffect(() => {
     setCopyFeedback(null)
@@ -83,7 +86,9 @@ function CredentialDisclosureDialog({
     if (event.key === 'Escape') {
       event.preventDefault()
       onClose()
+      return
     }
+    handleTabTrap(event)
   }
 
   async function handleCopy() {
@@ -101,52 +106,67 @@ function CredentialDisclosureDialog({
   }
 
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      tabIndex={-1}
-      onKeyDown={handleKeyDown}
-      className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-    >
-      <DialogHeader>
-        <h2 id={titleId} className="text-lg font-semibold">
-          {title}
-        </h2>
-        <p id={descriptionId} className="text-sm text-muted-foreground">
-          {description}
-        </p>
-      </DialogHeader>
-      <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Secreto de cliente</p>
-        <pre
-          id={secretId}
-          tabIndex={0}
-          aria-label="Valor del secreto de cliente"
-          className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-border/70 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <Dialog open={isOpen} onOpenChange={(next) => { if (!next) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          tabIndex={-1}
+          onKeyDown={handleKeyDown}
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          {activeDisclosure.credential.secret}
-        </pre>
-      </div>
-      <DialogFooter className="mt-4 flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-        <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
-          {copyFeedback}
-        </p>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            className="sm:min-w-24"
-            aria-label="Copiar secreto al portapapeles"
-            onClick={() => void handleCopy()}
-          >
-            Copiar
-          </Button>
-          <Button type="button" className="sm:min-w-24" onClick={onClose}>Cerrar</Button>
+          <DialogHeader>
+            <h2 id={titleId} className="text-lg font-semibold">
+              {title}
+            </h2>
+            <p id={descriptionId} className="text-sm text-muted-foreground">
+              {description}
+            </p>
+          </DialogHeader>
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">ID de credencial</dt>
+              <dd className="mt-1 break-all font-mono text-xs text-foreground">{activeDisclosure.credential.credentialId}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Expira</dt>
+              <dd className="mt-1 text-foreground">{formatCredentialExpiry(activeDisclosure.credential.expiresAt)}</dd>
+            </div>
+          </dl>
+          <div className="mt-4 rounded-2xl border border-border/70 bg-background/70 p-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Secreto de cliente</p>
+            <pre
+              id={secretId}
+              tabIndex={0}
+              aria-label="Valor del secreto de cliente"
+              className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-border/70 bg-muted/30 p-3 font-mono text-xs leading-5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {activeDisclosure.credential.secret}
+            </pre>
+          </div>
+          <DialogFooter className="mt-4 flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+            <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
+              {copyFeedback}
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                className="sm:min-w-24"
+                aria-label="Copiar secreto al portapapeles"
+                onClick={() => void handleCopy()}
+              >
+                Copiar
+              </Button>
+              <Button type="button" className="sm:min-w-24" onClick={onClose}>Cerrar</Button>
+            </div>
+          </DialogFooter>
         </div>
-      </DialogFooter>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -156,6 +176,7 @@ export function ConsoleServiceAccountsPage() {
   const [displayName, setDisplayName] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null)
+  const [createBusy, setCreateBusy] = useState(false)
   const [credentialDisclosure, setCredentialDisclosure] = useState<{ mode: 'reveal' | 'rotate'; credential: ConsoleIssuedCredential } | null>(null)
   const destructiveOp = useDestructiveOp()
   const displayNameId = useId()
@@ -172,6 +193,7 @@ export function ConsoleServiceAccountsPage() {
     setErrorFeedback(null)
     setCredentialDisclosure(null)
     setDisplayName('')
+    setCreateBusy(false)
   }, [activeTenantId, activeWorkspaceId, destructiveOp.handleCancel])
 
   if (!activeTenantId) {
@@ -184,10 +206,22 @@ export function ConsoleServiceAccountsPage() {
   const workspaceId = activeWorkspaceId
 
   async function handleCreate() {
-    const result = await createServiceAccount(workspaceId, { displayName, entityType: 'service_account', desiredState: 'active' })
-    setFeedback(`Cuenta de servicio creada: ${result.serviceAccountId}`)
-    setDisplayName('')
-    reload()
+    // Parity with handleIssue/handleRotate below: clear stale feedback, gate the submit control on
+    // a busy state, and surface a rejection instead of letting it become an unhandled rejection
+    // (#783).
+    setFeedback(null)
+    setErrorFeedback(null)
+    setCreateBusy(true)
+    try {
+      const result = await createServiceAccount(workspaceId, { displayName, entityType: 'service_account', desiredState: 'active' })
+      setFeedback(`Cuenta de servicio creada: ${result.serviceAccountId}`)
+      setDisplayName('')
+      reload()
+    } catch (rawError) {
+      setErrorFeedback(consoleServiceAccountsErrorMessage(rawError))
+    } finally {
+      setCreateBusy(false)
+    }
   }
 
   async function handleIssue(serviceAccountId: string) {
@@ -214,7 +248,13 @@ export function ConsoleServiceAccountsPage() {
       operationId: 'revoke-service-account-credential',
       resourceName: account.displayName ?? account.serviceAccountId,
       resourceType: 'credencial de cuenta de servicio',
-      impactDescription: 'La credencial dejará de funcionar de inmediato.',
+      // [#783] Revoking is TERMINAL for this credential — unlike a revoked-but-still-listed
+      // service account (which can still be deleted, see #687), there is no path back to a usable
+      // credential for it: it can never be re-issued (Revelar) or rotated again. State that
+      // explicitly so an operator does not expect a "un-revoke" or re-issue option afterward.
+      impactDescription:
+        'La credencial dejará de funcionar de inmediato. La revocación es terminal: no podrás volver a emitirla ni rotarla. ' +
+        'Para usar esta cuenta de servicio de nuevo, deberás eliminarla y crear una nueva.',
       onConfirm: () => handleRevoke(account.serviceAccountId),
       onSuccess: () => {
         setFeedback('Credencial revocada.')
@@ -259,7 +299,7 @@ export function ConsoleServiceAccountsPage() {
       <header className="rounded-3xl border border-border bg-card/70 p-6">
         <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
         <h1 className="text-2xl font-semibold tracking-tight">Cuentas de servicio</h1>
-        {writesBlocked ? <p className="mt-2 text-sm text-amber-700">La organización no está activa; las acciones de escritura están deshabilitadas.</p> : null}
+        {writesBlocked ? <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">La organización no está activa; las acciones de escritura están deshabilitadas.</p> : null}
       </header>
 
       <section className="rounded-3xl border border-border bg-card/70 p-6">
@@ -269,10 +309,12 @@ export function ConsoleServiceAccountsPage() {
             <span>Nombre de cuenta de servicio</span>
             <Input id={displayNameId} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
           </label>
-          <Button type="button" className="md:min-w-24" onClick={() => void handleCreate()} disabled={writesBlocked || !displayName.trim()}>Crear</Button>
+          <Button type="button" className="md:min-w-24" onClick={() => void handleCreate()} disabled={writesBlocked || !displayName.trim() || createBusy}>
+            {createBusy ? 'Creando…' : 'Crear'}
+          </Button>
         </div>
-        {feedback ? <p aria-live="polite" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
-        {errorFeedback ? <p role="alert" className="mt-3 text-sm text-red-700">{errorFeedback}</p> : null}
+        {feedback ? <p aria-live="polite" className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">{feedback}</p> : null}
+        {errorFeedback ? <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">{errorFeedback}</p> : null}
       </section>
 
       {loading ? <ConsolePageState kind="loading" title="Cargando cuentas de servicio" description="Consultando el listado del área de trabajo." /> : null}

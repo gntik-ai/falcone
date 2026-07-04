@@ -97,6 +97,50 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(revealButton).toHaveFocus()
   })
 
+  // #783 scenario 1: the one-time-credential disclosure is an accessible, action-anchored MODAL
+  // (aria-modal, Tab-trap, focus-return), shows credentialId + expiresAt, and its copy control
+  // degrades gracefully when the Clipboard API is unavailable. RED on main: CredentialDisclosureDialog
+  // is a bare `role="dialog"` div with no `aria-modal` and no Tab trap (Tab escapes the dialog), and
+  // never renders credentialId/expiresAt at all.
+  it('[#783] el modal de secreto es accesible (aria-modal + foco atrapado), muestra credentialId/expiresAt y degrada sin portapapeles', async () => {
+    const user = userEvent.setup()
+    // Simulate a browser/context with no Clipboard API (e.g. insecure context) rather than a
+    // rejecting one — navigator.clipboard itself is undefined.
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    mockIssueServiceAccountCredential.mockResolvedValue({ credentialId: 'cred_abc123', secret: 'secret-value', expiresAt: '2027-01-01T00:00:00.000Z' })
+    render(<ConsoleServiceAccountsPage />)
+
+    const revealButton = screen.getByRole('button', { name: /revelar secreto actual de ops sa/i })
+    await user.click(revealButton)
+    const dialog = await screen.findByRole('dialog', { name: /secreto actual de la cuenta de servicio/i })
+
+    // (a) True modal semantics + credentialId/expiresAt are displayed.
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveTextContent('cred_abc123')
+    expect(dialog).toHaveTextContent(/2027/)
+
+    // Tab-trap: from the last focusable element, Tab wraps back to the first instead of escaping
+    // the modal.
+    const focusableSelector =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector))
+    expect(focusable.length).toBeGreaterThan(1)
+    focusable[focusable.length - 1].focus()
+    await user.tab()
+    expect(focusable[0]).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(focusable[focusable.length - 1]).toHaveFocus()
+
+    // Copy degrades gracefully without the Clipboard API instead of throwing.
+    await user.click(screen.getByRole('button', { name: /copiar secreto/i }))
+    expect(screen.getByRole('status')).toHaveTextContent(/no se pudo copiar automáticamente/i)
+
+    await user.keyboard('{Escape}')
+    expect(revealButton).toHaveFocus()
+  })
+
   it('muestra la rotación como generación de un nuevo secreto', async () => {
     const user = userEvent.setup()
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
@@ -128,6 +172,12 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toHaveTextContent(/ops sa/i)
     expect(screen.getByRole('alertdialog')).toHaveTextContent(/la credencial dejará de funcionar de inmediato/i)
+    // [#783] Revoking is a terminal action for the credential: the copy must say it cannot be
+    // re-issued or rotated afterward, and that using the service account again requires deleting
+    // and recreating it.
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/no (podrás|se podrá) (volver a )?(emitir|revelar)/i)
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/ni rotarla/i)
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/eliminar.*crear/i)
 
     await user.click(screen.getByRole('button', { name: /^confirmar$/i }))
 
@@ -208,6 +258,48 @@ describe('ConsoleServiceAccountsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/revoked/i)
     // No success dialog opened.
     expect(screen.queryByRole('dialog', { name: /secreto actual de la cuenta de servicio/i })).not.toBeInTheDocument()
+  })
+
+  // #783: handleCreate did not have a busy/pending state or a try/catch, unlike its siblings
+  // handleIssue/handleRotate. RED on main: the submit button stays enabled mid-flight and a
+  // rejected create crashes (unhandled rejection) instead of surfacing an error.
+  it('[#783] handleCreate deshabilita el envío mientras está en curso (paridad con handleIssue/handleRotate)', async () => {
+    const user = userEvent.setup()
+    let resolveCreate: ((value: { serviceAccountId: string }) => void) | null = null
+    mockCreateServiceAccount.mockImplementation(
+      () => new Promise<{ serviceAccountId: string }>((resolve) => { resolveCreate = resolve })
+    )
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />)
+
+    await user.type(screen.getByLabelText(/nombre de cuenta de servicio/i), 'Nueva SA')
+    const createButton = screen.getByRole('button', { name: /crear/i })
+    await user.click(createButton)
+
+    // Busy: disabled and the label reflects the in-flight state (parity with handleIssue/handleRotate).
+    expect(createButton).toBeDisabled()
+    expect(createButton).toHaveTextContent(/creando/i)
+
+    resolveCreate!({ serviceAccountId: 'sa_9' })
+    // Not busy anymore — the label reverts (the field itself is cleared on success, which is a
+    // separate, pre-existing write-only-form behavior, not what this test is about).
+    await waitFor(() => expect(createButton).toHaveTextContent(/^crear$/i))
+  })
+
+  it('[#783] handleCreate surge el error sin romper la página cuando la creación falla', async () => {
+    const user = userEvent.setup()
+    mockCreateServiceAccount.mockRejectedValue(new Error('create explotó'))
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />)
+
+    await user.type(screen.getByLabelText(/nombre de cuenta de servicio/i), 'Nueva SA')
+    const createButton = screen.getByRole('button', { name: /crear/i })
+    await user.click(createButton)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/create explotó/i)
+    expect(createButton).toBeEnabled()
   })
 
   it('[#803] renderiza los encabezados de cuentas de servicio en español', () => {

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -90,15 +91,13 @@ function validateValue(value: string): string | null {
   return null
 }
 
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-
 // Accessible modal wrapper built on the shared Dialog primitive (which only renders the backdrop +
 // backdrop-click-to-close). This adds the modal a11y the primitive does not: role="dialog" +
 // aria-modal, an accessible name (aria-label) + description (aria-describedby), Escape-to-close,
-// focus-on-open, a Tab focus-trap, and focus-RETURN to the control that opened it on close —
-// mirroring the call-site pattern in DestructiveConfirmationDialog. The accessible name is kept as
-// an aria-label so existing `getByRole('dialog', { name })` queries keep matching.
+// focus-on-open, a Tab focus-trap, and focus-RETURN to the control that opened it on close, via the
+// shared `useModalFocusTrap` hook (also used by DestructiveConfirmationDialog and
+// ConsoleServiceAccountsPage's CredentialDisclosureDialog, #783). The accessible name is kept as an
+// aria-label so existing `getByRole('dialog', { name })` queries keep matching.
 function SecretDialog({
   open,
   label,
@@ -114,55 +113,20 @@ function SecretDialog({
   onClose: () => void
   children: ReactNode
 }) {
-  const panelRef = useRef<HTMLDivElement | null>(null)
-  const restoreFocusRef = useRef<HTMLElement | null>(null)
-
-  // Remember the trigger (and restore focus to it on close) + move focus into the dialog on open.
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-    restoreFocusRef.current = (document.activeElement as HTMLElement | null) ?? null
-    const panel = panelRef.current
-    const first = panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
-    ;(first ?? panel)?.focus()
-    return () => {
-      restoreFocusRef.current?.focus?.()
-    }
-  }, [open])
+  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(open)
 
   if (!open) {
     return null
   }
 
-  // Keep focus inside the dialog while Tab-cycling; Escape closes (unless an op is in flight).
+  // Escape closes (unless an op is in flight); Tab-cycling is delegated to the shared trap.
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape' && !busy) {
       event.preventDefault()
       onClose()
       return
     }
-    if (event.key !== 'Tab') {
-      return
-    }
-    const panel = panelRef.current
-    if (!panel) {
-      return
-    }
-    const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    if (focusable.length === 0) {
-      return
-    }
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    const active = document.activeElement
-    if (event.shiftKey && active === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault()
-      first.focus()
-    }
+    handleTabTrap(event)
   }
 
   return (

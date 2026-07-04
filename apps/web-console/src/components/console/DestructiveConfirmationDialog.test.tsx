@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -134,5 +136,55 @@ describe('DestructiveConfirmationDialog', () => {
     render(<DestructiveConfirmationDialog open config={buildConfig({ resourceName: 'Tenant Alpha' })} opState="ready" confirmError={null} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByText(FIXTURE_TENANT_BETA.name)).not.toBeInTheDocument()
     expect(screen.queryByText(FIXTURE_TENANT_BETA.tenantId)).not.toBeInTheDocument()
+  })
+
+  // #783 scenario 3: the dialog is focus-trapped (Tab cycles within it, never escaping to the
+  // page behind it) and returns focus to whatever triggered it once it closes. The `ui/dialog.tsx`
+  // primitive provides neither (bare backdrop overlay) — RED on main: Tab moves focus out of the
+  // dialog because there is no keydown handler on the panel to intercept it.
+  it('[#783] atrapa el foco con Tab y lo devuelve al disparador al cancelar', async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const [open, setOpen] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            abrir revocación
+          </button>
+          <DestructiveConfirmationDialog
+            open={open}
+            config={open ? buildConfig({ level: 'WARNING' }) : null}
+            opState="ready"
+            confirmError={null}
+            onConfirm={vi.fn()}
+            onCancel={() => setOpen(false)}
+          />
+        </>
+      )
+    }
+
+    render(<Harness />)
+    const trigger = screen.getByRole('button', { name: /abrir revocación/i })
+    await user.click(trigger)
+
+    const cancelButton = await screen.findByRole('button', { name: /cancelar/i })
+    const confirmButton = screen.getByRole('button', { name: /confirmar/i })
+
+    // Focus starts inside the dialog (on the first focusable element).
+    await waitFor(() => expect(cancelButton).toHaveFocus())
+
+    // Tab from the last focusable element wraps back to the first — it never leaves the dialog.
+    confirmButton.focus()
+    await user.tab()
+    expect(cancelButton).toHaveFocus()
+
+    // Shift+Tab from the first wraps to the last.
+    await user.tab({ shift: true })
+    expect(confirmButton).toHaveFocus()
+
+    // Closing (Cancelar) returns focus to the control that opened the dialog.
+    await user.click(cancelButton)
+    expect(trigger).toHaveFocus()
   })
 })

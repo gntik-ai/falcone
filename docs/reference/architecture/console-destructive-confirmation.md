@@ -50,6 +50,31 @@ the op and renders the controller's `opState`/`confirmError`; it never awaits th
 `config.onSuccess`. Success feedback and the list reload happen once, only when the op resolves
 successfully; a failed op surfaces an error with no success feedback.
 
+## Focus management: Tab-trap and focus-return (#783)
+
+`DestructiveConfirmationDialog` sits on the shared `ui/dialog.tsx` primitive, which only renders a
+backdrop overlay and click-outside-to-close — it provides none of the keyboard-accessibility
+semantics a modal needs. The dialog wires the shared
+`useModalFocusTrap` hook (`apps/web-console/src/components/console/hooks/useModalFocusTrap.ts`) onto
+its `role="alertdialog"` panel to add:
+
+- **Focus-on-open**: moves focus onto the first focusable descendant of the panel (the "type the
+  resource name" input for a `CRITICAL` confirmation, or the Cancelar button when there is no such
+  input) as soon as the dialog opens.
+- **Tab-trap**: `Tab` from the last focusable element wraps back to the first, and `Shift+Tab` from
+  the first wraps to the last — focus never escapes into the page behind the dialog while it is open.
+- **Focus-return**: closing the dialog (Cancelar, Escape, or a successful confirm) restores focus to
+  whatever control had focus immediately before the dialog opened (the row action that triggered it).
+
+Escape-to-close is handled separately by a `window`-level `keydown` listener (unchanged by this
+hook) that is disabled while `opState === 'confirming'`, so an in-flight destructive op cannot be
+dismissed out from under itself.
+
+The same `useModalFocusTrap` hook backs `ConsoleWorkspaceSecretsPage`'s `SecretDialog` and
+`ConsoleServiceAccountsPage`'s credential-disclosure modal (see
+[`service-account-credential-lifecycle.md`](./service-account-credential-lifecycle.md#console-ux-credential-disclosure-modal-and-status-badge-783)),
+so the trap/return semantics live in exactly one place instead of being re-implemented per dialog.
+
 ## Plan lifecycle usage
 
 The plan detail page uses the shared dialog for destructive plan actions:

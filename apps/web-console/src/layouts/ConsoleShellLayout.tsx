@@ -5,6 +5,7 @@ import {
   Database,
   FolderKanban,
   KeyRound,
+  KeySquare,
   LayoutDashboard,
   LogOut,
   Rocket,
@@ -214,7 +215,9 @@ const consoleNavigationItems = [
     group: 'operations',
     label: 'Cuentas de servicio',
     to: '/console/service-accounts',
-    icon: Settings,
+    // Credential-semantic icon (#783) — distinct from the `KeyRound` used by "Secretos del área de
+    // trabajo" below, since these are two different credential surfaces in the same nav group.
+    icon: KeySquare,
     description: 'Credenciales programáticas y service accounts del área de trabajo activa.'
   },
   {
