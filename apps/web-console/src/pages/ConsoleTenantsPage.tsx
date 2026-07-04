@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { CreateTenantWizard } from '@/components/console/wizards/CreateTenantWizard'
@@ -48,16 +49,16 @@ export function ConsoleTenantsPage() {
 
   return (
     <main className="space-y-6">
-      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <Badge variant="outline">Gobierno de organizaciones</Badge>
-            <div>
+      <header className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-5">
+          <div className="min-w-0 space-y-2">
+            <Badge variant="outline" className="uppercase tracking-[0.14em]">Gobierno de organizaciones</Badge>
+            <div className="space-y-1.5">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">Gestión de organizaciones</h1>
-              <p className="mt-2 text-sm text-muted-foreground">Alta guiada y gobierno inicial de organizaciones de plataforma.</p>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">Alta guiada y gobierno inicial de organizaciones de plataforma.</p>
             </div>
           </div>
-          <Button type="button" onClick={() => setWizardOpen(true)}>Nueva organización</Button>
+          <Button type="button" className="w-full shrink-0 sm:w-auto" onClick={() => setWizardOpen(true)}>Nueva organización</Button>
         </div>
       </header>
 
@@ -107,7 +108,7 @@ export function ConsoleTenantsPage() {
               </caption>
               <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                 <tr className="border-b border-border">
-                  <th scope="col" className="px-4 py-3 font-medium">Organización</th>
+                  <th scope="col" className="border-l-2 border-l-transparent px-4 py-3 font-medium">Organización</th>
                   <th scope="col" className="px-4 py-3 font-medium">Slug</th>
                   <th scope="col" className="px-4 py-3 font-medium">Estado</th>
                   <th scope="col" className="px-4 py-3 text-right font-medium">Acción</th>
@@ -121,13 +122,19 @@ export function ConsoleTenantsPage() {
                     <tr
                       key={tenant.tenantId}
                       aria-current={isActive ? 'true' : undefined}
-                      className={cn('transition-colors hover:bg-muted/20', isActive && 'bg-primary/5')}
+                      className={cn('transition-colors', isActive ? 'bg-primary/10' : 'hover:bg-muted/20')}
                     >
-                      <th scope="row" className="px-4 py-3 text-left font-medium text-foreground">
+                      <th
+                        scope="row"
+                        className={cn(
+                          'border-l-2 px-4 py-3 text-left font-medium text-foreground transition-colors',
+                          isActive ? 'border-l-primary' : 'border-l-transparent'
+                        )}
+                      >
                         <span className="inline-flex flex-wrap items-center gap-2">
                           {tenant.label}
                           {isActive ? (
-                            <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">Activa</Badge>
+                            <Badge variant="outline" className="border-primary/50 bg-primary/10 text-primary">Activa</Badge>
                           ) : null}
                         </span>
                       </th>
@@ -137,13 +144,14 @@ export function ConsoleTenantsPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         {canOpenTenantPlan ? (
-                          <Button type="button" variant="outline" size="sm" asChild>
+                          <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" asChild>
                             <Link
                               to={`/console/tenants/${tenant.tenantId}/plan`}
                               aria-label={`Abrir el plan de ${tenant.label}`}
                               onClick={() => activateTenant(tenant)}
                             >
                               Abrir plan
+                              <ChevronRight className="-mr-1 h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
                             </Link>
                           </Button>
                         ) : (
@@ -151,6 +159,7 @@ export function ConsoleTenantsPage() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="whitespace-nowrap"
                             disabled={isActive}
                             aria-label={
                               isActive
@@ -170,7 +179,7 @@ export function ConsoleTenantsPage() {
             </table>
           </div>
           {truncated ? (
-            <p className="border-t border-border/70 px-5 py-3 text-xs text-muted-foreground sm:px-6">
+            <p className="border-t border-border bg-muted/20 px-5 py-3 text-xs leading-5 text-muted-foreground sm:px-6">
               Mostrando las primeras {tenants.length} organizaciones. Hay más organizaciones disponibles no incluidas en esta vista.
             </p>
           ) : null}

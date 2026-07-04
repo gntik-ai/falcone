@@ -648,20 +648,25 @@ export function resolveInitialWorkspaceId(
 // getConsoleTenantStatusMeta / getConsoleWorkspaceStatusMeta. Exported so both the shell's
 // context-status cards and the /console/tenants inventory row badges (#752) render the
 // same tone visually instead of each page inventing its own status color scale.
+//
+// Tones are authored directly for the dark `:root` (the console never toggles `.dark`, so a
+// `dark:` variant would be dead code): light `-300` text on a `/10` tint stays legible on the
+// near-black card, whereas the old `-700` / `text-destructive` text rendered dark-on-dark. This
+// mirrors the dark-safe posture-badge treatment shipped in #750.
 export function getConsoleContextStatusBadgeClasses(tone: 'healthy' | 'warning' | 'restricted' | 'neutral'): string {
   if (tone === 'healthy') {
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
   }
 
   if (tone === 'warning') {
-    return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
   }
 
   if (tone === 'restricted') {
-    return 'border-destructive/30 bg-destructive/10 text-destructive'
+    return 'border-destructive/40 bg-destructive/10 text-red-300'
   }
 
-  return 'border-border bg-background text-muted-foreground'
+  return 'border-border bg-muted/40 text-muted-foreground'
 }
 
 export function getConsoleTenantStatusMeta(tenant: ConsoleTenantOption | null): {
