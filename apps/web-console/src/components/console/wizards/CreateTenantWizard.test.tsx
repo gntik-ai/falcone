@@ -87,6 +87,25 @@ describe('CreateTenantWizard', () => {
     expect(openResourceLink).toHaveAttribute('href', '/console/tenants/ten_new/plan')
   })
 
+  it('[#752][fn-console-tenant-inventory][role-aware] para un creador sin superadmin, el éxito enlaza al inventario (no a un plan que le rebotaría)', async () => {
+    // platform_operator is allowed to create a tenant but cannot open the superadmin-gated plan
+    // route — the success link must point to /console/tenants, where the new tenant now appears,
+    // instead of bouncing them off /console/tenants/:id/plan (#752).
+    readConsoleShellSessionMock.mockReturnValue({ principal: { platformRoles: ['platform_operator'] } })
+    const user = userEvent.setup()
+    render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/^plan$/i), '11111111-1111-4111-8111-111111111111')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/región/i), 'eu-west')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    const openResourceLink = await screen.findByRole('link', { name: /abrir recurso/i })
+    expect(openResourceLink).toHaveAttribute('href', '/console/tenants')
+  })
+
   it('bloquea la selección cuando no hay planes activos del catálogo', async () => {
     requestMock.mockImplementation((url: string) => {
       if (url.startsWith('/v1/plans')) return Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 })
