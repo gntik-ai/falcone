@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { type DestructiveOpConfig, type DestructiveOpState } from '@/lib/destructive-ops'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +37,9 @@ export function DestructiveConfirmationDialog({
   const descriptionId = useId()
   const isConfirming = opState === 'confirming'
   const isCritical = config?.level === 'CRITICAL'
+  // Tab-trap + focus-on-open + focus-return (#783). The `ui/dialog.tsx` primitive is a bare
+  // backdrop overlay and provides neither on its own.
+  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(open)
 
   useEffect(() => {
     setConfirmationText('')
@@ -77,7 +81,16 @@ export function DestructiveConfirmationDialog({
       }}
     >
       <DialogContent className="max-w-2xl overflow-hidden p-0">
-        <div role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
+        <div
+          ref={panelRef}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          tabIndex={-1}
+          onKeyDown={handleTabTrap}
+          className="focus:outline-none"
+        >
           <DialogHeader className="mb-0 border-b border-border/70 bg-muted/20 p-5 sm:p-6">
             <div className="flex gap-3">
               <span
@@ -157,7 +170,7 @@ export function DestructiveConfirmationDialog({
           </div>
 
           <DialogFooter className="mt-0 flex-col items-stretch border-t border-border/70 bg-muted/20 p-5 sm:flex-row sm:items-center sm:justify-end sm:p-6">
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel} disabled={isConfirming} autoFocus>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel} disabled={isConfirming}>
               Cancelar
             </Button>
             <Button

@@ -119,3 +119,38 @@ curl -s -X POST -H "Authorization: Bearer $OWNER" --data-binary '{}' \
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
   "$GW/v1/console/session"                                              # -> 401 (was 200 until ~natural expiry)
 ```
+
+## Console UX: credential-disclosure modal and status badge (#783)
+
+`apps/web-console/src/pages/ConsoleServiceAccountsPage.tsx` is the console surface for the
+endpoints above. Its "Revelar"/"Rotar" actions open `CredentialDisclosureDialog`, a true,
+action-anchored modal built on the shared `Dialog`/`DialogContent` primitive plus the
+`useModalFocusTrap` hook (see
+[`console-destructive-confirmation.md`](./console-destructive-confirmation.md#focus-management-tab-trap-and-focus-return-783)
+for the shared trap/return mechanics):
+
+- `role="dialog"` + `aria-modal="true"`, Tab-trapped, with focus returning to the "Revelar"/"Rotar"
+  row action that opened it once it closes (Escape or the "Cerrar" button).
+- Displays the credential's `credentialId` and `expiresAt` (both already returned by
+  `credential-issuance`/`credential-rotations`, see above) alongside the secret value.
+- The "Copiar" control confirms success (`role="status"`, `aria-live="polite"`) and degrades to an
+  inline instruction to select-and-copy manually when `navigator.clipboard` is unavailable — it
+  never throws.
+
+Each service account's credential state (`active` / `rotated` / `revoked` / an `expired` state a
+caller may report) is rendered by `ConsoleCredentialStatusBadge`, which color-encodes it — emerald
+for `active`, violet for `rotated`, red/destructive for `revoked`, amber for `expired` — instead of
+an identical neutral pill for every state. An unrecognized or missing status still renders the
+original neutral outline tone.
+
+**Revoking is terminal.** Unlike a revoked-but-still-listed service account (which can still be
+deleted — see the #687 note below), a revoked credential itself has no path back to a usable state:
+`credential-issuance`/`credential-rotations` both reject it with `409 CREDENTIAL_REVOKED` (see
+above). The console's revoke confirmation (`WARNING`-level,
+`DestructiveConfirmationDialog`/`useDestructiveOp`) states this explicitly — the credential can
+never be re-issued or rotated again, and using the service account again requires deleting it and
+creating a new one — so an operator does not expect an "un-revoke" or re-issue option afterward.
+Deleting the service account (`CRITICAL`-level, `DELETE
+/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}`) remains available for both an
+active and a revoked account (#687), which is the actual path back to a usable credential under
+the same display name.
