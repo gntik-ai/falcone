@@ -21,12 +21,15 @@
    * from the SAME hue family (~223, the navy's hue) tuned so it clears WCAG 1.4.11 (>=3:1 vs
    * --background, non-text UI contrast) with headroom, and --primary-foreground is a near-black
    * shade from that same hue (not raw white) so the button label clears WCAG 1.4.3 (>=4.5:1
-   * text contrast) against the now-lighter surface. Measured (see globals.test.ts): --primary
-   * vs --background = 5.60:1; --primary-foreground vs --primary = 5.35:1; --primary vs
-   * --secondary = 4.09:1 (clearly distinct from the secondary/disabled surface, untouched here).
+   * text contrast) against the now-lighter surface — and tuned dark enough (L=6%, not the initial
+   * 8%) that the label ALSO clears 4.5:1 in the HOVER state, where `hover:opacity-90` composites
+   * the whole button toward the dark page (see the hover-state assertion in brand-tokens.test.ts).
+   * Measured: --primary vs --background = 5.60:1; --primary-foreground vs --primary = 5.50:1 (4.63:1
+   * while hovered over --background); --primary vs --secondary = 4.09:1 (clearly distinct from the
+   * secondary/disabled surface, untouched here).
    */
   --primary: 223 60% 62%;
-  --primary-foreground: 223 60% 8%;
+  --primary-foreground: 223 60% 6%;
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
   --muted: 217.2 32.6% 17.5%;
@@ -42,10 +45,11 @@
    * and --destructive-foreground is darkened to match so the button label contrast stays
    * intact. Measured: --destructive (as text) vs --background = 5.56:1; vs the /10 tint over
    * background = 5.15:1; vs the /20 tint = 4.57:1; --destructive-foreground vs --destructive
-   * (button label) = 5.32:1 (was 9.56:1 — comfortably still >=4.5:1).
+   * (button label) = 5.49:1 at rest and 4.60:1 while hovered over --background (`hover:opacity-90`
+   * darkens the whole button toward the dark page, so the label must stay >=4.5:1 there too).
    */
   --destructive: 0 72% 62%;
-  --destructive-foreground: 0 72% 8%;
+  --destructive-foreground: 0 72% 6%;
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
@@ -66,7 +70,7 @@
    * dark-root (no `.dark` class is ever set on <html>); duplicated here so the token stays
    * consistent if `.dark` is ever toggled on. Was 210 40% 98% (near-white, also unbranded). */
   --primary: 223 60% 62%;
-  --primary-foreground: 223 60% 8%;
+  --primary-foreground: 223 60% 6%;
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
   --muted: 217.2 32.6% 17.5%;
@@ -75,7 +79,7 @@
   --accent-foreground: 210 40% 98%;
   /* #734: same accessible-error-text fix as :root — kept identical for the same reason. */
   --destructive: 0 72% 62%;
-  --destructive-foreground: 0 72% 8%;
+  --destructive-foreground: 0 72% 6%;
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;

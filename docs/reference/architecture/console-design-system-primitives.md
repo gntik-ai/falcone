@@ -186,11 +186,13 @@ stays empty.
 `--primary` is a lighter tint from the **same hue** (`223`, `≈220-230` is the navy family) tuned
 to clear WCAG 1.4.11 non-text contrast (`>=3:1` against `--background`) with headroom, and
 `--primary-foreground` is a near-black shade from that same hue (not raw white) so the button
-label clears WCAG 1.4.3 text contrast (`>=4.5:1`) against the now-lighter surface:
+label clears WCAG 1.4.3 text contrast (`>=4.5:1`) against the now-lighter surface — including the
+hovered state, where `hover:opacity-90` dims the whole button toward the dark page (the label sits
+at `L=6%` so it stays `>=4.5:1` there too, not only at rest):
 
 ```text
 --primary:            223 60% 62%   /* was 204 94% 94% (:root) / 210 40% 98% (.dark) — unbranded */
---primary-foreground: 223 60% 8%    /* was 222.2 47.4% 11.2% */
+--primary-foreground: 223 60% 6%    /* was 222.2 47.4% 11.2% */
 ```
 
 Measured (real WCAG contrast math, not eyeballed — see the `hsl -> relative luminance -> contrast
@@ -199,7 +201,8 @@ ratio` helper in `src/styles/brand-tokens.test.ts`):
 | Pair | Ratio | Requirement |
 | --- | --- | --- |
 | `--primary` vs `--background` | 5.60:1 | `>=3:1` (WCAG 1.4.11, non-text UI contrast) |
-| `--primary-foreground` vs `--primary` | 5.35:1 | `>=4.5:1` (WCAG 1.4.3, text contrast) |
+| `--primary-foreground` vs `--primary` (button label, at rest) | 5.50:1 | `>=4.5:1` (WCAG 1.4.3, text contrast) |
+| `--primary-foreground` vs `--primary`, both dimmed on hover (`opacity-90` over `--background`) | 4.63:1 | `>=4.5:1` (interaction-state text contrast) |
 | `--primary` vs `--secondary` | 4.09:1 | clearly distinct from the secondary/disabled surface |
 
 **Destructive — accessible error-text contrast.** `--destructive` is now a lighter red from the
@@ -208,7 +211,7 @@ to match so the destructive `Button` variant's label contrast is preserved:
 
 ```text
 --destructive:            0 72% 62%   /* was 0 62.8% 30.6% (#7F1D1D) */
---destructive-foreground: 0 72% 8%    /* was 210 40% 98% */
+--destructive-foreground: 0 72% 6%    /* was 210 40% 98% */
 ```
 
 | Pair | Ratio | Requirement |
@@ -216,7 +219,8 @@ to match so the destructive `Button` variant's label contrast is preserved:
 | `--destructive` (as text) vs `--background` | 5.56:1 | `>=4.5:1` (WCAG AA text) |
 | `--destructive` (as text) vs the `bg-destructive/10` tint over `--background` | 5.15:1 | `>=4.5:1` |
 | `--destructive` (as text) vs the `bg-destructive/20` tint over `--background` | 4.57:1 | `>=4.5:1` |
-| `--destructive-foreground` vs `--destructive` (button label) | 5.32:1 | `>=4.5:1` (was 9.56:1 — still comfortably clears it) |
+| `--destructive-foreground` vs `--destructive` (button label, at rest) | 5.49:1 | `>=4.5:1` (was 9.56:1 — still comfortably clears it) |
+| `--destructive-foreground` vs `--destructive`, both dimmed on hover (`opacity-90` over `--background`) | 4.60:1 | `>=4.5:1` (interaction-state text contrast) |
 
 **Focus ring — already accessible, left unchanged.** `--ring` (`212.7 26.8% 83.9%`) measures
 13.46:1 against `--background` and 12.01:1 against `--card` — a highly visible focus indicator

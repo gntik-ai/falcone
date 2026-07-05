@@ -119,6 +119,18 @@ describe.each(Object.entries(BLOCKS))('[#734][Scenario: brand action color on an
     expect(contrastRatio(primaryForeground, primary)).toBeGreaterThanOrEqual(4.5)
   })
 
+  // Interaction state: the filled Button/Badge/Tabs variants dim on hover via `hover:opacity-90`,
+  // which composites the WHOLE control (surface + label) toward the dark page — DARKENING both and
+  // shrinking the label/surface contrast. The near-black brand foreground has little headroom, so
+  // guard that the label still clears WCAG AA (>=4.5:1) in that hovered state, composited over the
+  // bare --background (the worst case, e.g. the destructive confirm button inside a bg-background
+  // dialog). `blendOver(color, 0.9, bg)` == the color rendered at 90% opacity over --background.
+  it('--primary-foreground stays >=4.5:1 on --primary while the button is hovered (opacity-90 over --background)', () => {
+    const hoveredLabel = blendOver(primaryForeground, 0.9, background)
+    const hoveredSurface = blendOver(primary, 0.9, background)
+    expect(contrastRatioRgb(hoveredLabel, hoveredSurface)).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('--destructive used as error TEXT clears WCAG AA (>=4.5:1) on the bare page background', () => {
     expect(contrastRatio(destructive, background)).toBeGreaterThanOrEqual(4.5)
   })
@@ -130,6 +142,15 @@ describe.each(Object.entries(BLOCKS))('[#734][Scenario: brand action color on an
 
   it('--destructive-foreground vs --destructive clears WCAG AA (>=4.5:1) so the destructive Button label stays legible', () => {
     expect(contrastRatio(destructiveForeground, destructive)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  // Same hovered-state guard as --primary above: the destructive confirm button (the app's most
+  // consequential action, and one that renders on the bare --background inside dialogs) must keep
+  // its label >=4.5:1 while dimmed on hover.
+  it('--destructive-foreground stays >=4.5:1 on --destructive while the button is hovered (opacity-90 over --background)', () => {
+    const hoveredLabel = blendOver(destructiveForeground, 0.9, background)
+    const hoveredSurface = blendOver(destructive, 0.9, background)
+    expect(contrastRatioRgb(hoveredLabel, hoveredSurface)).toBeGreaterThanOrEqual(4.5)
   })
 
   it('--ring vs --background stays a visible focus indicator (>=3:1, WCAG 1.4.11)', () => {
