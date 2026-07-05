@@ -197,7 +197,6 @@ export function LoginPage() {
   }, [statusView])
   const loginFeedbackId = feedback ? 'login-feedback' : undefined
   const isCredentialFeedback = feedback?.kind === 'credential'
-  const isDestructiveFeedback = feedback?.variant === 'destructive'
   const usernameDescription = describedBy(
     'login-username-help',
     fieldErrors.username ? 'login-username-required' : null,
@@ -316,21 +315,9 @@ export function LoginPage() {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
           <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId} noValidate>
             {feedback ? (
-              <Alert
-                id="login-feedback"
-                variant={feedback.variant}
-                aria-live="assertive"
-                aria-atomic="true"
-                className={
-                  isDestructiveFeedback ? 'border-destructive/30 bg-destructive/5 text-foreground shadow-sm' : undefined
-                }
-              >
-                <AlertTitle className={isDestructiveFeedback ? 'text-foreground' : undefined}>
-                  {feedback.title}
-                </AlertTitle>
-                <AlertDescription className={isDestructiveFeedback ? 'break-words text-muted-foreground' : undefined}>
-                  {feedback.message}
-                </AlertDescription>
+              <Alert id="login-feedback" variant={feedback.variant} aria-live="assertive" aria-atomic="true">
+                <AlertTitle>{feedback.title}</AlertTitle>
+                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 

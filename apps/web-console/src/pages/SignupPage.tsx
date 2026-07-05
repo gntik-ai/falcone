@@ -498,7 +498,7 @@ export function SignupPage() {
             {feedback ? (
               <Alert id="signup-feedback" variant={feedback.variant} aria-live="assertive">
                 <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription>{feedback.message}</AlertDescription>
+                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 

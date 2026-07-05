@@ -7,17 +7,20 @@ import { consoleAuthConfig } from '@/lib/console-config'
 
 export function WelcomePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
+    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
       <section
         aria-labelledby="foundation-title"
-        className="w-full max-w-3xl rounded-3xl border border-border bg-card/80 p-10 shadow-2xl shadow-black/20 backdrop-blur"
+        className="w-full max-w-3xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10"
       >
         <Badge className="mb-6" variant="secondary">
           Bienvenido a la consola
         </Badge>
         <div className="space-y-6">
           <div className="space-y-3">
-            <h1 id="foundation-title" className="text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h1
+              id="foundation-title"
+              className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
+            >
               In Falcone Console
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
@@ -64,13 +67,9 @@ export function WelcomePage() {
             </Button>
           </div>
 
-          <div className="rounded-2xl border border-dashed border-border/80 p-5">
-            <p className="text-sm leading-6 text-muted-foreground">
-              Desde aquí puedes iniciar sesión, solicitar acceso si tu organización habilita el registro y
-              recuperar tu contraseña si la olvidas. Si necesitas ayuda para entrar, contacta a quien
-              administre tu organización.
-            </p>
-          </div>
+          <p className="border-t border-border/60 pt-6 text-sm leading-6 text-muted-foreground">
+            ¿Necesitas ayuda para entrar? Contacta a quien administre tu organización.
+          </p>
         </div>
       </section>
     </main>

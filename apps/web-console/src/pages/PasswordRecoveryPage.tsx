@@ -189,7 +189,7 @@ export function PasswordRecoveryPage() {
                 aria-live={feedbackLive}
               >
                 <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription>{feedback.message}</AlertDescription>
+                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 
