@@ -27,8 +27,23 @@ describe('SignupPage', () => {
     expect(screen.getByLabelText(/ID de organización/i)).toHaveValue('ten_acme')
     expect(screen.getByLabelText(/ID de área de trabajo/i)).toHaveValue('wrk_console')
     expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('minlength', '10')
-    expect(screen.getByText(/la consola autenticada y la gestión robusta de sesión/i)).toBeInTheDocument()
+    expect(screen.getByText(/si tu organización requiere aprobación/i)).toBeInTheDocument()
     expect(screen.queryByText(/el shell autenticado/i)).not.toBeInTheDocument()
+  })
+
+  it('[#730] no muestra artefactos internos de scaffolding (badge EP/US, Realm/Client ID, rutas /v1/, roadmap)', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByRole('heading', { name: /crea tu acceso a in falcone console/i })
+
+    const text = document.body.textContent ?? ''
+    expect(text).not.toMatch(/EP-\d+\s*\/\s*US-UI/i)
+    expect(text).not.toMatch(/\/v1\//)
+    expect(text).not.toMatch(/llegarán en T\d/i)
+    expect(screen.queryByText(/^Realm\b/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/ID del cliente/i)).not.toBeInTheDocument()
   })
 
   it('muestra una pantalla informativa cuando la policy deshabilita signup', async () => {
@@ -75,7 +90,11 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'Abcd1234' } })
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
-    expect(await screen.findByText(/id de registro: reg_abc123/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /tu cuenta está lista/i })).toBeInTheDocument()
+    expect(screen.getByText(/reg_abc123/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^Estado:/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Modo de activación:/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Vista de estado:/i)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /continuar hacia login/i })).toHaveAttribute('href', '/login')
 
     await waitFor(() => {
@@ -139,7 +158,7 @@ describe('SignupPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
 
     expect(await screen.findByText(/estamos esperando la aprobación final para habilitar el acceso/i)).toBeInTheDocument()
-    expect(screen.getByText(/id de registro: reg_pending123/i)).toBeInTheDocument()
+    expect(screen.getByText(/reg_pending123/i)).toBeInTheDocument()
   })
 
   it('muestra feedback cuando ya existe una cuenta con esos datos', async () => {

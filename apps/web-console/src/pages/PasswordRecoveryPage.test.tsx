@@ -117,6 +117,16 @@ describe('PasswordRecoveryPage', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('[#730] no muestra artefactos internos de scaffolding (Realm/Client ID, rutas /v1/, badges EP/US)', () => {
+    renderPasswordRecoveryPage()
+
+    const text = document.body.textContent ?? ''
+    expect(text).not.toMatch(/EP-\d+\s*\/\s*US-UI/i)
+    expect(text).not.toMatch(/\/v1\//)
+    expect(screen.queryByText(/^Realm\b/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/ID del cliente/i)).not.toBeInTheDocument()
+  })
+
   it('[#729] el error de campo se limpia al editarlo', () => {
     renderPasswordRecoveryPage()
 
