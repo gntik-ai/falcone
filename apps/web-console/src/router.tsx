@@ -134,7 +134,7 @@ export const appRoutes = [
         handle: { title: 'Bienvenida · Consola In Falcone' }
       },
       {
-        path: '/login',
+        path: consoleAuthConfig.loginPath,
         element: <LoginPage />,
         handle: { title: 'Acceso · Consola In Falcone' }
       },

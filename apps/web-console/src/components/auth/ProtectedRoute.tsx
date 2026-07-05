@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
+import { consoleAuthConfig } from '@/lib/console-config'
 import {
   ensureConsoleSession,
   readConsoleShellSession,
@@ -73,7 +74,7 @@ export function ProtectedRoute() {
   }
 
   if (guardState === 'denied') {
-    return <Navigate replace to="/login" />
+    return <Navigate replace to={consoleAuthConfig.loginPath} />
   }
 
   return <Outlet />

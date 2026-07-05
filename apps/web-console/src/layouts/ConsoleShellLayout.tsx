@@ -26,6 +26,7 @@ import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyAc
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { terminateConsoleLoginSession } from '@/lib/console-auth'
+import { consoleAuthConfig } from '@/lib/console-config'
 import {
   ConsoleContextProvider,
   formatConsoleContextEnumLabel,
@@ -419,7 +420,7 @@ export function ConsoleShellLayout() {
       setSession(null)
       setMenuOpen(false)
       setIsLoggingOut(false)
-      navigate('/login', { replace: true })
+      navigate(consoleAuthConfig.loginPath, { replace: true })
     }
   }
 
