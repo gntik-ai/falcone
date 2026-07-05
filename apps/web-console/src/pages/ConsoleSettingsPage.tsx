@@ -11,10 +11,10 @@ export function ConsoleSettingsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-3">
+      <div className="space-y-2">
         <Badge variant="secondary">Ajustes</Badge>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Ajustes de consola</h1>
-        <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Ajustes de consola</h1>
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
           Preferencias operativas para tu cuenta y para {activeTenant?.label ?? 'la organización activa'}.
         </p>
       </div>

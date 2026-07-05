@@ -1,6 +1,7 @@
 // #744: converged onto the shared Card/Table/Badge primitives — this table previously rendered a
 // hard-coded solid-white panel with a light-slate header, both invisible-on-dark escapes.
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { exportDenialsAsCsv, type ScopeEnforcementDenial } from '@/lib/console-scope-enforcement'
@@ -41,7 +42,7 @@ export function ScopeEnforcementDenialsTable({ denials, isLoading, onLoadMore, h
         <input aria-label="ID de área de trabajo" className="rounded-xl border border-input bg-background px-2 py-1 text-sm text-foreground" placeholder="ID del área de trabajo" />
         <input aria-label="from" type="date" className="rounded-xl border border-input bg-background px-2 py-1 text-sm text-foreground" />
         <input aria-label="to" type="date" className="rounded-xl border border-input bg-background px-2 py-1 text-sm text-foreground" />
-        <button className="rounded-xl border border-input px-3 py-1 text-sm text-foreground hover:bg-accent" onClick={handleExport}>Exportar CSV</button>
+        <Button type="button" variant="outline" size="sm" onClick={handleExport}>Exportar CSV</Button>
       </div>
       <Table>
         <TableHeader>
@@ -74,9 +75,9 @@ export function ScopeEnforcementDenialsTable({ denials, isLoading, onLoadMore, h
         </TableBody>
       </Table>
       {hasMore ? (
-        <button className="rounded-xl border border-input px-3 py-1 text-sm text-foreground hover:bg-accent" onClick={onLoadMore}>
+        <Button type="button" variant="outline" size="sm" onClick={onLoadMore}>
           Cargar más
-        </button>
+        </Button>
       ) : null}
     </section>
   )

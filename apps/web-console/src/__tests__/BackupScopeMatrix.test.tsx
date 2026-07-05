@@ -41,6 +41,14 @@ describe('BackupScopeMatrix', () => {
     expect(screen.getByTestId('backup-scope-matrix').innerHTML).not.toMatch(/bg-\w+-100|bg-\w+-900|bg-white|bg-slate-\d|text-slate-\d/)
   })
 
+  it('[#744] renders through the shared Table primitive (bordered overflow container)', () => {
+    render(<BackupScopeMatrix entries={mockEntries} isLoading={false} />)
+    // The shared Table primitive wraps the <table> in a `data-slot="table-container"` that carries
+    // the console's rounded-bordered, horizontally-scrollable panel idiom — locking the migration
+    // away from the former hand-rolled <table> with its one-off `border-b` header.
+    expect(screen.getByTestId('backup-scope-matrix').closest('[data-slot="table-container"]')).not.toBeNull()
+  })
+
   it('renders RPO tooltip for entries with rpoRangeMinutes', () => {
     render(<BackupScopeMatrix entries={mockEntries} isLoading={false} />)
     const pgRow = screen.getByTestId('matrix-row-postgresql')

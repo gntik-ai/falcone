@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import type { InitiateRestoreResponse, ConfirmRestoreBody } from '@/services/backupOperationsApi'
+import { Button } from '@/components/ui/button'
 import { RiskLevelBadge } from './RiskLevelBadge'
 import { PrecheckResultList } from './PrecheckResultList'
 import { TenantNameInput } from './TenantNameInput'
@@ -48,7 +49,7 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
   }, [isConfirming, onAbort])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
         ref={panelRef}
         role="dialog"
@@ -57,7 +58,7 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
         aria-describedby={descriptionId}
         tabIndex={-1}
         onKeyDown={handleTabTrap}
-        className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border border-border bg-card p-6 shadow-xl focus:outline-none"
+        className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-border bg-card p-6 shadow-xl focus:outline-none"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -103,11 +104,12 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
         </section>
 
         <div className="mt-6 flex items-center justify-end gap-3">
-          <button type="button" onClick={onAbort} className="rounded border px-4 py-2 text-sm">
+          <Button type="button" variant="outline" onClick={onAbort}>
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="destructive"
             disabled={!canConfirm || isConfirming}
             onClick={() => onConfirm({
               tenant_name_confirmation: tenantName,
@@ -116,10 +118,9 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
               otp_code: otpCode.length === 6 ? otpCode : undefined,
               second_actor_token: secondActorToken.trim() || undefined,
             })}
-            className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {isConfirming ? 'Confirmando…' : 'Confirmar restauración'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

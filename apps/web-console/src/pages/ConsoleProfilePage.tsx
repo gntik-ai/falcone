@@ -16,10 +16,10 @@ export function ConsoleProfilePage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-3">
+      <div className="space-y-2">
         <Badge variant="secondary">Perfil</Badge>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Perfil de usuario</h1>
-        <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Perfil de usuario</h1>
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
           Datos de identidad y permisos de la sesión con la que has iniciado sesión en la consola.
         </p>
       </div>

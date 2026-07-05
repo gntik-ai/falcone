@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button'
 import type { ExportArtifact } from '@/api/configExportApi'
 
 interface ConfigExportResultPanelProps {
@@ -85,14 +86,9 @@ export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigEx
         </ul>
       </div>
 
-      <button
-        type="button"
-        onClick={() => downloadJson(artifact)}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        data-testid="download-json-btn"
-      >
+      <Button type="button" onClick={() => downloadJson(artifact)} data-testid="download-json-btn">
         Descargar JSON
-      </button>
+      </Button>
     </div>
   )
 }

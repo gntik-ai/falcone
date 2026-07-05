@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchDenials, type ScopeEnforcementDenial } from '@/lib/console-scope-enforcement'
 import { ScopeEnforcementDenialsTable } from '@/components/console/ScopeEnforcementDenialsTable'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 function countByType(denials: ScopeEnforcementDenial[], type: string) {
@@ -48,7 +49,7 @@ export function ConsoleScopeEnforcementPage({ isSuperadmin = true }: { isSuperad
           <p className="mt-2 text-sm text-muted-foreground">Solicitudes bloqueadas recientes por scopes de token, derechos del plan, aislamiento de área de trabajo o puntos de conexión sin declarar.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="rounded-xl border border-input px-3 py-2 text-sm text-foreground hover:bg-accent" onClick={() => setRefreshTick((value) => value + 1)}>Actualizar</button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setRefreshTick((value) => value + 1)}>Actualizar</Button>
           <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />Autoactualizar</label>
         </div>
       </header>

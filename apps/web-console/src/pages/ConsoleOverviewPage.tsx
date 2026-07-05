@@ -25,10 +25,10 @@ export function ConsoleOverviewPage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-3">
+      <div className="space-y-2">
         <Badge variant="secondary">Vista general</Badge>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Vista general de la consola</h1>
-        <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Vista general de la consola</h1>
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
           Estado operativo y accesos rápidos a la administración de tu organización en la plataforma BaaS.
         </p>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import type { InitiateRestoreBody } from '@/services/backupOperationsApi'
+import { Button } from '@/components/ui/button'
 import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 
 interface RestoreSimulationDialogProps {
@@ -51,7 +52,7 @@ export function RestoreSimulationDialog({
   }, [submitted, disabled, onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
         ref={panelRef}
         role="dialog"
@@ -60,7 +61,7 @@ export function RestoreSimulationDialog({
         aria-describedby={descriptionId}
         tabIndex={-1}
         onKeyDown={handleTabTrap}
-        className="w-full max-w-xl rounded-lg border border-border bg-card p-6 shadow-xl focus:outline-none"
+        className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xl focus:outline-none"
       >
         <h2 id={titleId} className="text-lg font-semibold text-foreground">Simulación de restore</h2>
         <p id={descriptionId} className="mt-2 text-sm text-muted-foreground">
@@ -73,20 +74,19 @@ export function RestoreSimulationDialog({
           <p><strong>Instantánea:</strong> {snapshotId}</p>
         </div>
         <div className="mt-6 flex items-center justify-end gap-3">
-          <button type="button" className="rounded border px-4 py-2 text-sm" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={disabled || submitted}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             onClick={async () => {
               setSubmitted(true)
               await onLaunch(body)
             }}
           >
             {submitted ? 'Lanzando…' : 'Lanzar simulación'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
