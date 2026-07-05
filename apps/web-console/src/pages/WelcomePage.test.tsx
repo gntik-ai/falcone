@@ -17,8 +17,13 @@ describe('WelcomePage', () => {
     expect(screen.getByText(/consola de administración para tu organización/i)).toBeInTheDocument()
     expect(screen.getByText(/bienvenido a la consola/i)).toBeInTheDocument()
     expect(screen.queryByText(/\bshell\b/i)).not.toBeInTheDocument()
+    // Every pre-auth destination is reachable from the welcome hub (login ⇄ signup ⇄ recovery).
     expect(screen.getByRole('link', { name: /ir al login/i })).toHaveAttribute('href', '/login')
-    expect(screen.getByRole('link', { name: /conocer la consola/i })).toHaveAttribute('href', '#console-overview')
+    expect(screen.getByRole('link', { name: /solicitar acceso/i })).toHaveAttribute('href', '/signup')
+    expect(screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })).toHaveAttribute(
+      'href',
+      '/password-recovery'
+    )
   })
 
   it('[#730] no muestra artefactos internos de scaffolding (badges EP/US, rutas /v1/, notas de roadmap)', () => {

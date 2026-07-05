@@ -123,6 +123,45 @@ describe('SignupPage', () => {
     expect(headers.get('Idempotency-Key')).toMatch(/^idem_/)
   })
 
+  it('[#730] muestra una única confirmación (guía + referencia) y mueve el foco a ella tras un alta activa', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+      .mockResolvedValueOnce(
+        createJsonResponse(201, {
+          registrationId: 'reg_abc123',
+          userId: 'usr_abc123',
+          activationMode: 'self_service',
+          state: 'active',
+          statusView: 'login',
+          createdAt: '2026-03-28T19:00:00.000Z',
+          message: 'La cuenta ya puede continuar a login.'
+        })
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage('/signup?tenantId=ten_acme')
+    await screen.findByRole('button', { name: /crear solicitud de acceso/i })
+
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/nombre visible/i), { target: { value: 'Operaciones Plataforma' } })
+    fireEvent.change(screen.getByLabelText(/correo principal/i), { target: { value: 'ops@example.com' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'Abcd1234' } })
+    fireEvent.click(screen.getByRole('button', { name: /crear solicitud de acceso/i }))
+
+    const heading = await screen.findByRole('heading', { name: /tu cuenta está lista/i })
+    // Leads with the service's plain-language guidance and keeps the human-readable reference.
+    expect(screen.getByText(/la cuenta ya puede continuar a login/i)).toBeInTheDocument()
+    expect(screen.getByText(/reg_abc123/i)).toBeInTheDocument()
+    // Exactly one success surface — no redundant second "success" banner.
+    expect(screen.getByText(/tu cuenta está lista/i)).toBeInTheDocument()
+    expect(screen.queryByText(/registro aceptado correctamente/i)).not.toBeInTheDocument()
+    // Focus lands on the confirmation container so the next Tab reaches "Continuar hacia login".
+    await waitFor(() => {
+      // eslint-disable-next-line testing-library/no-node-access
+      expect(heading.closest('div[tabindex="-1"]')).toHaveFocus()
+    })
+  })
+
   it('navega a activación pendiente cuando el signup queda pendiente', async () => {
     fetchMock
       .mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))

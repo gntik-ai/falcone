@@ -82,6 +82,7 @@ export function SignupPage() {
   const primaryEmailInputRef = useRef<HTMLInputElement>(null)
   const tenantIdInputRef = useRef<HTMLInputElement>(null)
   const passwordInputRef = useRef<HTMLInputElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -107,6 +108,15 @@ export function SignupPage() {
       workspaceId: current.workspaceId || queryWorkspaceId
     }))
   }, [queryTenantId, queryWorkspaceId])
+
+  // After a successful active-account signup, move focus to the confirmation so keyboard and
+  // assistive-tech users are taken straight to the plain-language guidance + primary next action,
+  // instead of being left on the (now-superseded) submit button (#730).
+  useEffect(() => {
+    if (registration) {
+      successRef.current?.focus()
+    }
+  }, [registration])
 
   const signupAllowed = signupPolicy?.selfServiceEnabled === true
 
@@ -217,14 +227,10 @@ export function SignupPage() {
         return
       }
 
+      // Single success surface: the confirmation alert below leads with the service's plain-language
+      // guidance, keeps the registration reference, and carries the primary next action. Avoid a
+      // second, redundant success banner via `feedback` (which stays reserved for error states).
       setRegistration(createdRegistration)
-      setFeedback({
-        variant: 'success',
-        title: 'Registro aceptado correctamente',
-        message:
-          createdRegistration.message ||
-          'Tu cuenta ya está disponible para continuar hacia el acceso de consola respaldado por Keycloak.'
-      })
     } catch (rawError) {
       const error = rawError as ApiError
 
@@ -497,18 +503,26 @@ export function SignupPage() {
             ) : null}
 
             {registration ? (
-              <Alert variant="success" role="status" aria-live="polite">
-                <AlertTitle>Tu cuenta está lista</AlertTitle>
-                <AlertDescription>
-                  <span className="block">
-                    Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
-                    {registration.registrationId}.
-                  </span>
-                  <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={consoleAuthConfig.loginPath}>
-                    Continuar hacia login
-                  </Link>
-                </AlertDescription>
-              </Alert>
+              <div ref={successRef} tabIndex={-1} className="outline-none">
+                <Alert variant="success" role="status" aria-live="polite">
+                  <AlertTitle>Tu cuenta está lista</AlertTitle>
+                  <AlertDescription>
+                    <span className="block">
+                      {registration.message || 'Tu cuenta ya está disponible para entrar en la consola.'}
+                    </span>
+                    <span className="mt-2 block">
+                      Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
+                      {registration.registrationId}.
+                    </span>
+                    <Link
+                      className="mt-3 inline-flex font-medium text-primary underline underline-offset-4"
+                      to={consoleAuthConfig.loginPath}
+                    >
+                      Continuar hacia login
+                    </Link>
+                  </AlertDescription>
+                </Alert>
+              </div>
             ) : null}
           </div>
 

@@ -1,7 +1,9 @@
 import { ArrowRight, KeyRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { consoleAuthConfig } from '@/lib/console-config'
 
 export function WelcomePage() {
   return (
@@ -42,23 +44,27 @@ export function WelcomePage() {
             </article>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button asChild>
-              <a href="/login">
-                Ir al login
-                <KeyRound className="h-4 w-4" aria-hidden="true" />
-              </a>
+          <div className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button asChild>
+                <Link to={consoleAuthConfig.loginPath}>
+                  Ir al login
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to={consoleAuthConfig.signupPath}>
+                  Solicitar acceso
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
+            <Button asChild variant="link" className="justify-start px-0">
+              <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
             </Button>
-            <Button asChild variant="outline">
-              <a href="#console-overview">
-                Conocer la consola
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </a>
-            </Button>
-            <Badge variant="outline">Sin dependencia de SDKs de navegador para autenticar</Badge>
           </div>
 
-          <div id="console-overview" className="rounded-2xl border border-dashed border-border/80 p-5">
+          <div className="rounded-2xl border border-dashed border-border/80 p-5">
             <p className="text-sm leading-6 text-muted-foreground">
               Desde aquí puedes iniciar sesión, solicitar acceso si tu organización habilita el registro y
               recuperar tu contraseña si la olvidas. Si necesitas ayuda para entrar, contacta a quien
