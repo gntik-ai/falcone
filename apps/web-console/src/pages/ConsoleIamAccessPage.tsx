@@ -228,7 +228,9 @@ export function ConsoleIamAccessPage() {
                     >
                       <span className="min-w-0">
                         <span className="block font-medium">{user.username}</span>
-                        <span className={`block text-xs ${selectedUserId === user.id ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                        {/* #734: /90 (not /80) so this sub-label clears WCAG AA on the now-navy
+                            bg-primary selected row — same fix/rationale as the shell nav sub-label. */}
+                        <span className={`block text-xs ${selectedUserId === user.id ? 'text-primary-foreground/90' : 'text-muted-foreground'}`}>
                           {user.email ?? 'sin email'}
                         </span>
                       </span>

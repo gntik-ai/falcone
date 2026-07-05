@@ -656,7 +656,12 @@ function ConsoleNavigation() {
                         <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-current')} aria-hidden="true" />
                         <span className="min-w-0">
                           <span className="block font-medium">{item.label}</span>
-                          <span className={cn('mt-1 block text-xs leading-5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                          {/* #734: /90 (not the more usual /80) for this sub-label. The active pill
+                              is now bg-primary — a mid-navy — instead of the old near-white surface,
+                              which shrank the headroom for the near-black --primary-foreground text:
+                              /80 on navy measures 4.33:1 (a small-text WCAG AA miss), /90 restores it
+                              to 4.97:1 with a barely-perceptible change. */}
+                          <span className={cn('mt-1 block text-xs leading-5', isActive ? 'text-primary-foreground/90' : 'text-muted-foreground')}>
                             {item.description}
                           </span>
                         </span>
