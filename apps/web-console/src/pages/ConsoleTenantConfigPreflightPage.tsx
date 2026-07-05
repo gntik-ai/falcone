@@ -34,7 +34,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
   // Access control
   if (userRole && !['superadmin', 'sre'].includes(userRole)) {
     return (
-      <div data-testid="forbidden" className="p-8 text-center text-red-600">
+      <div data-testid="forbidden" className="p-8 text-center text-destructive">
         No tienes permisos para acceder a esta página.
       </div>
     )
@@ -115,14 +115,14 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
   }, [])
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6" data-testid="preflight-page">
-      <h1 className="text-xl font-bold text-slate-800">Validación previa de conflictos</h1>
-      <p className="text-sm text-slate-500">
+    <div className="max-w-4xl mx-auto space-y-6" data-testid="preflight-page">
+      <h1 className="text-xl font-bold text-foreground">Validación previa de conflictos</h1>
+      <p className="text-sm text-muted-foreground">
         Organización destino: <span className="font-mono font-medium">{tenantId}</span>
       </p>
 
       {error && (
-        <div data-testid="page-error" className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+        <div data-testid="page-error" className="rounded-md bg-destructive/5 border border-destructive/30 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -130,9 +130,9 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
       {/* Step 1: Upload and analyze */}
       {step === 'upload' && (
         <div className="space-y-3" data-testid="step-upload">
-          <h2 className="text-sm font-semibold text-slate-700">Paso 1 — Cargar artefacto y analizar conflictos</h2>
+          <h2 className="text-sm font-semibold text-foreground">Paso 1 — Cargar artefacto y analizar conflictos</h2>
           <textarea
-            className="w-full h-48 rounded-md border border-slate-300 p-3 font-mono text-xs focus:ring-blue-500 focus:outline-none focus:ring-1"
+            className="w-full h-48 rounded-md border border-input bg-background p-3 font-mono text-xs text-foreground focus:ring-ring focus:outline-none focus:ring-1"
             placeholder="Pega aquí el JSON del artefacto de exportación…"
             value={artifactText}
             onChange={(e) => setArtifactText(e.target.value)}
@@ -141,10 +141,10 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
           />
 
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-1">Filtrar dominios (opcional):</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Filtrar dominios (opcional):</p>
             <div className="flex flex-wrap gap-2">
               {KNOWN_DOMAINS.map(d => (
-                <label key={d} className="flex items-center gap-1 text-xs text-slate-600">
+                <label key={d} className="flex items-center gap-1 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
                     checked={selectedDomains.includes(d)}
@@ -160,7 +160,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
 
           <button
             type="button"
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             onClick={handleAnalyze}
             disabled={loading || !artifactText.trim()}
             data-testid="analyze-button"
@@ -173,14 +173,14 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
       {/* Step map: Review identifier map */}
       {step === 'map' && (
         <div className="space-y-3" data-testid="step-map">
-          <h2 className="text-sm font-semibold text-slate-700">Confirmar mapa de identificadores</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-foreground">Confirmar mapa de identificadores</h2>
+          <p className="text-xs text-muted-foreground">
             El artefacto proviene de una organización diferente. Confirma o ajusta el mapa de identificadores antes de ejecutar el análisis.
           </p>
           <ConfigIdentifierMapEditor entries={mapEntries} onChange={setMapEntries} />
           <button
             type="button"
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             onClick={handleConfirmMapAndAnalyze}
             disabled={loading}
             data-testid="confirm-map-button"
@@ -196,14 +196,14 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
           <PreflightConflictReport report={report} />
 
           {report.summary.risk_level === 'low' && !report.summary.incomplete_analysis && (
-            <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700" data-testid="safe-banner">
+            <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-300" data-testid="safe-banner">
               ✅ Sin conflictos detectados. Puede reaprovisionar con confianza.
             </div>
           )}
 
           {(report.summary.conflict_counts.low + report.summary.conflict_counts.medium +
             report.summary.conflict_counts.high + report.summary.conflict_counts.critical) > 0 && (
-            <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700" data-testid="reprovision-link">
+            <div className="rounded-md bg-sky-500/10 border border-sky-500/30 p-3 text-sm text-sky-300" data-testid="reprovision-link">
               Revise los conflictos antes de proceder. Puede ir a la{' '}
               <a href={`/admin/tenants/${tenantId}/config/reprovision`} className="underline font-medium">
                 página de reaprovisionamiento
@@ -214,7 +214,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
 
           <button
             type="button"
-            className="rounded-md bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:opacity-90"
             onClick={handleReset}
             data-testid="reset-button"
           >

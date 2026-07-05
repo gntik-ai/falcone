@@ -17,12 +17,12 @@ interface StatusStyle {
 // Each status maps to a distinct label + colour so the canvas overlay is legible at a glance.
 const STATUS_STYLES: Record<NodeStatus, StatusStyle> = {
   scheduled: { label: 'Programado', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
-  started: { label: 'En ejecución', variant: 'outline', className: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300' },
-  retrying: { label: 'Reintentando', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300' },
-  completed: { label: 'Completado', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
+  started: { label: 'En ejecución', variant: 'outline', className: 'border-sky-500/30 bg-sky-500/10 text-sky-300' },
+  retrying: { label: 'Reintentando', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
+  completed: { label: 'Completado', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
   failed: { label: 'Fallido', variant: 'destructive', className: '' },
   skipped: { label: 'Omitido', variant: 'outline', className: 'border-border bg-background text-muted-foreground' },
-  'waiting-approval': { label: 'Esperando aprobación', variant: 'outline', className: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300' }
+  'waiting-approval': { label: 'Esperando aprobación', variant: 'outline', className: 'border-violet-500/30 bg-violet-500/10 text-violet-300' }
 }
 
 // Human-readable duration between two timestamps (ms → "1.2s" / "340ms" / "2m 5s").

@@ -28,19 +28,23 @@ const sourceLabels: Record<QuotaDimensionRow['source'], string> = {
 const usageStatusMeta: Record<UsageStatus, { label: string; className: string }> = {
   within_limit: {
     label: 'Dentro del límite',
-    className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
   },
   approaching_limit: {
     label: 'Cerca del límite',
-    className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    className: 'border-amber-500/40 bg-amber-500/10 text-amber-300'
   },
   at_limit: {
     label: 'En el límite',
-    className: 'border-amber-600/40 bg-amber-600/10 text-amber-800 dark:text-amber-200'
+    // #744: the console renders dark-root (no `.dark` class is ever set), so the previous
+    // `text-amber-800 dark:text-amber-200` pair rendered its dark amber-800 half unconditionally —
+    // low-contrast dark-on-dark. Pin the legible dark-root tone directly (brighter than
+    // `approaching_limit`'s amber-300 to keep the two severities distinguishable).
+    className: 'border-amber-600/40 bg-amber-600/10 text-amber-200'
   },
   over_limit: {
     label: 'Por encima del límite',
-    className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
+    className: 'border-red-500/40 bg-red-500/10 text-red-300'
   },
   unknown: {
     label: 'Desconocido',

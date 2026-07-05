@@ -8,10 +8,10 @@ import { cn } from '@/lib/utils'
 // and amber for expired. Anything outside this known set (including null/undefined) renders with
 // the same neutral outline tone the badge always used.
 const CREDENTIAL_STATUS_TONE: Record<string, string> = {
-  active: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  rotated: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+  active: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  rotated: 'border-violet-500/30 bg-violet-500/10 text-violet-300',
   revoked: 'border-destructive/30 bg-destructive/10 text-destructive',
-  expired: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+  expired: 'border-amber-500/30 bg-amber-500/10 text-amber-300'
 }
 
 // Localized, human labels for the known lifecycle states. Parity with `ConsoleAuditResultBadge`,

@@ -86,16 +86,16 @@ export default function ConsoleTenantConfigExportPage({ tenantId = 'default' }: 
   }
 
   return (
-    <div className="space-y-6 p-6" data-testid="config-export-page">
+    <div className="space-y-6" data-testid="config-export-page">
       <div>
-        <h1 className="text-2xl font-bold">Exportación de Configuración Funcional</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-bold text-foreground">Exportación de Configuración Funcional</h1>
+        <p className="text-sm text-muted-foreground">
           Selecciona los dominios a exportar y genera un artefacto JSON con la configuración de la organización.
         </p>
       </div>
 
       {error && !artifact && (
-        <div className="rounded-md bg-red-50 p-4 text-red-700" data-testid="page-error">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-destructive" data-testid="page-error">
           {error}
         </div>
       )}
@@ -111,14 +111,14 @@ export default function ConsoleTenantConfigExportPage({ tenantId = 'default' }: 
         type="button"
         onClick={handleExport}
         disabled={isLoading || selectedDomains.length === 0}
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-300"
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         data-testid="export-btn"
       >
         {isLoading ? 'Exportando…' : 'Exportar configuración'}
       </button>
 
       {partialWarning && (
-        <div className="rounded-md bg-amber-50 p-4 text-amber-700" data-testid="partial-warning">
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-amber-300" data-testid="partial-warning">
           La exportación se completó parcialmente. Algunos dominios presentaron errores.
         </div>
       )}

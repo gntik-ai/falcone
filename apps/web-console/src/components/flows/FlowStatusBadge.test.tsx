@@ -8,7 +8,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { FlowStatusBadge } from './FlowStatusBadge'
+import { FlowStatusBadge, RunStatusBadge } from './FlowStatusBadge'
 
 describe('FlowStatusBadge', () => {
   it('authors the draft ("Borrador") tone for the dark root (text-amber-300, not the light-mode -700 pair)', () => {
@@ -32,5 +32,37 @@ describe('FlowStatusBadge', () => {
     expect(badge.className).not.toMatch(/emerald-700/)
     expect(badge.className).toMatch(/border-emerald-500\/30/)
     expect(badge.className).toMatch(/bg-emerald-500\/10/)
+  })
+})
+
+describe('[#744][Scenario: Dark-theme table/panel] RunStatusBadge dark-root tones (same class of fix as FlowStatusBadge draft/published)', () => {
+  it('authors the "Completada" tone for the dark root (text-emerald-300, not the light-mode -700 pair)', () => {
+    render(<RunStatusBadge status="Completed" />)
+
+    const badge = screen.getByTestId('run-status-badge')
+    expect(badge).toHaveTextContent('Completada')
+    expect(badge.className).toMatch(/text-emerald-300/)
+    expect(badge.className).not.toMatch(/emerald-700/)
+    expect(badge.className).not.toMatch(/dark:/)
+  })
+
+  it('authors the "En ejecución" tone for the dark root (text-sky-300, not the light-mode -700 pair)', () => {
+    render(<RunStatusBadge status="Running" />)
+
+    const badge = screen.getByTestId('run-status-badge')
+    expect(badge).toHaveTextContent('En ejecución')
+    expect(badge.className).toMatch(/text-sky-300/)
+    expect(badge.className).not.toMatch(/sky-700/)
+    expect(badge.className).not.toMatch(/dark:/)
+  })
+
+  it('authors the "Expirada" tone for the dark root (text-amber-300, not the light-mode -700 pair)', () => {
+    render(<RunStatusBadge status="TimedOut" />)
+
+    const badge = screen.getByTestId('run-status-badge')
+    expect(badge).toHaveTextContent('Expirada')
+    expect(badge.className).toMatch(/text-amber-300/)
+    expect(badge.className).not.toMatch(/amber-700/)
+    expect(badge.className).not.toMatch(/dark:/)
   })
 })

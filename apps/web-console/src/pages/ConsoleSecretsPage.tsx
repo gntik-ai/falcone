@@ -1,5 +1,5 @@
 // #757: converged onto the shared Card/Table/Button/Textarea/Badge primitives. This page
-// previously rendered a hard-coded `bg-white` panel (a light-mode card leaking onto the dark
+// previously rendered a hard-coded solid-white panel (a light-mode card leaking onto the dark
 // console theme) and a hand-rolled <table> with its own one-off header styling.
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'

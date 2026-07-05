@@ -43,4 +43,10 @@ describe('ScopeEnforcementDenialsTable', () => {
     render(<ScopeEnforcementDenialsTable denials={[]} isLoading={false} hasMore={false} isSuperadmin />)
     expect(screen.getByText('No hay eventos denegados en este periodo')).toBeInTheDocument()
   })
+
+  it('[#744] exposes the export and load-more controls as Button primitives (role=button)', () => {
+    render(<ScopeEnforcementDenialsTable denials={rows as any} isLoading={false} hasMore isSuperadmin onLoadMore={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Exportar CSV' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cargar más' })).toBeInTheDocument()
+  })
 })

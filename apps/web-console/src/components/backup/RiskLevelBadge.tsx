@@ -3,10 +3,10 @@ import type { RiskLevel } from '@/services/backupOperationsApi'
 export function RiskLevelBadge({ riskLevel }: { riskLevel: RiskLevel }) {
   const styles =
     riskLevel === 'critical'
-      ? 'border-red-300 bg-red-100 text-red-800'
+      ? 'border-red-500/30 bg-red-500/10 text-red-300'
       : riskLevel === 'elevated'
-        ? 'border-amber-300 bg-amber-100 text-amber-800'
-        : 'border-emerald-300 bg-emerald-100 text-emerald-800'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
 
   const icon = riskLevel === 'critical' ? '🚫' : riskLevel === 'elevated' ? '⚠️' : 'ℹ️'
 

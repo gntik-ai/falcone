@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchDenials, type ScopeEnforcementDenial } from '@/lib/console-scope-enforcement'
 import { ScopeEnforcementDenialsTable } from '@/components/console/ScopeEnforcementDenialsTable'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 function countByType(denials: ScopeEnforcementDenial[], type: string) {
   return denials.filter((item) => item.denial_type === type).length
@@ -40,25 +42,34 @@ export function ConsoleScopeEnforcementPage({ isSuperadmin = true }: { isSuperad
   }), [denials])
 
   return (
-    <section className="space-y-4 p-4">
-      <header className="flex items-center justify-between gap-3">
+    <section className="space-y-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div>
-          <h1 className="text-2xl font-semibold">Cumplimiento de scopes — eventos denegados</h1>
-          <p className="text-sm text-slate-600">Solicitudes bloqueadas recientes por scopes de token, derechos del plan, aislamiento de área de trabajo o puntos de conexión sin declarar.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cumplimiento de scopes — eventos denegados</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Solicitudes bloqueadas recientes por scopes de token, derechos del plan, aislamiento de área de trabajo o puntos de conexión sin declarar.</p>
         </div>
-        <div className="flex gap-2">
-          <button className="rounded border px-3 py-2" onClick={() => setRefreshTick((value) => value + 1)}>Actualizar</button>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />Autoactualizar</label>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setRefreshTick((value) => value + 1)}>Actualizar</Button>
+          <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />Autoactualizar</label>
         </div>
       </header>
-      {isSuperadmin && summary.CONFIG_ERROR > 0 ? <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Puntos de conexión sin configurar detectados. Revisa la configuración de plataforma.</div> : null}
+      {isSuperadmin && summary.CONFIG_ERROR > 0 ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+          Puntos de conexión sin configurar detectados. Revisa la configuración de plataforma.
+        </div>
+      ) : null}
       <div className="grid gap-3 md:grid-cols-4">
-        {Object.entries(summary).map(([key, value]) => <div key={key} className="rounded border bg-white p-3 text-sm"><div className="text-slate-500">{key}</div><div className="text-2xl font-semibold">{value}</div></div>)}
+        {Object.entries(summary).map(([key, value]) => (
+          <Card key={key} className="p-3 text-sm">
+            <div className="text-muted-foreground">{key}</div>
+            <div className="text-2xl font-semibold text-foreground">{value}</div>
+          </Card>
+        ))}
       </div>
-      <div className="flex gap-2">
-        <input aria-label="from-range" type="date" onChange={(event) => setRange((current) => ({ ...current, from: new Date(event.target.value).toISOString() }))} />
-        <input aria-label="to-range" type="date" onChange={(event) => setRange((current) => ({ ...current, to: new Date(event.target.value).toISOString() }))} />
-        <div className="rounded border bg-white px-3 py-2 text-sm">Denegaciones totales en la ventana: {denials.length}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input aria-label="from-range" type="date" className="rounded-xl border border-input bg-background px-2 py-1 text-sm text-foreground" onChange={(event) => setRange((current) => ({ ...current, from: new Date(event.target.value).toISOString() }))} />
+        <input aria-label="to-range" type="date" className="rounded-xl border border-input bg-background px-2 py-1 text-sm text-foreground" onChange={(event) => setRange((current) => ({ ...current, to: new Date(event.target.value).toISOString() }))} />
+        <Card className="p-3 text-sm">Denegaciones totales en la ventana: {denials.length}</Card>
       </div>
       <ScopeEnforcementDenialsTable denials={denials} isLoading={loading} hasMore={Boolean(nextCursor)} isSuperadmin={isSuperadmin} />
     </section>

@@ -2,10 +2,10 @@ import { Badge } from '@/components/ui/badge'
 import type { PlanStatus } from '@/services/planManagementApi'
 
 const classNames: Record<PlanStatus, string> = {
-  draft: 'bg-slate-100 text-slate-900',
-  active: 'bg-green-100 text-green-900',
-  deprecated: 'bg-amber-100 text-amber-900',
-  archived: 'bg-zinc-200 text-zinc-900'
+  draft: 'border-border bg-muted/40 text-muted-foreground',
+  active: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  deprecated: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  archived: 'border-border bg-muted/60 text-muted-foreground'
 }
 
 const statusLabels: Record<PlanStatus, string> = {

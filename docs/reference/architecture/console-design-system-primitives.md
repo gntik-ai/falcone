@@ -96,3 +96,71 @@ particular — which previously had **zero `className` usage** — now use `Butt
 
 Superadmin-only surfaces (the Plans catalog, chrome/tokens) are out of scope for this
 guarantee; they are tracked by separate issues.
+
+## Token discipline (issue #744)
+
+Issue #757 converged the data-plane surface onto the shared primitives; issue #744 extended the
+same token discipline to the rest of the authenticated console and closed two remaining theme
+bugs.
+
+**No hardcoded light-mode utilities.** Every panel/table/badge in `apps/web-console/src` renders
+on theme tokens — `bg-card`, `bg-muted`, `text-foreground`, `text-muted-foreground`,
+`border-border` — never a literal Tailwind color that only reads correctly against a white page
+(`bg-white`, `bg-slate-<n>`, `text-slate-<n>`). A worst-offender example fixed by #744:
+`ConsoleSecretRotationPage.tsx` previously rendered three solid `bg-white` panels directly on the
+dark theme. This is enforced by a repo-guard test,
+`apps/web-console/src/no-hardcoded-light-mode-colors.test.ts`, which scans the whole
+`apps/web-console/src` tree (excluding `*.test.tsx`/`*.stories.tsx`) for these patterns. It
+carries a `SANCTIONED_EXCEPTIONS` list for the rare, reviewed case where a literal class is not a
+dark-theme regression (e.g. a vendored snippet whose color is not console UI) — kept **empty** as
+of #744.
+
+**Status-tone idiom.** Where a badge/pill communicates a semantic status (success, warning,
+error, info, neutral), it uses a translucent tint over the border/background with a `-300` text
+tone, not a solid light chip:
+
+```text
+border-emerald-500/30 bg-emerald-500/10 text-emerald-300   /* success */
+border-amber-500/30   bg-amber-500/10   text-amber-300     /* warning */
+border-red-500/30     bg-red-500/10     text-red-300       /* error   */
+border-sky-500/30     bg-sky-500/10     text-sky-300       /* info    */
+border-border         bg-muted/40       text-muted-foreground /* neutral */
+```
+
+This idiom was already established by `components/flows/FlowStatusBadge.tsx`; #744 applied it to
+every other status badge that still used a solid `bg-<color>-100 text-<color>-800`-style light
+chip (`OperationStatusBadge`, `PlanStatusBadge`, `PlanCapabilityBadge`, `BackupScopeLegend`,
+`PreflightRiskBadge`, `RiskLevelBadge`, and the ad hoc status colors in the config
+export/reprovision/preflight panels).
+
+**Dark-root `-300`-direct tone (no inert `dark:` pairs).** The console renders **dark-root**:
+`globals.css`'s `:root` block *is* the dark palette, `tailwind.config.ts` sets
+`darkMode: ['class']`, but no `.dark` class is ever added to `<html>`. A class string like
+`text-emerald-700 dark:text-emerald-300` therefore always renders its `-700` half — the `dark:`
+variant is dead code. Author the `-300` tone **directly**, with no `dark:` prefix and no `-700`
+companion:
+
+```tsx
+/* Wrong — dark: half never applies on this dark-root console */
+className="text-emerald-700 dark:text-emerald-300"
+
+/* Right */
+className="text-emerald-300"
+```
+
+Issue #757 fixed this for `FlowStatusBadge`'s draft/published tones; issue #744 applied the same
+fix to `RunStatusBadge` and 17 other spots across `NodeStatusBadge.tsx`,
+`ConsoleFlowDesignerPage.tsx`, `ConsoleFlowRunPage.tsx`, `ConsoleFlowHistoryPage.tsx`,
+`DestructiveConfirmationDialog.tsx`, `ConsoleCredentialStatusBadge.tsx`,
+`QuotaConsumptionTable.tsx`, and `CapabilityStatusGrid.tsx`.
+This is **not** a general license to strip every `dark:` variant repo-wide — only the inert
+`text-X-700 dark:text-X-300` pattern (and any `dark:` variant in a file already being rewritten
+for another reason) was touched; `dark:` variants elsewhere are left alone pending a future
+`.dark`-class decision.
+
+**Card elevation.** `--card` (and `--popover`) previously equalled `--background` in both
+`:root` and `.dark` in `globals.css`, so every `bg-card`/`bg-card/NN` panel had zero visual
+elevation against the page. Issue #744 gave `--card`/`--popover` a distinct, slightly lighter
+HSL value in both blocks, preserving `--card-foreground`'s contrast — a one-line-per-block token
+change, not a new component. `--primary`/brand/typeface/focus tokens are unaffected; those are
+issue #734's scope.

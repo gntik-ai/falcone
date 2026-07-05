@@ -5,9 +5,14 @@
 :root {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
+  /* #744: --card used to equal --background, so every `bg-card`/`bg-card/NN` panel had ZERO
+   * elevation against the page — cards were visually indistinguishable from the surface behind
+   * them. Give it a distinct, slightly lighter surface (keeping --card-foreground's contrast
+   * intact) so bordered panels read as elevated. --primary/brand tokens are untouched — that is
+   * #734's scope. */
+  --card: 222.2 47.4% 11.2%;
   --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
+  --popover: 222.2 47.4% 11.2%;
   --popover-foreground: 210 40% 98%;
   --primary: 204 94% 94%;
   --primary-foreground: 222.2 47.4% 11.2%;
@@ -28,9 +33,12 @@
 .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
+  /* #744: same elevated-card fix as :root — kept identical since the console renders dark-root
+   * (see the `dark:` idiom note below); duplicated here so the token stays consistent if a
+   * `.dark` class is ever toggled on <html>. */
+  --card: 222.2 47.4% 11.2%;
   --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
+  --popover: 222.2 47.4% 11.2%;
   --popover-foreground: 210 40% 98%;
   --primary: 210 40% 98%;
   --primary-foreground: 222.2 47.4% 11.2%;

@@ -17,11 +17,11 @@ const FLOW_STATUS_META: Record<string, StatusMeta> = {
 const RUN_STATUS_META: Record<string, StatusMeta> = {
   Canceled: { label: 'Cancelada', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
   Cancelled: { label: 'Cancelada', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
-  Completed: { label: 'Completada', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
+  Completed: { label: 'Completada', variant: 'outline', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
   Failed: { label: 'Fallida', variant: 'destructive', className: '' },
-  Running: { label: 'En ejecución', variant: 'outline', className: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+  Running: { label: 'En ejecución', variant: 'outline', className: 'border-sky-500/30 bg-sky-500/10 text-sky-300' },
   Terminated: { label: 'Terminada', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' },
-  TimedOut: { label: 'Expirada', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  TimedOut: { label: 'Expirada', variant: 'outline', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
   unknown: { label: 'Desconocido', variant: 'outline', className: 'border-border bg-muted/40 text-muted-foreground' }
 }
 

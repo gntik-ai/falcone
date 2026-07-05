@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { IdentifierMapEntry } from '@/api/configReprovisionApi'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface ConfigIdentifierMapEditorProps {
   entries: IdentifierMapEntry[]
@@ -17,7 +18,7 @@ export function ConfigIdentifierMapEditor({ entries, onChange, disabled = false 
 
   if (!entries || entries.length === 0) {
     return (
-      <div data-testid="identifier-map-empty" className="rounded-md border border-slate-200 p-4 text-sm text-slate-500">
+      <div data-testid="identifier-map-empty" className="rounded-md border border-border p-4 text-sm text-muted-foreground">
         No hay reemplazos de identificadores necesarios (la organización de origen coincide con el destino).
       </div>
     )
@@ -25,64 +26,64 @@ export function ConfigIdentifierMapEditor({ entries, onChange, disabled = false 
 
   return (
     <div data-testid="identifier-map-editor" className="space-y-2">
-      <h3 className="text-sm font-semibold text-slate-700">Mapa de identificadores</h3>
-      <p className="text-xs text-slate-500">
+      <h3 className="text-sm font-semibold text-foreground">Mapa de identificadores</h3>
+      <p className="text-xs text-muted-foreground">
         Revisa y ajusta los valores de destino antes de ejecutar el reaprovisionamiento.
       </p>
-      <table className="w-full text-sm border-collapse" role="table">
-        <thead>
-          <tr className="border-b border-slate-200">
-            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Alcance</th>
-            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Desde (origen)</th>
-            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase" scope="col">Hacia (destino)</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table role="table">
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Alcance</TableHead>
+            <TableHead scope="col">Desde (origen)</TableHead>
+            <TableHead scope="col">Hacia (destino)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {entries.map((entry, index) => {
             const isInvalid = !entry.to || entry.to.trim().length === 0
             return (
-              <tr
+              <TableRow
                 key={`${entry.from}-${index}`}
-                className={`border-b border-slate-100 ${isInvalid ? 'bg-red-50' : ''}`}
+                className={isInvalid ? 'bg-destructive/5' : undefined}
                 data-testid={`identifier-map-row-${index}`}
               >
-                <td className="py-2 px-3">
+                <TableCell>
                   {entry.scope ? (
-                    <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    <span className="inline-block rounded border border-border bg-muted/40 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {entry.scope}
                     </span>
                   ) : (
-                    <span className="text-slate-400 text-xs">—</span>
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
-                </td>
-                <td className="py-2 px-3">
-                  <span className="font-mono text-xs text-slate-700" data-testid={`identifier-map-from-${index}`}>
+                </TableCell>
+                <TableCell>
+                  <span className="font-mono text-xs text-foreground" data-testid={`identifier-map-from-${index}`}>
                     {entry.from}
                   </span>
-                </td>
-                <td className="py-2 px-3">
+                </TableCell>
+                <TableCell>
                   <input
                     type="text"
                     value={entry.to}
                     onChange={(e) => handleToChange(index, e.target.value)}
                     disabled={disabled}
-                    className={`w-full rounded border px-2 py-1 text-xs font-mono ${
+                    className={`w-full rounded border bg-background px-2 py-1 text-xs font-mono ${
                       isInvalid
-                        ? 'border-red-400 bg-red-50 text-red-800 focus:ring-red-500'
-                        : 'border-slate-300 text-slate-700 focus:ring-blue-500'
+                        ? 'border-destructive text-destructive focus:ring-destructive'
+                        : 'border-input text-foreground focus:ring-ring'
                     } focus:outline-none focus:ring-1`}
                     aria-label={`Valor destino para ${entry.from}`}
                     data-testid={`identifier-map-to-${index}`}
                   />
                   {isInvalid && (
-                    <span className="block mt-0.5 text-[10px] text-red-600">El valor destino es obligatorio</span>
+                    <span className="block mt-0.5 text-[10px] text-destructive">El valor destino es obligatorio</span>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )
           })}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

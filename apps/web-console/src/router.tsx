@@ -9,7 +9,9 @@ import { PasswordRecoveryPage } from '@/pages/PasswordRecoveryPage'
 import { PendingActivationPage } from '@/pages/PendingActivationPage'
 import { ConsoleAuthPage } from '@/pages/ConsoleAuthPage'
 import { ConsoleMembersPage } from '@/pages/ConsoleMembersPage'
-import { ConsolePlaceholderPage } from '@/pages/ConsolePlaceholderPage'
+import { ConsoleOverviewPage } from '@/pages/ConsoleOverviewPage'
+import { ConsoleProfilePage } from '@/pages/ConsoleProfilePage'
+import { ConsoleSettingsPage } from '@/pages/ConsoleSettingsPage'
 import { ConsoleTenantsPage } from '@/pages/ConsoleTenantsPage'
 import { ConsolePlanCatalogPage } from '@/pages/ConsolePlanCatalogPage'
 import { ConsolePlanCreatePage } from '@/pages/ConsolePlanCreatePage'
@@ -160,13 +162,7 @@ export const appRoutes = [
           },
           {
             path: 'overview',
-            element: (
-              <ConsolePlaceholderPage
-                badge="Vista general"
-                title="Vista general de la consola"
-                description="Resumen inicial del producto y punto de entrada persistente para la navegación administrativa del BaaS multi-organización."
-              />
-            )
+            element: <ConsoleOverviewPage />
           },
           {
             path: 'tenants',
@@ -340,23 +336,11 @@ export const appRoutes = [
           },
           {
             path: 'profile',
-            element: (
-              <ConsolePlaceholderPage
-                badge="Perfil"
-                title="Perfil de usuario"
-                description="Entrada base para la futura gestión del perfil del operador autenticado dentro de la consola."
-              />
-            )
+            element: <ConsoleProfilePage />
           },
           {
             path: 'settings',
-            element: (
-              <ConsolePlaceholderPage
-                badge="Ajustes"
-                title="Ajustes de consola"
-                description="Entrada base para los ajustes operativos y preferencias de la experiencia administrativa."
-              />
-            )
+            element: <ConsoleSettingsPage />
           },
           {
             path: '*',

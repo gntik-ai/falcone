@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const useConsoleContextMock = vi.hoisted(() => vi.fn())
@@ -12,23 +13,40 @@ vi.mock('@/lib/console-context', async () => {
   }
 })
 
-import { ConsolePlaceholderPage } from './ConsolePlaceholderPage'
+import { ConsoleOverviewPage } from './ConsoleOverviewPage'
 
-describe('ConsolePlaceholderPage', () => {
+const NO_SCAFFOLDING_PATTERNS = [/EP-\d+/, /US-UI/i, /consola base/i, /pantalla temporal/i, /entrada base/i, /iteración posterior/i]
+
+describe('ConsoleOverviewPage', () => {
   afterEach(() => {
     cleanup()
     useConsoleContextMock.mockReset()
+  })
+
+  it('[#744][Scenario: Tenant owner views any authenticated page] muestra copy de producto real, sin IDs de seguimiento ni texto de estado de desarrollo', () => {
+    useConsoleContextMock.mockReturnValue(createContextValue())
+
+    render(
+      <MemoryRouter>
+        <ConsoleOverviewPage />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByRole('heading', { name: /vista general de la consola/i })).toBeInTheDocument()
+
+    const pageText = document.body.textContent ?? ''
+    for (const pattern of NO_SCAFFOLDING_PATTERNS) {
+      expect(pageText).not.toMatch(pattern)
+    }
   })
 
   it('muestra los resúmenes de cuotas e inventario cuando hay datos disponibles', () => {
     useConsoleContextMock.mockReturnValue(createContextValue())
 
     render(
-      <ConsolePlaceholderPage
-        badge="Functions"
-        title="Functions y runtime serverless"
-        description="Vista contextual del dominio serverless."
-      />
+      <MemoryRouter>
+        <ConsoleOverviewPage />
+      </MemoryRouter>
     )
 
     expect(screen.getByTestId('console-tenant-quota-summary')).toBeInTheDocument()
@@ -37,12 +55,7 @@ describe('ConsolePlaceholderPage', () => {
 
     expect(screen.getByTestId('console-tenant-inventory-summary')).toBeInTheDocument()
     expect(screen.getByText(/composición de la organización activa/i)).toBeInTheDocument()
-    expect(screen.getByText('Áreas de trabajo')).toBeInTheDocument()
-    expect(screen.getByText(/Aplicaciones 5/i)).toBeInTheDocument()
     expect(screen.getByText(/workspace-prod/i)).toBeInTheDocument()
-    expect(screen.getByText(/seleccionadas en la consola/i)).toBeInTheDocument()
-    expect(screen.getByText('Consola base')).toBeInTheDocument()
-    expect(screen.getByText(/pantalla temporal navegable/i)).toBeInTheDocument()
   })
 
   it('oculta las secciones opcionales cuando no hay datos de cuota o inventario', () => {
@@ -57,34 +70,13 @@ describe('ConsolePlaceholderPage', () => {
     )
 
     render(
-      <ConsolePlaceholderPage
-        badge="Overview"
-        title="Vista general de la consola"
-        description="Resumen inicial del producto."
-      />
+      <MemoryRouter>
+        <ConsoleOverviewPage />
+      </MemoryRouter>
     )
 
     expect(screen.queryByTestId('console-tenant-quota-summary')).not.toBeInTheDocument()
     expect(screen.queryByTestId('console-tenant-inventory-summary')).not.toBeInTheDocument()
-  })
-
-  it('refleja el contexto activo aunque todavía no exista workspace seleccionado', () => {
-    useConsoleContextMock.mockReturnValue(
-      createContextValue({
-        activeWorkspace: null
-      })
-    )
-
-    render(
-      <ConsolePlaceholderPage
-        badge="Tenants"
-        title="Gestión de tenants"
-        description="Administración base de tenants."
-      />
-    )
-
-    expect(screen.getByText(/organización: tenant alpha/i)).toBeInTheDocument()
-    expect(screen.getByText(/estado de área de trabajo: sin área de trabajo activa/i)).toBeInTheDocument()
   })
 })
 
@@ -102,22 +94,8 @@ function createContextValue(overrides: Record<string, unknown> = {}) {
       governanceStatus: 'nominal',
       provisioningStatus: 'completed',
       quotaSummary: {
-        totals: {
-          nominal: 1,
-          warning: 1,
-          blocked: 1
-        },
+        totals: { nominal: 1, warning: 1, blocked: 1 },
         items: [
-          {
-            metricKey: 'storage_gb',
-            scope: 'tenant',
-            used: 80,
-            limit: 100,
-            remaining: 20,
-            utilizationPercent: 80,
-            severity: 'warning',
-            unit: 'GB'
-          },
           {
             metricKey: 'invocations_per_minute',
             scope: 'workspace',

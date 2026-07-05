@@ -125,7 +125,7 @@ export function DestructiveConfirmationDialog({
                 <section className="border-l border-border pl-4">
                   <h3 className="text-sm font-semibold tracking-tight text-foreground">Impacto en cascada</h3>
                   {opState === 'loading-impact' ? <p className="mt-2 text-sm text-muted-foreground">Calculando impacto…</p> : null}
-                  {config.cascadeImpactError ? <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">No se pudo calcular el impacto completo. Puedes continuar con la información disponible.</p> : null}
+                  {config.cascadeImpactError ? <p className="mt-2 text-sm text-amber-300">No se pudo calcular el impacto completo. Puedes continuar con la información disponible.</p> : null}
                   {!config.cascadeImpactError && opState !== 'loading-impact' && (config.cascadeImpact?.length ?? 0) === 0 ? (
                     <p className="mt-2 text-sm text-muted-foreground">No se detectaron recursos dependientes adicionales.</p>
                   ) : null}

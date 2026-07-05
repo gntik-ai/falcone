@@ -19,7 +19,7 @@ export function TenantNameInput({ tenantName, expectedName, value, onChange, onM
 
   return (
     <div className="space-y-1">
-      <label className="block text-sm font-medium text-slate-700">
+      <label className="block text-sm font-medium text-foreground">
         Escribe el nombre exacto de la organización para confirmar
       </label>
       <div className="flex items-center gap-2">
@@ -29,9 +29,9 @@ export function TenantNameInput({ tenantName, expectedName, value, onChange, onM
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          className="w-full rounded border px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-foreground"
         />
-        {isMatch ? <span aria-label="Coincide" className="text-green-600">✅</span> : <span aria-label="No coincide" className="text-slate-400">❌</span>}
+        {isMatch ? <span aria-label="Coincide" className="text-emerald-400">✅</span> : <span aria-label="No coincide" className="text-muted-foreground">❌</span>}
       </div>
     </div>
   )

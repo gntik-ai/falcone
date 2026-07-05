@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { useTriggerBackup } from '@/hooks/useTriggerBackup'
 
 interface TriggerBackupButtonProps {
@@ -31,35 +32,25 @@ export function TriggerBackupButton({
 
   return (
     <>
-      <button
-        type="button"
-        className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
-        data-testid="trigger-backup-button"
-        onClick={() => setShowModal(true)}
-      >
+      <Button type="button" size="sm" data-testid="trigger-backup-button" onClick={() => setShowModal(true)}>
         Iniciar backup
-      </button>
+      </Button>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h2 className="text-lg font-bold mb-2">Confirmar backup</h2>
-            <p className="text-sm text-gray-700 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-2 text-foreground">Confirmar backup</h2>
+            <p className="text-sm text-muted-foreground mb-4">
               ¿Iniciar backup bajo demanda para el componente <strong>{componentType}</strong> ({instanceId}) de la organización <strong>{tenantId}</strong>?
             </p>
-            {error && <p className="text-red-600 text-sm mb-2">{error.message}</p>}
+            {error && <p className="text-destructive text-sm mb-2">{error.message}</p>}
             <div className="flex gap-2 justify-end">
-              <button type="button" className="px-3 py-1.5 text-sm rounded border" onClick={() => setShowModal(false)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowModal(false)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white disabled:opacity-50"
-                disabled={isLoading}
-                onClick={() => void handleConfirm()}
-              >
+              </Button>
+              <Button type="button" size="sm" disabled={isLoading} onClick={() => void handleConfirm()}>
                 {isLoading ? 'Iniciando…' : 'Confirmar'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

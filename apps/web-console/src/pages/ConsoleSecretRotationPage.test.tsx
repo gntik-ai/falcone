@@ -49,4 +49,22 @@ describe('ConsoleSecretRotationPage', () => {
 
     await waitFor(() => expect(screen.getByText('apisix')).toBeInTheDocument())
   })
+
+  it('[#744][Scenario: Dark-theme table/panel] renders every panel on design tokens, no hardcoded light-mode backgrounds', async () => {
+    render(
+      <MemoryRouter initialEntries={['/console/secrets/platform%2Fpostgresql%2Fapp-password/rotate']}>
+        <Routes>
+          <Route path="/console/secrets/:encodedSecretPath/rotate" element={<ConsoleSecretRotationPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText('apisix')).toBeInTheDocument())
+
+    expect(document.body.innerHTML).not.toMatch(/bg-white/)
+    expect(document.body.innerHTML).not.toMatch(/bg-slate-\d/)
+    expect(document.body.innerHTML).not.toMatch(/text-slate-\d/)
+    expect(document.querySelectorAll('[data-slot="card"]').length).toBeGreaterThanOrEqual(3)
+    expect(document.querySelector('[data-slot="table"]')).not.toBeNull()
+  })
 })

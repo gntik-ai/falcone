@@ -150,7 +150,7 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
           <Button
             size="sm"
             variant="outline"
-            className="mt-3 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
+            className="mt-3 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
             onClick={() => void fetchPage(pageStack.at(-1))}
             disabled={loading}
           >
