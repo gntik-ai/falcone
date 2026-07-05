@@ -4,6 +4,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { getConsoleAccountStatusView, type ConsoleAccountStatusView } from '@/lib/console-auth'
+import {
+  AUTH_PANEL_CLASS_NAME,
+  AUTH_PANEL_HEADING_CLASS_NAME,
+  AUTH_PANEL_INTRO_CLASS_NAME
+} from '@/lib/console-auth-surface'
 import { consoleAuthConfig } from '@/lib/console-config'
 
 interface PendingActivationLocationState {
@@ -58,58 +63,56 @@ export function PendingActivationPage() {
   }, [navigationState?.message, statusView])
 
   return (
-    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
-      <section className="w-full max-w-3xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
-        <div className="mb-8 space-y-3">
-          <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-            {consoleAuthConfig.labels.pendingActivationTitle}
-          </h1>
-          <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-            Esta pantalla muestra el estado de tu solicitud de acceso mientras esperas aprobación o activación.
-          </p>
-        </div>
+    <section className={AUTH_PANEL_CLASS_NAME}>
+      <div className="mb-8 space-y-3">
+        <h1 className={`${AUTH_PANEL_HEADING_CLASS_NAME} max-w-2xl`}>
+          {consoleAuthConfig.labels.pendingActivationTitle}
+        </h1>
+        <p className={AUTH_PANEL_INTRO_CLASS_NAME}>
+          Esta pantalla muestra el estado de tu solicitud de acceso mientras esperas aprobación o activación.
+        </p>
+      </div>
 
-        <div className="space-y-6">
+      <div className="space-y-6">
+        <Alert>
+          <AlertTitle>{resolvedView.title}</AlertTitle>
+          <AlertDescription>
+            <span className="block">{resolvedView.message}</span>
+            {loading ? <span className="mt-2 block text-sm text-muted-foreground">Resolviendo la vista canónica de estado…</span> : null}
+          </AlertDescription>
+        </Alert>
+
+        {navigationState?.registrationId ? (
           <Alert>
-            <AlertTitle>{resolvedView.title}</AlertTitle>
+            <AlertTitle>Solicitud recibida</AlertTitle>
             <AlertDescription>
-              <span className="block">{resolvedView.message}</span>
-              {loading ? <span className="mt-2 block text-sm text-muted-foreground">Resolviendo la vista canónica de estado…</span> : null}
+              <span className="block">
+                Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
+                {navigationState.registrationId}.
+              </span>
             </AlertDescription>
           </Alert>
+        ) : null}
 
-          {navigationState?.registrationId ? (
-            <Alert>
-              <AlertTitle>Solicitud recibida</AlertTitle>
-              <AlertDescription>
-                <span className="block">
-                  Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
-                  {navigationState.registrationId}.
-                </span>
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
-          {resolvedView.allowedActions.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
-              {resolvedView.allowedActions.map((action) => (
-                <Button key={action.actionId} asChild variant="outline">
-                  <Link to={action.target}>{action.label}</Link>
-                </Button>
-              ))}
-            </div>
-          ) : null}
-
+        {resolvedView.allowedActions.length > 0 ? (
           <div className="flex flex-wrap gap-3">
-            <Button asChild>
-              <Link to={consoleAuthConfig.loginPath}>Volver a login</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link to={consoleAuthConfig.signupPath}>Revisar signup</Link>
-            </Button>
+            {resolvedView.allowedActions.map((action) => (
+              <Button key={action.actionId} asChild variant="outline">
+                <Link to={action.target}>{action.label}</Link>
+              </Button>
+            ))}
           </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link to={consoleAuthConfig.loginPath}>Volver a login</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to={consoleAuthConfig.signupPath}>Revisar signup</Link>
+          </Button>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
   )
 }

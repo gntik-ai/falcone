@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, RouterProvider, Routes, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { AuthLayout } from '@/layouts/AuthLayout'
 
 import { PendingActivationPage } from './PendingActivationPage'
 import { SignupPage } from './SignupPage'
@@ -29,6 +31,30 @@ describe('SignupPage', () => {
     expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute('minlength', '10')
     expect(screen.getByText(/si tu organización requiere aprobación/i)).toBeInTheDocument()
     expect(screen.queryByText(/el shell autenticado/i)).not.toBeInTheDocument()
+  })
+
+  it('[#731] montada dentro de AuthLayout: conserva el formulario y obtiene el marco de marca + título de la ruta', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    // AuthLayout reads route `handle` data via `useMatches()`, which requires a data router
+    // (createMemoryRouter/RouterProvider) — unlike the plain <MemoryRouter><Routes/> used elsewhere
+    // in this file for isolated SignupPage-only rendering.
+    const router = createMemoryRouter(
+      [
+        {
+          element: <AuthLayout />,
+          children: [{ path: '/signup', element: <SignupPage />, handle: { title: 'Solicitar acceso · Consola In Falcone' } }]
+        }
+      ],
+      { initialEntries: ['/signup'] }
+    )
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { name: /crea tu acceso a in falcone console/i })).toBeInTheDocument()
+    expect(document.title).toBe('Solicitar acceso · Consola In Falcone')
+    expect(screen.getByRole('img', { name: /in falcone/i })).toHaveAttribute('src', '/img/logo-wide.png')
+    expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
   })
 
   it('[#730] no muestra artefactos internos de scaffolding (badge EP/US, Realm/Client ID, rutas /v1/, roadmap)', async () => {

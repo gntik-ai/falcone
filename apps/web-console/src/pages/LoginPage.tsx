@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  AUTH_PANEL_ASIDE_CLASS_NAME,
+  AUTH_PANEL_CLASS_NAME,
+  AUTH_PANEL_HEADING_CLASS_NAME,
+  AUTH_PANEL_INTRO_CLASS_NAME
+} from '@/lib/console-auth-surface'
+import {
   createConsoleLoginSession,
   getConsoleAccountStatusView,
   getConsoleSignupPolicy,
@@ -300,170 +306,167 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
-      <section className="w-full max-w-4xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
-        <div className="mb-8 space-y-3 sm:mb-10">
-          <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
-          <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-            {consoleAuthConfig.headings.title}
-          </h1>
-          <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            {consoleAuthConfig.headings.subtitle}
-          </p>
-        </div>
+    <section className={AUTH_PANEL_CLASS_NAME}>
+      <div className="mb-8 space-y-3 sm:mb-10">
+        <h1 className={`${AUTH_PANEL_HEADING_CLASS_NAME} max-w-2xl`}>
+          {consoleAuthConfig.headings.title}
+        </h1>
+        <p className={AUTH_PANEL_INTRO_CLASS_NAME}>
+          {consoleAuthConfig.headings.subtitle}
+        </p>
+      </div>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
-          <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId} noValidate>
-            {feedback ? (
-              <Alert id="login-feedback" variant={feedback.variant} aria-live="assertive" aria-atomic="true">
-                <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
-              </Alert>
-            ) : null}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
+        <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId} noValidate>
+          {feedback ? (
+            <Alert id="login-feedback" variant={feedback.variant} aria-live="assertive" aria-atomic="true">
+              <AlertTitle>{feedback.title}</AlertTitle>
+              <AlertDescription className="break-words">{feedback.message}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
-              <Input
-                id="username"
-                name="username"
-                autoComplete="username"
-                aria-describedby={usernameDescription}
-                aria-invalid={usernameInvalid || undefined}
-                className={usernameInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                // Place the caret on the first field so keyboard and assistive-tech users
-                // can start typing their credential immediately on this dedicated login screen.
-                autoFocus
-                ref={usernameInputRef}
-                value={form.username}
-                onChange={(event) => {
-                  const value = event.target.value
-                  setForm((current) => ({ ...current, username: value }))
-                  if (fieldErrors.username) {
-                    setFieldErrors((current) => ({ ...current, username: undefined }))
-                  }
-                }}
-                placeholder="operaciones"
-                required
-                minLength={3}
-                maxLength={120}
-              />
-              <p id="login-username-help" className="text-xs leading-5 text-muted-foreground">
-                Usa el usuario de consola asociado a tu organización.
-              </p>
-              {fieldErrors.username ? (
-                <p id="login-username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                  {fieldErrors.username}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">{consoleAuthConfig.labels.password}</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                aria-describedby={passwordDescription}
-                aria-invalid={passwordInvalid || undefined}
-                className={passwordInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                ref={passwordInputRef}
-                value={form.password}
-                onChange={(event) => {
-                  const value = event.target.value
-                  setForm((current) => ({ ...current, password: value }))
-                  if (fieldErrors.password) {
-                    setFieldErrors((current) => ({ ...current, password: undefined }))
-                  }
-                }}
-                placeholder="••••••••••••"
-                required
-                // No client-side minLength on login: this form authenticates an EXISTING
-                // credential, so it must never impose a length floor that can exceed (or
-                // drift from) the platform password policy (`/v1/auth/signups/policy` →
-                // `passwordPolicy.minLength`, currently 8) and block policy-valid accounts
-                // from submitting. The backend / Keycloak policy stays authoritative. (#804)
-                maxLength={256}
-              />
-              <p id="login-password-help" className="text-xs leading-5 text-muted-foreground">
-                La policy de contraseña se valida en el servicio de acceso.
-              </p>
-              {fieldErrors.password ? (
-                <p id="login-password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                  {fieldErrors.password}
-                </p>
-              ) : null}
-            </div>
-
-            <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground transition-colors hover:bg-accent/40">
-              <input
-                type="checkbox"
-                checked={form.rememberMe}
-                onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))}
-                className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              />
-              <span>{consoleAuthConfig.labels.rememberMe}</span>
-            </label>
-
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="w-full sm:w-auto">
-                {isSubmitting ? consoleAuthConfig.labels.submitLoading : consoleAuthConfig.labels.submit}
-              </Button>
-              <Button asChild variant="link" className="justify-start px-0 sm:justify-center">
-                <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
-              </Button>
-            </div>
-
-            {statusView ? (
-              <Alert>
-                <AlertTitle>{statusView.title}</AlertTitle>
-                <AlertDescription>
-                  <span className="block">{statusView.message}</span>
-                  {statusAction ? (
-                    <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={statusAction.target}>
-                      {statusAction.label}
-                    </Link>
-                  ) : null}
-                </AlertDescription>
-              </Alert>
-            ) : null}
-          </form>
-
-          <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-semibold">Acceso y alta</h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              La consola consulta la policy efectiva de auto-registro y, si la sesión expira, devuelve al usuario al destino protegido una vez vuelva a autenticarse.
+          <div className="space-y-2">
+            <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
+            <Input
+              id="username"
+              name="username"
+              autoComplete="username"
+              aria-describedby={usernameDescription}
+              aria-invalid={usernameInvalid || undefined}
+              className={usernameInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+              // Place the caret on the first field so keyboard and assistive-tech users
+              // can start typing their credential immediately on this dedicated login screen.
+              autoFocus
+              ref={usernameInputRef}
+              value={form.username}
+              onChange={(event) => {
+                const value = event.target.value
+                setForm((current) => ({ ...current, username: value }))
+                if (fieldErrors.username) {
+                  setFieldErrors((current) => ({ ...current, username: undefined }))
+                }
+              }}
+              placeholder="operaciones"
+              required
+              minLength={3}
+              maxLength={120}
+            />
+            <p id="login-username-help" className="text-xs leading-5 text-muted-foreground">
+              Usa el usuario de consola asociado a tu organización.
             </p>
-            {policyLoading ? (
-              <p className="text-sm text-muted-foreground" role="status" aria-live="polite" aria-busy="true">
-                Cargando policy de registro…
+            {fieldErrors.username ? (
+              <p id="login-username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                {fieldErrors.username}
               </p>
-            ) : signupVisible ? (
-              <div className="space-y-2">
-                <Button asChild variant="outline" className="w-full">
-                  <Link to={signupTarget} aria-describedby={signupContextSummary ? 'signup-context-help' : undefined}>
-                    {consoleAuthConfig.labels.signup}
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">{consoleAuthConfig.labels.password}</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              aria-describedby={passwordDescription}
+              aria-invalid={passwordInvalid || undefined}
+              className={passwordInvalid ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+              ref={passwordInputRef}
+              value={form.password}
+              onChange={(event) => {
+                const value = event.target.value
+                setForm((current) => ({ ...current, password: value }))
+                if (fieldErrors.password) {
+                  setFieldErrors((current) => ({ ...current, password: undefined }))
+                }
+              }}
+              placeholder="••••••••••••"
+              required
+              // No client-side minLength on login: this form authenticates an EXISTING
+              // credential, so it must never impose a length floor that can exceed (or
+              // drift from) the platform password policy (`/v1/auth/signups/policy` →
+              // `passwordPolicy.minLength`, currently 8) and block policy-valid accounts
+              // from submitting. The backend / Keycloak policy stays authoritative. (#804)
+              maxLength={256}
+            />
+            <p id="login-password-help" className="text-xs leading-5 text-muted-foreground">
+              La policy de contraseña se valida en el servicio de acceso.
+            </p>
+            {fieldErrors.password ? (
+              <p id="login-password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                {fieldErrors.password}
+              </p>
+            ) : null}
+          </div>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground transition-colors hover:bg-accent/40">
+            <input
+              type="checkbox"
+              checked={form.rememberMe}
+              onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            />
+            <span>{consoleAuthConfig.labels.rememberMe}</span>
+          </label>
+
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="w-full sm:w-auto">
+              {isSubmitting ? consoleAuthConfig.labels.submitLoading : consoleAuthConfig.labels.submit}
+            </Button>
+            <Button asChild variant="link" className="justify-start px-0 sm:justify-center">
+              <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
+            </Button>
+          </div>
+
+          {statusView ? (
+            <Alert>
+              <AlertTitle>{statusView.title}</AlertTitle>
+              <AlertDescription>
+                <span className="block">{statusView.message}</span>
+                {statusAction ? (
+                  <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={statusAction.target}>
+                    {statusAction.label}
                   </Link>
-                </Button>
-                {signupContextSummary ? (
-                  <p id="signup-context-help" className="text-xs leading-5 text-muted-foreground">
-                    {signupContextSummary}
-                  </p>
                 ) : null}
-              </div>
-            ) : (
-              <Alert>
-                <AlertTitle>Registro no disponible</AlertTitle>
-                <AlertDescription>{signupPolicy?.message ?? consoleAuthConfig.labels.signupDisabled}</AlertDescription>
-              </Alert>
-            )}
-            <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
-              Tu sesión permanece protegida durante la navegación: si el destino que buscabas requería iniciar
-              sesión, volverás automáticamente a él en cuanto accedas.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </form>
+
+        <aside className={AUTH_PANEL_ASIDE_CLASS_NAME}>
+          <h2 className="text-lg font-semibold">Acceso y alta</h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            La consola consulta la policy efectiva de auto-registro y, si la sesión expira, devuelve al usuario al destino protegido una vez vuelva a autenticarse.
+          </p>
+          {policyLoading ? (
+            <p className="text-sm text-muted-foreground" role="status" aria-live="polite" aria-busy="true">
+              Cargando policy de registro…
+            </p>
+          ) : signupVisible ? (
+            <div className="space-y-2">
+              <Button asChild variant="outline" className="w-full">
+                <Link to={signupTarget} aria-describedby={signupContextSummary ? 'signup-context-help' : undefined}>
+                  {consoleAuthConfig.labels.signup}
+                </Link>
+              </Button>
+              {signupContextSummary ? (
+                <p id="signup-context-help" className="text-xs leading-5 text-muted-foreground">
+                  {signupContextSummary}
+                </p>
+              ) : null}
             </div>
-          </aside>
-        </div>
-      </section>
-    </main>
+          ) : (
+            <Alert>
+              <AlertTitle>Registro no disponible</AlertTitle>
+              <AlertDescription>{signupPolicy?.message ?? consoleAuthConfig.labels.signupDisabled}</AlertDescription>
+            </Alert>
+          )}
+          <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
+            Tu sesión permanece protegida durante la navegación: si el destino que buscabas requería iniciar
+            sesión, volverás automáticamente a él en cuanto accedas.
+          </div>
+        </aside>
+      </div>
+    </section>
   )
 }

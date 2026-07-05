@@ -1,6 +1,8 @@
 import { cleanup, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, RouterProvider, Routes, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { AuthLayout } from '@/layouts/AuthLayout'
 
 import { PendingActivationPage } from './PendingActivationPage'
 
@@ -98,6 +100,42 @@ describe('PendingActivationPage', () => {
 
     expect(await screen.findByText(/estamos esperando la aprobación final/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /revisar signup/i })).toHaveAttribute('href', '/signup')
+  })
+
+  it('[#731] montada dentro de AuthLayout: conserva la guía de estado y obtiene el marco de marca + título de la ruta', async () => {
+    fetchMock.mockResolvedValueOnce(
+      createJsonResponse(200, {
+        statusView: 'pending_activation',
+        title: 'Tu registro está pendiente de activación',
+        message: 'Estamos esperando la aprobación final para habilitar el acceso.',
+        allowedActions: []
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    // AuthLayout reads route `handle` data via `useMatches()`, which requires a data router
+    // (createMemoryRouter/RouterProvider) — unlike the plain <MemoryRouter><Routes/> used elsewhere
+    // in this file for isolated PendingActivationPage-only rendering.
+    const router = createMemoryRouter(
+      [
+        {
+          element: <AuthLayout />,
+          children: [
+            {
+              path: '/signup/pending-activation',
+              element: <PendingActivationPage />,
+              handle: { title: 'Registro pendiente · Consola In Falcone' }
+            }
+          ]
+        }
+      ],
+      { initialEntries: ['/signup/pending-activation'] }
+    )
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByText(/estamos esperando la aprobación final/i)).toBeInTheDocument()
+    expect(document.title).toBe('Registro pendiente · Consola In Falcone')
+    expect(screen.getByRole('img', { name: /in falcone/i })).toHaveAttribute('src', '/img/logo-wide.png')
   })
 })
 
