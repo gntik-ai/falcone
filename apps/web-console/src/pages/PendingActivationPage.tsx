@@ -4,6 +4,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { getConsoleAccountStatusView, type ConsoleAccountStatusView } from '@/lib/console-auth'
+import {
+  AUTH_PANEL_CLASS_NAME,
+  AUTH_PANEL_HEADING_CLASS_NAME,
+  AUTH_PANEL_INTRO_CLASS_NAME
+} from '@/lib/console-auth-surface'
 import { consoleAuthConfig } from '@/lib/console-config'
 
 interface PendingActivationLocationState {
@@ -58,12 +63,12 @@ export function PendingActivationPage() {
   }, [navigationState?.message, statusView])
 
   return (
-    <section className="w-full rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
+    <section className={AUTH_PANEL_CLASS_NAME}>
       <div className="mb-8 space-y-3">
-        <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+        <h1 className={`${AUTH_PANEL_HEADING_CLASS_NAME} max-w-2xl`}>
           {consoleAuthConfig.labels.pendingActivationTitle}
         </h1>
-        <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
+        <p className={AUTH_PANEL_INTRO_CLASS_NAME}>
           Esta pantalla muestra el estado de tu solicitud de acceso mientras esperas aprobación o activación.
         </p>
       </div>

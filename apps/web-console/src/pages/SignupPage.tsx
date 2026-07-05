@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  AUTH_PANEL_ASIDE_CLASS_NAME,
+  AUTH_PANEL_CLASS_NAME,
+  AUTH_PANEL_HEADING_CLASS_NAME,
+  AUTH_PANEL_INTRO_CLASS_NAME
+} from '@/lib/console-auth-surface'
+import {
   createConsoleSignup,
   getConsoleSignupPolicy,
   type ConsoleSignupPolicy,
@@ -266,12 +272,12 @@ export function SignupPage() {
   }
 
   return (
-    <section className="w-full rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
+    <section className={AUTH_PANEL_CLASS_NAME}>
       <div className="mb-8 space-y-3 sm:mb-10">
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+        <h1 className={`${AUTH_PANEL_HEADING_CLASS_NAME} max-w-3xl`}>
           {consoleAuthConfig.labels.signupTitle}
         </h1>
-        <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+        <p className={AUTH_PANEL_INTRO_CLASS_NAME}>
           {consoleAuthConfig.labels.signupSubtitle}
         </p>
       </div>
@@ -524,7 +530,7 @@ export function SignupPage() {
           ) : null}
         </div>
 
-        <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
+        <aside className={AUTH_PANEL_ASIDE_CLASS_NAME}>
           <h2 className="text-lg font-semibold">Policy de auto-registro</h2>
           <p className="text-sm leading-6 text-muted-foreground">
             La consola resuelve la policy efectiva antes de exponer el flujo de alta y refleja si el acceso será inmediato o pendiente de aprobación.

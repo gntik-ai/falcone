@@ -80,19 +80,24 @@ export function AuthLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="border-b border-border/60 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+      {/* Sticky so the brand mark and the "back to login" escape hatch stay in view while a tall
+          screen (e.g. the signup form) scrolls — which is what activates the header's frosted
+          `bg-background/95 backdrop-blur`. Mirrors ConsoleShellLayout's header height (h-16 via
+          py-3 + the h-10 mark) so the chrome reads consistently across the authed/unauth shells.
+          `flex-wrap` degrades gracefully at extreme narrow widths. */}
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
           {isWelcomeRoute ? (
-            <span className="flex items-center">
-              <img src="/img/logo-wide.png" alt="In Falcone" className="h-9 w-auto" />
+            <span className="flex shrink-0 items-center">
+              <img src="/img/logo-wide.png" alt="In Falcone" className="h-10 w-auto" />
             </span>
           ) : (
             <Link
               to="/"
               aria-label="Volver al inicio de In Falcone Console"
-              className="flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <img src="/img/logo-wide.png" alt="In Falcone" className="h-9 w-auto" />
+              <img src="/img/logo-wide.png" alt="In Falcone" className="h-10 w-auto" />
             </Link>
           )}
 
@@ -107,10 +112,14 @@ export function AuthLayout() {
         </div>
       </header>
 
+      {/* Top-aligned at EVERY breakpoint (no `lg:items-center`): the funnel screens have very
+          different heights (a short 404 vs. the tall two-column signup), so vertically centring
+          them would land each screen's h1 at a different Y and make the title jump as the user
+          moves between steps. Anchoring content to a consistent top offset keeps the heading put. */}
       <main
         ref={mainRef}
         tabIndex={-1}
-        className="flex flex-1 items-start justify-center px-4 py-8 focus:outline-none sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16"
+        className="flex flex-1 items-start justify-center px-4 py-10 focus:outline-none sm:px-6 sm:py-12 lg:px-8 lg:py-16"
       >
         <div data-testid="auth-shell-container" className="w-full max-w-5xl">
           <Outlet />

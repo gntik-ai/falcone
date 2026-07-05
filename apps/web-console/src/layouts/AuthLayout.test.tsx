@@ -191,4 +191,28 @@ describe('AuthLayout [#731]', () => {
     expect(usernameInput).toHaveFocus()
     expect(document.activeElement).not.toBe(screen.getByRole('main'))
   })
+
+  it('[#731] the header is sticky so the brand + escape hatch stay in view while a tall screen scrolls', () => {
+    renderAuthLayoutRoute('/signup')
+
+    const header = screen.getByRole('banner')
+    expect(header).toHaveClass('sticky')
+    expect(header).toHaveClass('top-0')
+  })
+
+  it('[#731] the brand mark renders at the shared h-10 size shared with the authenticated shell', () => {
+    renderAuthLayoutRoute('/login')
+
+    expect(screen.getByRole('img', { name: /in falcone/i })).toHaveClass('h-10')
+  })
+
+  it('[#731] the content region is top-aligned (never vertically centred) so the h1 does not jump between funnel steps', () => {
+    renderAuthLayoutRoute('/login')
+
+    const main = screen.getByRole('main')
+    // Vertical centring would land each screen's h1 at a different Y depending on the screen's
+    // height — anchoring to the top keeps the title put as the user moves through the funnel.
+    expect(main.className).toContain('items-start')
+    expect(main.className).not.toContain('items-center')
+  })
 })

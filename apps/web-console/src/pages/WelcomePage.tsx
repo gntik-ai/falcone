@@ -3,26 +3,25 @@ import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  AUTH_PANEL_CLASS_NAME,
+  AUTH_PANEL_HEADING_CLASS_NAME,
+  AUTH_PANEL_INTRO_CLASS_NAME
+} from '@/lib/console-auth-surface'
 import { consoleAuthConfig } from '@/lib/console-config'
 
 export function WelcomePage() {
   return (
-    <section
-      aria-labelledby="foundation-title"
-      className="w-full rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10"
-    >
+    <section aria-labelledby="foundation-title" className={AUTH_PANEL_CLASS_NAME}>
       <Badge className="mb-6" variant="secondary">
         Bienvenido a la consola
       </Badge>
       <div className="space-y-6">
         <div className="space-y-3">
-          <h1
-            id="foundation-title"
-            className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
-          >
+          <h1 id="foundation-title" className={AUTH_PANEL_HEADING_CLASS_NAME}>
             In Falcone Console
           </h1>
-          <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
+          <p className={AUTH_PANEL_INTRO_CLASS_NAME}>
             Consola de administración para tu organización en la plataforma BaaS de In Falcone: gestiona el
             acceso de tu equipo, la configuración de tu organización y los servicios habilitados desde un
             mismo lugar, con autenticación respaldada por Keycloak.
