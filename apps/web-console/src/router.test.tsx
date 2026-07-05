@@ -4,10 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { appRoutes } from './router'
 
-const { consoleAuthPageRenderMock, consoleIamAccessPageRenderMock, readConsoleShellSessionMock } = vi.hoisted(() => ({
+const {
+  consoleAuthPageRenderMock,
+  consoleIamAccessPageRenderMock,
+  readConsoleShellSessionMock,
+  hasUsableConsoleSessionMock
+} = vi.hoisted(() => ({
   consoleAuthPageRenderMock: vi.fn(),
   consoleIamAccessPageRenderMock: vi.fn(),
-  readConsoleShellSessionMock: vi.fn()
+  readConsoleShellSessionMock: vi.fn(),
+  hasUsableConsoleSessionMock: vi.fn()
 }))
 
 vi.mock('@/components/auth/ProtectedRoute', () => ({ ProtectedRoute: () => <Outlet /> }))
@@ -35,10 +41,17 @@ vi.mock('@/pages/ConsolePlanCreatePage', () => ({ ConsolePlanCreatePage: () => <
 vi.mock('@/pages/ConsolePlanDetailPage', () => ({ ConsolePlanDetailPage: () => <h1>Plan detail</h1> }))
 vi.mock('@/pages/ConsoleTenantPlanPage', () => ({ ConsoleTenantPlanPage: () => <h1>Tenant plan admin</h1> }))
 vi.mock('@/pages/ConsoleTenantPlanOverviewPage', () => ({ ConsoleTenantPlanOverviewPage: () => <h1>My plan</h1> }))
-vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: readConsoleShellSessionMock }))
+vi.mock('@/lib/console-session', () => ({
+  readConsoleShellSession: readConsoleShellSessionMock,
+  // NotFoundPage (#733) reads this to decide its auth-aware primary recovery action; the router
+  // tests below aren't about that decision, so default it to match the always-present superadmin
+  // session set up below (an authenticated session is, in fact, "usable").
+  hasUsableConsoleSession: hasUsableConsoleSessionMock
+}))
 
 beforeEach(() => {
   readConsoleShellSessionMock.mockReturnValue(createRouterSession(['superadmin']))
+  hasUsableConsoleSessionMock.mockReturnValue(true)
   consoleAuthPageRenderMock.mockClear()
   consoleIamAccessPageRenderMock.mockClear()
 })
@@ -46,6 +59,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   readConsoleShellSessionMock.mockReset()
+  hasUsableConsoleSessionMock.mockReset()
 })
 
 describe('router', () => {
