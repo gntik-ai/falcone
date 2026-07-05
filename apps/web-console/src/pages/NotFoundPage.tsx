@@ -1,9 +1,14 @@
 import { useEffect, useRef } from 'react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { AUTH_PANEL_CLASS_NAME, AUTH_PANEL_HEADING_CLASS_NAME } from '@/lib/console-auth-surface'
+import {
+  AUTH_PANEL_CLASS_NAME,
+  AUTH_PANEL_HEADING_CLASS_NAME,
+  AUTH_PANEL_INTRO_CLASS_NAME
+} from '@/lib/console-auth-surface'
 import { consoleAuthConfig } from '@/lib/console-config'
 import { hasUsableConsoleSession, readConsoleShellSession } from '@/lib/console-session'
 
@@ -54,23 +59,29 @@ export function NotFoundPage() {
 
   return (
     <section className={`${AUTH_PANEL_CLASS_NAME} text-center`}>
-      <Badge variant="secondary">404</Badge>
-      <h1 ref={headingRef} tabIndex={-1} className={`${AUTH_PANEL_HEADING_CLASS_NAME} mt-4 outline-none`}>
-        Página no encontrada
-      </h1>
-      <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-        La ruta que intentas abrir no existe en la consola de In Falcone. Puede que el enlace esté
-        desactualizado o que la dirección no sea correcta. Elige una de las opciones para continuar.
-      </p>
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+      <div className="mb-8 space-y-3 sm:mb-10">
+        <Badge variant="secondary">404</Badge>
+        <h1 ref={headingRef} tabIndex={-1} className={`${AUTH_PANEL_HEADING_CLASS_NAME} outline-none`}>
+          Página no encontrada
+        </h1>
+        <p className={`mx-auto ${AUTH_PANEL_INTRO_CLASS_NAME}`}>
+          La ruta que intentas abrir no existe en la consola de In Falcone. Puede que el enlace esté
+          desactualizado o que la dirección no sea correcta. Elige una de las opciones para continuar.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
         <Button asChild>
-          <Link to={primaryTarget}>{primaryLabel}</Link>
+          <Link to={primaryTarget}>
+            {primaryLabel}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </Button>
         <Button asChild variant="secondary">
           <Link to="/">Volver al inicio</Link>
         </Button>
         {canGoBack ? (
           <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Volver atrás
           </Button>
         ) : null}
