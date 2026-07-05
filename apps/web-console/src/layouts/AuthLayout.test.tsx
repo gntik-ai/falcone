@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -125,5 +125,70 @@ describe('AuthLayout [#731]', () => {
     // Same header element instance stays mounted across the route change (AuthLayout itself never
     // unmounts/remounts when moving within the unauthenticated funnel).
     expect(screen.getByRole('banner')).toBe(headerBeforeNavigation)
+  })
+
+  it('[#731] the brand logo keeps ONE consistent accessible identity; the home-link purpose lives on the link, not the image', async () => {
+    renderAuthLayoutRoute('/signup')
+    await screen.findByText('Signup content')
+
+    const brandLink = screen.getByRole('link', { name: 'Volver al inicio de In Falcone Console' })
+    // The image is the brand identity ("In Falcone") on every route — it is NOT re-labelled with the
+    // link's action, so the same logo asset is announced consistently across the funnel.
+    expect(within(brandLink).getByRole('img')).toHaveAttribute('alt', 'In Falcone')
+  })
+
+  it('[#731] on an in-app navigation, focus moves to <main> so keyboard/AT users are placed on the new screen (and the initial render is not hijacked)', async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          element: <AuthLayout />,
+          children: [
+            { path: '/', element: <div>Welcome content</div>, handle: { title: 'Bienvenida · Consola In Falcone' } },
+            { path: '/signup', element: <div>Signup content</div>, handle: { title: 'Solicitar acceso · Consola In Falcone' } }
+          ]
+        }
+      ],
+      { initialEntries: ['/'] }
+    )
+
+    render(<RouterProvider router={router} />)
+    await screen.findByText('Welcome content')
+    const main = screen.getByRole('main')
+    // Initial load must never steal focus onto the shell.
+    expect(document.activeElement).not.toBe(main)
+
+    router.navigate('/signup')
+    await screen.findByText('Signup content')
+
+    expect(document.activeElement).toBe(main)
+  })
+
+  it('[#731] route-change focus defers to a screen that autofocuses its own content (login/recovery keep their field focus)', async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          element: <AuthLayout />,
+          children: [
+            { path: '/', element: <div>Welcome content</div>, handle: { title: 'Bienvenida · Consola In Falcone' } },
+            {
+              path: '/login',
+              element: <input aria-label="Usuario" autoFocus />,
+              handle: { title: 'Acceso · Consola In Falcone' }
+            }
+          ]
+        }
+      ],
+      { initialEntries: ['/'] }
+    )
+
+    render(<RouterProvider router={router} />)
+    await screen.findByText('Welcome content')
+
+    router.navigate('/login')
+    const usernameInput = await screen.findByRole('textbox', { name: /usuario/i })
+
+    // The destination page already owns focus (its first field) — AuthLayout must leave it alone.
+    expect(usernameInput).toHaveFocus()
+    expect(document.activeElement).not.toBe(screen.getByRole('main'))
   })
 })
