@@ -266,288 +266,285 @@ export function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
-      <section className="w-full max-w-5xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
-        <div className="mb-8 space-y-3 sm:mb-10">
-          <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
-          <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-            {consoleAuthConfig.labels.signupTitle}
-          </h1>
-          <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            {consoleAuthConfig.labels.signupSubtitle}
-          </p>
-        </div>
+    <section className="w-full rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
+      <div className="mb-8 space-y-3 sm:mb-10">
+        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+          {consoleAuthConfig.labels.signupTitle}
+        </h1>
+        <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+          {consoleAuthConfig.labels.signupSubtitle}
+        </p>
+      </div>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-          <div className="space-y-5">
-            {policyLoading ? (
-              <Alert role="status" aria-live="polite" aria-busy="true">
-                <AlertTitle>Resolviendo policy de registro</AlertTitle>
-                <AlertDescription>{policySummary}</AlertDescription>
-              </Alert>
-            ) : signupAllowed ? (
-              <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={formFeedbackId} noValidate>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <div className="space-y-5">
+          {policyLoading ? (
+            <Alert role="status" aria-live="polite" aria-busy="true">
+              <AlertTitle>Resolviendo policy de registro</AlertTitle>
+              <AlertDescription>{policySummary}</AlertDescription>
+            </Alert>
+          ) : signupAllowed ? (
+            <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={formFeedbackId} noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  autoComplete="username"
+                  aria-describedby={describedBy('username-help', fieldErrors.username ? 'username-required' : null)}
+                  aria-invalid={Boolean(fieldErrors.username) || undefined}
+                  className={fieldErrors.username ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+                  ref={usernameInputRef}
+                  value={form.username}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setForm((current) => ({ ...current, username: value }))
+                    if (fieldErrors.username) {
+                      setFieldErrors((current) => ({ ...current, username: undefined }))
+                    }
+                  }}
+                  placeholder="operaciones"
+                  required
+                  minLength={3}
+                  maxLength={63}
+                  pattern="^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+                />
+                <p id="username-help" className="text-xs leading-5 text-muted-foreground">
+                  3-63 caracteres: minúsculas, números y guiones; empieza y termina con letra o número.
+                </p>
+                {fieldErrors.username ? (
+                  <p id="username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                    {fieldErrors.username}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="username">{consoleAuthConfig.labels.username}</Label>
+                  <Label htmlFor="displayName">{consoleAuthConfig.labels.displayName}</Label>
                   <Input
-                    id="username"
-                    name="username"
-                    autoComplete="username"
-                    aria-describedby={describedBy('username-help', fieldErrors.username ? 'username-required' : null)}
-                    aria-invalid={Boolean(fieldErrors.username) || undefined}
-                    className={fieldErrors.username ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                    ref={usernameInputRef}
-                    value={form.username}
+                    id="displayName"
+                    name="displayName"
+                    autoComplete="name"
+                    aria-describedby={fieldErrors.displayName ? 'displayName-required' : undefined}
+                    aria-invalid={Boolean(fieldErrors.displayName) || undefined}
+                    className={fieldErrors.displayName ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+                    ref={displayNameInputRef}
+                    value={form.displayName}
                     onChange={(event) => {
                       const value = event.target.value
-                      setForm((current) => ({ ...current, username: value }))
-                      if (fieldErrors.username) {
-                        setFieldErrors((current) => ({ ...current, username: undefined }))
+                      setForm((current) => ({ ...current, displayName: value }))
+                      if (fieldErrors.displayName) {
+                        setFieldErrors((current) => ({ ...current, displayName: undefined }))
                       }
                     }}
-                    placeholder="operaciones"
+                    placeholder="Operaciones Plataforma"
+                    required
+                    minLength={1}
+                    maxLength={120}
+                  />
+                  {fieldErrors.displayName ? (
+                    <p id="displayName-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                      {fieldErrors.displayName}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="primaryEmail">{consoleAuthConfig.labels.primaryEmail}</Label>
+                  <Input
+                    id="primaryEmail"
+                    name="primaryEmail"
+                    type="email"
+                    autoComplete="email"
+                    aria-describedby={fieldErrors.primaryEmail ? 'primaryEmail-required' : undefined}
+                    aria-invalid={Boolean(fieldErrors.primaryEmail) || undefined}
+                    className={fieldErrors.primaryEmail ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+                    ref={primaryEmailInputRef}
+                    value={form.primaryEmail}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setForm((current) => ({ ...current, primaryEmail: value }))
+                      if (fieldErrors.primaryEmail) {
+                        setFieldErrors((current) => ({ ...current, primaryEmail: undefined }))
+                      }
+                    }}
+                    placeholder="ops@example.com"
+                    required
+                    maxLength={160}
+                  />
+                  {fieldErrors.primaryEmail ? (
+                    <p id="primaryEmail-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                      {fieldErrors.primaryEmail}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-5 rounded-2xl border border-border/70 bg-background/35 p-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="tenantId">ID de organización requerido</Label>
+                  <Input
+                    id="tenantId"
+                    name="tenantId"
+                    autoComplete="organization"
+                    aria-describedby={describedBy('tenantId-help', fieldErrors.tenantId ? 'tenantId-required' : null)}
+                    aria-invalid={Boolean(fieldErrors.tenantId) || undefined}
+                    className={fieldErrors.tenantId ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+                    ref={tenantIdInputRef}
+                    value={form.tenantId}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setForm((current) => ({ ...current, tenantId: value }))
+                      if (fieldErrors.tenantId) {
+                        setFieldErrors((current) => ({ ...current, tenantId: undefined }))
+                      }
+                    }}
+                    placeholder="ten_demo"
                     required
                     minLength={3}
-                    maxLength={63}
-                    pattern="^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$"
+                    maxLength={120}
                   />
-                  <p id="username-help" className="text-xs leading-5 text-muted-foreground">
-                    3-63 caracteres: minúsculas, números y guiones; empieza y termina con letra o número.
+                  <p id="tenantId-help" className="text-xs leading-5 text-muted-foreground">
+                    Identifica la organización donde se creará la cuenta; se completa automáticamente cuando el enlace la incluye.
                   </p>
-                  {fieldErrors.username ? (
-                    <p id="username-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                      {fieldErrors.username}
+                  {fieldErrors.tenantId ? (
+                    <p id="tenantId-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                      {fieldErrors.tenantId}
                     </p>
                   ) : null}
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="displayName">{consoleAuthConfig.labels.displayName}</Label>
-                    <Input
-                      id="displayName"
-                      name="displayName"
-                      autoComplete="name"
-                      aria-describedby={fieldErrors.displayName ? 'displayName-required' : undefined}
-                      aria-invalid={Boolean(fieldErrors.displayName) || undefined}
-                      className={fieldErrors.displayName ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                      ref={displayNameInputRef}
-                      value={form.displayName}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        setForm((current) => ({ ...current, displayName: value }))
-                        if (fieldErrors.displayName) {
-                          setFieldErrors((current) => ({ ...current, displayName: undefined }))
-                        }
-                      }}
-                      placeholder="Operaciones Plataforma"
-                      required
-                      minLength={1}
-                      maxLength={120}
-                    />
-                    {fieldErrors.displayName ? (
-                      <p id="displayName-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                        {fieldErrors.displayName}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="primaryEmail">{consoleAuthConfig.labels.primaryEmail}</Label>
-                    <Input
-                      id="primaryEmail"
-                      name="primaryEmail"
-                      type="email"
-                      autoComplete="email"
-                      aria-describedby={fieldErrors.primaryEmail ? 'primaryEmail-required' : undefined}
-                      aria-invalid={Boolean(fieldErrors.primaryEmail) || undefined}
-                      className={fieldErrors.primaryEmail ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                      ref={primaryEmailInputRef}
-                      value={form.primaryEmail}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        setForm((current) => ({ ...current, primaryEmail: value }))
-                        if (fieldErrors.primaryEmail) {
-                          setFieldErrors((current) => ({ ...current, primaryEmail: undefined }))
-                        }
-                      }}
-                      placeholder="ops@example.com"
-                      required
-                      maxLength={160}
-                    />
-                    {fieldErrors.primaryEmail ? (
-                      <p id="primaryEmail-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                        {fieldErrors.primaryEmail}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="grid gap-5 rounded-2xl border border-border/70 bg-background/35 p-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="tenantId">ID de organización requerido</Label>
-                    <Input
-                      id="tenantId"
-                      name="tenantId"
-                      autoComplete="organization"
-                      aria-describedby={describedBy('tenantId-help', fieldErrors.tenantId ? 'tenantId-required' : null)}
-                      aria-invalid={Boolean(fieldErrors.tenantId) || undefined}
-                      className={fieldErrors.tenantId ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                      ref={tenantIdInputRef}
-                      value={form.tenantId}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        setForm((current) => ({ ...current, tenantId: value }))
-                        if (fieldErrors.tenantId) {
-                          setFieldErrors((current) => ({ ...current, tenantId: undefined }))
-                        }
-                      }}
-                      placeholder="ten_demo"
-                      required
-                      minLength={3}
-                      maxLength={120}
-                    />
-                    <p id="tenantId-help" className="text-xs leading-5 text-muted-foreground">
-                      Identifica la organización donde se creará la cuenta; se completa automáticamente cuando el enlace la incluye.
-                    </p>
-                    {fieldErrors.tenantId ? (
-                      <p id="tenantId-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                        {fieldErrors.tenantId}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="workspaceId">ID de área de trabajo opcional</Label>
-                    <Input
-                      id="workspaceId"
-                      name="workspaceId"
-                      autoComplete="off"
-                      aria-describedby="workspaceId-help"
-                      value={form.workspaceId}
-                      onChange={(event) => setForm((current) => ({ ...current, workspaceId: event.target.value }))}
-                      placeholder="wrk_demo"
-                      maxLength={120}
-                    />
-                    <p id="workspaceId-help" className="text-xs leading-5 text-muted-foreground">
-                      Añádelo solo si el acceso debe quedar asociado a un área de trabajo concreta desde el alta.
-                    </p>
-                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">{consoleAuthConfig.labels.password}</Label>
+                  <Label htmlFor="workspaceId">ID de área de trabajo opcional</Label>
                   <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    aria-describedby={describedBy('password-help', fieldErrors.password ? 'password-required' : null)}
-                    aria-invalid={Boolean(fieldErrors.password) || undefined}
-                    className={fieldErrors.password ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
-                    ref={passwordInputRef}
-                    value={form.password}
-                    onChange={(event) => {
-                      const value = event.target.value
-                      setForm((current) => ({ ...current, password: value }))
-                      if (fieldErrors.password) {
-                        setFieldErrors((current) => ({ ...current, password: undefined }))
-                      }
-                    }}
-                    placeholder="••••••••••••"
-                    required
-                    minLength={passwordMinLength}
-                    maxLength={256}
+                    id="workspaceId"
+                    name="workspaceId"
+                    autoComplete="off"
+                    aria-describedby="workspaceId-help"
+                    value={form.workspaceId}
+                    onChange={(event) => setForm((current) => ({ ...current, workspaceId: event.target.value }))}
+                    placeholder="wrk_demo"
+                    maxLength={120}
                   />
-                  <p id="password-help" className="text-xs leading-5 text-muted-foreground">
-                    Mínimo {passwordMinLength} caracteres según la policy de este entorno.
+                  <p id="workspaceId-help" className="text-xs leading-5 text-muted-foreground">
+                    Añádelo solo si el acceso debe quedar asociado a un área de trabajo concreta desde el alta.
                   </p>
-                  {fieldErrors.password ? (
-                    <p id="password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
-                      {fieldErrors.password}
-                    </p>
-                  ) : null}
                 </div>
+              </div>
 
-                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || policyLoading || !signupAllowed}
-                    aria-busy={isSubmitting}
-                    className="w-full sm:w-auto"
-                  >
-                    {isSubmitting ? consoleAuthConfig.labels.signupSubmitLoading : consoleAuthConfig.labels.signupSubmit}
-                  </Button>
-                  <Button asChild type="button" variant="link" className="justify-start px-0 sm:justify-center">
-                    <Link to={consoleAuthConfig.loginPath}>Ya tengo una cuenta</Link>
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <Alert>
-                <AlertTitle>Registro no disponible</AlertTitle>
+              <div className="space-y-2">
+                <Label htmlFor="password">{consoleAuthConfig.labels.password}</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  aria-describedby={describedBy('password-help', fieldErrors.password ? 'password-required' : null)}
+                  aria-invalid={Boolean(fieldErrors.password) || undefined}
+                  className={fieldErrors.password ? INVALID_FORM_CONTROL_CLASS_NAME : undefined}
+                  ref={passwordInputRef}
+                  value={form.password}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setForm((current) => ({ ...current, password: value }))
+                    if (fieldErrors.password) {
+                      setFieldErrors((current) => ({ ...current, password: undefined }))
+                    }
+                  }}
+                  placeholder="••••••••••••"
+                  required
+                  minLength={passwordMinLength}
+                  maxLength={256}
+                />
+                <p id="password-help" className="text-xs leading-5 text-muted-foreground">
+                  Mínimo {passwordMinLength} caracteres según la policy de este entorno.
+                </p>
+                {fieldErrors.password ? (
+                  <p id="password-required" role="alert" className={FORM_FIELD_ERROR_CLASS_NAME}>
+                    {fieldErrors.password}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || policyLoading || !signupAllowed}
+                  aria-busy={isSubmitting}
+                  className="w-full sm:w-auto"
+                >
+                  {isSubmitting ? consoleAuthConfig.labels.signupSubmitLoading : consoleAuthConfig.labels.signupSubmit}
+                </Button>
+                <Button asChild type="button" variant="link" className="justify-start px-0 sm:justify-center">
+                  <Link to={consoleAuthConfig.loginPath}>Ya tengo una cuenta</Link>
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <Alert>
+              <AlertTitle>Registro no disponible</AlertTitle>
+              <AlertDescription>
+                <span className="block">{policySummary}</span>
+                <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={consoleAuthConfig.loginPath}>
+                  Ir al acceso de consola
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {feedback ? (
+            <Alert id="signup-feedback" variant={feedback.variant} aria-live="assertive">
+              <AlertTitle>{feedback.title}</AlertTitle>
+              <AlertDescription className="break-words">{feedback.message}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {registration ? (
+            <div ref={successRef} tabIndex={-1} className="outline-none">
+              <Alert variant="success" role="status" aria-live="polite">
+                <AlertTitle>Tu cuenta está lista</AlertTitle>
                 <AlertDescription>
-                  <span className="block">{policySummary}</span>
-                  <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={consoleAuthConfig.loginPath}>
-                    Ir al acceso de consola
+                  <span className="block">
+                    {registration.message || 'Tu cuenta ya está disponible para entrar en la consola.'}
+                  </span>
+                  <span className="mt-2 block">
+                    Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
+                    {registration.registrationId}.
+                  </span>
+                  <Link
+                    className="mt-3 inline-flex font-medium text-primary underline underline-offset-4"
+                    to={consoleAuthConfig.loginPath}
+                  >
+                    Continuar hacia login
                   </Link>
                 </AlertDescription>
               </Alert>
-            )}
-
-            {feedback ? (
-              <Alert id="signup-feedback" variant={feedback.variant} aria-live="assertive">
-                <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
-              </Alert>
-            ) : null}
-
-            {registration ? (
-              <div ref={successRef} tabIndex={-1} className="outline-none">
-                <Alert variant="success" role="status" aria-live="polite">
-                  <AlertTitle>Tu cuenta está lista</AlertTitle>
-                  <AlertDescription>
-                    <span className="block">
-                      {registration.message || 'Tu cuenta ya está disponible para entrar en la consola.'}
-                    </span>
-                    <span className="mt-2 block">
-                      Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
-                      {registration.registrationId}.
-                    </span>
-                    <Link
-                      className="mt-3 inline-flex font-medium text-primary underline underline-offset-4"
-                      to={consoleAuthConfig.loginPath}
-                    >
-                      Continuar hacia login
-                    </Link>
-                  </AlertDescription>
-                </Alert>
-              </div>
-            ) : null}
-          </div>
-
-          <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-semibold">Policy de auto-registro</h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              La consola resuelve la policy efectiva antes de exponer el flujo de alta y refleja si el acceso será inmediato o pendiente de aprobación.
-            </p>
-            <Alert role="status" aria-live="polite" aria-busy={policyLoading}>
-              <AlertTitle>
-                {policyLoading
-                  ? 'Resolviendo policy…'
-                  : signupAllowed
-                    ? 'Registro habilitado'
-                    : 'Auto-registro deshabilitado'}
-              </AlertTitle>
-              <AlertDescription>{policySummary}</AlertDescription>
-            </Alert>
-            <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
-              Cuando el alta se acepta, tu cuenta queda lista para entrar en la consola; si tu organización
-              requiere aprobación, verás el estado de tu solicitud en la pantalla de activación pendiente.
             </div>
-          </aside>
+          ) : null}
         </div>
-      </section>
-    </main>
+
+        <aside className="self-start space-y-4 rounded-3xl border border-border/70 bg-background/45 p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-semibold">Policy de auto-registro</h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            La consola resuelve la policy efectiva antes de exponer el flujo de alta y refleja si el acceso será inmediato o pendiente de aprobación.
+          </p>
+          <Alert role="status" aria-live="polite" aria-busy={policyLoading}>
+            <AlertTitle>
+              {policyLoading
+                ? 'Resolviendo policy…'
+                : signupAllowed
+                  ? 'Registro habilitado'
+                  : 'Auto-registro deshabilitado'}
+            </AlertTitle>
+            <AlertDescription>{policySummary}</AlertDescription>
+          </Alert>
+          <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
+            Cuando el alta se acepta, tu cuenta queda lista para entrar en la consola; si tu organización
+            requiere aprobación, verás el estado de tu solicitud en la pantalla de activación pendiente.
+          </div>
+        </aside>
+      </div>
+    </section>
   )
 }

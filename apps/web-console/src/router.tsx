@@ -2,6 +2,7 @@ import { lazy } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { AuthLayout } from '@/layouts/AuthLayout'
 import { ConsoleShellLayout } from '@/layouts/ConsoleShellLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -122,24 +123,42 @@ function RequireWorkspaceSecretsRoute({ children }: { children: JSX.Element }) {
 // T05 endurece la entrada a `/console/*` con guardas de sesión y refresh on-demand.
 export const appRoutes = [
   {
-    path: '/',
-    element: <WelcomePage />
-  },
-  {
-    path: '/login',
-    element: <LoginPage />
-  },
-  {
-    path: consoleAuthConfig.passwordRecoveryPath,
-    element: <PasswordRecoveryPage />
-  },
-  {
-    path: '/signup',
-    element: <SignupPage />
-  },
-  {
-    path: '/signup/pending-activation',
-    element: <PendingActivationPage />
+    // Pathless layout route (#731): every unauthenticated screen — including the 404 fallback —
+    // shares AuthLayout's brand mark, container, and per-route `document.title` (read from each
+    // leaf route's `handle.title` below) via a single `<Outlet/>`.
+    element: <AuthLayout />,
+    children: [
+      {
+        path: '/',
+        element: <WelcomePage />,
+        handle: { title: 'Bienvenida · Consola In Falcone' }
+      },
+      {
+        path: '/login',
+        element: <LoginPage />,
+        handle: { title: 'Acceso · Consola In Falcone' }
+      },
+      {
+        path: consoleAuthConfig.passwordRecoveryPath,
+        element: <PasswordRecoveryPage />,
+        handle: { title: 'Recuperar contraseña · Consola In Falcone' }
+      },
+      {
+        path: '/signup',
+        element: <SignupPage />,
+        handle: { title: 'Solicitar acceso · Consola In Falcone' }
+      },
+      {
+        path: '/signup/pending-activation',
+        element: <PendingActivationPage />,
+        handle: { title: 'Registro pendiente · Consola In Falcone' }
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
+        handle: { title: 'Página no encontrada · Consola In Falcone' }
+      }
+    ]
   },
   {
     path: '/console',
@@ -351,10 +370,6 @@ export const appRoutes = [
         ]
       }
     ]
-  },
-  {
-    path: '*',
-    element: <NotFoundPage />
   }
 ]
 

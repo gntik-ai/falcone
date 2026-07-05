@@ -53,6 +53,20 @@ describe('router', () => {
     const router = createMemoryRouter(appRoutes, { initialEntries: ['/'] })
     render(<RouterProvider router={router} />)
     expect(await screen.findByRole('heading', { level: 1, name: /in falcone console/i })).toBeInTheDocument()
+    // [#731] AuthLayout wraps every unauthenticated route with the shared brand mark and a
+    // per-route, localized document.title.
+    expect(document.title).toBe('Bienvenida · Consola In Falcone')
+    expect(screen.getByRole('img', { name: /in falcone/i })).toHaveAttribute('src', '/img/logo-wide.png')
+  })
+
+  it('[#731] renderiza el 404 dentro de AuthLayout (brand mark + título localizado) para una ruta no reconocida', async () => {
+    const router = createMemoryRouter(appRoutes, { initialEntries: ['/this-route-does-not-exist'] })
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { level: 1, name: /página no encontrada/i })).toBeInTheDocument()
+    expect(document.title).toBe('Página no encontrada · Consola In Falcone')
+    expect(screen.getByRole('img', { name: /in falcone/i })).toHaveAttribute('src', '/img/logo-wide.png')
+    expect(screen.getByRole('link', { name: /volver al inicio de sesión/i })).toHaveAttribute('href', '/login')
   })
 
   it('renderiza tenants y workspaces con páginas reales', async () => {
@@ -97,6 +111,9 @@ describe('router', () => {
     expect(screen.getByRole('button', { name: /enviar instrucciones/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /volver a login/i })).toHaveAttribute('href', '/login')
     expect(screen.queryByRole('heading', { name: /página no encontrada/i })).not.toBeInTheDocument()
+    // [#731]
+    expect(document.title).toBe('Recuperar contraseña · Consola In Falcone')
+    expect(screen.getByRole('img', { name: /in falcone/i })).toHaveAttribute('src', '/img/logo-wide.png')
   })
 })
 
