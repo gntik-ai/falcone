@@ -1,72 +1,75 @@
 import { ArrowRight, KeyRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { consoleAuthConfig } from '@/lib/console-config'
 
 export function WelcomePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
+    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
       <section
         aria-labelledby="foundation-title"
-        className="w-full max-w-3xl rounded-3xl border border-border bg-card/80 p-10 shadow-2xl shadow-black/20 backdrop-blur"
+        className="w-full max-w-3xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10"
       >
         <Badge className="mb-6" variant="secondary">
-          Fundación de consola lista
+          Bienvenido a la consola
         </Badge>
         <div className="space-y-6">
           <div className="space-y-3">
-            <p className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
-              EP-14 / US-UI-01-T02
-            </p>
-            <h1 id="foundation-title" className="text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h1
+              id="foundation-title"
+              className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
+            >
               In Falcone Console
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Consola administrativa del producto BaaS multi-organización preparada para crecer con login,
-              navegación contextual y flujos seguros basados en Keycloak por medio de la familia pública
-              `/v1/auth/*`.
+              Consola de administración para tu organización en la plataforma BaaS de In Falcone: gestiona el
+              acceso de tu equipo, la configuración de tu organización y los servicios habilitados desde un
+              mismo lugar, con autenticación respaldada por Keycloak.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <article className="rounded-2xl border border-border/80 bg-background/60 p-5">
-              <h2 className="text-base font-semibold">Stack confirmado</h2>
+              <h2 className="text-base font-semibold">Acceso seguro</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                React, Tailwind CSS y componentes base con shadcn/ui ya operativos dentro del monorepo.
+                Inicia sesión con tu cuenta de organización; solo las personas autorizadas pueden entrar en la
+                consola.
               </p>
             </article>
             <article className="rounded-2xl border border-border/80 bg-background/60 p-5">
-              <h2 className="text-base font-semibold">Acceso listo para validar</h2>
+              <h2 className="text-base font-semibold">¿Aún no tienes cuenta?</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                La consola ya puede exponer el flujo de login con feedback para estados especiales,
-                recuperación de contraseña y descubrimiento de signup.
+                Si tu organización habilita el registro, puedes solicitar acceso y seguir el estado de tu alta
+                hasta que quede activa.
               </p>
             </article>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button asChild>
-              <a href="/login">
-                Ir al login
-                <KeyRound className="h-4 w-4" aria-hidden="true" />
-              </a>
+          <div className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button asChild>
+                <Link to={consoleAuthConfig.loginPath}>
+                  Ir al login
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to={consoleAuthConfig.signupPath}>
+                  Solicitar acceso
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
+            <Button asChild variant="link" className="justify-start px-0">
+              <Link to={consoleAuthConfig.passwordRecoveryPath}>{consoleAuthConfig.labels.passwordRecovery}</Link>
             </Button>
-            <Button asChild variant="outline">
-              <a href="#foundation-overview">
-                Ver alcance inicial
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </a>
-            </Button>
-            <Badge variant="outline">Sin dependencia de SDKs de navegador para autenticar</Badge>
           </div>
 
-          <div id="foundation-overview" className="rounded-2xl border border-dashed border-border/80 p-5">
-            <p className="text-sm leading-6 text-muted-foreground">
-              Esta pantalla valida la disponibilidad de la SPA, el sistema de estilos, el enrutamiento base
-              y el acceso inicial de la consola. Las rutas protegidas, la persistencia robusta de sesión y
-              el marco persistente de consola se incorporarán en tareas posteriores sin rehacer la base tecnológica.
-            </p>
-          </div>
+          <p className="border-t border-border/60 pt-6 text-sm leading-6 text-muted-foreground">
+            ¿Necesitas ayuda para entrar? Contacta a quien administre tu organización.
+          </p>
         </div>
       </section>
     </main>

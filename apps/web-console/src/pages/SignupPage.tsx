@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -83,6 +82,7 @@ export function SignupPage() {
   const primaryEmailInputRef = useRef<HTMLInputElement>(null)
   const tenantIdInputRef = useRef<HTMLInputElement>(null)
   const passwordInputRef = useRef<HTMLInputElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -108,6 +108,15 @@ export function SignupPage() {
       workspaceId: current.workspaceId || queryWorkspaceId
     }))
   }, [queryTenantId, queryWorkspaceId])
+
+  // After a successful active-account signup, move focus to the confirmation so keyboard and
+  // assistive-tech users are taken straight to the plain-language guidance + primary next action,
+  // instead of being left on the (now-superseded) submit button (#730).
+  useEffect(() => {
+    if (registration) {
+      successRef.current?.focus()
+    }
+  }, [registration])
 
   const signupAllowed = signupPolicy?.selfServiceEnabled === true
 
@@ -218,14 +227,10 @@ export function SignupPage() {
         return
       }
 
+      // Single success surface: the confirmation alert below leads with the service's plain-language
+      // guidance, keeps the registration reference, and carries the primary next action. Avoid a
+      // second, redundant success banner via `feedback` (which stays reserved for error states).
       setRegistration(createdRegistration)
-      setFeedback({
-        variant: 'success',
-        title: 'Registro aceptado correctamente',
-        message:
-          createdRegistration.message ||
-          'Tu cuenta ya está disponible para continuar hacia el acceso de consola respaldado por Keycloak.'
-      })
     } catch (rawError) {
       const error = rawError as ApiError
 
@@ -265,18 +270,11 @@ export function SignupPage() {
       <section className="w-full max-w-5xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
         <div className="mb-8 space-y-3 sm:mb-10">
           <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
-          <Badge variant="secondary" className="w-fit">
-            EP-14 / US-UI-01-T03
-          </Badge>
           <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             {consoleAuthConfig.labels.signupTitle}
           </h1>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
             {consoleAuthConfig.labels.signupSubtitle}
-          </p>
-          <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
-            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · ID del cliente{' '}
-            <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
           </p>
         </div>
 
@@ -500,24 +498,31 @@ export function SignupPage() {
             {feedback ? (
               <Alert id="signup-feedback" variant={feedback.variant} aria-live="assertive">
                 <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription>{feedback.message}</AlertDescription>
+                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 
             {registration ? (
-              <Alert variant="success" role="status" aria-live="polite">
-                <AlertTitle>Resumen del registro</AlertTitle>
-                <AlertDescription>
-                  <span className="block">ID de registro: {registration.registrationId}</span>
-                  <span className="block">Estado: {registration.state}</span>
-                  <span className="block">Modo de activación: {registration.activationMode}</span>
-                  <span className="block">Vista de estado: {registration.statusView}</span>
-                  <span className="block">Creado: {new Date(registration.createdAt).toLocaleString('es-ES')}</span>
-                  <Link className="mt-3 inline-flex font-medium text-primary underline underline-offset-4" to={consoleAuthConfig.loginPath}>
-                    Continuar hacia login
-                  </Link>
-                </AlertDescription>
-              </Alert>
+              <div ref={successRef} tabIndex={-1} className="outline-none">
+                <Alert variant="success" role="status" aria-live="polite">
+                  <AlertTitle>Tu cuenta está lista</AlertTitle>
+                  <AlertDescription>
+                    <span className="block">
+                      {registration.message || 'Tu cuenta ya está disponible para entrar en la consola.'}
+                    </span>
+                    <span className="mt-2 block">
+                      Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
+                      {registration.registrationId}.
+                    </span>
+                    <Link
+                      className="mt-3 inline-flex font-medium text-primary underline underline-offset-4"
+                      to={consoleAuthConfig.loginPath}
+                    >
+                      Continuar hacia login
+                    </Link>
+                  </AlertDescription>
+                </Alert>
+              </div>
             ) : null}
           </div>
 
@@ -537,7 +542,8 @@ export function SignupPage() {
               <AlertDescription>{policySummary}</AlertDescription>
             </Alert>
             <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
-              Esta iteración cubre signup y activación pendiente. La consola autenticada y la gestión robusta de sesión llegarán en T04 y T05.
+              Cuando el alta se acepta, tu cuenta queda lista para entrar en la consola; si tu organización
+              requiere aprobación, verás el estado de tu solicitud en la pantalla de activación pendiente.
             </div>
           </aside>
         </div>

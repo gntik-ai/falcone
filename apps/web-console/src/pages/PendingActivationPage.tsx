@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getConsoleAccountStatusView, type ConsoleAccountStatusView } from '@/lib/console-auth'
 import { consoleAuthConfig } from '@/lib/console-config'
@@ -59,13 +58,14 @@ export function PendingActivationPage() {
   }, [navigationState?.message, statusView])
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
-      <section className="w-full max-w-3xl rounded-3xl border border-border bg-card/80 p-10 shadow-2xl shadow-black/20 backdrop-blur">
+    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12 lg:items-center lg:px-8 lg:py-16">
+      <section className="w-full max-w-3xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
         <div className="mb-8 space-y-3">
-          <Badge variant="secondary">EP-14 / US-UI-01-T03</Badge>
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">{consoleAuthConfig.labels.pendingActivationTitle}</h1>
+          <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+            {consoleAuthConfig.labels.pendingActivationTitle}
+          </h1>
           <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-            Estado intermedio del acceso de consola respaldado por la familia pública `/v1/auth/*`.
+            Esta pantalla muestra el estado de tu solicitud de acceso mientras esperas aprobación o activación.
           </p>
         </div>
 
@@ -78,18 +78,14 @@ export function PendingActivationPage() {
             </AlertDescription>
           </Alert>
 
-          {navigationState ? (
+          {navigationState?.registrationId ? (
             <Alert>
-              <AlertTitle>Resumen del registro</AlertTitle>
+              <AlertTitle>Solicitud recibida</AlertTitle>
               <AlertDescription>
-                {navigationState.registrationId ? <span className="block">ID de registro: {navigationState.registrationId}</span> : null}
-                {navigationState.state ? <span className="block">Estado: {navigationState.state}</span> : null}
-                {navigationState.activationMode ? (
-                  <span className="block">Modo de activación: {navigationState.activationMode}</span>
-                ) : null}
-                {navigationState.createdAt ? (
-                  <span className="block">Creado: {new Date(navigationState.createdAt).toLocaleString('es-ES')}</span>
-                ) : null}
+                <span className="block">
+                  Guarda esta referencia de tu solicitud por si necesitas contactar a soporte:{' '}
+                  {navigationState.registrationId}.
+                </span>
               </AlertDescription>
             </Alert>
           ) : null}

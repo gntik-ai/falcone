@@ -19,7 +19,7 @@ export const consoleAuthConfig = {
     title: readEnv('VITE_CONSOLE_AUTH_TITLE', 'Accede a In Falcone Console'),
     subtitle: readEnv(
       'VITE_CONSOLE_AUTH_SUBTITLE',
-      'Autenticación respaldada por Keycloak y normalizada por la familia pública /v1/auth/* del control plane.'
+      'Autenticación respaldada por Keycloak, la misma capa de identidad que protege el resto de la plataforma.'
     )
   },
   labels: {
@@ -37,7 +37,7 @@ export const consoleAuthConfig = {
     signupTitle: readEnv('VITE_CONSOLE_SIGNUP_TITLE', 'Crea tu acceso a In Falcone Console'),
     signupSubtitle: readEnv(
       'VITE_CONSOLE_SIGNUP_SUBTITLE',
-      'Registro público respaldado por Keycloak y gobernado por la policy efectiva de /v1/auth/signups/policy.'
+      'Registro respaldado por Keycloak; la disponibilidad y los requisitos dependen de la policy configurada para tu organización.'
     ),
     signupSubmit: readEnv('VITE_CONSOLE_SIGNUP_SUBMIT_LABEL', 'Crear solicitud de acceso'),
     signupSubmitLoading: readEnv('VITE_CONSOLE_SIGNUP_SUBMIT_LOADING_LABEL', 'Enviando registro…'),

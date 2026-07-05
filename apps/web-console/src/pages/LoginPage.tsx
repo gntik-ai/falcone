@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -198,7 +197,6 @@ export function LoginPage() {
   }, [statusView])
   const loginFeedbackId = feedback ? 'login-feedback' : undefined
   const isCredentialFeedback = feedback?.kind === 'credential'
-  const isDestructiveFeedback = feedback?.variant === 'destructive'
   const usernameDescription = describedBy(
     'login-username-help',
     fieldErrors.username ? 'login-username-required' : null,
@@ -306,39 +304,20 @@ export function LoginPage() {
       <section className="w-full max-w-4xl rounded-3xl border border-border/80 bg-card/80 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
         <div className="mb-8 space-y-3 sm:mb-10">
           <img src="/img/logo-wide.png" alt="In Falcone" className="mb-3 h-16 w-auto" />
-          <Badge variant="secondary" className="w-fit">
-            EP-14 / US-UI-01-T05
-          </Badge>
           <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             {consoleAuthConfig.headings.title}
           </h1>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
             {consoleAuthConfig.headings.subtitle}
           </p>
-          <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
-            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · ID del cliente{' '}
-            <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
-          </p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
           <form className="space-y-6" onSubmit={handleSubmit} aria-describedby={loginFeedbackId} noValidate>
             {feedback ? (
-              <Alert
-                id="login-feedback"
-                variant={feedback.variant}
-                aria-live="assertive"
-                aria-atomic="true"
-                className={
-                  isDestructiveFeedback ? 'border-destructive/30 bg-destructive/5 text-foreground shadow-sm' : undefined
-                }
-              >
-                <AlertTitle className={isDestructiveFeedback ? 'text-foreground' : undefined}>
-                  {feedback.title}
-                </AlertTitle>
-                <AlertDescription className={isDestructiveFeedback ? 'break-words text-muted-foreground' : undefined}>
-                  {feedback.message}
-                </AlertDescription>
+              <Alert id="login-feedback" variant={feedback.variant} aria-live="assertive" aria-atomic="true">
+                <AlertTitle>{feedback.title}</AlertTitle>
+                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -479,7 +458,8 @@ export function LoginPage() {
               </Alert>
             )}
             <div className="rounded-2xl border border-dashed border-border/70 p-4 text-sm leading-6 text-muted-foreground">
-              Esta iteración ya protege la consola, conserva el destino solicitado y prepara la base para que T06 valide login, logout y navegación por E2E.
+              Tu sesión permanece protegida durante la navegación: si el destino que buscabas requería iniciar
+              sesión, volverás automáticamente a él en cuanto accedas.
             </div>
           </aside>
         </div>

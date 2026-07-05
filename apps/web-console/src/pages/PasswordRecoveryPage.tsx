@@ -130,10 +130,6 @@ export function PasswordRecoveryPage() {
           <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
             Solicita instrucciones para recuperar una cuenta de consola. Por seguridad, la respuesta no confirma si el usuario existe.
           </p>
-          <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">
-            Realm <span className="font-medium text-foreground">{consoleAuthConfig.realm}</span> · ID del cliente{' '}
-            <span className="font-medium text-foreground">{consoleAuthConfig.clientId}</span>
-          </p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
@@ -193,7 +189,7 @@ export function PasswordRecoveryPage() {
                 aria-live={feedbackLive}
               >
                 <AlertTitle>{feedback.title}</AlertTitle>
-                <AlertDescription>{feedback.message}</AlertDescription>
+                <AlertDescription className="break-words">{feedback.message}</AlertDescription>
               </Alert>
             ) : null}
 

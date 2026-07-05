@@ -25,11 +25,26 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /mantener la sesión abierta/i })).toBeInTheDocument()
-    expect(screen.getByText(/esta iteración ya protege la consola/i)).toBeInTheDocument()
+    expect(screen.getByText(/tu sesión permanece protegida durante la navegación/i)).toBeInTheDocument()
     expect(screen.queryByText(/protege el shell/i)).not.toBeInTheDocument()
     const recoveryLink = screen.getByRole('link', { name: /¿olvidaste tu contraseña\?/i })
     expect(recoveryLink).toHaveAttribute('href', '/password-recovery')
     expect(recoveryLink).not.toHaveAttribute('type')
+  })
+
+  it('[#730] no muestra artefactos internos de scaffolding (badge EP/US, Realm/Client ID, rutas /v1/, roadmap)', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage()
+    await screen.findByRole('heading', { name: /accede a in falcone console/i })
+
+    const text = document.body.textContent ?? ''
+    expect(text).not.toMatch(/EP-\d+\s*\/\s*US-UI/i)
+    expect(text).not.toMatch(/\/v1\//)
+    expect(text).not.toMatch(/llegarán en T\d/i)
+    expect(screen.queryByText(/^Realm\b/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/ID del cliente/i)).not.toBeInTheDocument()
   })
 
   it('[#726] navega desde el enlace de contraseña olvidada hasta una vista real de recuperación', async () => {
