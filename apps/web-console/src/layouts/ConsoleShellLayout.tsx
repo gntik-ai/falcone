@@ -434,7 +434,7 @@ export function ConsoleShellLayout() {
                 <Link className="block truncate text-base font-semibold tracking-tight" to="/console/overview">
                   Consola In Falcone
                 </Link>
-                <p className="truncate text-xs text-muted-foreground">Marco persistente + estado contextual · EP-14 / US-UI-02-T02</p>
+                <p className="truncate text-xs text-muted-foreground">Panel de administración multi-organización</p>
               </div>
             </div>
 
@@ -548,7 +548,7 @@ export function ConsoleShellLayout() {
         </div>
 
         <div className="border-t border-border bg-background/95 px-4 py-3 lg:hidden">
-          <p className="text-xs text-muted-foreground">La experiencia optimizada para móvil llegará en una iteración posterior. T02 prioriza el estado contextual dentro de la consola de escritorio.</p>
+          <p className="text-xs text-muted-foreground">Para aprovechar todas las funciones de administración, te recomendamos usar la consola desde una pantalla de escritorio.</p>
         </div>
       </div>
     </ConsoleContextProvider>

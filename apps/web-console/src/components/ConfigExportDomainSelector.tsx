@@ -30,12 +30,12 @@ export function ConfigExportDomainSelector({
   return (
     <div data-testid="domain-selector" className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-slate-700">Dominios a exportar</h3>
+        <h3 className="text-sm font-medium text-foreground">Dominios a exportar</h3>
         <button
           type="button"
           onClick={handleSelectAll}
           disabled={disabled}
-          className="text-xs text-blue-600 hover:text-blue-800 disabled:text-slate-400"
+          className="text-xs text-primary hover:opacity-80 disabled:text-muted-foreground"
           data-testid="select-all-btn"
         >
           Seleccionar todos los disponibles
@@ -54,18 +54,18 @@ export function ConfigExportDomainSelector({
                 checked={isChecked}
                 disabled={disabled || !isAvailable}
                 onChange={e => handleToggle(domain.domain_key, e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-input"
                 aria-label={domain.description}
                 data-testid={`domain-check-${domain.domain_key}`}
               />
               <label
                 htmlFor={`domain-${domain.domain_key}`}
-                className={`text-sm ${isAvailable ? 'text-slate-700' : 'text-slate-400'}`}
+                className={`text-sm ${isAvailable ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 {domain.description}
                 {!isAvailable && domain.reason && (
                   <span
-                    className="ml-1 text-xs text-slate-400"
+                    className="ml-1 text-xs text-muted-foreground"
                     title={domain.reason}
                     data-testid={`domain-reason-${domain.domain_key}`}
                   >

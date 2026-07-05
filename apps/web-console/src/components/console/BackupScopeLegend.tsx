@@ -1,16 +1,16 @@
 import { Badge } from '@/components/ui/badge'
 
 const STATUS_BADGES: Array<{ key: string; label: string; className: string; description: string }> = [
-  { key: 'platform-managed', label: 'Gestionado por la plataforma', className: 'bg-emerald-100 text-emerald-900', description: 'La plataforma gestiona el backup por completo' },
-  { key: 'operator-managed', label: 'Gestionado por operador', className: 'bg-amber-100 text-amber-900', description: 'El operador debe configurar el backup' },
-  { key: 'not-supported', label: 'No soportado', className: 'bg-red-100 text-red-900', description: 'El backup no está disponible para este componente en este perfil' },
-  { key: 'unknown', label: 'Desconocido', className: 'bg-slate-100 text-slate-900', description: 'No se puede determinar el estado del backup' }
+  { key: 'platform-managed', label: 'Gestionado por la plataforma', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', description: 'La plataforma gestiona el backup por completo' },
+  { key: 'operator-managed', label: 'Gestionado por operador', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300', description: 'El operador debe configurar el backup' },
+  { key: 'not-supported', label: 'No soportado', className: 'border-red-500/30 bg-red-500/10 text-red-300', description: 'El backup no está disponible para este componente en este perfil' },
+  { key: 'unknown', label: 'Desconocido', className: 'border-border bg-muted/40 text-muted-foreground', description: 'No se puede determinar el estado del backup' }
 ]
 
 const OPERATIONAL_BADGES: Array<{ key: string; label: string; className: string }> = [
-  { key: 'operational', label: 'Operativo', className: 'bg-emerald-100 text-emerald-900' },
-  { key: 'degraded', label: 'Degradado', className: 'bg-amber-100 text-amber-900' },
-  { key: 'unknown', label: 'Desconocido', className: 'bg-slate-100 text-slate-900' }
+  { key: 'operational', label: 'Operativo', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
+  { key: 'degraded', label: 'Degradado', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
+  { key: 'unknown', label: 'Desconocido', className: 'border-border bg-muted/40 text-muted-foreground' }
 ]
 
 export function BackupScopeLegend() {
@@ -39,5 +39,5 @@ export function BackupScopeLegend() {
 
 export function getCoverageBadgeClass(status: string): string {
   const badge = STATUS_BADGES.find((b) => b.key === status)
-  return badge?.className ?? 'bg-slate-100 text-slate-900'
+  return badge?.className ?? 'border-border bg-muted/40 text-muted-foreground'
 }

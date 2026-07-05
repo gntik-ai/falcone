@@ -28,11 +28,11 @@ const sourceLabels: Record<QuotaDimensionRow['source'], string> = {
 const usageStatusMeta: Record<UsageStatus, { label: string; className: string }> = {
   within_limit: {
     label: 'Dentro del límite',
-    className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
   },
   approaching_limit: {
     label: 'Cerca del límite',
-    className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    className: 'border-amber-500/40 bg-amber-500/10 text-amber-300'
   },
   at_limit: {
     label: 'En el límite',
@@ -40,7 +40,7 @@ const usageStatusMeta: Record<UsageStatus, { label: string; className: string }>
   },
   over_limit: {
     label: 'Por encima del límite',
-    className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
+    className: 'border-red-500/40 bg-red-500/10 text-red-300'
   },
   unknown: {
     label: 'Desconocido',

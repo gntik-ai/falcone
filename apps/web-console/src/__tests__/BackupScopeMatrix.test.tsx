@@ -12,28 +12,33 @@ describe('BackupScopeMatrix', () => {
     expect(screen.getAllByTestId(/^matrix-row-/)).toHaveLength(7)
   })
 
-  it('renders platform-managed entries with green badge class', () => {
+  it('renders platform-managed entries with dark-root-safe emerald badge class', () => {
     render(<BackupScopeMatrix entries={mockEntries} isLoading={false} />)
     const pgRow = screen.getByTestId('matrix-row-postgresql')
-    const badge = pgRow.querySelector('.bg-emerald-100')
+    const badge = pgRow.querySelector('.text-emerald-300')
     expect(badge).not.toBeNull()
     expect(badge?.textContent).toBe('platform-managed')
   })
 
-  it('renders not-supported entries with red badge class', () => {
+  it('renders not-supported entries with dark-root-safe red badge class', () => {
     render(<BackupScopeMatrix entries={mockEntries} isLoading={false} />)
     const apisixRow = screen.getByTestId('matrix-row-apisix_config')
-    const badge = apisixRow.querySelector('.bg-red-100')
+    const badge = apisixRow.querySelector('.text-red-300')
     expect(badge).not.toBeNull()
     expect(badge?.textContent).toBe('not-supported')
   })
 
-  it('renders operator-managed entries with amber badge class', () => {
+  it('renders operator-managed entries with dark-root-safe amber badge class', () => {
     render(<BackupScopeMatrix entries={mockEntries} isLoading={false} />)
     const kafkaRow = screen.getByTestId('matrix-row-kafka')
-    const badge = kafkaRow.querySelector('.bg-amber-100')
+    const badge = kafkaRow.querySelector('.text-amber-300')
     expect(badge).not.toBeNull()
     expect(badge?.textContent).toBe('operator-managed')
+  })
+
+  it('[#744][Scenario: Dark-theme table/panel] no coverage or operational badge uses hardcoded light-mode classes', () => {
+    render(<BackupScopeMatrix entries={mockEntries} isLoading={false} />)
+    expect(screen.getByTestId('backup-scope-matrix').innerHTML).not.toMatch(/bg-\w+-100|bg-\w+-900|bg-white|bg-slate-\d|text-slate-\d/)
   })
 
   it('renders RPO tooltip for entries with rpoRangeMinutes', () => {

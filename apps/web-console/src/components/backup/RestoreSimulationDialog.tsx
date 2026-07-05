@@ -31,12 +31,12 @@ export function RestoreSimulationDialog({
 
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold">Simulación de restore</h2>
-        <p className="mt-2 text-sm text-slate-600">
+      <div className="w-full max-w-xl rounded-lg border border-border bg-card p-6 shadow-xl">
+        <h2 className="text-lg font-semibold text-foreground">Simulación de restore</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
           Esta acción ejecuta un drill en un entorno seguro. No toca producción.
         </p>
-        <div className="mt-4 space-y-1 text-sm text-slate-700">
+        <div className="mt-4 space-y-1 text-sm text-foreground">
           <p><strong>Organización:</strong> {tenantId}</p>
           <p><strong>Componente:</strong> {componentType}</p>
           <p><strong>Instancia:</strong> {instanceId}</p>

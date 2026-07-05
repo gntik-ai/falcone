@@ -35,7 +35,7 @@ export default function BackupStatusPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Estado de Backups</h1>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Las simulaciones de restore se muestran con modo explícito y evidencia consultable.
           </p>
         </div>

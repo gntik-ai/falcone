@@ -42,12 +42,12 @@ export function TriggerBackupButton({
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h2 className="text-lg font-bold mb-2">Confirmar backup</h2>
-            <p className="text-sm text-gray-700 mb-4">
+          <div className="rounded-lg border border-border bg-card shadow-xl p-6 max-w-md w-full">
+            <h2 className="text-lg font-bold mb-2 text-foreground">Confirmar backup</h2>
+            <p className="text-sm text-muted-foreground mb-4">
               ¿Iniciar backup bajo demanda para el componente <strong>{componentType}</strong> ({instanceId}) de la organización <strong>{tenantId}</strong>?
             </p>
-            {error && <p className="text-red-600 text-sm mb-2">{error.message}</p>}
+            {error && <p className="text-destructive text-sm mb-2">{error.message}</p>}
             <div className="flex gap-2 justify-end">
               <button type="button" className="px-3 py-1.5 text-sm rounded border" onClick={() => setShowModal(false)}>
                 Cancelar

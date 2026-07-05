@@ -7,11 +7,11 @@ interface ConfigExportResultPanelProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  ok: 'bg-emerald-100 text-emerald-800',
-  empty: 'bg-slate-100 text-slate-600',
-  error: 'bg-red-100 text-red-800',
-  not_available: 'bg-slate-50 text-slate-400',
-  not_requested: 'bg-slate-50 text-slate-400',
+  ok: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  empty: 'border-border bg-muted/40 text-muted-foreground',
+  error: 'border-red-500/30 bg-red-500/10 text-red-300',
+  not_available: 'border-border bg-muted/40 text-muted-foreground',
+  not_requested: 'border-border bg-muted/40 text-muted-foreground',
 }
 
 function downloadJson(artifact: ExportArtifact) {
@@ -29,7 +29,7 @@ function downloadJson(artifact: ExportArtifact) {
 export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigExportResultPanelProps) {
   if (isLoading) {
     return (
-      <div data-testid="result-loading" className="animate-pulse p-6 text-center text-slate-500">
+      <div data-testid="result-loading" className="animate-pulse p-6 text-center text-muted-foreground">
         Exportando configuración…
       </div>
     )
@@ -37,7 +37,7 @@ export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigEx
 
   if (error) {
     return (
-      <div data-testid="result-error" className="rounded-md bg-red-50 p-4 text-red-700">
+      <div data-testid="result-error" className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-destructive">
         {error}
       </div>
     )
@@ -47,36 +47,36 @@ export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigEx
 
   return (
     <div data-testid="result-panel" className="space-y-4">
-      <div className="rounded-md border border-slate-200 p-4">
-        <h3 className="text-sm font-semibold text-slate-700 mb-2">Metadatos de exportación</h3>
+      <div className="rounded-md border border-border p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-2">Metadatos de exportación</h3>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          <dt className="text-slate-500">Organización</dt>
-          <dd>{artifact.tenant_id}</dd>
-          <dt className="text-slate-500">Formato</dt>
-          <dd>{artifact.format_version}</dd>
-          <dt className="text-slate-500">Timestamp</dt>
-          <dd>{artifact.export_timestamp}</dd>
-          <dt className="text-slate-500">Perfil</dt>
-          <dd>{artifact.deployment_profile}</dd>
-          <dt className="text-slate-500">ID de correlación</dt>
-          <dd className="font-mono text-[10px]">{artifact.correlation_id}</dd>
+          <dt className="text-muted-foreground">Organización</dt>
+          <dd className="text-foreground">{artifact.tenant_id}</dd>
+          <dt className="text-muted-foreground">Formato</dt>
+          <dd className="text-foreground">{artifact.format_version}</dd>
+          <dt className="text-muted-foreground">Timestamp</dt>
+          <dd className="text-foreground">{artifact.export_timestamp}</dd>
+          <dt className="text-muted-foreground">Perfil</dt>
+          <dd className="text-foreground">{artifact.deployment_profile}</dd>
+          <dt className="text-muted-foreground">ID de correlación</dt>
+          <dd className="font-mono text-[10px] text-foreground">{artifact.correlation_id}</dd>
         </dl>
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-slate-700">Dominios</h3>
+        <h3 className="text-sm font-semibold text-foreground">Dominios</h3>
         <ul className="space-y-1">
           {artifact.domains.map(d => (
             <li key={d.domain_key} className="flex items-center gap-2 text-sm" data-testid={`domain-result-${d.domain_key}`}>
-              <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[d.status] ?? ''}`}>
+              <span className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[d.status] ?? ''}`}>
                 {d.status}
               </span>
-              <span className="text-slate-700">{d.domain_key}</span>
+              <span className="text-foreground">{d.domain_key}</span>
               {d.items_count !== undefined && d.status === 'ok' && (
-                <span className="text-xs text-slate-400">({d.items_count} items)</span>
+                <span className="text-xs text-muted-foreground">({d.items_count} items)</span>
               )}
               {d.status === 'error' && d.error && (
-                <span className="text-xs text-red-600" data-testid={`domain-error-${d.domain_key}`}>
+                <span className="text-xs text-destructive" data-testid={`domain-error-${d.domain_key}`}>
                   — {d.error}
                 </span>
               )}
@@ -88,7 +88,7 @@ export function ConfigExportResultPanel({ artifact, isLoading, error }: ConfigEx
       <button
         type="button"
         onClick={() => downloadJson(artifact)}
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
         data-testid="download-json-btn"
       >
         Descargar JSON

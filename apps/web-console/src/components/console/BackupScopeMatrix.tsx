@@ -10,7 +10,8 @@ function formatRange(range: { min: number; max: number } | null): string {
 
 function OperationalChip({ status }: { status: string }) {
   if (status === 'unknown') return null
-  const className = status === 'operational' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
+  const className =
+    status === 'operational' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
   return <Badge className={className}>{status}</Badge>
 }
 

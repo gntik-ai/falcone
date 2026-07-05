@@ -167,7 +167,7 @@ function RunView({
           <RunStatusBadge status={detail?.status} />
           {!terminal ? (
             live.streaming ? (
-              <span className="text-xs text-emerald-700 dark:text-emerald-300" data-testid="run-streaming-indicator">
+              <span className="text-xs text-emerald-300" data-testid="run-streaming-indicator">
                 En vivo
               </span>
             ) : (

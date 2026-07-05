@@ -60,7 +60,7 @@ export function WorkspaceDocSections({ enabledServices }: Props) {
               </div>
               {activeSnippet ? (
                 <div className="space-y-2">
-                  <pre className="overflow-auto rounded bg-slate-100 p-3"><code>{activeSnippet.code}</code></pre>
+                  <pre className="overflow-auto rounded bg-muted p-3 text-foreground"><code>{activeSnippet.code}</code></pre>
                   <button
                     type="button"
                     className="rounded bg-black px-3 py-2 text-white"
@@ -72,7 +72,7 @@ export function WorkspaceDocSections({ enabledServices }: Props) {
                   >
                     {copiedId === activeSnippet.id ? 'Copiado ✓' : 'Copiar'}
                   </button>
-                  {activeSnippet.secretPlaceholderRef ? <p className="text-sm text-slate-500">{activeSnippet.secretPlaceholderRef}</p> : null}
+                  {activeSnippet.secretPlaceholderRef ? <p className="text-sm text-muted-foreground">{activeSnippet.secretPlaceholderRef}</p> : null}
                 </div>
               ) : null}
             </div>

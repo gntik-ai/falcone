@@ -27,26 +27,26 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
 
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border border-border bg-card p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">Confirmar restauración destructiva</h2>
-            <p className="text-sm text-slate-600">Se requiere confirmación reforzada antes de continuar.</p>
+            <h2 className="text-lg font-semibold text-foreground">Confirmar restauración destructiva</h2>
+            <p className="text-sm text-muted-foreground">Se requiere confirmación reforzada antes de continuar.</p>
           </div>
           <RiskLevelBadge riskLevel={precheckResponse.risk_level} />
         </div>
 
         <section className="mt-4 space-y-2">
-          <h3 className="text-sm font-semibold">Objetivo</h3>
-          <p className="text-sm text-slate-700">Organización: {precheckResponse.target.tenant_name}</p>
-          <p className="text-sm text-slate-700">Componente: {precheckResponse.target.component_type}</p>
-          <p className="text-sm text-slate-700">Instancia: {precheckResponse.target.instance_id}</p>
-          <p className="text-sm text-slate-700">Instantánea: {precheckResponse.target.snapshot_id}</p>
-          <p className="text-sm text-slate-500">Creado: {new Date(precheckResponse.target.snapshot_created_at).toLocaleString()} · {precheckResponse.target.snapshot_age_hours} horas</p>
+          <h3 className="text-sm font-semibold text-foreground">Objetivo</h3>
+          <p className="text-sm text-foreground">Organización: {precheckResponse.target.tenant_name}</p>
+          <p className="text-sm text-foreground">Componente: {precheckResponse.target.component_type}</p>
+          <p className="text-sm text-foreground">Instancia: {precheckResponse.target.instance_id}</p>
+          <p className="text-sm text-foreground">Instantánea: {precheckResponse.target.snapshot_id}</p>
+          <p className="text-sm text-muted-foreground">Creado: {new Date(precheckResponse.target.snapshot_created_at).toLocaleString()} · {precheckResponse.target.snapshot_age_hours} horas</p>
         </section>
 
         <section className="mt-4 space-y-2">
-          <h3 className="text-sm font-semibold">Prechecks</h3>
+          <h3 className="text-sm font-semibold text-foreground">Prechecks</h3>
           <PrecheckResultList prechecks={precheckResponse.prechecks} />
         </section>
 
@@ -54,7 +54,7 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
           <TenantNameInput tenantName={precheckResponse.target.tenant_name} value={tenantName} onChange={setTenantName} />
 
           {needsWarningsAck && (
-            <label className="flex items-start gap-2 text-sm text-slate-700">
+            <label className="flex items-start gap-2 text-sm text-foreground">
               <input type="checkbox" checked={acknowledgeWarnings} onChange={(e) => setAcknowledgeWarnings(e.target.checked)} />
               <span>He revisado y entiendo las advertencias mostradas</span>
             </label>

@@ -498,7 +498,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     <div className="min-w-0 flex-1 border-l border-border" data-testid="designer-yaml-pane">
       {viewMode !== 'canvas' && !yamlValidity.parseable ? (
         <p
-          className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-700 dark:text-amber-300"
+          className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-300"
           role="status"
           data-testid="designer-yaml-degraded-banner"
         >
@@ -558,11 +558,11 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
             </Badge>
           ) : null}
           {dirty ? (
-            <span data-testid="unsaved-changes-indicator" className="text-xs text-amber-700 dark:text-amber-300">
+            <span data-testid="unsaved-changes-indicator" className="text-xs text-amber-300">
               Cambios sin guardar
             </span>
           ) : savedAt ? (
-            <span data-testid="saved-indicator" className="text-xs text-emerald-700 dark:text-emerald-300">
+            <span data-testid="saved-indicator" className="text-xs text-emerald-300">
               Guardado
             </span>
           ) : null}

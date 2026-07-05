@@ -83,6 +83,27 @@ describe('ConsoleShellLayout', () => {
     expect(screen.queryByTestId('console-context-operational-alert')).not.toBeInTheDocument()
   })
 
+  it('[#744][Scenario: Tenant owner views any authenticated page] no renderiza IDs de seguimiento interno ni copy de estado de desarrollo en el chrome', async () => {
+    stubShellApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    await screen.findByRole('link', { name: /consola in falcone/i })
+
+    const shellText = document.body.textContent ?? ''
+    expect(shellText).not.toMatch(/EP-\d+/)
+    expect(shellText).not.toMatch(/US-UI/)
+    expect(shellText).not.toMatch(/iteración posterior/i)
+    expect(shellText).not.toMatch(/\bT02\b/)
+    expect(screen.getByText(/panel de administración multi-organización/i)).toBeInTheDocument()
+  })
+
   it('[#752][fn-console-context-panel][Scenario: context cards suppressed on platform-global routes] oculta el panel de contexto en una ruta global de plataforma (plans)', async () => {
     stubShellApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha')],

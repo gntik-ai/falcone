@@ -7,11 +7,11 @@ interface PreflightRiskBadgeProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
-const LEVEL_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
-  low:      { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Sin conflictos' },
-  medium:   { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Riesgo medio' },
-  high:     { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Riesgo alto' },
-  critical: { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Riesgo crítico' },
+const LEVEL_CONFIG: Record<string, { tone: string; label: string }> = {
+  low:      { tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', label: 'Sin conflictos' },
+  medium:   { tone: 'border-amber-500/30 bg-amber-500/10 text-amber-300',       label: 'Riesgo medio' },
+  high:     { tone: 'border-orange-500/30 bg-orange-500/10 text-orange-300',   label: 'Riesgo alto' },
+  critical: { tone: 'border-red-500/30 bg-red-500/10 text-red-300',            label: 'Riesgo crítico' },
 }
 
 const SIZE_CLASSES: Record<string, string> = {
@@ -26,7 +26,7 @@ export function PreflightRiskBadge({ riskLevel, size = 'md' }: PreflightRiskBadg
 
   return (
     <span
-      className={`inline-flex items-center rounded-full font-semibold ${config.bg} ${config.text} ${sizeClass}`}
+      className={`inline-flex items-center rounded-full border font-semibold ${config.tone} ${sizeClass}`}
       data-testid="risk-badge"
       data-risk-level={riskLevel}
       aria-label={`Nivel de riesgo: ${config.label}`}

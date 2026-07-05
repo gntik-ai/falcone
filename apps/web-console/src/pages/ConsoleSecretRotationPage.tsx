@@ -1,17 +1,29 @@
+// #744: converged onto the shared Card/Table/Badge/Input/Textarea/Button/Label primitives. This
+// page previously rendered three hard-coded solid-white panels (a light-mode card leaking onto the
+// dark console theme, the worst offender in the #744 verification census) and a hand-rolled
+// <table> with its own one-off header styling.
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { getConsumerStatus, initiateRotation, listRotationHistory } from '@/actions/secretRotationActions'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+
+const STATUS_TONE: Record<string, string> = {
+  confirmed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  timeout: 'border-red-500/30 bg-red-500/10 text-red-300',
+  pending: 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+}
 
 function StatusBadge({ state }: { state: string }) {
-  const tone = useMemo(() => {
-    if (state === 'confirmed') return 'bg-green-100 text-green-800'
-    if (state === 'timeout') return 'bg-red-100 text-red-800'
-    if (state === 'pending') return 'bg-yellow-100 text-yellow-800'
-    return 'bg-slate-100 text-slate-800'
-  }, [state])
+  const tone = useMemo(() => STATUS_TONE[state] ?? 'border-border bg-muted/40 text-muted-foreground', [state])
 
-  return <span className={`rounded px-2 py-1 text-xs ${tone}`}>{state}</span>
+  return <Badge className={tone}>{state}</Badge>
 }
 
 export function ConsoleSecretRotationPage() {
@@ -53,76 +65,115 @@ export function ConsoleSecretRotationPage() {
   }, [secretPath])
 
   return (
-    <section className="space-y-6 p-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Rotar secreto</h1>
-        <p className="text-sm text-slate-600">{secretPath}</p>
+    <section className="space-y-6">
+      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Rotar secreto</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{secretPath}</p>
       </header>
 
-      <div className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">Formulario de rotación</h2>
-        <div className="mt-4 grid gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Formulario de rotación</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
           <label className="grid gap-2">
-            <span>Periodo de gracia (segundos)</span>
-            <input aria-label="Selector de periodo de gracia" type="range" min={300} max={86400} value={gracePeriodSeconds} onChange={(event) => setGracePeriodSeconds(Number(event.target.value))} />
-            <input aria-label="Entrada de periodo de gracia" type="number" min={300} max={86400} value={gracePeriodSeconds} onChange={(event) => setGracePeriodSeconds(Number(event.target.value))} className="rounded border p-2" />
+            <span className="text-sm font-medium text-foreground">Periodo de gracia (segundos)</span>
+            <input
+              aria-label="Selector de periodo de gracia"
+              type="range"
+              min={300}
+              max={86400}
+              value={gracePeriodSeconds}
+              onChange={(event) => setGracePeriodSeconds(Number(event.target.value))}
+            />
+            <Input
+              aria-label="Entrada de periodo de gracia"
+              type="number"
+              min={300}
+              max={86400}
+              value={gracePeriodSeconds}
+              onChange={(event) => setGracePeriodSeconds(Number(event.target.value))}
+            />
           </label>
           <label className="grid gap-2">
-            <span>Justificación</span>
-            <textarea aria-label="Justificación" required className="rounded border p-2" value={justification} onChange={(event) => setJustification(event.target.value)} />
+            <Label htmlFor="rotation-justification">Justificación</Label>
+            <Textarea
+              id="rotation-justification"
+              aria-label="Justificación"
+              required
+              value={justification}
+              onChange={(event) => setJustification(event.target.value)}
+            />
           </label>
           <label className="grid gap-2">
-            <span>Valor nuevo</span>
-            <input aria-label="Valor nuevo" type="password" className="rounded border p-2" value={newValue} onChange={(event) => setNewValue(event.target.value)} />
+            <Label htmlFor="rotation-new-value">Valor nuevo</Label>
+            <Input
+              id="rotation-new-value"
+              aria-label="Valor nuevo"
+              type="password"
+              value={newValue}
+              onChange={(event) => setNewValue(event.target.value)}
+            />
           </label>
           <div>
-            <button className="rounded bg-blue-600 px-3 py-2 text-white" onClick={async () => {
-              await initiateRotation(secretPath, { gracePeriodSeconds, justification, newValue })
-            }}>Enviar rotación</button>
+            <Button
+              type="button"
+              onClick={async () => {
+                await initiateRotation(secretPath, { gracePeriodSeconds, justification, newValue })
+              }}
+            >
+              Enviar rotación
+            </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">Historial de rotación</h2>
-        <table className="mt-3 min-w-full text-sm">
-          <thead>
-            <tr>
-              <th className="px-2 py-1 text-left">Evento</th>
-              <th className="px-2 py-1 text-left">Actor</th>
-              <th className="px-2 py-1 text-left">Marca temporal</th>
-              <th className="px-2 py-1 text-left">Versión nueva</th>
-              <th className="px-2 py-1 text-left">Versión anterior</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((item, index) => (
-              <tr key={index} className="border-t">
-                <td className="px-2 py-1">{String(item.event_type ?? item.eventType ?? '—')}</td>
-                <td className="px-2 py-1">{String(item.actor_id ?? item.actorId ?? '—')}</td>
-                <td className="px-2 py-1">{String(item.occurred_at ?? item.occurredAt ?? '—')}</td>
-                <td className="px-2 py-1">{String(item.vault_version_new ?? item.vaultVersionNew ?? '—')}</td>
-                <td className="px-2 py-1">{String(item.vault_version_old ?? item.vaultVersionOld ?? '—')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Historial de rotación</CardTitle>
+        </CardHeader>
+        <CardContent className="mt-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Evento</TableHead>
+                <TableHead>Actor</TableHead>
+                <TableHead>Marca temporal</TableHead>
+                <TableHead>Versión nueva</TableHead>
+                <TableHead>Versión anterior</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {history.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{String(item.event_type ?? item.eventType ?? '—')}</TableCell>
+                  <TableCell>{String(item.actor_id ?? item.actorId ?? '—')}</TableCell>
+                  <TableCell>{String(item.occurred_at ?? item.occurredAt ?? '—')}</TableCell>
+                  <TableCell>{String(item.vault_version_new ?? item.vaultVersionNew ?? '—')}</TableCell>
+                  <TableCell>{String(item.vault_version_old ?? item.vaultVersionOld ?? '—')}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      <div className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">Estado de consumidores</h2>
-        <div className="mt-3 space-y-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Estado de consumidores</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
           {consumers.map((consumer) => (
-            <div key={consumer.consumer_id} className="flex items-center justify-between rounded border p-3 text-sm">
+            <div key={consumer.consumer_id} className="flex items-center justify-between rounded-2xl border border-border/70 bg-background/50 p-3 text-sm">
               <div>
-                <div className="font-medium">{consumer.consumer_id}</div>
-                <div className="text-slate-600">{consumer.reload_mechanism}</div>
+                <div className="font-medium text-foreground">{consumer.consumer_id}</div>
+                <div className="text-muted-foreground">{consumer.reload_mechanism}</div>
               </div>
               <StatusBadge state={consumer.state} />
             </div>
           ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </section>
   )
 }
