@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import type { InitiateRestoreResponse, ConfirmRestoreBody } from '@/services/backupOperationsApi'
 import { RiskLevelBadge } from './RiskLevelBadge'
 import { PrecheckResultList } from './PrecheckResultList'
 import { TenantNameInput } from './TenantNameInput'
 import { CriticalConfirmationPanel } from './CriticalConfirmationPanel'
+import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import type { ConfirmRestoreOpts } from '@/hooks/useTriggerRestore'
 
 interface RestoreConfirmationDialogProps {
@@ -24,14 +25,44 @@ export function RestoreConfirmationDialog({ precheckResponse, onConfirm, onAbort
   const needsCriticalFactor = precheckResponse.risk_level === 'critical'
   const hasSecondFactor = !needsCriticalFactor || otpCode.length === 6 || secondActorToken.trim().length > 0
   const canConfirm = !hasBlocking && tenantMatches && (!needsWarningsAck || acknowledgeWarnings) && hasSecondFactor
+  const titleId = useId()
+  const descriptionId = useId()
+  // Focus-on-open + Tab-trap + focus-return, matching the sibling DestructiveConfirmationDialog.
+  // The dialog is mounted only while active, so it is always "open" here.
+  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(true)
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      // Escape dismisses the dialog (same effect as the Cancelar button) unless a confirmation is
+      // already in flight — mirrors DestructiveConfirmationDialog's Escape semantics.
+      if (event.key === 'Escape' && !isConfirming) {
+        event.preventDefault()
+        void onAbort()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isConfirming, onAbort])
 
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border border-border bg-card p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+        onKeyDown={handleTabTrap}
+        className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border border-border bg-card p-6 shadow-xl focus:outline-none"
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Confirmar restauración destructiva</h2>
-            <p className="text-sm text-muted-foreground">Se requiere confirmación reforzada antes de continuar.</p>
+            <h2 id={titleId} className="text-lg font-semibold text-foreground">Confirmar restauración destructiva</h2>
+            <p id={descriptionId} className="text-sm text-muted-foreground">Se requiere confirmación reforzada antes de continuar.</p>
           </div>
           <RiskLevelBadge riskLevel={precheckResponse.risk_level} />
         </div>

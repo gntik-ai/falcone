@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import type { InitiateRestoreBody } from '@/services/backupOperationsApi'
+import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 
 interface RestoreSimulationDialogProps {
   tenantId: string
@@ -21,6 +22,10 @@ export function RestoreSimulationDialog({
   disabled = false,
 }: RestoreSimulationDialogProps) {
   const [submitted, setSubmitted] = useState(false)
+  const titleId = useId()
+  const descriptionId = useId()
+  // Focus-on-open + Tab-trap + focus-return, matching the sibling DestructiveConfirmationDialog.
+  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(true)
   const body = useMemo<InitiateRestoreBody>(() => ({
     tenant_id: tenantId,
     component_type: componentType,
@@ -29,11 +34,36 @@ export function RestoreSimulationDialog({
     execution_mode: 'simulation',
   }), [tenantId, componentType, instanceId, snapshotId])
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      // Escape dismisses the drill dialog (same effect as the Cancelar button) unless a launch is
+      // already in flight.
+      if (event.key === 'Escape' && !submitted && !disabled) {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [submitted, disabled, onClose])
+
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-xl rounded-lg border border-border bg-card p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-foreground">Simulación de restore</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+        onKeyDown={handleTabTrap}
+        className="w-full max-w-xl rounded-lg border border-border bg-card p-6 shadow-xl focus:outline-none"
+      >
+        <h2 id={titleId} className="text-lg font-semibold text-foreground">Simulación de restore</h2>
+        <p id={descriptionId} className="mt-2 text-sm text-muted-foreground">
           Esta acción ejecuta un drill en un entorno seguro. No toca producción.
         </p>
         <div className="mt-4 space-y-1 text-sm text-foreground">

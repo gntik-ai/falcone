@@ -136,11 +136,11 @@ export function ConsoleSecretRotationPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Evento</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Marca temporal</TableHead>
-                <TableHead>Versión nueva</TableHead>
-                <TableHead>Versión anterior</TableHead>
+                <TableHead scope="col">Evento</TableHead>
+                <TableHead scope="col">Actor</TableHead>
+                <TableHead scope="col">Marca temporal</TableHead>
+                <TableHead scope="col">Versión nueva</TableHead>
+                <TableHead scope="col">Versión anterior</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

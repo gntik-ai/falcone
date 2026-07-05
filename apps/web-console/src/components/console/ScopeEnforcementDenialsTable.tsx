@@ -46,13 +46,13 @@ export function ScopeEnforcementDenialsTable({ denials, isLoading, onLoadMore, h
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Marca temporal</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Actor</TableHead>
-            <TableHead>Recurso</TableHead>
-            <TableHead>Faltante</TableHead>
-            {isSuperadmin ? <TableHead>Organización</TableHead> : null}
-            <TableHead>IP de origen</TableHead>
+            <TableHead scope="col">Marca temporal</TableHead>
+            <TableHead scope="col">Tipo</TableHead>
+            <TableHead scope="col">Actor</TableHead>
+            <TableHead scope="col">Recurso</TableHead>
+            <TableHead scope="col">Faltante</TableHead>
+            {isSuperadmin ? <TableHead scope="col">Organización</TableHead> : null}
+            <TableHead scope="col">IP de origen</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -39,4 +39,28 @@ describe('RestoreConfirmationDialog', () => {
     fireEvent.change(screen.getByLabelText('Confirmación del nombre de la organización'), { target: { value: 'Tenant ABC' } })
     expect(button).toBeEnabled()
   })
+
+  it('[#744] exposes the dialog with an accessible name from its title (aria-labelledby)', () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    const onAbort = vi.fn().mockResolvedValue(undefined)
+    render(<RestoreConfirmationDialog precheckResponse={response} onConfirm={onConfirm} onAbort={onAbort} isConfirming={false} />)
+
+    // The dialog must carry an accessible name so a screen reader announces what it is on open.
+    expect(screen.getByRole('dialog', { name: 'Confirmar restauración destructiva' })).toBeInTheDocument()
+  })
+
+  it('[#744] Escape dismisses the dialog (delegates to onAbort) unless a confirmation is in flight', () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    const onAbort = vi.fn().mockResolvedValue(undefined)
+    const { rerender } = render(
+      <RestoreConfirmationDialog precheckResponse={response} onConfirm={onConfirm} onAbort={onAbort} isConfirming={false} />
+    )
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onAbort).toHaveBeenCalledTimes(1)
+
+    rerender(<RestoreConfirmationDialog precheckResponse={response} onConfirm={onConfirm} onAbort={onAbort} isConfirming />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onAbort).toHaveBeenCalledTimes(1)
+  })
 })

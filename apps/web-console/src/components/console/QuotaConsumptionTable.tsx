@@ -36,7 +36,11 @@ const usageStatusMeta: Record<UsageStatus, { label: string; className: string }>
   },
   at_limit: {
     label: 'En el límite',
-    className: 'border-amber-600/40 bg-amber-600/10 text-amber-800 dark:text-amber-200'
+    // #744: the console renders dark-root (no `.dark` class is ever set), so the previous
+    // `text-amber-800 dark:text-amber-200` pair rendered its dark amber-800 half unconditionally —
+    // low-contrast dark-on-dark. Pin the legible dark-root tone directly (brighter than
+    // `approaching_limit`'s amber-300 to keep the two severities distinguishable).
+    className: 'border-amber-600/40 bg-amber-600/10 text-amber-200'
   },
   over_limit: {
     label: 'Por encima del límite',
