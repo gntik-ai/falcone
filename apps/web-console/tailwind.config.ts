@@ -44,6 +44,33 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
+      },
+      // #734: the console had zero @font-face / bundled font files — body and every component
+      // fell back to Tailwind preflight's default `ui-sans-serif, system-ui, …` stack, so there
+      // was no defined brand typeface. Inter Variable is self-hosted via the
+      // `@fontsource-variable/inter` package (imported in src/main.tsx, bundled into the app —
+      // no runtime Google-Fonts/CDN fetch, so this works fully offline/air-gapped). Tailwind's
+      // preflight sets `html { font-family: theme('fontFamily.sans', …) }`, so overriding `sans`
+      // here (rather than requiring an explicit `font-sans` utility) makes every screen pick up
+      // the brand face by default; the system stack remains as the fallback if the font hasn't
+      // loaded yet or a subset glyph isn't covered.
+      fontFamily: {
+        sans: [
+          '"Inter Variable"',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif',
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+          '"Noto Color Emoji"'
+        ]
       }
     }
   },

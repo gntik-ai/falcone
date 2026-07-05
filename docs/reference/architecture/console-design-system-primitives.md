@@ -164,3 +164,91 @@ elevation against the page. Issue #744 gave `--card`/`--popover` a distinct, sli
 HSL value in both blocks, preserving `--card-foreground`'s contrast — a one-line-per-block token
 change, not a new component. `--primary`/brand/typeface/focus tokens are unaffected; those are
 issue #734's scope.
+
+## Brand tokens (issue #734)
+
+Issue #744 fixed card elevation but explicitly left `--primary`/`--destructive`/typeface/focus
+alone. Issue #734 closes that gap: the console had a brand navy (`#1B2D5B`) in
+`index.html`'s `theme-color` meta and the logo, but it never made it into a CSS token — every
+primary button rendered an unbranded pale ice-blue (`--primary: 204 94% 94%`), there was no
+`@font-face`/bundled font (body and buttons fell back to Tailwind preflight's generic
+`ui-sans-serif, system-ui, …` stack), and `--destructive` — reused as inline error TEXT color on
+dozens of screens, not just the destructive button's surface — measured ~2:1 contrast as text, a
+WCAG AA failure (needs 4.5:1). All three are now fixed at the **token** level in
+`apps/web-console/src/styles/globals.css` (both the `:root` and `.dark` blocks, kept in sync per
+the #744 idiom, since the console renders dark-root with no `.dark` class ever applied to
+`<html>`), so every screen picks up the fix automatically — no component was hand-patched with a
+literal palette class, and the `no-hardcoded-light-mode-colors.test.ts` guard's exceptions list
+stays empty.
+
+**Primary — navy-family brand blue.** The raw brand navy (`hsl(223 54% 23%)`, `#1B2D5B`) is only
+~1.5:1 against `--background` and unusable as a large button surface on this dark theme, so
+`--primary` is a lighter tint from the **same hue** (`223`, `≈220-230` is the navy family) tuned
+to clear WCAG 1.4.11 non-text contrast (`>=3:1` against `--background`) with headroom, and
+`--primary-foreground` is a near-black shade from that same hue (not raw white) so the button
+label clears WCAG 1.4.3 text contrast (`>=4.5:1`) against the now-lighter surface:
+
+```text
+--primary:            223 60% 62%   /* was 204 94% 94% (:root) / 210 40% 98% (.dark) — unbranded */
+--primary-foreground: 223 60% 8%    /* was 222.2 47.4% 11.2% */
+```
+
+Measured (real WCAG contrast math, not eyeballed — see the `hsl -> relative luminance -> contrast
+ratio` helper in `src/styles/brand-tokens.test.ts`):
+
+| Pair | Ratio | Requirement |
+| --- | --- | --- |
+| `--primary` vs `--background` | 5.60:1 | `>=3:1` (WCAG 1.4.11, non-text UI contrast) |
+| `--primary-foreground` vs `--primary` | 5.35:1 | `>=4.5:1` (WCAG 1.4.3, text contrast) |
+| `--primary` vs `--secondary` | 4.09:1 | clearly distinct from the secondary/disabled surface |
+
+**Destructive — accessible error-text contrast.** `--destructive` is now a lighter red from the
+same hue (`0`) so it is legible as inline error text, and `--destructive-foreground` is darkened
+to match so the destructive `Button` variant's label contrast is preserved:
+
+```text
+--destructive:            0 72% 62%   /* was 0 62.8% 30.6% (#7F1D1D) */
+--destructive-foreground: 0 72% 8%    /* was 210 40% 98% */
+```
+
+| Pair | Ratio | Requirement |
+| --- | --- | --- |
+| `--destructive` (as text) vs `--background` | 5.56:1 | `>=4.5:1` (WCAG AA text) |
+| `--destructive` (as text) vs the `bg-destructive/10` tint over `--background` | 5.15:1 | `>=4.5:1` |
+| `--destructive` (as text) vs the `bg-destructive/20` tint over `--background` | 4.57:1 | `>=4.5:1` |
+| `--destructive-foreground` vs `--destructive` (button label) | 5.32:1 | `>=4.5:1` (was 9.56:1 — still comfortably clears it) |
+
+**Focus ring — already accessible, left unchanged.** `--ring` (`212.7 26.8% 83.9%`) measures
+13.46:1 against `--background` and 12.01:1 against `--card` — a highly visible focus indicator
+already, well above the `>=3:1` WCAG 1.4.11 bar. No change was needed; `brand-tokens.test.ts`
+guards the ratio staying `>=3:1` so a future edit can't silently regress it.
+
+**Typeface — self-hosted Inter Variable.** The console previously shipped no `@font-face` at
+all. It now bundles the
+[`@fontsource-variable/inter`](https://www.npmjs.com/package/@fontsource-variable/inter) package
+(OFL-1.1 licensed) as a normal `apps/web-console` dependency:
+
+```ts
+// src/main.tsx — only the non-italic weight axis (100-900) is imported; the console never
+// renders italics. The font files ship inside the npm package and are bundled into the Vite
+// build output as ordinary static assets — no runtime Google-Fonts/CDN fetch, so this works
+// fully offline/air-gapped, matching the self-hosted product's deployment model.
+import '@fontsource-variable/inter/wght.css'
+```
+
+```ts
+// tailwind.config.ts — theme.extend.fontFamily.sans
+sans: ['"Inter Variable"', 'ui-sans-serif', 'system-ui', /* …Tailwind's default system stack */]
+```
+
+Tailwind's preflight sets `html { font-family: theme('fontFamily.sans', …) }`, so overriding
+`fontFamily.sans` (rather than requiring every component to opt in via a `font-sans` utility
+class) makes **every** screen pick up the brand face by default — the system stack remains as the
+fallback for the brief pre-load window or any glyph the bundled subsets don't cover.
+
+**How to use these tokens.** Nothing changes for callers: `bg-primary text-primary-foreground`
+(the `Button` `default` variant, `Badge` `default` variant, active nav/tab states) and
+`text-destructive` (inline error copy) already consume these variables via
+`hsl(var(--primary))` / `hsl(var(--destructive))` in `tailwind.config.ts` — the brand color and
+accessible contrast apply automatically everywhere those utilities are used, with no
+component-level changes required.
