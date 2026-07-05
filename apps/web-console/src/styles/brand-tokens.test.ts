@@ -140,6 +140,11 @@ describe.each(Object.entries(BLOCKS))('[#734][Scenario: brand action color on an
     expect(contrastRatioRgb(hslToRgb(destructive), tint)).toBeGreaterThanOrEqual(4.5)
   })
 
+  it('--destructive used as error TEXT clears WCAG AA (>=4.5:1) on the bg-destructive/20 tint over the page background', () => {
+    const tint = blendOver(destructive, 0.2, background)
+    expect(contrastRatioRgb(hslToRgb(destructive), tint)).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('--destructive-foreground vs --destructive clears WCAG AA (>=4.5:1) so the destructive Button label stays legible', () => {
     expect(contrastRatio(destructiveForeground, destructive)).toBeGreaterThanOrEqual(4.5)
   })
