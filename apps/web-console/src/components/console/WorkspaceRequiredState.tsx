@@ -89,7 +89,11 @@ export function WorkspaceActivationAction({
   if (workspaces.length === 0) {
     if (canCreateWorkspace) {
       return (
-        <Button asChild>
+        // Primary CTA — mirrors ConsolePageState's own action button (`w-full sm:w-auto`) so the
+        // designated first action fills the column on mobile (a comfortable tap target, matching the
+        // full-width picker) and hugs its label from `sm` up, reading identically whether it renders
+        // in the full-page empty state or the shell's workspace context card.
+        <Button asChild className="w-full sm:w-auto">
           <Link to="/console/workspaces">Crear área de trabajo</Link>
         </Button>
       )
