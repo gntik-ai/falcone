@@ -39,8 +39,8 @@ Each primitive forwards `{...props}` to the underlying element, so `id`, `value`
 `placeholder`, `htmlFor`, `type`, and ARIA attributes behave identically — only the styling
 changes. The data-plane editors and the realtime subscribe form follow this rule:
 `ConsolePostgresDataPage`, `ConsoleMongoDataPage`, `RealtimeConsole`, `EventsConsole`, and
-`FunctionsConsole` use `Input`/`Select`/`Textarea`/`Label` for their text-entry fields. As of
-#757, the row/document editors these pages render — `PostgresDataEditor` and
+`FunctionsConsole` use `Input`/`Select`/`Textarea`/`Label` for their text-entry fields. As
+of #757, the row/document editors these pages render — `PostgresDataEditor` and
 `MongoDataEditor` — also use the primitives for every field (filter column/operator/value,
 page size, edit/insert JSON textareas); they previously rendered bare, unstyled native
 controls. See `console-design-system-primitives.md` for the `Card`/`Table`/`Tabs` primitives
