@@ -265,4 +265,43 @@ describe('ConsoleMongoPage', () => {
     expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getAllByText(/<RESOURCE_HOST>/).length).toBeGreaterThan(0)
   })
+
+  // #757: converge the hand-rolled <table> markup onto the shared Table primitive so the header
+  // style matches the Postgres inventory page (same th classes, one `data-slot="table"` idiom).
+  it('renders the databases table via the shared Table primitive (#757)', async () => {
+    mockUseConsoleContext.mockReturnValue(buildContext({ activeTenantId: 'tenant-a' }))
+    mockRequestConsoleSessionJson.mockResolvedValueOnce({
+      items: [{ databaseName: 'catalog', stats: { dataSize: 2048, storageSize: 4096, collections: 4, indexes: 7 } }]
+    })
+
+    const { container } = render(<ConsoleMongoPage />)
+    await screen.findByText('catalog')
+
+    expect(container.querySelector('[data-slot="table"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-slot="table-header"]')).toBeInTheDocument()
+  })
+
+  // Round-3 review fix (#757): the breadcrumb entries were bare <button>s bypassing the shared
+  // Button primitive. Pin that they render via Button (role stays "button" — no accessible-name
+  // or behavior regression) and that clicking still resets the drill-down state.
+  it('renders the breadcrumb entries via the shared Button primitive and preserves their click behavior (#757 round 3)', async () => {
+    mockUseConsoleContext.mockReturnValue(buildContext({ activeTenantId: 'tenant-a', activeWorkspaceId: 'ws-1' }))
+    mockRequestConsoleSessionJson
+      .mockResolvedValueOnce({ items: [{ databaseName: 'catalog' }] })
+      .mockResolvedValueOnce({ items: [{ collectionName: 'orders' }] })
+      .mockResolvedValueOnce({ items: [] })
+
+    render(<ConsoleMongoPage />)
+    await clickDatabase('catalog')
+    await screen.findByText('orders')
+
+    const databasesCrumb = screen.getByRole('button', { name: 'Bases de datos' })
+    expect(databasesCrumb.className).toMatch(/focus-visible:ring-offset-background/)
+    const databaseCrumb = screen.getByRole('button', { name: 'catalog' })
+    expect(databaseCrumb.className).toMatch(/focus-visible:ring-offset-background/)
+
+    fireEvent.click(databasesCrumb)
+    expect(screen.queryByText('orders')).not.toBeInTheDocument()
+    expect(await screen.findAllByText('catalog')).not.toHaveLength(0)
+  })
 })

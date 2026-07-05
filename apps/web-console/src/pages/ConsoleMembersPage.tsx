@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
 import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
@@ -385,51 +389,47 @@ function CreateUserPanel({
         </div>
       ) : null}
       <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={submit}>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Usuario</span>
-          <input
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="members-create-username">Usuario</Label>
+          <Input
+            id="members-create-username"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             placeholder="jdoe"
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             required
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Email</span>
-          <input
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="members-create-email">Email</Label>
+          <Input
+            id="members-create-email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="jdoe@example.com"
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Contraseña</span>
-          <input
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="members-create-password">Contraseña</Label>
+          <Input
+            id="members-create-password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             required
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Rol inicial</span>
-          <select
-            value={role}
-            onChange={(event) => setRole(event.target.value)}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="members-create-role">Rol inicial</Label>
+          <Select id="members-create-role" value={role} onChange={(event) => setRole(event.target.value)}>
             {assignableRoles.length === 0 ? <option value="tenant_developer">Desarrollador de organización</option> : null}
             {assignableRoles.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
         <div className="sm:col-span-2">
           <Button type="submit" disabled={busy || !username.trim() || !password.trim()}>
             {busy ? 'Creando…' : 'Crear usuario'}
@@ -483,96 +483,88 @@ function ConsoleSectionError({
 
 function UsersTable({ users }: { users: IamUser[] }) {
   return (
-    <div className="mt-4 overflow-x-auto">
-      <table className="min-w-full divide-y divide-border text-left text-sm">
-        <caption className="sr-only">Listado de usuarios IAM del realm activo</caption>
-        <thead>
-          <tr className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            <th scope="col" className="px-3 py-3 font-medium">Usuario</th>
-            <th scope="col" className="px-3 py-3 font-medium">Email</th>
-            <th scope="col" className="px-3 py-3 font-medium">Estado</th>
-            <th scope="col" className="px-3 py-3 font-medium">Ciclo de vida</th>
-            <th scope="col" className="px-3 py-3 font-medium">Roles</th>
-            <th scope="col" className="px-3 py-3 font-medium">Acciones requeridas</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/80">
-          {users.map((user) => (
-            <tr key={user.userId}>
-              <td className="px-3 py-4">
-                <div className="font-medium text-foreground">{user.username}</div>
-              </td>
-              <td className="px-3 py-4 text-muted-foreground">{user.email ?? 'No disponible'}</td>
-              <td className="px-3 py-4">
-                <Badge variant={user.enabled ? 'secondary' : 'outline'}>{user.enabled ? 'Activo' : 'Desactivado'}</Badge>
-              </td>
-              <td className="px-3 py-4 text-muted-foreground">{formatConsoleEnumLabel(user.state ?? null)}</td>
-              <td className="px-3 py-4">
-                {user.realmRoles && user.realmRoles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {user.realmRoles.map((role) => (
-                      <Badge key={role} variant="outline">{role}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Sin roles</span>
-                )}
-              </td>
-              <td className="px-3 py-4">
-                {user.requiredActions && user.requiredActions.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {user.requiredActions.map((action) => (
-                      <Badge key={action} variant="outline">{action}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Sin pendientes</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table containerClassName="mt-4" aria-label="Listado de usuarios IAM del realm activo">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Usuario</TableHead>
+          <TableHead>Email</TableHead>
+          <TableHead>Estado</TableHead>
+          <TableHead>Ciclo de vida</TableHead>
+          <TableHead>Roles</TableHead>
+          <TableHead>Acciones requeridas</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {users.map((user) => (
+          <TableRow key={user.userId}>
+            <TableCell className="font-medium text-foreground">{user.username}</TableCell>
+            <TableCell className="text-muted-foreground">{user.email ?? 'No disponible'}</TableCell>
+            <TableCell>
+              <Badge variant={user.enabled ? 'secondary' : 'outline'}>{user.enabled ? 'Activo' : 'Desactivado'}</Badge>
+            </TableCell>
+            <TableCell className="text-muted-foreground">{formatConsoleEnumLabel(user.state ?? null)}</TableCell>
+            <TableCell>
+              {user.realmRoles && user.realmRoles.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {user.realmRoles.map((role) => (
+                    <Badge key={role} variant="outline">{role}</Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">Sin roles</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {user.requiredActions && user.requiredActions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {user.requiredActions.map((action) => (
+                    <Badge key={action} variant="outline">{action}</Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">Sin pendientes</span>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }
 
 function RolesTable({ roles }: { roles: IamRole[] }) {
   return (
-    <div className="mt-4 overflow-x-auto">
-      <table className="min-w-full divide-y divide-border text-left text-sm">
-        <caption className="sr-only">Listado de roles IAM del realm activo</caption>
-        <thead>
-          <tr className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            <th scope="col" className="px-3 py-3 font-medium">Rol</th>
-            <th scope="col" className="px-3 py-3 font-medium">Descripción</th>
-            <th scope="col" className="px-3 py-3 font-medium">Tipo</th>
-            <th scope="col" className="px-3 py-3 font-medium">Roles compuestos</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/80">
-          {roles.map((role) => (
-            <tr key={role.roleName}>
-              <td className="px-3 py-4 font-medium text-foreground">{role.roleName}</td>
-              <td className="px-3 py-4 text-muted-foreground">{role.description?.trim() || 'Sin descripción'}</td>
-              <td className="px-3 py-4">
-                <Badge variant={role.composite ? 'secondary' : 'outline'}>{role.composite ? 'Compuesto' : 'Simple'}</Badge>
-              </td>
-              <td className="px-3 py-4">
-                {role.composite && role.compositeRoles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {role.compositeRoles.map((compositeRole) => (
-                      <Badge key={compositeRole} variant="outline">{compositeRole}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Sin roles hijo</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table containerClassName="mt-4" aria-label="Listado de roles IAM del realm activo">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Rol</TableHead>
+          <TableHead>Descripción</TableHead>
+          <TableHead>Tipo</TableHead>
+          <TableHead>Roles compuestos</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {roles.map((role) => (
+          <TableRow key={role.roleName}>
+            <TableCell className="font-medium text-foreground">{role.roleName}</TableCell>
+            <TableCell className="text-muted-foreground">{role.description?.trim() || 'Sin descripción'}</TableCell>
+            <TableCell>
+              <Badge variant={role.composite ? 'secondary' : 'outline'}>{role.composite ? 'Compuesto' : 'Simple'}</Badge>
+            </TableCell>
+            <TableCell>
+              {role.composite && role.compositeRoles.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {role.compositeRoles.map((compositeRole) => (
+                    <Badge key={compositeRole} variant="outline">{compositeRole}</Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">Sin roles hijo</span>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }

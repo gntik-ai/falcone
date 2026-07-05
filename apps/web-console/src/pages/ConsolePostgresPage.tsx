@@ -4,6 +4,7 @@ import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
 import { ProvisionDatabaseWizard } from '@/components/console/wizards/ProvisionDatabaseWizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
@@ -269,13 +270,13 @@ function formatLabel(value?: string | null): string {
 function getRiskTone(value?: string | null): string {
   switch (value) {
     case 'critical':
-      return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
+      return 'border-red-500/40 bg-red-500/10 text-red-300'
     case 'high':
-      return 'border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300'
+      return 'border-orange-500/40 bg-orange-500/10 text-orange-300'
     case 'medium':
-      return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
+      return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-300'
     case 'low':
-      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
     default:
       return 'border-border bg-muted text-foreground'
   }
@@ -867,23 +868,41 @@ export function ConsolePostgresPage() {
           </div>
 
           <nav aria-label="Navegación PostgreSQL" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <button type="button" className="rounded-md px-2 py-1 hover:bg-muted" onClick={() => setSelectedDatabase(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto rounded-md px-2 py-1 font-normal hover:bg-muted"
+              onClick={() => setSelectedDatabase(null)}
+            >
               Bases de datos
-            </button>
+            </Button>
             {selectedDatabase ? (
               <>
                 <span aria-hidden="true">›</span>
-                <button type="button" className="rounded-md px-2 py-1 hover:bg-muted" onClick={() => setSelectedSchema(null)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto rounded-md px-2 py-1 font-normal hover:bg-muted"
+                  onClick={() => setSelectedSchema(null)}
+                >
                   {selectedDatabase}
-                </button>
+                </Button>
               </>
             ) : null}
             {selectedSchema ? (
               <>
                 <span aria-hidden="true">›</span>
-                <button type="button" className="rounded-md px-2 py-1 hover:bg-muted" onClick={() => setSelectedTable(null)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto rounded-md px-2 py-1 font-normal hover:bg-muted"
+                  onClick={() => setSelectedTable(null)}
+                >
                   {selectedSchema}
-                </button>
+                </Button>
               </>
             ) : null}
             {selectedTable ? (
@@ -924,34 +943,32 @@ export function ConsolePostgresPage() {
             <ConsoleSectionEmpty message="No hay bases de datos disponibles para esta organización." />
           ) : null}
           {!databases.loading && !databases.error && databases.data.length > 0 ? (
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
-              <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de bases de datos PostgreSQL">
-                <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3">Base de datos</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Propietario</th>
-                    <th className="px-4 py-3">Ubicación</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-background/40">
-                  {databases.data.map((database) => (
-                    <tr
-                      key={database.databaseName}
-                      className={`cursor-pointer transition-colors ${isActiveRow(selectedDatabase === database.databaseName)}`}
-                      onClick={() => setSelectedDatabase(database.databaseName)}
-                    >
-                      <td className="px-4 py-3 font-medium text-foreground">{database.databaseName}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">{formatLabel(database.state)}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{database.ownerRoleName}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatLabel(database.placementMode)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table containerClassName="mt-4" aria-label="Listado de bases de datos PostgreSQL">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Base de datos</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Propietario</TableHead>
+                  <TableHead>Ubicación</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {databases.data.map((database) => (
+                  <TableRow
+                    key={database.databaseName}
+                    className={`cursor-pointer ${isActiveRow(selectedDatabase === database.databaseName)}`}
+                    onClick={() => setSelectedDatabase(database.databaseName)}
+                  >
+                    <TableCell className="font-medium text-foreground">{database.databaseName}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{formatLabel(database.state)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{database.ownerRoleName}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatLabel(database.placementMode)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : null}
         </section>
       ) : null}
@@ -988,38 +1005,36 @@ export function ConsolePostgresPage() {
             <ConsoleSectionEmpty message="No hay esquemas visibles para el área de trabajo activa en esta base de datos." />
           ) : null}
           {activeWorkspaceId && !schemas.loading && !schemas.error && schemas.data.length > 0 ? (
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
-              <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de esquemas PostgreSQL del área de trabajo activa">
-                <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3">Esquema</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Propietario</th>
-                    <th className="px-4 py-3">Conteos</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-background/40">
-                  {schemas.data.map((schema) => (
-                    <tr
-                      key={schema.schemaName}
-                      className={`cursor-pointer transition-colors ${isActiveRow(selectedSchema === schema.schemaName)}`}
-                      onClick={() => setSelectedSchema(schema.schemaName)}
-                    >
-                      <td className="px-4 py-3 font-medium text-foreground">{schema.schemaName}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">{formatLabel(schema.state)}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{schema.ownerRoleName}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {schema.objectCounts
-                          ? `${schema.objectCounts.tables} tablas · ${schema.objectCounts.views} vistas · ${schema.objectCounts.materializedViews} materializadas · ${schema.objectCounts.indexes} índices`
-                          : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table containerClassName="mt-4" aria-label="Listado de esquemas PostgreSQL del área de trabajo activa">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Esquema</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Propietario</TableHead>
+                  <TableHead>Conteos</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {schemas.data.map((schema) => (
+                  <TableRow
+                    key={schema.schemaName}
+                    className={`cursor-pointer ${isActiveRow(selectedSchema === schema.schemaName)}`}
+                    onClick={() => setSelectedSchema(schema.schemaName)}
+                  >
+                    <TableCell className="font-medium text-foreground">{schema.schemaName}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{formatLabel(schema.state)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{schema.ownerRoleName}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {schema.objectCounts
+                        ? `${schema.objectCounts.tables} tablas · ${schema.objectCounts.views} vistas · ${schema.objectCounts.materializedViews} materializadas · ${schema.objectCounts.indexes} índices`
+                        : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : null}
         </section>
         </>
@@ -1064,32 +1079,30 @@ export function ConsolePostgresPage() {
                 ) : null}
                 {!tables.loading && !tables.error && tables.data.length === 0 ? <ConsoleSectionEmpty message="Este esquema no tiene tablas definidas." /> : null}
                 {!tables.loading && !tables.error && tables.data.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border">
-                    <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de tablas PostgreSQL del esquema seleccionado">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Tabla</th>
-                          <th className="px-4 py-3">Estado</th>
-                          <th className="px-4 py-3">Columnas</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-background/40">
-                        {tables.data.map((table) => (
-                          <tr
-                            key={table.tableName}
-                            className={`cursor-pointer transition-colors ${isActiveRow(selectedTable === table.tableName)}`}
-                            onClick={() => setSelectedTable(table.tableName)}
-                          >
-                            <td className="px-4 py-3 font-medium text-foreground">{table.tableName}</td>
-                            <td className="px-4 py-3">
-                              <Badge variant="outline">{formatLabel(table.state)}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">{table.columnCount}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table aria-label="Listado de tablas PostgreSQL del esquema seleccionado">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tabla</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Columnas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tables.data.map((table) => (
+                        <TableRow
+                          key={table.tableName}
+                          className={`cursor-pointer ${isActiveRow(selectedTable === table.tableName)}`}
+                          onClick={() => setSelectedTable(table.tableName)}
+                        >
+                          <TableCell className="font-medium text-foreground">{table.tableName}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{formatLabel(table.state)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{table.columnCount}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : null}
               </div>
             ) : null}
@@ -1110,38 +1123,36 @@ export function ConsolePostgresPage() {
                 ) : null}
                 {!views.loading && !views.error && views.data.length === 0 ? <ConsoleSectionEmpty message="Este esquema no tiene vistas definidas." /> : null}
                 {!views.loading && !views.error && views.data.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border">
-                    <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de vistas PostgreSQL del esquema seleccionado">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Vista</th>
-                          <th className="px-4 py-3">Estado</th>
-                          <th className="px-4 py-3">Columnas</th>
-                          <th className="px-4 py-3">Barrera de seguridad</th>
-                          <th className="px-4 py-3 text-right">Vista previa</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-background/40">
-                        {views.data.map((view) => (
-                          <tr key={view.viewName} className="transition-colors hover:bg-muted/60">
-                            <td className="px-4 py-3 font-medium text-foreground">{view.viewName}</td>
-                            <td className="px-4 py-3">
-                              <Badge variant="outline">{formatLabel(view.state)}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">{view.columns?.join(', ') || '—'}</td>
-                            <td className="px-4 py-3 text-muted-foreground">
-                              <Badge variant="secondary">{view.securityBarrier ? 'Sí' : 'No'}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('view', view.viewName)}>
-                                Vista previa DDL
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table aria-label="Listado de vistas PostgreSQL del esquema seleccionado">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Vista</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Columnas</TableHead>
+                        <TableHead>Barrera de seguridad</TableHead>
+                        <TableHead className="text-right">Vista previa</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {views.data.map((view) => (
+                        <TableRow key={view.viewName} className="hover:bg-muted/60">
+                          <TableCell className="font-medium text-foreground">{view.viewName}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{formatLabel(view.state)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{view.columns?.join(', ') || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <Badge variant="secondary">{view.securityBarrier ? 'Sí' : 'No'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('view', view.viewName)}>
+                              Vista previa DDL
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : null}
               </div>
             ) : null}
@@ -1164,40 +1175,38 @@ export function ConsolePostgresPage() {
                   />
                 ) : null}
                 {!matViews.loading && !matViews.error && matViews.data.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border">
-                    <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de vistas materializadas PostgreSQL del esquema seleccionado">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Vista materializada</th>
-                          <th className="px-4 py-3">Estado</th>
-                          <th className="px-4 py-3">Con datos</th>
-                          <th className="px-4 py-3">Política de refresh</th>
-                          <th className="px-4 py-3">Integridad</th>
-                          <th className="px-4 py-3 text-right">Vista previa</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-background/40">
-                        {matViews.data.map((view) => (
-                          <tr key={view.viewName} className="transition-colors hover:bg-muted/60">
-                            <td className="px-4 py-3 font-medium text-foreground">{view.viewName}</td>
-                            <td className="px-4 py-3">
-                              <Badge variant="outline">{formatLabel(view.state)}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">
-                              <Badge variant="secondary">{view.withData ? 'Sí' : 'No'}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">{view.refreshPolicy || '—'}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{view.integrityProfile?.populationState || '—'}</td>
-                            <td className="px-4 py-3 text-right">
-                              <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('matview', view.viewName)}>
-                                Vista previa DDL
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table aria-label="Listado de vistas materializadas PostgreSQL del esquema seleccionado">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Vista materializada</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Con datos</TableHead>
+                        <TableHead>Política de refresh</TableHead>
+                        <TableHead>Integridad</TableHead>
+                        <TableHead className="text-right">Vista previa</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matViews.data.map((view) => (
+                        <TableRow key={view.viewName} className="hover:bg-muted/60">
+                          <TableCell className="font-medium text-foreground">{view.viewName}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{formatLabel(view.state)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <Badge variant="secondary">{view.withData ? 'Sí' : 'No'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{view.refreshPolicy || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{view.integrityProfile?.populationState || '—'}</TableCell>
+                          <TableCell className="text-right">
+                            <Button type="button" variant="outline" size="sm" onClick={() => void openDdlPreview('matview', view.viewName)}>
+                              Vista previa DDL
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : null}
               </div>
             ) : null}
@@ -1252,32 +1261,30 @@ export function ConsolePostgresPage() {
                   <ConsoleSectionEmpty message="Esta tabla no tiene columnas definidas." />
                 ) : null}
                 {!columns.loading && !columns.error && columns.data.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border">
-                    <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de columnas de la tabla seleccionada">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Columna</th>
-                          <th className="px-4 py-3">Tipo</th>
-                          <th className="px-4 py-3">Nullable</th>
-                          <th className="px-4 py-3">Default</th>
-                          <th className="px-4 py-3">Posición</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-background/40">
-                        {columns.data.map((column) => (
-                          <tr key={column.columnName}>
-                            <td className="px-4 py-3 font-medium text-foreground">{column.columnName}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{column.dataType?.typeName || 'desconocido'}</td>
-                            <td className="px-4 py-3">
-                              <Badge variant="secondary">{column.nullable ? 'NULL' : 'NOT NULL'}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">{column.defaultExpression || '—'}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{column.ordinalPosition ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table aria-label="Listado de columnas de la tabla seleccionada">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Columna</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Nullable</TableHead>
+                        <TableHead>Default</TableHead>
+                        <TableHead>Posición</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {columns.data.map((column) => (
+                        <TableRow key={column.columnName}>
+                          <TableCell className="font-medium text-foreground">{column.columnName}</TableCell>
+                          <TableCell className="text-muted-foreground">{column.dataType?.typeName || 'desconocido'}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{column.nullable ? 'NULL' : 'NOT NULL'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{column.defaultExpression || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{column.ordinalPosition ?? '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : null}
               </div>
             ) : null}
@@ -1300,34 +1307,32 @@ export function ConsolePostgresPage() {
                   <ConsoleSectionEmpty message="Esta tabla no tiene índices definidos." />
                 ) : null}
                 {!indexes.loading && !indexes.error && indexes.data.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border">
-                    <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de índices de la tabla seleccionada">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Índice</th>
-                          <th className="px-4 py-3">Método</th>
-                          <th className="px-4 py-3">Unicidad</th>
-                          <th className="px-4 py-3">Keys</th>
-                          <th className="px-4 py-3">Include</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-background/40">
-                        {indexes.data.map((index) => (
-                          <tr key={index.indexName}>
-                            <td className="px-4 py-3 font-medium text-foreground">{index.indexName}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{index.indexMethod}</td>
-                            <td className="px-4 py-3">
-                              <Badge variant="secondary">{index.unique ? 'Único' : '—'}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">
-                              {index.keys?.map((key) => key.columnName || key.expression || '—').join(', ') || '—'}
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">{index.includeColumns?.join(', ') || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table aria-label="Listado de índices de la tabla seleccionada">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Índice</TableHead>
+                        <TableHead>Método</TableHead>
+                        <TableHead>Unicidad</TableHead>
+                        <TableHead>Keys</TableHead>
+                        <TableHead>Include</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {indexes.data.map((index) => (
+                        <TableRow key={index.indexName}>
+                          <TableCell className="font-medium text-foreground">{index.indexName}</TableCell>
+                          <TableCell className="text-muted-foreground">{index.indexMethod}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{index.unique ? 'Único' : '—'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {index.keys?.map((key) => key.columnName || key.expression || '—').join(', ') || '—'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{index.includeColumns?.join(', ') || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : null}
               </div>
             ) : null}
@@ -1354,30 +1359,28 @@ export function ConsolePostgresPage() {
                   />
                 ) : null}
                 {!policies.loading && !policies.error && policies.data.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border">
-                    <table className="min-w-full divide-y divide-border text-sm" aria-label="Listado de políticas de la tabla seleccionada">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Policy</th>
-                          <th className="px-4 py-3">Modo</th>
-                          <th className="px-4 py-3">Command</th>
-                          <th className="px-4 py-3">Roles</th>
-                          <th className="px-4 py-3">Using</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-background/40">
-                        {policies.data.map((policy) => (
-                          <tr key={policy.policyName}>
-                            <td className="px-4 py-3 font-medium text-foreground">{policy.policyName}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{formatLabel(policy.policyMode)}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{policy.appliesTo?.command?.toUpperCase() || '—'}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{policy.appliesTo?.roles?.join(', ') || '(todos los roles)'}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{truncateText(policy.usingExpression)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table aria-label="Listado de políticas de la tabla seleccionada">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Policy</TableHead>
+                        <TableHead>Modo</TableHead>
+                        <TableHead>Command</TableHead>
+                        <TableHead>Roles</TableHead>
+                        <TableHead>Using</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {policies.data.map((policy) => (
+                        <TableRow key={policy.policyName}>
+                          <TableCell className="font-medium text-foreground">{policy.policyName}</TableCell>
+                          <TableCell className="text-muted-foreground">{formatLabel(policy.policyMode)}</TableCell>
+                          <TableCell className="text-muted-foreground">{policy.appliesTo?.command?.toUpperCase() || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{policy.appliesTo?.roles?.join(', ') || '(todos los roles)'}</TableCell>
+                          <TableCell className="text-muted-foreground">{truncateText(policy.usingExpression)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : null}
               </div>
             ) : null}
@@ -1559,7 +1562,7 @@ function ConsoleSectionError({
   onRetry: () => void
 }) {
   return (
-    <div role="alert" className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
+    <div role="alert" className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
       <p>{message}</p>
       <div className="mt-3">
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>

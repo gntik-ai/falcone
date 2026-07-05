@@ -141,3 +141,46 @@ describe('MongoDataEditor — richer UX', () => {
     expect(await screen.findByText(/"body":"as-anon"/)).toBeInTheDocument()
   })
 })
+
+// #757: the editor must render every control via the shared design-system primitives
+// (Button/Input/Select/Textarea) — no native/unstyled <button>/<input>/<select>/<textarea>.
+describe('MongoDataEditor — design system (#757)', () => {
+  it('renders every button and field via the shared design-system primitives', async () => {
+    mocked.issueApiKey.mockResolvedValue({ id: 'k1', key: 'flc_anon_secret', prefix: 'flc_anon_s', keyType: 'anon', scopes: [] })
+    mocked.previewDocumentsWithApiKey.mockResolvedValue({ items: [{ _id: 'p1', body: 'as-anon' }] })
+    const { container } = renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir clave anónima' }))
+    await screen.findByText('flc_anon_secret')
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar vista previa de solo lectura' }))
+    await screen.findByText(/"body":"as-anon"/)
+
+    const buttons = container.querySelectorAll('button')
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of Array.from(buttons)) {
+      expect(button.className).toMatch(/focus-visible:ring-offset-background/)
+    }
+
+    const fields = container.querySelectorAll('input, select, textarea')
+    expect(fields.length).toBeGreaterThan(0)
+    for (const field of Array.from(fields)) {
+      expect(field.className).toMatch(/rounded-xl border border-input/)
+    }
+  })
+
+  it('authors the insert-success status for the dark root (text-emerald-300, not the light-mode -700 pair)', async () => {
+    // The console never mounts `.dark` — dark IS the `:root` — so a `text-emerald-700 dark:text-emerald-300`
+    // pair renders its light-mode `-700` tone (~3.5:1 on the dark background, below WCAG AA 4.5:1). The
+    // status tone must be authored directly for the dark root.
+    mocked.insertDocument.mockResolvedValue({ item: {} })
+    renderEditor()
+    await screen.findByText(/"body":"hello"/)
+    fireEvent.change(screen.getByLabelText('Documento nuevo (JSON)'), { target: { value: '{"body":"new"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Insertar' }))
+    const status = await screen.findByText('Documento insertado')
+    expect(status.className).toMatch(/text-emerald-300/)
+    expect(status.className).not.toMatch(/text-emerald-700/)
+    expect(status.className).not.toMatch(/dark:/)
+  })
+})
