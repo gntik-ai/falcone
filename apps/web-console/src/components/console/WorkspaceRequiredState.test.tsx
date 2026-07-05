@@ -120,6 +120,10 @@ describe('WorkspaceRequiredState', () => {
     renderState()
 
     const picker = screen.getByRole('combobox', { name: /seleccionar área de trabajo/i })
+    // #742 a11y (WCAG 2.5.3 Label in Name): the picker's accessible name equals its VISIBLE label,
+    // so it can't regress to an aria-label that diverges from what sighted users read.
+    expect(picker).toHaveAccessibleName('Seleccionar área de trabajo')
+    expect(screen.getByText('Seleccionar área de trabajo')).toBeInTheDocument()
     await user.selectOptions(picker, 'wrk_2')
 
     expect(mockSelectWorkspace).toHaveBeenCalledWith('wrk_2')

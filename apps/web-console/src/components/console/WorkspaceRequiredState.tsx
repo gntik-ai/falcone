@@ -4,6 +4,7 @@
 // for a signed-in user with no active workspace. This component is the ONE place that turns that
 // static message into a real first action, reusing the console-context workspaces list +
 // `selectWorkspace` setter (the same mechanism the header's context switcher already uses).
+import { useId } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
@@ -81,6 +82,10 @@ export function WorkspaceActivationAction({
   canCreateWorkspace: boolean
   onSelectWorkspace: (workspaceId: string | null) => void
 }) {
+  // Programmatic label association for the picker (mirrors ConsolePageState's useId convention).
+  // Hooks run before the zero-workspace early return so the rule-of-hooks order stays stable.
+  const selectId = useId()
+
   if (workspaces.length === 0) {
     if (canCreateWorkspace) {
       return (
@@ -103,10 +108,16 @@ export function WorkspaceActivationAction({
   }
 
   return (
-    <label className="flex w-full max-w-sm flex-col gap-1.5 text-sm">
-      <span className="font-medium text-foreground">Activar área de trabajo</span>
+    // Explicit label/control association via htmlFor+id: the visible label IS the accessible name
+    // (WCAG 2.5.3 Label in Name), so voice-control and screen-reader users get the same "Seleccionar
+    // área de trabajo" as sighted users — and it matches the header context switcher's label instead
+    // of drifting to a second name for the same "activate a workspace" action. No aria-label override.
+    <div className="flex w-full max-w-sm flex-col gap-1.5 text-sm">
+      <label htmlFor={selectId} className="font-medium text-foreground">
+        Seleccionar área de trabajo
+      </label>
       <Select
-        aria-label="Seleccionar área de trabajo"
+        id={selectId}
         defaultValue=""
         onChange={(event) => {
           if (event.target.value) {
@@ -123,6 +134,6 @@ export function WorkspaceActivationAction({
           </option>
         ))}
       </Select>
-    </label>
+    </div>
   )
 }
