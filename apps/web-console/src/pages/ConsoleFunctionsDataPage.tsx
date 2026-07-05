@@ -3,6 +3,7 @@
 import { Link } from 'react-router-dom'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { FunctionsConsole } from '@/components/console/FunctionsConsole'
 import { Badge } from '@/components/ui/badge'
 import { useConsoleContext } from '@/lib/console-context'
@@ -21,13 +22,7 @@ export function ConsoleFunctionsDataPage() {
   }
 
   if (!activeWorkspaceId) {
-    return (
-      <ConsolePageState
-        kind="blocked"
-        title="Funciones bloqueadas"
-        description="Selecciona un área de trabajo para usar funciones."
-      />
-    )
+    return <WorkspaceRequiredState description="Selecciona un área de trabajo para usar funciones." />
   }
 
   return (

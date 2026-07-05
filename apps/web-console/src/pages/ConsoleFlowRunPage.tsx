@@ -13,6 +13,7 @@ import { RunCanvas } from '@/components/flows/RunCanvas'
 import { RunActionToolbar, type WaitingApprovalNode } from '@/components/flows/RunActionToolbar'
 import { RunNodeDetailPanel } from '@/components/flows/RunNodeDetailPanel'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { RunStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { Input } from '@/components/ui/input'
 import { useConsoleContext } from '@/lib/console-context'
@@ -262,13 +263,7 @@ export function ConsoleFlowRunPage() {
   if (!activeWorkspaceId) {
     return (
       <section className="p-6">
-        <ConsolePageState
-          kind="blocked"
-          title="Ejecución bloqueada"
-          description="Selecciona un área de trabajo para abrir la vista de ejecución."
-          actionLabel="Gestionar áreas de trabajo"
-          onAction={() => navigate('/console/workspaces')}
-        />
+        <WorkspaceRequiredState title="Ejecución bloqueada" description="Selecciona un área de trabajo para abrir la vista de ejecución." />
       </section>
     )
   }

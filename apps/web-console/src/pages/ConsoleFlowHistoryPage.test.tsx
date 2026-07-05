@@ -146,3 +146,26 @@ describe('ConsoleFlowHistoryPage filters', () => {
     )
   })
 })
+
+// #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static blocked state
+// whose only action navigated away.
+describe('ConsoleFlowHistoryPage — no active workspace', () => {
+  it('[#742] shows the shared WorkspaceRequiredState instead of listing executions', () => {
+    mockListExecutions.mockReset()
+    mockUseConsoleContext.mockReturnValue({
+      activeWorkspaceId: null,
+      activeTenantId: 'ten1',
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
+
+    renderPage()
+
+    expect(mockListExecutions).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Historial bloqueado' })).toBeInTheDocument()
+    expect(screen.getByText(/selecciona un área de trabajo para ver el historial de ejecuciones/i)).toBeInTheDocument()
+  })
+})

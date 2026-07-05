@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -898,11 +899,7 @@ export function ConsoleFunctionsPage() {
     )
   }
   if (!activeWorkspaceId) {
-    return (
-      <Alert variant="destructive">
-        Selecciona un área de trabajo para ver las funciones.
-      </Alert>
-    )
+    return <WorkspaceRequiredState description="Selecciona un área de trabajo para ver las funciones." />
   }
 
   return (

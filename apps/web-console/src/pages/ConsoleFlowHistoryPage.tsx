@@ -10,6 +10,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { RunStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -342,13 +343,7 @@ export function ConsoleFlowHistoryPage() {
   if (!activeWorkspaceId) {
     return (
       <section className="p-6">
-        <ConsolePageState
-          kind="blocked"
-          title="Historial bloqueado"
-          description="Selecciona un área de trabajo para ver el historial de ejecuciones."
-          actionLabel="Gestionar áreas de trabajo"
-          onAction={() => navigate('/console/workspaces')}
-        />
+        <WorkspaceRequiredState title="Historial bloqueado" description="Selecciona un área de trabajo para ver el historial de ejecuciones." />
       </section>
     )
   }

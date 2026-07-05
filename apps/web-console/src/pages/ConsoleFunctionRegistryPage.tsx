@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -96,13 +97,7 @@ export function ConsoleFunctionRegistryPage() {
         </div>
       </header>
 
-      {!activeWorkspaceId ? (
-        <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">
-            Selecciona una organización y un área de trabajo en la barra superior para gestionar sus funciones.
-          </p>
-        </section>
-      ) : null}
+      {!activeWorkspaceId ? <WorkspaceRequiredState description="Selecciona un área de trabajo para registrar y ver sus funciones." /> : null}
 
       {error ? (
         <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

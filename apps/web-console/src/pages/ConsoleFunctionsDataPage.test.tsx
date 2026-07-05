@@ -35,19 +35,30 @@ describe('ConsoleFunctionsDataPage', () => {
     vi.clearAllMocks()
   })
 
-  it('[#797] muestra guards de contexto con ConsolePageState', () => {
+  it('[#797] muestra guard de organización con ConsolePageState', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: null, activeWorkspaceId: null })
 
     renderPage()
 
     expect(screen.getByRole('alert', { name: 'Funciones bloqueadas' })).toHaveTextContent('Selecciona una organización para usar funciones.')
+  })
 
-    cleanup()
-    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_alpha', activeWorkspaceId: null })
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static blocked state.
+  it('[#742][#797] muestra el guard de área de trabajo con la acción en línea compartida', () => {
+    mockUseConsoleContext.mockReturnValue({
+      activeTenantId: 'ten_alpha',
+      activeWorkspaceId: null,
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
 
     renderPage()
 
-    expect(screen.getByRole('alert', { name: 'Funciones bloqueadas' })).toHaveTextContent('Selecciona un área de trabajo para usar funciones.')
+    expect(screen.getByRole('status')).toHaveTextContent('Selecciona un área de trabajo para usar funciones.')
+    expect(screen.getByTestId('workspace-required-create-denied')).toBeInTheDocument()
   })
 
   it('[#797] alinea el título con la etiqueta de ruta de despliegue rápido', async () => {

@@ -7,13 +7,15 @@ import { ConsoleFunctionsPage } from './ConsoleFunctionsPage'
 
 const mockUseConsoleContext = vi.fn()
 const mockRequestConsoleSessionJson = vi.fn()
+const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
 }))
 
 vi.mock('@/lib/console-session', () => ({
-  requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args)
+  requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args),
+  readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 
 function createContext(
@@ -22,6 +24,11 @@ function createContext(
     activeWorkspaceId: string | null
     capabilities: Record<string, boolean>
     capabilitiesLoading: boolean
+    workspaces: Array<{ workspaceId: string; tenantId: string; label: string; secondary: string }>
+    workspacesLoading: boolean
+    workspacesError: string | null
+    selectWorkspace: (workspaceId: string | null) => void
+    reloadWorkspaces: () => Promise<void>
   }> = {}
 ) {
   return {
@@ -29,6 +36,11 @@ function createContext(
     activeWorkspaceId: 'wrk_alpha',
     capabilities: { public_functions: true },
     capabilitiesLoading: false,
+    workspaces: [],
+    workspacesLoading: false,
+    workspacesError: null,
+    selectWorkspace: vi.fn(),
+    reloadWorkspaces: vi.fn(),
     ...overrides
   }
 }
@@ -124,6 +136,8 @@ describe('ConsoleFunctionsPage', () => {
   beforeEach(() => {
     mockUseConsoleContext.mockReset()
     mockRequestConsoleSessionJson.mockReset()
+    mockReadConsoleShellSession.mockReset()
+    mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1', platformRoles: ['tenant_owner'] } })
   })
 
   afterEach(() => {
@@ -131,13 +145,34 @@ describe('ConsoleFunctionsPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('muestra los guards de tenant y workspace', () => {
+  it('muestra el guard de organización', () => {
     renderPage(createContext({ activeTenantId: null, activeWorkspaceId: null }))
     expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
+  })
 
-    cleanup()
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static alert.
+  it('[#742] muestra el guard de área de trabajo con la acción en línea compartida', () => {
     renderPage(createContext({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+  })
+
+  it('[#742] ofrece un selector en línea que activa el área de trabajo elegida', async () => {
+    const user = userEvent.setup()
+    const selectWorkspace = vi.fn()
+    renderPage(
+      createContext({
+        activeWorkspaceId: null,
+        workspaces: [
+          { workspaceId: 'wrk_alpha', tenantId: 'ten_alpha', label: 'App Dev', secondary: 'dev' },
+          { workspaceId: 'wrk_beta', tenantId: 'ten_alpha', label: 'App Staging', secondary: 'staging' }
+        ],
+        selectWorkspace
+      })
+    )
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /seleccionar área de trabajo/i }), 'wrk_beta')
+    expect(selectWorkspace).toHaveBeenCalledWith('wrk_beta')
   })
 
   it('carga inventario y renderiza la lista', async () => {

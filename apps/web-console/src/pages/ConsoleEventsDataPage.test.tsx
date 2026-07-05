@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockUseConsoleContext, mockReadConsoleShellSession, mockEventsConsole } = vi.hoisted(() => ({
@@ -73,9 +75,33 @@ describe('ConsoleEventsDataPage', () => {
   })
 
   it('shows a workspace selection state before rendering the Events console', () => {
-    mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: '' })
-    render(<ConsoleEventsDataPage />)
+    mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: '', workspaces: [] })
+    render(<ConsoleEventsDataPage />, { wrapper: MemoryRouter })
     expect(screen.getByRole('status')).toHaveTextContent('Selecciona un área de trabajo para usar eventos.')
     expect(mockEventsConsole).not.toHaveBeenCalled()
+  })
+
+  // #742: the no-workspace state is the shared WorkspaceRequiredState — assert its inline action.
+  it('[#742] offers a create-workspace CTA when the active organization has no workspaces', () => {
+    mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: '', workspaces: [] })
+    render(<ConsoleEventsDataPage />, { wrapper: MemoryRouter })
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+  })
+
+  it('[#742] offers an inline picker that activates the chosen workspace when workspaces already exist', async () => {
+    const user = userEvent.setup()
+    const selectWorkspace = vi.fn()
+    mockUseConsoleContext.mockReturnValue({
+      activeWorkspaceId: '',
+      workspaces: [
+        { workspaceId: 'ws_1', tenantId: 'ten_1', label: 'Producción', secondary: 'prod' },
+        { workspaceId: 'ws_2', tenantId: 'ten_1', label: 'Staging', secondary: 'staging' }
+      ],
+      selectWorkspace
+    })
+    render(<ConsoleEventsDataPage />, { wrapper: MemoryRouter })
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /seleccionar área de trabajo/i }), 'ws_2')
+    expect(selectWorkspace).toHaveBeenCalledWith('ws_2')
   })
 })

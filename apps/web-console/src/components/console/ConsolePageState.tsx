@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 
 export function ConsolePageState({
@@ -6,13 +6,19 @@ export function ConsolePageState({
   title,
   description,
   actionLabel,
-  onAction
+  onAction,
+  children
 }: {
   kind: 'loading' | 'error' | 'empty' | 'blocked'
   title: string
   description: string
   actionLabel?: string
   onAction?: () => void
+  // Extra inline content rendered below the title/description (and the actionLabel/onAction
+  // button, if present) — e.g. WorkspaceRequiredState's inline workspace picker / create-workspace
+  // CTA (#742). Optional so every pre-existing call site (title + description [+ a single action])
+  // is unaffected.
+  children?: ReactNode
 }) {
   const titleId = useId()
   const descriptionId = useId()
@@ -36,6 +42,7 @@ export function ConsolePageState({
           </Button>
         </div>
       ) : null}
+      {children ? <div className="pt-4">{children}</div> : null}
     </section>
   )
 }

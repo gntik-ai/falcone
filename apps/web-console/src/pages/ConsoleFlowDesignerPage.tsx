@@ -55,6 +55,7 @@ import {
 import { parseYamlToFlow, serializeFlowToYaml } from '@/lib/flows/yaml-serialiser'
 import type { ViewMode } from '@/lib/flows/view-sync'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
@@ -690,13 +691,7 @@ export function ConsoleFlowDesignerPage() {
   if (!activeWorkspaceId) {
     return (
       <section className="p-6">
-        <ConsolePageState
-          kind="blocked"
-          title="Diseñador bloqueado"
-          description="Selecciona un área de trabajo para abrir el diseñador."
-          actionLabel="Gestionar áreas de trabajo"
-          onAction={() => navigate('/console/workspaces')}
-        />
+        <WorkspaceRequiredState title="Diseñador bloqueado" description="Selecciona un área de trabajo para abrir el diseñador." />
       </section>
     )
   }

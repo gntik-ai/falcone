@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
@@ -676,7 +677,7 @@ export function ConsoleKafkaPage() {
   }
 
   if (!activeWorkspaceId) {
-    return <p role="alert">Selecciona un área de trabajo para ver los recursos Kafka.</p>
+    return <WorkspaceRequiredState description="Selecciona un área de trabajo para ver los recursos Kafka." />
   }
 
   const lagSummary = lagTone(topicMetadata.data?.lag?.totalLag)

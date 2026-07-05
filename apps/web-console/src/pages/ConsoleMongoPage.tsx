@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { ProvisionDatabaseWizard } from '@/components/console/wizards/ProvisionDatabaseWizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -600,7 +601,9 @@ export function ConsoleMongoPage() {
 
           {databaseTab === 'collections' ? (
             !activeWorkspaceId ? (
-              <ConsoleSectionEmpty message="Selecciona un área de trabajo para ver las colecciones." />
+              <div className="mt-4">
+                <WorkspaceRequiredState description="Selecciona un área de trabajo para ver las colecciones." />
+              </div>
             ) : collections.loading ? (
               <ConsoleSectionLoading label="Cargando colecciones…" />
             ) : collections.error ? (
@@ -742,7 +745,9 @@ export function ConsoleMongoPage() {
           ) : null}
 
           {collectionDetailTab === 'documents' ? !activeWorkspaceId ? (
-            <ConsoleSectionEmpty message="Selecciona un área de trabajo para explorar documentos." />
+            <div className="mt-4">
+              <WorkspaceRequiredState description="Selecciona un área de trabajo para explorar documentos." />
+            </div>
           ) : documents.loading ? (
             <ConsoleSectionLoading label="Cargando documentos…" />
           ) : documents.error ? (

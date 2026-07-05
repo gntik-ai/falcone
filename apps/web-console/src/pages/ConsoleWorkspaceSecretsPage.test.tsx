@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceSecret } from '@/services/secretsApi'
@@ -11,9 +12,13 @@ const mockListSecrets = vi.fn()
 const mockCreateSecret = vi.fn()
 const mockUpdateSecret = vi.fn()
 const mockDeleteSecret = vi.fn()
+const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
+}))
+vi.mock('@/lib/console-session', () => ({
+  readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 
 // Mock only the network methods; keep the pure helpers (readSecretName/secretEnvVarName) real.
@@ -34,6 +39,11 @@ function context(
     activeWorkspaceId: string | null
     activeTenant: { label: string } | null
     activeWorkspace: { label: string; environment: string | null } | null
+    workspaces: Array<{ workspaceId: string; tenantId: string; label: string; secondary: string }>
+    workspacesLoading: boolean
+    workspacesError: string | null
+    selectWorkspace: (workspaceId: string | null) => void
+    reloadWorkspaces: () => Promise<void>
   }> = {}
 ) {
   return {
@@ -41,6 +51,11 @@ function context(
     activeWorkspaceId: 'wrk_alpha',
     activeTenant: { label: 'Acme' },
     activeWorkspace: { label: 'App Dev', environment: 'dev' },
+    workspaces: [],
+    workspacesLoading: false,
+    workspacesError: null,
+    selectWorkspace: vi.fn(),
+    reloadWorkspaces: vi.fn(),
     ...overrides
   }
 }
@@ -59,7 +74,7 @@ function secret(overrides: Partial<WorkspaceSecret> = {}): WorkspaceSecret {
 
 function renderPage(ctx = context()) {
   mockUseConsoleContext.mockReturnValue(ctx)
-  return render(<ConsoleWorkspaceSecretsPage />)
+  return render(<ConsoleWorkspaceSecretsPage />, { wrapper: MemoryRouter })
 }
 
 const apiError = (status: number, code: string, message = code) => Object.assign(new Error(message), { status, code, message })
@@ -72,6 +87,8 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     mockUpdateSecret.mockReset()
     mockDeleteSecret.mockReset()
     mockListSecrets.mockResolvedValue({ items: [], page: { size: 0 } })
+    mockReadConsoleShellSession.mockReset()
+    mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1', platformRoles: ['tenant_owner'] } })
   })
 
   afterEach(() => {
@@ -81,8 +98,33 @@ describe('ConsoleWorkspaceSecretsPage', () => {
 
   it('shows a "select a workspace" empty state and issues NO request when no workspace is active', () => {
     renderPage(context({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/selecciona un área de trabajo/i)
     expect(mockListSecrets).not.toHaveBeenCalled()
+  })
+
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState — assert its inline action.
+  it('[#742] offers a create-workspace CTA when the active organization has none', () => {
+    renderPage(context({ activeWorkspaceId: null, workspaces: [] }))
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+    expect(mockListSecrets).not.toHaveBeenCalled()
+  })
+
+  it('[#742] offers an inline picker that activates the chosen workspace when workspaces already exist', async () => {
+    const user = userEvent.setup()
+    const selectWorkspace = vi.fn()
+    renderPage(
+      context({
+        activeWorkspaceId: null,
+        workspaces: [
+          { workspaceId: 'wrk_alpha', tenantId: 'ten_alpha', label: 'App Dev', secondary: 'dev' },
+          { workspaceId: 'wrk_beta', tenantId: 'ten_alpha', label: 'App Staging', secondary: 'staging' }
+        ],
+        selectWorkspace
+      })
+    )
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /seleccionar área de trabajo/i }), 'wrk_beta')
+    expect(selectWorkspace).toHaveBeenCalledWith('wrk_beta')
   })
 
   it('lists secrets as metadata only (env-var, refCount, timestamps) with no value in the DOM', async () => {

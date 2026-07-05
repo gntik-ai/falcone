@@ -23,6 +23,7 @@ import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'rea
 
 import { ActiveOperationsIndicator } from '@/components/console/ActiveOperationsIndicator'
 import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyActionBadge'
+import { WorkspaceActivationAction } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { terminateConsoleLoginSession } from '@/lib/console-auth'
@@ -846,16 +847,25 @@ function ConsoleContextStatusPanel() {
     operationalAlerts,
     reloadTenants,
     reloadWorkspaces,
+    selectWorkspace,
     tenantsError,
     tenantsLoading,
     workspaces,
     workspacesError,
     workspacesLoading
   } = useConsoleContext()
+  const { can } = useConsolePermissions()
 
   const tenantStatus = useMemo(() => getConsoleTenantStatusMeta(activeTenant), [activeTenant])
   const workspaceStatus = useMemo(() => getConsoleWorkspaceStatusMeta(activeWorkspace), [activeWorkspace])
   const hasNoWorkspaces = Boolean(activeTenantId) && !workspacesLoading && !workspacesError && workspaces.length === 0
+  // #742 (Scenario 1): give the "no active workspace" card a real first action instead of the
+  // static "Selecciona un área de trabajo…" sentence below — a workspace picker when the active
+  // organization already has workspaces, or a create-first-workspace CTA (degrading honestly when
+  // the role can't create one) when it has none. Only once a tenant is active and the workspaces
+  // list finished loading without error (the no-tenant-selected case is out of scope for #742 and
+  // keeps its existing static copy).
+  const showWorkspaceActivationAction = Boolean(activeTenantId) && !activeWorkspace && !workspacesLoading && !workspacesError
 
   return (
     <section aria-label="Estado operativo del contexto" className="space-y-4" data-testid="console-context-status-panel">
@@ -951,6 +961,15 @@ function ConsoleContextStatusPanel() {
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 Reintentar áreas de trabajo
               </Button>
+            </div>
+          ) : null}
+          {showWorkspaceActivationAction ? (
+            <div className="mt-3 border-t border-border/70 pt-3">
+              <WorkspaceActivationAction
+                workspaces={workspaces}
+                canCreateWorkspace={can('tenant.workspaces.create')}
+                onSelectWorkspace={selectWorkspace}
+              />
             </div>
           ) : null}
         </article>

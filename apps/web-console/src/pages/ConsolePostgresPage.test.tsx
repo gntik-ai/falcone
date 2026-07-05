@@ -5,13 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsolePostgresPage } from './ConsolePostgresPage'
 
-const { requestConsoleSessionJsonMock, useConsoleContextMock } = vi.hoisted(() => ({
+const { requestConsoleSessionJsonMock, useConsoleContextMock, readConsoleShellSessionMock } = vi.hoisted(() => ({
   requestConsoleSessionJsonMock: vi.fn(),
-  useConsoleContextMock: vi.fn()
+  useConsoleContextMock: vi.fn(),
+  readConsoleShellSessionMock: vi.fn()
 }))
 
 vi.mock('@/lib/console-session', () => ({
-  requestConsoleSessionJson: requestConsoleSessionJsonMock
+  requestConsoleSessionJson: requestConsoleSessionJsonMock,
+  readConsoleShellSession: readConsoleShellSessionMock
 }))
 
 vi.mock('@/lib/console-context', () => ({
@@ -54,12 +56,14 @@ describe('ConsolePostgresPage', () => {
   beforeEach(() => {
     currentContext = createConsoleContext()
     useConsoleContextMock.mockImplementation(() => currentContext)
+    readConsoleShellSessionMock.mockReturnValue({ principal: { userId: 'usr_1', platformRoles: ['tenant_owner'] } })
   })
 
   afterEach(() => {
     cleanup()
     requestConsoleSessionJsonMock.mockReset()
     useConsoleContextMock.mockReset()
+    readConsoleShellSessionMock.mockReset()
   })
 
   it('T01.11.01 Sin tenant activo → empty state global visible', async () => {
@@ -84,6 +88,9 @@ describe('ConsolePostgresPage', () => {
     await user.click(screen.getByText('app_db'))
 
     expect(await screen.findByText('Selecciona un área de trabajo para ver esquemas.')).toBeInTheDocument()
+    // #742: the "select a workspace" empty state now offers an inline create-workspace CTA
+    // instead of leaving the user at a dead end.
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
   })
 
   it('T01.11.03 Carga de databases: renderiza tabla con databaseName, state, ownerRoleName', async () => {

@@ -213,13 +213,25 @@ describe('ConsoleFlowsPage capability gating (#790)', () => {
     expect(screen.queryByTestId('confirm-action-dialog')).not.toBeInTheDocument()
   })
 
-  it('[#793] uses ConsolePageState for the no-workspace blocked state', () => {
-    mockUseConsoleContext.mockReturnValue({ activeWorkspaceId: null, capabilities: {}, capabilitiesLoading: false })
+  // #742: the no-workspace state is now the shared WorkspaceRequiredState (ConsolePageState kind
+  // "empty") with an inline create-workspace CTA / workspace picker, instead of a static "blocked"
+  // state whose only action navigated away to the (dead-end for most roles) /console/workspaces page.
+  it('[#742][#793] uses the shared WorkspaceRequiredState for the no-workspace state', () => {
+    mockUseConsoleContext.mockReturnValue({
+      activeWorkspaceId: null,
+      capabilities: {},
+      capabilitiesLoading: false,
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
 
     renderPage()
 
-    expect(screen.getByRole('alert', { name: /flujos bloqueados/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /gestionar áreas de trabajo/i })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
   })
 })
 

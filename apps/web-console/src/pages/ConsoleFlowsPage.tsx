@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
@@ -99,13 +100,7 @@ export function ConsoleFlowsPage() {
     return (
       <section className="space-y-5 p-6">
         <h1 className="text-xl font-semibold">Flujos</h1>
-        <ConsolePageState
-          kind="blocked"
-          title="Flujos bloqueados"
-          description="Selecciona un área de trabajo para gestionar, publicar y ejecutar flujos."
-          actionLabel="Gestionar áreas de trabajo"
-          onAction={() => navigate('/console/workspaces')}
-        />
+        <WorkspaceRequiredState description="Selecciona un área de trabajo para gestionar, publicar y ejecutar flujos." />
       </section>
     )
   }
