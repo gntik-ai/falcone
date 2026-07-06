@@ -286,6 +286,9 @@ export function ConsoleStoragePage() {
   const [creatingBucket, setCreatingBucket] = useState(false)
   const [createBucketError, setCreateBucketError] = useState<string | null>(null)
   const newBucketNameId = useId()
+  const createBucketFormId = useId()
+  const createBucketHelpId = useId()
+  const newBucketNameRef = useRef<HTMLInputElement>(null)
   // #758: upload-object affordance + form state (per selected bucket; reset alongside the rest of
   // the bucket-detail state below).
   const [showUploadForm, setShowUploadForm] = useState(false)
@@ -295,6 +298,10 @@ export function ConsoleStoragePage() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadKeyId = useId()
   const uploadFileId = useId()
+  const uploadKeyHelpId = useId()
+  const uploadFileHelpId = useId()
+  const uploadFormId = useId()
+  const uploadKeyRef = useRef<HTMLInputElement>(null)
   const uploadFileInputRef = useRef<HTMLInputElement>(null)
 
   const resetBucketDetailState = useCallback(() => {
@@ -537,6 +544,18 @@ export function ConsoleStoragePage() {
     return () => controller.abort()
   }, [loadObjectMeta, selectedBucketId, selectedObjectKey])
 
+  // #758 a11y: when a disclosure form opens, move focus into it so keyboard and screen-reader
+  // users land on the first field instead of being stranded on the toggle button. Focus is not
+  // forced on close — clicking the toggle keeps focus on it, and a successful create/upload/delete
+  // is announced through the polite live region below.
+  useEffect(() => {
+    if (showCreateBucketForm) newBucketNameRef.current?.focus()
+  }, [showCreateBucketForm])
+
+  useEffect(() => {
+    if (showUploadForm) uploadKeyRef.current?.focus()
+  }, [showUploadForm])
+
   const selectedBucket = useMemo(
     () => buckets.data.find((bucket) => bucket.resourceId === selectedBucketId) ?? null,
     [buckets.data, selectedBucketId]
@@ -604,6 +623,8 @@ export function ConsoleStoragePage() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  aria-expanded={showCreateBucketForm}
+                  aria-controls={createBucketFormId}
                 >
                   {showCreateBucketForm ? 'Cerrar' : 'Nuevo bucket'}
                 </Button>
@@ -612,6 +633,8 @@ export function ConsoleStoragePage() {
             <CardContent>
               {showCreateBucketForm ? (
                 <form
+                  id={createBucketFormId}
+                  aria-busy={creatingBucket}
                   className="mb-4 space-y-3 rounded-lg border border-dashed border-border p-4"
                   onSubmit={(event) => {
                     event.preventDefault()
@@ -623,17 +646,20 @@ export function ConsoleStoragePage() {
                     <Label htmlFor={newBucketNameId}>Nombre del bucket (opcional)</Label>
                     <Input
                       id={newBucketNameId}
+                      ref={newBucketNameRef}
                       value={newBucketName}
                       onChange={(event) => setNewBucketName(event.target.value)}
                       placeholder="p. ej. media-assets"
                       autoComplete="off"
                       spellCheck={false}
+                      disabled={creatingBucket}
+                      aria-describedby={createBucketHelpId}
                     />
-                    <span className="text-xs leading-5 text-muted-foreground">
-                      El nombre final puede normalizarse (minúsculas, DNS-seguro) y queda asociado a esta área de trabajo.
+                    <span id={createBucketHelpId} className="text-xs leading-5 text-muted-foreground">
+                      El nombre es orientativo: el final puede normalizarse (minúsculas, DNS-seguro) y queda asociado a esta área de trabajo. Al crearlo se confirma el nombre real.
                     </span>
                   </div>
-                  <Button type="submit" size="sm" disabled={creatingBucket}>
+                  <Button type="submit" size="sm" disabled={creatingBucket} aria-busy={creatingBucket}>
                     {creatingBucket ? 'Creando…' : 'Crear'}
                   </Button>
                   {createBucketError ? <Alert variant="destructive">{createBucketError}</Alert> : null}
@@ -657,8 +683,16 @@ export function ConsoleStoragePage() {
                   ) : null}
                 </div>
               ) : null}
-              {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
-              {bucketExportNotice ? <p className="mb-3" role="status">{bucketExportNotice}</p> : null}
+              {bucketActionError ? <Alert variant="destructive" className="mb-3">{bucketActionError}</Alert> : null}
+              {/* Persistent polite live region so create/upload/delete/export success is announced
+                  reliably even though it renders here (in the buckets column) after an async op. */}
+              <div aria-live="polite" className="empty:hidden">
+                {bucketExportNotice ? (
+                  <p className="mb-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100">
+                    {bucketExportNotice}
+                  </p>
+                ) : null}
+              </div>
               {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
                 <Table aria-label="Listado de buckets del área de trabajo activa">
                   <TableHeader>
@@ -842,6 +876,8 @@ export function ConsoleStoragePage() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      aria-expanded={showUploadForm}
+                      aria-controls={uploadFormId}
                     >
                       {showUploadForm ? 'Cerrar' : 'Subir objeto'}
                     </Button>
@@ -849,6 +885,8 @@ export function ConsoleStoragePage() {
 
                   {showUploadForm ? (
                     <form
+                      id={uploadFormId}
+                      aria-busy={uploadingObject}
                       className="space-y-3 rounded-lg border border-dashed border-border p-4"
                       onSubmit={(event) => {
                         event.preventDefault()
@@ -860,13 +898,16 @@ export function ConsoleStoragePage() {
                         <Label htmlFor={uploadKeyId}>Clave del objeto (opcional)</Label>
                         <Input
                           id={uploadKeyId}
+                          ref={uploadKeyRef}
                           value={uploadKey}
                           onChange={(event) => setUploadKey(event.target.value)}
                           placeholder={uploadFile?.name ?? 'media/nuevo-objeto.png'}
                           autoComplete="off"
                           spellCheck={false}
+                          disabled={uploadingObject}
+                          aria-describedby={uploadKeyHelpId}
                         />
-                        <span className="text-xs leading-5 text-muted-foreground">
+                        <span id={uploadKeyHelpId} className="text-xs leading-5 text-muted-foreground">
                           Si se deja vacío, se usa el nombre del archivo seleccionado.
                         </span>
                       </div>
@@ -876,11 +917,16 @@ export function ConsoleStoragePage() {
                           id={uploadFileId}
                           ref={uploadFileInputRef}
                           type="file"
-                          className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                          className="block w-full rounded-md text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                           onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+                          disabled={uploadingObject}
+                          aria-describedby={uploadFileHelpId}
                         />
+                        <span id={uploadFileHelpId} className="text-xs leading-5 text-muted-foreground">
+                          Se sube el contenido exacto del archivo (incluido binario), tal cual, al bucket seleccionado.
+                        </span>
                       </div>
-                      <Button type="submit" size="sm" disabled={!uploadFile || uploadingObject}>
+                      <Button type="submit" size="sm" disabled={!uploadFile || uploadingObject} aria-busy={uploadingObject}>
                         {uploadingObject ? 'Subiendo…' : 'Subir'}
                       </Button>
                       {uploadError ? <Alert variant="destructive">{uploadError}</Alert> : null}
