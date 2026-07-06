@@ -26,5 +26,8 @@ describe('ConsoleQuotaPostureBadge', () => {
     const link = screen.getByRole('link')
     expect(link).toHaveAttribute('href', '/console/quotas')
     expect(link).toHaveTextContent('Límite duro superado')
+    // #766 UX pass: the link exposes a "Ver cuotas" wayfinding intent to assistive tech (the visible
+    // forward-arrow affordance next to the label is decorative / aria-hidden).
+    expect(link).toHaveAccessibleName(/ver cuotas/i)
   })
 })

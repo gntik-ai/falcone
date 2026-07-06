@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +50,7 @@ export function ConsoleMetricDimensionRow({ dimension }: { dimension: ConsoleMet
           className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-300 underline-offset-2 hover:underline"
         >
           Ver cuotas de la organización
+          <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         </Link>
       ) : null}
     </div>

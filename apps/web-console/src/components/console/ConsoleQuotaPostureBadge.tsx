@@ -1,6 +1,8 @@
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 const postureLabels: Record<string, string> = {
   within_limit: 'Dentro del límite',
@@ -26,12 +28,15 @@ export function ConsoleQuotaPostureBadge({ posture, linkTo }: { posture: string 
         : 'border-border bg-secondary text-secondary-foreground'
 
   const label = postureLabels[normalized] ?? normalized.replace(/_/g, ' ')
-  const badge = <Badge className={className}>{label}</Badge>
 
-  // #766 wayfinding: the Quotas + Observability headers both show this badge with no path
-  // between them. When `linkTo` is provided, wrap it in a focusable link (opt-in — omitting
-  // `linkTo` keeps every pre-existing render, which never provided a Router context, unchanged).
-  if (!linkTo) return badge
+  // #766 wayfinding: the Observability header summarizes quota posture but offered no path to the
+  // Quotas page it describes. When `linkTo` is provided, wrap the badge in a focusable link (opt-in
+  // — omitting `linkTo` keeps every pre-existing render, which never provided a Router context,
+  // unchanged; the Quotas page itself deliberately omits it to avoid a self-link to the page you
+  // are already on) and surface a forward-arrow affordance so a clickable badge reads as navigable,
+  // not merely decorative. The arrow is decorative (`aria-hidden`); the link's own `aria-label`
+  // carries the "Ver cuotas" intent for assistive tech.
+  if (!linkTo) return <Badge className={className}>{label}</Badge>
 
   return (
     <Link
@@ -39,7 +44,10 @@ export function ConsoleQuotaPostureBadge({ posture, linkTo }: { posture: string 
       aria-label={`${label}. Ver cuotas.`}
       className="rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      {badge}
+      <Badge className={cn(className, 'gap-1')}>
+        {label}
+        <ArrowRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+      </Badge>
     </Link>
   )
 }

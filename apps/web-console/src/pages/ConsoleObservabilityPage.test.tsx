@@ -163,8 +163,12 @@ describe('ConsoleObservabilityPage', () => {
     expect(screen.getByLabelText('Desde')).toBeInTheDocument()
     expect(screen.getByLabelText('Hasta')).toBeInTheDocument()
 
-    // Result count, honestly noting the hook's 50-item cap rather than inventing pagination.
-    expect(screen.getByText(/1 evento mostrado/i)).toBeInTheDocument()
+    // Result count, honestly noting the hook's 50-item cap rather than inventing pagination, and
+    // announced through a polite live region so filter-driven count changes reach screen readers.
+    const resultCount = screen.getByText(/1 evento mostrado/i)
+    expect(resultCount).toBeInTheDocument()
+    expect(resultCount).toHaveAttribute('role', 'status')
+    expect(resultCount).toHaveAttribute('aria-live', 'polite')
 
     const eventButton = screen.getByRole('button', { name: 'evt_1' })
     expect(eventButton).toHaveAttribute('aria-expanded', 'false')

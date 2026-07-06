@@ -333,9 +333,9 @@ export function ConsoleObservabilityPage() {
                   returns no cursor/hasMore, so there is nothing to paginate against — surface the
                   count and the cap honestly instead of inventing pagination the backend doesn't
                   support. */}
-              <p className="text-sm text-muted-foreground">
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
                 {audit.records.length} {audit.records.length === 1 ? 'evento mostrado' : 'eventos mostrados'}
-                {audit.records.length >= 50 ? ' · límite de 50 por consulta; ajusta los filtros para acotar los resultados' : ''}
+                {audit.records.length >= 50 ? ' · se muestran hasta 50 por consulta; ajusta los filtros para acotar los resultados' : ''}
               </p>
               <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
                 <table className="w-full text-left text-sm">

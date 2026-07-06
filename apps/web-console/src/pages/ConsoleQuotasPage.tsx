@@ -46,7 +46,11 @@ export function ConsoleQuotasPage() {
         <p className="text-sm font-medium text-muted-foreground">{activeTenant?.label ?? 'Organización activa'}</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cuotas</h1>
-          <ConsoleQuotaPostureBadge posture={posture?.overallPosture ?? null} linkTo="/console/quotas" />
+          {/* #766 UX pass: no `linkTo` here — this badge already sits on the Quotas page, so
+              linking it to `/console/quotas` is a self-link to the page you are already on. The
+              posture cross-link stays only where it navigates somewhere new (Observability header +
+              exceeded metric rows → Quotas). */}
+          <ConsoleQuotaPostureBadge posture={posture?.overallPosture ?? null} />
         </div>
         <p className="mt-3 text-sm text-muted-foreground">Última evaluación: {posture?.evaluatedAt ?? 'n/a'}</p>
       </header>
