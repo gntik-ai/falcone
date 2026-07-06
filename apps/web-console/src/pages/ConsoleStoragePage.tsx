@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
+import { formatBytes } from '@/lib/format'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
 import { cn } from '@/lib/utils'
@@ -207,22 +208,6 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Sí' : 'No'
   return String(value)
-}
-
-function formatBytes(bytes?: number | null): string {
-  if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '—'
-  if (bytes < 1024) return `${bytes} B`
-
-  const units = ['KB', 'MB', 'GB', 'TB', 'PB']
-  let value = bytes / 1024
-  let unitIndex = 0
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024
-    unitIndex += 1
-  }
-
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`
 }
 
 function formatRelativeDate(value?: string | null): string {

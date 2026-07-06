@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
+import { formatBytes } from '@/lib/format'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
@@ -104,22 +105,6 @@ const EMPTY_DOCUMENTS_STATE: DocumentsState = {
 
 function encodePathSegment(value: string): string {
   return encodeURIComponent(value)
-}
-
-function formatBytes(bytes?: number): string {
-  if (typeof bytes !== 'number' || Number.isNaN(bytes) || bytes < 0) {
-    return '—'
-  }
-
-  if (bytes === 0) {
-    return '0 B'
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  const value = bytes / 1024 ** exponent
-
-  return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`
 }
 
 function isActiveRow(selected: boolean): string {

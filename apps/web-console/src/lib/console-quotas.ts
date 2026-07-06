@@ -14,6 +14,11 @@ export interface ConsoleQuotaDimensionView {
   freshnessStatus: 'fresh' | 'degraded' | 'unavailable'
   isWarning: boolean
   isExceeded: boolean
+  // #766: the wire's `unit` field ('count' | 'bytes' — see `QuotaDimensionPosture` and
+  // `quota_dimension_catalog.unit`) is not populated by every deploy runtime, so this is
+  // optional. `lib/format.ts::isByteUnitDimension` falls back to the dimensionId naming
+  // convention (`*_bytes`) when it's absent.
+  unit?: string
 }
 
 export interface ConsoleQuotaPosture {
@@ -35,6 +40,7 @@ interface QuotaPostureResponse {
     measuredValue?: number
     remainingToHardLimit?: number | null
     freshnessStatus?: 'fresh' | 'degraded' | 'unavailable'
+    unit?: string
   }>
   hardLimitBreaches?: string[]
 }
@@ -69,7 +75,8 @@ export function normalizeQuotaPosture(posture: QuotaPostureResponse | null | und
         pctUsed,
         freshnessStatus: dimension.freshnessStatus ?? 'fresh',
         isWarning,
-        isExceeded
+        isExceeded,
+        unit: dimension.unit
       }
     })
   }

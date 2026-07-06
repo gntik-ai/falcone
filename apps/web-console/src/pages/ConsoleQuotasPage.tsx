@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostureBadge'
@@ -6,6 +8,7 @@ import { QuotaAdjustDialog, type QuotaAdjustTarget } from '@/components/console/
 import { useConsoleContext } from '@/lib/console-context'
 import { useConsoleQuotas, type ConsoleQuotaDimensionView } from '@/lib/console-quotas'
 import { useConsolePermissions } from '@/lib/console-permissions'
+import { formatDimensionValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const policyModeLabels: Record<string, string> = {
@@ -43,7 +46,7 @@ export function ConsoleQuotasPage() {
         <p className="text-sm font-medium text-muted-foreground">{activeTenant?.label ?? 'Organización activa'}</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cuotas</h1>
-          <ConsoleQuotaPostureBadge posture={posture?.overallPosture ?? null} />
+          <ConsoleQuotaPostureBadge posture={posture?.overallPosture ?? null} linkTo="/console/quotas" />
         </div>
         <p className="mt-3 text-sm text-muted-foreground">Última evaluación: {posture?.evaluatedAt ?? 'n/a'}</p>
       </header>
@@ -77,7 +80,7 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
           <caption className="sr-only">Postura de cuotas: {title}</caption>
           <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th scope="col" className="px-4 py-3 font-medium">Dimensión</th>
+              <th scope="col" className="border-l-4 border-l-transparent px-4 py-3 font-medium">Dimensión</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Límite</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Consumo</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">% uso</th>
@@ -92,25 +95,45 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
                 key={`${title}-${dimension.dimensionId}`}
                 className={cn(
                   'transition-colors',
-                  dimension.isExceeded ? 'bg-red-500/10' : dimension.isWarning ? 'bg-amber-500/10' : 'hover:bg-muted/20'
+                  // #766: the exceeded tint is strengthened (10 -> 15) and paired with a left
+                  // accent border on the leading cell below — color is never the only cue.
+                  dimension.isExceeded ? 'bg-red-500/15 hover:bg-red-500/20' : dimension.isWarning ? 'bg-amber-500/10' : 'hover:bg-muted/20'
                 )}
               >
-                <th scope="row" className="max-w-[16rem] whitespace-normal break-words px-4 py-3 text-left font-medium text-foreground">{dimension.displayName}</th>
-                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.hardLimit ?? 'sin límite'}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.measuredValue}</td>
-                <td
+                <th
+                  scope="row"
                   className={cn(
-                    'whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums',
-                    dimension.pctUsed === null
-                      ? 'text-muted-foreground'
-                      : dimension.isExceeded
-                        ? 'text-red-300'
-                        : dimension.isWarning
-                          ? 'text-amber-300'
-                          : 'text-foreground'
+                    'max-w-[16rem] whitespace-normal break-words border-l-4 px-4 py-3 text-left font-medium text-foreground',
+                    dimension.isExceeded ? 'border-l-red-500' : dimension.isWarning ? 'border-l-amber-500' : 'border-l-transparent'
                   )}
                 >
-                  {dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}
+                  {dimension.displayName}
+                </th>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  {dimension.hardLimit !== null ? formatDimensionValue(dimension.hardLimit, dimension.unit, dimension.dimensionId) : 'sin límite'}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  {formatDimensionValue(dimension.measuredValue, dimension.unit, dimension.dimensionId)}
+                </td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums">
+                  <span
+                    className={cn(
+                      'inline-flex items-center justify-end gap-1.5',
+                      dimension.pctUsed === null
+                        ? 'text-muted-foreground'
+                        : dimension.isExceeded
+                          ? 'text-red-300'
+                          : dimension.isWarning
+                            ? 'text-amber-300'
+                            : 'text-foreground'
+                    )}
+                  >
+                    {dimension.isExceeded ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+                    <span>{dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}</span>
+                  </span>
+                  {dimension.isExceeded ? (
+                    <Badge variant="destructive" className="ml-2 align-middle">Superado</Badge>
+                  ) : null}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{policyModeLabels[dimension.policyMode] ?? dimension.policyMode.replace(/_/g, ' ')}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{freshnessStatusLabels[dimension.freshnessStatus] ?? dimension.freshnessStatus.replace(/_/g, ' ')}</td>

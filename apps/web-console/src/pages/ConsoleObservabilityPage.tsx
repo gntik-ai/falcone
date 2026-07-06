@@ -158,7 +158,7 @@ export function ConsoleObservabilityPage() {
             <p className="text-sm text-muted-foreground">{headerText || 'Organización activa'}</p>
             <h1 className="text-2xl font-semibold tracking-tight">Observabilidad</h1>
           </div>
-          {metrics.overview ? <ConsoleQuotaPostureBadge posture={metrics.overview.overallPosture} /> : null}
+          {metrics.overview ? <ConsoleQuotaPostureBadge posture={metrics.overview.overallPosture} linkTo="/console/quotas" /> : null}
         </div>
         <div className="flex gap-2">
           <Button type="button" variant={tab === 'metrics' ? 'default' : 'outline'} onClick={() => setTab('metrics')}>Métricas</Button>
@@ -193,24 +193,34 @@ export function ConsoleObservabilityPage() {
       ) : (
         <div className="space-y-4">
           <section className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+            <div className="flex flex-wrap items-end gap-3">
               <label className="text-sm font-medium">
                 <span className="mb-1 block text-muted-foreground">Actor</span>
-                <input aria-label="Actor" value={filters.actorId ?? ''} onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2" />
+                <input aria-label="Actor" value={filters.actorId ?? ''} onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value || undefined }))} className="w-full min-w-[10rem] rounded-xl border border-input bg-background px-3 py-2" />
               </label>
               <label className="text-sm font-medium">
                 <span className="mb-1 block text-muted-foreground">Categoría</span>
-                <input aria-label="Categoría" value={filters.category ?? ''} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2" />
+                <input aria-label="Categoría" value={filters.category ?? ''} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value || undefined }))} className="w-full min-w-[10rem] rounded-xl border border-input bg-background px-3 py-2" />
               </label>
               <label className="text-sm font-medium">
                 <span className="mb-1 block text-muted-foreground">Resultado</span>
-                <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full rounded-xl border border-input bg-background px-3 py-2">
+                <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full min-w-[10rem] rounded-xl border border-input bg-background px-3 py-2">
                   <option value="">Todos</option>
                   <option value="success">Éxito</option>
                   <option value="failure">Fallo</option>
                 </select>
               </label>
-              <div className="flex md:justify-end">
+              {/* #766: `ConsoleAuditFilter.from`/`.to` were already modeled and wired into the
+                  fetch (`appendDateFilters`), but the audit tab never exposed inputs for them. */}
+              <label className="text-sm font-medium">
+                <span className="mb-1 block text-muted-foreground">Desde</span>
+                <input type="date" aria-label="Desde" value={filters.from ?? ''} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value || undefined }))} className="rounded-xl border border-input bg-background px-3 py-2" />
+              </label>
+              <label className="text-sm font-medium">
+                <span className="mb-1 block text-muted-foreground">Hasta</span>
+                <input type="date" aria-label="Hasta" value={filters.to ?? ''} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value || undefined }))} className="rounded-xl border border-input bg-background px-3 py-2" />
+              </label>
+              <div className="ml-auto flex">
                 <Button
                   type="button"
                   variant="outline"
@@ -318,39 +328,60 @@ export function ConsoleObservabilityPage() {
           {audit.error ? <ConsolePageState kind="error" title="No se pudo cargar la auditoría" description={audit.error} actionLabel="Reintentar" onAction={audit.reload} /> : null}
           {!audit.loading && !audit.error && audit.records.length === 0 ? <ConsolePageState kind="empty" title="Sin eventos de auditoría" description="No se encontraron registros con los filtros actuales." /> : null}
           {audit.records.length > 0 ? (
-            <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3">Evento</th>
-                    <th className="px-4 py-3">Categoría</th>
-                    <th className="px-4 py-3">Resultado</th>
-                    <th className="px-4 py-3">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {audit.records.map((record) => (
-                    <Fragment key={record.eventId}>
-                      <tr className="border-b border-border/60">
-                        <td className="px-4 py-3">
-                          <button type="button" className="font-medium underline" onClick={() => setExpandedRecordId((current) => current === record.eventId ? null : record.eventId)}>
-                            {record.eventId}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3"><ConsoleAuditCategoryBadge category={record.action.category} /></td>
-                        <td className="px-4 py-3"><ConsoleAuditResultBadge result={record.result?.outcome ?? 'unknown'} /></td>
-                        <td className="px-4 py-3">{record.eventTimestamp}</td>
-                      </tr>
-                      {expandedRecordId === record.eventId ? (
-                        <tr>
-                          <td className="px-4 py-3" colSpan={4}><ConsoleAuditRecordDetail record={record} /></td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* #766 audit triage depth: `useConsoleAuditRecords` hard-codes `page[size]=50` and
+                  returns no cursor/hasMore, so there is nothing to paginate against — surface the
+                  count and the cap honestly instead of inventing pagination the backend doesn't
+                  support. */}
+              <p className="text-sm text-muted-foreground">
+                {audit.records.length} {audit.records.length === 1 ? 'evento mostrado' : 'eventos mostrados'}
+                {audit.records.length >= 50 ? ' · límite de 50 por consulta; ajusta los filtros para acotar los resultados' : ''}
+              </p>
+              <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-4 py-3">Evento</th>
+                      <th className="px-4 py-3">Categoría</th>
+                      <th className="px-4 py-3">Resultado</th>
+                      <th className="px-4 py-3">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {audit.records.map((record) => {
+                      const isExpanded = expandedRecordId === record.eventId
+                      const detailId = `audit-record-detail-${record.eventId}`
+                      return (
+                        <Fragment key={record.eventId}>
+                          <tr className="border-b border-border/60">
+                            <td className="px-4 py-3">
+                              <Button
+                                type="button"
+                                variant="link"
+                                className="h-auto whitespace-normal break-all p-0 font-mono text-sm"
+                                aria-expanded={isExpanded}
+                                aria-controls={detailId}
+                                onClick={() => setExpandedRecordId((current) => current === record.eventId ? null : record.eventId)}
+                              >
+                                {record.eventId}
+                              </Button>
+                            </td>
+                            <td className="px-4 py-3"><ConsoleAuditCategoryBadge category={record.action.category} /></td>
+                            <td className="px-4 py-3"><ConsoleAuditResultBadge result={record.result?.outcome ?? 'unknown'} /></td>
+                            <td className="px-4 py-3">{record.eventTimestamp}</td>
+                          </tr>
+                          {isExpanded ? (
+                            <tr>
+                              <td id={detailId} className="px-4 py-3" colSpan={4}><ConsoleAuditRecordDetail record={record} /></td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : null}
         </div>
       )}
