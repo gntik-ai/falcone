@@ -193,6 +193,17 @@ describe('ConsoleFunctionsPage', () => {
     expect(await screen.findByText(/no hay funciones en esta área de trabajo/i)).toBeInTheDocument()
   })
 
+  // [#743] confirmed-repro shape: a 403 FORBIDDEN must never render the raw backend message,
+  // even when both the inventory call and its actions-fallback reject.
+  it('[#743] localiza un error 403 del backend al cargar el inventario — nunca el texto crudo', async () => {
+    mockRequestConsoleSessionJson.mockRejectedValue({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+    renderPage()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
+  })
+
   it('selecciona función y carga detalle', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
@@ -347,7 +358,10 @@ describe('ConsoleFunctionsPage', () => {
 
     expect(await screen.findByText(/id de recurso/i)).toBeInTheDocument()
     expect(screen.getByText(/"ok": true/)).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent(/server error/i)
+    // [#743] a 500 renders the shared localized status text — never the raw thrown message.
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(/no está disponible en este momento/i)
+    expect(alert.textContent ?? '').not.toMatch(/server error/i)
   })
 
   it('fallo en resultado no bloquea metadata ni logs (RF-FEL-06)', async () => {
@@ -375,7 +389,10 @@ describe('ConsoleFunctionsPage', () => {
 
     expect(await screen.findByText(/id de recurso/i)).toBeInTheDocument()
     expect(screen.getByText(/hello\s+world/)).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent(/result unavailable/i)
+    // [#743] a 500 renders the shared localized status text — never the raw thrown message.
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(/no está disponible en este momento/i)
+    expect(alert.textContent ?? '').not.toMatch(/result unavailable/i)
   })
 
   it('muestra mensaje cuando contentType es octet-stream', async () => {
@@ -602,7 +619,11 @@ describe('ConsoleFunctionsPage', () => {
     await openTab('Invocar')
     await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/quota exceeded/i)
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudo invocar la función/i)
+    expect(alert.textContent ?? '').not.toMatch(/quota exceeded/i)
   })
 
   it('abre deploy create y envía POST con recarga de inventario', async () => {
@@ -710,7 +731,11 @@ describe('ConsoleFunctionsPage', () => {
     await userEvent.type(within(dialog).getByPlaceholderText('hello-fn'), 'hello-fn')
     await userEvent.click(within(dialog).getByRole('button', { name: /^eliminar$/i }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/delete failed/i)
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await within(dialog).findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudo eliminar la función/i)
+    expect(alert.textContent ?? '').not.toMatch(/delete failed/i)
     expect(screen.queryByText(/función eliminada/i)).not.toBeInTheDocument()
     const remainingInventoryRow = screen.getAllByRole('button', { name: /hello-fn/i }).find((button) => button.textContent?.includes('Entorno:'))
     expect(remainingInventoryRow).toBeInTheDocument()

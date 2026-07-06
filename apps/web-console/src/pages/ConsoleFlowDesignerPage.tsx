@@ -59,6 +59,7 @@ import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredSt
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import {
   getFlow,
   isFlowApiError,
@@ -176,7 +177,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
       const loaded = await getFlow(workspaceId, flowId)
       resetFromRecord(loaded)
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'No se pudo cargar el flujo.')
+      setLoadError(describeConsoleError(error, 'No se pudo cargar el flujo.'))
     } finally {
       setLoading(false)
     }
@@ -396,6 +397,10 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 
   const applyServerRejection = useCallback((error: unknown): string => {
     if (isFlowApiError(error)) {
+      // The per-node entries below (`code`/`nodeId`/`message`) are the console-owned, structured
+      // FLOW_VALIDATION_FAILED payload the Problems panel is built to display — a legitimate
+      // user-facing message, not a raw transport string (see #743's proposal for this
+      // distinction).
       setServerErrors(
         error.body.errors.map((entry) => ({
           code: entry.code,
@@ -403,9 +408,20 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
           message: entry.message
         }))
       )
-      return error.message
+      // The flow-level banner text, however, is NOT guaranteed to be validation-owned copy —
+      // `toFlowApiError` (flowsApi.ts) wraps ANY publish/validate rejection this way, including a
+      // 404/500 unrelated to validation. Map it through the shared, localized helper: a real 422
+      // (no recognized status mapping) falls back to the validation-aware copy below; a genuine
+      // transport failure (404/500/...) gets its proper localized status text instead of the raw
+      // backend message.
+      return describeConsoleError(
+        error,
+        error.body.errors.length > 0
+          ? 'La validación del flujo encontró errores; revisa el panel de problemas.'
+          : 'La solicitud falló.'
+      )
     }
-    return error instanceof Error ? error.message : 'La solicitud falló'
+    return describeConsoleError(error, 'La solicitud falló.')
   }, [])
 
   // When the YAML editor is the active surface the YAML buffer is the source of truth; resolve

@@ -11,6 +11,7 @@ import {
 } from '@/api/configPreflightApi'
 import type { PreflightReport, PreflightRequest } from '@/api/configPreflightApi'
 import type { IdentifierMapEntry } from '@/api/configReprovisionApi'
+import { describeConsoleError } from '@/lib/console-errors'
 
 type Step = 'upload' | 'map' | 'result'
 
@@ -65,7 +66,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
       if (err instanceof SyntaxError) {
         setError('El artefacto no es un JSON válido.')
       } else if (err instanceof ConfigPreflightApiError) {
-        setError(err.message)
+        setError(describeConsoleError({ status: err.statusCode, code: err.code, message: err.message }, 'Error al ejecutar la validación previa.'))
       } else {
         setError('Error al ejecutar la validación previa.')
       }
@@ -89,7 +90,7 @@ export function ConsoleTenantConfigPreflightPage({ tenantId, userRole }: PagePro
       setStep('result')
     } catch (err) {
       if (err instanceof ConfigPreflightApiError) {
-        setError(err.message)
+        setError(describeConsoleError({ status: err.statusCode, code: err.code, message: err.message }, 'Error al ejecutar la validación previa.'))
       } else {
         setError('Error al ejecutar la validación previa.')
       }

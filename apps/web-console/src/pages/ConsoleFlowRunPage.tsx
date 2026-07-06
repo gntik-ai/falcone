@@ -17,6 +17,7 @@ import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredSt
 import { RunStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { Input } from '@/components/ui/input'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { useFlowExecution, type NodeStatusSnapshot } from '@/lib/hooks/use-flow-execution'
 import { getFlow, type FlowDefinitionRecord } from '@/services/flowsApi'
 import {
@@ -75,7 +76,7 @@ function RunView({
       setRecord(flow)
       setDetail(exec)
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la ejecución.')
+      setLoadError(describeConsoleError(error, 'No se pudo cargar la ejecución.'))
     } finally {
       setLoading(false)
     }

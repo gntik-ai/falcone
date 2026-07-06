@@ -153,6 +153,33 @@ describe('ConsolePlanDetailPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/organizaciones activas/i)
   })
 
+  it('[#743] localiza el error de carga inicial — nunca el mensaje crudo del backend', async () => {
+    planApi.getPlan.mockRejectedValue(Object.assign(new Error('requires superadmin'), { status: 403, code: 'FORBIDDEN' }))
+    planApi.getPlanLimitsProfile.mockResolvedValue({ planId: 'p1', profile: [] })
+
+    renderPage()
+
+    const state = await screen.findByRole('alert', { name: /no se pudo cargar el plan/i })
+    expect(state).toHaveTextContent(/no tienes permiso/i)
+    expect(state.textContent ?? '').not.toMatch(/requires superadmin/i)
+  })
+
+  it('[#743] las transiciones de ciclo de vida con un código no reconocido localizan el mensaje — nunca el texto crudo', async () => {
+    planApi.getPlan.mockResolvedValue({ ...plan, status: 'active', assignedTenantCount: 1 })
+    planApi.transitionPlanLifecycle.mockRejectedValue(
+      Object.assign(new Error('No action mapped for POST /v1/plans/p1/lifecycle'), { status: 400, code: 'SOME_UNRECOGNIZED_CODE' })
+    )
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /marcar como obsoleto/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^confirmar$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent ?? '').not.toMatch(/no action mapped/i)
+    expect(alert.textContent?.trim()).not.toBe('')
+  })
+
   it('keeps backend deletion refusals visible in the confirmation dialog', async () => {
     planApi.getPlan.mockResolvedValue({ ...plan, status: 'draft', assignedTenantCount: 0 })
     planApi.deletePlan.mockRejectedValue(apiError(409, 'PLAN_HAS_ASSIGNMENT_HISTORY'))

@@ -115,7 +115,11 @@ describe('useDestructiveOp', () => {
   it.each([
     [{ status: 401, message: 'Unauthorized' }, 'Tu sesión ha expirado. Vuelve a iniciar sesión.'],
     [{ status: 404, message: 'Missing' }, 'El recurso ya no existe o ha sido eliminado.'],
-    [new Error('Backend exploded'), 'Backend exploded']
+    // [#743] a network/unknown-status rejection — even a plain `Error` with its own message —
+    // renders the shared localized fallback, never the raw thrown message ("Backend exploded").
+    [new Error('Backend exploded'), 'No se pudo completar la operación.'],
+    // [#743] the confirmed-repro shape: a 403 must never echo the raw backend text.
+    [{ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' }, 'No tienes permiso para ver este recurso.']
   ])('muestra el mensaje correcto al fallar la confirmación', async (error, expectedMessage) => {
     const { result } = renderHook(() => useDestructiveOp())
 

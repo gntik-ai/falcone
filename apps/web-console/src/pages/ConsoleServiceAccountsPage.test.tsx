@@ -281,6 +281,24 @@ describe('ConsoleServiceAccountsPage', () => {
     })
   })
 
+  it('[#743] localiza el error cuando la revocación falla — nunca el mensaje crudo del backend', async () => {
+    const user = userEvent.setup()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { state: 'active', label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [{ serviceAccountId: 'sa_1', displayName: 'Ops SA', desiredState: 'active', expiresAt: null, credentialStatus: { state: 'active' }, accessProjection: { effectiveAccess: 'rw', clientState: 'active' } }], loading: false, error: null, reload: vi.fn(), knownIds: ['sa_1'] })
+    // Confirmed-repro shape: revoke rejects raw and unprocessed, exactly as requestConsoleSessionJson
+    // throws it — this page's onConfirm does NOT pre-localize it, so useDestructiveOp is the only
+    // thing standing between this and a raw "requires superadmin" render.
+    mockRevokeServiceAccountCredential.mockRejectedValue({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+    render(<ConsoleServiceAccountsPage />)
+
+    await user.click(screen.getByRole('button', { name: /revocar/i }))
+    await user.click(screen.getByRole('button', { name: /^confirmar$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
+  })
+
   it('abre confirmación CRITICAL al eliminar una service account y llama al SDK (#687)', async () => {
     const user = userEvent.setup()
     const reload = vi.fn()

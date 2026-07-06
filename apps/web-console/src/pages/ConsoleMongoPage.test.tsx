@@ -96,8 +96,23 @@ describe('ConsoleMongoPage', () => {
 
     render(<ConsoleMongoPage />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Mongo down')
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudieron cargar las bases de datos mongodb/i)
+    expect(alert.textContent ?? '').not.toMatch(/mongo down/i)
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+  })
+
+  it('[#743] localiza un error 403 del backend al cargar bases de datos — nunca el texto crudo', async () => {
+    mockUseConsoleContext.mockReturnValue(buildContext({ activeTenantId: 'tenant-a' }))
+    mockRequestConsoleSessionJson.mockRejectedValueOnce({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+
+    render(<ConsoleMongoPage />)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
   })
 
   it('T05: al seleccionar database carga collections y views', async () => {
@@ -160,7 +175,12 @@ describe('ConsoleMongoPage', () => {
     fireEvent.click(await screen.findByText('orders'))
     fireEvent.click(await screen.findByRole('button', { name: 'Documentos' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('403 Forbidden')
+    // [#743] a network/unknown-status failure (this rejection carries no real `status` field,
+    // just a message that happens to say "403 Forbidden") renders the page's own localized
+    // fallback — never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudieron cargar más documentos|no se pudieron cargar los documentos/i)
+    expect(alert.textContent ?? '').not.toMatch(/403 forbidden/i)
     fireEvent.click(screen.getByRole('button', { name: 'Índices' }))
     expect(await screen.findByText('status_1')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Validación' }))

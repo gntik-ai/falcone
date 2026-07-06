@@ -264,7 +264,11 @@ describe('ConsolePostgresPage', () => {
 
     expect(await screen.findByText('id')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /índices/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/índices degradados/i)
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudieron cargar los índices de la tabla/i)
+    expect(alert.textContent ?? '').not.toMatch(/índices degradados/i)
 
     await user.click(screen.getByRole('button', { name: /columnas/i }))
     expect(await screen.findByText('gen_random_uuid()')).toBeInTheDocument()
@@ -347,11 +351,31 @@ describe('ConsolePostgresPage', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/bases degradadas/i)
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudieron cargar las bases de datos postgresql/i)
+    expect(alert.textContent ?? '').not.toMatch(/bases degradadas/i)
     await user.click(screen.getAllByRole('button', { name: /reintentar/i })[0]!)
 
     expect(await screen.findByText('app_db')).toBeInTheDocument()
     expect(getRequestCount('/v1/postgres/databases?page%5Bsize%5D=100')).toBe(2)
+  })
+
+  // [#743] confirmed-repro shape: a 403 FORBIDDEN must never render the raw backend message.
+  it('[#743] localiza un error 403 del backend al cargar bases de datos — nunca el texto crudo', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url === '/v1/postgres/databases?page%5Bsize%5D=100') {
+        throw { status: 403, code: 'FORBIDDEN', message: 'requires superadmin' }
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderPage()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
   })
 
   it('muestra snippets de conexión para la base seleccionada y usa placeholders de host', async () => {

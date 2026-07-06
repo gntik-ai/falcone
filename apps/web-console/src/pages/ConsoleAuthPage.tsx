@@ -8,6 +8,7 @@ import { CreateIamClientWizard } from '@/components/console/wizards/CreateIamCli
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
@@ -303,7 +304,7 @@ export function ConsoleAuthPage() {
         setRealmState({
           ...EMPTY_REALM_STATE,
           loading: false,
-          error: getErrorMessage(error, 'No se pudo cargar el inventario Auth/IAM del realm.')
+          error: describeConsoleError(error, 'No se pudo cargar el inventario Auth/IAM del realm.')
         })
       })
 
@@ -331,7 +332,7 @@ export function ConsoleAuthPage() {
         setApplicationsState({
           ...EMPTY_APPLICATIONS_STATE,
           loading: false,
-          error: getErrorMessage(error, 'No se pudieron cargar las aplicaciones externas del área de trabajo.')
+          error: describeConsoleError(error, 'No se pudieron cargar las aplicaciones externas del área de trabajo.')
         })
       })
 
@@ -470,7 +471,7 @@ export function ConsoleAuthPage() {
       setEditingApplicationId(null)
       await reloadApplications(isEditing ? 'Aplicación actualizada. Refrescando inventario…' : 'Aplicación creada. Refrescando inventario…')
     } catch (error) {
-      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo guardar la aplicación.') })
+      setFeedback({ tone: 'error', message: describeConsoleError(error, 'No se pudo guardar la aplicación.') })
     } finally {
       setIsSubmittingApplication(false)
     }
@@ -536,7 +537,7 @@ export function ConsoleAuthPage() {
       setProviderEditingId(null)
       await reloadApplications(isEditing ? 'Proveedor actualizado. Refrescando inventario…' : 'Proveedor añadido. Refrescando inventario…')
     } catch (error) {
-      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo guardar el proveedor.') })
+      setFeedback({ tone: 'error', message: describeConsoleError(error, 'No se pudo guardar el proveedor.') })
     } finally {
       setIsSubmittingProvider(false)
     }
@@ -553,7 +554,7 @@ export function ConsoleAuthPage() {
       )
       await reloadApplications(`Proveedor ${provider.alias} actualizado.`)
     } catch (error) {
-      setFeedback({ tone: 'error', message: getErrorMessage(error, 'No se pudo cambiar el estado del proveedor.') })
+      setFeedback({ tone: 'error', message: describeConsoleError(error, 'No se pudo cambiar el estado del proveedor.') })
     } finally {
       setIsSubmittingProvider(false)
     }
@@ -878,10 +879,6 @@ function formatList(values?: string[]): string {
   return values && values.length > 0 ? values.join(', ') : '—'
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') return error.message
-  return fallback
-}
 
 function splitLines(value: string): string[] {
   return value.split('\n').map((entry) => entry.trim()).filter(Boolean)

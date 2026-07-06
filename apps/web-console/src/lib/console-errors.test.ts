@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  describeConsoleError,
-  getConsoleErrorCode,
-  getConsoleErrorCorrelationId,
-  getConsoleErrorStatus
-} from './console-errors'
+import { describeConsoleError, getConsoleErrorStatus } from './console-errors'
 
 const FALLBACK = 'No se pudieron cargar los datos de la página.'
 
@@ -79,31 +74,3 @@ describe('getConsoleErrorStatus', () => {
   })
 })
 
-describe('getConsoleErrorCode', () => {
-  it('reads a top-level code', () => {
-    expect(getConsoleErrorCode({ code: 'FORBIDDEN' })).toBe('FORBIDDEN')
-  })
-
-  it('reads a code nested under body', () => {
-    expect(getConsoleErrorCode({ body: { code: 'CONFLICT' } })).toBe('CONFLICT')
-  })
-
-  it('returns undefined when absent', () => {
-    expect(getConsoleErrorCode({})).toBeUndefined()
-  })
-})
-
-describe('getConsoleErrorCorrelationId', () => {
-  it('prefers correlationId over requestId', () => {
-    expect(getConsoleErrorCorrelationId({ correlationId: 'corr_1', requestId: 'req_1' })).toBe('corr_1')
-  })
-
-  it('falls back to requestId', () => {
-    expect(getConsoleErrorCorrelationId({ requestId: 'req_1' })).toBe('req_1')
-  })
-
-  it('returns undefined when neither is present', () => {
-    expect(getConsoleErrorCorrelationId({})).toBeUndefined()
-    expect(getConsoleErrorCorrelationId(new Error('boom'))).toBeUndefined()
-  })
-})

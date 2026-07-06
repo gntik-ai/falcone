@@ -17,11 +17,6 @@
  * `Error` instances, `PlanApiError`, or a plain object read off a non-JSON response). */
 interface ConsoleErrorLike {
   status?: unknown
-  code?: unknown
-  message?: unknown
-  correlationId?: unknown
-  requestId?: unknown
-  body?: { message?: unknown; code?: unknown } | unknown
 }
 
 function asRecord(error: unknown): ConsoleErrorLike | null {
@@ -33,29 +28,6 @@ function asRecord(error: unknown): ConsoleErrorLike | null {
 export function getConsoleErrorStatus(error: unknown): number | undefined {
   const record = asRecord(error)
   return record && typeof record.status === 'number' ? record.status : undefined
-}
-
-/** Reads a well-known machine `code` off a thrown error, if present. */
-export function getConsoleErrorCode(error: unknown): string | undefined {
-  const record = asRecord(error)
-  if (record && typeof record.code === 'string' && record.code.trim()) return record.code
-  const body = record?.body
-  if (body && typeof body === 'object' && 'code' in body) {
-    const bodyCode = (body as { code?: unknown }).code
-    if (typeof bodyCode === 'string' && bodyCode.trim()) return bodyCode
-  }
-  return undefined
-}
-
-/** Surfaces a support-facing correlation id (never the raw error message) so pages can render
- * it as muted secondary text, e.g. "Código de referencia: corr_...". Additive — pages are not
- * required to use this. */
-export function getConsoleErrorCorrelationId(error: unknown): string | undefined {
-  const record = asRecord(error)
-  if (!record) return undefined
-  if (typeof record.correlationId === 'string' && record.correlationId.trim()) return record.correlationId
-  if (typeof record.requestId === 'string' && record.requestId.trim()) return record.requestId
-  return undefined
 }
 
 /**

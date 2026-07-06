@@ -95,4 +95,19 @@ describe('ConsoleTenantConfigExportPage', () => {
       expect(screen.getByTestId('page-error')).toHaveTextContent('demasiado grande')
     })
   })
+
+  it('[#743] an unrecognized status code localizes the message — never the raw backend text', async () => {
+    mockGetDomains.mockResolvedValue(DOMAINS_RESPONSE)
+    mockExport.mockRejectedValue(new ConfigExportApiError(500, 'No action mapped for POST /v1/tenants/acme/config/export'))
+
+    render(<ConsoleTenantConfigExportPage tenantId="acme" />)
+    await waitFor(() => expect(screen.getByTestId('export-btn')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId('export-btn'))
+    await waitFor(() => {
+      const errorEl = screen.getByTestId('page-error')
+      expect(errorEl).toHaveTextContent(/no está disponible en este momento/i)
+      expect(errorEl.textContent ?? '').not.toMatch(/no action mapped/i)
+    })
+  })
 })

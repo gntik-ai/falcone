@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { ApiError } from '@/lib/http'
 
 interface FunctionRecord {
   id: string
@@ -24,10 +24,6 @@ interface FunctionRecord {
 interface ListResponse {
   items: FunctionRecord[]
   total: number
-}
-
-function errMsg(error: unknown, fallback: string): string {
-  return (error as Partial<ApiError>)?.message?.trim() || fallback
 }
 
 export function ConsoleFunctionRegistryPage() {
@@ -47,7 +43,7 @@ export function ConsoleFunctionRegistryPage() {
       const res = await requestConsoleSessionJson<ListResponse>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/functions`)
       setItems(res.items ?? [])
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudieron cargar las funciones del área de trabajo.'))
+      setError(describeConsoleError(rawError, 'No se pudieron cargar las funciones del área de trabajo.'))
     } finally {
       setLoading(false)
     }
@@ -75,7 +71,7 @@ export function ConsoleFunctionRegistryPage() {
       setName('')
       await load(activeWorkspaceId)
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudo registrar la función.'))
+      setError(describeConsoleError(rawError, 'No se pudo registrar la función.'))
     } finally {
       setBusy(false)
     }

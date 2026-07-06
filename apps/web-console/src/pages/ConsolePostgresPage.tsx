@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
@@ -163,10 +164,6 @@ type PgMutationAccepted = {
   riskProfile?: PgRiskProfile
 }
 
-type ApiErrorBody = {
-  message?: string
-}
-
 const EMPTY_COLLECTION_STATE = <T,>(data: T): SectionState<T> => ({
   data,
   loading: false,
@@ -179,23 +176,6 @@ const EMPTY_DDL_PREVIEW: DdlPreviewState = {
   riskProfile: null,
   loading: false,
   error: null
-}
-
-function getApiErrorMessage(rawError: unknown, fallback: string): string {
-  if (typeof rawError === 'object' && rawError !== null) {
-    if ('message' in rawError && typeof rawError.message === 'string' && rawError.message.trim()) {
-      return rawError.message
-    }
-
-    if ('body' in rawError) {
-      const body = rawError.body as ApiErrorBody | undefined
-      if (typeof body?.message === 'string' && body.message.trim()) {
-        return body.message
-      }
-    }
-  }
-
-  return fallback
 }
 
 function encodePathSegment(value: string): string {
@@ -404,7 +384,7 @@ export function ConsolePostgresPage() {
       const response = await loadDatabases()
       setDatabases({ data: response.items ?? [], loading: false, error: null })
     } catch (error) {
-      setDatabases({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar las bases de datos PostgreSQL.') })
+      setDatabases({ data: [], loading: false, error: describeConsoleError(error, 'No se pudieron cargar las bases de datos PostgreSQL.') })
     }
   }, [])
 
@@ -415,7 +395,7 @@ export function ConsolePostgresPage() {
       const response = await loadSchemas(databaseName)
       setSchemas({ data: response.items ?? [], loading: false, error: null })
     } catch (error) {
-      setSchemas({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los esquemas PostgreSQL.') })
+      setSchemas({ data: [], loading: false, error: describeConsoleError(error, 'No se pudieron cargar los esquemas PostgreSQL.') })
     }
   }, [])
 
@@ -433,19 +413,19 @@ export function ConsolePostgresPage() {
     if (tablesResult.status === 'fulfilled') {
       setTables({ data: tablesResult.value.items ?? [], loading: false, error: null })
     } else {
-      setTables({ data: [], loading: false, error: getApiErrorMessage(tablesResult.reason, 'No se pudieron cargar las tablas del esquema.') })
+      setTables({ data: [], loading: false, error: describeConsoleError(tablesResult.reason, 'No se pudieron cargar las tablas del esquema.') })
     }
 
     if (viewsResult.status === 'fulfilled') {
       setViews({ data: viewsResult.value.items ?? [], loading: false, error: null })
     } else {
-      setViews({ data: [], loading: false, error: getApiErrorMessage(viewsResult.reason, 'No se pudieron cargar las vistas del esquema.') })
+      setViews({ data: [], loading: false, error: describeConsoleError(viewsResult.reason, 'No se pudieron cargar las vistas del esquema.') })
     }
 
     if (matViewsResult.status === 'fulfilled') {
       setMatViews({ data: matViewsResult.value.items ?? [], loading: false, error: null })
     } else {
-      setMatViews({ data: [], loading: false, error: getApiErrorMessage(matViewsResult.reason, 'No se pudieron cargar las vistas materializadas del esquema.') })
+      setMatViews({ data: [], loading: false, error: describeConsoleError(matViewsResult.reason, 'No se pudieron cargar las vistas materializadas del esquema.') })
     }
   }, [])
 
@@ -465,25 +445,25 @@ export function ConsolePostgresPage() {
     if (columnsResult.status === 'fulfilled') {
       setColumns({ data: columnsResult.value.items ?? [], loading: false, error: null })
     } else {
-      setColumns({ data: [], loading: false, error: getApiErrorMessage(columnsResult.reason, 'No se pudieron cargar las columnas de la tabla.') })
+      setColumns({ data: [], loading: false, error: describeConsoleError(columnsResult.reason, 'No se pudieron cargar las columnas de la tabla.') })
     }
 
     if (indexesResult.status === 'fulfilled') {
       setIndexes({ data: indexesResult.value.items ?? [], loading: false, error: null })
     } else {
-      setIndexes({ data: [], loading: false, error: getApiErrorMessage(indexesResult.reason, 'No se pudieron cargar los índices de la tabla.') })
+      setIndexes({ data: [], loading: false, error: describeConsoleError(indexesResult.reason, 'No se pudieron cargar los índices de la tabla.') })
     }
 
     if (policiesResult.status === 'fulfilled') {
       setPolicies({ data: policiesResult.value.items ?? [], loading: false, error: null })
     } else {
-      setPolicies({ data: [], loading: false, error: getApiErrorMessage(policiesResult.reason, 'No se pudieron cargar las políticas RLS de la tabla.') })
+      setPolicies({ data: [], loading: false, error: describeConsoleError(policiesResult.reason, 'No se pudieron cargar las políticas RLS de la tabla.') })
     }
 
     if (securityResult.status === 'fulfilled') {
       setSecurity({ data: securityResult.value, loading: false, error: null })
     } else {
-      setSecurity({ data: null, loading: false, error: getApiErrorMessage(securityResult.reason, 'No se pudo cargar la seguridad efectiva de la tabla.') })
+      setSecurity({ data: null, loading: false, error: describeConsoleError(securityResult.reason, 'No se pudo cargar la seguridad efectiva de la tabla.') })
     }
   }, [])
 
@@ -588,7 +568,7 @@ export function ConsolePostgresPage() {
           warnings: [],
           riskProfile: null,
           loading: false,
-          error: getApiErrorMessage(error, 'No se pudo generar el preview DDL del recurso seleccionado.')
+          error: describeConsoleError(error, 'No se pudo generar el preview DDL del recurso seleccionado.')
         })
       }
     },
@@ -622,7 +602,7 @@ export function ConsolePostgresPage() {
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setDatabases({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar las bases de datos PostgreSQL.') })
+          setDatabases({ data: [], loading: false, error: describeConsoleError(error, 'No se pudieron cargar las bases de datos PostgreSQL.') })
         }
       }
     })()
@@ -652,7 +632,7 @@ export function ConsolePostgresPage() {
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setSchemas({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los esquemas PostgreSQL.') })
+          setSchemas({ data: [], loading: false, error: describeConsoleError(error, 'No se pudieron cargar los esquemas PostgreSQL.') })
         }
       }
     })()
@@ -695,19 +675,19 @@ export function ConsolePostgresPage() {
       if (tablesResult.status === 'fulfilled') {
         setTables({ data: tablesResult.value.items ?? [], loading: false, error: null })
       } else {
-        setTables({ data: [], loading: false, error: getApiErrorMessage(tablesResult.reason, 'No se pudieron cargar las tablas del esquema.') })
+        setTables({ data: [], loading: false, error: describeConsoleError(tablesResult.reason, 'No se pudieron cargar las tablas del esquema.') })
       }
 
       if (viewsResult.status === 'fulfilled') {
         setViews({ data: viewsResult.value.items ?? [], loading: false, error: null })
       } else {
-        setViews({ data: [], loading: false, error: getApiErrorMessage(viewsResult.reason, 'No se pudieron cargar las vistas del esquema.') })
+        setViews({ data: [], loading: false, error: describeConsoleError(viewsResult.reason, 'No se pudieron cargar las vistas del esquema.') })
       }
 
       if (matViewsResult.status === 'fulfilled') {
         setMatViews({ data: matViewsResult.value.items ?? [], loading: false, error: null })
       } else {
-        setMatViews({ data: [], loading: false, error: getApiErrorMessage(matViewsResult.reason, 'No se pudieron cargar las vistas materializadas del esquema.') })
+        setMatViews({ data: [], loading: false, error: describeConsoleError(matViewsResult.reason, 'No se pudieron cargar las vistas materializadas del esquema.') })
       }
     })()
 
@@ -754,25 +734,25 @@ export function ConsolePostgresPage() {
       if (columnsResult.status === 'fulfilled') {
         setColumns({ data: columnsResult.value.items ?? [], loading: false, error: null })
       } else {
-        setColumns({ data: [], loading: false, error: getApiErrorMessage(columnsResult.reason, 'No se pudieron cargar las columnas de la tabla.') })
+        setColumns({ data: [], loading: false, error: describeConsoleError(columnsResult.reason, 'No se pudieron cargar las columnas de la tabla.') })
       }
 
       if (indexesResult.status === 'fulfilled') {
         setIndexes({ data: indexesResult.value.items ?? [], loading: false, error: null })
       } else {
-        setIndexes({ data: [], loading: false, error: getApiErrorMessage(indexesResult.reason, 'No se pudieron cargar los índices de la tabla.') })
+        setIndexes({ data: [], loading: false, error: describeConsoleError(indexesResult.reason, 'No se pudieron cargar los índices de la tabla.') })
       }
 
       if (policiesResult.status === 'fulfilled') {
         setPolicies({ data: policiesResult.value.items ?? [], loading: false, error: null })
       } else {
-        setPolicies({ data: [], loading: false, error: getApiErrorMessage(policiesResult.reason, 'No se pudieron cargar las políticas RLS de la tabla.') })
+        setPolicies({ data: [], loading: false, error: describeConsoleError(policiesResult.reason, 'No se pudieron cargar las políticas RLS de la tabla.') })
       }
 
       if (securityResult.status === 'fulfilled') {
         setSecurity({ data: securityResult.value, loading: false, error: null })
       } else {
-        setSecurity({ data: null, loading: false, error: getApiErrorMessage(securityResult.reason, 'No se pudo cargar la seguridad efectiva de la tabla.') })
+        setSecurity({ data: null, loading: false, error: describeConsoleError(securityResult.reason, 'No se pudo cargar la seguridad efectiva de la tabla.') })
       }
     })()
 
@@ -816,7 +796,7 @@ export function ConsolePostgresPage() {
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setSchemas({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los esquemas PostgreSQL.') })
+          setSchemas({ data: [], loading: false, error: describeConsoleError(error, 'No se pudieron cargar los esquemas PostgreSQL.') })
         }
       }
     })()

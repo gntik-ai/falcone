@@ -18,6 +18,7 @@ import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { useConsolePermissions } from '@/lib/console-permissions'
 import { createFlowDraft, listFlows, type FlowScheduleTriggerAck, type FlowSummary } from '@/services/flowsApi'
 
@@ -64,7 +65,7 @@ export function ConsoleFlowsPage() {
       const response = await listFlows(activeWorkspaceId)
       setFlows(response.items ?? [])
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'No se pudieron cargar los flujos')
+      setLoadError(describeConsoleError(error, 'No se pudieron cargar los flujos'))
     } finally {
       setLoading(false)
     }
@@ -90,7 +91,7 @@ export function ConsoleFlowsPage() {
       if (status === 403) {
         setCreateDenied(true)
       } else {
-        setCreateError(error instanceof Error ? error.message : 'No se pudo crear el borrador del flujo')
+        setCreateError(describeConsoleError(error, 'No se pudo crear el borrador del flujo'))
       }
       setCreating(false)
     }
