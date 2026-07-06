@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
+import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
+import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
 import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
+import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import { exportBucketObjects } from '@/services/dataExportImportApi'
+import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
+import { cn } from '@/lib/utils'
+import { createBucket, exportBucketObjects, uploadObject } from '@/services/dataExportImportApi'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline'
@@ -122,6 +129,24 @@ const STORAGE_MULTIPART_READ_API_AVAILABLE = false
 // clamps this to the platform maximum (STORAGE_PRESIGN_MAX_TTL_SECONDS, default 3600).
 const PRESIGNED_DOWNLOAD_TTL_SECONDS = 300
 
+// #758 visual polish — centralized class treatments (mirroring the module-level `emptyStateClassName`
+// idiom in EventsConsole/ConsoleFunctionsPage) so the create/upload disclosure forms, the actionable
+// empty states and the success notice stay consistent instead of carrying one-off inline strings.
+//
+// Active disclosure form: a solid, subtly-lit "well" that reads as an input surface — deliberately
+// distinct from the dashed, recessed empty-state placeholders below (solid border + muted fill).
+const DISCLOSURE_FORM_CLASS = 'space-y-4 rounded-2xl border border-border bg-muted/30 p-4 sm:p-5'
+// Actionable empty state inside an already-populated card: centered, dashed and muted with room for a
+// primary CTA — the console's empty-state convention (ConsoleMembersPage/ConsolePostgresPage), sized
+// as an in-card inset (bg-background/40) rather than a full-section panel.
+const CARD_EMPTY_STATE_CLASS =
+  'flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-background/40 px-6 py-10 text-center'
+// Polite success notice: identical tokens to the design system's Alert `success` variant (emerald
+// tone + rounded-2xl/px-4/py-3 geometry) but rendered as a roleless element, so it can live inside the
+// persistent aria-live="polite" region without the assertive role Alert hardcodes.
+const SUCCESS_NOTICE_CLASS =
+  'rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100'
+
 type StoragePresignedUrl = {
   url: string
   operation: string
@@ -130,6 +155,27 @@ type StoragePresignedUrl = {
   expiresAt: string
   ttlSeconds: number
   ttlClamped?: boolean
+}
+
+// Reads a File in-browser and resolves its exact bytes as a base64 string (#758), via the
+// FileReader data-URL path (`data:<mime>;base64,<data>`), stripping the "data:...;base64," prefix.
+// The result is sent to `uploadObject`'s JSON envelope so binary content round-trips byte-faithfully
+// (see `resolveObjectBody`'s `encoding: 'base64'` branch on the control-plane side).
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string') {
+        reject(new Error('unexpected FileReader result type'))
+        return
+      }
+      const commaIndex = result.indexOf(',')
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('file read failed'))
+    reader.readAsDataURL(file)
+  })
 }
 
 function isAbortError(rawError: unknown): boolean {
@@ -247,16 +293,45 @@ export function ConsoleStoragePage() {
   const [usage, setUsage] = useState<SectionState<StorageUsageSnapshot | null>>(EMPTY_USAGE_STATE)
   // #676 object-I/O completeness affordances (write actions; not part of the read snapshots).
   const [presigned, setPresigned] = useState<SectionState<StoragePresignedUrl | null>>({ data: null, loading: false, error: null })
-  const [deletingBucketId, setDeletingBucketId] = useState<string | null>(null)
   const [bucketActionError, setBucketActionError] = useState<string | null>(null)
   const [exportingBucketId, setExportingBucketId] = useState<string | null>(null)
   const [bucketExportNotice, setBucketExportNotice] = useState<string | null>(null)
+  // #758: bucket delete now routes through the shared destructive-confirmation dialog instead of
+  // firing the DELETE immediately.
+  const destructiveOp = useDestructiveOp()
+  // #758: create-bucket affordance + form state.
+  const [showCreateBucketForm, setShowCreateBucketForm] = useState(false)
+  const [newBucketName, setNewBucketName] = useState('')
+  const [creatingBucket, setCreatingBucket] = useState(false)
+  const [createBucketError, setCreateBucketError] = useState<string | null>(null)
+  const newBucketNameId = useId()
+  const createBucketFormId = useId()
+  const createBucketHelpId = useId()
+  const newBucketNameRef = useRef<HTMLInputElement>(null)
+  // #758: upload-object affordance + form state (per selected bucket; reset alongside the rest of
+  // the bucket-detail state below).
+  const [showUploadForm, setShowUploadForm] = useState(false)
+  const [uploadKey, setUploadKey] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadingObject, setUploadingObject] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const uploadKeyId = useId()
+  const uploadFileId = useId()
+  const uploadKeyHelpId = useId()
+  const uploadFileHelpId = useId()
+  const uploadFormId = useId()
+  const uploadKeyRef = useRef<HTMLInputElement>(null)
+  const uploadFileInputRef = useRef<HTMLInputElement>(null)
 
   const resetBucketDetailState = useCallback(() => {
     setBucketTab('objects')
     setObjects(EMPTY_OBJECTS_STATE)
     setSelectedObjectKey(null)
     setObjectMeta(EMPTY_OBJECT_META_STATE)
+    setShowUploadForm(false)
+    setUploadKey('')
+    setUploadFile(null)
+    setUploadError(null)
   }, [])
 
   const loadBuckets = useCallback(async (workspaceId: string, signal?: AbortSignal) => {
@@ -365,28 +440,90 @@ export function ConsoleStoragePage() {
     }
   }, [])
 
-  // Delete a SINGLE bucket the caller owns (#676). On success, refresh the bucket list and clear
-  // the selection if the deleted bucket was selected.
-  const deleteBucketAction = useCallback(async (bucketId: string, workspaceId: string) => {
-    setBucketActionError(null)
-    setDeletingBucketId(bucketId)
+  // Delete a SINGLE bucket the caller owns (#676), now guarded by the shared destructive-op
+  // confirmation dialog (#758 — the safety crux): the DELETE fires only after the operator types
+  // the exact bucket name and confirms (CRITICAL level, mirroring ConsoleServiceAccountsPage's
+  // delete-service-account flow). `onConfirm` awaits the request and lets a rejection THROW so the
+  // dialog surfaces `confirmError`; the list/usage refresh + status notice move to `onSuccess`.
+  const deleteBucketRequest = useCallback(async (bucketId: string) => {
+    await requestConsoleSessionJson<{ bucket: string; deleted: boolean }>(`/v1/storage/buckets/${bucketId}`, { method: 'DELETE' })
+  }, [])
+
+  const openDeleteBucketDialog = useCallback((bucket: StorageBucket) => {
+    destructiveOp.openDialog({
+      level: DESTRUCTIVE_OP_LEVELS['delete-storage-bucket'],
+      operationId: 'delete-storage-bucket',
+      resourceName: bucket.bucketName,
+      resourceType: 'bucket',
+      impactDescription: 'Se eliminarán el bucket y TODOS sus objetos de forma permanente. Esta acción es irreversible.',
+      onConfirm: () => deleteBucketRequest(bucket.resourceId),
+      onSuccess: () => {
+        setSelectedBucketId((current) => (current === bucket.resourceId ? null : current))
+        setBucketActionError(null)
+        setBucketExportNotice(`Bucket "${bucket.bucketName}" eliminado.`)
+        void loadBuckets(bucket.workspaceId)
+        void loadUsage(bucket.workspaceId)
+      }
+    })
+  }, [deleteBucketRequest, destructiveOp.openDialog, loadBuckets, loadUsage])
+
+  // Create a bucket for the active workspace (#758). `name` is only a hint — the control plane
+  // derives a DNS-safe, workspace-scoped physical name, so the operator is told the effective name
+  // may differ and the confirmation notice always echoes back the ACTUAL created name.
+  const createBucketAction = useCallback(async (workspaceId: string) => {
+    setCreateBucketError(null)
+    setCreatingBucket(true)
     try {
-      await requestConsoleSessionJson<{ bucket: string; deleted: boolean }>(`/v1/storage/buckets/${bucketId}`, { method: 'DELETE' })
-      setSelectedBucketId((current) => (current === bucketId ? null : current))
+      const trimmed = newBucketName.trim()
+      const result = await createBucket(workspaceId, trimmed ? { name: trimmed } : {})
+      setNewBucketName('')
+      setShowCreateBucketForm(false)
+      setBucketActionError(null)
+      setBucketExportNotice(`Bucket creado: ${result.bucket.bucketName}.`)
       await loadBuckets(workspaceId)
       await loadUsage(workspaceId)
     } catch (error) {
-      if (!isAbortError(error)) setBucketActionError(describeConsoleError(error, 'No se pudo eliminar el bucket.'))
+      if (!isAbortError(error)) setCreateBucketError(describeConsoleError(error, 'No se pudo crear el bucket.'))
     } finally {
-      setDeletingBucketId(null)
+      setCreatingBucket(false)
     }
-  }, [loadBuckets, loadUsage])
+  }, [newBucketName, loadBuckets, loadUsage])
+
+  // Upload a single object's exact bytes into the selected bucket (#758). The file is read
+  // in-browser and sent as a base64 JSON envelope (see `readFileAsBase64` / `resolveObjectBody`
+  // above) so binary content round-trips byte-faithfully.
+  const uploadObjectAction = useCallback(async (bucketId: string) => {
+    if (!uploadFile) return
+    setUploadError(null)
+    setUploadingObject(true)
+    try {
+      const key = uploadKey.trim() || uploadFile.name
+      const content = await readFileAsBase64(uploadFile)
+      const result = await uploadObject(bucketId, key, { content, contentType: uploadFile.type || 'application/octet-stream' })
+      setUploadKey('')
+      setUploadFile(null)
+      setShowUploadForm(false)
+      if (uploadFileInputRef.current) uploadFileInputRef.current.value = ''
+      setBucketActionError(null)
+      setBucketExportNotice(`Objeto subido: ${result.objectKey} (${formatBytes(result.sizeBytes)}).`)
+      await loadObjects(bucketId, null)
+    } catch (error) {
+      if (!isAbortError(error)) setUploadError(describeConsoleError(error, 'No se pudo subir el objeto.'))
+    } finally {
+      setUploadingObject(false)
+    }
+  }, [uploadFile, uploadKey, loadObjects])
 
   useEffect(() => {
     setBuckets(EMPTY_BUCKETS_STATE)
     setSelectedBucketId(null)
     resetBucketDetailState()
     setUsage(EMPTY_USAGE_STATE)
+    setBucketActionError(null)
+    setBucketExportNotice(null)
+    setShowCreateBucketForm(false)
+    setNewBucketName('')
+    setCreateBucketError(null)
 
     if (!activeWorkspaceId) {
       return undefined
@@ -425,6 +562,18 @@ export function ConsoleStoragePage() {
     void loadObjectMeta(selectedBucketId, selectedObjectKey, controller.signal)
     return () => controller.abort()
   }, [loadObjectMeta, selectedBucketId, selectedObjectKey])
+
+  // #758 a11y: when a disclosure form opens, move focus into it so keyboard and screen-reader
+  // users land on the first field instead of being stranded on the toggle button. Focus is not
+  // forced on close — clicking the toggle keeps focus on it, and a successful create/upload/delete
+  // is announced through the polite live region below.
+  useEffect(() => {
+    if (showCreateBucketForm) newBucketNameRef.current?.focus()
+  }, [showCreateBucketForm])
+
+  useEffect(() => {
+    if (showUploadForm) uploadKeyRef.current?.focus()
+  }, [showUploadForm])
 
   const selectedBucket = useMemo(
     () => buckets.data.find((bucket) => bucket.resourceId === selectedBucketId) ?? null,
@@ -475,7 +624,7 @@ export function ConsoleStoragePage() {
     <main className="space-y-6" data-testid="console-storage-page">
       <section className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Almacenamiento / objetos</h1>
-        <p className="text-sm text-muted-foreground">Buckets, objetos, metadatos y uso del área de trabajo activa usando únicamente rutas públicas de lectura.</p>
+        <p className="text-sm text-muted-foreground">Buckets, objetos, metadatos y uso del área de trabajo activa. Crear buckets, subir objetos y eliminar un bucket (con confirmación) están disponibles desde esta página.</p>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
@@ -486,9 +635,70 @@ export function ConsoleStoragePage() {
                 <CardTitle>Buckets</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">Inventario visible para el área de trabajo activa.</p>
               </div>
-              <Badge variant="outline">{buckets.data.length} visibles</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{buckets.data.length} visibles</Badge>
+                <Button
+                  onClick={() => setShowCreateBucketForm((current) => !current)}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-expanded={showCreateBucketForm}
+                  aria-controls={createBucketFormId}
+                >
+                  {showCreateBucketForm ? 'Cerrar' : 'Nuevo bucket'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
+              {showCreateBucketForm ? (
+                <form
+                  id={createBucketFormId}
+                  aria-busy={creatingBucket}
+                  className={cn('mb-4', DISCLOSURE_FORM_CLASS)}
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void createBucketAction(activeWorkspaceId)
+                  }}
+                  noValidate
+                >
+                  <div className="space-y-1.5">
+                    <Label htmlFor={newBucketNameId}>Nombre del bucket (opcional)</Label>
+                    <Input
+                      id={newBucketNameId}
+                      ref={newBucketNameRef}
+                      value={newBucketName}
+                      onChange={(event) => setNewBucketName(event.target.value)}
+                      placeholder="p. ej. media-assets"
+                      autoComplete="off"
+                      spellCheck={false}
+                      disabled={creatingBucket}
+                      aria-describedby={createBucketHelpId}
+                    />
+                    <p id={createBucketHelpId} className="text-xs leading-5 text-muted-foreground">
+                      El nombre es orientativo: el final puede normalizarse (minúsculas, DNS-seguro) y queda asociado a esta área de trabajo. Al crearlo se confirma el nombre real.
+                    </p>
+                  </div>
+                  {createBucketError ? <Alert variant="destructive">{createBucketError}</Alert> : null}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="submit" size="sm" disabled={creatingBucket} aria-busy={creatingBucket}>
+                      {creatingBucket ? 'Creando…' : 'Crear'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={creatingBucket}
+                      onClick={() => {
+                        setShowCreateBucketForm(false)
+                        setNewBucketName('')
+                        setCreateBucketError(null)
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
               {buckets.loading ? <p>Cargando buckets…</p> : null}
               {!buckets.loading && buckets.error ? (
                 <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
@@ -496,9 +706,25 @@ export function ConsoleStoragePage() {
                   <Button onClick={() => void loadBuckets(activeWorkspaceId)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
                 </div>
               ) : null}
-              {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el área de trabajo seleccionada.</p> : null}
-              {bucketActionError ? <p className="mb-3" role="alert">{bucketActionError}</p> : null}
-              {bucketExportNotice ? <p className="mb-3" role="status">{bucketExportNotice}</p> : null}
+              {!buckets.loading && !buckets.error && buckets.data.length === 0 ? (
+                <div className={CARD_EMPTY_STATE_CLASS} role="status">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">No hay buckets en el área de trabajo seleccionada.</p>
+                    <p className="text-sm text-muted-foreground">Crea el primero para empezar a almacenar objetos.</p>
+                  </div>
+                  {!showCreateBucketForm ? (
+                    <Button onClick={() => setShowCreateBucketForm(true)} type="button">
+                      Crear bucket
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              {bucketActionError ? <Alert variant="destructive" className="mb-3">{bucketActionError}</Alert> : null}
+              {/* Persistent polite live region so create/upload/delete/export success is announced
+                  reliably even though it renders here (in the buckets column) after an async op. */}
+              <div aria-live="polite" className="empty:hidden">
+                {bucketExportNotice ? <p className={cn('mb-3', SUCCESS_NOTICE_CLASS)}>{bucketExportNotice}</p> : null}
+              </div>
               {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
                 <Table aria-label="Listado de buckets del área de trabajo activa">
                   <TableHeader>
@@ -546,13 +772,12 @@ export function ConsoleStoragePage() {
                                 {exportingBucketId === bucket.resourceId ? 'Exportando…' : 'Exportar'}
                               </Button>
                               <Button
-                                disabled={deletingBucketId === bucket.resourceId}
-                                onClick={() => void deleteBucketAction(bucket.resourceId, bucket.workspaceId)}
+                                onClick={() => openDeleteBucketDialog(bucket)}
                                 type="button"
                                 variant="destructive"
                                 size="sm"
                               >
-                                {deletingBucketId === bucket.resourceId ? 'Eliminando…' : 'Eliminar'}
+                                Eliminar
                               </Button>
                             </div>
                           </TableCell>
@@ -676,6 +901,87 @@ export function ConsoleStoragePage() {
                 </TabsList>
 
                 <TabsContent value="objects" className="space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-muted-foreground">Objetos del bucket seleccionado.</p>
+                    <Button
+                      onClick={() => setShowUploadForm((current) => !current)}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-expanded={showUploadForm}
+                      aria-controls={uploadFormId}
+                    >
+                      {showUploadForm ? 'Cerrar' : 'Subir objeto'}
+                    </Button>
+                  </div>
+
+                  {showUploadForm ? (
+                    <form
+                      id={uploadFormId}
+                      aria-busy={uploadingObject}
+                      className={DISCLOSURE_FORM_CLASS}
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        void uploadObjectAction(selectedBucket.resourceId)
+                      }}
+                      noValidate
+                    >
+                      <div className="space-y-1.5">
+                        <Label htmlFor={uploadKeyId}>Clave del objeto (opcional)</Label>
+                        <Input
+                          id={uploadKeyId}
+                          ref={uploadKeyRef}
+                          value={uploadKey}
+                          onChange={(event) => setUploadKey(event.target.value)}
+                          placeholder={uploadFile?.name ?? 'media/nuevo-objeto.png'}
+                          autoComplete="off"
+                          spellCheck={false}
+                          disabled={uploadingObject}
+                          aria-describedby={uploadKeyHelpId}
+                        />
+                        <p id={uploadKeyHelpId} className="text-xs leading-5 text-muted-foreground">
+                          Si se deja vacío, se usa el nombre del archivo seleccionado.
+                        </p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor={uploadFileId}>Archivo</Label>
+                        <Input
+                          id={uploadFileId}
+                          ref={uploadFileInputRef}
+                          type="file"
+                          className="cursor-pointer file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:transition-opacity hover:file:opacity-90"
+                          onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+                          disabled={uploadingObject}
+                          aria-describedby={uploadFileHelpId}
+                        />
+                        <p id={uploadFileHelpId} className="text-xs leading-5 text-muted-foreground">
+                          Se sube el contenido exacto del archivo (incluido binario), tal cual, al bucket seleccionado.
+                        </p>
+                      </div>
+                      {uploadError ? <Alert variant="destructive">{uploadError}</Alert> : null}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="submit" size="sm" disabled={!uploadFile || uploadingObject} aria-busy={uploadingObject}>
+                          {uploadingObject ? 'Subiendo…' : 'Subir'}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={uploadingObject}
+                          onClick={() => {
+                            setShowUploadForm(false)
+                            setUploadKey('')
+                            setUploadFile(null)
+                            setUploadError(null)
+                            if (uploadFileInputRef.current) uploadFileInputRef.current.value = ''
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  ) : null}
+
                   {objects.loading ? <p>Cargando objetos…</p> : null}
                   {!objects.loading && objects.error ? (
                     <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
@@ -683,7 +989,19 @@ export function ConsoleStoragePage() {
                       <Button onClick={() => void loadObjects(selectedBucket.resourceId, null)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
                     </div>
                   ) : null}
-                  {!objects.loading && !objects.error && objects.data && objects.data.items.length === 0 ? <p>Este bucket está vacío.</p> : null}
+                  {!objects.loading && !objects.error && objects.data && objects.data.items.length === 0 ? (
+                    <div className={CARD_EMPTY_STATE_CLASS} role="status">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">Este bucket está vacío.</p>
+                        <p className="text-sm text-muted-foreground">Sube el primer objeto para empezar.</p>
+                      </div>
+                      {!showUploadForm ? (
+                        <Button onClick={() => setShowUploadForm(true)} type="button">
+                          Subir el primer objeto
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {!objects.error && objects.data && objects.data.items.length > 0 ? (
                     <>
                       <Table aria-label="Listado de objetos del bucket seleccionado">
@@ -837,6 +1155,15 @@ export function ConsoleStoragePage() {
           )}
         </Card>
       </section>
+
+      <DestructiveConfirmationDialog
+        open={destructiveOp.isOpen}
+        config={destructiveOp.config}
+        opState={destructiveOp.opState}
+        confirmError={destructiveOp.confirmError}
+        onConfirm={() => void destructiveOp.handleConfirm()}
+        onCancel={destructiveOp.handleCancel}
+      />
     </main>
   )
 }

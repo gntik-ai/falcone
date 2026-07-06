@@ -36,7 +36,10 @@ export const DESTRUCTIVE_OP_LEVELS: Record<string, DestructiveOpLevel> = {
   // Deleting a service account removes its Keycloak client AND its persistence row permanently
   // (not just disabling the credential like revoke) — CRITICAL (#687).
   'delete-service-account': 'CRITICAL',
-  'delete-function': 'CRITICAL'
+  'delete-function': 'CRITICAL',
+  // Deleting a storage bucket removes the physical bucket AND every object inside it permanently
+  // (#758) — CRITICAL, same tier as delete-service-account/delete-function.
+  'delete-storage-bucket': 'CRITICAL'
 }
 
 type CascadeImpactResponse = {

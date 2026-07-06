@@ -354,7 +354,9 @@ describe('ConsoleStoragePage', () => {
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith(presignUrl, expect.objectContaining({ method: 'POST' }))
   })
 
-  it('elimina un bucket individual y refresca el inventario (#676)', async () => {
+  // #758: deleting a bucket is now CRITICAL-guarded by the shared destructive-op confirmation
+  // dialog — the DELETE must NOT fire until the operator types the exact bucket name and confirms.
+  it('exige confirmación explícita (nombre exacto) antes de eliminar un bucket (#758)', async () => {
     let bucketsEmptied = false
     mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string }) => {
       if (url === '/v1/storage/buckets?page[size]=100') return bucketsEmptied ? { items: [], page: { size: 0 } } : mockBuckets()
@@ -370,8 +372,154 @@ describe('ConsoleStoragePage', () => {
     // The first row's Eliminar button targets res_bucket_1 (media-assets, owned by wrk_alpha).
     await user.click((await screen.findAllByRole('button', { name: /^eliminar$/i }))[0])
 
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent(/media-assets/i)
+    expect(dialog).toHaveTextContent(/todos sus objetos/i)
+    expect(dialog).toHaveTextContent(/irreversible/i)
+
+    // Opening the dialog must NOT have sent the DELETE yet.
+    expect(mockRequestConsoleSessionJson).not.toHaveBeenCalledWith('/v1/storage/buckets/res_bucket_1', expect.objectContaining({ method: 'DELETE' }))
+
+    // CRITICAL ops require typing the exact resource name before the confirm button enables.
+    await user.type(screen.getByPlaceholderText('media-assets'), 'media-assets')
+    // The footer confirm button (also labelled "Eliminar") is the last match.
+    const confirmButtons = screen.getAllByRole('button', { name: /^eliminar$/i })
+    await user.click(confirmButtons[confirmButtons.length - 1])
+
     await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/storage/buckets/res_bucket_1', expect.objectContaining({ method: 'DELETE' })))
     expect(await screen.findByText(/no hay buckets en el área de trabajo seleccionada/i)).toBeInTheDocument()
+  })
+
+  it('el estado vacío de buckets ofrece crear el primero, y el formulario emite el POST real (#758)', async () => {
+    let created = false
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string; body?: unknown }) => {
+      if (url === '/v1/storage/buckets?page[size]=100') {
+        return created ? mockBuckets({ items: [mockBuckets().items[0]] }) : { items: [], page: { size: 0 } }
+      }
+      if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage()
+      if (url === '/v1/storage/workspaces/wrk_alpha/buckets' && init?.method === 'POST') {
+        expect(init?.body).toMatchObject({ name: 'media-assets' })
+        created = true
+        return {
+          bucket: { resourceId: 'res_bucket_1', bucketName: 'media-assets', workspaceId: 'wrk_alpha', tenantId: 'ten_alpha', region: 'eu-west-1', status: 'active' },
+          record: {},
+          storageCredential: null
+        }
+      }
+      throw new Error(`Unexpected URL ${url} (${init?.method ?? 'GET'})`)
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+    expect(await screen.findByText(/no hay buckets en el área de trabajo seleccionada/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^crear bucket$/i }))
+    await user.type(screen.getByLabelText(/nombre del bucket/i), 'media-assets')
+    await user.click(screen.getByRole('button', { name: /^crear$/i }))
+
+    await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/storage/workspaces/wrk_alpha/buckets', expect.objectContaining({ method: 'POST' })))
+    expect(await screen.findByRole('button', { name: 'media-assets' })).toBeInTheDocument()
+  })
+
+  it('un 409 al crear un bucket se muestra localizado y nunca el mensaje crudo del backend (#758)', async () => {
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string }) => {
+      if (url === '/v1/storage/buckets?page[size]=100') return { items: [], page: { size: 0 } }
+      if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage()
+      if (url === '/v1/storage/workspaces/wrk_alpha/buckets' && init?.method === 'POST') {
+        const error = new Error('storage bucket quota reached for this workspace: 8/8') as Error & { status?: number }
+        error.status = 409
+        throw error
+      }
+      throw new Error(`Unexpected URL ${url} (${init?.method ?? 'GET'})`)
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /^crear bucket$/i }))
+    await user.click(screen.getByRole('button', { name: /^crear$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/conflicto/i)
+    expect(alert.textContent ?? '').not.toMatch(/quota reached/i)
+  })
+
+  it('sube un objeto en el bucket seleccionado codificando el archivo en base64 (#758)', async () => {
+    const putUrl = '/v1/storage/buckets/res_bucket_1/objects/media%2Fnuevo.txt'
+    let uploaded = false
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string; body?: unknown }) => {
+      if (url === '/v1/storage/buckets?page[size]=100') return mockBuckets()
+      if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage()
+      if (url === '/v1/storage/buckets/res_bucket_1/objects?page%5Bsize%5D=50') {
+        return uploaded
+          ? mockObjects({
+              items: [
+                ...mockObjects().items,
+                {
+                  resourceId: 'res_obj_new',
+                  bucketResourceId: 'res_bucket_1',
+                  bucketName: 'media-assets',
+                  objectKey: 'media/nuevo.txt',
+                  contentType: 'text/plain',
+                  sizeBytes: 5,
+                  timestamps: {}
+                }
+              ],
+              page: { size: 50 }
+            })
+          : mockObjects()
+      }
+      if (url === putUrl && init?.method === 'PUT') {
+        const body = init?.body as { content?: string; contentType?: string; encoding?: string }
+        expect(body.encoding).toBe('base64')
+        expect(body.contentType).toBe('text/plain')
+        expect(body.content).toBe(Buffer.from('hello').toString('base64'))
+        uploaded = true
+        return { objectKey: 'media/nuevo.txt', bucketName: 'media-assets', sizeBytes: 5, contentType: 'text/plain' }
+      }
+      throw new Error(`Unexpected URL ${url} (${init?.method ?? 'GET'})`)
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'media-assets' }))
+    await user.click(await screen.findByRole('button', { name: /^subir objeto$/i }))
+
+    const file = new File(['hello'], 'nuevo.txt', { type: 'text/plain' })
+    await user.upload(screen.getByLabelText(/^archivo$/i), file)
+    await user.type(screen.getByLabelText(/clave del objeto/i), 'media/nuevo.txt')
+    await user.click(screen.getByRole('button', { name: /^subir$/i }))
+
+    await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith(putUrl, expect.objectContaining({ method: 'PUT' })))
+    expect(await screen.findByRole('button', { name: 'media/nuevo.txt' })).toBeInTheDocument()
+  })
+
+  it('un 409 al subir un objeto se muestra localizado y nunca el mensaje crudo del backend (#758)', async () => {
+    const putUrl = '/v1/storage/buckets/res_bucket_1/objects/media%2Fnuevo.txt'
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, init?: { method?: string }) => {
+      if (url === '/v1/storage/buckets?page[size]=100') return mockBuckets()
+      if (url === '/v1/storage/workspaces/wrk_alpha/usage') return mockUsage()
+      if (url === '/v1/storage/buckets/res_bucket_1/objects?page%5Bsize%5D=50') return mockObjects()
+      if (url === putUrl && init?.method === 'PUT') {
+        const error = new Error('storage byte quota would be exceeded for this workspace') as Error & { status?: number }
+        error.status = 409
+        throw error
+      }
+      throw new Error(`Unexpected URL ${url} (${init?.method ?? 'GET'})`)
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'media-assets' }))
+    await user.click(await screen.findByRole('button', { name: /^subir objeto$/i }))
+
+    const file = new File(['hello'], 'nuevo.txt', { type: 'text/plain' })
+    await user.upload(screen.getByLabelText(/^archivo$/i), file)
+    await user.type(screen.getByLabelText(/clave del objeto/i), 'media/nuevo.txt')
+    await user.click(screen.getByRole('button', { name: /^subir$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/conflicto/i)
+    expect(alert.textContent ?? '').not.toMatch(/byte quota/i)
   })
 
   it('mantiene la página utilizable cuando falla la metadatos del objeto', async () => {

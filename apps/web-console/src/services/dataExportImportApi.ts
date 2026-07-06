@@ -40,6 +40,63 @@ export interface StorageImportResultSummary {
 const bucketDataBase = (workspaceId: string, bucketId: string) =>
   `/v1/storage/workspaces/${enc(workspaceId)}/buckets/${enc(bucketId)}`
 
+// ---- Bucket create / object upload (#758: storage console CRUD completeness) ----
+export interface StorageCreateBucketResult {
+  bucket: {
+    resourceId: string
+    bucketName: string
+    workspaceId: string
+    tenantId: string
+    region?: string
+    status?: string
+  }
+  record?: Record<string, JsonValue>
+  storageCredential?: Record<string, JsonValue> | null
+}
+
+// Provision a new bucket for a workspace. `name` is only a HINT: the control plane derives a
+// DNS-safe, workspace-id-scoped physical bucket name (`deriveBucketName`), so the returned
+// `bucket.bucketName` may differ from the requested name — callers should surface the returned
+// name rather than assuming the request echoed back verbatim. A per-workspace bucket-count quota
+// (default 8) rejects with 409 `STORAGE_QUOTA_EXCEEDED` once reached.
+export function createBucket(
+  workspaceId: string,
+  options: { name?: string } = {}
+): Promise<StorageCreateBucketResult> {
+  const body: Record<string, JsonValue> = {}
+  if (options.name != null) body.name = options.name
+  return requestConsoleSessionJson<StorageCreateBucketResult>(`/v1/storage/workspaces/${enc(workspaceId)}/buckets`, {
+    method: 'POST',
+    body
+  })
+}
+
+export interface StorageUploadObjectResult {
+  objectKey: string
+  bucketName: string
+  sizeBytes: number
+  contentType: string
+}
+
+// Upload a single object's exact bytes via the JSON envelope the control plane's
+// `resolveObjectBody` accepts: `encoding: 'base64'` decodes `content` to the exact byte sequence
+// (so binary content, e.g. images, round-trips byte-identically), rather than the UTF-8 string
+// path used when `encoding` is omitted. A per-workspace total-bytes quota (when configured)
+// rejects with 409 `STORAGE_QUOTA_EXCEEDED`.
+export function uploadObject(
+  bucketId: string,
+  objectKey: string,
+  options: { content: string; contentType: string }
+): Promise<StorageUploadObjectResult> {
+  return requestConsoleSessionJson<StorageUploadObjectResult>(
+    `/v1/storage/buckets/${enc(bucketId)}/objects/${enc(objectKey)}`,
+    {
+      method: 'PUT',
+      body: { content: options.content, contentType: options.contentType, encoding: 'base64' }
+    }
+  )
+}
+
 // Export a bucket's objects into an inline manifest (bounded; over a size cap -> 413). The manifest
 // is also persisted in the bucket and re-readable via getBucketExportManifest.
 export function exportBucketObjects(
