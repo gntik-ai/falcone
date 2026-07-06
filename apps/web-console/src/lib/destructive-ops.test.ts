@@ -70,7 +70,9 @@ describe('destructive-ops', () => {
       'delete-service-account': 'CRITICAL',
       'delete-function': 'CRITICAL',
       // Deleting a storage bucket removes the physical bucket AND every object inside it (#758).
-      'delete-storage-bucket': 'CRITICAL'
+      'delete-storage-bucket': 'CRITICAL',
+      // Removing a tenant realm's social identity provider only breaks that ONE login method (#782).
+      'delete-identity-provider': 'WARNING'
     })
   })
 })

@@ -9,6 +9,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 import { PasswordRecoveryPage } from '@/pages/PasswordRecoveryPage'
 import { PendingActivationPage } from '@/pages/PendingActivationPage'
 import { ConsoleAuthPage } from '@/pages/ConsoleAuthPage'
+import { ConsoleAuthConfigPage } from '@/pages/ConsoleAuthConfigPage'
 import { ConsoleMembersPage } from '@/pages/ConsoleMembersPage'
 import { ConsoleOverviewPage } from '@/pages/ConsoleOverviewPage'
 import { ConsoleProfilePage } from '@/pages/ConsoleProfilePage'
@@ -244,6 +245,14 @@ export const appRoutes = [
           {
             path: 'auth',
             element: <RequireSuperadminRoute><ConsoleAuthPage /></RequireSuperadminRoute>
+          },
+          {
+            // Tenant realm auth-config (#782) — plain authenticated route, NOT superadmin-gated:
+            // the backend (`authorizeAuthConfig`) already authorizes owner/admin/superadmin, and a
+            // tenant owner must be able to reach it (unlike `/console/auth` above, which owners are
+            // redirected away from per #740).
+            path: 'auth-config',
+            element: <ConsoleAuthConfigPage />
           },
           {
             path: 'postgres',

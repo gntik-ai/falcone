@@ -9,6 +9,7 @@ import {
   KeySquare,
   LayoutDashboard,
   Lock,
+  LogIn,
   LogOut,
   PieChart,
   Rocket,
@@ -192,6 +193,18 @@ const consoleNavigationItems = [
     icon: Shield,
     description: 'Superficie Auth/IAM para alcances, clientes, proveedores y aplicaciones externas del contexto activo.',
     requiresSuperadminAccess: true
+  },
+  {
+    // #782: distinct from "Autenticación" above (superadmin-only realm/IAM inventory) — this is the
+    // tenant owner/admin-reachable surface for the realm's OWN login settings (registration, email
+    // login, password reset, remember-me, email verification) and its configured social identity
+    // providers. Plain (no requiresSuperadminAccess/restrictedForAction): the backend already
+    // authorizes owner/admin/superadmin server-side (`authorizeAuthConfig`).
+    group: 'administration',
+    label: 'Autenticación de la organización',
+    to: '/console/auth-config',
+    icon: LogIn,
+    description: 'Configura el registro, inicio de sesión, recuperación de contraseña y proveedores de identidad del realm de tu organización.'
   },
   {
     group: 'dataPlane',

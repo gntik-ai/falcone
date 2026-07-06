@@ -364,6 +364,16 @@ describe('ConsoleShellLayout', () => {
     expect(membersLink).toHaveAttribute('href', '/console/members')
   })
 
+  it('[#782] renderiza el ítem "Autenticación de la organización" y apunta a /console/auth-config (plano, no gateado a superadmin)', async () => {
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    const authConfigLink = await screen.findByRole('link', { name: /autenticación de la organización/i })
+    expect(authConfigLink).toHaveAttribute('href', '/console/auth-config')
+  })
+
   it('[#740] oculta Auth e IAM Access en la navegación para tenant_owner', async () => {
     stubShellApi()
     persistConsoleShellSession(createSessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
@@ -372,7 +382,7 @@ describe('ConsoleShellLayout', () => {
 
     expect(await screen.findByRole('link', { name: /vista general/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación(?! de la organización)/i })).not.toBeInTheDocument()
   })
 
   it('[#740] mantiene Auth e IAM Access visibles para superadmin', async () => {
@@ -382,7 +392,7 @@ describe('ConsoleShellLayout', () => {
     renderShell('/console/overview')
 
     expect(await screen.findByRole('link', { name: /^acceso iam/i })).toHaveAttribute('href', '/console/iam-access')
-    expect(await screen.findByRole('link', { name: /^autenticación/i })).toHaveAttribute('href', '/console/auth')
+    expect(await screen.findByRole('link', { name: /^autenticación(?! de la organización)/i })).toHaveAttribute('href', '/console/auth')
   })
 
   it('renderiza el ítem PostgreSQL en el sidebar', async () => {
@@ -987,11 +997,15 @@ describe('[#741] navegación de consola consciente del rol', () => {
     expect(screen.queryByRole('link', { name: /gestión de organizaciones/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^planes/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación(?! de la organización)/i })).not.toBeInTheDocument()
 
     expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
     expect(screen.getByRole('link', { name: /^resumen de asignación/i })).toHaveAttribute('href', '/console/my-plan/allocation')
     expect(screen.getByRole('link', { name: /^flujos \/ workflows/i })).toHaveAttribute('href', '/console/flows')
+    // [#782] unlike the superadmin-only "Autenticación" entry above, "Autenticación de la
+    // organización" (realm auth-config) MUST stay visible to a tenant owner — that is the whole
+    // point of the fix.
+    expect(screen.getByRole('link', { name: /^autenticación de la organización/i })).toHaveAttribute('href', '/console/auth-config')
   })
 
   it('mantiene Tenants/IAM Access/Plans/Auth/Mi plan visibles para superadmin (sin regresión)', async () => {
@@ -1003,7 +1017,7 @@ describe('[#741] navegación de consola consciente del rol', () => {
     expect(await screen.findByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
     expect(screen.getByRole('link', { name: /^acceso iam/i })).toHaveAttribute('href', '/console/iam-access')
     expect(screen.getByRole('link', { name: /^planes/i })).toHaveAttribute('href', '/console/plans')
-    expect(screen.getByRole('link', { name: /^autenticación/i })).toHaveAttribute('href', '/console/auth')
+    expect(screen.getByRole('link', { name: /^autenticación(?! de la organización)/i })).toHaveAttribute('href', '/console/auth')
     expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
     expect(screen.getByRole('link', { name: /^resumen de asignación/i })).toHaveAttribute('href', '/console/my-plan/allocation')
   })
@@ -1017,7 +1031,7 @@ describe('[#741] navegación de consola consciente del rol', () => {
     expect(await screen.findByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
     expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^planes/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación(?! de la organización)/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
   })
 
@@ -1030,7 +1044,7 @@ describe('[#741] navegación de consola consciente del rol', () => {
     expect(await screen.findByRole('link', { name: /gestión de organizaciones/i })).toHaveAttribute('href', '/console/tenants')
     expect(screen.queryByRole('link', { name: /^acceso iam/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^planes/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^autenticación/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^autenticación(?! de la organización)/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^mi plan/i })).toHaveAttribute('href', '/console/my-plan')
   })
 
