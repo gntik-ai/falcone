@@ -24,6 +24,7 @@ vi.mock('@/pages/ConsoleAuthPage', () => ({
     return <h1>Auth IAM</h1>
   }
 }))
+vi.mock('@/pages/ConsoleAuthConfigPage', () => ({ ConsoleAuthConfigPage: () => <h1>Auth Config Real</h1> }))
 vi.mock('@/pages/ConsoleIamAccessPage', () => ({
   ConsoleIamAccessPage: () => {
     consoleIamAccessPageRenderMock()
@@ -157,6 +158,24 @@ it('[#740] permite que superadmin abra /console/auth', async () => {
 
   expect(await screen.findByRole('heading', { name: /auth iam/i })).toBeInTheDocument()
   expect(consoleAuthPageRenderMock).toHaveBeenCalled()
+})
+
+it('[#782] permite que tenant_owner abra /console/auth-config (NO está gateado a superadmin, a diferencia de /console/auth)', async () => {
+  readConsoleShellSessionMock.mockReturnValue(createRouterSession(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
+
+  const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/auth-config'] })
+  render(<RouterProvider router={router} />)
+
+  expect(await screen.findByRole('heading', { name: /auth config real/i })).toBeInTheDocument()
+})
+
+it('[#782] permite que superadmin abra /console/auth-config', async () => {
+  readConsoleShellSessionMock.mockReturnValue(createRouterSession(['superadmin']))
+
+  const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/auth-config'] })
+  render(<RouterProvider router={router} />)
+
+  expect(await screen.findByRole('heading', { name: /auth config real/i })).toBeInTheDocument()
 })
 
 it('[#740] redirige tenant_owner desde /console/iam-access sin renderizar IAM Access', async () => {

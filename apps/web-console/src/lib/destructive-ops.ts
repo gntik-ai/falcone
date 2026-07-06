@@ -39,7 +39,11 @@ export const DESTRUCTIVE_OP_LEVELS: Record<string, DestructiveOpLevel> = {
   'delete-function': 'CRITICAL',
   // Deleting a storage bucket removes the physical bucket AND every object inside it permanently
   // (#758) — CRITICAL, same tier as delete-service-account/delete-function.
-  'delete-storage-bucket': 'CRITICAL'
+  'delete-storage-bucket': 'CRITICAL',
+  // Removing a tenant realm's social identity provider (#782) only breaks that ONE login method —
+  // other providers and username/password access are unaffected — so WARNING (same tier as
+  // detach-provider), not CRITICAL.
+  'delete-identity-provider': 'WARNING'
 }
 
 type CascadeImpactResponse = {
