@@ -37,6 +37,7 @@ export function ConsoleMcpServerDetailPage() {
   const [view, setView] = useState<McpServerDetailView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('connect')
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     setError(null)
@@ -52,7 +53,7 @@ export function ConsoleMcpServerDetailPage() {
         setError(describeConsoleError(err, 'No se pudo cargar el servidor MCP.'))
       })
     return () => controller.abort()
-  }, [activeWorkspaceId, mcpServerId])
+  }, [activeWorkspaceId, mcpServerId, reloadNonce])
 
   const tools = useMemo(() => view?.tools ?? [], [view])
   const toolsCountLabel = tools.length === 1 ? '1 publicada' : `${tools.length} publicadas`
@@ -98,6 +99,8 @@ export function ConsoleMcpServerDetailPage() {
         kind="error"
         title="No se pudo cargar el servidor MCP"
         description={error}
+        actionLabel="Reintentar"
+        onAction={() => setReloadNonce((nonce) => nonce + 1)}
       />
     )
   }

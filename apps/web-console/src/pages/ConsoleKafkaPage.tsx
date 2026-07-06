@@ -1062,7 +1062,7 @@ export function ConsoleKafkaPage() {
                     </div>
                   ) : null}
                   {publishResult.data ? (
-                    <div className="rounded-lg border border-border p-3 text-sm" role="alert">
+                    <div className="rounded-lg border border-border p-3 text-sm" role="status">
                       <p><strong>ID de publicación:</strong> {publishResult.data.publicationId}</p>
                       <p><strong>Estado:</strong> {publishResult.data.status}</p>
                       <p><strong>Aceptada en:</strong> {publishResult.data.acceptedAt ?? '—'}</p>

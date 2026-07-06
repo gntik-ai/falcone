@@ -256,11 +256,6 @@ export function ConsoleMembersPage() {
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">Usuarios disponibles en el realm de consola de la organización activa.</p>
           </div>
-          {usersError ? (
-            <Button type="button" variant="outline" size="sm" onClick={reloadUsers}>
-              Reintentar usuarios
-            </Button>
-          ) : null}
         </div>
 
         {usersLoading ? <ConsoleSectionLoading label="Cargando usuarios IAM…" /> : null}
@@ -277,11 +272,6 @@ export function ConsoleMembersPage() {
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">Roles definidos en el realm de consola para esta organización.</p>
           </div>
-          {rolesError ? (
-            <Button type="button" variant="outline" size="sm" onClick={reloadRoles}>
-              Reintentar roles
-            </Button>
-          ) : null}
         </div>
 
         {rolesLoading ? <ConsoleSectionLoading label="Cargando roles IAM…" /> : null}

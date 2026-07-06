@@ -574,7 +574,12 @@ export function ConsoleStoragePage() {
             </CardHeader>
             <CardContent>
               {usage.loading ? <p>Cargando uso…</p> : null}
-              {!usage.loading && usage.error ? <p role="alert">{usage.error}</p> : null}
+              {!usage.loading && usage.error ? (
+                <div className="space-y-3">
+                  <p role="alert">{usage.error}</p>
+                  <Button onClick={() => void loadUsage(activeWorkspaceId)} type="button">Reintentar</Button>
+                </div>
+              ) : null}
               {!usage.loading && !usage.error && usage.data ? (
                 <div className="space-y-4">
                   {usage.data.collectionStatus === 'provider_unavailable' ? (

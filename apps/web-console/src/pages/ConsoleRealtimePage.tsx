@@ -71,7 +71,13 @@ export function ConsoleRealtimePage() {
   if (loading) {
     return (
       <main className="space-y-4">
-        <div data-testid="realtime-loading-skeleton" className="h-24 animate-pulse rounded-3xl border border-border bg-muted/40" />
+        <div
+          data-testid="realtime-loading-skeleton"
+          role="status"
+          aria-label="Cargando configuración en tiempo real"
+          aria-busy="true"
+          className="h-24 animate-pulse rounded-3xl border border-border bg-muted/40"
+        />
       </main>
     )
   }
