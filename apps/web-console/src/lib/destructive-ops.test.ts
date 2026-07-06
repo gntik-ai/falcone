@@ -68,7 +68,9 @@ describe('destructive-ops', () => {
       'revoke-service-account-credential': 'WARNING',
       // Deleting a service account removes its Keycloak client AND its persistence row permanently (#687).
       'delete-service-account': 'CRITICAL',
-      'delete-function': 'CRITICAL'
+      'delete-function': 'CRITICAL',
+      // Deleting a storage bucket removes the physical bucket AND every object inside it (#758).
+      'delete-storage-bucket': 'CRITICAL'
     })
   })
 })

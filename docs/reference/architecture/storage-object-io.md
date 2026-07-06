@@ -117,6 +117,29 @@ A non-owner receives `404 BUCKET_NOT_FOUND` (no existence leak) and nothing is d
 
 ## Web console
 
-The console storage page (`Storage`) surfaces two of these directly: select an object and use the
-**Presigned URLs** tab to "Generar URL de descarga prefirmada", and use the per-row **Eliminar** action
-to delete a single bucket. A full multipart upload UI is not provided in the console.
+The console storage page (`Storage`) surfaces most of this object-I/O surface directly:
+
+- Select an object and use the **Presigned URLs** tab to "Generar URL de descarga prefirmada".
+- **Create a bucket**: the Buckets card's "Nuevo bucket" control opens a small form (an optional
+  bucket-name hint) that calls `POST /v1/storage/workspaces/{workspaceId}/buckets`. Because the
+  control plane derives a DNS-safe, workspace-scoped physical name (`deriveBucketName`), the console
+  states that the effective name may differ from the hint and always echoes back the bucket name the
+  backend actually created. A workspace with zero buckets renders an actionable empty state with a
+  "Crear bucket" call to action that opens the same form, so a new workspace is never a dead end. A
+  409 (per-workspace bucket-count quota reached) is surfaced through the shared, localized
+  `describeConsoleError` mapper — never the raw backend message.
+- **Upload an object**: the Objetos tab's "Subir objeto" control opens a form (an optional object-key
+  override + a file picker) that reads the selected file in-browser and calls
+  `PUT /v1/storage/buckets/{bucketId}/objects/{objectKey}` with the JSON envelope
+  `{ content: <base64>, contentType, encoding: "base64" }` (the same envelope
+  `resolveObjectBody` accepts server-side), so binary content round-trips byte-faithfully. An empty
+  bucket's object list renders an actionable "Subir el primer objeto" empty state that opens the same
+  form. A 409 (per-workspace byte-quota reached) is surfaced through `describeConsoleError`.
+- **Delete a bucket** (per-row **Eliminar** action): this is a **CRITICAL, confirmation-gated**
+  destructive operation (issue #758) — clicking it opens the shared destructive-confirmation dialog,
+  which states that deleting the bucket removes every object inside it and requires the operator to
+  type the bucket's exact name before the `DELETE /v1/storage/buckets/{bucketId}` request is sent. The
+  request never fires on a single click.
+
+A full multipart upload UI is not provided in the console (see the "Multipart / resumable upload"
+section above); the console's upload affordance is a single-request `PUT`.
