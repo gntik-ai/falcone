@@ -240,7 +240,11 @@ describe('ConsoleStoragePage', () => {
       throw new Error(`Unexpected URL ${url}`)
     })
     renderPage()
-    expect(await screen.findByRole('alert')).toHaveTextContent(/buckets degradados/i)
+    // [#743] A network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudo cargar el inventario de buckets/i)
+    expect(alert.textContent ?? '').not.toMatch(/buckets degradados/i)
   })
 
   it('selecciona un bucket y carga objetos; la paginación usa el cursor público', async () => {
@@ -384,7 +388,10 @@ describe('ConsoleStoragePage', () => {
     await user.click(await screen.findByRole('button', { name: 'media-assets' }))
     await user.click(await screen.findByRole('button', { name: 'media/hero.png' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/metadata degradada/i)
+    // [#743] localized fallback, never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudieron cargar los metadatos del objeto/i)
+    expect(alert.textContent ?? '').not.toMatch(/metadata degradada/i)
     expect(screen.getByText(/almacenamiento \/ objetos/i)).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Objetos' })).toBeInTheDocument()
   })

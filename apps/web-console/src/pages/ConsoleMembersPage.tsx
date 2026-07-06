@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
 import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
 import { useConsolePermissions } from '@/lib/console-permissions'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 
@@ -16,10 +17,6 @@ interface PageInfo {
   after?: string | null
   nextCursor?: string | null
   size: number
-}
-
-interface ErrorResponse {
-  message?: string
 }
 
 interface IamProviderCompatibility {
@@ -70,29 +67,6 @@ interface IamRoleCollectionResponse {
   items: IamRole[]
   page: PageInfo
   compatibility: IamProviderCompatibility
-}
-
-function getApiErrorStatus(rawError: unknown): number | undefined {
-  return typeof rawError === 'object' && rawError !== null && 'status' in rawError && typeof (rawError as { status?: unknown }).status === 'number'
-    ? (rawError as { status: number }).status
-    : undefined
-}
-
-function getApiErrorMessage(rawError: unknown, fallback: string): string {
-  if (typeof rawError === 'object' && rawError !== null) {
-    if ('message' in rawError && typeof rawError.message === 'string' && rawError.message.trim()) {
-      return rawError.message
-    }
-
-    if ('body' in rawError) {
-      const body = rawError.body as ErrorResponse | undefined
-      if (body?.message?.trim()) {
-        return body.message
-      }
-    }
-  }
-
-  return fallback
 }
 
 async function listRealmUsers(realmId: string): Promise<IamUserCollectionResponse> {
@@ -155,7 +129,7 @@ export function ConsoleMembersPage() {
       } catch (error) {
         if (!cancelled) {
           setUsers([])
-          setUsersError(getApiErrorMessage(error, 'No se pudieron cargar los usuarios IAM del realm.'))
+          setUsersError(describeConsoleError(error, 'No se pudieron cargar los usuarios IAM del realm.'))
         }
       } finally {
         if (!cancelled) {
@@ -194,7 +168,7 @@ export function ConsoleMembersPage() {
       } catch (error) {
         if (!cancelled) {
           setRoles([])
-          setRolesError(getApiErrorMessage(error, 'No se pudieron cargar los roles IAM del realm.'))
+          setRolesError(describeConsoleError(error, 'No se pudieron cargar los roles IAM del realm.'))
         }
       } finally {
         if (!cancelled) {
@@ -363,10 +337,10 @@ function CreateUserPanel({
       // #761: a 403 gets the shared, role-aware PermissionDeniedNotice instead of the raw backend
       // message — this is defense-in-depth (the CTA above is already hidden for roles denied
       // `tenant.members.manage`), reached only by a stale-session race.
-      if (getApiErrorStatus(rawError) === 403) {
+      if (getConsoleErrorStatus(rawError) === 403) {
         setPermissionDenied(true)
       } else {
-        setError(getApiErrorMessage(rawError, 'No se pudo crear el usuario en el realm de la organización.'))
+        setError(describeConsoleError(rawError, 'No se pudo crear el usuario en el realm de la organización.'))
       }
     } finally {
       setBusy(false)

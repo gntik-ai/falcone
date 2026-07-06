@@ -123,6 +123,17 @@ describe('ConsoleTenantPlanOverviewPage', () => {
     expect(getEffectiveEntitlementsMock).toHaveBeenCalledTimes(2)
   })
 
+  it('[#743] localiza un error 403 del backend — nunca el texto crudo — en el resumen del plan', async () => {
+    readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['tenant_owner'], tenantIds: ['ten_alpha'] }))
+    getEffectiveEntitlementsMock.mockRejectedValue({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+
+    render(<MemoryRouter><ConsoleTenantPlanOverviewPage /></MemoryRouter>)
+
+    const alert = await screen.findByRole('alert', { name: /resumen del plan no disponible/i })
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
+  })
+
   it('renders a superadmin no-personal-plan state with a plan catalog action', async () => {
     const user = userEvent.setup()
     readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['superadmin'], tenantIds: [] }))

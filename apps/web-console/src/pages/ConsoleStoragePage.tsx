@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import { exportBucketObjects } from '@/services/dataExportImportApi'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
@@ -129,25 +130,6 @@ type StoragePresignedUrl = {
   expiresAt: string
   ttlSeconds: number
   ttlClamped?: boolean
-}
-
-function getApiErrorMessage(rawError: unknown, fallback: string): string {
-  if (rawError && typeof rawError === 'object') {
-    const maybeMessage = 'message' in rawError ? rawError.message : undefined
-    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
-      return maybeMessage
-    }
-
-    const maybeBody = 'body' in rawError ? rawError.body : undefined
-    if (maybeBody && typeof maybeBody === 'object' && maybeBody !== null && 'message' in maybeBody) {
-      const bodyMessage = (maybeBody as { message?: unknown }).message
-      if (typeof bodyMessage === 'string' && bodyMessage.trim()) {
-        return bodyMessage
-      }
-    }
-  }
-
-  return fallback
 }
 
 function isAbortError(rawError: unknown): boolean {
@@ -286,7 +268,7 @@ export function ConsoleStoragePage() {
       setBuckets({ data: filtered, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setBuckets({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el inventario de buckets.') })
+      setBuckets({ data: [], loading: false, error: describeConsoleError(error, 'No se pudo cargar el inventario de buckets.') })
     }
   }, [])
 
@@ -298,7 +280,7 @@ export function ConsoleStoragePage() {
       setUsage({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setUsage({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el uso del área de trabajo.') })
+      setUsage({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar el uso del área de trabajo.') })
     }
   }, [])
 
@@ -325,7 +307,7 @@ export function ConsoleStoragePage() {
       setObjects((current) => ({
         data: after ? current.data : null,
         loading: false,
-        error: getApiErrorMessage(error, 'No se pudo cargar el inventario de objetos.')
+        error: describeConsoleError(error, 'No se pudo cargar el inventario de objetos.')
       }))
     }
   }, [])
@@ -338,7 +320,7 @@ export function ConsoleStoragePage() {
       setObjectMeta({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setObjectMeta({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los metadatos del objeto.') })
+      setObjectMeta({ data: null, loading: false, error: describeConsoleError(error, 'No se pudieron cargar los metadatos del objeto.') })
     }
   }, [])
 
@@ -355,7 +337,7 @@ export function ConsoleStoragePage() {
       setPresigned({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setPresigned({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo generar la URL prefirmada.') })
+      setPresigned({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo generar la URL prefirmada.') })
     }
   }, [])
 
@@ -377,7 +359,7 @@ export function ConsoleStoragePage() {
       URL.revokeObjectURL(url)
       setBucketExportNotice(`Exportados ${manifest.totalObjects} objeto(s) (manifiesto ${manifest.manifestId}).`)
     } catch (error) {
-      if (!isAbortError(error)) setBucketActionError(getApiErrorMessage(error, 'No se pudo exportar el bucket.'))
+      if (!isAbortError(error)) setBucketActionError(describeConsoleError(error, 'No se pudo exportar el bucket.'))
     } finally {
       setExportingBucketId(null)
     }
@@ -394,7 +376,7 @@ export function ConsoleStoragePage() {
       await loadBuckets(workspaceId)
       await loadUsage(workspaceId)
     } catch (error) {
-      if (!isAbortError(error)) setBucketActionError(getApiErrorMessage(error, 'No se pudo eliminar el bucket.'))
+      if (!isAbortError(error)) setBucketActionError(describeConsoleError(error, 'No se pudo eliminar el bucket.'))
     } finally {
       setDeletingBucketId(null)
     }

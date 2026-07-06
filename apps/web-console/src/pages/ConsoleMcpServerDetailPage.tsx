@@ -8,6 +8,7 @@ import { McpServerPlayground } from '@/components/console/mcp/McpServerPlaygroun
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { fetchMcpServerDetail } from '@/lib/mcp/mcp-api'
 import { toMcpServerDetailViewModel, type McpServerDetailView } from '@/lib/mcp/mcp-server-detail'
 
@@ -48,7 +49,7 @@ export function ConsoleMcpServerDetailPage() {
       .then((payload) => setView(toMcpServerDetailViewModel(payload)))
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
-        setError(err instanceof Error ? err.message : 'No se pudo cargar el servidor MCP.')
+        setError(describeConsoleError(err, 'No se pudo cargar el servidor MCP.'))
       })
     return () => controller.abort()
   }, [activeWorkspaceId, mcpServerId])
