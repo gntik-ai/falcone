@@ -16,6 +16,7 @@ import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
+import { cn } from '@/lib/utils'
 import { createBucket, exportBucketObjects, uploadObject } from '@/services/dataExportImportApi'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
@@ -127,6 +128,24 @@ const STORAGE_MULTIPART_READ_API_AVAILABLE = false
 // Default lifetime (seconds) requested for a console-generated presigned download URL. The backend
 // clamps this to the platform maximum (STORAGE_PRESIGN_MAX_TTL_SECONDS, default 3600).
 const PRESIGNED_DOWNLOAD_TTL_SECONDS = 300
+
+// #758 visual polish — centralized class treatments (mirroring the module-level `emptyStateClassName`
+// idiom in EventsConsole/ConsoleFunctionsPage) so the create/upload disclosure forms, the actionable
+// empty states and the success notice stay consistent instead of carrying one-off inline strings.
+//
+// Active disclosure form: a solid, subtly-lit "well" that reads as an input surface — deliberately
+// distinct from the dashed, recessed empty-state placeholders below (solid border + muted fill).
+const DISCLOSURE_FORM_CLASS = 'space-y-4 rounded-2xl border border-border bg-muted/30 p-4 sm:p-5'
+// Actionable empty state inside an already-populated card: centered, dashed and muted with room for a
+// primary CTA — the console's empty-state convention (ConsoleMembersPage/ConsolePostgresPage), sized
+// as an in-card inset (bg-background/40) rather than a full-section panel.
+const CARD_EMPTY_STATE_CLASS =
+  'flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-background/40 px-6 py-10 text-center'
+// Polite success notice: identical tokens to the design system's Alert `success` variant (emerald
+// tone + rounded-2xl/px-4/py-3 geometry) but rendered as a roleless element, so it can live inside the
+// persistent aria-live="polite" region without the assertive role Alert hardcodes.
+const SUCCESS_NOTICE_CLASS =
+  'rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100'
 
 type StoragePresignedUrl = {
   url: string
@@ -635,14 +654,14 @@ export function ConsoleStoragePage() {
                 <form
                   id={createBucketFormId}
                   aria-busy={creatingBucket}
-                  className="mb-4 space-y-3 rounded-lg border border-dashed border-border p-4"
+                  className={cn('mb-4', DISCLOSURE_FORM_CLASS)}
                   onSubmit={(event) => {
                     event.preventDefault()
                     void createBucketAction(activeWorkspaceId)
                   }}
                   noValidate
                 >
-                  <div className="flex flex-col gap-1.5">
+                  <div className="space-y-1.5">
                     <Label htmlFor={newBucketNameId}>Nombre del bucket (opcional)</Label>
                     <Input
                       id={newBucketNameId}
@@ -655,14 +674,29 @@ export function ConsoleStoragePage() {
                       disabled={creatingBucket}
                       aria-describedby={createBucketHelpId}
                     />
-                    <span id={createBucketHelpId} className="text-xs leading-5 text-muted-foreground">
+                    <p id={createBucketHelpId} className="text-xs leading-5 text-muted-foreground">
                       El nombre es orientativo: el final puede normalizarse (minúsculas, DNS-seguro) y queda asociado a esta área de trabajo. Al crearlo se confirma el nombre real.
-                    </span>
+                    </p>
                   </div>
-                  <Button type="submit" size="sm" disabled={creatingBucket} aria-busy={creatingBucket}>
-                    {creatingBucket ? 'Creando…' : 'Crear'}
-                  </Button>
                   {createBucketError ? <Alert variant="destructive">{createBucketError}</Alert> : null}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="submit" size="sm" disabled={creatingBucket} aria-busy={creatingBucket}>
+                      {creatingBucket ? 'Creando…' : 'Crear'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={creatingBucket}
+                      onClick={() => {
+                        setShowCreateBucketForm(false)
+                        setNewBucketName('')
+                        setCreateBucketError(null)
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
                 </form>
               ) : null}
               {buckets.loading ? <p>Cargando buckets…</p> : null}
@@ -673,11 +707,13 @@ export function ConsoleStoragePage() {
                 </div>
               ) : null}
               {!buckets.loading && !buckets.error && buckets.data.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground" role="status">
-                  <p className="font-medium text-foreground">No hay buckets en el área de trabajo seleccionada.</p>
-                  <p className="mt-1">Crea el primero para empezar a almacenar objetos.</p>
+                <div className={CARD_EMPTY_STATE_CLASS} role="status">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">No hay buckets en el área de trabajo seleccionada.</p>
+                    <p className="text-sm text-muted-foreground">Crea el primero para empezar a almacenar objetos.</p>
+                  </div>
                   {!showCreateBucketForm ? (
-                    <Button onClick={() => setShowCreateBucketForm(true)} type="button" size="sm" className="mt-3">
+                    <Button onClick={() => setShowCreateBucketForm(true)} type="button">
                       Crear bucket
                     </Button>
                   ) : null}
@@ -687,11 +723,7 @@ export function ConsoleStoragePage() {
               {/* Persistent polite live region so create/upload/delete/export success is announced
                   reliably even though it renders here (in the buckets column) after an async op. */}
               <div aria-live="polite" className="empty:hidden">
-                {bucketExportNotice ? (
-                  <p className="mb-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100">
-                    {bucketExportNotice}
-                  </p>
-                ) : null}
+                {bucketExportNotice ? <p className={cn('mb-3', SUCCESS_NOTICE_CLASS)}>{bucketExportNotice}</p> : null}
               </div>
               {!buckets.loading && !buckets.error && buckets.data.length > 0 ? (
                 <Table aria-label="Listado de buckets del área de trabajo activa">
@@ -887,14 +919,14 @@ export function ConsoleStoragePage() {
                     <form
                       id={uploadFormId}
                       aria-busy={uploadingObject}
-                      className="space-y-3 rounded-lg border border-dashed border-border p-4"
+                      className={DISCLOSURE_FORM_CLASS}
                       onSubmit={(event) => {
                         event.preventDefault()
                         void uploadObjectAction(selectedBucket.resourceId)
                       }}
                       noValidate
                     >
-                      <div className="flex flex-col gap-1.5">
+                      <div className="space-y-1.5">
                         <Label htmlFor={uploadKeyId}>Clave del objeto (opcional)</Label>
                         <Input
                           id={uploadKeyId}
@@ -907,29 +939,46 @@ export function ConsoleStoragePage() {
                           disabled={uploadingObject}
                           aria-describedby={uploadKeyHelpId}
                         />
-                        <span id={uploadKeyHelpId} className="text-xs leading-5 text-muted-foreground">
+                        <p id={uploadKeyHelpId} className="text-xs leading-5 text-muted-foreground">
                           Si se deja vacío, se usa el nombre del archivo seleccionado.
-                        </span>
+                        </p>
                       </div>
-                      <div className="flex flex-col gap-1.5">
+                      <div className="space-y-1.5">
                         <Label htmlFor={uploadFileId}>Archivo</Label>
-                        <input
+                        <Input
                           id={uploadFileId}
                           ref={uploadFileInputRef}
                           type="file"
-                          className="block w-full rounded-md text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:transition-opacity hover:file:opacity-90"
                           onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
                           disabled={uploadingObject}
                           aria-describedby={uploadFileHelpId}
                         />
-                        <span id={uploadFileHelpId} className="text-xs leading-5 text-muted-foreground">
+                        <p id={uploadFileHelpId} className="text-xs leading-5 text-muted-foreground">
                           Se sube el contenido exacto del archivo (incluido binario), tal cual, al bucket seleccionado.
-                        </span>
+                        </p>
                       </div>
-                      <Button type="submit" size="sm" disabled={!uploadFile || uploadingObject} aria-busy={uploadingObject}>
-                        {uploadingObject ? 'Subiendo…' : 'Subir'}
-                      </Button>
                       {uploadError ? <Alert variant="destructive">{uploadError}</Alert> : null}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="submit" size="sm" disabled={!uploadFile || uploadingObject} aria-busy={uploadingObject}>
+                          {uploadingObject ? 'Subiendo…' : 'Subir'}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={uploadingObject}
+                          onClick={() => {
+                            setShowUploadForm(false)
+                            setUploadKey('')
+                            setUploadFile(null)
+                            setUploadError(null)
+                            if (uploadFileInputRef.current) uploadFileInputRef.current.value = ''
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     </form>
                   ) : null}
 
@@ -941,11 +990,13 @@ export function ConsoleStoragePage() {
                     </div>
                   ) : null}
                   {!objects.loading && !objects.error && objects.data && objects.data.items.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground" role="status">
-                      <p className="font-medium text-foreground">Este bucket está vacío.</p>
-                      <p className="mt-1">Sube el primer objeto para empezar.</p>
+                    <div className={CARD_EMPTY_STATE_CLASS} role="status">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">Este bucket está vacío.</p>
+                        <p className="text-sm text-muted-foreground">Sube el primer objeto para empezar.</p>
+                      </div>
                       {!showUploadForm ? (
-                        <Button onClick={() => setShowUploadForm(true)} type="button" size="sm" className="mt-3">
+                        <Button onClick={() => setShowUploadForm(true)} type="button">
                           Subir el primer objeto
                         </Button>
                       ) : null}
