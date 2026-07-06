@@ -13,8 +13,8 @@ built on (`apps/web-console/src/services/authConfigApi.ts`).
 
 The screen is distinct from the existing superadmin-only **Autenticación** screen (`/console/auth`,
 `ConsoleAuthPage.tsx`), which is a realm/IAM **inventory** view (users/roles/scopes/clients) plus
-external-application management and is gated to `superadmin` (owners are redirected away from it, per
-#740). `/console/auth-config` is the **opposite**: a tenant owner/admin-reachable surface for that
+external-application management and is gated to `superadmin` (owners are redirected away from it,
+per issue #740). `/console/auth-config` is the **opposite**: a tenant owner/admin-reachable surface for that
 tenant's **own** realm login settings — it is **not** superadmin-gated.
 
 ## Who can use it
