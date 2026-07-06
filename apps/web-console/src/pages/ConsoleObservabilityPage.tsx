@@ -20,6 +20,7 @@ import {
 } from '@/lib/console-metrics'
 import { useConsoleContext } from '@/lib/console-context'
 import { useConsolePermissions } from '@/lib/console-permissions'
+import { cn } from '@/lib/utils'
 
 const TENANT_SCOPE_METRICS_RANGE: ConsoleMetricRange = { preset: '24h' }
 
@@ -152,15 +153,15 @@ export function ConsoleObservabilityPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-3 rounded-3xl border border-border bg-card/70 p-6">
+      <header className="space-y-4 rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">{headerText || 'Organización activa'}</p>
-            <h1 className="text-2xl font-semibold tracking-tight">Observabilidad</h1>
+            <p className="text-sm font-medium text-muted-foreground">{headerText || 'Organización activa'}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Observabilidad</h1>
           </div>
           {metrics.overview ? <ConsoleQuotaPostureBadge posture={metrics.overview.overallPosture} linkTo="/console/quotas" /> : null}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant={tab === 'metrics' ? 'default' : 'outline'} onClick={() => setTab('metrics')}>Métricas</Button>
           {canReadAudit ? (
             <Button type="button" variant={tab === 'audit' ? 'default' : 'outline'} onClick={() => setTab('audit')}>Auditoría</Button>
@@ -193,18 +194,21 @@ export function ConsoleObservabilityPage() {
       ) : (
         <div className="space-y-4">
           <section className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-sm font-medium">
-                <span className="mb-1 block text-muted-foreground">Actor</span>
-                <input aria-label="Actor" value={filters.actorId ?? ''} onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value || undefined }))} className="w-full min-w-[10rem] rounded-xl border border-input bg-background px-3 py-2" />
+            {/* #766 responsiveness: the audit filters lay out on a fluid grid (1 → 2 → 3 columns)
+                with a uniform field idiom, and the export action gets its own right-aligned row, so
+                the panel holds its rhythm from narrow to wide without ragged wrapping. */}
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Actor</span>
+                <input aria-label="Actor" value={filters.actorId ?? ''} onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" />
               </label>
-              <label className="text-sm font-medium">
-                <span className="mb-1 block text-muted-foreground">Categoría</span>
-                <input aria-label="Categoría" value={filters.category ?? ''} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value || undefined }))} className="w-full min-w-[10rem] rounded-xl border border-input bg-background px-3 py-2" />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Categoría</span>
+                <input aria-label="Categoría" value={filters.category ?? ''} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" />
               </label>
-              <label className="text-sm font-medium">
-                <span className="mb-1 block text-muted-foreground">Resultado</span>
-                <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full min-w-[10rem] rounded-xl border border-input bg-background px-3 py-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resultado</span>
+                <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Todos</option>
                   <option value="success">Éxito</option>
                   <option value="failure">Fallo</option>
@@ -212,28 +216,28 @@ export function ConsoleObservabilityPage() {
               </label>
               {/* #766: `ConsoleAuditFilter.from`/`.to` were already modeled and wired into the
                   fetch (`appendDateFilters`), but the audit tab never exposed inputs for them. */}
-              <label className="text-sm font-medium">
-                <span className="mb-1 block text-muted-foreground">Desde</span>
-                <input type="date" aria-label="Desde" value={filters.from ?? ''} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value || undefined }))} className="rounded-xl border border-input bg-background px-3 py-2" />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Desde</span>
+                <input type="date" aria-label="Desde" value={filters.from ?? ''} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" />
               </label>
-              <label className="text-sm font-medium">
-                <span className="mb-1 block text-muted-foreground">Hasta</span>
-                <input type="date" aria-label="Hasta" value={filters.to ?? ''} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value || undefined }))} className="rounded-xl border border-input bg-background px-3 py-2" />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hasta</span>
+                <input type="date" aria-label="Hasta" value={filters.to ?? ''} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value || undefined }))} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" />
               </label>
-              <div className="ml-auto flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full md:w-auto"
-                  disabled={isExporting}
-                  aria-busy={isExporting}
-                  aria-describedby={exportFeedbackId}
-                  onClick={() => void handleExport()}
-                >
-                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
-                  {isExporting ? 'Exportando auditoría...' : 'Exportar auditoría'}
-                </Button>
-              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={isExporting}
+                aria-busy={isExporting}
+                aria-describedby={exportFeedbackId}
+                onClick={() => void handleExport()}
+              >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
+                {isExporting ? 'Exportando auditoría...' : 'Exportar auditoría'}
+              </Button>
             </div>
           </section>
           {exportFeedback ? (
@@ -333,53 +337,59 @@ export function ConsoleObservabilityPage() {
                   returns no cursor/hasMore, so there is nothing to paginate against — surface the
                   count and the cap honestly instead of inventing pagination the backend doesn't
                   support. */}
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+              <p role="status" aria-live="polite" className="text-sm tabular-nums text-muted-foreground">
                 {audit.records.length} {audit.records.length === 1 ? 'evento mostrado' : 'eventos mostrados'}
                 {audit.records.length >= 50 ? ' · se muestran hasta 50 por consulta; ajusta los filtros para acotar los resultados' : ''}
               </p>
-              <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="px-4 py-3">Evento</th>
-                      <th className="px-4 py-3">Categoría</th>
-                      <th className="px-4 py-3">Resultado</th>
-                      <th className="px-4 py-3">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {audit.records.map((record) => {
-                      const isExpanded = expandedRecordId === record.eventId
-                      const detailId = `audit-record-detail-${record.eventId}`
-                      return (
-                        <Fragment key={record.eventId}>
-                          <tr className="border-b border-border/60">
-                            <td className="px-4 py-3">
-                              <Button
-                                type="button"
-                                variant="link"
-                                className="h-auto whitespace-normal break-all p-0 font-mono text-sm"
-                                aria-expanded={isExpanded}
-                                aria-controls={detailId}
-                                onClick={() => setExpandedRecordId((current) => current === record.eventId ? null : record.eventId)}
-                              >
-                                {record.eventId}
-                              </Button>
-                            </td>
-                            <td className="px-4 py-3"><ConsoleAuditCategoryBadge category={record.action.category} /></td>
-                            <td className="px-4 py-3"><ConsoleAuditResultBadge result={record.result?.outcome ?? 'unknown'} /></td>
-                            <td className="px-4 py-3">{record.eventTimestamp}</td>
-                          </tr>
-                          {isExpanded ? (
-                            <tr>
-                              <td id={detailId} className="px-4 py-3" colSpan={4}><ConsoleAuditRecordDetail record={record} /></td>
+              <div className="overflow-hidden rounded-3xl border border-border bg-card/70 shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[36rem] text-left text-sm">
+                    <caption className="sr-only">Eventos de auditoría</caption>
+                    <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+                      <tr className="border-b border-border">
+                        <th scope="col" className="px-4 py-3 font-medium">Evento</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Categoría</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Resultado</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {audit.records.map((record) => {
+                        const isExpanded = expandedRecordId === record.eventId
+                        const detailId = `audit-record-detail-${record.eventId}`
+                        return (
+                          <Fragment key={record.eventId}>
+                            {/* #766 disclosure rhythm: an expanded event shares a subtle tint with
+                                its detail row and drops the divider between the two so the pair reads
+                                as one open unit; collapsed rows keep the hover affordance + divider. */}
+                            <tr className={cn('transition-colors', isExpanded ? 'bg-muted/25' : 'border-b border-border/60 last:border-b-0 hover:bg-muted/20')}>
+                              <td className="px-4 py-3 align-top">
+                                <Button
+                                  type="button"
+                                  variant="link"
+                                  className="h-auto whitespace-normal break-all p-0 text-left font-mono text-sm"
+                                  aria-expanded={isExpanded}
+                                  aria-controls={detailId}
+                                  onClick={() => setExpandedRecordId((current) => current === record.eventId ? null : record.eventId)}
+                                >
+                                  {record.eventId}
+                                </Button>
+                              </td>
+                              <td className="px-4 py-3 align-top"><ConsoleAuditCategoryBadge category={record.action.category} /></td>
+                              <td className="px-4 py-3 align-top"><ConsoleAuditResultBadge result={record.result?.outcome ?? 'unknown'} /></td>
+                              <td className="whitespace-nowrap px-4 py-3 align-top tabular-nums text-muted-foreground">{record.eventTimestamp}</td>
                             </tr>
-                          ) : null}
-                        </Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                            {isExpanded ? (
+                              <tr className="border-b border-border/60 bg-muted/25 last:border-b-0">
+                                <td id={detailId} className="px-4 pb-4 pt-0" colSpan={4}><ConsoleAuditRecordDetail record={record} /></td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           ) : null}

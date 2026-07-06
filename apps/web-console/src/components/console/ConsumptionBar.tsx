@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 function getTone(current: number, limit: number) {
@@ -19,7 +20,7 @@ function getTone(current: number, limit: number) {
 // `ConsoleMetricDimensionRow`). The stripe + the breach badge below are the non-color cues
 // (WCAG 1.4.1) layered on top of the existing red tone.
 const OVER_LIMIT_STRIPE_BACKGROUND_IMAGE =
-  'repeating-linear-gradient(135deg, rgba(255,255,255,0.4) 0px, rgba(255,255,255,0.4) 3px, transparent 3px, transparent 7px)'
+  'repeating-linear-gradient(135deg, rgba(255,255,255,0.5) 0px, rgba(255,255,255,0.5) 3px, transparent 3px, transparent 6px)'
 
 export function ConsumptionBar({
   current,
@@ -34,8 +35,8 @@ export function ConsumptionBar({
 }) {
   if (limit === -1) {
     return (
-      <div aria-label={label ?? 'Uso sin límite'} className="break-words text-sm">
-        <span>{current !== null ? formatValue(current) : '—'}</span> <span className="text-muted-foreground">/ Sin límite</span>
+      <div aria-label={label ?? 'Uso sin límite'} className="break-words text-sm tabular-nums">
+        <span className="font-medium text-foreground">{current !== null ? formatValue(current) : '—'}</span> <span className="text-muted-foreground">/ Sin límite</span>
       </div>
     )
   }
@@ -58,7 +59,9 @@ export function ConsumptionBar({
   }
   return (
     <div className="space-y-2">
-      <div className="break-words text-sm">{formatValue(current)} / {formatValue(limit)}</div>
+      <div className={cn('break-words text-sm tabular-nums', isOverLimit ? 'font-semibold text-red-300' : 'font-medium text-foreground')}>
+        {formatValue(current)} / {formatValue(limit)}
+      </div>
       <div
         role="progressbar"
         aria-label={label ?? 'Progreso de consumo'}
@@ -66,18 +69,18 @@ export function ConsumptionBar({
         aria-valuemax={ariaMax}
         aria-valuenow={ariaNow}
         aria-valuetext={ariaValueText}
-        className="h-2 w-full overflow-hidden rounded-full bg-muted"
+        className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
       >
         <div data-testid="consumption-bar-fill" className={cn('h-full rounded-full transition-all', getTone(current, limit))} style={fillStyle} />
       </div>
       {isOverLimit ? (
-        <div
+        <Badge
           data-testid="consumption-bar-breach-marker"
-          className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-300"
+          className="gap-1 border-red-500/40 bg-red-500/15 text-red-300"
         >
           <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
           Por encima del límite
-        </div>
+        </Badge>
       ) : null}
     </div>
   )

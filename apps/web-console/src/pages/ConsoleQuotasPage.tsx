@@ -77,7 +77,7 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
     <section className="overflow-hidden rounded-3xl border border-border bg-card/70 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border px-5 py-4 sm:px-6">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-        <p className="text-xs text-muted-foreground">{dimensionCount} {dimensionCount === 1 ? 'dimensión' : 'dimensiones'}</p>
+        <p className="text-xs tabular-nums text-muted-foreground">{dimensionCount} {dimensionCount === 1 ? 'dimensión' : 'dimensiones'}</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[52rem] text-left text-sm">
@@ -120,24 +120,31 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
                   {formatDimensionValue(dimension.measuredValue, dimension.unit, dimension.dimensionId)}
                 </td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums">
-                  <span
-                    className={cn(
-                      'inline-flex items-center justify-end gap-1.5',
-                      dimension.pctUsed === null
-                        ? 'text-muted-foreground'
-                        : dimension.isExceeded
-                          ? 'text-red-300'
-                          : dimension.isWarning
-                            ? 'text-amber-300'
-                            : 'text-foreground'
-                    )}
-                  >
-                    {dimension.isExceeded ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-                    <span>{dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}</span>
-                  </span>
-                  {dimension.isExceeded ? (
-                    <Badge variant="destructive" className="ml-2 align-middle">Superado</Badge>
-                  ) : null}
+                  <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                    <span
+                      className={cn(
+                        dimension.pctUsed === null
+                          ? 'text-muted-foreground'
+                          : dimension.isExceeded
+                            ? 'text-red-300'
+                            : dimension.isWarning
+                              ? 'text-amber-300'
+                              : 'text-foreground'
+                      )}
+                    >
+                      {dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}
+                    </span>
+                    {/* #766 breach language: the exceeded chip shares the ConsumptionBar marker /
+                        metric-card idiom (soft red tint + hazard icon) instead of the loud solid
+                        destructive Badge, so every breach cue across Quotas + Observability reads
+                        as one deliberate treatment. */}
+                    {dimension.isExceeded ? (
+                      <Badge className="gap-1 border-red-500/40 bg-red-500/15 text-red-300">
+                        <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        Superado
+                      </Badge>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{policyModeLabels[dimension.policyMode] ?? dimension.policyMode.replace(/_/g, ' ')}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{freshnessStatusLabels[dimension.freshnessStatus] ?? dimension.freshnessStatus.replace(/_/g, ' ')}</td>

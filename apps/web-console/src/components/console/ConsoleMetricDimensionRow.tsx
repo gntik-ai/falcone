@@ -18,26 +18,45 @@ export function ConsoleMetricDimensionRow({ dimension }: { dimension: ConsoleMet
   const limit = dimension.hardLimit ?? -1
 
   return (
-    <div className="rounded-2xl border border-border bg-card/50 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="font-medium">{dimension.displayName}</h3>
-          <p className="text-sm text-muted-foreground">{dimension.dimensionId}</p>
+    <div
+      className={cn(
+        // #766 breach language: the card surface itself carries the tone so an exceeded card reads
+        // as "in breach" before you parse the numbers — the same red-500/40 border + tint used by
+        // the breach chip, the posture badge and the Quotas rows. Warning is a calmer amber wash
+        // with no chip, so breach keeps clear visual priority.
+        'rounded-2xl border p-4 transition-colors',
+        dimension.isExceeded
+          ? 'border-red-500/40 bg-red-500/10'
+          : dimension.isWarning
+            ? 'border-amber-500/40 bg-amber-500/5'
+            : 'border-border bg-card/50'
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h3 className="font-medium text-foreground">{dimension.displayName}</h3>
+          <p className="mt-0.5 break-all font-mono text-xs text-muted-foreground">{dimension.dimensionId}</p>
         </div>
-        <div className="text-right text-sm">
+        <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-sm">
           {dimension.pctUsed !== null ? (
-            <p
-              className={cn(
-                'mt-0.5 inline-flex items-center justify-end gap-1.5',
-                dimension.isExceeded ? 'font-semibold text-red-300' : dimension.isWarning ? 'font-medium text-amber-300' : 'text-muted-foreground'
-              )}
-            >
-              {dimension.isExceeded ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-              <span>{dimension.pctUsed}% usado</span>
-              {dimension.isExceeded ? <Badge variant="destructive">Por encima del límite</Badge> : null}
-            </p>
+            <>
+              <span
+                className={cn(
+                  'tabular-nums',
+                  dimension.isExceeded ? 'font-semibold text-red-300' : dimension.isWarning ? 'font-medium text-amber-300' : 'text-muted-foreground'
+                )}
+              >
+                {dimension.pctUsed}% usado
+              </span>
+              {dimension.isExceeded ? (
+                <Badge className="gap-1 border-red-500/40 bg-red-500/15 text-red-300">
+                  <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  Por encima del límite
+                </Badge>
+              ) : null}
+            </>
           ) : (
-            <p className="text-muted-foreground">Sin límite fijo</p>
+            <span className="text-muted-foreground">Sin límite fijo</span>
           )}
         </div>
       </div>
@@ -47,7 +66,7 @@ export function ConsoleMetricDimensionRow({ dimension }: { dimension: ConsoleMet
       {dimension.isExceeded ? (
         <Link
           to="/console/quotas"
-          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-300 underline-offset-2 hover:underline"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-red-300 underline-offset-2 hover:underline"
         >
           Ver cuotas de la organización
           <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
