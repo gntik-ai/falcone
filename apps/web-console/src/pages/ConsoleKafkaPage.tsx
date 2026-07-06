@@ -694,9 +694,9 @@ export function ConsoleKafkaPage() {
 
             {inventory.loading ? <p>Cargando inventario…</p> : null}
             {!inventory.loading && inventory.error ? (
-              <div className="space-y-3">
-                <p role="alert">{inventory.error}</p>
-                <Button onClick={() => void loadInventory(activeWorkspaceId)}>Reintentar</Button>
+              <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                <p className="text-sm text-destructive">{inventory.error}</p>
+                <Button onClick={() => void loadInventory(activeWorkspaceId)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
               </div>
             ) : null}
             {!inventory.loading && !inventory.error && inventory.data && inventory.data.items.length === 0 ? <p>No hay tópicos en esta área de trabajo.</p> : null}

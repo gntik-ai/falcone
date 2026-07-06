@@ -491,9 +491,9 @@ export function ConsoleStoragePage() {
             <CardContent>
               {buckets.loading ? <p>Cargando buckets…</p> : null}
               {!buckets.loading && buckets.error ? (
-                <div className="space-y-3">
-                  <p role="alert">{buckets.error}</p>
-                  <Button onClick={() => void loadBuckets(activeWorkspaceId)} type="button">Reintentar</Button>
+                <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm text-destructive">{buckets.error}</p>
+                  <Button onClick={() => void loadBuckets(activeWorkspaceId)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
                 </div>
               ) : null}
               {!buckets.loading && !buckets.error && buckets.data.length === 0 ? <p>No hay buckets en el área de trabajo seleccionada.</p> : null}
@@ -575,9 +575,9 @@ export function ConsoleStoragePage() {
             <CardContent>
               {usage.loading ? <p>Cargando uso…</p> : null}
               {!usage.loading && usage.error ? (
-                <div className="space-y-3">
-                  <p role="alert">{usage.error}</p>
-                  <Button onClick={() => void loadUsage(activeWorkspaceId)} type="button">Reintentar</Button>
+                <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm text-destructive">{usage.error}</p>
+                  <Button onClick={() => void loadUsage(activeWorkspaceId)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
                 </div>
               ) : null}
               {!usage.loading && !usage.error && usage.data ? (
@@ -678,9 +678,9 @@ export function ConsoleStoragePage() {
                 <TabsContent value="objects" className="space-y-4">
                   {objects.loading ? <p>Cargando objetos…</p> : null}
                   {!objects.loading && objects.error ? (
-                    <div className="space-y-3">
-                      <p role="alert">{objects.error}</p>
-                      <Button onClick={() => void loadObjects(selectedBucket.resourceId, null)} type="button">Reintentar</Button>
+                    <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                      <p className="text-sm text-destructive">{objects.error}</p>
+                      <Button onClick={() => void loadObjects(selectedBucket.resourceId, null)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
                     </div>
                   ) : null}
                   {!objects.loading && !objects.error && objects.data && objects.data.items.length === 0 ? <p>Este bucket está vacío.</p> : null}
