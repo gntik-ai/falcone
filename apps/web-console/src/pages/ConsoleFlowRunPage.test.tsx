@@ -176,3 +176,27 @@ describe('ConsoleFlowRunPage — running run', () => {
     )
   })
 })
+
+// #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static blocked state
+// whose only action navigated away.
+describe('ConsoleFlowRunPage — no active workspace', () => {
+  it('[#742] shows the shared WorkspaceRequiredState instead of fetching a run', () => {
+    mockGetExecution.mockReset()
+    mockUseConsoleContext.mockReturnValue({
+      activeWorkspaceId: null,
+      activeTenantId: 'ten1',
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
+
+    renderRun()
+
+    expect(mockGetFlow).not.toHaveBeenCalled()
+    expect(mockGetExecution).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Ejecución bloqueada' })).toBeInTheDocument()
+    expect(screen.getByText(/selecciona un área de trabajo para abrir la vista de ejecución/i)).toBeInTheDocument()
+  })
+})

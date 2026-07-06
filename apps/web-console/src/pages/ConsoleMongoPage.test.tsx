@@ -1,18 +1,27 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleMongoPage } from '@/pages/ConsoleMongoPage'
 
 const mockRequestConsoleSessionJson = vi.fn()
 const mockUseConsoleContext = vi.fn()
+const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-session', () => ({
-  requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args)
+  requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args),
+  readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
 }))
+
+// #742: the no-workspace "colecciones"/"documentos" empty states now render the shared
+// WorkspaceRequiredState, which links to /console/workspaces — every render below needs a Router.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(ui, { wrapper: MemoryRouter })
+}
 
 function buildContext(
   overrides: Partial<{
@@ -39,6 +48,8 @@ describe('ConsoleMongoPage', () => {
   beforeEach(() => {
     mockRequestConsoleSessionJson.mockReset()
     mockUseConsoleContext.mockReset()
+    mockReadConsoleShellSession.mockReset()
+    mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1', platformRoles: ['tenant_owner'] } })
     cleanup()
   })
 
@@ -59,6 +70,9 @@ describe('ConsoleMongoPage', () => {
     await clickDatabase('catalog')
     expect(await screen.findByText('Selecciona un área de trabajo para ver las colecciones.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Documentos' })).not.toBeInTheDocument()
+    // #742: the "select a workspace" empty state now offers an inline create-workspace CTA
+    // instead of leaving the user at a dead end.
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
   })
 
   it('T03: muestra lista de databases con stats formateados', async () => {

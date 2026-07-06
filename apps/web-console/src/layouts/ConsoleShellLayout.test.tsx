@@ -290,6 +290,59 @@ describe('ConsoleShellLayout', () => {
     expect(screen.getByTestId('console-context-workspace-status')).not.toHaveTextContent(/workspace alpha/i)
   })
 
+  // #742 (Scenario 1 + Scenario 3): the "no active workspace" card gives a real first action
+  // instead of the previously-static "Selecciona un área de trabajo para completar el contexto
+  // operativo." sentence with zero buttons/links/inputs.
+  it('[#742] muestra un CTA para crear la primera área de trabajo cuando la organización activa no tiene ninguna', async () => {
+    stubShellApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: { ten_alpha: [] }
+    })
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
+    })
+
+    const workspaceCard = screen.getByTestId('console-context-workspace-status')
+    const createLink = within(workspaceCard).getByRole('link', { name: /crear área de trabajo/i })
+    expect(createLink).toHaveAttribute('href', '/console/workspaces')
+  })
+
+  it('[#742] muestra un selector de área de trabajo en línea cuando la organización activa tiene varias y ninguna está activa, y activa la elegida', async () => {
+    stubShellApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [
+          createWorkspace('wrk_1', 'ten_alpha', 'Workspace Uno'),
+          createWorkspace('wrk_2', 'ten_alpha', 'Workspace Dos')
+        ]
+      }
+    })
+    persistConsoleShellSession(baseSession)
+    const user = userEvent.setup()
+
+    renderShell('/console/overview')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-tenant-select')).toHaveValue('ten_alpha')
+      // Two workspaces and no persisted selection: no auto-fallback (that only applies when
+      // there is exactly one), so the context switch-workspace select stays unset…
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('')
+    })
+
+    const workspaceCard = screen.getByTestId('console-context-workspace-status')
+    const picker = within(workspaceCard).getByRole('combobox', { name: /seleccionar área de trabajo/i })
+    await user.selectOptions(picker, 'wrk_2')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('console-context-workspace-select')).toHaveValue('wrk_2')
+      expect(screen.getByTestId('console-context-workspace-status')).toHaveTextContent(/workspace dos/i)
+    })
+  })
+
   it('muestra estado vacío cuando no hay tenants accesibles', async () => {
     stubShellApi({ tenants: [] })
     persistConsoleShellSession(baseSession)

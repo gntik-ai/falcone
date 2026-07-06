@@ -1,24 +1,42 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleStoragePage } from './ConsoleStoragePage'
 
 const mockUseConsoleContext = vi.fn()
 const mockRequestConsoleSessionJson = vi.fn()
+const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
 }))
 
 vi.mock('@/lib/console-session', () => ({
-  requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args)
+  requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args),
+  readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 
-function createContext(overrides: Partial<{ activeTenantId: string | null; activeWorkspaceId: string | null }> = {}) {
+function createContext(
+  overrides: Partial<{
+    activeTenantId: string | null
+    activeWorkspaceId: string | null
+    workspaces: Array<{ workspaceId: string; tenantId: string; label: string; secondary: string }>
+    workspacesLoading: boolean
+    workspacesError: string | null
+    selectWorkspace: (workspaceId: string | null) => void
+    reloadWorkspaces: () => Promise<void>
+  }> = {}
+) {
   return {
     activeTenantId: 'ten_alpha',
     activeWorkspaceId: 'wrk_alpha',
+    workspaces: [],
+    workspacesLoading: false,
+    workspacesError: null,
+    selectWorkspace: vi.fn(),
+    reloadWorkspaces: vi.fn(),
     ...overrides
   }
 }
@@ -128,7 +146,7 @@ function mockUsage(overrides: Record<string, unknown> = {}) {
 
 function renderPage(context = createContext()) {
   mockUseConsoleContext.mockReturnValue(context)
-  return render(<ConsoleStoragePage />)
+  return render(<ConsoleStoragePage />, { wrapper: MemoryRouter })
 }
 
 function queueHappyPath(options: {
@@ -174,6 +192,8 @@ describe('ConsoleStoragePage', () => {
     vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-03-29T06:30:00.000Z').getTime())
     mockUseConsoleContext.mockReset()
     mockRequestConsoleSessionJson.mockReset()
+    mockReadConsoleShellSession.mockReset()
+    mockReadConsoleShellSession.mockReturnValue({ principal: { userId: 'usr_1', platformRoles: ['tenant_owner'] } })
   })
 
   afterEach(() => {
@@ -181,16 +201,18 @@ describe('ConsoleStoragePage', () => {
     vi.restoreAllMocks()
   })
 
-  it('muestra los guards de tenant y workspace sin llamar APIs', () => {
+  it('muestra el guard de organización sin llamar APIs', () => {
     renderPage(createContext({ activeTenantId: null, activeWorkspaceId: null }))
     expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
     expect(mockRequestConsoleSessionJson).not.toHaveBeenCalled()
+  })
 
-    cleanup()
-
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static `<p role="alert">`.
+  it('[#742] muestra el guard de área de trabajo con la acción en línea compartida, sin llamar APIs', () => {
     renderPage(createContext({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/selecciona un área de trabajo/i)
     expect(mockRequestConsoleSessionJson).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
   })
 
   it('carga buckets del workspace activo y muestra uso del workspace', async () => {

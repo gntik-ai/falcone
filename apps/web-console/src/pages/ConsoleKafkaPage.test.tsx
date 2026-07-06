@@ -18,10 +18,25 @@ vi.mock('@/lib/console-session', () => ({
   readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 
-function createContext(overrides: Partial<{ activeTenantId: string | null; activeWorkspaceId: string | null }> = {}) {
+function createContext(
+  overrides: Partial<{
+    activeTenantId: string | null
+    activeWorkspaceId: string | null
+    workspaces: Array<{ workspaceId: string; tenantId: string; label: string; secondary: string }>
+    workspacesLoading: boolean
+    workspacesError: string | null
+    selectWorkspace: (workspaceId: string | null) => void
+    reloadWorkspaces: () => Promise<void>
+  }> = {}
+) {
   return {
     activeTenantId: 'ten_alpha',
     activeWorkspaceId: 'wrk_alpha',
+    workspaces: [],
+    workspacesLoading: false,
+    workspacesError: null,
+    selectWorkspace: vi.fn(),
+    reloadWorkspaces: vi.fn(),
     ...overrides
   }
 }
@@ -197,13 +212,16 @@ describe('ConsoleKafkaPage', () => {
     vi.unstubAllGlobals()
   })
 
-  it('muestra los empty states de tenant y workspace', () => {
+  it('muestra el empty state de tenant', () => {
     renderPage(createContext({ activeTenantId: null, activeWorkspaceId: null }))
     expect(screen.getByRole('alert')).toHaveTextContent(/selecciona una organización/i)
+  })
 
-    cleanup()
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static `<p role="alert">`.
+  it('[#742] muestra el guard de área de trabajo con la acción en línea compartida', () => {
     renderPage(createContext({ activeWorkspaceId: null }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/selecciona un área de trabajo/i)
+    expect(screen.getByTestId('workspace-required-create-denied')).toBeInTheDocument()
   })
 
   it('carga inventario, muestra quota agotada y carga bridges', async () => {

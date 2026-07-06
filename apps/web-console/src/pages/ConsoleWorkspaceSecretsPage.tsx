@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, type FormEvent, type 
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -244,11 +245,7 @@ export function ConsoleWorkspaceSecretsPage() {
   // No workspace selected → explicit empty state; issue NO request (handled by reload guard).
   if (!activeWorkspaceId) {
     return (
-      <ConsolePageState
-        kind="blocked"
-        title="Selecciona un área de trabajo"
-        description="Elige un área de trabajo activa para gestionar sus secretos de función. Cada secreto pertenece a una única área de trabajo."
-      />
+      <WorkspaceRequiredState description="Elige un área de trabajo activa para gestionar sus secretos de función. Cada secreto pertenece a una única área de trabajo." />
     )
   }
 

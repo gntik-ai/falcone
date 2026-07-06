@@ -2,6 +2,7 @@ import { type KeyboardEvent, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { McpServerConnectPanel } from '@/components/console/mcp/McpServerConnectPanel'
 import { McpServerPlayground } from '@/components/console/mcp/McpServerPlayground'
 import { Badge } from '@/components/ui/badge'
@@ -85,11 +86,7 @@ export function ConsoleMcpServerDetailPage() {
     }
     return (
       <div data-testid="mcp-detail-no-workspace">
-        <ConsolePageState
-          kind="empty"
-          title="Selecciona un área de trabajo"
-          description="El detalle y el área de pruebas del servidor MCP se cargan para el área de trabajo activa. Selecciona un área de trabajo para continuar."
-        />
+        <WorkspaceRequiredState description="El detalle y el área de pruebas del servidor MCP se cargan para el área de trabajo activa. Selecciona un área de trabajo para continuar." />
       </div>
     )
   }

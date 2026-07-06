@@ -35,6 +35,9 @@ describe('ConsoleMcpServerDetailPage', () => {
     fetchMcpServerDetailMock.mockReset()
     consoleContextMock.activeWorkspaceId = 'ws_1'
     consoleContextMock.workspacesLoading = false
+    delete (consoleContextMock as Record<string, unknown>).workspaces
+    delete (consoleContextMock as Record<string, unknown>).workspacesError
+    delete (consoleContextMock as Record<string, unknown>).selectWorkspace
   })
 
   it('shows the endpoint, active version and curated tool list on success', async () => {
@@ -82,5 +85,25 @@ describe('ConsoleMcpServerDetailPage', () => {
 
     expect(fetchMcpServerDetailMock).not.toHaveBeenCalled()
     expect(screen.getByTestId('mcp-detail-no-workspace')).toHaveTextContent('Selecciona un área de trabajo')
+  })
+
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState — assert its inline picker
+  // renders here too when the active organization already has workspaces.
+  it('[#742] offers an inline workspace picker that activates the chosen workspace', async () => {
+    const user = userEvent.setup()
+    const selectWorkspace = vi.fn()
+    Object.assign(consoleContextMock, {
+      activeWorkspaceId: null,
+      workspaces: [
+        { workspaceId: 'ws_1', tenantId: 'ten_1', label: 'Producción', secondary: 'prod' },
+        { workspaceId: 'ws_2', tenantId: 'ten_1', label: 'Staging', secondary: 'staging' }
+      ],
+      workspacesError: null,
+      selectWorkspace
+    })
+    renderPage()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /seleccionar área de trabajo/i }), 'ws_2')
+    expect(selectWorkspace).toHaveBeenCalledWith('ws_2')
   })
 })

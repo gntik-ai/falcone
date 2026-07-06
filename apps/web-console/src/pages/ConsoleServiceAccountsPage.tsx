@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { ConsoleCredentialStatusBadge } from '@/components/console/ConsoleCredentialStatusBadge'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { READ_ONLY_AFFORDANCE_TEXT_TONE } from '@/components/console/ReadOnlyActionBadge'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import {
   consoleServiceAccountsErrorMessage,
   createServiceAccount,
@@ -266,11 +267,7 @@ export function ConsoleServiceAccountsPage() {
   }
   if (!activeWorkspaceId) {
     return (
-      <ConsolePageState
-        kind="blocked"
-        title="Selecciona un área de trabajo"
-        description="Elige un área de trabajo activa para gestionar sus cuentas de servicio. Cada cuenta de servicio pertenece a una única área de trabajo."
-      />
+      <WorkspaceRequiredState description="Elige un área de trabajo activa para gestionar sus cuentas de servicio. Cada cuenta de servicio pertenece a una única área de trabajo." />
     )
   }
 

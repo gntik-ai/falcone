@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { ProvisionDatabaseWizard } from '@/components/console/wizards/ProvisionDatabaseWizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -996,7 +997,11 @@ export function ConsolePostgresPage() {
             </div>
           </div>
 
-          {!activeWorkspaceId ? <ConsoleSectionEmpty message="Selecciona un área de trabajo para ver esquemas." /> : null}
+          {!activeWorkspaceId ? (
+            <div className="mt-4">
+              <WorkspaceRequiredState description="Selecciona un área de trabajo para ver esquemas." />
+            </div>
+          ) : null}
           {activeWorkspaceId && schemas.loading ? <ConsoleSectionLoading label="Cargando esquemas PostgreSQL…" /> : null}
           {activeWorkspaceId && !schemas.loading && schemas.error ? (
             <ConsoleSectionError message={schemas.error} actionLabel="Reintentar" onRetry={() => void reloadSchemas(selectedDatabase)} />

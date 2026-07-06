@@ -134,3 +134,25 @@ describe('ConsoleFlowDesignerPage run-history navigation (#792)', () => {
     expect(screen.getByTestId('current-state')).toHaveTextContent('ten1:ws1:flow-1')
   })
 })
+
+// #742: the no-workspace guard is the shared WorkspaceRequiredState, not a static blocked state
+// whose only action navigated away.
+describe('ConsoleFlowDesignerPage — no active workspace', () => {
+  it('[#742] shows the shared WorkspaceRequiredState instead of loading the flow', () => {
+    mockGetFlow.mockReset()
+    mockUseConsoleContext.mockReturnValue({
+      activeWorkspaceId: null,
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
+
+    renderPage()
+
+    expect(mockGetFlow).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Diseñador bloqueado' })).toBeInTheDocument()
+    expect(screen.getByText(/selecciona un área de trabajo para abrir el diseñador/i)).toBeInTheDocument()
+  })
+})

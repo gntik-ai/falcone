@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
@@ -171,13 +172,7 @@ export function ConsoleWorkspaceDatabasePage() {
         </div>
       </header>
 
-      {!activeWorkspaceId ? (
-        <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">
-            Selecciona una organización y un área de trabajo en la barra superior para gestionar su base de datos.
-          </p>
-        </section>
-      ) : null}
+      {!activeWorkspaceId ? <WorkspaceRequiredState description="Selecciona un área de trabajo para aprovisionar y gestionar su base de datos." /> : null}
 
       {error ? (
         <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

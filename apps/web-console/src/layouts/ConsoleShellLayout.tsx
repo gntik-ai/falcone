@@ -23,6 +23,7 @@ import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'rea
 
 import { ActiveOperationsIndicator } from '@/components/console/ActiveOperationsIndicator'
 import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyActionBadge'
+import { WorkspaceActivationAction } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { terminateConsoleLoginSession } from '@/lib/console-auth'
@@ -846,16 +847,25 @@ function ConsoleContextStatusPanel() {
     operationalAlerts,
     reloadTenants,
     reloadWorkspaces,
+    selectWorkspace,
     tenantsError,
     tenantsLoading,
     workspaces,
     workspacesError,
     workspacesLoading
   } = useConsoleContext()
+  const { can } = useConsolePermissions()
 
   const tenantStatus = useMemo(() => getConsoleTenantStatusMeta(activeTenant), [activeTenant])
   const workspaceStatus = useMemo(() => getConsoleWorkspaceStatusMeta(activeWorkspace), [activeWorkspace])
   const hasNoWorkspaces = Boolean(activeTenantId) && !workspacesLoading && !workspacesError && workspaces.length === 0
+  // #742 (Scenario 1): give the "no active workspace" card a real first action instead of the
+  // static "Selecciona un área de trabajo…" sentence below — a workspace picker when the active
+  // organization already has workspaces, or a create-first-workspace CTA (degrading honestly when
+  // the role can't create one) when it has none. Only once a tenant is active and the workspaces
+  // list finished loading without error (the no-tenant-selected case is out of scope for #742 and
+  // keeps its existing static copy).
+  const showWorkspaceActivationAction = Boolean(activeTenantId) && !activeWorkspace && !workspacesLoading && !workspacesError
 
   return (
     <section aria-label="Estado operativo del contexto" className="space-y-4" data-testid="console-context-status-panel">
@@ -940,17 +950,46 @@ function ConsoleContextStatusPanel() {
                 ? 'No se encontraron áreas de trabajo accesibles para la organización activa.'
                 : workspaceStatus.description}
           </p>
-          {workspacesError || hasNoWorkspaces ? (
+          {workspacesError ? (
+            // A real load failure: retrying IS the primary recovery here, so it keeps the outline
+            // button and leads the footer (the activation action is suppressed while the list errored).
             <div className="mt-3 flex flex-col gap-3 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
-              {workspacesError ? (
-                <p className="text-sm text-destructive">{workspacesError}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">Vuelve a consultar áreas de trabajo si la organización se acaba de aprovisionar.</p>
-              )}
-              <Button type="button" variant="outline" size="sm" onClick={() => void reloadWorkspaces()}>
+              <p className="text-sm text-destructive">{workspacesError}</p>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void reloadWorkspaces()}>
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 Reintentar áreas de trabajo
               </Button>
+            </div>
+          ) : showWorkspaceActivationAction ? (
+            // #742 (Scenario 1): no active workspace. The activation action (create-first-workspace
+            // CTA / inline picker / honest degrade) is the DESIGNATED FIRST action, so it LEADS and
+            // carries the visual weight in a single section. When the organization simply has no
+            // workspaces yet, the "just provisioned? re-check" recovery is subordinated BELOW it as a
+            // quiet ghost affordance — the earlier layout stacked that outline retry, on its own
+            // divider, ABOVE the primary CTA, inverting the hierarchy.
+            <div className="mt-3 space-y-3 border-t border-border/70 pt-3">
+              <WorkspaceActivationAction
+                workspaces={workspaces}
+                canCreateWorkspace={can('tenant.workspaces.create')}
+                onSelectWorkspace={selectWorkspace}
+              />
+              {hasNoWorkspaces ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Vuelve a consultar áreas de trabajo si la organización se acaba de aprovisionar.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void reloadWorkspaces()}
+                    className="shrink-0 text-muted-foreground"
+                  >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    Reintentar áreas de trabajo
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </article>

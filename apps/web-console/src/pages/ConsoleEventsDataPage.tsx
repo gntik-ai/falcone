@@ -3,6 +3,7 @@
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
 
 import { EventsConsole } from '@/components/console/EventsConsole'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { useConsoleContext } from '@/lib/console-context'
 import { readConsoleShellSession } from '@/lib/console-session'
@@ -13,11 +14,7 @@ export function ConsoleEventsDataPage() {
   const canManageEvents = canPerformStructuralWrites(readConsoleShellSession()?.principal?.platformRoles)
 
   if (!activeWorkspaceId) {
-    return (
-      <section role="status" className="rounded-3xl border border-dashed border-border bg-card/40 p-6 text-sm text-muted-foreground shadow-sm">
-        Selecciona un área de trabajo para usar eventos.
-      </section>
-    )
+    return <WorkspaceRequiredState description="Selecciona un área de trabajo para usar eventos." />
   }
 
   return (

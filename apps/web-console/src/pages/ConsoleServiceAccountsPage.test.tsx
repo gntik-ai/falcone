@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleServiceAccountsPage } from './ConsoleServiceAccountsPage'
@@ -75,10 +76,58 @@ describe('ConsoleServiceAccountsPage', () => {
   })
 
   it('muestra bloqueo sin workspace', () => {
-    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null })
+    mockUseConsoleContext.mockReturnValue({
+      activeTenantId: 'ten_1',
+      activeWorkspaceId: null,
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />, { wrapper: MemoryRouter })
+    expect(screen.getByRole('status')).toHaveTextContent(/selecciona un área de trabajo/i)
+  })
+
+  // #742: the no-workspace guard is the shared WorkspaceRequiredState — assert its inline action
+  // renders here too (not just in its own unit test) so this page cannot silently regress to a
+  // dead-end static message.
+  it('[#742] ofrece un CTA para crear la primera área de trabajo cuando la organización activa no tiene ninguna', () => {
+    mockUseConsoleContext.mockReturnValue({
+      activeTenantId: 'ten_1',
+      activeWorkspaceId: null,
+      workspaces: [],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace: vi.fn(),
+      reloadWorkspaces: vi.fn()
+    })
+    mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
+    render(<ConsoleServiceAccountsPage />, { wrapper: MemoryRouter })
+    expect(screen.getByRole('link', { name: /crear área de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+  })
+
+  it('[#742] ofrece un selector en línea que activa el área de trabajo elegida cuando ya existen áreas de trabajo', async () => {
+    const user = userEvent.setup()
+    const selectWorkspace = vi.fn()
+    mockUseConsoleContext.mockReturnValue({
+      activeTenantId: 'ten_1',
+      activeWorkspaceId: null,
+      workspaces: [
+        { workspaceId: 'wrk_1', tenantId: 'ten_1', label: 'Producción', secondary: 'prod' },
+        { workspaceId: 'wrk_2', tenantId: 'ten_1', label: 'Staging', secondary: 'staging' }
+      ],
+      workspacesLoading: false,
+      workspacesError: null,
+      selectWorkspace,
+      reloadWorkspaces: vi.fn()
+    })
     mockUseConsoleServiceAccounts.mockReturnValue({ accounts: [], loading: false, error: null, reload: vi.fn(), knownIds: [] })
     render(<ConsoleServiceAccountsPage />)
-    expect(screen.getByRole('alert')).toHaveTextContent(/selecciona un área de trabajo/i)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /seleccionar área de trabajo/i }), 'wrk_2')
+    expect(selectWorkspace).toHaveBeenCalledWith('wrk_2')
   })
 
   it('muestra empty state del workspace, no del navegador local', () => {

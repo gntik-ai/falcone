@@ -4,6 +4,7 @@
 import { useState } from 'react'
 
 import { PostgresDataEditor } from '@/components/console/PostgresDataEditor'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
@@ -15,7 +16,7 @@ export function ConsolePostgresDataPage() {
   const [tableName, setTableName] = useState('')
 
   if (!activeWorkspaceId) {
-    return <p className="text-sm text-muted-foreground">Selecciona un área de trabajo para editar datos.</p>
+    return <WorkspaceRequiredState description="Selecciona un área de trabajo para editar datos." />
   }
 
   const ready = databaseName.trim() !== '' && tableName.trim() !== ''

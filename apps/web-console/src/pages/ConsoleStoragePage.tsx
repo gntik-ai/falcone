@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
+import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -485,7 +486,7 @@ export function ConsoleStoragePage() {
   }
 
   if (!activeWorkspaceId) {
-    return <p role="alert">Selecciona un área de trabajo para ver los recursos de almacenamiento.</p>
+    return <WorkspaceRequiredState description="Selecciona un área de trabajo para ver los recursos de almacenamiento." />
   }
 
   return (
