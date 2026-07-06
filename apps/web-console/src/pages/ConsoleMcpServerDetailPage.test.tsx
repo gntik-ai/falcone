@@ -79,6 +79,15 @@ describe('ConsoleMcpServerDetailPage', () => {
     expect(screen.getByRole('tabpanel', { name: 'Área de pruebas' })).toBeInTheDocument()
   })
 
+  it('[#743] localiza el error de carga del servidor MCP — nunca el mensaje crudo del backend', async () => {
+    fetchMcpServerDetailMock.mockRejectedValue({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+    renderPage()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
+  })
+
   it('does not request a server detail without an active workspace and shows a clear state', () => {
     consoleContextMock.activeWorkspaceId = null
     renderPage()

@@ -7,6 +7,7 @@ import {
   ConfigReprovisionApiError,
 } from '@/api/configReprovisionApi'
 import type { IdentifierMapEntry, IdentifierMap, ReprovisionResult } from '@/api/configReprovisionApi'
+import { describeConsoleError } from '@/lib/console-errors'
 
 type Step = 'upload' | 'map' | 'configure' | 'result'
 
@@ -54,7 +55,7 @@ export function ConsoleTenantConfigReprovisionPage({ tenantId, userRole }: PageP
       if (err instanceof SyntaxError) {
         setError('El artefacto no es un JSON válido.')
       } else if (err instanceof ConfigReprovisionApiError) {
-        setError(err.message)
+        setError(describeConsoleError({ status: err.statusCode, code: err.code, message: err.message }, 'Error al analizar el artefacto.'))
       } else {
         setError('Error al analizar el artefacto.')
       }
@@ -95,7 +96,7 @@ export function ConsoleTenantConfigReprovisionPage({ tenantId, userRole }: PageP
       setStep('result')
     } catch (err) {
       if (err instanceof ConfigReprovisionApiError) {
-        setError(err.message)
+        setError(describeConsoleError({ status: err.statusCode, code: err.code, message: err.message }, 'Error al ejecutar el reaprovisionamiento.'))
       } else {
         setError('Error al ejecutar el reaprovisionamiento.')
       }

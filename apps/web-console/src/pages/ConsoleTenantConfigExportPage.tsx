@@ -9,6 +9,7 @@ import {
 } from '@/api/configExportApi'
 import { ConfigExportDomainSelector } from '@/components/ConfigExportDomainSelector'
 import { ConfigExportResultPanel } from '@/components/ConfigExportResultPanel'
+import { describeConsoleError } from '@/lib/console-errors'
 
 interface ConsoleTenantConfigExportPageProps {
   tenantId?: string
@@ -71,7 +72,11 @@ export default function ConsoleTenantConfigExportPage({ tenantId = 'default' }: 
             setError('Demasiadas solicitudes. Espera un momento e intenta de nuevo.')
             break
           default:
-            setError(err.message)
+            // The four cases above are console-owned copy for a narrow, known allow-list of
+            // status codes (#743's proposal note). Anything else must never echo the raw
+            // transport message — map by the real status (ConfigExportApiError carries it as
+            // `statusCode`, not `status`).
+            setError(describeConsoleError({ status: err.statusCode, code: err.code, message: err.message }, 'Error inesperado durante la exportación.'))
         }
       } else {
         setError('Error inesperado durante la exportación.')

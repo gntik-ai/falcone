@@ -9,6 +9,7 @@ import { ConsoleFlowDesignerPage } from './ConsoleFlowDesignerPage'
 const mockUseConsoleContext = vi.fn()
 const mockGetFlow = vi.fn()
 const mockTriggerFlowSchedule = vi.fn()
+const mockUpdateFlowDraft = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
@@ -19,7 +20,7 @@ vi.mock('@/services/flowsApi', () => ({
   isFlowApiError: () => false,
   publishFlow: vi.fn(),
   triggerFlowSchedule: (...args: unknown[]) => mockTriggerFlowSchedule(...args),
-  updateFlowDraft: vi.fn()
+  updateFlowDraft: (...args: unknown[]) => mockUpdateFlowDraft(...args)
 }))
 
 vi.mock('@xyflow/react', () => ({
@@ -74,6 +75,7 @@ function renderPage(flowId = 'flow-1') {
 
 beforeEach(() => {
   mockUseConsoleContext.mockReset().mockReturnValue({ activeWorkspaceId: 'ws1' })
+  mockUpdateFlowDraft.mockReset()
   mockGetFlow.mockReset().mockResolvedValue({
     flowId: 'flow-1',
     name: 'Alpha flow',
@@ -132,6 +134,21 @@ describe('ConsoleFlowDesignerPage run-history navigation (#792)', () => {
     await waitFor(() => expect(mockTriggerFlowSchedule).toHaveBeenCalledWith('ws1', 'flow-1'))
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/console/flows/flow-1/runs'))
     expect(screen.getByTestId('current-state')).toHaveTextContent('ten1:ws1:flow-1')
+  })
+})
+
+describe('ConsoleFlowDesignerPage save-error banner (#743)', () => {
+  it('localiza el error de guardado — nunca el mensaje crudo del backend', async () => {
+    mockUpdateFlowDraft.mockRejectedValueOnce({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await waitFor(() => expect(mockGetFlow).toHaveBeenCalledWith('ws1', 'flow-1'))
+    await user.click(screen.getByTestId('save-draft-button'))
+
+    const banner = await screen.findByText(/no tienes permiso/i)
+    expect(banner.textContent ?? '').not.toMatch(/requires superadmin/i)
   })
 })
 

@@ -4,6 +4,7 @@ import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredSt
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { ApiError } from '@/lib/http'
 
@@ -55,10 +56,6 @@ interface RotateResponse {
   dsn?: string
 }
 
-function errMsg(error: unknown, fallback: string): string {
-  return (error as Partial<ApiError>)?.message?.trim() || fallback
-}
-
 export function ConsoleWorkspaceDatabasePage() {
   const { activeWorkspace, activeWorkspaceId } = useConsoleContext()
   const [record, setRecord] = useState<WorkspaceDatabaseRecord | null>(null)
@@ -83,7 +80,7 @@ export function ConsoleWorkspaceDatabasePage() {
         setRecord(null)
         setNotProvisioned(true)
       } else {
-        setError(errMsg(rawError, 'No se pudo cargar la base de datos del área de trabajo.'))
+        setError(describeConsoleError(rawError, 'No se pudo cargar la base de datos del área de trabajo.'))
       }
     } finally {
       setLoading(false)
@@ -115,7 +112,7 @@ export function ConsoleWorkspaceDatabasePage() {
       setConnection(res.connection)
       setNotProvisioned(false)
     } catch (rawError) {
-      setError(errMsg(rawError, 'No se pudo aprovisionar la base de datos del área de trabajo.'))
+      setError(describeConsoleError(rawError, 'No se pudo aprovisionar la base de datos del área de trabajo.'))
     } finally {
       setBusy(false)
     }
@@ -135,13 +132,16 @@ export function ConsoleWorkspaceDatabasePage() {
       )
       setRotation(res)
     } catch (rawError) {
-      // Clear any stale rotation panel; surface the backend reason (e.g. DB_SHARED_MODE) verbatim.
+      // Clear any stale rotation panel. DB_SHARED_MODE is a known, console-owned code with its
+      // own copy (#743's narrow allow-list) — handled directly so the generic 409 mapping below
+      // never overrides it. Anything else (including an unrecognized code on the same 409)
+      // routes through the shared, never-raw helper.
       setRotation(null)
-      const fallback =
-        (rawError as Partial<ApiError>)?.code === 'DB_SHARED_MODE'
-          ? 'Esta área de trabajo usa la credencial compartida de la plataforma; no hay una credencial dedicada que rotar.'
-          : 'No se pudo rotar la credencial de base de datos.'
-      setError(errMsg(rawError, fallback))
+      if ((rawError as Partial<ApiError>)?.code === 'DB_SHARED_MODE') {
+        setError('Esta área de trabajo usa la credencial compartida de la plataforma; no hay una credencial dedicada que rotar.')
+      } else {
+        setError(describeConsoleError(rawError, 'No se pudo rotar la credencial de base de datos.'))
+      }
     } finally {
       setBusy(false)
     }

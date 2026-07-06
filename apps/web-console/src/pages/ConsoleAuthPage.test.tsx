@@ -314,7 +314,11 @@ describe('ConsoleAuthPage', () => {
     await user.click(await screen.findByRole('button', { name: /editar/i }))
     await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
 
-    expect(await screen.findByText(/no autorizado por política del workspace/i)).toBeInTheDocument()
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const feedback = await screen.findByText(/no se pudo guardar la aplicación/i)
+    expect(feedback).toBeInTheDocument()
+    expect(screen.queryByText(/no autorizado por política del workspace/i)).not.toBeInTheDocument()
   })
 
   it('muestra snippets IAM para el client seleccionado sin filtrar secretos reales', async () => {

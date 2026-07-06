@@ -238,7 +238,10 @@ describe('ConsoleMembersPage', () => {
 
     const alerts = await screen.findAllByRole('alert')
     expect(alerts).toHaveLength(2)
-    expect(alerts[0]?.textContent ?? '').toMatch(/usuarios degradados|roles degradados/i)
+    // [#743] A 500 is a technical failure — it must render the shared localized copy, never
+    // the raw backend message ("Usuarios degradados"/"Roles degradados").
+    expect(alerts[0]?.textContent ?? '').toMatch(/no está disponible en este momento/i)
+    expect(alerts.map((alert) => alert.textContent ?? '').join(' ')).not.toMatch(/usuarios degradados|roles degradados/i)
 
     await user.click(screen.getAllByRole('button', { name: /reintentar usuarios/i })[0]!)
     await user.click(screen.getAllByRole('button', { name: /reintentar roles/i })[0]!)
@@ -247,6 +250,44 @@ describe('ConsoleMembersPage', () => {
       expect(screen.getByText('alice')).toBeInTheDocument()
       expect(screen.getByText('realm-admin')).toBeInTheDocument()
     })
+  })
+
+  it('[#743] localiza el 403 "requires superadmin" de roles — nunca el texto crudo del backend — y ofrece Reintentar', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const parsedUrl = new URL(url, 'http://localhost')
+
+      if (parsedUrl.pathname === '/v1/tenants') {
+        return createJsonResponse(200, {
+          items: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
+          page: {}
+        })
+      }
+
+      if (parsedUrl.pathname === '/v1/workspaces') {
+        return createJsonResponse(200, { items: [], page: {} })
+      }
+
+      if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/users') {
+        return createJsonResponse(200, { items: [createIamUser('usr_1', 'alice')], page: { size: 100 }, compatibility: createCompatibility() })
+      }
+
+      // Confirmed live repro (#743): GET .../roles → 403 {"code":"FORBIDDEN","message":"requires
+      // superadmin"}. The page must never render "requires superadmin" verbatim.
+      if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/roles') {
+        return createJsonResponse(403, { code: 'FORBIDDEN', message: 'requires superadmin' })
+      }
+
+      return createJsonResponse(404, { message: 'Not found' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(screen.getAllByRole('button', { name: /reintentar roles/i }).length).toBeGreaterThan(0)
   })
 })
 

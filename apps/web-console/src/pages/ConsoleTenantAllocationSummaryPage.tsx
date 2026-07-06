@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { WorkspaceAllocationSummaryTable } from '@/components/console/WorkspaceAllocationSummaryTable'
+import { describeConsoleError } from '@/lib/console-errors'
 import { isTenantlessPlatformPrincipal } from '@/lib/console-principal'
 import { readConsoleShellSession } from '@/lib/console-session'
 import * as api from '@/services/planManagementApi'
@@ -9,6 +10,7 @@ export function ConsoleTenantAllocationSummaryPage() {
   const tenantlessPlatformPrincipal = isTenantlessPlatformPrincipal(readConsoleShellSession()?.principal)
   const [data, setData] = useState<api.AllocationSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     if (tenantlessPlatformPrincipal) {
@@ -17,8 +19,9 @@ export function ConsoleTenantAllocationSummaryPage() {
       return
     }
 
-    api.getTenantAllocationSummary().then(setData).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el resumen de asignación'))
-  }, [tenantlessPlatformPrincipal])
+    setError(null)
+    api.getTenantAllocationSummary().then(setData).catch((err) => setError(describeConsoleError(err, 'No se pudo cargar el resumen de asignación')))
+  }, [tenantlessPlatformPrincipal, reloadNonce])
 
   if (tenantlessPlatformPrincipal) {
     return (
@@ -29,7 +32,7 @@ export function ConsoleTenantAllocationSummaryPage() {
       />
     )
   }
-  if (error) return <ConsolePageState kind="error" title="Resumen de asignación no disponible" description={error} />
+  if (error) return <ConsolePageState kind="error" title="Resumen de asignación no disponible" description={error} actionLabel="Reintentar" onAction={() => setReloadNonce((nonce) => nonce + 1)} />
   if (!data) return <ConsolePageState kind="loading" title="Cargando resumen de asignación" description="Obteniendo subcuotas asignadas a áreas de trabajo." />
   if (data.dimensions.every((item) => item.workspaces.length === 0)) return <ConsolePageState kind="empty" title="Todavía no hay asignaciones de área de trabajo" description="Todas las dimensiones usan actualmente la reserva compartida de la organización." />
 

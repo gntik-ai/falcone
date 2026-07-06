@@ -4,6 +4,7 @@ import { CapabilityStatusGrid } from '@/components/console/CapabilityStatusGrid'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
+import { describeConsoleError } from '@/lib/console-errors'
 import { getConsolePlatformRoles, isTenantlessPlatformPrincipal } from '@/lib/console-principal'
 import { readConsoleShellSession } from '@/lib/console-session'
 import * as api from '@/services/planManagementApi'
@@ -30,7 +31,7 @@ export function ConsoleTenantPlanOverviewPage() {
     // backend error) renders the accessible error state below instead of reaching the
     // route error boundary.
     setError(null)
-    api.getEffectiveEntitlements(undefined, { includeConsumption: true }).then(setSummary).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el resumen del plan'))
+    api.getEffectiveEntitlements(undefined, { includeConsumption: true }).then(setSummary).catch((err) => setError(describeConsoleError(err, 'No se pudo cargar el resumen del plan')))
   }, [tenantlessPlatformPrincipal, reloadNonce])
 
   if (tenantlessPlatformPrincipal) {

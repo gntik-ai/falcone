@@ -305,7 +305,10 @@ describe('ConsoleKafkaPage', () => {
     await user.click(await screen.findByText('orders.created'))
     await user.click(screen.getByRole('button', { name: 'Metadatos' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/metadatos degradados/i)
+    // [#743] localized fallback, never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudieron cargar los metadatos operacionales del tópico/i)
+    expect(alert.textContent ?? '').not.toMatch(/metadatos degradados/i)
     expect(screen.queryByText(/svc-orders/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Detalle' }))
     expect((await screen.findAllByText('evt.ten_alpha.orders.created')).length).toBeGreaterThan(0)
@@ -351,7 +354,10 @@ describe('ConsoleKafkaPage', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/inventario degradado/i)
+    // [#743] localized fallback, never the raw thrown message.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudo cargar el inventario de kafka/i)
+    expect(alert.textContent ?? '').not.toMatch(/inventario degradado/i)
     await user.click(screen.getByRole('button', { name: /reintentar/i }))
     expect((await screen.findAllByText(/orders.created/i)).length).toBeGreaterThan(0)
   })
@@ -380,13 +386,17 @@ describe('ConsoleKafkaPage', () => {
       if (url === '/v1/events/topics/res_topic_1/access') return mockAccessPolicy()
       if (url === '/v1/events/topics/res_topic_1/metadata') return mockMetadata()
       if (url === '/v1/events/workspaces/wrk_alpha/bridges/evb_orders') return mockBridge()
-      if (url === '/v1/events/topics/res_topic_1/publish') throw new Error('quota exceeded 429')
+      // [#743] the quota-guidance heuristic used to sniff the raw backend message for "quota"/
+      // "429" — now it reads the actual HTTP status, so the thrown error must carry one.
+      if (url === '/v1/events/topics/res_topic_1/publish') throw { status: 429, code: 'RATE_LIMITED', message: 'quota exceeded 429' }
       throw new Error(`Unexpected URL ${url}`)
     })
 
     await user.clear(screen.getByLabelText(/contenido json/i))
     await user.click(screen.getByRole('button', { name: /publicar evento/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/quota exceeded 429/i)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/se alcanzó el límite de solicitudes/i)
+    expect(alert.textContent ?? '').not.toMatch(/quota exceeded 429/i)
     expect(screen.getByLabelText(/contenido json/i)).toBeInTheDocument()
     expect(screen.getByText(/detalle > cuotas/i)).toBeInTheDocument()
   })
@@ -415,6 +425,9 @@ describe('ConsoleKafkaPage', () => {
 
   it('muestra error aislado en stream sin reconexión infinita', async () => {
     queueHappyPath()
+    // [#743] the SSE endpoint fails via a raw `fetch`, so the response's raw `message` must
+    // never be echoed — only the shared localized copy (here, the network/unmapped-status
+    // fallback, since the mock carries no explicit `status`).
     fetchMock.mockResolvedValue({ ok: false, json: async () => ({ message: 'SSE no disponible' }) } as Response)
     const user = userEvent.setup()
 
@@ -423,7 +436,9 @@ describe('ConsoleKafkaPage', () => {
     await user.click(screen.getByRole('button', { name: 'Flujo' }))
     await user.click(screen.getByRole('button', { name: /iniciar flujo/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/sse no disponible/i)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no se pudo iniciar el flujo/i)
+    expect(alert.textContent ?? '').not.toMatch(/sse no disponible/i)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

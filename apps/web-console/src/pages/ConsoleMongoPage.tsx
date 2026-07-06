@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
@@ -99,25 +100,6 @@ const EMPTY_DOCUMENTS_STATE: DocumentsState = {
   error: null,
   nextCursor: null,
   loadingMore: false
-}
-
-function getApiErrorMessage(rawError: unknown, fallback: string): string {
-  if (rawError && typeof rawError === 'object') {
-    const maybeMessage = 'message' in rawError ? rawError.message : undefined
-    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
-      return maybeMessage
-    }
-
-    const maybeBody = 'body' in rawError ? rawError.body : undefined
-    if (maybeBody && typeof maybeBody === 'object' && 'message' in maybeBody) {
-      const bodyMessage = maybeBody.message
-      if (typeof bodyMessage === 'string' && bodyMessage.trim()) {
-        return bodyMessage
-      }
-    }
-  }
-
-  return fallback
 }
 
 function encodePathSegment(value: string): string {
@@ -250,7 +232,7 @@ export function ConsoleMongoPage() {
         setDatabases({
           data: [],
           loading: false,
-          error: getApiErrorMessage(error, 'No se pudieron cargar las bases de datos MongoDB.')
+          error: describeConsoleError(error, 'No se pudieron cargar las bases de datos MongoDB.')
         })
       })
 
@@ -283,14 +265,14 @@ export function ConsoleMongoPage() {
           : {
               data: [],
               loading: false,
-              error: getApiErrorMessage(collectionsResult.reason, 'No se pudieron cargar las colecciones.')
+              error: describeConsoleError(collectionsResult.reason, 'No se pudieron cargar las colecciones.')
             }
       )
 
       setViews(
         viewsResult.status === 'fulfilled'
           ? { data: viewsResult.value?.items ?? [], loading: false, error: null }
-          : { data: [], loading: false, error: getApiErrorMessage(viewsResult.reason, 'No se pudieron cargar las vistas.') }
+          : { data: [], loading: false, error: describeConsoleError(viewsResult.reason, 'No se pudieron cargar las vistas.') }
       )
     })
 
@@ -321,14 +303,14 @@ export function ConsoleMongoPage() {
           : {
               data: [],
               loading: false,
-              error: getApiErrorMessage(collectionsResult.reason, 'No se pudieron cargar las colecciones.')
+              error: describeConsoleError(collectionsResult.reason, 'No se pudieron cargar las colecciones.')
             }
       )
 
       setViews(
         viewsResult.status === 'fulfilled'
           ? { data: viewsResult.value?.items ?? [], loading: false, error: null }
-          : { data: [], loading: false, error: getApiErrorMessage(viewsResult.reason, 'No se pudieron cargar las vistas.') }
+          : { data: [], loading: false, error: describeConsoleError(viewsResult.reason, 'No se pudieron cargar las vistas.') }
       )
     })
 
@@ -368,14 +350,14 @@ export function ConsoleMongoPage() {
           : {
               data: null,
               loading: false,
-              error: getApiErrorMessage(detailResult.reason, 'No se pudo cargar la validación de la colección.')
+              error: describeConsoleError(detailResult.reason, 'No se pudo cargar la validación de la colección.')
             }
       )
 
       setIndexes(
         indexesResult.status === 'fulfilled'
           ? { data: indexesResult.value.items ?? [], loading: false, error: null }
-          : { data: [], loading: false, error: getApiErrorMessage(indexesResult.reason, 'No se pudieron cargar los índices.') }
+          : { data: [], loading: false, error: describeConsoleError(indexesResult.reason, 'No se pudieron cargar los índices.') }
       )
 
       setDocuments(
@@ -390,7 +372,7 @@ export function ConsoleMongoPage() {
           : {
               data: [],
               loading: false,
-              error: getApiErrorMessage(documentsResult.reason, 'No se pudieron cargar los documentos.'),
+              error: describeConsoleError(documentsResult.reason, 'No se pudieron cargar los documentos.'),
               nextCursor: null,
               loadingMore: false
             }
@@ -436,7 +418,7 @@ export function ConsoleMongoPage() {
       setDocuments((previous) => ({
         ...previous,
         loadingMore: false,
-        error: getApiErrorMessage(error, 'No se pudieron cargar más documentos.')
+        error: describeConsoleError(error, 'No se pudieron cargar más documentos.')
       }))
     }
   }, [documents.loadingMore, documents.nextCursor, selectedCollection, selectedDatabase])

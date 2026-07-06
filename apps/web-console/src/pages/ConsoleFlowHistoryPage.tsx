@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import {
   listExecutions,
   type ExecutionListFilters,
@@ -91,7 +92,7 @@ function HistoryList({ workspaceId, flowId }: { workspaceId: string; flowId: str
         setNextPageToken(response.nextPageToken ?? null)
         setLoaded(true)
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'No se pudieron cargar las ejecuciones')
+        setError(describeConsoleError(caught, 'No se pudieron cargar las ejecuciones'))
       } finally {
         setLoading(false)
       }

@@ -6,6 +6,7 @@ import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import { PlanAssignmentDialog } from '@/components/console/PlanAssignmentDialog'
 import { PlanImpactHistoryTable } from '@/components/console/PlanImpactHistoryTable'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
+import { describeConsoleError } from '@/lib/console-errors'
 import * as api from '@/services/planManagementApi'
 
 export function ConsoleTenantPlanPage() {
@@ -17,18 +18,19 @@ export function ConsoleTenantPlanPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
   useEffect(() => {
     // The assignment and entitlement fetches are load-bearing for the page: surface a
     // dedicated, accessible error state if either rejects (otherwise a reject would only
     // reach the route error boundary). History and the plan catalog are secondary, so
     // their failures must never block the page — swallow them to empty defaults.
     setError(null)
-    api.getTenantCurrentPlan(tenantId).then(setData).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el plan de la organización'))
-    api.getEffectiveEntitlements(tenantId, { includeConsumption: true }).then(setSummary).catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar los derechos de la organización'))
+    api.getTenantCurrentPlan(tenantId).then(setData).catch((err) => setError(describeConsoleError(err, 'No se pudo cargar el plan de la organización')))
+    api.getEffectiveEntitlements(tenantId, { includeConsumption: true }).then(setSummary).catch((err) => setError(describeConsoleError(err, 'No se pudieron cargar los derechos de la organización')))
     api.getPlanChangeHistory(tenantId).then(setHistory).catch(() => undefined)
     api.listPlans({ status: 'active' }).then((response) => setPlans(response.items)).catch(() => undefined)
-  }, [tenantId])
-  if (error) return <ConsolePageState kind="error" title="Plan de la organización no disponible" description={error} />
+  }, [tenantId, reloadNonce])
+  if (error) return <ConsolePageState kind="error" title="Plan de la organización no disponible" description={error} actionLabel="Reintentar" onAction={() => setReloadNonce((nonce) => nonce + 1)} />
   if (!data || !summary) return <ConsolePageState kind="loading" title="Cargando plan de la organización" description="Consultando asignación, derechos e historial de impacto." />
   const planDisplayName = data?.plan?.displayName ?? null
   const planStatus = data?.plan?.status as api.PlanStatus | undefined

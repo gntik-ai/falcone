@@ -4,6 +4,7 @@ import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredSt
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
 import { readConsoleShellSession, requestConsoleSessionJson } from '@/lib/console-session'
 
 type KafkaNamingPolicy = {
@@ -198,25 +199,6 @@ const EMPTY_TOPIC_ACCESS_STATE: SectionState<KafkaAccessPolicy | null> = { data:
 const EMPTY_TOPIC_METADATA_STATE: SectionState<KafkaMetadata | null> = { data: null, loading: false, error: null }
 const EMPTY_PUBLISH_RESULT_STATE: SectionState<KafkaPublishAccepted | null> = { data: null, loading: false, error: null }
 
-function getApiErrorMessage(rawError: unknown, fallback: string): string {
-  if (rawError && typeof rawError === 'object') {
-    const maybeMessage = 'message' in rawError ? rawError.message : undefined
-    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
-      return maybeMessage
-    }
-
-    const maybeBody = 'body' in rawError ? rawError.body : undefined
-    if (maybeBody && typeof maybeBody === 'object' && maybeBody !== null && 'message' in maybeBody) {
-      const bodyMessage = (maybeBody as { message?: unknown }).message
-      if (typeof bodyMessage === 'string' && bodyMessage.trim()) {
-        return bodyMessage
-      }
-    }
-  }
-
-  return fallback
-}
-
 function isAbortError(rawError: unknown): boolean {
   return rawError instanceof DOMException
     ? rawError.name === 'AbortError'
@@ -387,6 +369,10 @@ export function ConsoleKafkaPage() {
   const [topicMetadata, setTopicMetadata] = useState<SectionState<KafkaMetadata | null>>(EMPTY_TOPIC_METADATA_STATE)
   const [publishForm, setPublishForm] = useState({ payload: '', eventType: '', key: '', contentType: 'application/json' })
   const [publishResult, setPublishResult] = useState<SectionState<KafkaPublishAccepted | null>>(EMPTY_PUBLISH_RESULT_STATE)
+  // #743: the quota guidance below the publish error used to sniff the raw backend message for
+  // "quota"/"429" substrings — impossible once the message is localized. Track the rate-limit
+  // condition from the actual HTTP status instead.
+  const [publishRateLimited, setPublishRateLimited] = useState(false)
   const [streamActive, setStreamActive] = useState(false)
   const [streamEvents, setStreamEvents] = useState<KafkaStreamEvent[]>([])
   const [streamError, setStreamError] = useState<string | null>(null)
@@ -405,6 +391,7 @@ export function ConsoleKafkaPage() {
     setTopicAccess(EMPTY_TOPIC_ACCESS_STATE)
     setTopicMetadata(EMPTY_TOPIC_METADATA_STATE)
     setPublishResult(EMPTY_PUBLISH_RESULT_STATE)
+    setPublishRateLimited(false)
     setStreamEvents([])
     setStreamError(null)
     setStreamActive(false)
@@ -420,7 +407,7 @@ export function ConsoleKafkaPage() {
       setInventory({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setInventory({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el inventario de Kafka.') })
+      setInventory({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar el inventario de Kafka.') })
     }
   }, [])
 
@@ -431,7 +418,7 @@ export function ConsoleKafkaPage() {
       setTopicDetail({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setTopicDetail({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el detalle del tópico.') })
+      setTopicDetail({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar el detalle del tópico.') })
     }
   }, [])
 
@@ -442,7 +429,7 @@ export function ConsoleKafkaPage() {
       setTopicAccess({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setTopicAccess({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la política de acceso del tópico.') })
+      setTopicAccess({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar la política de acceso del tópico.') })
     }
   }, [])
 
@@ -474,7 +461,7 @@ export function ConsoleKafkaPage() {
       setTopicMetadata({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setTopicMetadata({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudieron cargar los metadatos operacionales del tópico.') })
+      setTopicMetadata({ data: null, loading: false, error: describeConsoleError(error, 'No se pudieron cargar los metadatos operacionales del tópico.') })
     }
   }, [])
 
@@ -503,9 +490,11 @@ export function ConsoleKafkaPage() {
         body: body as never
       })
       setPublishResult({ data, loading: false, error: null })
+      setPublishRateLimited(false)
     } catch (error) {
-      const message = getApiErrorMessage(error, 'No se pudo publicar el evento de prueba.')
+      const message = describeConsoleError(error, 'No se pudo publicar el evento de prueba.')
       setPublishResult({ data: null, loading: false, error: message })
+      setPublishRateLimited(getConsoleErrorStatus(error) === 429)
     }
   }, [publishForm, selectedTopicId])
 
@@ -532,16 +521,11 @@ export function ConsoleKafkaPage() {
       })
 
       if (!response.ok) {
-        let message = 'No se pudo iniciar el flujo.'
-        try {
-          const body = (await response.json()) as { message?: string }
-          if (typeof body.message === 'string' && body.message.trim()) {
-            message = body.message
-          }
-        } catch {
-          // noop
-        }
-        setStreamError(message)
+        // #743: the SSE stream endpoint fails via a raw `fetch`, not `requestConsoleSessionJson`
+        // (no ApiError normalization), so the backend's `message` used to be echoed verbatim.
+        // Map through the shared, localized helper instead — the response status is the only
+        // signal worth trusting here.
+        setStreamError(describeConsoleError({ status: response.status }, 'No se pudo iniciar el flujo.'))
         setStreamActive(false)
         return
       }
@@ -576,7 +560,7 @@ export function ConsoleKafkaPage() {
         streamAbortRef.current = null
         return
       }
-      setStreamError(getApiErrorMessage(error, 'La conexión de flujo falló.'))
+      setStreamError(describeConsoleError(error, 'La conexión de flujo falló.'))
       setStreamActive(false)
       streamAbortRef.current = null
     }
@@ -607,6 +591,7 @@ export function ConsoleKafkaPage() {
 
     stopStream()
     setPublishResult(EMPTY_PUBLISH_RESULT_STATE)
+    setPublishRateLimited(false)
     setStreamEvents([])
     setStreamError(null)
     setShowHighVolumeWarning(false)
@@ -653,7 +638,7 @@ export function ConsoleKafkaPage() {
         setBridges({ data: loaded, loading: false, error: null })
       } catch (error) {
         if (isAbortError(error)) return
-        setBridges({ data: [], loading: false, error: getApiErrorMessage(error, 'No se pudo cargar la lista de puentes.') })
+        setBridges({ data: [], loading: false, error: describeConsoleError(error, 'No se pudo cargar la lista de puentes.') })
       }
     })()
 
@@ -709,9 +694,9 @@ export function ConsoleKafkaPage() {
 
             {inventory.loading ? <p>Cargando inventario…</p> : null}
             {!inventory.loading && inventory.error ? (
-              <div className="space-y-3">
-                <p role="alert">{inventory.error}</p>
-                <Button onClick={() => void loadInventory(activeWorkspaceId)}>Reintentar</Button>
+              <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                <p className="text-sm text-destructive">{inventory.error}</p>
+                <Button onClick={() => void loadInventory(activeWorkspaceId)} type="button" variant="outline" size="sm" className="mt-3">Reintentar</Button>
               </div>
             ) : null}
             {!inventory.loading && !inventory.error && inventory.data && inventory.data.items.length === 0 ? <p>No hay tópicos en esta área de trabajo.</p> : null}
@@ -1073,11 +1058,11 @@ export function ConsoleKafkaPage() {
                   {publishResult.error ? (
                     <div className="rounded-lg border border-destructive/40 p-3 text-sm" role="alert">
                       <p>{publishResult.error}</p>
-                      {publishResult.error.includes('quota') || publishResult.error.includes('429') ? <p className="mt-2 text-muted-foreground">Revisa la pestaña Detalle &gt; Cuotas para validar límites o aplicación de límites.</p> : null}
+                      {publishRateLimited ? <p className="mt-2 text-muted-foreground">Revisa la pestaña Detalle &gt; Cuotas para validar límites o aplicación de límites.</p> : null}
                     </div>
                   ) : null}
                   {publishResult.data ? (
-                    <div className="rounded-lg border border-border p-3 text-sm" role="alert">
+                    <div className="rounded-lg border border-border p-3 text-sm" role="status">
                       <p><strong>ID de publicación:</strong> {publishResult.data.publicationId}</p>
                       <p><strong>Estado:</strong> {publishResult.data.status}</p>
                       <p><strong>Aceptada en:</strong> {publishResult.data.acceptedAt ?? '—'}</p>

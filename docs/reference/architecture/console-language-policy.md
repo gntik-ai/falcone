@@ -20,6 +20,30 @@ labels should use Spanish UI nouns: `organización` for tenant and `área de tra
 For example, prefer `Cuentas de servicio` over `Service Accounts`, `Observabilidad` over
 `Observability`, and `Métricas` / `Auditoría` over `Metrics` / `Audit`.
 
+## Error states: never echo the raw transport message (issue #743)
+
+A failed request's raw transport/exception text (an HTTP `statusText`, a bare `HTTP_404` code, or
+the backend's own English `message` — e.g. `requires superadmin`, `No action mapped for GET
+/v1/...`) is not Spanish, and rendering it verbatim breaks this policy just as much as an
+untranslated label does. `apps/web-console/src/lib/console-errors.ts`'s
+`describeConsoleError(error, fallback)` is the single, shared, dependency-free helper for mapping
+a failed console request to page content:
+
+- It maps a well-known HTTP `status` (401/403/404/409/429/5xx) to localized Spanish copy.
+- When the status is absent or unrecognized (a network error, an aborted request, or a thrown
+  value that isn't request-shaped), it returns the page's own **already-localized** `fallback`
+  string — never the raw thrown/exception message.
+- It never returns `error.message`/`body.message` for a technical failure. Pages that need a
+  support-facing reference id (not the raw message) can use the additive
+  `getConsoleErrorCorrelationId(error)`.
+
+Every console page that shows an error state derived from a failed request (loading, mutation, or
+retry) should route the message through `describeConsoleError`, and render it via the shared
+`ConsolePageState`/section-error markup (`role="alert"`, with a Retry action) rather than a
+one-off `<Alert>`/`<p>`. Do not write a page-local `getApiErrorMessage` that reads
+`error.message`/`body.message` first and falls back to a localized string second — that inverted
+preference is exactly the anti-pattern issue #743 fixed.
+
 ## Regression guard
 
 Issue #803 is covered by focused tests in the shell, Observability page, and MCP detail route:
@@ -34,6 +58,15 @@ Issue #803 is covered by focused tests in the shell, Observability page, and MCP
 - `flow-definition-validator.test.mjs`, `FlowSemanticValidation.test.ts`, and
   `FlowProblemsPanel.test.tsx` check that shared `FLW-E` semantic validation messages render in
   Spanish while preserving codes, node IDs, task type identifiers, cron strings, and durations.
+
+Issue #743 (never echo the raw transport message) is covered by `console-errors.test.ts` (the
+`describeConsoleError` mapping table plus the two raw-string invariants: a 403 `FORBIDDEN`/
+"requires superadmin" and a 404 "No action mapped for ..." must never appear in the mapped
+result) and by regression tests in every page this change touched:
+`ConsoleMembersPage.test.tsx` (the confirmed live repro — 403 on the roles call),
+`ConsoleStoragePage.test.tsx`, `ConsoleKafkaPage.test.tsx`, `ConsoleRealtimePage.test.tsx`,
+`ConsoleMcpServerDetailPage.test.tsx`, `ConsoleTenantAllocationSummaryPage.test.tsx`,
+`ConsoleTenantPlanOverviewPage.test.tsx`, and `ConsoleTenantPlanPage.test.tsx`.
 
 This policy is frontend-only. It does not affect backend API contracts, generated SDKs, auth
 claims, persistence, or real-time event shapes.

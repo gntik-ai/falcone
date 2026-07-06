@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
+import { describeConsoleError } from '@/lib/console-errors'
 import * as api from '@/services/planManagementApi'
 
 export function ConsolePlanCreatePage() {
@@ -35,7 +36,7 @@ export function ConsolePlanCreatePage() {
       const created = await api.createPlan({ slug, displayName: trimmedDisplayName, description, capabilities: {}, quotaDimensions: {} }) as api.PlanRecord
       navigate(`/console/plans/${created.id}`)
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'No se pudo crear el plan')
+      setError(describeConsoleError(fetchError, 'No se pudo crear el plan'))
     }
   }
   return (

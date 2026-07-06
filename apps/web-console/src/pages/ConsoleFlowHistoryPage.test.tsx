@@ -111,7 +111,11 @@ describe('ConsoleFlowHistoryPage filters', () => {
     mockListExecutions.mockRejectedValueOnce(new Error('Temporal no disponible'))
     renderPage()
 
-    expect(await screen.findByRole('alert', { name: /no se pudieron cargar las ejecuciones/i })).toHaveTextContent('Temporal no disponible')
+    // [#743] a network/unknown-status failure renders the page's own localized fallback —
+    // never the raw thrown message.
+    const alert = await screen.findByRole('alert', { name: /no se pudieron cargar las ejecuciones/i })
+    expect(alert).toHaveTextContent(/no se pudieron cargar las ejecuciones/i)
+    expect(alert.textContent ?? '').not.toMatch(/temporal no disponible/i)
     expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
   })
 

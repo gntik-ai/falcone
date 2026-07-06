@@ -61,9 +61,13 @@ describe('DestructiveConfirmationDialog + useDestructiveOp composition (#780)', 
     await user.click(screen.getByRole('button', { name: /open/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
-    // The op ran exactly once and the failure is surfaced as an inline error.
+    // The op ran exactly once and the failure is surfaced as an inline error. [#743] a
+    // network/unknown-status rejection renders the shared localized fallback — never the raw
+    // thrown message.
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/boom/i)
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent(/no se pudo completar la operación/i)
+      expect(alert.textContent ?? '').not.toMatch(/boom/i)
     })
     expect(onConfirm).toHaveBeenCalledTimes(1)
     // No success feedback on failure. (RED on main: the dialog fired config.onSuccess

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
 import { parseJsonObject, prettyJson } from '@/lib/editor-ux'
@@ -317,19 +318,6 @@ function getFunctionPanelId(tab: FunctionDetailTab) {
   return `functions-${tab}-panel`
 }
 
-function getApiErrorMessage(rawError: unknown, fallback: string): string {
-  if (rawError && typeof rawError === 'object') {
-    const maybeMessage = 'message' in rawError ? rawError.message : undefined
-    if (typeof maybeMessage === 'string' && maybeMessage.trim()) return maybeMessage
-    const maybeBody = 'body' in rawError ? rawError.body : undefined
-    if (maybeBody && typeof maybeBody === 'object' && maybeBody !== null && 'message' in maybeBody) {
-      const message = (maybeBody as { message?: unknown }).message
-      if (typeof message === 'string' && message.trim()) return message
-    }
-  }
-  return fallback
-}
-
 function isAbortError(rawError: unknown): boolean {
   return rawError instanceof DOMException && rawError.name === 'AbortError'
 }
@@ -351,20 +339,35 @@ function formatJson(value: unknown): string {
   return prettyJson(value)
 }
 
-function getActivationUnavailableMessage(message: string): string {
-  const normalized = message.toLowerCase()
-  if (normalized.includes('404') || normalized.includes('not found') || normalized.includes('no encontrada') || normalized.includes('no encontrado')) {
-    return 'Esta activación ya no está disponible.'
-  }
-  return message
+// Narrow, intentional exception to "never read `.message`" (#743): this ONLY feeds a
+// keyword match that selects between two hardcoded, safe Spanish strings below — the raw text
+// itself is never rendered. Any error that doesn't match falls through to `describeConsoleError`.
+function rawErrorMessageForKeywordMatch(error: unknown): string {
+  return typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: unknown }).message === 'string'
+    ? (error as { message: string }).message
+    : ''
 }
 
-function getActivationLogsMessage(message: string): string {
-  const normalized = message.toLowerCase()
-  if (normalized.includes('403') || normalized.includes('permiso') || normalized.includes('forbidden')) {
+function getActivationUnavailableMessage(error: unknown, fallback: string): string {
+  const normalized = rawErrorMessageForKeywordMatch(error).toLowerCase()
+  if (
+    getConsoleErrorStatus(error) === 404 ||
+    normalized.includes('404') ||
+    normalized.includes('not found') ||
+    normalized.includes('no encontrada') ||
+    normalized.includes('no encontrado')
+  ) {
+    return 'Esta activación ya no está disponible.'
+  }
+  return describeConsoleError(error, fallback)
+}
+
+function getActivationLogsMessage(error: unknown, fallback: string): string {
+  const normalized = rawErrorMessageForKeywordMatch(error).toLowerCase()
+  if (getConsoleErrorStatus(error) === 403 || normalized.includes('403') || normalized.includes('permiso') || normalized.includes('forbidden')) {
     return 'No tienes permisos para ver los registros de esta activación.'
   }
-  return getActivationUnavailableMessage(message)
+  return getActivationUnavailableMessage(error, fallback)
 }
 
 function statusToneClass(value?: string | null): string {
@@ -533,7 +536,7 @@ export function ConsoleFunctionsPage() {
         })
       } catch (fallbackError) {
         if (isAbortError(fallbackError)) return
-        setInventory({ data: null, loading: false, error: getApiErrorMessage(fallbackError, getApiErrorMessage(error, 'No se pudo cargar el inventario de funciones.')) })
+        setInventory({ data: null, loading: false, error: describeConsoleError(fallbackError, describeConsoleError(error, 'No se pudo cargar el inventario de funciones.')) })
       }
     }
   }, [])
@@ -545,7 +548,7 @@ export function ConsoleFunctionsPage() {
       setActionDetail({ data, loading: false, error: null })
     } catch (error) {
       if (isAbortError(error)) return
-      setActionDetail({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el detalle de la función.') })
+      setActionDetail({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar el detalle de la función.') })
     }
   }, [])
 
@@ -558,7 +561,7 @@ export function ConsoleFunctionsPage() {
       setRollbackTargetVersionId(eligible?.versionId ?? null)
     } catch (error) {
       if (isAbortError(error)) return
-      setVersions({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar el historial de versiones.') })
+      setVersions({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar el historial de versiones.') })
     }
   }, [])
 
@@ -570,7 +573,7 @@ export function ConsoleFunctionsPage() {
       return data
     } catch (error) {
       if (isAbortError(error)) return null
-      setActivations({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo cargar las activaciones.') })
+      setActivations({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo cargar las activaciones.') })
       return null
     }
   }, [])
@@ -651,9 +654,9 @@ export function ConsoleFunctionsPage() {
         activation: activationResultData.status === 'fulfilled' ? activationResultData.value : null,
         logs: logsResultData.status === 'fulfilled' ? logsResultData.value : null,
         result: payloadResultData.status === 'fulfilled' ? payloadResultData.value : null,
-        activationError: activationResultData.status === 'rejected' ? getApiErrorMessage(activationResultData.reason, 'No se pudo cargar la activación.') : null,
-        logsError: logsResultData.status === 'rejected' ? getApiErrorMessage(logsResultData.reason, 'No se pudieron cargar los registros.') : null,
-        resultError: payloadResultData.status === 'rejected' ? getApiErrorMessage(payloadResultData.reason, 'No se pudo cargar el resultado.') : null
+        activationError: activationResultData.status === 'rejected' ? getActivationUnavailableMessage(activationResultData.reason, 'No se pudo cargar la activación.') : null,
+        logsError: logsResultData.status === 'rejected' ? getActivationLogsMessage(logsResultData.reason, 'No se pudieron cargar los registros.') : null,
+        resultError: payloadResultData.status === 'rejected' ? getActivationUnavailableMessage(payloadResultData.reason, 'No se pudo cargar el resultado.') : null
       }
       setActivationDetail({ data: next, loading: false, error: null })
     })
@@ -764,7 +767,7 @@ export function ConsoleFunctionsPage() {
         setActionDetailTab('activations')
       }
     } catch (error) {
-      setInvokeResult({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo invocar la función.') })
+      setInvokeResult({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo invocar la función.') })
     }
   }, [invokeForm, loadActivations, selectedActionId])
 
@@ -821,7 +824,7 @@ export function ConsoleFunctionsPage() {
         await loadActionDetail(resourceId)
       }
     } catch (error) {
-      setDeployResult({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo desplegar la función.') })
+      setDeployResult({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo desplegar la función.') })
     }
   }, [actionDetail.data, activeTenantId, activeWorkspaceId, deployForm, loadActionDetail, loadInventory, selectedActionId])
 
@@ -844,7 +847,7 @@ export function ConsoleFunctionsPage() {
       setRollbackResult({ data, loading: false, error: null })
       await Promise.all([loadActionDetail(selectedActionId), loadVersions(selectedActionId)])
     } catch (error) {
-      setRollbackResult({ data: null, loading: false, error: getApiErrorMessage(error, 'No se pudo solicitar la reversión.') })
+      setRollbackResult({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo solicitar la reversión.') })
     }
   }, [loadActionDetail, loadVersions, rollbackTargetVersionId, selectedActionId])
 
@@ -853,8 +856,10 @@ export function ConsoleFunctionsPage() {
       await deleteFunction(action.resourceId, deleteIdempotencyKeyRef.current)
       deleteIdempotencyKeyRef.current = buildIdempotencyKey()
     } catch (error) {
-      const message = getApiErrorMessage(error, 'No se pudo eliminar la función.')
-      throw Object.assign(error instanceof Error ? error : new Error(message), { message })
+      const message = describeConsoleError(error, 'No se pudo eliminar la función.')
+      // `preLocalized: true` tells useDestructiveOp's shared confirm-error mapping to trust this
+      // already-safe message verbatim instead of re-deriving a more generic one (#743).
+      throw Object.assign(error instanceof Error ? error : new Error(message), { message, preLocalized: true })
     }
   }, [])
 
@@ -1224,10 +1229,10 @@ export function ConsoleFunctionsPage() {
                         { label: 'Retención (días)', value: activationDetail.data.activation.policy?.retentionDays }
                       ]} />
                     ) : null}
-                    {activationDetail.data.activationError ? <Alert variant="destructive">{getActivationUnavailableMessage(activationDetail.data.activationError)}</Alert> : null}
+                    {activationDetail.data.activationError ? <Alert variant="destructive">{activationDetail.data.activationError}</Alert> : null}
                     <section className="space-y-2">
                       <h3 className="font-semibold">Registros</h3>
-                      {activationDetail.data.logsError ? <Alert variant="destructive">{getActivationLogsMessage(activationDetail.data.logsError)}</Alert> : null}
+                      {activationDetail.data.logsError ? <Alert variant="destructive">{activationDetail.data.logsError}</Alert> : null}
                       {!activationDetail.data.logsError && activationDetail.data.logs?.truncated ? (
                         <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
                           Los registros están truncados. Se muestra el contenido disponible.
@@ -1241,7 +1246,7 @@ export function ConsoleFunctionsPage() {
                     </section>
                     <section className="space-y-2">
                       <h3 className="font-semibold">Resultado</h3>
-                      {activationDetail.data.resultError ? <Alert variant="destructive">{getActivationUnavailableMessage(activationDetail.data.resultError)}</Alert> : null}
+                      {activationDetail.data.resultError ? <Alert variant="destructive">{activationDetail.data.resultError}</Alert> : null}
                       {!activationDetail.data.resultError && activationDetail.data.result ? (() => {
                         const res = activationDetail.data.result
                         const ct = res.contentType ?? ''

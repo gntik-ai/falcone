@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -69,10 +70,33 @@ describe('ConsoleRealtimePage', () => {
   })
 
   it('renderiza error si falla la carga', async () => {
+    // [#743] a network/unknown-status failure must render the shared, localized error state —
+    // never the raw thrown message.
     requestConsoleSessionJsonMock.mockRejectedValue(new Error('boom'))
     renderPage()
+    const alert = await waitFor(() => screen.getByRole('alert'))
+    expect(alert).toHaveTextContent(/no se pudo cargar la configuración realtime del área de trabajo/i)
+    expect(alert.textContent ?? '').not.toMatch(/boom/i)
+    expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
+  })
+
+  it('[#743] el botón Reintentar de la carga fallida vuelve a solicitar la configuración realtime', async () => {
+    requestConsoleSessionJsonMock.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
+      workspaceId: 'ws_123',
+      realtimeEndpointUrl: 'wss://rt.example.test',
+      features: { realtime: true },
+      dataSources: []
+    })
+    const user = userEvent.setup()
+
+    renderPage()
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
-    expect(screen.getByText(/boom/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(await screen.findByText('Realtime panel mock')).toBeInTheDocument()
+    expect(requestConsoleSessionJsonMock).toHaveBeenCalledTimes(2)
   })
 
   it('mapea correctamente tipos de canal', () => {

@@ -8,6 +8,7 @@ import { McpServerPlayground } from '@/components/console/mcp/McpServerPlaygroun
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { fetchMcpServerDetail } from '@/lib/mcp/mcp-api'
 import { toMcpServerDetailViewModel, type McpServerDetailView } from '@/lib/mcp/mcp-server-detail'
 
@@ -36,6 +37,7 @@ export function ConsoleMcpServerDetailPage() {
   const [view, setView] = useState<McpServerDetailView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('connect')
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     setError(null)
@@ -48,10 +50,10 @@ export function ConsoleMcpServerDetailPage() {
       .then((payload) => setView(toMcpServerDetailViewModel(payload)))
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
-        setError(err instanceof Error ? err.message : 'No se pudo cargar el servidor MCP.')
+        setError(describeConsoleError(err, 'No se pudo cargar el servidor MCP.'))
       })
     return () => controller.abort()
-  }, [activeWorkspaceId, mcpServerId])
+  }, [activeWorkspaceId, mcpServerId, reloadNonce])
 
   const tools = useMemo(() => view?.tools ?? [], [view])
   const toolsCountLabel = tools.length === 1 ? '1 publicada' : `${tools.length} publicadas`
@@ -97,6 +99,8 @@ export function ConsoleMcpServerDetailPage() {
         kind="error"
         title="No se pudo cargar el servidor MCP"
         description={error}
+        actionLabel="Reintentar"
+        onAction={() => setReloadNonce((nonce) => nonce + 1)}
       />
     )
   }

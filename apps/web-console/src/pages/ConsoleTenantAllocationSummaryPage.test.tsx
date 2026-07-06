@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { mockGetTenantAllocationSummary, mockReadConsoleShellSession } = vi.hoisted(() => ({
@@ -81,6 +82,25 @@ describe('ConsoleTenantAllocationSummaryPage', () => {
     expect(screen.getByText(/no hay asignaciones personales de organización/i)).toBeInTheDocument()
     expect(screen.queryByText(/TENANT_NOT_FOUND/)).not.toBeInTheDocument()
     expect(mockGetTenantAllocationSummary).not.toHaveBeenCalled()
+  })
+
+  it('[#743] localiza un error 403 del backend y permite reintentar en lugar de mostrar el texto crudo', async () => {
+    mockReadConsoleShellSession.mockReturnValue(createSession({ platformRoles: ['tenant_owner'], tenantIds: ['ten_alpha'] }))
+    mockGetTenantAllocationSummary
+      .mockRejectedValueOnce({ status: 403, code: 'FORBIDDEN', message: 'requires superadmin' })
+      .mockResolvedValueOnce({ tenantId: 'pro-corp', dimensions: [] })
+    const user = userEvent.setup()
+
+    render(<ConsoleTenantAllocationSummaryPage />)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso/i)
+    expect(alert.textContent ?? '').not.toMatch(/requires superadmin/i)
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(mockGetTenantAllocationSummary).toHaveBeenCalledTimes(2)
   })
 })
 

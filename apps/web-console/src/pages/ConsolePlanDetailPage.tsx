@@ -7,6 +7,7 @@ import { PlanCapabilityBadge } from '@/components/console/PlanCapabilityBadge'
 import { PlanLimitsTable } from '@/components/console/PlanLimitsTable'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { describeConsoleError } from '@/lib/console-errors'
 import { cn } from '@/lib/utils'
 import * as api from '@/services/planManagementApi'
 import { AlertTriangle, Archive, ArrowLeft, Ban, CheckCircle2, Circle, Info, Rocket, Trash2, Users } from 'lucide-react'
@@ -58,7 +59,10 @@ function limitErrorMessage(error: unknown): string {
     return 'PLAN_LIMITS_FROZEN: este plan ya no acepta cambios de límites.'
   }
 
-  const message = error instanceof Error && error.message ? error.message : 'La solicitud falló.'
+  // Codes above are console-owned copy for a narrow, known allow-list of 4xx codes (#743's
+  // proposal note on preserving genuinely user-facing backend validation copy). Anything else —
+  // an unrecognized code, or no code at all — must never echo the raw transport message.
+  const message = describeConsoleError(error, 'La solicitud falló.')
   return code && !message.includes(code) ? `${code}: ${message}` : message
 }
 
@@ -79,7 +83,10 @@ function planActionErrorMessage(error: unknown): string {
     return 'INVALID_TRANSITION: esta transición no está permitida para el estado actual del plan.'
   }
 
-  const message = error instanceof Error && error.message ? error.message : 'La solicitud falló.'
+  // Codes above are console-owned copy for a narrow, known allow-list of 4xx codes (#743's
+  // proposal note on preserving genuinely user-facing backend validation copy). Anything else —
+  // an unrecognized code, or no code at all — must never echo the raw transport message.
+  const message = describeConsoleError(error, 'La solicitud falló.')
   return code && !message.includes(code) ? `${code}: ${message}` : message
 }
 
@@ -197,7 +204,7 @@ export function ConsolePlanDetailPage() {
         setLimitFeedback(null)
         setActionFeedback(null)
       } catch (fetchError) {
-        if (!cancelled) setError(fetchError instanceof Error ? fetchError.message : 'Error')
+        if (!cancelled) setError(describeConsoleError(fetchError, 'No se pudo cargar el plan.'))
       }
     }
 
@@ -312,7 +319,7 @@ export function ConsolePlanDetailPage() {
         })
         return
       }
-      throw Object.assign(caught instanceof Error ? caught : new Error(message), { message })
+      throw Object.assign(caught instanceof Error ? caught : new Error(message), { message, preLocalized: true })
     } finally {
       setBusyPlanAction(null)
     }
@@ -363,7 +370,8 @@ export function ConsolePlanDetailPage() {
           await api.deletePlan(plan.id)
         } catch (caught) {
           throw Object.assign(caught instanceof Error ? caught : new Error('No se pudo eliminar el plan.'), {
-            message: planActionErrorMessage(caught)
+            message: planActionErrorMessage(caught),
+            preLocalized: true
           })
         } finally {
           setBusyPlanAction(null)

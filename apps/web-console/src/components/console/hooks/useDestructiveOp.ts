@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { describeConsoleError } from '@/lib/console-errors'
 import {
   fetchCascadeImpact,
   type CascadeImpactResourceType,
@@ -24,8 +25,24 @@ function isCascadeImpactResourceType(value: string): value is CascadeImpactResou
 }
 
 function getConfirmErrorMessage(error: unknown) {
+  // A small number of callers (e.g. ConsolePlanDetailPage's lifecycle/delete confirmations)
+  // pre-localize their own rejection — mapping specific backend codes (PLAN_HAS_ACTIVE_
+  // ASSIGNMENTS, INVALID_TRANSITION, ...) to console-owned copy — and mark the result
+  // `preLocalized: true` alongside a safe `message`. Trust that verbatim instead of re-deriving
+  // a more generic mapping that would discard the caller's more specific, already-safe text.
+  if (typeof error === 'object' && error !== null && (error as { preLocalized?: unknown }).preLocalized === true) {
+    const preLocalizedMessage = (error as { message?: unknown }).message
+    if (typeof preLocalizedMessage === 'string' && preLocalizedMessage.trim()) {
+      return preLocalizedMessage
+    }
+  }
+
   const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status?: number }).status : undefined
 
+  // These two overrides pre-date #743 and are already localized, destructive-op-specific
+  // copy (not raw transport text) — kept verbatim rather than falling through to the shared
+  // helper's more generic 401/404 wording. Everything else — including the previous
+  // unconditional `error.message` echo below — now routes through the shared, never-raw helper.
   if (status === 401) {
     return 'Tu sesión ha expirado. Vuelve a iniciar sesión.'
   }
@@ -34,11 +51,7 @@ function getConfirmErrorMessage(error: unknown) {
     return 'El recurso ya no existe o ha sido eliminado.'
   }
 
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return 'No se pudo completar la operación.'
+  return describeConsoleError(error, 'No se pudo completar la operación.')
 }
 
 export function useDestructiveOp(): UseDestructiveOpReturn {
