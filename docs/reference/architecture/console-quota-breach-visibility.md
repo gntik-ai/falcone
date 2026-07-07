@@ -101,9 +101,11 @@ limit/measured value.
 `ConsoleQuotaPostureBadge.tsx` gained an opt-in `linkTo` prop: when provided, the badge is
 wrapped in a `react-router-dom` `Link` to that path; when omitted (the default), the component
 renders exactly as before (no `Router` context required — every pre-existing render of this
-component is unaffected). Both the Quotas and Observability page headers now pass
-`linkTo="/console/quotas"`. An exceeded `ConsoleMetricDimensionRow` also renders a "Ver cuotas de
-la organización" link to `/console/quotas`.
+component is unaffected). The Observability page header passes `linkTo="/console/quotas"` so its
+posture badge cross-links to the Quotas view; the Quotas page header deliberately omits `linkTo`
+(a badge that navigates to the page you are already on is a confusing self-link). An exceeded
+`ConsoleMetricDimensionRow` also renders a "Ver cuotas de la organización" link to
+`/console/quotas`.
 
 ## Audit triage depth
 
