@@ -16,6 +16,14 @@ export interface ConsoleMetricDimensionView {
   pctUsed: number | null
   policyMode: 'enforced' | 'unbounded'
   freshnessStatus: 'fresh' | 'degraded' | 'unavailable'
+  // #766: mirrors `ConsoleQuotaDimensionView.isWarning`/`.isExceeded` in console-quotas.ts (same
+  // >=80%/>=100% thresholds) so a metric row can render the same breach-honest, non-color-only
+  // cue the Quotas table uses, and can cross-link to the Quotas view when exceeded.
+  isWarning: boolean
+  isExceeded: boolean
+  // Wire `unit` ('count' | 'bytes') — optional because not every deploy runtime populates it;
+  // see `lib/format.ts::isByteUnitDimension` for the dimensionId-based fallback.
+  unit?: string
 }
 
 export interface ConsoleMetricsOverview {
@@ -89,6 +97,7 @@ interface OverviewResponse {
     hardLimit?: number | null
     policyMode?: 'enforced' | 'unbounded'
     freshnessStatus?: 'fresh' | 'degraded' | 'unavailable'
+    unit?: string
   }>
 }
 
@@ -159,6 +168,10 @@ export function normalizeMetricsOverview(
             : 0
     const hardLimit = typeof dimension.hardLimit === 'number' ? dimension.hardLimit : null
     const pctUsed = hardLimit && hardLimit > 0 ? Math.round((measuredValue / hardLimit) * 100) : null
+    // Same thresholds as `normalizeQuotaPosture` in console-quotas.ts: >=100% is a breach
+    // regardless of how far over (245% and 100% are both "exceeded"), 80-99% is a warning.
+    const isExceeded = (pctUsed ?? 0) >= 100
+    const isWarning = !isExceeded && (pctUsed ?? 0) >= 80
 
     return {
       dimensionId: key,
@@ -167,7 +180,10 @@ export function normalizeMetricsOverview(
       hardLimit,
       pctUsed,
       policyMode: dimension.policyMode ?? 'enforced',
-      freshnessStatus: dimension.freshnessStatus ?? 'fresh'
+      freshnessStatus: dimension.freshnessStatus ?? 'fresh',
+      isWarning,
+      isExceeded,
+      unit: dimension.unit
     }
   })
 

@@ -1,8 +1,15 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleObservabilityPage } from './ConsoleObservabilityPage'
+
+// #766: the posture badge header now links to `/console/quotas`, and an exceeded metric row
+// links there too — both need a Router context.
+function renderPage() {
+  return render(<ConsoleObservabilityPage />, { wrapper: MemoryRouter })
+}
 
 const mockUseConsoleContext = vi.fn()
 const mockUseConsoleMetrics = vi.fn()
@@ -42,7 +49,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: 'wrk_1', activeTenant: { label: 'Tenant' }, activeWorkspace: { label: 'Workspace' } })
     mockUseConsoleMetrics.mockReturnValue({ overview: { generatedAt: 'now', overallPosture: 'within_limit', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10, pctUsed: 50, policyMode: 'enforced', freshnessStatus: 'fresh' }], hasQuotaWarning: false }, loading: false, error: null, reload: vi.fn() })
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
-    render(<ConsoleObservabilityPage />)
+    renderPage()
     expect(screen.getByText('API')).toBeInTheDocument()
     const rangeSelect = screen.getByLabelText(/ventana de métricas/i) as HTMLSelectElement
     expect(rangeSelect).toBeEnabled()
@@ -61,7 +68,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleMetrics.mockReturnValue({ overview: { generatedAt: 'now', overallPosture: 'within_limit', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10, pctUsed: 50, policyMode: 'enforced', freshnessStatus: 'fresh' }], hasQuotaWarning: false }, loading: false, error: null, reload: vi.fn() })
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
 
-    render(<ConsoleObservabilityPage />)
+    renderPage()
 
     const rangeSelect = screen.getByLabelText(/ventana de métricas/i)
     expect(rangeSelect).toBeDisabled()
@@ -78,7 +85,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleMetrics.mockReturnValue({ overview: { generatedAt: 'now', overallPosture: 'within_limit', dimensions: [{ dimensionId: 'api', displayName: 'API', measuredValue: 5, hardLimit: 10, pctUsed: 50, policyMode: 'enforced', freshnessStatus: 'fresh' }], hasQuotaWarning: false }, loading: false, error: null, reload: vi.fn() })
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
 
-    render(<ConsoleObservabilityPage />)
+    renderPage()
 
     expect(screen.getByRole('heading', { name: 'Observabilidad' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Métricas' })).toBeInTheDocument()
@@ -118,7 +125,7 @@ describe('ConsoleObservabilityPage', () => {
       items: [{ eventId: 'evt_1', maskingApplied: true }]
     })
 
-    render(<ConsoleObservabilityPage />)
+    renderPage()
     await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     await user.click(screen.getByRole('button', { name: 'evt_1' }))
     expect(screen.getByText(/correlación/i)).toBeInTheDocument()
@@ -138,6 +145,42 @@ describe('ConsoleObservabilityPage', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:audit-export')
   })
 
+  it('[#766] expone el disclosure del id de evento con aria-expanded/aria-controls, el conteo de resultados y el filtro de rango de fechas', async () => {
+    const user = userEvent.setup()
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeWorkspaceId: null, activeTenant: { label: 'Tenant' }, activeWorkspace: null })
+    mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
+    mockUseConsoleAuditRecords.mockReturnValue({
+      records: [{ eventId: 'evt_1', eventTimestamp: 'now', correlationId: 'corr', actor: { actorId: 'usr_1', actorType: 'tenant_user', displayName: 'User' }, action: { actionId: 'create', category: 'resource_creation' }, resource: null, result: { outcome: 'succeeded' }, origin: { ipAddress: '127.0.0.1' }, scope: null, metadata: null }],
+      loading: false,
+      error: null,
+      reload: vi.fn()
+    })
+
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Auditoría' }))
+
+    // Date-range filter (#766: ConsoleAuditFilter already modeled `from`/`to`; expose them).
+    expect(screen.getByLabelText('Desde')).toBeInTheDocument()
+    expect(screen.getByLabelText('Hasta')).toBeInTheDocument()
+
+    // Result count, honestly noting the hook's 50-item cap rather than inventing pagination, and
+    // announced through a polite live region so filter-driven count changes reach screen readers.
+    const resultCount = screen.getByText(/1 evento mostrado/i)
+    expect(resultCount).toBeInTheDocument()
+    expect(resultCount).toHaveAttribute('role', 'status')
+    expect(resultCount).toHaveAttribute('aria-live', 'polite')
+
+    const eventButton = screen.getByRole('button', { name: 'evt_1' })
+    expect(eventButton).toHaveAttribute('aria-expanded', 'false')
+    expect(eventButton).toHaveAttribute('aria-controls')
+    expect(eventButton.className).toMatch(/font-mono/)
+
+    await user.click(eventButton)
+    expect(eventButton).toHaveAttribute('aria-expanded', 'true')
+    const controlsId = eventButton.getAttribute('aria-controls')!
+    expect(document.getElementById(controlsId)).toBeInTheDocument()
+  })
+
   it('anuncia y deshabilita la exportación mientras espera respuesta', async () => {
     const user = userEvent.setup()
     let resolveExport: (value: unknown) => void = () => {}
@@ -150,7 +193,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
     mockExportAuditRecords.mockReturnValue(exportPromise)
 
-    render(<ConsoleObservabilityPage />)
+    renderPage()
     await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     const exportButton = screen.getByRole('button', { name: /exportar auditoría/i })
 
@@ -172,7 +215,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
     mockExportAuditRecords.mockResolvedValue({ status: 'accepted', message: 'Export queued; artifact pending.' })
 
-    render(<ConsoleObservabilityPage />)
+    renderPage()
     await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     await user.click(screen.getByRole('button', { name: /exportar/i }))
 
@@ -190,7 +233,7 @@ describe('ConsoleObservabilityPage', () => {
     mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
     mockExportAuditRecords.mockRejectedValue(new Error('Audit export unavailable'))
 
-    render(<ConsoleObservabilityPage />)
+    renderPage()
     await user.click(screen.getByRole('button', { name: 'Auditoría' }))
     await user.click(screen.getByRole('button', { name: /exportar/i }))
 
@@ -208,7 +251,7 @@ describe('ConsoleObservabilityPage', () => {
       mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
       mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
 
-      render(<ConsoleObservabilityPage />)
+      renderPage()
 
       expect(screen.getByRole('button', { name: 'Métricas' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Auditoría' })).not.toBeInTheDocument()
@@ -220,7 +263,7 @@ describe('ConsoleObservabilityPage', () => {
       mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
       mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
 
-      render(<ConsoleObservabilityPage />)
+      renderPage()
 
       expect(mockUseConsoleAuditRecords).toHaveBeenCalledWith(null, null, {})
     })
@@ -231,7 +274,7 @@ describe('ConsoleObservabilityPage', () => {
       mockUseConsoleMetrics.mockReturnValue({ overview: null, loading: false, error: null, reload: vi.fn() })
       mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
 
-      render(<ConsoleObservabilityPage />)
+      renderPage()
 
       expect(mockUseConsoleAuditRecords).toHaveBeenCalledWith('ten_1', 'wrk_1', {})
     })
@@ -243,7 +286,7 @@ describe('ConsoleObservabilityPage', () => {
       mockUseConsoleAuditRecords.mockReturnValue({ records: [], loading: false, error: null, reload: vi.fn() })
       const user = userEvent.setup()
 
-      render(<ConsoleObservabilityPage />)
+      renderPage()
 
       const auditTab = screen.getByRole('button', { name: 'Auditoría' })
       expect(auditTab).toBeInTheDocument()

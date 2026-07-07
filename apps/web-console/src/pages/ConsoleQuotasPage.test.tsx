@@ -1,8 +1,16 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleQuotasPage } from './ConsoleQuotasPage'
+
+// The page renders `QuotaAdjustDialog`, which uses react-router `Link`s (plan shortcuts), so every
+// render needs a Router context. Note: the header posture badge intentionally does NOT self-link to
+// `/console/quotas` — you are already on that page (see the no-self-link assertion below).
+function renderPage() {
+  return render(<ConsoleQuotasPage />, { wrapper: MemoryRouter })
+}
 
 const mockUseConsoleContext = vi.fn()
 const mockUseConsoleQuotas = vi.fn()
@@ -40,12 +48,16 @@ describe('ConsoleQuotasPage', () => {
     mockReadConsoleShellSession.mockReturnValue({ principal: { platformRoles: ['platform_operator'] } })
     mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeTenant: { label: 'Tenant' }, activeWorkspaceId: 'wrk_1' })
     mockUseConsoleQuotas.mockReturnValue({ posture: { overallPosture: 'warning_threshold_reached', evaluatedAt: 'now', dimensions: [{ dimensionId: 'api', displayName: 'API', hardLimit: 10, softLimit: null, measuredValue: 8, remainingToHardLimit: 2, pctUsed: 80, policyMode: 'enforced', freshnessStatus: 'fresh', isWarning: true, isExceeded: false }, { dimensionId: 'storage', displayName: 'Storage', hardLimit: 10, softLimit: null, measuredValue: 11, remainingToHardLimit: 0, pctUsed: 110, policyMode: 'enforced', freshnessStatus: 'fresh', isWarning: false, isExceeded: true }], generatedAt: 'now', hardLimitDimensions: [] }, workspacePosture: null, loading: false, error: null, reload: vi.fn() })
-    render(<ConsoleQuotasPage />)
+    renderPage()
     expect(screen.getByText('API')).toBeInTheDocument()
     expect(screen.getByText('Storage')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /ajustar cuota/i }).length).toBeGreaterThan(0)
     // The old "out of scope" scaffolding disclaimer must be gone now that the action is wired.
     expect(screen.queryByText(/fuera de T01/i)).not.toBeInTheDocument()
+    // #766 UX pass: the header posture badge must NOT self-link to the Quotas page you are already
+    // on (the cross-link belongs only on Observability → Quotas). The wayfinding link carries a
+    // "Ver cuotas" accessible name, so its absence here proves there is no self-link.
+    expect(screen.queryByRole('link', { name: /ver cuotas/i })).not.toBeInTheDocument()
   })
 
   it('WHEN a superadmin adjusts a dimension hard limit and confirms THEN it persists via the plan-limit API, shows a success confirmation, and refreshes the quotas table', async () => {
@@ -62,7 +74,7 @@ describe('ConsoleQuotasPage', () => {
     planApi.getTenantCurrentPlan.mockResolvedValue({ assignment: { planId: 'plan_1' }, plan: { id: 'plan_1', displayName: 'Starter', status: 'active' } })
     planApi.setPlanLimit.mockResolvedValue({ planId: 'plan_1', dimensionKey: 'max_workspaces', newValue: 10, source: 'explicit' })
 
-    render(<ConsoleQuotasPage />)
+    renderPage()
     await userEvent.click(screen.getByRole('button', { name: /ajustar cuota de maximum workspaces/i }))
 
     const input = await screen.findByLabelText(/nuevo límite de maximum workspaces/i)
@@ -89,7 +101,7 @@ describe('ConsoleQuotasPage', () => {
     planApi.getTenantCurrentPlan.mockResolvedValue({ assignment: { planId: 'plan_1' }, plan: { id: 'plan_1', displayName: 'Starter', status: 'active' } })
     planApi.setPlanLimit.mockRejectedValue(Object.assign(new Error('nope'), { code: 'PLAN_LIMITS_FROZEN', status: 409 }))
 
-    render(<ConsoleQuotasPage />)
+    renderPage()
     await userEvent.click(screen.getByRole('button', { name: /ajustar cuota de maximum workspaces/i }))
 
     const input = await screen.findByLabelText(/nuevo límite de maximum workspaces/i)

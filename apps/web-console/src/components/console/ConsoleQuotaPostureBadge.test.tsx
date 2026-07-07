@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { ConsoleQuotaPostureBadge } from './ConsoleQuotaPostureBadge'
@@ -13,5 +14,20 @@ describe('ConsoleQuotaPostureBadge', () => {
 
     rerender(<ConsoleQuotaPostureBadge posture="mystery_state" />)
     expect(screen.getByText('mystery state')).toBeInTheDocument()
+  })
+
+  it('sin linkTo, no requiere contexto de router (comportamiento previo intacto)', () => {
+    render(<ConsoleQuotaPostureBadge posture="within_limit" />)
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('[#766] con linkTo, envuelve la insignia en un enlace de navegación hacia Cuotas', () => {
+    render(<ConsoleQuotaPostureBadge posture="hard_limit_breached" linkTo="/console/quotas" />, { wrapper: MemoryRouter })
+    const link = screen.getByRole('link')
+    expect(link).toHaveAttribute('href', '/console/quotas')
+    expect(link).toHaveTextContent('Límite duro superado')
+    // #766 UX pass: the link exposes a "Ver cuotas" wayfinding intent to assistive tech (the visible
+    // forward-arrow affordance next to the label is decorative / aria-hidden).
+    expect(link).toHaveAccessibleName(/ver cuotas/i)
   })
 })

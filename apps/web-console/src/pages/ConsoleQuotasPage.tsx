@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostureBadge'
@@ -6,6 +8,7 @@ import { QuotaAdjustDialog, type QuotaAdjustTarget } from '@/components/console/
 import { useConsoleContext } from '@/lib/console-context'
 import { useConsoleQuotas, type ConsoleQuotaDimensionView } from '@/lib/console-quotas'
 import { useConsolePermissions } from '@/lib/console-permissions'
+import { formatDimensionValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const policyModeLabels: Record<string, string> = {
@@ -43,6 +46,10 @@ export function ConsoleQuotasPage() {
         <p className="text-sm font-medium text-muted-foreground">{activeTenant?.label ?? 'Organización activa'}</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cuotas</h1>
+          {/* #766 UX pass: no `linkTo` here — this badge already sits on the Quotas page, so
+              linking it to `/console/quotas` is a self-link to the page you are already on. The
+              posture cross-link stays only where it navigates somewhere new (Observability header +
+              exceeded metric rows → Quotas). */}
           <ConsoleQuotaPostureBadge posture={posture?.overallPosture ?? null} />
         </div>
         <p className="mt-3 text-sm text-muted-foreground">Última evaluación: {posture?.evaluatedAt ?? 'n/a'}</p>
@@ -70,14 +77,14 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
     <section className="overflow-hidden rounded-3xl border border-border bg-card/70 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border px-5 py-4 sm:px-6">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-        <p className="text-xs text-muted-foreground">{dimensionCount} {dimensionCount === 1 ? 'dimensión' : 'dimensiones'}</p>
+        <p className="text-xs tabular-nums text-muted-foreground">{dimensionCount} {dimensionCount === 1 ? 'dimensión' : 'dimensiones'}</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[52rem] text-left text-sm">
           <caption className="sr-only">Postura de cuotas: {title}</caption>
           <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th scope="col" className="px-4 py-3 font-medium">Dimensión</th>
+              <th scope="col" className="border-l-4 border-l-transparent px-4 py-3 font-medium">Dimensión</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Límite</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Consumo</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">% uso</th>
@@ -92,25 +99,52 @@ function QuotaTable({ title, posture, isSuperadmin, onAdjust }: { title: string;
                 key={`${title}-${dimension.dimensionId}`}
                 className={cn(
                   'transition-colors',
-                  dimension.isExceeded ? 'bg-red-500/10' : dimension.isWarning ? 'bg-amber-500/10' : 'hover:bg-muted/20'
+                  // #766: the exceeded tint is strengthened (10 -> 15) and paired with a left
+                  // accent border on the leading cell below — color is never the only cue.
+                  dimension.isExceeded ? 'bg-red-500/15 hover:bg-red-500/20' : dimension.isWarning ? 'bg-amber-500/10' : 'hover:bg-muted/20'
                 )}
               >
-                <th scope="row" className="max-w-[16rem] whitespace-normal break-words px-4 py-3 text-left font-medium text-foreground">{dimension.displayName}</th>
-                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.hardLimit ?? 'sin límite'}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{dimension.measuredValue}</td>
-                <td
+                <th
+                  scope="row"
                   className={cn(
-                    'whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums',
-                    dimension.pctUsed === null
-                      ? 'text-muted-foreground'
-                      : dimension.isExceeded
-                        ? 'text-red-300'
-                        : dimension.isWarning
-                          ? 'text-amber-300'
-                          : 'text-foreground'
+                    'max-w-[16rem] whitespace-normal break-words border-l-4 px-4 py-3 text-left font-medium text-foreground',
+                    dimension.isExceeded ? 'border-l-red-500' : dimension.isWarning ? 'border-l-amber-500' : 'border-l-transparent'
                   )}
                 >
-                  {dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}
+                  {dimension.displayName}
+                </th>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  {dimension.hardLimit !== null ? formatDimensionValue(dimension.hardLimit, dimension.unit, dimension.dimensionId) : 'sin límite'}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  {formatDimensionValue(dimension.measuredValue, dimension.unit, dimension.dimensionId)}
+                </td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums">
+                  <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                    <span
+                      className={cn(
+                        dimension.pctUsed === null
+                          ? 'text-muted-foreground'
+                          : dimension.isExceeded
+                            ? 'text-red-300'
+                            : dimension.isWarning
+                              ? 'text-amber-300'
+                              : 'text-foreground'
+                      )}
+                    >
+                      {dimension.pctUsed !== null ? `${dimension.pctUsed}%` : '—'}
+                    </span>
+                    {/* #766 breach language: the exceeded chip shares the ConsumptionBar marker /
+                        metric-card idiom (soft red tint + hazard icon) instead of the loud solid
+                        destructive Badge, so every breach cue across Quotas + Observability reads
+                        as one deliberate treatment. */}
+                    {dimension.isExceeded ? (
+                      <Badge className="gap-1 border-red-500/40 bg-red-500/15 text-red-300">
+                        <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        Superado
+                      </Badge>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{policyModeLabels[dimension.policyMode] ?? dimension.policyMode.replace(/_/g, ' ')}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{freshnessStatusLabels[dimension.freshnessStatus] ?? dimension.freshnessStatus.replace(/_/g, ' ')}</td>
