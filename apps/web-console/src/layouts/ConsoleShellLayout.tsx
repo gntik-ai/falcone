@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type RefObject } from 'react'
 import {
   Activity,
   ChevronDown,
+  ChevronRight,
   Database,
   FolderKanban,
   Gauge,
@@ -11,6 +12,7 @@ import {
   Lock,
   LogIn,
   LogOut,
+  Menu,
   PieChart,
   Rocket,
   RefreshCw,
@@ -18,11 +20,13 @@ import {
   Settings,
   Shield,
   User,
-  Workflow
+  Workflow,
+  X
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom'
 
 import { ActiveOperationsIndicator } from '@/components/console/ActiveOperationsIndicator'
+import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyActionBadge'
 import { WorkspaceActivationAction } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
@@ -304,6 +308,150 @@ const consoleNavigationItems = [
   }
 ] as const
 
+type ConsoleBreadcrumb = {
+  label: string
+  to?: string
+}
+
+function buildConsoleBreadcrumbs(pathname: string): ConsoleBreadcrumb[] {
+  const normalizedPath = normalizeConsolePath(pathname)
+  const breadcrumbs: ConsoleBreadcrumb[] = [
+    {
+      label: 'Consola',
+      to: normalizedPath === '/console/overview' ? undefined : '/console/overview'
+    }
+  ]
+
+  const navMatch = [...consoleNavigationItems]
+    .filter((item) => normalizedPath === item.to || normalizedPath.startsWith(`${item.to}/`))
+    .sort((left, right) => right.to.length - left.to.length)[0]
+
+  const basePath = navMatch?.to ?? '/console'
+  if (navMatch && navMatch.to !== '/console/overview') {
+    breadcrumbs.push({
+      label: navMatch.label,
+      to: normalizedPath === navMatch.to ? undefined : navMatch.to
+    })
+  }
+
+  const remainingPath = normalizedPath.slice(basePath.length).replace(/^\/+/, '')
+  const remainingSegments = remainingPath ? remainingPath.split('/').filter(Boolean) : []
+  const extraCrumbs = buildConsoleBreadcrumbTail(basePath, remainingSegments)
+
+  if (extraCrumbs.length > 0) {
+    const lastBreadcrumbIndex = breadcrumbs.length - 1
+    const lastBreadcrumb = breadcrumbs[lastBreadcrumbIndex]
+    if (breadcrumbs.length > 1 && lastBreadcrumb?.to === undefined) {
+      breadcrumbs[lastBreadcrumbIndex] = {
+        ...lastBreadcrumb,
+        to: basePath
+      }
+    }
+    breadcrumbs.push(...extraCrumbs)
+  }
+
+  return breadcrumbs
+}
+
+function normalizeConsolePath(pathname: string): string {
+  const withoutQuery = pathname.split(/[?#]/)[0] || '/console/overview'
+  const withoutTrailingSlash = withoutQuery.length > 1 ? withoutQuery.replace(/\/+$/, '') : withoutQuery
+  return withoutTrailingSlash === '/console' ? '/console/overview' : withoutTrailingSlash
+}
+
+function buildConsoleBreadcrumbTail(basePath: string, segments: string[]): ConsoleBreadcrumb[] {
+  if (segments.length === 0) {
+    return []
+  }
+
+  if (basePath === '/console/flows') {
+    const [flowId, runsSegment, executionId] = segments
+    const crumbs: ConsoleBreadcrumb[] = []
+    if (flowId) {
+      crumbs.push({
+        label: `Flujo ${decodeConsolePathSegment(flowId)}`,
+        to: runsSegment ? `/console/flows/${flowId}` : undefined
+      })
+    }
+    if (runsSegment === 'runs') {
+      crumbs.push({
+        label: executionId ? 'Ejecuciones' : 'Ejecuciones',
+        to: executionId ? `/console/flows/${flowId}/runs` : undefined
+      })
+    }
+    if (executionId) {
+      crumbs.push({ label: `Ejecución ${decodeConsolePathSegment(executionId)}` })
+    }
+    return crumbs
+  }
+
+  if (basePath === '/console/workspaces') {
+    const [workspaceId, child] = segments
+    const crumbs: ConsoleBreadcrumb[] = []
+    if (workspaceId) {
+      crumbs.push({
+        label: `Área ${decodeConsolePathSegment(workspaceId)}`,
+        to: child ? `/console/workspaces/${workspaceId}` : undefined
+      })
+    }
+    if (child === 'realtime') {
+      crumbs.push({ label: 'Tiempo real' })
+    } else if (child === 'docs') {
+      crumbs.push({ label: 'Documentación' })
+    }
+    return crumbs
+  }
+
+  if (basePath === '/console/operations') {
+    return [{ label: `Operación ${decodeConsolePathSegment(segments[0] ?? '')}` }]
+  }
+
+  if (basePath === '/console/plans') {
+    const [planSegment] = segments
+    if (planSegment === 'new') {
+      return [{ label: 'Nuevo plan' }]
+    }
+    return [{ label: `Plan ${decodeConsolePathSegment(planSegment ?? '')}` }]
+  }
+
+  if (basePath === '/console/tenants') {
+    const [tenantId, child] = segments
+    const crumbs: ConsoleBreadcrumb[] = []
+    if (tenantId) {
+      crumbs.push({
+        label: `Organización ${decodeConsolePathSegment(tenantId)}`,
+        to: child ? `/console/tenants/${tenantId}` : undefined
+      })
+    }
+    if (child === 'plan') {
+      crumbs.push({ label: 'Plan' })
+    }
+    return crumbs
+  }
+
+  return segments.map((segment, index) => ({
+    label: formatConsolePathSegment(segment),
+    to: index === segments.length - 1 ? undefined : `${basePath}/${segments.slice(0, index + 1).join('/')}`
+  }))
+}
+
+function decodeConsolePathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
+function formatConsolePathSegment(segment: string): string {
+  const decoded = decodeConsolePathSegment(segment)
+  return decoded
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^./, (letter) => letter.toUpperCase())
+}
+
 export function ConsoleShellLayout() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -329,9 +477,19 @@ export function ConsoleShellLayout() {
   )
   const [session, setSession] = useState(() => readConsoleShellSession())
   const [menuOpen, setMenuOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const avatarButtonRef = useRef<HTMLButtonElement | null>(null)
+  const drawerButtonRef = useRef<HTMLButtonElement | null>(null)
+  const mainRef = useRef<HTMLElement | null>(null)
+  const { panelRef: drawerPanelRef, handleTabTrap: handleDrawerTabTrap } = useModalFocusTrap<HTMLDivElement>(
+    drawerOpen,
+    {
+      initialFocus: 'panel',
+      resolveReturnFocus: () => drawerButtonRef.current
+    }
+  )
 
   const principalLabel = useMemo(() => getConsolePrincipalLabel(session), [session])
   const principalSecondary = useMemo(() => getConsolePrincipalSecondary(session), [session])
@@ -341,9 +499,11 @@ export function ConsoleShellLayout() {
   // tokens buried inside the opened avatar dropdown (see below), with no resting signal that a
   // read-only role's write actions are unavailable.
   const permissions = useConsolePermissions()
+  const breadcrumbs = useMemo(() => buildConsoleBreadcrumbs(location.pathname), [location.pathname])
 
   useEffect(() => {
     setSession(readConsoleShellSession())
+    setDrawerOpen(false)
   }, [location.pathname])
 
   useEffect(() => {
@@ -382,6 +542,26 @@ export function ConsoleShellLayout() {
     }
   }, [menuOpen])
 
+  useEffect(() => {
+    if (!drawerOpen) {
+      return undefined
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') {
+        return
+      }
+
+      setDrawerOpen(false)
+    }
+
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [drawerOpen])
+
   function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
       return
@@ -416,6 +596,11 @@ export function ConsoleShellLayout() {
     items[nextIndex]?.focus()
   }
 
+  function handleSkipToContent(event: ReactMouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    mainRef.current?.focus()
+  }
+
   async function handleLogout() {
     setIsLoggingOut(true)
 
@@ -441,15 +626,36 @@ export function ConsoleShellLayout() {
   return (
     <ConsoleContextProvider session={session} routeWorkspaceId={routeWorkspaceId}>
       <div className="min-h-screen bg-background text-foreground">
+        <a
+          href="#console-main-content"
+          onClick={handleSkipToContent}
+          className="sr-only fixed left-4 top-4 z-[60] rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg focus:not-sr-only focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+        >
+          Saltar al contenido principal
+        </a>
         <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-          <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <div className="flex min-w-0 items-center gap-3">
-              <img src="/img/logo-wide.png" alt="In Falcone" className="h-10 w-auto" />
+          <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6 lg:gap-4 lg:px-8">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <Button
+                ref={drawerButtonRef}
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Abrir navegación y contexto"
+                aria-controls="console-shell-drawer"
+                aria-expanded={drawerOpen}
+                data-testid="console-shell-drawer-trigger"
+                onClick={() => setDrawerOpen(true)}
+                className="h-10 w-10 shrink-0 xl:hidden"
+              >
+                <Menu className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <img src="/img/logo-wide.png" alt="In Falcone" className="h-9 w-auto shrink-0 sm:h-10" />
               <div className="min-w-0">
-                <Link className="block truncate text-base font-semibold tracking-tight" to="/console/overview">
+                <Link className="block max-w-[8.5rem] truncate text-sm font-semibold tracking-tight sm:max-w-none sm:text-base" to="/console/overview">
                   Consola In Falcone
                 </Link>
-                <p className="truncate text-xs text-muted-foreground">Panel de administración multi-organización</p>
+                <p className="hidden truncate text-xs text-muted-foreground sm:block">Panel de administración multi-organización</p>
               </div>
             </div>
 
@@ -457,16 +663,16 @@ export function ConsoleShellLayout() {
               <ConsoleHeaderContextControls />
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <ActiveOperationsIndicator />
             </div>
 
-            <div className="relative flex items-center gap-3">
+            <div className="relative flex shrink-0 items-center gap-2 sm:gap-3">
               <RoleBadge permissions={permissions} />
 
-              <div className="hidden text-right md:block">
-                <p className="text-sm font-medium text-foreground">{principalLabel}</p>
-                <p className="text-xs text-muted-foreground">{principalSecondary}</p>
+              <div className="hidden max-w-48 text-right 2xl:block">
+                <p className="truncate text-sm font-medium text-foreground">{principalLabel}</p>
+                <p className="truncate text-xs text-muted-foreground">{principalSecondary}</p>
               </div>
 
               <button
@@ -477,9 +683,9 @@ export function ConsoleShellLayout() {
                 aria-label={`Abrir menú de usuario de ${principalLabel}`}
                 data-testid="console-shell-avatar"
                 onClick={() => setMenuOpen((current) => !current)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-2 py-1.5 shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:rounded-2xl sm:px-3 sm:py-2"
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground sm:h-10 sm:w-10">
                   {principalInitials ? principalInitials : <User className="h-4 w-4" aria-hidden="true" />}
                 </span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
@@ -546,35 +752,144 @@ export function ConsoleShellLayout() {
           </div>
         </header>
 
+        <ConsoleResponsiveDrawer
+          open={drawerOpen}
+          panelRef={drawerPanelRef}
+          onClose={() => setDrawerOpen(false)}
+          onKeyDown={handleDrawerTabTrap}
+        />
+
         <div className="mx-auto flex max-w-[1600px] pt-16">
-          <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-72 shrink-0 overflow-y-auto border-r border-border bg-card/35 px-4 py-6 lg:block">
+          <aside
+            data-testid="console-shell-sidebar"
+            className="sticky top-16 hidden h-[calc(100vh-4rem)] w-72 shrink-0 overflow-y-auto border-r border-border bg-card/35 px-4 py-6 xl:block"
+          >
             <div className="space-y-2 rounded-3xl border border-border/70 bg-background/50 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">Navegación principal</p>
               <ConsoleNavigation />
             </div>
           </aside>
 
-          <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto lg:px-8 lg:py-8">
+          <main
+            id="console-main-content"
+            ref={mainRef}
+            tabIndex={-1}
+            className="min-w-0 flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8 xl:h-[calc(100vh-4rem)] xl:overflow-y-auto"
+          >
             <div className="mx-auto max-w-5xl space-y-6">
+              <ConsoleBreadcrumbs items={breadcrumbs} />
               {isPlatformGlobalRoute ? null : <ConsoleContextStatusPanel />}
               <Outlet />
             </div>
           </main>
         </div>
 
-        <div className="border-t border-border bg-background/95 px-4 py-3 lg:hidden">
-          <p className="text-xs text-muted-foreground">Para aprovechar todas las funciones de administración, te recomendamos usar la consola desde una pantalla de escritorio.</p>
+        <div data-testid="console-shell-mobile-hint" className="border-t border-border bg-background/95 px-4 py-3 xl:hidden">
+          <p className="text-xs text-muted-foreground">La navegación y el selector de contexto están disponibles desde el botón del encabezado.</p>
         </div>
       </div>
     </ConsoleContextProvider>
   )
 }
 
+function ConsoleResponsiveDrawer({
+  open,
+  panelRef,
+  onClose,
+  onKeyDown
+}: {
+  open: boolean
+  panelRef: RefObject<HTMLDivElement>
+  onClose: () => void
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void
+}) {
+  if (!open) {
+    return null
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 xl:hidden" data-testid="console-shell-drawer-layer">
+      <button
+        type="button"
+        aria-label="Cerrar navegación y contexto"
+        className="absolute inset-0 h-full w-full bg-background/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div
+        id="console-shell-drawer"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="console-shell-drawer-title"
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        className="fixed inset-y-0 left-0 flex w-[min(28rem,calc(100vw-2rem))] max-w-full flex-col border-r border-border/80 bg-background shadow-2xl shadow-black/40 outline-none"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
+          <div className="min-w-0">
+            <h2 id="console-shell-drawer-title" className="text-base font-semibold tracking-tight text-foreground">
+              Navegación y contexto
+            </h2>
+            <p className="mt-1 max-w-[18rem] text-xs leading-5 text-muted-foreground">Cambia de sección, organización o área de trabajo.</p>
+          </div>
+          <Button type="button" variant="ghost" size="icon" aria-label="Cerrar navegación y contexto" onClick={onClose} className="shrink-0">
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+          <ConsoleHeaderContextControls variant="drawer" />
+          <div className="rounded-2xl border border-border/70 bg-card/40 p-3">
+            <ConsoleNavigation onNavigate={onClose} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ConsoleBreadcrumbs({ items }: { items: ConsoleBreadcrumb[] }) {
+  return (
+    <nav aria-label="Ruta de navegación de consola" data-testid="console-shell-breadcrumbs" className="text-sm">
+      <ol className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1
+
+          return (
+            <li key={`${item.label}-${index}`} className="flex min-w-0 max-w-full items-center gap-1.5">
+              {item.to && !isLast ? (
+                <Link
+                  to={item.to}
+                  title={item.label}
+                  className="inline-block min-w-0 max-w-[9rem] truncate rounded-sm align-bottom font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[16rem]"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <span
+                  title={item.label}
+                  className={cn(
+                    'inline-block min-w-0 max-w-[11rem] truncate align-bottom sm:max-w-[20rem]',
+                    isLast && 'font-medium text-foreground'
+                  )}
+                  aria-current={isLast ? 'page' : undefined}
+                >
+                  {item.label}
+                </span>
+              )}
+              {!isLast ? <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
 // Always-visible, humanized role indicator (#761 — F2c-3). Lives in the identity zone's
-// ALWAYS-rendered wrapper (`relative flex items-center gap-3`, next to the avatar button), not the
-// `hidden … md:block` name/email column — that zone disappears below `md` while the avatar (and
-// this badge) survive every breakpoint (#745's responsive dead-zone). Collapses to icon-only below
-// `sm` to stay within a cramped mobile header; the label re-appears at `sm` and up.
+// ALWAYS-rendered identity wrapper next to the avatar button, not the `hidden … 2xl:block`
+// name/email column — that zone disappears at narrower desktop widths while the avatar (and this
+// badge) survive every breakpoint (#745's responsive dead-zone). Collapses to icon-only below `sm`
+// to stay within a cramped mobile header; the label re-appears at `sm` and up.
 function RoleBadge({ permissions }: { permissions: ReturnType<typeof useConsolePermissions> }) {
   const { highestRoleLabel, highestRoleTone } = permissions
   const isReadOnlyTone = highestRoleTone === 'read-only' || highestRoleTone === 'unknown'
@@ -589,15 +904,15 @@ function RoleBadge({ permissions }: { permissions: ReturnType<typeof useConsoleP
       role="status"
       aria-label={ariaLabel}
       title={ariaLabel}
-      className={cn('shrink-0 gap-1.5', isReadOnlyTone && READ_ONLY_AFFORDANCE_BADGE_TONE)}
+      className={cn('min-w-0 shrink-0 gap-1.5', isReadOnlyTone && READ_ONLY_AFFORDANCE_BADGE_TONE)}
     >
       {isReadOnlyTone ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-      <span className="hidden sm:inline">{highestRoleLabel}</span>
+      <span className="hidden max-w-36 truncate sm:inline">{highestRoleLabel}</span>
     </Badge>
   )
 }
 
-function ConsoleNavigation() {
+function ConsoleNavigation({ onNavigate }: { onNavigate?: () => void } = {}) {
   // The Workspace Secrets entry is shown only when the same coarse, fail-safe gate that guards the
   // route is satisfied (workspace membership / tenant-admin / platform role). This runs inside the
   // ConsoleContextProvider, so the active workspace is available.
@@ -659,9 +974,10 @@ function ConsoleNavigation() {
                     key={item.to}
                     to={item.to}
                     end={'exactActive' in item ? item.exactActive : undefined}
+                    onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
+                        'flex min-w-0 items-start gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
                         isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       )
                     }
@@ -669,8 +985,8 @@ function ConsoleNavigation() {
                     {({ isActive }) => (
                       <>
                         <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-current')} aria-hidden="true" />
-                        <span className="min-w-0">
-                          <span className="block font-medium">{item.label}</span>
+                        <span className="min-w-0 break-words">
+                          <span className="block font-medium leading-5">{item.label}</span>
                           {/* #734: /90 (not the more usual /80) for this sub-label. The active pill
                               is now bg-primary — a mid-navy — instead of the old near-white surface,
                               which shrank the headroom for the near-black --primary-foreground text:
@@ -693,7 +1009,7 @@ function ConsoleNavigation() {
   )
 }
 
-function ConsoleHeaderContextControls() {
+function ConsoleHeaderContextControls({ variant = 'header' }: { variant?: 'header' | 'drawer' } = {}) {
   const {
     activeTenant,
     activeTenantId,
@@ -762,27 +1078,40 @@ function ConsoleHeaderContextControls() {
   ])
 
   const workspaceDisabled = tenantsLoading || !activeTenantId || workspacesLoading || Boolean(tenantsError) || hasNoTenants
+  const isDrawer = variant === 'drawer'
 
   return (
     <section
-      aria-label="Contexto activo de consola"
-      className="hidden min-w-0 flex-1 items-center justify-center xl:flex"
+      aria-label={isDrawer ? 'Contexto activo en navegación móvil' : 'Contexto activo de consola'}
+      data-testid={isDrawer ? 'console-drawer-context-controls' : 'console-header-context-controls'}
+      className={cn(
+        isDrawer
+          ? 'flex w-full min-w-0 flex-col'
+          : 'hidden min-w-0 flex-1 items-center justify-center xl:flex'
+      )}
     >
-      <div className="flex w-full max-w-3xl items-center gap-2 rounded-xl border border-border bg-card/70 px-3 py-1.5 shadow-sm">
+      <div
+        className={cn(
+          'w-full rounded-xl border border-border bg-card/70 shadow-sm',
+          isDrawer
+            ? 'grid gap-3 px-3 py-3'
+            : 'flex max-w-3xl items-center gap-2 px-3 py-1.5'
+        )}
+      >
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.18em] text-muted-foreground">Contexto</p>
-          <p className="mt-1 truncate text-xs leading-4 text-muted-foreground">{contextHint}</p>
+          <p className={cn('mt-1 text-xs leading-4 text-muted-foreground', isDrawer ? 'break-words' : 'truncate')}>{contextHint}</p>
         </div>
 
-        <label className="flex min-w-[210px] max-w-[240px] flex-1 flex-col gap-1">
+        <label className={cn('flex flex-1 flex-col gap-1', isDrawer ? 'min-w-0' : 'min-w-[210px] max-w-[240px]')}>
           <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Organización</span>
           <select
             aria-label="Seleccionar organización"
-            data-testid="console-context-tenant-select"
+            data-testid={isDrawer ? 'console-drawer-context-tenant-select' : 'console-context-tenant-select'}
             value={activeTenantId ?? ''}
             disabled={tenantsLoading || hasNoTenants}
             onChange={(event) => selectTenant(event.target.value || null)}
-            className="h-8 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-8 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
               {tenantsLoading ? 'Cargando organizaciones…' : hasNoTenants ? 'Sin organizaciones accesibles' : 'Selecciona una organización'}
@@ -795,15 +1124,15 @@ function ConsoleHeaderContextControls() {
           </select>
         </label>
 
-        <label className="flex min-w-[210px] max-w-[240px] flex-1 flex-col gap-1">
+        <label className={cn('flex flex-1 flex-col gap-1', isDrawer ? 'min-w-0' : 'min-w-[210px] max-w-[240px]')}>
           <span className="text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">Área de trabajo</span>
           <select
             aria-label="Seleccionar área de trabajo"
-            data-testid="console-context-workspace-select"
+            data-testid={isDrawer ? 'console-drawer-context-workspace-select' : 'console-context-workspace-select'}
             value={activeWorkspaceId ?? ''}
             disabled={workspaceDisabled}
             onChange={(event) => selectWorkspace(event.target.value || null)}
-            className="h-8 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-8 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
               {!activeTenantId
@@ -830,9 +1159,10 @@ function ConsoleHeaderContextControls() {
             aria-label="Reintentar organizaciones"
             title="Reintentar organizaciones"
             onClick={() => void reloadTenants()}
-            className="h-9 w-9 shrink-0 rounded-lg px-0"
+            className={cn('h-9 shrink-0 rounded-lg', isDrawer ? 'w-full' : 'w-9 px-0')}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {isDrawer ? <span>Reintentar organizaciones</span> : null}
           </Button>
         ) : workspacesError || hasNoWorkspaces ? (
           <Button
@@ -842,9 +1172,10 @@ function ConsoleHeaderContextControls() {
             aria-label="Reintentar áreas de trabajo"
             title="Reintentar áreas de trabajo"
             onClick={() => void reloadWorkspaces()}
-            className="h-9 w-9 shrink-0 rounded-lg px-0"
+            className={cn('h-9 shrink-0 rounded-lg', isDrawer ? 'w-full' : 'w-9 px-0')}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {isDrawer ? <span>Reintentar áreas de trabajo</span> : null}
           </Button>
         ) : null}
       </div>

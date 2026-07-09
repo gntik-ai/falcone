@@ -1,7 +1,9 @@
 import { lazy } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useNavigate } from 'react-router-dom'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { ConsolePageState } from '@/components/console/ConsolePageState'
+import { Button } from '@/components/ui/button'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { ConsoleShellLayout } from '@/layouts/ConsoleShellLayout'
 import { LoginPage } from '@/pages/LoginPage'
@@ -97,7 +99,12 @@ const ConsoleFlowHistoryPage = lazy(async () => {
 function RequireSuperadminRoute({ children }: { children: JSX.Element }) {
   const session = readConsoleShellSession()
   const roles = session?.principal?.platformRoles ?? []
-  return roles.includes('superadmin') ? children : <Navigate replace to="/console/my-plan" />
+  return roles.includes('superadmin') ? children : (
+    <ConsoleAccessDeniedState
+      title="Necesitas permisos de superadmin"
+      description="Esta sección administra recursos globales de la plataforma. Tu sesión actual no incluye el rol superadmin, así que la consola conserva esta ruta y muestra el bloqueo en lugar de enviarte a otra página sin explicación."
+    />
+  )
 }
 
 // #761 (F2c-5, observer-first IA): the bare `/console` index previously always redirected to the
@@ -112,13 +119,55 @@ function ConsoleIndexRedirect() {
 }
 
 // Fail-safe, coarse gate for the Workspace Secrets screen (#723): an operator who is neither a
-// member of the active workspace nor a tenant-admin/platform-role operator is redirected away. This
-// runs inside ConsoleShellLayout's Outlet, so the ConsoleContext (active workspace) is available.
-// Per-secret mutate authority stays server-enforced — this is defense-in-depth only.
+// member of the active workspace nor a tenant-admin/platform-role operator sees an explicit
+// blocked state. This runs inside ConsoleShellLayout's Outlet, so the ConsoleContext (active
+// workspace) is available. Per-secret mutate authority stays server-enforced — this is
+// defense-in-depth only.
 function RequireWorkspaceSecretsRoute({ children }: { children: JSX.Element }) {
   const session = readConsoleShellSession()
   const { activeWorkspaceId } = useConsoleContext()
-  return canManageWorkspaceSecrets(session, activeWorkspaceId) ? children : <Navigate replace to="/console/my-plan" />
+  return canManageWorkspaceSecrets(session, activeWorkspaceId) ? children : (
+    <ConsoleAccessDeniedState
+      title="Sin acceso a los secretos del área de trabajo"
+      description="Necesitas pertenecer al área de trabajo activa o tener permisos de administración de organización o plataforma para gestionar estos secretos. Cambia el contexto o solicita acceso antes de continuar."
+    />
+  )
+}
+
+function ConsoleAccessDeniedState({ title, description }: { title: string; description: string }) {
+  const navigate = useNavigate()
+
+  return (
+    <ConsolePageState
+      kind="blocked"
+      title={title}
+      description={description}
+      actionLabel="Volver a la vista general"
+      onAction={() => navigate('/console/overview')}
+    >
+      <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => navigate('/console/my-plan')}>
+        Revisar mi plan y permisos
+      </Button>
+    </ConsolePageState>
+  )
+}
+
+function ConsoleUnknownRouteState() {
+  const navigate = useNavigate()
+
+  return (
+    <ConsolePageState
+      kind="empty"
+      title="Sección de consola no encontrada"
+      description="No encontramos esta dirección autenticada. Tu sesión y el contexto activo se mantienen; revisa la ruta, usa la navegación de la consola o vuelve a una sección conocida."
+      actionLabel="Volver a la vista general"
+      onAction={() => navigate('/console/overview')}
+    >
+      <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => navigate(-1)}>
+        Volver a la página anterior
+      </Button>
+    </ConsolePageState>
+  )
 }
 
 // T05 endurece la entrada a `/console/*` con guardas de sesión y refresh on-demand.
@@ -372,7 +421,7 @@ export const appRoutes = [
           },
           {
             path: '*',
-            element: <Navigate replace to="/console/overview" />
+            element: <ConsoleUnknownRouteState />
           }
             ]
           }
