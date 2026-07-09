@@ -104,6 +104,98 @@ describe('ConsoleShellLayout', () => {
     expect(screen.getByText(/panel de administración multi-organización/i)).toBeInTheDocument()
   })
 
+  it('[#745][Scenario: Deep route and keyboard access] renderiza skip-link y breadcrumb del shell en rutas profundas', async () => {
+    stubShellApi({
+      tenants: [
+        createTenant('ten_alpha', 'Tenant Alpha'),
+        createTenant('ten_beta', 'Tenant Beta')
+      ],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')],
+        ten_beta: [createWorkspace('wrk_beta', 'ten_beta', 'Workspace Beta')]
+      }
+    })
+    persistConsoleShellSession(
+      createSessionWithRoles(['tenant_owner'], {
+        tenantIds: ['ten_alpha', 'ten_beta'],
+        workspaceIds: ['wrk_alpha', 'wrk_beta']
+      })
+    )
+    const user = userEvent.setup()
+
+    renderShell('/console/workspaces/wrk_beta')
+
+    expect(await screen.findByRole('heading', { name: /workspace route probe/i })).toBeInTheDocument()
+    const skipLink = screen.getByRole('link', { name: /saltar al contenido principal/i })
+    expect(skipLink).toHaveAttribute('href', '#console-main-content')
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'console-main-content')
+
+    await user.click(skipLink)
+
+    expect(screen.getByRole('main')).toHaveFocus()
+
+    const breadcrumbs = screen.getByTestId('console-shell-breadcrumbs')
+    expect(within(breadcrumbs).getByRole('link', { name: /^consola$/i })).toHaveAttribute('href', '/console/overview')
+    expect(within(breadcrumbs).getByRole('link', { name: /gestión de áreas de trabajo/i })).toHaveAttribute('href', '/console/workspaces')
+    expect(within(breadcrumbs).getByText(/área wrk_beta/i)).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('[#745][Scenario: Narrow viewport] abre un drawer con navegación y selectores de contexto alcanzables', async () => {
+    stubShellApi({
+      tenants: [createTenant('ten_alpha', 'Tenant Alpha')],
+      workspacesByTenant: {
+        ten_alpha: [createWorkspace('wrk_alpha', 'ten_alpha', 'Workspace Alpha')]
+      }
+    })
+    persistConsoleShellSession(baseSession)
+    const user = userEvent.setup()
+
+    renderShell('/console/overview')
+
+    const drawerTrigger = await screen.findByRole('button', { name: /abrir navegación y contexto/i })
+    await user.click(drawerTrigger)
+
+    const drawer = screen.getByRole('dialog', { name: /navegación y contexto/i })
+    await waitFor(() => {
+      expect(drawer).toHaveFocus()
+    })
+    expect(within(drawer).getByRole('navigation', { name: /navegación principal de consola/i })).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(within(drawer).getByTestId('console-drawer-context-tenant-select')).toHaveValue('ten_alpha')
+      expect(within(drawer).getByTestId('console-drawer-context-workspace-select')).toHaveValue('wrk_alpha')
+    })
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /navegación y contexto/i })).not.toBeInTheDocument()
+    })
+    expect(drawerTrigger).toHaveFocus()
+
+    await user.click(drawerTrigger)
+    const reopenedDrawer = screen.getByRole('dialog', { name: /navegación y contexto/i })
+
+    await user.click(within(reopenedDrawer).getByRole('link', { name: /^postgresql/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /navegación y contexto/i })).not.toBeInTheDocument()
+    })
+    expect(await screen.findByRole('heading', { name: /postgresql/i })).toBeInTheDocument()
+  })
+
+  it('[#745][Scenario: Responsive breakpoints] evita solapar sidebar y drawer entre lg y xl', async () => {
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+
+    renderShell('/console/overview')
+
+    expect(await screen.findByRole('button', { name: /abrir navegación y contexto/i })).toHaveClass('xl:hidden')
+    expect(screen.getByTestId('console-shell-sidebar')).toHaveClass('xl:block')
+    expect(screen.getByTestId('console-shell-sidebar')).not.toHaveClass('lg:block')
+    expect(screen.getByTestId('console-shell-mobile-hint')).toHaveClass('xl:hidden')
+  })
+
   it('[#752][fn-console-context-panel][Scenario: context cards suppressed on platform-global routes] oculta el panel de contexto en una ruta global de plataforma (plans)', async () => {
     stubShellApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha')],

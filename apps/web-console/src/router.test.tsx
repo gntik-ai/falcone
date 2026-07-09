@@ -139,13 +139,16 @@ it('renderiza plan catalog para superadmin', async () => {
   expect(await screen.findByRole('heading', { name: /plan catalog/i })).toBeInTheDocument()
 })
 
-it('[#740] redirige tenant_owner desde /console/auth sin renderizar Auth', async () => {
+it('[#745] muestra un bloqueo explícito para tenant_owner en /console/auth sin renderizar Auth', async () => {
   readConsoleShellSessionMock.mockReturnValue(createRouterSession(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
 
   const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/auth'] })
   render(<RouterProvider router={router} />)
 
-  expect(await screen.findByRole('heading', { name: /my plan/i })).toBeInTheDocument()
+  expect(await screen.findByRole('alert')).toHaveTextContent(/necesitas permisos de superadmin/i)
+  expect(screen.getByRole('button', { name: /volver a la vista general/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /revisar mi plan y permisos/i })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: /my plan/i })).not.toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: /auth iam/i })).not.toBeInTheDocument()
   expect(consoleAuthPageRenderMock).not.toHaveBeenCalled()
 })
@@ -178,13 +181,16 @@ it('[#782] permite que superadmin abra /console/auth-config', async () => {
   expect(await screen.findByRole('heading', { name: /auth config real/i })).toBeInTheDocument()
 })
 
-it('[#740] redirige tenant_owner desde /console/iam-access sin renderizar IAM Access', async () => {
+it('[#745] muestra un bloqueo explícito para tenant_owner en /console/iam-access sin renderizar IAM Access', async () => {
   readConsoleShellSessionMock.mockReturnValue(createRouterSession(['tenant_owner'], { tenantIds: ['ten_alpha'] }))
 
   const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/iam-access'] })
   render(<RouterProvider router={router} />)
 
-  expect(await screen.findByRole('heading', { name: /my plan/i })).toBeInTheDocument()
+  expect(await screen.findByRole('alert')).toHaveTextContent(/necesitas permisos de superadmin/i)
+  expect(screen.getByRole('button', { name: /volver a la vista general/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /revisar mi plan y permisos/i })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: /my plan/i })).not.toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: /iam access/i })).not.toBeInTheDocument()
   expect(consoleIamAccessPageRenderMock).not.toHaveBeenCalled()
 })
@@ -197,6 +203,17 @@ it('[#740] permite que superadmin abra /console/iam-access', async () => {
 
   expect(await screen.findByRole('heading', { name: /iam access/i })).toBeInTheDocument()
   expect(consoleIamAccessPageRenderMock).toHaveBeenCalled()
+})
+
+it('[#745] muestra una recuperación explícita para rutas autenticadas desconocidas en vez de redirigir', async () => {
+  const router = createMemoryRouter(appRoutes, { initialEntries: ['/console/no-existe'] })
+  render(<RouterProvider router={router} />)
+
+  expect(await screen.findByText(/sección de consola no encontrada/i)).toBeInTheDocument()
+  expect(screen.getByText(/tu sesión y el contexto activo se mantienen/i)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /volver a la vista general/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /volver a la página anterior/i })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: /vista general de la consola/i })).not.toBeInTheDocument()
 })
 
 function createRouterSession(
