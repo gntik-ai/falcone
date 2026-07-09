@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
@@ -7,6 +7,7 @@ import { PlanCapabilityBadge } from '@/components/console/PlanCapabilityBadge'
 import { PlanLimitsTable } from '@/components/console/PlanLimitsTable'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { describeConsoleError } from '@/lib/console-errors'
 import { cn } from '@/lib/utils'
 import * as api from '@/services/planManagementApi'
@@ -38,14 +39,6 @@ const lifecycleStatusSummaries: Record<api.PlanStatus, string> = {
   active: 'Asignable',
   deprecated: 'En retirada',
   archived: 'Retirado'
-}
-
-function getTabId(tab: PlanDetailTab) {
-  return `plan-detail-${tab}-tab`
-}
-
-function getPanelId(tab: PlanDetailTab) {
-  return `plan-detail-${tab}-panel`
 }
 
 function limitErrorMessage(error: unknown): string {
@@ -325,22 +318,6 @@ export function ConsolePlanDetailPage() {
     }
   }
 
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, value: PlanDetailTab) {
-    const currentIndex = planDetailTabs.findIndex((item) => item.value === value)
-    let nextIndex: number | null = null
-
-    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % planDetailTabs.length
-    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + planDetailTabs.length) % planDetailTabs.length
-    if (event.key === 'Home') nextIndex = 0
-    if (event.key === 'End') nextIndex = planDetailTabs.length - 1
-
-    if (nextIndex === null) return
-    event.preventDefault()
-    const nextTab = planDetailTabs[nextIndex].value
-    setTab(nextTab)
-    requestAnimationFrame(() => document.getElementById(getTabId(nextTab))?.focus())
-  }
-
   function openLifecycleConfirmation(action: PlanLifecycleAction) {
     if (!plan) return
     destructiveOp.openDialog({
@@ -396,7 +373,8 @@ export function ConsolePlanDetailPage() {
   const deleteDisabled = controlsDisabled || deleteBlockedByActiveStatus
 
   return (
-    <main className="space-y-6">
+    <main>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as PlanDetailTab)} className="gap-6">
       <header className="overflow-hidden rounded-3xl border border-border bg-card/70 shadow-sm">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -527,26 +505,17 @@ export function ConsolePlanDetailPage() {
         </div>
         <div className="border-t border-border/70 px-5 py-3 sm:px-6">
           <div className="-mx-1 overflow-x-auto px-1">
-            <div role="tablist" aria-label="Detalle del plan" className="inline-flex min-w-full gap-1 rounded-xl border border-border bg-background/50 p-1 sm:min-w-0">
+            <TabsList aria-label="Detalle del plan" className="inline-flex min-w-full gap-1 rounded-xl border border-border bg-background/50 p-1 sm:min-w-0">
               {planDetailTabs.map(({ value, label }) => (
-                <Button
+                <TabsTrigger
                   key={value}
-                  type="button"
-                  role="tab"
-                  id={getTabId(value)}
-                  aria-controls={getPanelId(value)}
-                  aria-selected={tab === value}
-                  tabIndex={tab === value ? 0 : -1}
-                  variant={tab === value ? 'default' : 'ghost'}
-                  size="sm"
+                  value={value}
                   className="h-8 shrink-0 rounded-md px-3 text-xs sm:text-sm"
-                  onClick={() => setTab(value)}
-                  onKeyDown={(event) => handleTabKeyDown(event, value)}
                 >
                   {label}
-                </Button>
+                </TabsTrigger>
               ))}
-            </div>
+            </TabsList>
           </div>
         </div>
       </header>
@@ -556,21 +525,17 @@ export function ConsolePlanDetailPage() {
           variant={actionFeedback.kind === 'error' ? 'destructive' : 'success'}
           role={actionFeedback.kind === 'error' ? 'alert' : 'status'}
           aria-live={actionFeedback.kind === 'error' ? 'assertive' : 'polite'}
-          className="rounded-sm text-foreground"
+          className="text-foreground"
         >
           <AlertTitle>{actionFeedback.title}</AlertTitle>
           <AlertDescription>{actionFeedback.message}</AlertDescription>
         </Alert>
       ) : null}
 
-      {tab === 'info' ? (
-        <section
-          role="tabpanel"
-          id={getPanelId('info')}
-          aria-labelledby={getTabId('info')}
-          tabIndex={0}
-          className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
-        >
+      <TabsContent
+        value="info"
+        className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
+      >
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="min-w-0 space-y-3">
               <div className="flex items-center gap-2">
@@ -598,17 +563,12 @@ export function ConsolePlanDetailPage() {
               </div>
             </dl>
           </div>
-        </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === 'capabilities' ? (
-        <section
-          role="tabpanel"
-          id={getPanelId('capabilities')}
-          aria-labelledby={getTabId('capabilities')}
-          tabIndex={0}
-          className="space-y-4 rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
-        >
+      <TabsContent
+        value="capabilities"
+        className="space-y-4 rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
+      >
           <div className="space-y-1">
             <h2 className="text-sm font-semibold tracking-tight text-foreground">Capacidades</h2>
             <p className="text-sm leading-6 text-muted-foreground">Funciones habilitadas o bloqueadas para organizaciones asignadas a este plan.</p>
@@ -625,17 +585,12 @@ export function ConsolePlanDetailPage() {
           ) : (
             <p className="text-sm leading-6 text-muted-foreground">Este plan no tiene capacidades configuradas.</p>
           )}
-        </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === 'limits' ? (
-        <section
-          role="tabpanel"
-          id={getPanelId('limits')}
-          aria-labelledby={getTabId('limits')}
-          tabIndex={0}
-          className="space-y-5 rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
-        >
+      <TabsContent
+        value="limits"
+        className="space-y-5 rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
+      >
           <div className="space-y-1">
             <h2 className="text-sm font-semibold tracking-tight text-foreground">Límites base</h2>
             <p className="text-sm leading-6 text-muted-foreground">
@@ -649,7 +604,7 @@ export function ConsolePlanDetailPage() {
               variant={limitFeedback.kind === 'error' ? 'destructive' : 'success'}
               role={limitFeedback.kind === 'error' ? 'alert' : 'status'}
               aria-live={limitFeedback.kind === 'error' ? 'assertive' : 'polite'}
-              className="rounded-sm text-foreground"
+              className="text-foreground"
             >
               <AlertTitle>{limitFeedback.title}</AlertTitle>
               <AlertDescription>{limitFeedback.message}</AlertDescription>
@@ -666,17 +621,12 @@ export function ConsolePlanDetailPage() {
           ) : (
             <p className="text-sm leading-6 text-muted-foreground">Este plan no tiene dimensiones de cuota configuradas.</p>
           )}
-        </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === 'tenants' ? (
-        <section
-          role="tabpanel"
-          id={getPanelId('tenants')}
-          aria-labelledby={getTabId('tenants')}
-          tabIndex={0}
-          className="space-y-4 rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
-        >
+      <TabsContent
+        value="tenants"
+        className="space-y-4 rounded-3xl border border-border bg-card/70 p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-6"
+      >
           <div className="flex gap-3">
             <Users className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div className="space-y-1">
@@ -690,8 +640,8 @@ export function ConsolePlanDetailPage() {
           <Button variant="outline" asChild className="w-full sm:w-fit">
             <Link to="/console/tenants">Abrir organizaciones</Link>
           </Button>
-        </section>
-      ) : null}
+      </TabsContent>
+      </Tabs>
 
       <DestructiveConfirmationDialog
         open={destructiveOp.isOpen}

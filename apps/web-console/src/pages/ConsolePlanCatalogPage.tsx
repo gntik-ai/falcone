@@ -2,16 +2,48 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import * as api from '@/services/planManagementApi'
+
+const statusFilterLabels: Record<api.PlanStatus | 'all', string> = {
+  all: 'Todos',
+  draft: 'Borrador',
+  active: 'Activo',
+  deprecated: 'Obsoleto',
+  archived: 'Archivado'
+}
 
 export function ConsolePlanCatalogPage() {
   const navigate = useNavigate()
   const [state, setState] = useState({ items: [] as api.PlanRecord[], total: 0, page: 1, pageSize: 20, loading: true, error: '' as string | null, status: 'all' as api.PlanStatus | 'all' })
-  useEffect(() => { api.listPlans({ status: state.status, page: state.page, pageSize: state.pageSize }).then((response) => setState((current) => ({ ...current, ...response, loading: false, error: null }))).catch((error) => setState((current) => ({ ...current, loading: false, error: error.message ?? 'Error' }))) }, [state.page, state.pageSize, state.status])
+
+  useEffect(() => {
+    let cancelled = false
+
+    setState((current) => ({ ...current, loading: true, error: null }))
+    api.listPlans({ status: state.status, page: state.page, pageSize: state.pageSize })
+      .then((response) => {
+        if (!cancelled) setState((current) => ({ ...current, ...response, loading: false, error: null }))
+      })
+      .catch((error) => {
+        if (!cancelled) setState((current) => ({ ...current, loading: false, error: error.message ?? 'Error' }))
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [state.page, state.pageSize, state.status])
+
   if (state.loading) return <ConsolePageState kind="loading" title="Cargando planes" description="Consultando el catálogo de planes." />
   if (state.error) return <ConsolePageState kind="error" title="No se pudieron cargar los planes" description={state.error} />
-  if (!state.items.length) return <ConsolePageState kind="empty" title="No se encontraron planes" description="Crea el primer plan." actionLabel="Crear plan" onAction={() => navigate('/console/plans/new')} />
+  if (!state.items.length && state.status === 'all') return <ConsolePageState kind="empty" title="No se encontraron planes" description="Crea el primer plan." actionLabel="Crear plan" onAction={() => navigate('/console/plans/new')} />
+
+  function clearStatusFilter() {
+    setState((current) => ({ ...current, status: 'all', page: 1, loading: true, error: null }))
+  }
+
   return (
     <main className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
@@ -25,44 +57,44 @@ export function ConsolePlanCatalogPage() {
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="space-y-2 text-sm" htmlFor="plan-status-filter">
             <span className="font-medium text-foreground">Filtrar por estado</span>
-            <select
+            <Select
               id="plan-status-filter"
               aria-label="Filtro de estado"
-              className="block w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="w-48"
               value={state.status}
-              onChange={(e) => { const status = e.currentTarget.value as api.PlanStatus | 'all'; setState((current) => ({ ...current, status, page: 1 })) }}
+              onChange={(e) => { const status = e.currentTarget.value as api.PlanStatus | 'all'; setState((current) => ({ ...current, status, page: 1, loading: true, error: null })) }}
             >
-              <option className="bg-card text-foreground" value="all">Todos</option>
-              <option className="bg-card text-foreground" value="draft">Borrador</option>
-              <option className="bg-card text-foreground" value="active">Activo</option>
-              <option className="bg-card text-foreground" value="deprecated">Obsoleto</option>
-              <option className="bg-card text-foreground" value="archived">Archivado</option>
-            </select>
+              <option className="bg-card text-foreground" value="all">{statusFilterLabels.all}</option>
+              <option className="bg-card text-foreground" value="draft">{statusFilterLabels.draft}</option>
+              <option className="bg-card text-foreground" value="active">{statusFilterLabels.active}</option>
+              <option className="bg-card text-foreground" value="deprecated">{statusFilterLabels.deprecated}</option>
+              <option className="bg-card text-foreground" value="archived">{statusFilterLabels.archived}</option>
+            </Select>
           </label>
           <p className="pb-2 text-sm text-muted-foreground" aria-live="polite">
             {state.total} {state.total === 1 ? 'plan' : 'planes'}
           </p>
         </div>
       </header>
-      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-        <table className="min-w-full divide-y divide-border text-sm" aria-label="Catálogo de planes">
-          <thead className="bg-muted/40">
-            <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th scope="col" className="px-4 py-3 font-medium">Slug</th>
-              <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
-              <th scope="col" className="px-4 py-3 font-medium">Estado</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">Asignados</th>
-              <th scope="col" className="px-4 py-3 font-medium">Actualizado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/70">
+      {state.items.length ? (
+        <Table aria-label="Catálogo de planes" containerClassName="bg-card shadow-sm">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Slug</TableHead>
+              <TableHead scope="col">Nombre</TableHead>
+              <TableHead scope="col">Estado</TableHead>
+              <TableHead scope="col" className="text-right">Asignados</TableHead>
+              <TableHead scope="col">Actualizado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {state.items.map((plan) => (
-              <tr
+              <TableRow
                 key={plan.id}
                 className="cursor-pointer transition-colors hover:bg-accent/40 focus-within:bg-accent/40"
                 onClick={() => navigate(`/console/plans/${plan.id}`)}
               >
-                <td className="px-4 py-4 font-medium text-foreground">
+                <TableCell className="py-4 font-medium text-foreground">
                   <Link
                     to={`/console/plans/${plan.id}`}
                     onClick={(event) => event.stopPropagation()}
@@ -70,16 +102,31 @@ export function ConsolePlanCatalogPage() {
                   >
                     {plan.slug}
                   </Link>
-                </td>
-                <td className="px-4 py-4 text-foreground">{plan.displayName}</td>
-                <td className="px-4 py-4"><PlanStatusBadge status={plan.status} /></td>
-                <td className="px-4 py-4 text-right tabular-nums text-foreground">{plan.assignedTenantCount ?? 0}</td>
-                <td className="px-4 py-4 text-muted-foreground">{plan.updatedAt ?? '—'}</td>
-              </tr>
+                </TableCell>
+                <TableCell className="py-4 text-foreground">{plan.displayName}</TableCell>
+                <TableCell className="py-4"><PlanStatusBadge status={plan.status} /></TableCell>
+                <TableCell className="py-4 text-right tabular-nums text-foreground">{plan.assignedTenantCount ?? 0}</TableCell>
+                <TableCell className="py-4 text-muted-foreground">{plan.updatedAt ?? '—'}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      ) : (
+        <ConsolePageState
+          kind="empty"
+          title={`No hay planes con estado ${statusFilterLabels[state.status]}`}
+          description="Cambia el filtro para volver al catálogo completo o crea un plan nuevo si necesitas ampliar la oferta."
+        >
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearStatusFilter}>
+              Ver todos los planes
+            </Button>
+            <Button type="button" className="w-full sm:w-auto" onClick={() => navigate('/console/plans/new')}>
+              Crear plan
+            </Button>
+          </div>
+        </ConsolePageState>
+      )}
     </main>
   )
 }

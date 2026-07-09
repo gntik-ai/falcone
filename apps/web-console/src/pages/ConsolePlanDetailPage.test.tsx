@@ -84,10 +84,29 @@ describe('ConsolePlanDetailPage', () => {
   it('renders plan detail tabs', async () => {
     renderPage()
     expect(await screen.findByText('Starter')).toBeInTheDocument()
-    expect(screen.getByRole('tablist', { name: /detalle del plan/i })).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: /detalle del plan/i })).toHaveAttribute('data-slot', 'tabs-list')
+    expect(screen.getByRole('tab', { name: /información/i })).toHaveAttribute('data-slot', 'tabs-trigger')
     expect(screen.getByRole('tab', { name: /información/i })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: /capacidades/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /asignaciones de organizaciones/i })).toBeInTheDocument()
+  })
+
+  it('[#751] marks the active detail tab with the shared Tabs state and renders one active panel', async () => {
+    renderPage()
+
+    expect(await screen.findByText('Starter')).toBeInTheDocument()
+    const infoTab = screen.getByRole('tab', { name: /información/i })
+    const capabilitiesTab = screen.getByRole('tab', { name: /capacidades/i })
+    expect(infoTab).toHaveAttribute('data-state', 'active')
+    expect(capabilitiesTab).toHaveAttribute('data-state', 'inactive')
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('data-slot', 'tabs-content')
+    expect(screen.getByRole('tabpanel')).toHaveTextContent(/resumen del plan/i)
+
+    await userEvent.click(capabilitiesTab)
+
+    expect(infoTab).toHaveAttribute('data-state', 'inactive')
+    expect(capabilitiesTab).toHaveAttribute('data-state', 'active')
+    expect(screen.getByRole('tabpanel')).toHaveTextContent(/funciones habilitadas/i)
   })
 
   it('offers lifecycle controls on a draft plan and reflects the activated status', async () => {

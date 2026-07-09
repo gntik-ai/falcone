@@ -51,6 +51,12 @@ before — migrating to the primitive does not change what `getByRole('table', {
 resolves to; it only changes which component the accessible-name-and-styling implementation
 lives in.
 
+Issue #751 extends the same table contract to the superadmin Plans catalog. `ConsolePlanCatalogPage`
+renders `/console/plans` through `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/
+`TableCell`, with row-level `cursor-pointer`, hover, and focus-within affordances preserved on
+the clickable plan rows. Plans status cells render `PlanStatusBadge`, which follows the
+dark-root translucent status-tone idiom below.
+
 **Sanctioned exception — `ConsoleFlowsPage.tsx`:** the flow-list table renders through `Table`
 (one component, one `data-slot="table"`), but deliberately overrides the container to
 `containerClassName="rounded-lg bg-card"` (not the canonical `rounded-2xl`, and adding a
@@ -78,6 +84,10 @@ mode-switchers that were previously a plain `Button` group with no tab semantics
 `ConsoleStoragePage.tsx`'s bucket detail switcher (Objetos / URLs prefirmadas / Multiparte) is
 the first adopter: it is exactly a tab strip (one panel visible at a time, mutually
 exclusive), and now exposes `role="tablist"`/`role="tab"` instead of a bare button group. The
+superadmin plan-detail page is also an adopter as of issue #751: `ConsolePlanDetailPage` renders
+Información / Capacidades / Límites / Asignaciones de organizaciones through `TabsList`,
+`TabsTrigger`, and `TabsContent`, so active/inactive state, roving tabindex, and tab-panel ARIA
+wiring stay consistent with the rest of the console. The
 Postgres/Mongo inventory pages' own internal switchers (schema/table-detail tabs; database/
 collection-detail tabs) are **not** converted in this change — see the "Deliberately out of
 scope" section of `openspec/changes/add-757-console-dataplane-design-system/proposal.md` for
@@ -94,8 +104,10 @@ remaining hard-coded panel background, and no remaining native/unstyled `<button
 particular — which previously had **zero `className` usage** — now use `Button`, `Input`,
 `Select`, `Textarea`, `Label`, `Card`, and `Table` for every control.
 
-Superadmin-only surfaces (the Plans catalog, chrome/tokens) are out of scope for this
-guarantee; they are tracked by separate issues.
+Issue #751 brings the superadmin Plans catalog/detail into this guarantee: Plans uses shared
+`Table` and `Tabs`, and the tenant-creation wizard's progress indicator now separates
+`current`, `completed`, and `upcoming` states with design-token classes and `aria-current="step"`
+only on the active step. Chrome/token work remains tracked separately.
 
 ## Token discipline (issue #744)
 
