@@ -354,7 +354,7 @@ function invitationBody(body, { tenantId, workspaceId, actorId }) {
       tenantId,
       workspaceId,
       emailHash: hash,
-      maskedEmail: typeof body.maskedEmail === 'string' && body.maskedEmail.trim() ? body.maskedEmail.trim() : rawEmail ? maskEmail(rawEmail) : null,
+      maskedEmail: rawEmail ? maskEmail(rawEmail) : null,
       role,
       status: 'pending',
       expiresAt: invitationExpiresAt(body),

@@ -132,6 +132,53 @@ test('fix-759-11: tenant owner invitation persists masked/hash email and returns
   }
 });
 
+test('fix-759-11a: caller-supplied maskedEmail cannot persist the raw invitee address', async () => {
+  const rawEmail = 'guest@example.com';
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    body: {
+      email: rawEmail,
+      maskedEmail: rawEmail,
+      role: 'workspace_viewer',
+      message: 'Hola',
+      workspaceId: 'wrk_alpha',
+    },
+  }));
+
+  assert.equal(res.statusCode, 202);
+  const insert = store.calls.find(([name]) => name === 'insertInvitation');
+  assert.ok(insert, 'handler must persist an invitation record');
+  const invitation = insert[1];
+  assert.equal(invitation.maskedEmail, 'g***t@example.com');
+  assert.equal('email' in invitation, false);
+  assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
+});
+
+test('fix-759-11b: hash-only invitations do not trust caller-supplied maskedEmail', async () => {
+  const rawEmail = 'guest@example.com';
+  const emailHash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    body: {
+      emailHash,
+      maskedEmail: rawEmail,
+      role: 'workspace_viewer',
+      workspaceId: 'wrk_alpha',
+    },
+  }));
+
+  assert.equal(res.statusCode, 202);
+  const insert = store.calls.find(([name]) => name === 'insertInvitation');
+  assert.ok(insert, 'handler must persist an invitation record');
+  const invitation = insert[1];
+  assert.equal(invitation.emailHash, emailHash);
+  assert.equal(invitation.maskedEmail, null);
+  assert.equal('email' in invitation, false);
+  assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
+});
+
 test('fix-759-12: workspace admin can invite only for a verified workspace binding', async () => {
   const allowedStore = fakeStore();
   const allowed = await LOCAL_HANDLERS.createInvitation(ctx({
