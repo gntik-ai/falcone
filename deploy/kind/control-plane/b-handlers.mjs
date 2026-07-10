@@ -1136,11 +1136,16 @@ async function iamListRoles(ctx) {
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
 async function iamCreateRole(ctx) {
-  if (!ctx.body.name) return err(400, 'VALIDATION_ERROR', 'name required');
+  const roleName = typeof ctx.body?.roleName === 'string' && ctx.body.roleName.trim()
+    ? ctx.body.roleName.trim()
+    : typeof ctx.body?.name === 'string' && ctx.body.name.trim()
+      ? ctx.body.name.trim()
+      : '';
+  if (!roleName) return err(400, 'VALIDATION_ERROR', 'roleName required');
   const kc = ctx.kcAdmin ?? kcAdmin;
   try {
-    await kc.createRealmRole(ctx.params.realmId, ctx.body.name);
-    return ok(201, { name: ctx.body.name, realm: ctx.params.realmId });
+    await kc.createRealmRole(ctx.params.realmId, roleName);
+    return ok(201, { name: roleName, roleName, realm: ctx.params.realmId });
   } catch (e) {
     return kcBackedErr(e, 'IAM_CREATE_ROLE_FAILED');
   }
