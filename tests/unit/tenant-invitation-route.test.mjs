@@ -120,6 +120,16 @@ test('fix-759-11: tenant owner invitation persists masked/hash email and returns
   assert.match(invitation.emailHash, /^[0-9a-f]{64}$/);
   assert.equal('email' in invitation, false);
   assert.equal(invitation.metadata.message, 'Hola');
+  assert.deepEqual(invitation.targetBindings, [
+    { bindingType: 'tenant', bindingRef: 'ten_alpha' },
+    { bindingType: 'workspace', bindingRef: 'wrk_alpha' },
+  ]);
+  for (const binding of invitation.targetBindings) {
+    assert.equal('targetType' in binding, false);
+    assert.equal('tenantId' in binding, false);
+    assert.equal('workspaceId' in binding, false);
+    assert.equal('role' in binding, false);
+  }
 });
 
 test('fix-759-12: workspace admin can invite only for a verified workspace binding', async () => {
@@ -173,4 +183,43 @@ test('fix-759-13: workspace admin cannot grant tenant-scope roles through a work
 
   assert.equal(res.statusCode, 403);
   assert.equal(store.calls.some(([name]) => name === 'insertInvitation'), false);
+});
+
+test('fix-759-14: caller-supplied targetBindings cannot smuggle cross-scope invitation bindings', async () => {
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    identity: {
+      actorType: 'workspace_admin',
+      tenantId: 'ten_alpha',
+      sub: 'usr_ws_admin',
+      roles: ['workspace_admin'],
+      workspaceIds: ['wrk_alpha'],
+    },
+    body: {
+      email: 'guest@example.com',
+      role: 'workspace_viewer',
+      message: 'Hola',
+      workspaceId: 'wrk_alpha',
+      targetBindings: [
+        { bindingType: 'tenant', bindingRef: 'ten_beta' },
+        { bindingType: 'workspace', bindingRef: 'wrk_beta' },
+      ],
+    },
+  }));
+
+  assert.equal(res.statusCode, 202);
+  const insert = store.calls.find(([name]) => name === 'insertInvitation');
+  assert.ok(insert, 'handler must persist a derived invitation record');
+  const invitation = insert[1];
+  assert.equal(invitation.tenantId, 'ten_alpha');
+  assert.equal(invitation.workspaceId, 'wrk_alpha');
+  assert.deepEqual(invitation.targetBindings, [
+    { bindingType: 'tenant', bindingRef: 'ten_alpha' },
+    { bindingType: 'workspace', bindingRef: 'wrk_alpha' },
+  ]);
+  assert.equal(
+    invitation.targetBindings.some((binding) => ['ten_beta', 'wrk_beta'].includes(binding.bindingRef)),
+    false,
+  );
 });

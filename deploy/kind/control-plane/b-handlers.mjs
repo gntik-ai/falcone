@@ -317,6 +317,14 @@ function invitationExpiresAt(body) {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 }
 
+function invitationTargetBindings({ tenantId, workspaceId, role }) {
+  const bindings = [{ bindingType: 'tenant', bindingRef: tenantId }];
+  if (role.startsWith('workspace_')) {
+    bindings.push({ bindingType: 'workspace', bindingRef: workspaceId });
+  }
+  return bindings;
+}
+
 function invitationBody(body, { tenantId, workspaceId, actorId }) {
   const role = normalizeInvitationRole(body.role ?? body.roleName);
   if (!role) return { error: err(400, 'VALIDATION_ERROR', 'role is required') };
@@ -339,15 +347,7 @@ function invitationBody(body, { tenantId, workspaceId, actorId }) {
     ? { ...body.metadata }
     : {};
   if (message) metadata.message = message;
-  const targetType = body.targetType ?? (workspaceId ? 'workspace' : 'tenant');
-  const targetBindings = Array.isArray(body.targetBindings) && body.targetBindings.length
-    ? body.targetBindings
-    : [{
-        targetType,
-        tenantId,
-        ...(workspaceId ? { workspaceId } : {}),
-        role
-      }];
+  const targetBindings = invitationTargetBindings({ tenantId, workspaceId, role });
   return {
     invitation: {
       id: compactId('inv'),
