@@ -1087,7 +1087,8 @@ function unsupportedIamCreateFields(body = {}) {
 
 async function iamCreateUser(ctx) {
   const { params, body, identity } = ctx;
-  if (!body.username && !body.email) return err(400, 'VALIDATION_ERROR', 'username or email required');
+  const username = typeof body.username === 'string' ? body.username.trim() : '';
+  if (!username) return err(400, 'VALIDATION_ERROR', 'username required');
   const unsupported = unsupportedIamCreateFields(body);
   if (unsupported.length > 0) {
     return err(400, 'UNSUPPORTED_FIELD', `unsupported create-user fields: ${unsupported.join(', ')}`);
@@ -1099,7 +1100,7 @@ async function iamCreateUser(ctx) {
     const requiredActions = requiredActionsFromBody(body);
     const attributes = body.attributes && typeof body.attributes === 'object' ? body.attributes : {};
     const id = await kc.createUser(params.realmId, {
-      username: body.username ?? body.email,
+      username,
       email: body.email ?? null,
       firstName: body.firstName ?? null,
       lastName: body.lastName ?? null,
@@ -1113,7 +1114,7 @@ async function iamCreateUser(ctx) {
     if (realmRoles.length) await kc.assignRealmRoles(params.realmId, id, realmRoles);
     return ok(201, {
       userId: id,
-      username: body.username ?? body.email,
+      username,
       realm: params.realmId,
       roles: realmRoles,
       realmRoles,
