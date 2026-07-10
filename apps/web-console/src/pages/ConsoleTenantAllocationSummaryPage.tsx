@@ -70,10 +70,10 @@ export function ConsoleTenantAllocationSummaryPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <section className="space-y-6">
       <AllocationSummaryHeader />
       {content}
-    </main>
+    </section>
   )
 }
 

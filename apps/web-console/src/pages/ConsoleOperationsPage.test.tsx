@@ -95,7 +95,11 @@ describe('ConsoleOperationsPage', () => {
 
     render(<ConsoleOperationsPage />)
 
-    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'failed' } })
+    const statusFilter = screen.getByLabelText('Filtrar por estado')
+    expect(statusFilter).toHaveClass('h-11')
+    expect(screen.getByLabelText('Filtrar por tipo de operación')).toHaveClass('h-11')
+
+    fireEvent.change(statusFilter, { target: { value: 'failed' } })
 
     expect(mockUseOperations).toHaveBeenLastCalledWith({ status: 'failed', operationType: undefined, workspaceId: undefined }, { limit: 20, offset: 0 })
   })

@@ -148,7 +148,7 @@ export function ConsoleWorkspaceDatabasePage() {
   }
 
   return (
-    <main className="space-y-6" data-testid="console-workspace-database-page">
+    <section className="space-y-6" data-testid="console-workspace-database-page">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
@@ -245,7 +245,7 @@ export function ConsoleWorkspaceDatabasePage() {
           )}
         </section>
       ) : null}
-    </main>
+    </section>
   )
 }
 

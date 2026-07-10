@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import type { ConsoleQuotaDimensionView } from '@/lib/console-quotas'
 import * as api from '@/services/planManagementApi'
 
@@ -99,13 +98,6 @@ export function QuotaAdjustDialog({
   const triggerTableKeyRef = useRef<string | null>(target ? target.tableKey : null)
   if (target) triggerTableKeyRef.current = target.tableKey
 
-  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(isOpen, {
-    resolveReturnFocus: () => {
-      const key = triggerTableKeyRef.current
-      return key ? document.querySelector<HTMLElement>(quotaAdjustTriggerSelector(key)) : null
-    }
-  })
-
   useEffect(() => {
     if (!target) return
     let cancelled = false
@@ -160,15 +152,6 @@ export function QuotaAdjustDialog({
   const activeTarget = target
   const { dimension } = activeTarget
 
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape' && !busy) {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    handleTabTrap(event)
-  }
-
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (busy || resolution.status !== 'ready') return
@@ -203,18 +186,18 @@ export function QuotaAdjustDialog({
   const readyDescribedBy = [scopeId, helpId, validationError ? errorId : null].filter(Boolean).join(' ')
 
   return (
-    <Dialog open={isOpen} onOpenChange={(next) => { if (!next && !busy) onClose() }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => { if (!next && !busy) onClose() }}
+      focusTrapOptions={{
+        resolveReturnFocus: () => {
+          const key = triggerTableKeyRef.current
+          return key ? document.querySelector<HTMLElement>(quotaAdjustTriggerSelector(key)) : null
+        }
+      }}
+    >
       <DialogContent className="max-w-lg">
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          aria-describedby={descriptionId}
-          tabIndex={-1}
-          onKeyDown={handleKeyDown}
-          className="focus:outline-none"
-        >
+        <div>
           <DialogHeader>
             <DialogTitle id={titleId} className="break-words">Ajustar cuota: {dimension.displayName}</DialogTitle>
             <DialogDescription id={descriptionId}>

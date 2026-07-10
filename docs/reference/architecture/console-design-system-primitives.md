@@ -53,9 +53,12 @@ lives in.
 
 Issue #751 extends the same table contract to the superadmin Plans catalog. `ConsolePlanCatalogPage`
 renders `/console/plans` through `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/
-`TableCell`, with row-level `cursor-pointer`, hover, and focus-within affordances preserved on
-the clickable plan rows. Plans status cells render `PlanStatusBadge`, which follows the
-dark-root translucent status-tone idiom below.
+`TableCell`. Issue #753 then removed the mouse-only row click handler: plan rows now expose real
+links (slug and action cell) so keyboard and pointer users activate the same semantic targets.
+Plans status cells render `PlanStatusBadge`, which follows the dark-root translucent status-tone
+idiom below. See
+[console-superadmin-accessibility-baseline.md](./console-superadmin-accessibility-baseline.md)
+for the broader superadmin accessibility baseline.
 
 **Sanctioned exception — `ConsoleFlowsPage.tsx`:** the flow-list table renders through `Table`
 (one component, one `data-slot="table"`), but deliberately overrides the container to

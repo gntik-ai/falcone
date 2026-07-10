@@ -31,6 +31,11 @@ plans such as hardcoded Starter/Growth options. If the active catalog is loading
 empty, the wizard keeps the Plan step in place with an accessible status/error/empty message and
 does not allow the operator to continue until a real active plan is selectable.
 
+The wizard is rendered through the shared accessible `Dialog` primitive. Outside/backdrop clicks do
+not close it, so an accidental click cannot discard partially entered tenant data; explicit Cancel,
+Escape, and successful completion still use the normal close/reset behavior. See
+[console-superadmin-accessibility-baseline.md](./console-superadmin-accessibility-baseline.md).
+
 No wire contract changed for this behavior. The frontend still calls `GET /v1/plans` and
 `POST /v1/tenants`, and the tenant create body still uses `planId`; the fix is that `planId` now comes
 from a real catalog record ID instead of a synthetic UI value.

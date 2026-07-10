@@ -95,7 +95,7 @@ export function ConsoleDocsPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="workspace-docs-heading">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-4">
@@ -168,6 +168,6 @@ export function ConsoleDocsPage() {
           setNotesOverride((notesOverride ?? data.customNotes).filter((note) => note.noteId !== noteId))
         }}
       />
-    </main>
+    </section>
   )
 }

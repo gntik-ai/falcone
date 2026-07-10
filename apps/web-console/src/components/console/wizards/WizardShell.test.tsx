@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -139,6 +139,18 @@ describe('WizardShell', () => {
     await user.click(screen.getByRole('button', { name: /anterior/i }))
     expect(screen.getByLabelText(/plan/i)).toHaveValue('starter')
     await user.click(screen.getByRole('button', { name: /anterior/i }))
+    expect(screen.getByLabelText(/nombre/i)).toHaveValue('Tenant A')
+  })
+
+  it('[#753] un clic accidental en el backdrop no cierra ni reinicia un wizard con datos', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+
+    await user.type(screen.getByLabelText(/nombre/i), 'Tenant A')
+    const dialog = screen.getByRole('dialog', { name: /wizard/i })
+    fireEvent.click(dialog.parentElement!)
+
+    expect(screen.getByRole('dialog', { name: /wizard/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre/i)).toHaveValue('Tenant A')
   })
 })

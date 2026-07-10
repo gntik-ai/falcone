@@ -9,6 +9,7 @@ import { ConsoleMetricDimensionRow } from '@/components/console/ConsoleMetricDim
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostureBadge'
 import { ConsoleTimeRangeSelector } from '@/components/console/ConsoleTimeRangeSelector'
+import { Select } from '@/components/ui/select'
 import {
   exportAuditRecords,
   useConsoleAuditRecords,
@@ -208,11 +209,11 @@ export function ConsoleObservabilityPage() {
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resultado</span>
-                <select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm">
+                <Select aria-label="Resultado" value={filters.result ?? ''} onChange={(event) => setFilters((current) => ({ ...current, result: (event.target.value || undefined) as ConsoleAuditFilter['result'] }))}>
                   <option value="">Todos</option>
                   <option value="success">Éxito</option>
                   <option value="failure">Fallo</option>
-                </select>
+                </Select>
               </label>
               {/* #766: `ConsoleAuditFilter.from`/`.to` were already modeled and wired into the
                   fetch (`appendDateFilters`), but the audit tab never exposed inputs for them. */}

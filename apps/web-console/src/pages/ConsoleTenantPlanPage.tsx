@@ -37,7 +37,7 @@ export function ConsoleTenantPlanPage() {
   const isAssigned = Boolean(data?.assignment)
   const limits = summary.quantitativeLimits ?? []
   return (
-    <main className="space-y-6">
+    <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="tenant-plan-heading">
         <nav aria-label="Ruta de navegación" className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
           <Link className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" to="/console/tenants">
@@ -97,6 +97,6 @@ export function ConsoleTenantPlanPage() {
         <PlanImpactHistoryTable items={history.items} />
       </section>
       <PlanAssignmentDialog open={dialogOpen} tenantId={tenantId} currentPlanId={data?.assignment?.planId ?? null} activePlans={plans.map((plan) => ({ id: plan.id, displayName: plan.displayName, status: plan.status }))} onConfirm={async (planId) => { setAssigning(true); try { await api.assignPlan(tenantId, { planId, assignedBy: 'console' }); setDialogOpen(false) } finally { setAssigning(false) } }} onCancel={() => setDialogOpen(false)} />
-    </main>
+    </section>
   )
 }

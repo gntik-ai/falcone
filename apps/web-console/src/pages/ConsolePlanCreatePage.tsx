@@ -40,9 +40,9 @@ export function ConsolePlanCreatePage() {
     }
   }
   return (
-    <main className="space-y-6">
+    <section className="space-y-6" aria-labelledby="plan-create-heading">
       <header className="rounded-3xl border border-border bg-card/70 p-6">
-        <h1 className="text-2xl font-semibold">Crear plan</h1>
+        <h1 id="plan-create-heading" className="text-2xl font-semibold">Crear plan</h1>
       </header>
       <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-border bg-card/70 p-6">
         <div className="space-y-2">
@@ -74,6 +74,6 @@ export function ConsolePlanCreatePage() {
         {error ? <Alert variant="destructive">{error}</Alert> : null}
         <Button type="submit">Crear</Button>
       </form>
-    </main>
+    </section>
   )
 }

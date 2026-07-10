@@ -1,8 +1,7 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
-import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -85,12 +84,9 @@ function credentialTriggerFallback(mode: 'reveal' | 'rotate', serviceAccountId: 
   return document.querySelector<HTMLElement>('[data-testid="service-accounts-heading"]')
 }
 
-// A true, action-anchored MODAL for the one-time credential disclosure (#783): built on the shared
-// Dialog/DialogContent primitive (backdrop + click-outside-to-close) plus the same
-// `useModalFocusTrap` hook used by DestructiveConfirmationDialog and
-// ConsoleWorkspaceSecretsPage's SecretDialog, so Tab never escapes it and focus returns to the
-// triggering row action (Revelar/Rotar) on close. `initialFocus: 'panel'` preserves the existing
-// behavior of moving focus onto the dialog container itself (not a specific control inside it).
+// A true, action-anchored modal for the one-time credential disclosure (#783). `initialFocus:
+// 'panel'` preserves the existing behavior of moving focus onto the dialog container itself, and
+// resolveReturnFocus re-locates the triggering row action after reloads.
 function CredentialDisclosureDialog({
   disclosure,
   onClose
@@ -112,14 +108,6 @@ function CredentialDisclosureDialog({
       triggerInfoRef.current = { mode: disclosure.mode, serviceAccountId: disclosure.serviceAccountId }
     }
   }, [disclosure])
-  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(isOpen, {
-    initialFocus: 'panel',
-    resolveReturnFocus: () => {
-      const info = triggerInfoRef.current
-      return info ? credentialTriggerFallback(info.mode, info.serviceAccountId) : null
-    }
-  })
-
   useEffect(() => {
     setCopyFeedback(null)
   }, [disclosure?.credential.credentialId, disclosure?.credential.secret, disclosure?.mode])
@@ -134,15 +122,6 @@ function CredentialDisclosureDialog({
   const description = isRotate
     ? 'Actualiza tus clientes con este valor. Rotar reemplaza el secreto anterior e invalida los tokens emitidos antes de la rotación.'
     : 'Este panel revela el secreto de cliente actual y puede mostrarse de nuevo. Usa Rotar para reemplazarlo e invalidar los tokens emitidos con el secreto anterior.'
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    handleTabTrap(event)
-  }
 
   async function handleCopy() {
     if (!navigator.clipboard?.writeText) {
@@ -159,18 +138,19 @@ function CredentialDisclosureDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(next) => { if (!next) onClose() }}>
-      <DialogContent className="max-w-lg">
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          aria-describedby={descriptionId}
-          tabIndex={-1}
-          onKeyDown={handleKeyDown}
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => { if (!next) onClose() }}
+      focusTrapOptions={{
+        initialFocus: 'panel',
+        resolveReturnFocus: () => {
+          const info = triggerInfoRef.current
+          return info ? credentialTriggerFallback(info.mode, info.serviceAccountId) : null
+        }
+      }}
+    >
+      <DialogContent className="max-w-lg" aria-labelledby={titleId} aria-describedby={descriptionId}>
+        <div>
           <DialogHeader>
             <h2 id={titleId} className="text-lg font-semibold">
               {title}

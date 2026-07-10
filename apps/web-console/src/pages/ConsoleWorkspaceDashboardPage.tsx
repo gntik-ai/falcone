@@ -68,7 +68,7 @@ export function ConsoleWorkspaceDashboardPage() {
   }))
 
   return (
-    <main className="space-y-6">
+    <section className="space-y-6">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,34rem)] lg:items-start">
           <div className="min-w-0 space-y-2">
@@ -100,7 +100,7 @@ export function ConsoleWorkspaceDashboardPage() {
       </header>
       <QuotaConsumptionTable rows={quotaRows} title="Consumo del área de trabajo" />
       {capabilities ? <CapabilityStatusGrid capabilities={capabilities} /> : null}
-    </main>
+    </section>
   )
 }
 

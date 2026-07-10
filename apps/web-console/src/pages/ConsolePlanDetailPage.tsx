@@ -373,7 +373,7 @@ export function ConsolePlanDetailPage() {
   const deleteDisabled = controlsDisabled || deleteBlockedByActiveStatus
 
   return (
-    <main>
+    <section aria-labelledby="plan-detail-heading">
       <Tabs value={tab} onValueChange={(value) => setTab(value as PlanDetailTab)} className="gap-6">
       <header className="overflow-hidden rounded-3xl border border-border bg-card/70 shadow-sm">
         <div className="p-5 sm:p-6">
@@ -386,7 +386,7 @@ export function ConsolePlanDetailPage() {
                 </span>
               </div>
               <div className="space-y-2">
-                <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{plan.displayName}</h1>
+                <h1 id="plan-detail-heading" className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{plan.displayName}</h1>
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
                   Administra el estado del plan, sus límites base y las asignaciones que consumen este catálogo.
                 </p>
@@ -651,6 +651,6 @@ export function ConsolePlanDetailPage() {
         onConfirm={() => void destructiveOp.handleConfirm()}
         onCancel={destructiveOp.handleCancel}
       />
-    </main>
+    </section>
   )
 }

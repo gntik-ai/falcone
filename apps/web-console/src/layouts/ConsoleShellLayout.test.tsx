@@ -129,6 +129,7 @@ describe('ConsoleShellLayout', () => {
     const skipLink = screen.getByRole('link', { name: /saltar al contenido principal/i })
     expect(skipLink).toHaveAttribute('href', '#console-main-content')
     expect(screen.getByRole('main')).toHaveAttribute('id', 'console-main-content')
+    expect(screen.getAllByRole('main')).toHaveLength(1)
 
     await user.click(skipLink)
 

@@ -668,7 +668,7 @@ export function ConsoleKafkaPage() {
   const lagSummary = lagTone(topicMetadata.data?.lag?.totalLag)
 
   return (
-    <main className="space-y-6" data-testid="console-kafka-page">
+    <section className="space-y-6" data-testid="console-kafka-page">
       <section className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Kafka / Eventos</h1>
         <p className="text-sm text-muted-foreground">Tópicos, ACLs, metadatos operacionales, puentes y herramientas de publicación/flujo para el área de trabajo activa.</p>
@@ -1102,6 +1102,6 @@ export function ConsoleKafkaPage() {
           )}
         </section>
       </section>
-    </main>
+    </section>
   )
 }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
-import { useModalFocusTrap } from '@/components/console/hooks/useModalFocusTrap'
 import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -92,12 +91,7 @@ function validateValue(value: string): string | null {
   return null
 }
 
-// Accessible modal wrapper built on the shared Dialog primitive (which only renders the backdrop +
-// backdrop-click-to-close). This adds the modal a11y the primitive does not: role="dialog" +
-// aria-modal, an accessible name (aria-label) + description (aria-describedby), Escape-to-close,
-// focus-on-open, a Tab focus-trap, and focus-RETURN to the control that opened it on close, via the
-// shared `useModalFocusTrap` hook (also used by DestructiveConfirmationDialog and
-// ConsoleServiceAccountsPage's CredentialDisclosureDialog, #783). The accessible name is kept as an
+// Accessible modal wrapper built on the shared Dialog primitive. The accessible name is kept as an
 // aria-label so existing `getByRole('dialog', { name })` queries keep matching.
 function SecretDialog({
   open,
@@ -114,37 +108,14 @@ function SecretDialog({
   onClose: () => void
   children: ReactNode
 }) {
-  const { panelRef, handleTabTrap } = useModalFocusTrap<HTMLDivElement>(open)
-
   if (!open) {
     return null
   }
 
-  // Escape closes (unless an op is in flight); Tab-cycling is delegated to the shared trap.
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape' && !busy) {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    handleTabTrap(event)
-  }
-
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose() }}>
-      <DialogContent className="max-w-lg">
-        {/* DialogContent does not set the role/name, so the modal semantics live on this inner div
-            (also where the test's getByRole('dialog', { name }) resolves). */}
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={label}
-          aria-describedby={describedById}
-          tabIndex={-1}
-          onKeyDown={handleKeyDown}
-          className="focus:outline-none"
-        >
+      <DialogContent className="max-w-lg" aria-label={label} aria-describedby={describedById}>
+        <div>
           {children}
         </div>
       </DialogContent>

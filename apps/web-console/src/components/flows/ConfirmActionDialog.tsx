@@ -31,9 +31,7 @@ export function ConfirmActionDialog({
 }: ConfirmActionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        {/* DialogContent does not spread arbitrary props, so the test hook lives on an inner div. */}
-        <div data-testid="confirm-action-dialog">
+      <DialogContent className="max-w-md" data-testid="confirm-action-dialog">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -56,7 +54,6 @@ export function ConfirmActionDialog({
             {pending ? 'Trabajando…' : confirmLabel}
           </Button>
         </DialogFooter>
-        </div>
       </DialogContent>
     </Dialog>
   )
