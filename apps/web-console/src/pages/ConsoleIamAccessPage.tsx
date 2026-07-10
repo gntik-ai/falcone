@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
+import { describeConsoleError } from '@/lib/console-errors'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { ApiError, JsonValue } from '@/lib/http'
 
@@ -75,16 +76,12 @@ const IAM_ACCESS_ERROR_MESSAGES: Record<string, string> = {
   UNSUPPORTED_FIELD: 'La operación pidió campos IAM que este entorno todavía no puede aplicar.'
 }
 
-const RAW_KEYCLOAK_ERROR_PATTERN = /\bkeycloak\s+[A-Z]+\s+\/realms\/|\/admin\/realms\/|\/realms\/|\{[^{}]*(?:"error"|"errorMessage")\s*:/i
-
 function errMsg(error: unknown, fallback: string): string {
   const apiError = error as Partial<ApiError>
   const code = apiError?.code?.trim()
   if (code && IAM_ACCESS_ERROR_MESSAGES[code]) return IAM_ACCESS_ERROR_MESSAGES[code]
 
-  const message = apiError?.message?.trim()
-  if (!message || RAW_KEYCLOAK_ERROR_PATTERN.test(message)) return fallback
-  return message
+  return describeConsoleError(error, fallback)
 }
 
 function getUserId(user: IamUser): string {

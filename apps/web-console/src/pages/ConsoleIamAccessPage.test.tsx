@@ -386,7 +386,32 @@ describe('ConsoleIamAccessPage', () => {
     expect(alert).not.toHaveTextContent(/verbatim upstream body/i)
   })
 
-  it('falls back when an unknown IAM mutation error includes realm URL fragments', async () => {
+  it('uses shared localized error mapping for unmapped forbidden backend messages', async () => {
+    const user = userEvent.setup()
+    stubIamApi({
+      users: [createUser('usr-1', 'ada')],
+      roles: [createRole('tenant_admin')],
+      groups: [],
+      userRoles: { 'usr-1': [] },
+      userGroups: { 'usr-1': [] },
+      mutationError: {
+        status: 403,
+        code: 'FORBIDDEN',
+        message: 'requires superadmin'
+      }
+    })
+
+    render(<ConsoleIamAccessPage />)
+
+    await user.click(await screen.findByRole('button', { name: /ada/i }))
+    await user.selectOptions(await screen.findByLabelText(/rol a asignar/i), 'tenant_admin')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/no tienes permiso para ver este recurso/i)
+    expect(alert).not.toHaveTextContent(/requires superadmin/i)
+  })
+
+  it('uses shared status mapping when an unknown IAM mutation error includes realm URL fragments', async () => {
     const user = userEvent.setup()
     stubIamApi({
       users: [createUser('usr-1', 'ada')],
@@ -407,7 +432,7 @@ describe('ConsoleIamAccessPage', () => {
     await user.selectOptions(await screen.findByLabelText(/rol a asignar/i), 'tenant_admin')
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/la operación de iam no pudo completarse/i)
+    expect(alert).toHaveTextContent(/el servicio no está disponible/i)
     expect(alert).not.toHaveTextContent(/\/realms\//i)
     expect(alert).not.toHaveTextContent(/sso\.example\.test/i)
     expect(alert).not.toHaveTextContent(/verbatim upstream body/i)
