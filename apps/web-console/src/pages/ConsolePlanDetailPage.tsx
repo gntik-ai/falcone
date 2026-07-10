@@ -4,7 +4,7 @@ import { DestructiveConfirmationDialog } from '@/components/console/DestructiveC
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
 import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import { PlanCapabilityBadge } from '@/components/console/PlanCapabilityBadge'
-import { PlanLimitsTable } from '@/components/console/PlanLimitsTable'
+import { PlanLimitsTable, type PlanLimitRowStatus } from '@/components/console/PlanLimitsTable'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -17,6 +17,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 type PlanDetailTab = 'info' | 'capabilities' | 'limits' | 'tenants'
 type LimitFeedback = { kind: 'success' | 'error'; title: string; message: string } | null
 type ActionFeedback = { kind: 'success' | 'error'; title: string; message: string } | null
+type LimitMutationOptions = { showPageError?: boolean }
 type BusyPlanAction = `lifecycle:${api.PlanStatus}` | 'delete'
 type PlanLifecycleAction = {
   targetStatus: api.PlanStatus
@@ -96,6 +97,13 @@ function assignedTenantSummary(count: number | null): string {
   return `${count} organizaciones activas usan este plan.`
 }
 
+function affectedTenantResetSummary(count: number | null): string {
+  if (count === null) return 'El número de organizaciones afectadas no está disponible en este detalle.'
+  if (count === 0) return 'Actualmente no hay organizaciones activas afectadas.'
+  if (count === 1) return 'Afecta a 1 organización activa asignada a este plan.'
+  return `Afecta a ${count} organizaciones activas asignadas a este plan.`
+}
+
 function statusLabel(status: api.PlanStatus): string {
   return {
     draft: 'borrador',
@@ -112,6 +120,25 @@ function statusDisplayLabel(status: api.PlanStatus): string {
     deprecated: 'Obsoleto',
     archived: 'Archivado'
   }[status]
+}
+
+function limitEditingTitle(plan: api.PlanRecord, assignedTenantCount: number | null): string {
+  if (plan.status === 'draft') return 'Editando borrador'
+  if (plan.status === 'active') {
+    if (assignedTenantCount === 0) return 'Editando plan activo sin asignaciones'
+    return 'Editando plan activo'
+  }
+  return 'Límites de solo lectura'
+}
+
+function limitEditingDescription(plan: api.PlanRecord, assignedTenantCount: number | null): string {
+  if (plan.status === 'draft') {
+    return 'Estos cambios preparan el catálogo antes de asignarlo a organizaciones. Escribe un valor entero y usa Guardar para confirmar cada fila.'
+  }
+  if (plan.status === 'active') {
+    return `${affectedTenantResetSummary(assignedTenantCount)} Escribe un valor entero y usa Guardar para confirmar cada fila; Restablecer pide confirmación porque cambia derechos efectivos.`
+  }
+  return `El plan está ${statusLabel(plan.status)}; sus límites ya no aceptan edición desde esta vista.`
 }
 
 function getLifecycleAction(status: api.PlanStatus): PlanLifecycleAction | null {
@@ -174,6 +201,7 @@ export function ConsolePlanDetailPage() {
   const [actionFeedback, setActionFeedback] = useState<ActionFeedback>(null)
   const [busyPlanAction, setBusyPlanAction] = useState<BusyPlanAction | null>(null)
   const [busyDimensionKey, setBusyDimensionKey] = useState<string | null>(null)
+  const [limitRowStatuses, setLimitRowStatuses] = useState<Record<string, PlanLimitRowStatus | undefined>>({})
 
   const refreshLimitProfile = useCallback(async () => {
     const limits = await api.getPlanLimitsProfile(planId)
@@ -196,6 +224,7 @@ export function ConsolePlanDetailPage() {
         setError(null)
         setLimitFeedback(null)
         setActionFeedback(null)
+        setLimitRowStatuses({})
       } catch (fetchError) {
         if (!cancelled) setError(describeConsoleError(fetchError, 'No se pudo cargar el plan.'))
       }
@@ -216,20 +245,27 @@ export function ConsolePlanDetailPage() {
     }
   }
 
+  function setLimitRowStatus(key: string, status: PlanLimitRowStatus) {
+    setLimitRowStatuses((current) => ({ ...current, [key]: status }))
+  }
+
   async function handleLimitUpdate(key: string, value: number) {
     if (!plan) return
     setBusyDimensionKey(key)
+    setLimitRowStatus(key, { state: 'saving', message: 'Guardando' })
     setLimitFeedback(null)
     try {
       let result: api.PlanLimitSetResponse
       try {
         result = await api.setPlanLimit(plan.id, key, value)
       } catch (caught) {
+        const message = limitErrorMessage(caught)
         await restorePersistedLimitProfile()
+        setLimitRowStatus(key, { state: 'failed', message: 'No se guardó' })
         setLimitFeedback({
           kind: 'error',
           title: 'El límite no se guardó',
-          message: limitErrorMessage(caught)
+          message
         })
         return
       }
@@ -240,6 +276,7 @@ export function ConsolePlanDetailPage() {
       } catch {
         setProfile((current) => [...current])
       }
+      setLimitRowStatus(key, { state: 'saved', message: 'Guardado' })
       setLimitFeedback({
         kind: 'success',
         title: 'Límite guardado',
@@ -250,21 +287,28 @@ export function ConsolePlanDetailPage() {
     }
   }
 
-  async function handleLimitReset(key: string) {
+  async function handleLimitReset(key: string, options: LimitMutationOptions = {}) {
     if (!plan) return
+    const showPageError = options.showPageError ?? true
     setBusyDimensionKey(key)
+    setLimitRowStatus(key, { state: 'saving', message: 'Restableciendo' })
     setLimitFeedback(null)
     try {
       let result: api.PlanLimitRemoveResponse
       try {
         result = await api.removePlanLimit(plan.id, key)
       } catch (caught) {
+        const message = limitErrorMessage(caught)
         await restorePersistedLimitProfile()
+        setLimitRowStatus(key, { state: 'failed', message: 'No se restableció' })
         setLimitFeedback({
           kind: 'error',
           title: 'No se pudo restablecer el límite',
-          message: limitErrorMessage(caught)
+          message
         })
+        if (!showPageError) {
+          throw Object.assign(caught instanceof Error ? caught : new Error(message), { message, preLocalized: true })
+        }
         return
       }
 
@@ -274,6 +318,7 @@ export function ConsolePlanDetailPage() {
       } catch {
         setProfile((current) => [...current])
       }
+      setLimitRowStatus(key, { state: 'saved', message: 'Restablecido' })
       setLimitFeedback({
         kind: 'success',
         title: 'Límite restablecido',
@@ -282,6 +327,23 @@ export function ConsolePlanDetailPage() {
     } finally {
       setBusyDimensionKey(null)
     }
+  }
+
+  function openLimitResetConfirmation(dimension: api.LimitProfileRow) {
+    if (!plan) return
+    const activeCopy = plan.status === 'active'
+      ? `${affectedTenantResetSummary(activeAssignmentCount)} Las organizaciones verán el valor efectivo devuelto por el plan después de confirmar.`
+      : 'El plan no está activo; aun así, Restablecer elimina el valor explícito de esta dimensión.'
+
+    destructiveOp.openDialog({
+      level: 'WARNING',
+      operationId: `reset-plan-limit-${dimension.dimensionKey}`,
+      resourceName: dimension.displayLabel,
+      resourceType: 'límite del plan',
+      resourceId: plan.id,
+      impactDescription: `${activeCopy} La fila se reconciliará con el valor persistido que devuelva la API.`,
+      onConfirm: () => handleLimitReset(dimension.dimensionKey, { showPageError: false })
+    })
   }
 
   async function handleLifecycleTransition(targetStatus: api.PlanStatus, options: { showPageError?: boolean } = {}) {
@@ -595,10 +657,19 @@ export function ConsolePlanDetailPage() {
             <h2 className="text-sm font-semibold tracking-tight text-foreground">Límites base</h2>
             <p className="text-sm leading-6 text-muted-foreground">
               {limitEditingEnabled
-                ? 'Los cambios se guardan cuando el campo pierde el foco. Usa -1 para indicar sin límite.'
+                ? 'Usa -1 para indicar sin límite. Los cambios quedan como borrador local hasta que guardas la fila.'
                 : `Los límites son de solo lectura porque el plan está ${statusLabel(plan.status)}.`}
             </p>
           </div>
+          <Alert
+            variant={plan.status === 'active' ? 'warning' : 'default'}
+            role="status"
+            aria-live="polite"
+            className="text-foreground"
+          >
+            <AlertTitle>{limitEditingTitle(plan, activeAssignmentCount)}</AlertTitle>
+            <AlertDescription>{limitEditingDescription(plan, activeAssignmentCount)}</AlertDescription>
+          </Alert>
           {limitFeedback ? (
             <Alert
               variant={limitFeedback.kind === 'error' ? 'destructive' : 'success'}
@@ -615,8 +686,9 @@ export function ConsolePlanDetailPage() {
               dimensions={profile}
               editable={limitEditingEnabled}
               busyDimensionKey={busyDimensionKey}
+              rowStatuses={limitRowStatuses}
               onUpdate={handleLimitUpdate}
-              onRemove={handleLimitReset}
+              onResetRequest={openLimitResetConfirmation}
             />
           ) : (
             <p className="text-sm leading-6 text-muted-foreground">Este plan no tiene dimensiones de cuota configuradas.</p>

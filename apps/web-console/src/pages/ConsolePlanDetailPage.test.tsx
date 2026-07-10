@@ -23,7 +23,8 @@ const plan: PlanRecord = {
   description: 'Desc',
   status: 'active',
   capabilities: { api: true },
-  quotaDimensions: {}
+  quotaDimensions: {},
+  assignedTenantCount: 2
 }
 
 function limitRow(effectiveValue: number, source: LimitProfileRow['source'] = 'explicit'): LimitProfileRow {
@@ -52,11 +53,6 @@ async function openLimitsTab() {
   expect(await screen.findByText('Starter')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('tab', { name: /límites/i }))
   return screen.findByLabelText(/max workspaces: valor del límite/i) as Promise<HTMLInputElement>
-}
-
-async function tabPastLimitReset() {
-  await userEvent.tab()
-  await userEvent.tab()
 }
 
 const apiError = (status: number, code: string) => Object.assign(new Error(code), { status, code })
@@ -216,7 +212,54 @@ describe('ConsolePlanDetailPage', () => {
     expect(screen.queryByText('Catálogo listo')).not.toBeInTheDocument()
   })
 
-  it('shows an explicit error and restores the persisted value when the API rejects an edit', async () => {
+  it('[#769] shows the active assigned-plan warning on the Limits tab', async () => {
+    planApi.getPlan.mockResolvedValue({ ...plan, status: 'active', assignedTenantCount: 2 })
+
+    renderPage()
+    await openLimitsTab()
+
+    expect(screen.getByText(/editando plan activo/i)).toBeInTheDocument()
+    expect(screen.getByText(/afecta a 2 organizaciones activas/i)).toBeInTheDocument()
+  })
+
+  it('[#769] rejects decimal drafts locally and does not call the plan-limit API', async () => {
+    renderPage()
+    const input = await openLimitsTab()
+
+    await userEvent.clear(input)
+    await userEvent.type(input, '1.5')
+    await userEvent.tab()
+
+    expect(screen.getAllByText(/usa -1 para indicar sin límite/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /guardar límite de max workspaces/i })).toBeDisabled()
+    expect(planApi.setPlanLimit).not.toHaveBeenCalled()
+  })
+
+  it('[#769] requires the explicit Save button before committing a draft limit', async () => {
+    planApi.setPlanLimit.mockResolvedValue({
+      planId: 'p1',
+      dimensionKey: 'max_workspaces',
+      previousValue: 10,
+      newValue: 12,
+      source: 'explicit'
+    })
+
+    renderPage()
+    const input = await openLimitsTab()
+
+    await userEvent.clear(input)
+    await userEvent.type(input, '12')
+    await userEvent.tab()
+
+    expect(screen.getByText(/cambio sin guardar/i)).toBeInTheDocument()
+    expect(planApi.setPlanLimit).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: /guardar límite de max workspaces/i }))
+
+    await waitFor(() => expect(planApi.setPlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces', 12))
+  })
+
+  it('shows an explicit error and restores the persisted value when the API rejects an integer edit', async () => {
     planApi.getPlanLimitsProfile
       .mockResolvedValueOnce({ planId: 'p1', profile: [limitRow(10)] })
       .mockResolvedValueOnce({ planId: 'p1', profile: [limitRow(10)] })
@@ -226,16 +269,17 @@ describe('ConsolePlanDetailPage', () => {
     const input = await openLimitsTab()
 
     await userEvent.clear(input)
-    await userEvent.type(input, '1.5')
-    await tabPastLimitReset()
+    await userEvent.type(input, '12')
+    await userEvent.click(screen.getByRole('button', { name: /guardar límite de max workspaces/i }))
 
-    await waitFor(() => expect(planApi.setPlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces', 1.5))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid_limit_value/i)
+    await waitFor(() => expect(planApi.setPlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces', 12))
+    expect(await screen.findByText(/invalid_limit_value/i)).toBeInTheDocument()
     await waitFor(() => expect(input).toHaveValue(10))
+    expect(screen.getAllByText(/no se guardó/i).length).toBeGreaterThan(0)
     expect(screen.getByText('Explícito')).toBeInTheDocument()
   })
 
-  it('updates the row from accepted API data after a successful edit', async () => {
+  it('[#769] updates the row from accepted and refreshed API data after Save succeeds', async () => {
     planApi.getPlanLimitsProfile
       .mockResolvedValueOnce({ planId: 'p1', profile: [limitRow(10)] })
       .mockResolvedValueOnce({ planId: 'p1', profile: [limitRow(42)] })
@@ -252,15 +296,17 @@ describe('ConsolePlanDetailPage', () => {
 
     await userEvent.clear(input)
     await userEvent.type(input, '41')
-    await tabPastLimitReset()
+    await userEvent.click(screen.getByRole('button', { name: /guardar límite de max workspaces/i }))
 
     await waitFor(() => expect(planApi.setPlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces', 41))
-    expect(await screen.findByRole('status')).toHaveTextContent(/límite guardado/i)
+    expect(await screen.findByText(/límite guardado/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/guardado/i).length).toBeGreaterThan(0)
     await waitFor(() => expect(input).toHaveValue(42))
     expect(screen.getByText('Explícito')).toBeInTheDocument()
   })
 
-  it('shows the reverted default value without reload after reset succeeds', async () => {
+  it('[#769] confirms reset on an active assigned plan and reconciles to the persisted default', async () => {
+    planApi.getPlan.mockResolvedValue({ ...plan, status: 'active', assignedTenantCount: 2 })
     planApi.getPlanLimitsProfile
       .mockResolvedValueOnce({ planId: 'p1', profile: [limitRow(42)] })
       .mockResolvedValueOnce({ planId: 'p1', profile: [limitRow(5, 'default')] })
@@ -278,8 +324,14 @@ describe('ConsolePlanDetailPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /restablecer límite de max workspaces al valor predeterminado/i }))
 
+    expect(planApi.removePlanLimit).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('alertdialog', { name: /confirmar acción/i })
+    expect(dialog).toHaveTextContent(/afecta a 2 organizaciones activas asignadas a este plan/i)
+
+    await userEvent.click(screen.getByRole('button', { name: /^confirmar$/i }))
+
     await waitFor(() => expect(planApi.removePlanLimit).toHaveBeenCalledWith('p1', 'max_workspaces'))
-    expect(await screen.findByRole('status')).toHaveTextContent(/límite restablecido/i)
+    expect(await screen.findByText(/límite restablecido/i)).toBeInTheDocument()
     await waitFor(() => expect(input).toHaveValue(5))
     expect(screen.getByText('Predeterminado')).toBeInTheDocument()
   })
