@@ -54,6 +54,7 @@ interface IamApiState {
   loadErrorOnce?: boolean
   detailDelayUsers?: Record<string, Promise<void>>
   detailErrorUsers?: Record<string, unknown>
+  mutationDelay?: Promise<void>
 }
 
 describe('ConsoleIamAccessPage', () => {
@@ -345,6 +346,48 @@ describe('ConsoleIamAccessPage', () => {
     expect(screen.getByLabelText(/grupo a asignar/i)).toBeEnabled()
   })
 
+  it('keeps the newly selected user detail active when an earlier membership mutation finishes', async () => {
+    const user = userEvent.setup()
+    let releaseMutation: (() => void) | undefined
+    const pendingMutation = new Promise<void>((resolve) => {
+      releaseMutation = resolve
+    })
+    const apiState = stubIamApi({
+      users: [createUser('usr-1', 'ada'), createUser('usr-2', 'grace')],
+      roles: [createRole('tenant_admin')],
+      groups: [],
+      userRoles: { 'usr-1': [], 'usr-2': [] },
+      userGroups: { 'usr-1': [], 'usr-2': [] },
+      mutationDelay: pendingMutation
+    })
+
+    render(<ConsoleIamAccessPage />)
+
+    await user.click(await screen.findByRole('button', { name: /ada/i }))
+    await user.selectOptions(await screen.findByLabelText(/rol a asignar/i), 'tenant_admin')
+    await waitFor(() => {
+      expect(findMutationCall('POST', '/users/usr-1/role-assignments')).toBeDefined()
+    })
+
+    await user.click(screen.getByRole('button', { name: /grace/i }))
+    expect(await screen.findByRole('heading', { name: /acceso de grace/i })).toBeInTheDocument()
+    expect(await screen.findByText(/^sin roles\.$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/rol a asignar/i)).toBeDisabled()
+
+    releaseMutation?.()
+
+    await waitFor(() => {
+      expect(apiState.userRoles['usr-1']).toContain('tenant_admin')
+    })
+    await waitFor(() => {
+      expect(screen.getByLabelText(/rol a asignar/i)).toBeEnabled()
+    })
+    expect(screen.getByRole('heading', { name: /acceso de grace/i })).toBeInTheDocument()
+    expect(screen.getByText(/^sin roles\.$/i)).toBeInTheDocument()
+    expect(screen.queryByText(/cargando detalle/i)).not.toBeInTheDocument()
+    expect(detailRequestCount('usr-1')).toBe(2)
+  })
+
   it('searches and paginates users and renders empty search state with ConsolePageState affordances', async () => {
     const user = userEvent.setup()
     stubIamApi({
@@ -578,6 +621,7 @@ function stubIamApi(overrides: Partial<IamApiState> = {}) {
 
     if (url.endsWith('/role-assignments')) {
       if (state.mutationError) throw state.mutationError
+      await state.mutationDelay
       const userId = decodeURIComponent(url.match(/\/users\/([^/]+)\/role-assignments$/)?.[1] ?? '')
       const requestBody = objectBody(options?.body)
       const maybeRoles = requestBody.roles
@@ -597,6 +641,7 @@ function stubIamApi(overrides: Partial<IamApiState> = {}) {
     const groupMembershipMatch = url.match(/^\/v1\/iam\/realms\/tenant-alpha\/users\/([^/]+)\/groups\/([^/]+)$/)
     if (groupMembershipMatch) {
       if (state.mutationError) throw state.mutationError
+      await state.mutationDelay
       const userId = decodeURIComponent(groupMembershipMatch[1])
       const groupId = decodeURIComponent(groupMembershipMatch[2])
       if (method === 'PUT') {
@@ -611,6 +656,8 @@ function stubIamApi(overrides: Partial<IamApiState> = {}) {
 
     throw new Error(`unexpected request ${method} ${url}`)
   })
+
+  return state
 }
 
 function createUser(userId: string, username: string, overrides: Partial<IamUserFixture> = {}): IamUserFixture {
@@ -655,4 +702,15 @@ function findMutationCall(method: string, pathFragment: string) {
     const requestOptions = options as { method?: string } | undefined
     return typeof url === 'string' && url.includes(pathFragment) && requestOptions?.method === method
   })
+}
+
+function detailRequestCount(userId: string) {
+  return requestConsoleSessionJsonMock.mock.calls.filter(([url, options]) => {
+    const requestOptions = options as { method?: string } | undefined
+    return (
+      typeof url === 'string' &&
+      url.match(new RegExp(`/users/${userId}/(roles|groups)$`)) &&
+      (requestOptions?.method ?? 'GET') === 'GET'
+    )
+  }).length
 }

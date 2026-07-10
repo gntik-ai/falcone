@@ -127,6 +127,8 @@ export function ConsoleIamAccessPage() {
   const [createRoleForm, setCreateRoleForm] = useState({ name: '' })
   const [createGroupForm, setCreateGroupForm] = useState({ name: '' })
   const detailLoadSequenceRef = useRef(0)
+  const selectedUserIdRef = useRef<string | null>(selectedUserId)
+  const realmRef = useRef<string | null>(realm ?? null)
 
   const restoreFocus = useCallback((focusKey?: string | null) => {
     if (!focusKey) return
@@ -232,6 +234,7 @@ export function ConsoleIamAccessPage() {
   }, [restoreFocus])
 
   useEffect(() => {
+    realmRef.current = realm ?? null
     if (!realm) {
       setUsers([])
       setRoles([])
@@ -247,6 +250,10 @@ export function ConsoleIamAccessPage() {
     }
     void loadCatalog(realm)
   }, [realm, loadCatalog])
+
+  useEffect(() => {
+    selectedUserIdRef.current = selectedUserId
+  }, [selectedUserId])
 
   useEffect(() => {
     if (!realm || !selectedUserId) {
@@ -311,6 +318,7 @@ export function ConsoleIamAccessPage() {
   function selectUser(userId: string) {
     if (selectedUserId === userId) return
     detailLoadSequenceRef.current += 1
+    selectedUserIdRef.current = userId
     setSelectedUserId(userId)
     setDetailLoading(true)
     setDetailError(null)
@@ -420,13 +428,17 @@ export function ConsoleIamAccessPage() {
     success: string,
     options: { rethrow?: boolean } = {}
   ) {
-    if (!realm || !selectedUserId) return
+    const targetRealm = realm
+    const targetUserId = selectedUserId
+    if (!targetRealm || !targetUserId) return
     beginMutation()
     try {
       const requestOptions: { method: typeof method; body?: JsonValue } = { method }
       if (body !== undefined) requestOptions.body = body
       await requestConsoleSessionJson(path, requestOptions)
-      await loadUserDetail(realm, selectedUserId, { focusKey, successMessage: success })
+      if (realmRef.current === targetRealm && selectedUserIdRef.current === targetUserId) {
+        await loadUserDetail(targetRealm, targetUserId, { focusKey, successMessage: success })
+      }
     } catch (rawError) {
       setMutationError(errMsg(rawError, 'La operación de IAM no pudo completarse.'))
       if (!options.rethrow) {
