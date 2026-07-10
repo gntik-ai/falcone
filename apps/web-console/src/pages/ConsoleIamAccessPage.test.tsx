@@ -52,6 +52,7 @@ interface IamApiState {
   userGroups: Record<string, string[]>
   mutationError?: unknown
   loadErrorOnce?: boolean
+  detailDelayUsers?: Record<string, Promise<void>>
   detailErrorUsers?: Record<string, unknown>
 }
 
@@ -291,6 +292,10 @@ describe('ConsoleIamAccessPage', () => {
 
   it('clears stale membership controls when selected-user detail loading fails', async () => {
     const user = userEvent.setup()
+    let releaseGraceDetail: (() => void) | undefined
+    const graceDetailPending = new Promise<void>((resolve) => {
+      releaseGraceDetail = resolve
+    })
     const detailErrorUsers: Record<string, unknown> = {
       'usr-2': { status: 503, code: 'IAM_LIST_USER_ROLES_FAILED', message: 'detail backend unavailable' }
     }
@@ -300,6 +305,7 @@ describe('ConsoleIamAccessPage', () => {
       groups: [createGroup('grp-1', 'soporte')],
       userRoles: { 'usr-1': ['tenant_admin'], 'usr-2': [] },
       userGroups: { 'usr-1': ['grp-1'], 'usr-2': [] },
+      detailDelayUsers: { 'usr-2': graceDetailPending },
       detailErrorUsers
     })
 
@@ -310,6 +316,13 @@ describe('ConsoleIamAccessPage', () => {
     expect(await screen.findByRole('button', { name: /quitar de grupo soporte/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /grace/i }))
+
+    expect(await screen.findByText(/cargando detalle/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /quitar rol tenant_admin/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /quitar de grupo soporte/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/rol a asignar/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/grupo a asignar/i)).not.toBeInTheDocument()
+    releaseGraceDetail?.()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo cargar el detalle del usuario iam/i)
     expect(screen.queryByRole('button', { name: /quitar rol tenant_admin/i })).not.toBeInTheDocument()
@@ -508,11 +521,13 @@ function stubIamApi(overrides: Partial<IamApiState> = {}) {
     const detailMatch = url.match(/^\/v1\/iam\/realms\/tenant-alpha\/users\/([^/]+)\/(roles|groups)$/)
     if (method === 'GET' && detailMatch?.[2] === 'roles') {
       const userId = decodeURIComponent(detailMatch[1])
+      await state.detailDelayUsers?.[userId]
       if (state.detailErrorUsers?.[userId]) throw state.detailErrorUsers[userId]
       return collection((state.userRoles[userId] ?? []).map((roleName) => createRole(roleName)))
     }
     if (method === 'GET' && detailMatch?.[2] === 'groups') {
       const userId = decodeURIComponent(detailMatch[1])
+      await state.detailDelayUsers?.[userId]
       if (state.detailErrorUsers?.[userId]) throw state.detailErrorUsers[userId]
       const assignedGroupIds = state.userGroups[userId] ?? []
       return collection(state.groups.filter((group) => assignedGroupIds.includes(group.id)))

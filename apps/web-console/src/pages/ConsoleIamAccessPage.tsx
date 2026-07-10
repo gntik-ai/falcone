@@ -116,6 +116,7 @@ export function ConsoleIamAccessPage() {
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailLoadedUserId, setDetailLoadedUserId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -153,6 +154,7 @@ export function ConsoleIamAccessPage() {
       setUserRoles([])
       setUserGroups([])
       setDetailError(null)
+      setDetailLoadedUserId(null)
     }
 
     try {
@@ -197,6 +199,7 @@ export function ConsoleIamAccessPage() {
     detailLoadSequenceRef.current = detailLoadSequence
     setDetailLoading(true)
     setDetailError(null)
+    setDetailLoadedUserId(null)
     setMutationError(null)
     setUserRoles([])
     setUserGroups([])
@@ -210,6 +213,7 @@ export function ConsoleIamAccessPage() {
       setUserRoles(rolesRes.items ?? [])
       setUserGroups(groupsRes.items ?? [])
       setDetailError(null)
+      setDetailLoadedUserId(userId)
       if (options.successMessage) {
         setSuccessMessage(options.successMessage)
       }
@@ -218,6 +222,7 @@ export function ConsoleIamAccessPage() {
       if (detailLoadSequenceRef.current !== detailLoadSequence) return
       setUserRoles([])
       setUserGroups([])
+      setDetailLoadedUserId(null)
       setDetailError(errMsg(rawError, 'No se pudo cargar el detalle del usuario.'))
     } finally {
       if (detailLoadSequenceRef.current === detailLoadSequence) {
@@ -236,6 +241,7 @@ export function ConsoleIamAccessPage() {
       setUserRoles([])
       setUserGroups([])
       setDetailError(null)
+      setDetailLoadedUserId(null)
       setLoadError(null)
       return
     }
@@ -249,6 +255,7 @@ export function ConsoleIamAccessPage() {
       setUserRoles([])
       setUserGroups([])
       setDetailError(null)
+      setDetailLoadedUserId(null)
       return
     }
     void loadUserDetail(realm, selectedUserId)
@@ -299,6 +306,18 @@ export function ConsoleIamAccessPage() {
   function clearUserSearch() {
     setUserSearch('')
     restoreFocus('users-search')
+  }
+
+  function selectUser(userId: string) {
+    if (selectedUserId === userId) return
+    detailLoadSequenceRef.current += 1
+    setSelectedUserId(userId)
+    setDetailLoading(true)
+    setDetailError(null)
+    setDetailLoadedUserId(null)
+    setMutationError(null)
+    setUserRoles([])
+    setUserGroups([])
   }
 
   async function createUser(event: FormEvent) {
@@ -800,7 +819,7 @@ export function ConsoleIamAccessPage() {
                               <button
                                 type="button"
                                 data-focus-key={`user-row-${userId}`}
-                                onClick={() => setSelectedUserId(userId)}
+                                onClick={() => selectUser(userId)}
                                 className="text-left font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 aria-pressed={selected}
                               >
@@ -877,7 +896,7 @@ export function ConsoleIamAccessPage() {
                     description="Elige un usuario de la lista para gestionar su estado, roles y grupos."
                   />
                 </div>
-              ) : detailLoading ? (
+              ) : detailLoading || (!detailError && detailLoadedUserId !== getUserId(selectedUser)) ? (
                 <div className="mt-4">
                   <ConsolePageState
                     kind="loading"
