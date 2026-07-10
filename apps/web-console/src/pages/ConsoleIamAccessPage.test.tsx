@@ -52,6 +52,7 @@ interface IamApiState {
   userGroups: Record<string, string[]>
   mutationError?: unknown
   loadErrorOnce?: boolean
+  detailErrorUsers?: Record<string, unknown>
 }
 
 describe('ConsoleIamAccessPage', () => {
@@ -288,6 +289,36 @@ describe('ConsoleIamAccessPage', () => {
     })
   })
 
+  it('clears stale membership controls when selected-user detail loading fails', async () => {
+    const user = userEvent.setup()
+    stubIamApi({
+      users: [createUser('usr-1', 'ada'), createUser('usr-2', 'grace')],
+      roles: [createRole('tenant_admin')],
+      groups: [createGroup('grp-1', 'soporte')],
+      userRoles: { 'usr-1': ['tenant_admin'], 'usr-2': [] },
+      userGroups: { 'usr-1': ['grp-1'], 'usr-2': [] },
+      detailErrorUsers: {
+        'usr-2': { status: 503, code: 'IAM_LIST_USER_ROLES_FAILED', message: 'detail backend unavailable' }
+      }
+    })
+
+    render(<ConsoleIamAccessPage />)
+
+    await user.click(await screen.findByRole('button', { name: /ada/i }))
+    expect(await screen.findByRole('button', { name: /quitar rol tenant_admin/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /quitar de grupo soporte/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /grace/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo cargar el detalle del usuario iam/i)
+    expect(screen.queryByRole('button', { name: /quitar rol tenant_admin/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /quitar de grupo soporte/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/^sin roles\.$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^sin grupos\.$/i)).toBeInTheDocument()
+    expect(findMutationCall('DELETE', '/users/usr-2/role-assignments')).toBeUndefined()
+    expect(findMutationCall('DELETE', '/users/usr-2/groups/grp-1')).toBeUndefined()
+  })
+
   it('searches and paginates users and renders empty search state with ConsolePageState affordances', async () => {
     const user = userEvent.setup()
     stubIamApi({
@@ -464,10 +495,12 @@ function stubIamApi(overrides: Partial<IamApiState> = {}) {
     const detailMatch = url.match(/^\/v1\/iam\/realms\/tenant-alpha\/users\/([^/]+)\/(roles|groups)$/)
     if (method === 'GET' && detailMatch?.[2] === 'roles') {
       const userId = decodeURIComponent(detailMatch[1])
+      if (state.detailErrorUsers?.[userId]) throw state.detailErrorUsers[userId]
       return collection((state.userRoles[userId] ?? []).map((roleName) => createRole(roleName)))
     }
     if (method === 'GET' && detailMatch?.[2] === 'groups') {
       const userId = decodeURIComponent(detailMatch[1])
+      if (state.detailErrorUsers?.[userId]) throw state.detailErrorUsers[userId]
       const assignedGroupIds = state.userGroups[userId] ?? []
       return collection(state.groups.filter((group) => assignedGroupIds.includes(group.id)))
     }

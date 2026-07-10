@@ -10,8 +10,9 @@ those routes, the web console treats both platform IAM pages as superadmin-only:
 
 - the Auth and IAM Access navigation items are visible only to sessions whose `platformRoles` include
   `superadmin`;
-- direct non-superadmin access to `/console/auth` and `/console/iam-access` is redirected to
-  `/console/my-plan` before the platform IAM page mounts;
+- direct non-superadmin access to `/console/auth` and `/console/iam-access` renders an explicit
+  access-denied state inside the console shell, preserving the route and offering `/console/my-plan`
+  as a follow-up action;
 - neither page must be shown to tenant owners as an actionable destination that can only render `403
   requires superadmin`.
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AlertTriangle, Plus, RefreshCw, Search, Trash2, UserCheck, UserMinus, X } from 'lucide-react'
 
 import { ConsolePageState } from '@/components/console/ConsolePageState'
@@ -124,6 +124,7 @@ export function ConsoleIamAccessPage() {
   const [createUserForm, setCreateUserForm] = useState({ username: '', email: '', password: '', role: '' })
   const [createRoleForm, setCreateRoleForm] = useState({ name: '' })
   const [createGroupForm, setCreateGroupForm] = useState({ name: '' })
+  const detailLoadSequenceRef = useRef(0)
 
   const restoreFocus = useCallback((focusKey?: string | null) => {
     if (!focusKey) return
@@ -190,14 +191,19 @@ export function ConsoleIamAccessPage() {
     userId: string,
     options: { focusKey?: string; successMessage?: string } = {}
   ) => {
+    const detailLoadSequence = detailLoadSequenceRef.current + 1
+    detailLoadSequenceRef.current = detailLoadSequence
     setDetailLoading(true)
     setMutationError(null)
+    setUserRoles([])
+    setUserGroups([])
     try {
       const base = `/v1/iam/realms/${encodeURIComponent(realmId)}/users/${encodeURIComponent(userId)}`
       const [rolesRes, groupsRes] = await Promise.all([
         requestConsoleSessionJson<ListRolesResponse>(`${base}/roles`),
         requestConsoleSessionJson<ListGroupsResponse>(`${base}/groups`)
       ])
+      if (detailLoadSequenceRef.current !== detailLoadSequence) return
       setUserRoles(rolesRes.items ?? [])
       setUserGroups(groupsRes.items ?? [])
       if (options.successMessage) {
@@ -205,9 +211,14 @@ export function ConsoleIamAccessPage() {
       }
       restoreFocus(options.focusKey)
     } catch (rawError) {
+      if (detailLoadSequenceRef.current !== detailLoadSequence) return
+      setUserRoles([])
+      setUserGroups([])
       setMutationError(errMsg(rawError, 'No se pudo cargar el detalle del usuario.'))
     } finally {
-      setDetailLoading(false)
+      if (detailLoadSequenceRef.current === detailLoadSequence) {
+        setDetailLoading(false)
+      }
     }
   }, [restoreFocus])
 
@@ -228,6 +239,8 @@ export function ConsoleIamAccessPage() {
 
   useEffect(() => {
     if (!realm || !selectedUserId) {
+      detailLoadSequenceRef.current += 1
+      setDetailLoading(false)
       setUserRoles([])
       setUserGroups([])
       return
