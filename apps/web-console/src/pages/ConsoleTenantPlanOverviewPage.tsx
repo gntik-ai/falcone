@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { CapabilityStatusGrid } from '@/components/console/CapabilityStatusGrid'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTable'
+import { Alert } from '@/components/ui/alert'
 import { describeConsoleError } from '@/lib/console-errors'
 import { getConsolePlatformRoles, isTenantlessPlatformPrincipal } from '@/lib/console-principal'
 import { readConsoleShellSession } from '@/lib/console-session'
@@ -73,11 +75,14 @@ export function ConsoleTenantPlanOverviewPage() {
         </dl>
       </header>
       {overLimitDimensionCount > 0 ? (
-        <p role="status" className="rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 shadow-sm dark:text-amber-200">
-          {overLimitDimensionCount === 1
-            ? '1 dimensión está actualmente por encima del límite.'
-            : `${overLimitDimensionCount} dimensiones están actualmente por encima del límite.`}
-        </p>
+        <Alert variant="destructive" className="flex items-start gap-3 shadow-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            {overLimitDimensionCount === 1
+              ? '1 dimensión está actualmente por encima del límite.'
+              : `${overLimitDimensionCount} dimensiones están actualmente por encima del límite.`}
+          </p>
+        </Alert>
       ) : null}
       {limits.length ? (
         <QuotaConsumptionTable title="Cuotas efectivas actuales" rows={limits.map((item) => ({ dimensionKey: item.dimensionKey, displayLabel: item.displayLabel ?? item.dimensionKey, unit: item.unit, effectiveValue: item.effectiveValue ?? -1, source: 'plan', currentUsage: item.currentUsage ?? null, usageStatus: item.usageStatus, usageUnknownReason: item.usageUnknownReason }))} />

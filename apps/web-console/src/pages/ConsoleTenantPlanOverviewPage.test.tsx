@@ -50,6 +50,27 @@ describe('ConsoleTenantPlanOverviewPage', () => {
     expect(getEffectiveEntitlementsMock).toHaveBeenCalledWith(undefined, { includeConsumption: true })
   })
 
+  it('[#774] renders the aggregate over-limit banner as a destructive alert, not an amber warning', async () => {
+    readConsoleShellSessionMock.mockReturnValue(createSession({ platformRoles: ['tenant_owner'], tenantIds: ['ten_alpha'] }))
+    getEffectiveEntitlementsMock.mockResolvedValue({
+      tenantId: 'ten_alpha',
+      planSlug: 'starter',
+      planStatus: 'active',
+      quantitativeLimits: [{ dimensionKey: 'max_workspaces', displayLabel: 'Workspaces', unit: 'count', effectiveValue: 100, source: 'plan', quotaType: 'hard', currentUsage: 245, usageStatus: 'over_limit' }],
+      capabilities: []
+    })
+
+    render(<MemoryRouter><ConsoleTenantPlanOverviewPage /></MemoryRouter>)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/1 dimensión está actualmente por encima del límite/i)
+    expect(alert).toHaveClass('border-destructive/40')
+    expect(alert).toHaveClass('bg-destructive/10')
+    expect(alert.className).not.toMatch(/amber/)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', expect.stringMatching(/por encima del límite/i))
+    expect(screen.getAllByText(/por encima del límite/i).length).toBeGreaterThan(1)
+  })
+
   // Scenario 2 (issue #735): an absent/empty `quantitativeLimits` collection must render
   // a clear "no quotas" empty state instead of throwing when `.filter`/`.map` is called
   // on it. On main this ALSO errors identically to the populated case (undefined
