@@ -179,6 +179,43 @@ test('fix-759-11b: hash-only invitations do not trust caller-supplied maskedEmai
   assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
 });
 
+test('fix-759-11c: caller-supplied metadata cannot smuggle raw email or bindings', async () => {
+  const rawEmail = 'guest@example.com';
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    body: {
+      email: rawEmail,
+      role: 'workspace_viewer',
+      message: 'Hola',
+      workspaceId: 'wrk_alpha',
+      metadata: {
+        email: rawEmail,
+        maskedEmail: rawEmail,
+        targetBindings: [
+          { bindingType: 'tenant', bindingRef: 'ten_beta' },
+          { bindingType: 'workspace', bindingRef: 'wrk_beta' },
+        ],
+      },
+    },
+  }));
+
+  assert.equal(res.statusCode, 202);
+  const insert = store.calls.find(([name]) => name === 'insertInvitation');
+  assert.ok(insert, 'handler must persist an invitation record');
+  const invitation = insert[1];
+  assert.deepEqual(invitation.metadata, { message: 'Hola' });
+  assert.equal(JSON.stringify(invitation.metadata).includes(rawEmail), false);
+  assert.deepEqual(invitation.targetBindings, [
+    { bindingType: 'tenant', bindingRef: 'ten_alpha' },
+    { bindingType: 'workspace', bindingRef: 'wrk_alpha' },
+  ]);
+  assert.equal(
+    invitation.targetBindings.some((binding) => ['ten_beta', 'wrk_beta'].includes(binding.bindingRef)),
+    false,
+  );
+});
+
 test('fix-759-12: workspace admin can invite only for a verified workspace binding', async () => {
   const allowedStore = fakeStore();
   const allowed = await LOCAL_HANDLERS.createInvitation(ctx({

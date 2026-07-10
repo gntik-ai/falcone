@@ -343,9 +343,7 @@ function invitationBody(body, { tenantId, workspaceId, actorId }) {
   const message = typeof body.message === 'string' && body.message.trim()
     ? body.message.trim().slice(0, 500)
     : null;
-  const metadata = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
-    ? { ...body.metadata }
-    : {};
+  const metadata = {};
   if (message) metadata.message = message;
   const targetBindings = invitationTargetBindings({ tenantId, workspaceId, role });
   return {

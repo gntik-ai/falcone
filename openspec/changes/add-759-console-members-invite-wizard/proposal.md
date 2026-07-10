@@ -16,6 +16,9 @@ onboarding.
 - Hide both member-management actions for read-only roles and keep the existing read-only indicator.
 - Retarget the wizard to the canonical public route `POST /v1/tenants/{tenantId}/invitations` with
   `workspaceId` in the body, and add the missing deployed control-plane local handler for that route.
+- Derive persisted invitation target bindings from verified tenant/workspace scope and whitelist
+  invitation metadata so caller-supplied email, masked-email, or binding-shaped metadata cannot be
+  persisted.
 - Add focused page tests that open the wizard from Members, submit an invitation payload with
   email/role/message, and assert the flow never requires or posts a password.
 - Add a control-plane route/handler regression test so the invite flow cannot regress to a
@@ -29,7 +32,8 @@ onboarding.
 - `web-console`: ADDED requirement for `/console/members` to expose the invite-by-email member
   action through the existing invite wizard and permission matrix.
 - `iam`: ADDED requirement for the canonical tenant invitation route to accept console member
-  invitations and persist masked/hash invitation records.
+  invitations and persist masked/hash invitation records with server-derived bindings and
+  server-whitelisted metadata.
 
 ## Non-Goals
 
@@ -48,8 +52,8 @@ onboarding.
 ## Risks and Rollback
 
 - Risk is limited to the Members page action surface and the tenant invitation POST route. The
-  handler is additive, stores only masked email plus hash, and is gated by verified tenant/workspace
-  scope.
+  handler is additive, stores only masked email plus hash, derives bindings from verified
+  tenant/workspace scope, and whitelists persisted metadata.
 - Rollback is removing the `InviteUserWizard` mount and `Invitar usuario` button from
   `ConsoleMembersPage` and removing the additive invitation route while leaving the existing
   direct-create path intact.
