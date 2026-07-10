@@ -99,6 +99,10 @@ function normalizeForSearch(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase()
 }
 
+function isUserSuspended(user: IamUser): boolean {
+  return user.enabled === false || user.state === 'suspended' || user.state === 'disabled'
+}
+
 export function ConsoleIamAccessPage() {
   const { activeTenant, activeTenantId } = useConsoleContext()
   // Falcone tenancy model: the realm name == the tenantId.
@@ -276,6 +280,11 @@ export function ConsoleIamAccessPage() {
     setBusy(false)
   }
 
+  function clearUserSearch() {
+    setUserSearch('')
+    restoreFocus('users-search')
+  }
+
   async function createUser(event: FormEvent) {
     event.preventDefault()
     if (!realm) return
@@ -383,7 +392,9 @@ export function ConsoleIamAccessPage() {
       await loadUserDetail(realm, selectedUserId, { focusKey, successMessage: success })
     } catch (rawError) {
       setMutationError(errMsg(rawError, 'La operación de IAM no pudo completarse.'))
-      restoreFocus(focusKey)
+      if (!options.rethrow) {
+        restoreFocus(focusKey)
+      }
       if (options.rethrow) {
         throw rawError
       }
@@ -426,6 +437,7 @@ export function ConsoleIamAccessPage() {
       resourceType: 'usuario IAM',
       cascadeImpact: [],
       impactDescription: 'Se eliminará el usuario del realm activo y se retirarán sus roles y pertenencias a grupos.',
+      onSuccess: () => restoreFocus('users-search'),
       onConfirm: async () => {
         beginMutation()
         try {
@@ -457,6 +469,7 @@ export function ConsoleIamAccessPage() {
       resourceName: roleName,
       resourceType: 'rol asignado',
       impactDescription: `Se retirará el rol ${roleName} de ${selectedUser?.username ?? 'este usuario'}.`,
+      onSuccess: () => restoreFocus('assign-role'),
       onConfirm: () => mutateMembership(
         `${base}/role-assignments`,
         'DELETE',
@@ -477,6 +490,7 @@ export function ConsoleIamAccessPage() {
       resourceName: group.name,
       resourceType: 'pertenencia a grupo',
       impactDescription: `Se retirará ${selectedUser?.username ?? 'el usuario'} del grupo ${group.name}.`,
+      onSuccess: () => restoreFocus('assign-group'),
       onConfirm: () => mutateMembership(
         `${base}/groups/${encodeURIComponent(group.id)}`,
         'DELETE',
@@ -576,6 +590,9 @@ export function ConsoleIamAccessPage() {
                     data-focus-key="create-user-username"
                     value={createUserForm.username}
                     onChange={(event) => setCreateUserForm((current) => ({ ...current, username: event.target.value }))}
+                    autoComplete="username"
+                    aria-describedby="iam-create-user-help"
+                    disabled={busy}
                     placeholder="ada"
                   />
                 </div>
@@ -586,9 +603,15 @@ export function ConsoleIamAccessPage() {
                     type="email"
                     value={createUserForm.email}
                     onChange={(event) => setCreateUserForm((current) => ({ ...current, email: event.target.value }))}
+                    autoComplete="email"
+                    aria-describedby="iam-create-user-help"
+                    disabled={busy}
                     placeholder="ada@example.test"
                   />
                 </div>
+                <p id="iam-create-user-help" className="text-xs leading-5 text-muted-foreground">
+                  Indica usuario, email o ambos; el realm aceptará el identificador disponible.
+                </p>
                 <div className="space-y-1.5">
                   <Label htmlFor="iam-create-user-password">Contraseña temporal</Label>
                   <Input
@@ -596,6 +619,8 @@ export function ConsoleIamAccessPage() {
                     type="password"
                     value={createUserForm.password}
                     onChange={(event) => setCreateUserForm((current) => ({ ...current, password: event.target.value }))}
+                    autoComplete="new-password"
+                    disabled={busy}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -632,6 +657,8 @@ export function ConsoleIamAccessPage() {
                     data-focus-key="create-role-name"
                     value={createRoleForm.name}
                     onChange={(event) => setCreateRoleForm({ name: event.target.value })}
+                    autoComplete="off"
+                    disabled={busy}
                     placeholder="tenant_support"
                     required
                   />
@@ -656,6 +683,8 @@ export function ConsoleIamAccessPage() {
                     data-focus-key="create-group-name"
                     value={createGroupForm.name}
                     onChange={(event) => setCreateGroupForm({ name: event.target.value })}
+                    autoComplete="off"
+                    disabled={busy}
                     placeholder="soporte"
                     required
                   />
@@ -674,12 +703,12 @@ export function ConsoleIamAccessPage() {
                 <div>
                   <h2 id="iam-users-heading" className="text-lg font-semibold">Usuarios ({filteredUsers.length})</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {userTotal > users.length ? `${users.length} de ${userTotal} cargados.` : 'Busca y pagina el inventario del realm activo.'}
+                    {loading ? 'Actualizando inventario…' : userTotal > users.length ? `${users.length} de ${userTotal} cargados.` : 'Busca y pagina el inventario del realm activo.'}
                   </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" disabled={loading || busy} onClick={() => void loadCatalog(realm, { preserveSelection: true, focusKey: 'users-search' })}>
-                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                  Recargar
+                <Button type="button" variant="outline" size="sm" disabled={loading || busy} aria-busy={loading} onClick={() => void loadCatalog(realm, { preserveSelection: true, focusKey: 'users-search' })}>
+                  <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} aria-hidden="true" />
+                  {loading ? 'Recargando…' : 'Recargar'}
                 </Button>
               </div>
 
@@ -694,11 +723,14 @@ export function ConsoleIamAccessPage() {
                       className="pl-9"
                       value={userSearch}
                       onChange={(event) => setUserSearch(event.target.value)}
+                      type="search"
+                      autoComplete="off"
+                      aria-describedby="iam-users-pagination-status"
                       placeholder="Usuario, email o id"
                     />
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+                <p id="iam-users-pagination-status" className="text-sm text-muted-foreground" role="status" aria-live="polite">
                   Página {currentPage + 1} de {totalPages}
                 </p>
               </div>
@@ -722,7 +754,7 @@ export function ConsoleIamAccessPage() {
                     title="Sin resultados"
                     description="No hay usuarios que coincidan con la búsqueda actual."
                     actionLabel="Limpiar búsqueda"
-                    onAction={() => setUserSearch('')}
+                    onAction={clearUserSearch}
                   />
                 </div>
               ) : null}
@@ -742,7 +774,7 @@ export function ConsoleIamAccessPage() {
                       {pagedUsers.map((user) => {
                         const userId = getUserId(user)
                         const selected = selectedUserId === userId
-                        const suspended = user.enabled === false || user.state === 'suspended' || user.state === 'disabled'
+                        const suspended = isUserSuspended(user)
                         return (
                           <TableRow key={userId} className={selected ? 'bg-primary/10' : undefined}>
                             <TableCell>
@@ -798,10 +830,10 @@ export function ConsoleIamAccessPage() {
                       Mostrando {currentPage * USERS_PAGE_SIZE + 1}-{Math.min((currentPage + 1) * USERS_PAGE_SIZE, filteredUsers.length)} de {filteredUsers.length}
                     </p>
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setUserPage((page) => Math.max(0, page - 1))}>
+                      <Button type="button" variant="outline" size="sm" disabled={currentPage === 0} aria-label="Página anterior de usuarios" onClick={() => setUserPage((page) => Math.max(0, page - 1))}>
                         Anterior
                       </Button>
-                      <Button type="button" variant="outline" size="sm" disabled={currentPage >= totalPages - 1} onClick={() => setUserPage((page) => Math.min(totalPages - 1, page + 1))}>
+                      <Button type="button" variant="outline" size="sm" disabled={currentPage >= totalPages - 1} aria-label="Página siguiente de usuarios" onClick={() => setUserPage((page) => Math.min(totalPages - 1, page + 1))}>
                         Siguiente
                       </Button>
                     </div>
@@ -837,8 +869,8 @@ export function ConsoleIamAccessPage() {
                       <p className="text-sm font-medium text-foreground">{selectedUser.email ?? 'sin email'}</p>
                       <p className="mt-1 font-mono text-xs text-muted-foreground">{getUserId(selectedUser)}</p>
                     </div>
-                    <Badge variant={selectedUser.enabled ? 'secondary' : 'outline'}>
-                      {selectedUser.enabled ? 'activo' : 'suspendido'}
+                    <Badge variant={isUserSuspended(selectedUser) ? 'outline' : 'secondary'}>
+                      {isUserSuspended(selectedUser) ? 'suspendido' : 'activo'}
                     </Badge>
                   </div>
 
@@ -848,10 +880,10 @@ export function ConsoleIamAccessPage() {
                       variant="outline"
                       data-focus-key={`status-user-detail-${getUserId(selectedUser)}`}
                       disabled={busy}
-                      onClick={() => void setUserStatus(selectedUser, !selectedUser.enabled, `status-user-detail-${getUserId(selectedUser)}`)}
+                      onClick={() => void setUserStatus(selectedUser, isUserSuspended(selectedUser), `status-user-detail-${getUserId(selectedUser)}`)}
                     >
-                      {selectedUser.enabled ? <UserMinus className="h-4 w-4" aria-hidden="true" /> : <UserCheck className="h-4 w-4" aria-hidden="true" />}
-                      {selectedUser.enabled ? 'Suspender usuario' : 'Habilitar usuario'}
+                      {isUserSuspended(selectedUser) ? <UserCheck className="h-4 w-4" aria-hidden="true" /> : <UserMinus className="h-4 w-4" aria-hidden="true" />}
+                      {isUserSuspended(selectedUser) ? 'Habilitar usuario' : 'Suspender usuario'}
                     </Button>
                     <Button
                       type="button"

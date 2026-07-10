@@ -193,6 +193,29 @@ describe('ConsoleIamAccessPage', () => {
     })
   })
 
+  it('uses the IAM state field for stale suspended users in the detail controls', async () => {
+    const user = userEvent.setup()
+    stubIamApi({
+      users: [createUser('usr-1', 'ada', { enabled: true, state: 'suspended' })],
+      roles: [],
+      groups: [],
+      userRoles: { 'usr-1': [] },
+      userGroups: { 'usr-1': [] }
+    })
+
+    render(<ConsoleIamAccessPage />)
+
+    await user.click(await screen.findByRole('button', { name: /ada/i }))
+    await user.click(await screen.findByRole('button', { name: /^habilitar usuario$/i }))
+
+    await waitFor(() => {
+      expect(requestConsoleSessionJsonMock).toHaveBeenCalledWith(
+        '/v1/iam/realms/tenant-alpha/users/usr-1/status',
+        expect.objectContaining({ method: 'PATCH', body: { enabled: true } })
+      )
+    })
+  })
+
   it('requires confirmation before removing role and group memberships', async () => {
     const user = userEvent.setup()
     stubIamApi({
@@ -215,6 +238,12 @@ describe('ConsoleIamAccessPage', () => {
     await waitFor(() => {
       expect(findMutationCall('DELETE', '/role-assignments')).toBeDefined()
     })
+    await waitFor(() => {
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.getByLabelText(/rol a asignar/i)).toHaveFocus()
+    })
 
     await user.click(await screen.findByRole('button', { name: /quitar de grupo soporte/i }))
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
@@ -222,6 +251,12 @@ describe('ConsoleIamAccessPage', () => {
     await user.click(screen.getByRole('button', { name: /^confirmar$/i }))
     await waitFor(() => {
       expect(findMutationCall('DELETE', '/groups/grp-1')).toBeDefined()
+    })
+    await waitFor(() => {
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.getByLabelText(/grupo a asignar/i)).toHaveFocus()
     })
   })
 
@@ -253,6 +288,9 @@ describe('ConsoleIamAccessPage', () => {
     expect(await screen.findByText(/sin resultados/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /limpiar búsqueda/i }))
     expect(screen.getByLabelText(/buscar usuarios/i)).toHaveValue('')
+    await waitFor(() => {
+      expect(screen.getByLabelText(/buscar usuarios/i)).toHaveFocus()
+    })
   })
 
   it('uses ConsolePageState for load failures and retries the catalog request', async () => {

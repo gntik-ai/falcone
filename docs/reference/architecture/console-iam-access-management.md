@@ -30,8 +30,9 @@ DELETE until the superadmin confirms. User deletion also uses the destructive co
 The users list is searchable and paginated on the client after loading the realm inventory. Initial
 loading, empty, and load-error states use `ConsolePageState`; load failures expose a retry action.
 Successful mutations render a polite `aria-live` success announcement and restore keyboard focus to
-the initiating control after the post-mutation refetch, so keyboard and screen-reader users remain
-oriented.
+the initiating control, or to the next relevant selector when the initiating chip/button disappears
+after a membership removal, so keyboard and screen-reader users remain oriented after the
+post-mutation refetch.
 
 ## Contract note
 
