@@ -7,11 +7,15 @@ const rows = [{ dimensionKey: 'requests', displayLabel: 'Requests', effectiveVal
 
 describe('PlanLimitsTable', () => {
   it('renders unlimited and editable states', () => {
-    const onRemove = vi.fn()
-    render(<PlanLimitsTable dimensions={rows} editable onRemove={onRemove} />)
+    const onResetRequest = vi.fn()
+    render(<PlanLimitsTable dimensions={rows} editable onResetRequest={onResetRequest} />)
     expect(screen.getByLabelText(/requests: valor del límite/i)).toBeInTheDocument()
+    expect(screen.getByText('Explícito')).toBeInTheDocument()
+    expect(screen.getByText('Persistido')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /guardar límite de requests/i })).toBeDisabled()
     screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i }).click()
-    expect(onRemove).toHaveBeenCalledWith('requests')
+    expect(onResetRequest).toHaveBeenCalledWith(rows[0])
   })
 
   it('resets the visible input when refreshed dimensions change', async () => {
@@ -26,17 +30,61 @@ describe('PlanLimitsTable', () => {
     expect(input).toHaveValue(10)
   })
 
-  it('does not submit a draft edit before a pointer reset', async () => {
+  it('requires the explicit save affordance before submitting a draft edit', async () => {
     const user = userEvent.setup()
     const onUpdate = vi.fn()
-    const onRemove = vi.fn()
 
     render(
       <PlanLimitsTable
         dimensions={[{ ...rows[0], effectiveValue: 10 }]}
         editable
         onUpdate={onUpdate}
-        onRemove={onRemove}
+      />
+    )
+
+    const input = screen.getByLabelText(/requests: valor del límite/i)
+    await user.clear(input)
+    await user.type(input, '12')
+    expect(screen.getByText(/cambio sin guardar/i)).toBeInTheDocument()
+
+    await user.tab()
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /guardar límite de requests/i }))
+    expect(onUpdate).toHaveBeenCalledWith('requests', 12)
+  })
+
+  it('blocks decimal drafts locally and does not call update', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn()
+    render(
+      <PlanLimitsTable
+        dimensions={[{ ...rows[0], effectiveValue: 10 }]}
+        editable
+        onUpdate={onUpdate}
+      />
+    )
+
+    const input = screen.getByLabelText(/requests: valor del límite/i)
+    await user.clear(input)
+    await user.type(input, '1.5')
+    expect(input).toHaveValue(1.5)
+    expect(screen.getAllByText(/usa -1 para indicar sin límite/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /guardar límite de requests/i })).toBeDisabled()
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it('does not submit a draft edit before a reset request', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn()
+    const onResetRequest = vi.fn()
+
+    render(
+      <PlanLimitsTable
+        dimensions={[{ ...rows[0], effectiveValue: 10 }]}
+        editable
+        onUpdate={onUpdate}
+        onResetRequest={onResetRequest}
       />
     )
 
@@ -46,63 +94,10 @@ describe('PlanLimitsTable', () => {
     await user.click(screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i }))
 
     expect(onUpdate).not.toHaveBeenCalled()
-    expect(onRemove).toHaveBeenCalledWith('requests')
+    expect(onResetRequest).toHaveBeenCalledWith({ ...rows[0], effectiveValue: 10 })
   })
 
-  it('does not submit a draft edit when keyboard focus moves to reset before activation', async () => {
-    const user = userEvent.setup()
-    const onUpdate = vi.fn()
-    const onRemove = vi.fn()
-
-    render(
-      <PlanLimitsTable
-        dimensions={[{ ...rows[0], effectiveValue: 10 }]}
-        editable
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-      />
-    )
-
-    const input = screen.getByLabelText(/requests: valor del límite/i)
-    await user.clear(input)
-    await user.type(input, '12')
-    await user.tab()
-
-    const resetButton = screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i })
-    expect(resetButton).toHaveFocus()
-    expect(onUpdate).not.toHaveBeenCalled()
-
-    await user.keyboard('{Enter}')
-
-    expect(onUpdate).not.toHaveBeenCalled()
-    expect(onRemove).toHaveBeenCalledWith('requests')
-  })
-
-  it('submits a keyboard draft when focus leaves reset without activation', async () => {
-    const user = userEvent.setup()
-    const onUpdate = vi.fn()
-    const onRemove = vi.fn()
-
-    render(
-      <PlanLimitsTable
-        dimensions={[{ ...rows[0], effectiveValue: 10 }]}
-        editable
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-      />
-    )
-
-    const input = screen.getByLabelText(/requests: valor del límite/i)
-    await user.clear(input)
-    await user.type(input, '12')
-    await user.tab()
-    await user.tab()
-
-    expect(onRemove).not.toHaveBeenCalled()
-    expect(onUpdate).toHaveBeenCalledWith('requests', 12)
-  })
-
-  it('restores the persisted value when an empty draft loses focus', async () => {
+  it('marks an empty draft invalid without submitting on blur', async () => {
     const user = userEvent.setup()
     const onUpdate = vi.fn()
 
@@ -112,15 +107,23 @@ describe('PlanLimitsTable', () => {
     await user.clear(input)
     await user.tab()
 
+    expect(screen.getByText(/introduce -1/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /guardar límite de requests/i })).toBeDisabled()
     expect(onUpdate).not.toHaveBeenCalled()
-    expect(input).toHaveValue(10)
   })
 
   it('makes the busy row state explicit', () => {
-    render(<PlanLimitsTable dimensions={[{ ...rows[0], effectiveValue: 10 }]} editable busyDimensionKey="requests" />)
+    render(
+      <PlanLimitsTable
+        dimensions={[{ ...rows[0], effectiveValue: 10 }]}
+        editable
+        busyDimensionKey="requests"
+        rowStatuses={{ requests: { state: 'saving', message: 'Restableciendo' } }}
+      />
+    )
 
     expect(screen.getByLabelText(/requests: valor del límite/i)).toBeDisabled()
     expect(screen.getByRole('button', { name: /guardando límite de requests/i })).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent(/guardando límite de requests/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/restableciendo/i)
   })
 })
