@@ -15,6 +15,12 @@ const mockDeleteSecret = vi.fn()
 const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({
+  getConsoleContextStatusBadgeClasses: (tone: 'healthy' | 'warning' | 'restricted' | 'neutral') => {
+    if (tone === 'restricted') return 'border-destructive/40 bg-destructive/10 text-red-300'
+    if (tone === 'warning') return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+    if (tone === 'healthy') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+    return 'border-border bg-muted/40 text-muted-foreground'
+  },
   useConsoleContext: () => mockUseConsoleContext()
 }))
 vi.mock('@/lib/console-session', () => ({
@@ -132,6 +138,10 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     renderPage()
 
     expect(await screen.findByText('db_password')).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: /secretos de función/i })
+    expect(table).toHaveAttribute('data-slot', 'table')
+    const removedHardWidthClass = ['min-w', '[64rem]'].join('-')
+    expect(table.className).not.toContain(removedHardWidthClass)
     // Derived UPPER_SNAKE env-var name is shown.
     expect(screen.getByText('DB_PASSWORD')).toBeInTheDocument()
     // refCount + description render; there is NO version column and NO value anywhere.
@@ -165,6 +175,23 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     expect(document.body.textContent).not.toContain('super-secret-value')
   })
 
+  it('[#772] reports name and value validation per field in one submit', async () => {
+    renderPage()
+    await screen.findByText(/no hay secretos/i)
+    const nameInput = screen.getByLabelText(/nombre del secreto/i)
+    const valueInput = screen.getByLabelText(/^valor del secreto$/i)
+
+    await userEvent.click(screen.getByRole('button', { name: /crear secreto/i }))
+
+    const nameError = screen.getByText(/el nombre del secreto es obligatorio/i)
+    const valueError = screen.getByText(/el valor del secreto es obligatorio/i)
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true')
+    expect(valueInput).toHaveAttribute('aria-invalid', 'true')
+    expect(nameInput.getAttribute('aria-describedby')).toContain(nameError.id)
+    expect(valueInput.getAttribute('aria-describedby')).toContain(valueError.id)
+    expect(mockCreateSecret).not.toHaveBeenCalled()
+  })
+
   it('blocks an invalid secret name client-side and issues no create request', async () => {
     renderPage()
     await screen.findByText(/no hay secretos/i)
@@ -185,17 +212,36 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     expect(await screen.findByTestId('workspace-secrets-create-error')).toHaveTextContent(/ya existe un secreto/i)
   })
 
-  it('delete confirmation shows the reference-safety warning (with the count when > 0)', async () => {
+  it('[#772] requires type-to-confirm delete and shows referenced functions in the shared destructive dialog', async () => {
     mockListSecrets.mockResolvedValue({ items: [secret({ resolvedRefCount: 3 })], page: { size: 1 } })
     mockDeleteSecret.mockResolvedValue({ name: 'db_password', deleted: true })
     renderPage()
 
     // Row action carries a per-secret accessible name so screen-reader users can tell rows apart.
     await userEvent.click(await screen.findByRole('button', { name: /eliminar el secreto db_password/i }))
-    const dialog = screen.getByRole('dialog', { name: /eliminar secreto/i })
-    expect(within(dialog).getByTestId('workspace-secrets-delete-warning')).toHaveTextContent(/3 función/i)
-    await userEvent.click(within(dialog).getByRole('button', { name: /eliminar secreto/i }))
+    const dialog = screen.getByRole('alertdialog', { name: /eliminar secreto del área de trabajo/i })
+    expect(dialog).toHaveTextContent(/3 función/i)
+    expect(dialog).toHaveTextContent(/funciones que lo usan\s*\/\s*3/i)
+    const confirmButton = within(dialog).getByRole('button', { name: /^eliminar$/i })
+    expect(confirmButton).toBeDisabled()
+    await userEvent.type(within(dialog).getByLabelText(/escribe exactamente el nombre/i), 'db_password')
+    expect(confirmButton).toBeEnabled()
+    await userEvent.click(confirmButton)
     await waitFor(() => expect(mockDeleteSecret).toHaveBeenCalledWith('wrk_alpha', 'db_password'))
+    const feedback = await screen.findByTestId('workspace-secrets-table-feedback')
+    expect(feedback).toHaveTextContent(/eliminado/i)
+    expect(feedback).toHaveAttribute('role', 'status')
+    expect(feedback).toHaveAttribute('aria-live', 'polite')
+  })
+
+  it('[#772] requires type-to-confirm delete in production even when no references are currently detected', async () => {
+    mockListSecrets.mockResolvedValue({ items: [secret({ resolvedRefCount: 0 })], page: { size: 1 } })
+    renderPage(context({ activeWorkspace: { label: 'App Prod', environment: 'production' } }))
+
+    await userEvent.click(await screen.findByRole('button', { name: /eliminar el secreto db_password/i }))
+    const dialog = screen.getByRole('alertdialog', { name: /eliminar secreto del área de trabajo/i })
+    expect(dialog).toHaveTextContent(/producción/i)
+    expect(within(dialog).getByRole('button', { name: /^eliminar$/i })).toBeDisabled()
   })
 
   it('replace never pre-fills the value field and clears it after a successful submit', async () => {
@@ -210,9 +256,20 @@ describe('ConsoleWorkspaceSecretsPage', () => {
     const valueInput = within(dialog).getByLabelText(/nuevo valor del secreto/i) as HTMLInputElement
     // Never pre-filled from a read.
     expect(valueInput.value).toBe('')
+    const replaceButton = within(dialog).getByRole('button', { name: /^reemplazar$/i })
+    await userEvent.click(replaceButton)
+    const validation = await within(dialog).findByText(/el valor del secreto es obligatorio/i)
+    expect(valueInput).toHaveAttribute('aria-invalid', 'true')
+    expect(valueInput.getAttribute('aria-describedby')).toContain(validation.id)
+    expect(mockUpdateSecret).not.toHaveBeenCalled()
     await userEvent.type(valueInput, 'rotated-value')
-    await userEvent.click(within(dialog).getByRole('button', { name: /^reemplazar$/i }))
+    expect(valueInput).not.toHaveAttribute('aria-invalid')
+    await userEvent.click(replaceButton)
     await waitFor(() => expect(mockUpdateSecret).toHaveBeenCalledWith('wrk_alpha', 'db_password', { secretValue: 'rotated-value' }))
+    const feedback = await screen.findByTestId('workspace-secrets-row-feedback')
+    expect(feedback).toHaveTextContent(/reemplazado/i)
+    expect(feedback).toHaveAttribute('role', 'status')
+    expect(feedback).toHaveAttribute('aria-live', 'polite')
     expect(document.body.textContent).not.toContain('rotated-value')
   })
 
@@ -235,7 +292,10 @@ describe('ConsoleWorkspaceSecretsPage', () => {
 
   it('shows a production stage badge for a production-environment workspace', async () => {
     renderPage(context({ activeWorkspace: { label: 'App Prod', environment: 'production' } }))
-    expect(await screen.findByTestId('workspace-secrets-stage-badge')).toHaveTextContent(/producción/i)
+    const badge = await screen.findByTestId('workspace-secrets-stage-badge')
+    expect(badge).toHaveTextContent(/producción/i)
+    expect(badge.className).toContain('bg-destructive/10')
+    expect(badge.className).toContain('text-red-300')
   })
 
   it('submits the create form on Enter (real <form onSubmit>)', async () => {
@@ -268,7 +328,9 @@ describe('ConsoleWorkspaceSecretsPage', () => {
 
     const live = container.querySelector('[aria-live="polite"]') as HTMLElement
     await waitFor(() => expect(live).toHaveTextContent(/creado/i))
-    expect(live.textContent).not.toContain('super-secret-value')
+    const status = within(live).getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status.textContent).not.toContain('super-secret-value')
   })
 
   it('replace and delete dialogs expose aria-modal and close on Escape', async () => {
@@ -284,10 +346,10 @@ describe('ConsoleWorkspaceSecretsPage', () => {
 
     // Delete dialog: same modal contract; Escape dismisses without calling the API.
     await userEvent.click(await screen.findByRole('button', { name: /eliminar el secreto/i }))
-    const deleteDialog = screen.getByRole('dialog', { name: /eliminar secreto/i })
+    const deleteDialog = screen.getByRole('alertdialog', { name: /confirmar acción/i })
     expect(deleteDialog).toHaveAttribute('aria-modal', 'true')
     await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /eliminar secreto/i })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(mockDeleteSecret).not.toHaveBeenCalled()
   })
 

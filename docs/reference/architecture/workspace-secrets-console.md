@@ -121,18 +121,45 @@ install is unchanged. The console renders this as a **first-class "secrets backe
 state** (a single informational panel, not a repeating error toast). The kind profile enables the
 backend via the self-signed TLS path (`deploy/kind/values-kind-vault.yaml`).
 
-## Pre-delete reference-safety warning
+## Pre-delete confirmation and reference-safety
 
 Function deploy **silently skips** a missing secret reference, so deleting a referenced secret can
-silently break a function's environment on its next deploy. Before deleting, the screen shows a
-confirmation with a **reference-safety warning**:
+silently break a function's environment on its next deploy. Before deleting, the screen routes the
+operation through the shared `DestructiveConfirmationDialog`:
 
-- when `resolvedRefCount` is greater than zero, it states the number of referencing functions and
-  that deleting the secret removes the injected env var on their next deploy;
-- otherwise it shows a generic warning ("deleting this secret may break functions that reference it
-  on their next deploy").
+- when `resolvedRefCount` is greater than zero, the dialog is **critical**, requires the operator
+  to type the secret name, and lists the referencing function count in the cascade-impact section;
+- when the active workspace is production (`production` or `prod`), the dialog is also **critical**
+  and requires type-to-confirm even if no references are currently detected;
+- otherwise the same shared dialog is used at warning level, keeping the confirmation semantics and
+  error handling consistent with storage buckets, service accounts, functions, plans, and other
+  high-consequence console actions.
 
 Deletion is never blocked by the reference count — the warning is advisory.
+
+The page owns the function-reference count; there is no separate admin cascade-impact endpoint for
+workspace-secret metadata. The console passes that count as a static cascade-impact summary to the
+shared destructive-operation hook so the canonical dialog can present it without issuing a synthetic
+admin request.
+
+## Console UX and accessibility hardening
+
+The Workspace Secrets page follows the shared console UX conventions for page-level and row-level
+state:
+
+- an in-page breadcrumb (`Áreas de trabajo > <workspace> > Secretos`) mirrors the shell breadcrumb
+  and keeps the leaf page navigable inside the page content;
+- the active environment badge reuses the console context status-badge tone helper so production
+  reads as restricted/destructive and non-production reads as neutral;
+- create validation is per-field: invalid name and invalid value errors render in the same submit
+  cycle, with `aria-invalid` and `aria-describedby` on the corresponding input, and no request is
+  issued until both fields pass;
+- create success remains near the create form, replace success is shown next to the affected secret
+  row, and delete success is shown near the table/list region instead of being announced from the
+  create card;
+- the metadata table uses the shared `Table` primitive and responsive column priority instead of a
+  hard `min-w-[64rem]` layout, so row labels, actions, and dynamic text do not force a laptop-width
+  horizontal scroll as the only usable state.
 
 ## Console states
 

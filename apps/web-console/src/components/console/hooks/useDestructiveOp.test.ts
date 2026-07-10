@@ -21,7 +21,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function buildConfig(overrides: Partial<Omit<DestructiveOpConfig, 'cascadeImpact' | 'cascadeImpactError'>> = {}): Omit<DestructiveOpConfig, 'cascadeImpact' | 'cascadeImpactError'> {
+function buildConfig(overrides: Partial<Omit<DestructiveOpConfig, 'cascadeImpactError'>> = {}): Omit<DestructiveOpConfig, 'cascadeImpactError'> {
   return {
     level: 'WARNING',
     operationId: 'soft-delete-application',
@@ -63,6 +63,24 @@ describe('useDestructiveOp', () => {
 
     expect(fetchCascadeImpactMock).not.toHaveBeenCalled()
     expect(result.current.opState).toBe('ready')
+  })
+
+  it('usa impacto estático del caller sin llamar al endpoint de cascada', () => {
+    const { result } = renderHook(() => useDestructiveOp())
+
+    act(() => {
+      result.current.openDialog(buildConfig({
+        level: 'CRITICAL',
+        operationId: 'delete-workspace-secret',
+        resourceName: 'db_password',
+        resourceType: 'secreto del área de trabajo',
+        cascadeImpact: [{ resourceType: 'funciones que lo usan', count: 3 }]
+      }))
+    })
+
+    expect(fetchCascadeImpactMock).not.toHaveBeenCalled()
+    expect(result.current.opState).toBe('ready')
+    expect(result.current.config?.cascadeImpact).toEqual([{ resourceType: 'funciones que lo usan', count: 3 }])
   })
 
   it('degrada a ready cuando falla la carga de cascada', async () => {
