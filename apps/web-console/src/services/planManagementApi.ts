@@ -48,7 +48,16 @@ export interface AllocationSummaryDimension {
   tenantEffectiveValue: number
   totalAllocated: number
   unallocated: number | null
-  workspaces: Array<{ workspaceId: string; allocatedValue: number }>
+  workspaces: Array<{
+    workspaceId: string
+    allocatedValue: number
+    displayLabel?: string | null
+    workspaceDisplayName?: string | null
+    workspaceName?: string | null
+    workspaceSlug?: string | null
+    name?: string | null
+    slug?: string | null
+  }>
   isFullyAllocated: boolean
 }
 
