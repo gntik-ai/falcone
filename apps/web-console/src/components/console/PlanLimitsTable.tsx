@@ -60,7 +60,7 @@ function formatRowStatus({
   rowStatus?: PlanLimitRowStatus
 }): { label: string; tone: 'muted' | 'success' | 'warning' | 'destructive'; icon: 'saved' | 'saving' | 'error' | null; role?: 'status' | 'alert' } {
   if (rowStatus?.state === 'saving') {
-    return { label: 'Guardando', tone: 'warning', icon: 'saving', role: 'status' }
+    return { label: rowStatus.message ?? 'Guardando', tone: 'warning', icon: 'saving', role: 'status' }
   }
   if (!validation.valid) {
     return { label: validation.message, tone: 'destructive', icon: 'error', role: 'alert' }
@@ -74,7 +74,7 @@ function formatRowStatus({
   if (rowStatus?.state === 'saved') {
     return { label: rowStatus.message ?? 'Guardado', tone: 'success', icon: 'saved', role: 'status' }
   }
-  return { label: 'Persistido', tone: 'muted', icon: 'saved', role: 'status' }
+  return { label: 'Persistido', tone: 'muted', icon: 'saved' }
 }
 
 export function PlanLimitsTable({
@@ -164,7 +164,7 @@ export function PlanLimitsTable({
                   <span
                     id={statusId}
                     role={displayedStatus.role}
-                    aria-live={displayedStatus.role === 'alert' ? 'assertive' : 'polite'}
+                    aria-live={displayedStatus.role ? (displayedStatus.role === 'alert' ? 'assertive' : 'polite') : undefined}
                     className={cn(
                       'inline-flex min-h-8 max-w-full items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium leading-5',
                       displayedStatus.tone === 'muted' && 'border-border bg-muted/30 text-muted-foreground',
@@ -179,7 +179,7 @@ export function PlanLimitsTable({
                     <span>{displayedStatus.label}</span>
                   </span>
                 </td>
-                <td className="px-4 py-4 text-muted-foreground">{dimension.effectiveValue === -1 ? 'Sin límite' : formatLimitSource(dimension.source)}</td>
+                <td className="px-4 py-4 text-muted-foreground">{formatLimitSource(dimension.source)}</td>
                 <td className="px-4 py-4 text-muted-foreground">{dimension.unit ?? 'count'}</td>
                 <td className="w-56 px-4 py-4">
                   {editable ? (

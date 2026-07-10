@@ -10,6 +10,9 @@ describe('PlanLimitsTable', () => {
     const onResetRequest = vi.fn()
     render(<PlanLimitsTable dimensions={rows} editable onResetRequest={onResetRequest} />)
     expect(screen.getByLabelText(/requests: valor del límite/i)).toBeInTheDocument()
+    expect(screen.getByText('Explícito')).toBeInTheDocument()
+    expect(screen.getByText('Persistido')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /guardar límite de requests/i })).toBeDisabled()
     screen.getByRole('button', { name: /restablecer límite de requests al valor predeterminado/i }).click()
     expect(onResetRequest).toHaveBeenCalledWith(rows[0])
@@ -115,12 +118,12 @@ describe('PlanLimitsTable', () => {
         dimensions={[{ ...rows[0], effectiveValue: 10 }]}
         editable
         busyDimensionKey="requests"
-        rowStatuses={{ requests: { state: 'saving', message: 'Guardando' } }}
+        rowStatuses={{ requests: { state: 'saving', message: 'Restableciendo' } }}
       />
     )
 
     expect(screen.getByLabelText(/requests: valor del límite/i)).toBeDisabled()
     expect(screen.getByRole('button', { name: /guardando límite de requests/i })).toBeDisabled()
-    expect(screen.getAllByText(/guardando/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('status')).toHaveTextContent(/restableciendo/i)
   })
 })
