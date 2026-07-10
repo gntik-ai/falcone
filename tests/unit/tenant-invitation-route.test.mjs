@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { routes } from '../../deploy/kind/control-plane/routes.mjs';
@@ -31,6 +32,10 @@ function matchRoute(compiledRoutes, method, path) {
     if (m) return { route: r, params: m.groups ?? {} };
   }
   return null;
+}
+
+function sha256Hex(value) {
+  return createHash('sha256').update(String(value).trim().toLowerCase()).digest('hex');
 }
 
 function fakeStore({ workspace = { id: 'wrk_alpha', tenant_id: 'ten_alpha' } } = {}) {
@@ -175,6 +180,49 @@ test('fix-759-11b: hash-only invitations do not trust caller-supplied maskedEmai
   const invitation = insert[1];
   assert.equal(invitation.emailHash, emailHash);
   assert.equal(invitation.maskedEmail, null);
+  assert.equal('email' in invitation, false);
+  assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
+});
+
+test('fix-759-11b-1: hash-only invitations reject raw-email emailHash values', async () => {
+  const rawEmail = 'guest@example.com';
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    body: {
+      emailHash: rawEmail,
+      role: 'workspace_viewer',
+      workspaceId: 'wrk_alpha',
+    },
+  }));
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'VALIDATION_ERROR');
+  assert.match(res.body.message, /emailHash must be a SHA-256 hex digest/);
+  assert.equal(store.calls.some(([name]) => name === 'insertInvitation'), false);
+});
+
+test('fix-759-11b-2: email input overrides a mismatched caller-supplied emailHash', async () => {
+  const rawEmail = 'guest@example.com';
+  const mismatchedHash = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    body: {
+      email: rawEmail,
+      emailHash: mismatchedHash,
+      role: 'workspace_viewer',
+      workspaceId: 'wrk_alpha',
+    },
+  }));
+
+  assert.equal(res.statusCode, 202);
+  const insert = store.calls.find(([name]) => name === 'insertInvitation');
+  assert.ok(insert, 'handler must persist an invitation record');
+  const invitation = insert[1];
+  assert.equal(invitation.emailHash, sha256Hex(rawEmail));
+  assert.notEqual(invitation.emailHash, mismatchedHash);
+  assert.equal(invitation.maskedEmail, 'g***t@example.com');
   assert.equal('email' in invitation, false);
   assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
 });

@@ -61455,8 +61455,9 @@
           },
           "emailHash": {
             "type": "string",
-            "minLength": 12,
-            "maxLength": 255
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
           },
           "maskedEmail": {
             "type": "string",
@@ -61549,8 +61550,9 @@
           },
           "emailHash": {
             "type": "string",
-            "minLength": 12,
-            "maxLength": 255
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[0-9A-Fa-f]{64}$"
           },
           "maskedEmail": {
             "type": "string",

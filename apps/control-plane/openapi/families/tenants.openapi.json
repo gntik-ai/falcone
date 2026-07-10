@@ -591,8 +591,9 @@
             "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
           },
           "emailHash": {
-            "maxLength": 255,
-            "minLength": 12,
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
             "type": "string"
           },
           "entityType": {
@@ -770,8 +771,9 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "emailHash": {
-            "maxLength": 255,
-            "minLength": 12,
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9A-Fa-f]{64}$",
             "type": "string"
           },
           "entityType": {

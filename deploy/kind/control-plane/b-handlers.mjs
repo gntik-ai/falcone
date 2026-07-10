@@ -274,6 +274,7 @@ function canManageTenantId(identity, tenantId) {
 }
 
 const INVITATION_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INVITATION_EMAIL_HASH_RE = /^[0-9a-f]{64}$/i;
 const INVITATION_ROLE_ALIASES = new Map([
   ['viewer', 'workspace_viewer'],
   ['editor', 'workspace_developer']
@@ -291,6 +292,12 @@ function normalizeInvitationRole(role) {
 
 function emailHash(email) {
   return createHash('sha256').update(String(email).trim().toLowerCase()).digest('hex');
+}
+
+function normalizeEmailHash(hash) {
+  if (typeof hash !== 'string') return null;
+  const candidate = hash.trim();
+  return INVITATION_EMAIL_HASH_RE.test(candidate) ? candidate.toLowerCase() : null;
 }
 
 function maskEmail(email) {
@@ -333,10 +340,20 @@ function invitationBody(body, { tenantId, workspaceId, actorId }) {
   if (rawEmail && !INVITATION_EMAIL_RE.test(rawEmail)) {
     return { error: err(400, 'VALIDATION_ERROR', 'email must be a valid email address') };
   }
-  const hash = typeof body.emailHash === 'string' && body.emailHash.trim().length >= 12
-    ? body.emailHash.trim()
-    : rawEmail ? emailHash(rawEmail) : null;
-  if (!hash) return { error: err(400, 'VALIDATION_ERROR', 'email or emailHash is required') };
+  const suppliedHash = normalizeEmailHash(body.emailHash);
+  const hasMalformedHash = typeof body.emailHash === 'string' && body.emailHash.trim() && !suppliedHash;
+  const hash = rawEmail ? emailHash(rawEmail) : suppliedHash;
+  if (!hash) {
+    return {
+      error: err(
+        400,
+        'VALIDATION_ERROR',
+        hasMalformedHash
+          ? 'emailHash must be a SHA-256 hex digest'
+          : 'email or emailHash is required'
+      )
+    };
+  }
   if (role.startsWith('workspace_') && !workspaceId) {
     return { error: err(400, 'VALIDATION_ERROR', 'workspaceId is required for workspace roles') };
   }

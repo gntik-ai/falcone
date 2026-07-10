@@ -19,6 +19,8 @@ onboarding.
 - Derive persisted invitation target bindings from verified tenant/workspace scope and whitelist
   invitation metadata so caller-supplied email, masked-email, or binding-shaped metadata cannot be
   persisted.
+- Validate hash-only invitation requests so `emailHash` must be a SHA-256 hex digest, and derive the
+  persisted hash from `email` whenever the caller supplies a raw email.
 - Add focused page tests that open the wizard from Members, submit an invitation payload with
   email/role/message, and assert the flow never requires or posts a password.
 - Add a control-plane route/handler regression test so the invite flow cannot regress to a
@@ -53,7 +55,7 @@ onboarding.
 
 - Risk is limited to the Members page action surface and the tenant invitation POST route. The
   handler is additive, stores only masked email plus hash, derives bindings from verified
-  tenant/workspace scope, and whitelists persisted metadata.
+  tenant/workspace scope, whitelists persisted metadata, and rejects non-digest `emailHash` input.
 - Rollback is removing the `InviteUserWizard` mount and `Invitar usuario` button from
   `ConsoleMembersPage` and removing the additive invitation route while leaving the existing
   direct-create path intact.

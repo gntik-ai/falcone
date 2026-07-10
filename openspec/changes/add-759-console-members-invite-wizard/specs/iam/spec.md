@@ -17,9 +17,11 @@ owner/admin principals SHALL be allowed only when the requested `workspaceId` be
 and is present in the principal's verified workspace binding.
 
 The route SHALL NOT trust caller-supplied email, masked email, or binding-shaped fields in
-invitation metadata. It SHALL persist only server-whitelisted metadata, including the sanitized
-`message` when present, and SHALL NOT persist caller-supplied `metadata.email`,
-`metadata.maskedEmail`, or `metadata.targetBindings`.
+invitation metadata. For hash-only requests, caller-supplied `emailHash` SHALL be accepted only
+when it is a valid SHA-256 hex digest; when a raw `email` is present, the route SHALL derive the
+persisted hash from that email instead of trusting a supplied `emailHash`. It SHALL persist only
+server-whitelisted metadata, including the sanitized `message` when present, and SHALL NOT persist
+caller-supplied `metadata.email`, `metadata.maskedEmail`, or `metadata.targetBindings`.
 
 #### Scenario: Tenant owner submits a workspace invitation
 
@@ -46,3 +48,9 @@ invitation metadata. It SHALL persist only server-whitelisted metadata, includin
   binding references
 - **THEN** the route accepts the invitation only with server-derived masked/hash email,
   server-derived `targetBindings`, and server-whitelisted message metadata
+
+#### Scenario: Caller emailHash cannot store raw email
+
+- **WHEN** an authorized principal calls the same route with an `emailHash` value that is not a
+  SHA-256 hex digest, including a raw email address
+- **THEN** the route rejects the request and does not persist an invitation
