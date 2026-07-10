@@ -16,8 +16,8 @@ the role-aware read-only indicator instead.
 
 - **WHEN** an authorized owner opens `/console/members` and chooses `Invitar usuario`
 - **THEN** the existing invite wizard opens and can submit an invitation email flow to
-  `/v1/workspaces/{workspaceId}/invitations` with email/role/message, without displaying,
-  requiring, or posting a password
+  `/v1/tenants/{tenantId}/invitations` with email/role/message and the active `workspaceId`,
+  without displaying, requiring, or posting a password
 
 #### Scenario: Read-only role cannot access member-management actions
 

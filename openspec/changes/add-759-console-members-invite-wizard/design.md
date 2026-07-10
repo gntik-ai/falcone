@@ -1,7 +1,7 @@
 ## Design
 
-The existing invite wizard remains the single implementation of the invitation flow. This change only
-mounts it from the Members route and adds the missing affordance.
+The existing invite wizard remains the single console implementation of the invitation flow. This
+change mounts it from the Members route and adds the missing affordance.
 
 `ConsoleMembersPage` already uses `useConsolePermissions().can('tenant.members.manage')` to gate the
 direct-create action. `InviteUserWizard` independently delegates `invite_member` to the same
@@ -13,11 +13,15 @@ password-backed Keycloak user directly. The invite action is presented first bec
 ordinary member onboarding: the owner supplies an email, role, and optional message, and the invitee
 finishes activation through the invitation flow.
 
-No contract changes are required. The existing wizard already posts:
+The wizard uses the canonical public invitation route:
 
 ```http
-POST /v1/workspaces/{workspaceId}/invitations
+POST /v1/tenants/{tenantId}/invitations
 ```
 
-with `email`, `role`, and `message`; this change does not add, remove, or rename any request or
-response fields.
+with `email`, `role`, `message`, and the active `workspaceId` in the JSON body. The control-plane
+runtime now registers that route in both `routes.mjs` and `route-map.runtime.json`, persists a
+`tenant_invitations` row with masked email plus email hash, and returns the public
+`MutationAccepted` envelope (`entityType: invitation`, `entityId: inv_*`). The handler accepts
+tenant owner/admin callers for the tenant and workspace owner/admin callers only when the requested
+workspace is present in their verified workspace binding.

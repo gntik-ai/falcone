@@ -1183,17 +1183,17 @@
     "consoleUsed": true
   },
   {
-    "operationId": "inviteWorkspaceMember",
+    "operationId": "createInvitation",
     "method": "POST",
-    "path": "/v1/workspaces/{workspaceId}/invitations",
-    "family": "workspaces",
-    "module": "NONE",
-    "export": "",
-    "invoke": "UNKNOWN",
-    "deps": ["pg", "keycloakAdmin", "kafka"],
-    "auth": "workspace_admin / tenant_owner (invite_member)",
+    "path": "/v1/tenants/{tenantId}/invitations",
+    "family": "tenants",
+    "module": "deploy/kind/control-plane/b-handlers.mjs",
+    "export": "createInvitation",
+    "invoke": "localHandler",
+    "deps": ["pg"],
+    "auth": "authenticated; tenant_owner/tenant_admin or workspace_owner/workspace_admin for body.workspaceId",
     "subroutes": "no",
-    "notes": "InviteUserWizard.tsx -> submitWizardRequest('/v1/workspaces/{ws}/invitations'). Catalog has createInvitation at /v1/tenants/{tenantId}/invitations. No invitation handler action found. GAP.",
+    "notes": "InviteUserWizard.tsx -> submitWizardRequest('/v1/tenants/{tenantId}/invitations') with body.workspaceId/email/role/message. Local handler persists tenant_invitations with masked email/hash and returns MutationAccepted.",
     "consoleUsed": true
   },
   {

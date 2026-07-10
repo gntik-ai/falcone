@@ -399,9 +399,19 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
       const parsedUrl = new URL(url, 'http://localhost')
       const method = init?.method ?? 'GET'
 
-      if (method === 'POST' && parsedUrl.pathname === '/v1/workspaces/wrk_a1/invitations') {
+      if (method === 'POST' && parsedUrl.pathname === '/v1/tenants/ten_alpha/invitations') {
         invitationBodies.push(parseRequestJsonBody(init?.body))
-        return createJsonResponse(201, { invitationId: 'inv_759' })
+        return createJsonResponse(202, {
+          commandId: 'cmd_759',
+          requestId: 'req_759',
+          entityType: 'invitation',
+          entityId: 'inv_759',
+          status: 'accepted',
+          acceptedEventType: 'iam.invitation.created',
+          desiredState: 'active',
+          correlationId: 'corr_759',
+          acceptedAt: '2099-03-28T18:00:00.000Z'
+        })
       }
 
       if (parsedUrl.pathname === '/v1/tenants/ten_alpha') return createJsonResponse(200, { tenant })
@@ -449,7 +459,8 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
     expect(invitationBodies[0]).toEqual({
       email: 'guest@example.com',
       role: 'workspace_admin',
-      message: 'Invitación desde Members'
+      message: 'Invitación desde Members',
+      workspaceId: 'wrk_a1'
     })
     expect(invitationBodies[0]).not.toHaveProperty('password')
   })

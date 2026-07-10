@@ -396,6 +396,13 @@
     "notes": "self variant; resolves actor.tenantId"
   },
   {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations",
+    "localHandler": "createInvitation",
+    "auth": "authenticated",
+    "notes": "Console Members invite-by-email (#759). Public-contract tenant route; body.workspaceId scopes workspace invites. Handler persists tenant_invitations with masked email/hash and verifies tenant owner/admin or workspace owner/admin for the target workspace."
+  },
+  {
     "method": "GET",
     "path": "/v1/capability-catalog",
     "module": "/repo/services/provisioning-orchestrator/src/actions/capability-catalog-list.mjs",

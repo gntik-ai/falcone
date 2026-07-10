@@ -108,8 +108,10 @@ empty page rather than a wizard that blocks late with its trigger still enabled.
 `tenant.members.manage`:
 
 - **"Invitar usuario"** opens `InviteUserWizard`, which delegates `invite_member` to the same
-  permission source and submits `POST /v1/workspaces/{workspaceId}/invitations` with
-  email/role/message. This flow does not ask the owner to set a password.
+  permission source and submits `POST /v1/tenants/{tenantId}/invitations` with
+  email/role/message plus the active `workspaceId`. This flow does not ask the owner to set a
+  password, and the deployed control-plane handler persists a masked-email/hash invitation record
+  rather than the raw email address.
 - **"Crear usuario"** keeps the direct Keycloak user-create panel for administrators that need to
   provision a password-backed user immediately.
 

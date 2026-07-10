@@ -28733,6 +28733,8 @@
         "developer_external",
         "tenant_owner",
         "tenant_admin",
+        "workspace_owner",
+        "workspace_admin",
         "platform_team"
       ],
       "authRequired": true,
@@ -28800,7 +28802,7 @@
       ],
       "tenantBinding": "required",
       "visibility": "public",
-      "workspaceBinding": "none"
+      "workspaceBinding": "optional"
     },
     {
       "adminChannel": null,

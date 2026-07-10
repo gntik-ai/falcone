@@ -223,6 +223,37 @@
         ],
         "type": "string"
       },
+      "ConsoleInvitationWriteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "format": "email",
+            "maxLength": 255,
+            "minLength": 5,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "role": {
+            "maxLength": 80,
+            "minLength": 3,
+            "type": "string"
+          },
+          "workspaceId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "workspaceId"
+        ],
+        "type": "object"
+      },
       "DurationString": {
         "description": "Compact duration string used by in-falcone lifecycle policies.",
         "pattern": "^[0-9]+(?:s|m|h|d)$",
@@ -992,6 +1023,7 @@
               "platform_user",
               "tenant",
               "workspace",
+              "invitation",
               "external_application",
               "service_account",
               "managed_resource"
@@ -4686,7 +4718,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InvitationWriteRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/InvitationWriteRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsoleInvitationWriteRequest"
+                  }
+                ]
               }
             }
           },
@@ -4798,6 +4837,8 @@
           "developer_external",
           "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
         "x-family": "tenants",
@@ -4805,7 +4846,9 @@
         "x-rate-limit-class": "control-write",
         "x-resource-type": "invitation",
         "x-scope": "tenant",
-        "x-visibility": "public"
+        "x-tenant-binding": "required",
+        "x-visibility": "public",
+        "x-workspace-binding": "optional"
       }
     },
     "/v1/tenants/{tenantId}/invitations/{invitationId}": {
