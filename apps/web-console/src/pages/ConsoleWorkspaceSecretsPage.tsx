@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
+import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
+import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Alert } from '@/components/ui/alert'
@@ -8,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useConsoleContext } from '@/lib/console-context'
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { getConsoleContextStatusBadgeClasses, useConsoleContext } from '@/lib/console-context'
 import type { ApiError } from '@/lib/http'
 import {
   createSecret,
@@ -23,6 +27,19 @@ import {
 // Client-side validation mirrors the server contract (FunctionWorkspaceSecret*).
 const SECRET_NAME_RE = /^[a-z][a-z0-9_-]{0,62}$/
 const VALUE_MAX = 65535
+
+type CreateValidationState = {
+  name: string | null
+  value: string | null
+}
+
+type SecretFeedback = {
+  message: string
+  targetName: string
+  placement: 'create' | 'row' | 'table'
+}
+
+const EMPTY_CREATE_VALIDATION: CreateValidationState = { name: null, value: null }
 
 function isApiError(error: unknown): error is ApiError {
   return Boolean(error) && typeof error === 'object' && 'status' in (error as Record<string, unknown>)
@@ -123,6 +140,31 @@ function SecretDialog({
   )
 }
 
+function WorkspaceSecretsBreadcrumb({
+  workspaceId,
+  workspaceLabel
+}: {
+  workspaceId: string
+  workspaceLabel: string | null | undefined
+}) {
+  return (
+    <nav aria-label="Navegación de secretos del área de trabajo" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <Link to="/console/workspaces" className="font-medium text-foreground underline-offset-4 hover:underline">
+        Áreas de trabajo
+      </Link>
+      <span aria-hidden="true">›</span>
+      <Link
+        to={`/console/workspaces/${workspaceId}`}
+        className="font-medium text-foreground underline-offset-4 hover:underline"
+      >
+        {workspaceLabel ?? workspaceId}
+      </Link>
+      <span aria-hidden="true">›</span>
+      <span>Secretos</span>
+    </nav>
+  )
+}
+
 export function ConsoleWorkspaceSecretsPage() {
   const { activeTenant, activeWorkspace, activeWorkspaceId } = useConsoleContext()
 
@@ -134,7 +176,7 @@ export function ConsoleWorkspaceSecretsPage() {
   const [createName, setCreateName] = useState('')
   const [createValue, setCreateValue] = useState('')
   const [createDescription, setCreateDescription] = useState('')
-  const [createValidation, setCreateValidation] = useState<string | null>(null)
+  const [createValidation, setCreateValidation] = useState<CreateValidationState>(EMPTY_CREATE_VALIDATION)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createBusy, setCreateBusy] = useState(false)
 
@@ -147,22 +189,22 @@ export function ConsoleWorkspaceSecretsPage() {
   const [replaceBusy, setReplaceBusy] = useState(false)
 
   // Delete confirmation (with reference-safety warning).
-  const [deleteTarget, setDeleteTarget] = useState<WorkspaceSecret | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
+  const destructiveOp = useDestructiveOp()
 
-  const [feedback, setFeedback] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<SecretFeedback | null>(null)
 
   // Stable ids so labels/inputs and alerts/inputs are wired (htmlFor / aria-describedby).
   const createNameId = useId()
+  const createNameHelpId = useId()
+  const createNameErrorId = useId()
   const createValueId = useId()
+  const createValueHelpId = useId()
+  const createValueErrorId = useId()
   const createDescriptionId = useId()
-  const createValidationId = useId()
   const replaceValueId = useId()
   const replaceDescriptionId = useId()
   const replaceValidationId = useId()
   const replaceDescId = useId()
-  const deleteDescId = useId()
 
   const environment = activeWorkspace?.environment ?? null
   const isProduction = environment === 'production' || environment === 'prod'
@@ -190,13 +232,12 @@ export function ConsoleWorkspaceSecretsPage() {
     setCreateName('')
     setCreateValue('')
     setCreateDescription('')
-    setCreateValidation(null)
+    setCreateValidation(EMPTY_CREATE_VALIDATION)
     setCreateError(null)
     setReplaceTarget(null)
     setReplaceValue('')
     setReplaceDescription('')
-    setDeleteTarget(null)
-    setDeleteError(null)
+    destructiveOp.handleCancel()
     setFeedback(null)
     if (activeWorkspaceId) {
       void reload()
@@ -204,7 +245,7 @@ export function ConsoleWorkspaceSecretsPage() {
       setSecrets([])
       setListError(null)
     }
-  }, [activeWorkspaceId, reload])
+  }, [activeWorkspaceId, destructiveOp.handleCancel, reload])
 
   const isEmpty = !loading && !listError && secrets.length === 0
 
@@ -227,10 +268,13 @@ export function ConsoleWorkspaceSecretsPage() {
   if (backendDisabled) {
     return (
       <section className="space-y-6" data-testid="workspace-secrets-backend-disabled">
-        <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+        <header className="space-y-2 rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
+          <WorkspaceSecretsBreadcrumb workspaceId={activeWorkspaceId} workspaceLabel={activeWorkspace?.label} />
           <Badge variant="outline">Secretos del área de trabajo</Badge>
-          <p className="mt-2 text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del área de trabajo</h1>
+          <div>
+            <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Secretos del área de trabajo</h1>
+          </div>
         </header>
         <ConsolePageState
           kind="blocked"
@@ -242,6 +286,15 @@ export function ConsoleWorkspaceSecretsPage() {
   }
 
   const workspaceId = activeWorkspaceId
+  const createNameDescribedBy = [createNameHelpId, createValidation.name ? createNameErrorId : null].filter(Boolean).join(' ') || undefined
+  const createValueDescribedBy = [createValueHelpId, createValidation.value ? createValueErrorId : null].filter(Boolean).join(' ') || undefined
+  const tableLevelFeedback =
+    feedback && feedback.placement !== 'create' && (
+      feedback.placement === 'table' ||
+      !secrets.some((secret) => readSecretName(secret) === feedback.targetName)
+    )
+      ? feedback
+      : null
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault()
@@ -250,14 +303,15 @@ export function ConsoleWorkspaceSecretsPage() {
     setCreateError(null)
     const nameError = validateName(createName)
     const valueError = validateValue(createValue)
-    setCreateValidation(nameError ?? valueError)
+    setCreateValidation({ name: nameError, value: valueError })
     if (nameError || valueError) {
       return
     }
+    const name = createName
     setCreateBusy(true)
     try {
       await createSecret(workspaceId, {
-        secretName: createName,
+        secretName: name,
         secretValue: createValue,
         ...(createDescription.trim() ? { description: createDescription.trim() } : {})
       })
@@ -265,8 +319,8 @@ export function ConsoleWorkspaceSecretsPage() {
       setCreateValue('')
       setCreateName('')
       setCreateDescription('')
-      setCreateValidation(null)
-      setFeedback(`Secreto "${createName}" creado.`)
+      setCreateValidation(EMPTY_CREATE_VALIDATION)
+      setFeedback({ message: `Secreto "${name}" creado.`, targetName: name, placement: 'create' })
       await reload()
     } catch (error) {
       setCreateError(describeSecretError(error, 'mutate'))
@@ -311,7 +365,7 @@ export function ConsoleWorkspaceSecretsPage() {
       // Write-only: clear the value from component state immediately after a successful replace.
       setReplaceValue('')
       setReplaceTarget(null)
-      setFeedback(`Secreto "${name}" reemplazado.`)
+      setFeedback({ message: `Secreto "${name}" reemplazado.`, targetName: name, placement: 'row' })
       await reload()
     } catch (error) {
       setReplaceError(describeSecretError(error, 'mutate'))
@@ -320,32 +374,43 @@ export function ConsoleWorkspaceSecretsPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!deleteTarget) {
-      return
-    }
-    // A fresh op starts: drop any stale success/feedback before the new outcome is announced.
+  function openDelete(secret: WorkspaceSecret) {
     setFeedback(null)
-    setDeleteError(null)
-    const name = readSecretName(deleteTarget)
-    setDeleteBusy(true)
-    try {
-      await deleteSecret(workspaceId, name)
-      setDeleteTarget(null)
-      setFeedback(`Secreto "${name}" eliminado.`)
-      await reload()
-    } catch (error) {
-      setDeleteError(describeSecretError(error, 'mutate'))
-    } finally {
-      setDeleteBusy(false)
-    }
+    const name = readSecretName(secret)
+    const refCount = Math.max(0, Number.isFinite(secret.resolvedRefCount) ? secret.resolvedRefCount : 0)
+    const requiresTypedConfirmation = refCount > 0 || isProduction
+    const impactParts = [
+      refCount > 0
+        ? `${refCount} función(es) referencian este secreto. Al eliminarlo, la variable de entorno inyectada desaparecerá en su próximo despliegue y podría romper su funcionamiento.`
+        : 'No hay funciones referenciadas detectadas ahora, pero una referencia ausente se omite silenciosamente durante el despliegue.',
+      isProduction
+        ? 'El área de trabajo activa está marcada como producción; confirma explícitamente antes de eliminar un secreto de este entorno.'
+        : null
+    ].filter(Boolean)
+
+    destructiveOp.openDialog({
+      level: requiresTypedConfirmation ? 'CRITICAL' : 'WARNING',
+      operationId: 'delete-workspace-secret',
+      resourceName: name,
+      resourceType: 'secreto del área de trabajo',
+      cascadeImpact: refCount > 0 ? [{ resourceType: 'funciones que lo usan', count: refCount }] : [],
+      impactDescription: impactParts.join(' '),
+      onConfirm: async () => {
+        await deleteSecret(workspaceId, name)
+      },
+      onSuccess: () => {
+        setFeedback({ message: `Secreto "${name}" eliminado.`, targetName: name, placement: 'table' })
+        void reload()
+      }
+    })
   }
 
   return (
     <section className="space-y-6" data-testid="workspace-secrets-page">
-      <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
+      <header className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-5">
+          <div className="min-w-0 space-y-2">
+            <WorkspaceSecretsBreadcrumb workspaceId={workspaceId} workspaceLabel={activeWorkspace?.label} />
             <Badge variant="outline">Secretos del área de trabajo</Badge>
             <div>
               <p className="text-sm text-muted-foreground">{header || 'Área de trabajo activa'}</p>
@@ -360,11 +425,7 @@ export function ConsoleWorkspaceSecretsPage() {
             <Badge
               variant="outline"
               data-testid="workspace-secrets-stage-badge"
-              className={
-                isProduction
-                  ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                  : 'border-border bg-background text-muted-foreground'
-              }
+              className={`${getConsoleContextStatusBadgeClasses(isProduction ? 'restricted' : 'neutral')} shrink-0`}
             >
               {isProduction ? 'Producción' : `Entorno: ${environment}`}
             </Badge>
@@ -372,7 +433,7 @@ export function ConsoleWorkspaceSecretsPage() {
         </div>
       </header>
 
-      <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
+      <section className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold text-foreground">Crear secreto</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           El valor se envía cifrado al servicio y se elimina del formulario tras crearlo. No hay forma de
@@ -381,17 +442,21 @@ export function ConsoleWorkspaceSecretsPage() {
         <form className="mt-5 space-y-5" onSubmit={(event) => void handleCreate(event)} noValidate>
           <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={createNameId}>Nombre</Label>
+              <Label htmlFor={createNameId}>Nombre del secreto</Label>
               <Input
                 id={createNameId}
-                aria-label="Nombre del secreto"
+                aria-describedby={createNameDescribedBy}
+                aria-invalid={createValidation.name ? true : undefined}
                 value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
+                onChange={(event) => {
+                  setCreateName(event.target.value)
+                  setCreateValidation((current) => current.name ? { ...current, name: null } : current)
+                }}
                 placeholder="db_password"
                 autoComplete="off"
                 spellCheck={false}
               />
-              <span className="text-xs leading-5 text-muted-foreground">
+              <span id={createNameHelpId} className="text-xs leading-5 text-muted-foreground">
                 {createName ? (
                   <>
                     Variable de entorno:{' '}
@@ -401,27 +466,40 @@ export function ConsoleWorkspaceSecretsPage() {
                   'Minúsculas, empieza por letra. Se expone como variable de entorno en UPPER_SNAKE.'
                 )}
               </span>
+              {createValidation.name ? (
+                <p id={createNameErrorId} role="alert" className="text-sm font-medium text-destructive">
+                  {createValidation.name}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={createValueId}>Valor</Label>
+              <Label htmlFor={createValueId}>Valor del secreto</Label>
               <Input
                 id={createValueId}
                 type="password"
                 autoComplete="new-password"
-                aria-label="Valor del secreto"
+                aria-describedby={createValueDescribedBy}
+                aria-invalid={createValidation.value ? true : undefined}
                 value={createValue}
-                onChange={(event) => setCreateValue(event.target.value)}
+                onChange={(event) => {
+                  setCreateValue(event.target.value)
+                  setCreateValidation((current) => current.value ? { ...current, value: null } : current)
+                }}
                 placeholder="••••••••"
               />
-              <span className="text-xs leading-5 text-muted-foreground">
+              <span id={createValueHelpId} className="text-xs leading-5 text-muted-foreground">
                 Solo escritura: nunca se vuelve a mostrar tras guardarlo.
               </span>
+              {createValidation.value ? (
+                <p id={createValueErrorId} role="alert" className="text-sm font-medium text-destructive">
+                  {createValidation.value}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-2">
-              <Label htmlFor={createDescriptionId}>Descripción (opcional)</Label>
+              <Label htmlFor={createDescriptionId}>Descripción del secreto (opcional)</Label>
               <Input
                 id={createDescriptionId}
-                aria-label="Descripción del secreto"
                 value={createDescription}
                 onChange={(event) => setCreateDescription(event.target.value)}
                 placeholder="Nota no secreta para identificar el secreto"
@@ -431,15 +509,11 @@ export function ConsoleWorkspaceSecretsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               type="submit"
-              disabled={createBusy || !createName.trim() || createValue.length === 0}
+              disabled={createBusy}
+              className="w-full sm:w-auto"
             >
               {createBusy ? 'Creando…' : 'Crear secreto'}
             </Button>
-            {createValidation ? (
-              <p id={createValidationId} role="alert" className="text-sm font-medium text-destructive">
-                {createValidation}
-              </p>
-            ) : null}
           </div>
           {createError ? (
             <Alert variant="destructive" data-testid="workspace-secrets-create-error">
@@ -449,7 +523,7 @@ export function ConsoleWorkspaceSecretsPage() {
         </form>
         {/* Outcomes (create / replace / delete) are announced to assistive tech. */}
         <div aria-live="polite" className="mt-4">
-          {feedback ? <Alert variant="success">{feedback}</Alert> : null}
+          {feedback?.placement === 'create' ? <Alert variant="success" role="status" aria-live="polite">{feedback.message}</Alert> : null}
         </div>
       </section>
 
@@ -465,6 +539,13 @@ export function ConsoleWorkspaceSecretsPage() {
           onAction={() => void reload()}
         />
       ) : null}
+      {tableLevelFeedback ? (
+        <div aria-live="polite">
+          <Alert variant="success" role="status" aria-live="polite" data-testid="workspace-secrets-table-feedback">
+            {tableLevelFeedback.message}
+          </Alert>
+        </div>
+      ) : null}
       {isEmpty ? (
         <ConsolePageState
           kind="empty"
@@ -474,66 +555,92 @@ export function ConsoleWorkspaceSecretsPage() {
       ) : null}
 
       {secrets.length > 0 ? (
-        <div className="overflow-x-auto rounded-3xl border border-border bg-card/70 shadow-sm">
-          <table className="w-full min-w-[64rem] divide-y divide-border text-left text-sm">
-            <caption className="sr-only">Secretos de función del área de trabajo activa (solo metadatos; los valores no se muestran)</caption>
-            <thead>
-              <tr className="bg-muted/40 align-top text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
-                <th scope="col" className="px-4 py-3 font-medium">Variable de entorno</th>
-                <th scope="col" className="px-4 py-3 font-medium">
+        <section className="space-y-3" aria-labelledby="workspace-secrets-metadata-heading">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0">
+              <h2 id="workspace-secrets-metadata-heading" className="text-lg font-semibold tracking-tight text-foreground">Secretos guardados</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {activeWorkspace?.label ?? workspaceId}{environment ? ` · ${environment}` : ''}
+              </p>
+            </div>
+            <Badge variant="outline" className="border-border bg-muted/40 text-muted-foreground">
+              {secrets.length} {secrets.length === 1 ? 'secreto' : 'secretos'}
+            </Badge>
+          </div>
+          <Table
+            containerClassName="bg-card/70 shadow-sm"
+            aria-label="Secretos de función del área de trabajo activa"
+          >
+            <TableCaption>Secretos de función del área de trabajo activa (solo metadatos; los valores no se muestran)</TableCaption>
+            <TableHeader>
+              <TableRow className="align-top">
+                <TableHead>Nombre</TableHead>
+                <TableHead>Variable de entorno</TableHead>
+                <TableHead>
                   Funciones que lo usan
                   <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-muted-foreground">
                     Recuento informativo; puede ir por detrás del último despliegue.
                   </span>
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">Creado</th>
-                <th scope="col" className="px-4 py-3 font-medium">Actualizado</th>
-                <th scope="col" className="px-4 py-3 font-medium">Descripción</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/80" data-testid="workspace-secrets-table-body">
+                </TableHead>
+                <TableHead className="hidden lg:table-cell">Creado</TableHead>
+                <TableHead className="hidden xl:table-cell">Actualizado</TableHead>
+                <TableHead className="hidden md:table-cell">Descripción</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody data-testid="workspace-secrets-table-body">
               {secrets.map((secret) => {
                 const name = readSecretName(secret)
+                const rowFeedback = feedback?.placement === 'row' && feedback.targetName === name ? feedback : null
                 return (
-                  <tr key={name} className="transition-colors hover:bg-muted/30">
-                    <th scope="row" className="px-4 py-4 text-left font-medium text-foreground">{name}</th>
-                    <td className="px-4 py-4">
-                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{secretEnvVarName(name)}</code>
-                    </td>
-                    <td className="px-4 py-4 tabular-nums text-muted-foreground">{secret.resolvedRefCount}</td>
-                    <td className="px-4 py-4 text-muted-foreground">{formatTimestamp(secret.timestamps?.createdAt)}</td>
-                    <td className="px-4 py-4 text-muted-foreground">{formatTimestamp(secret.timestamps?.updatedAt)}</td>
-                    <td className="px-4 py-4 text-muted-foreground">{secret.description ?? '—'}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openReplace(secret)}
-                          aria-label={`Reemplazar el secreto ${name}`}
-                        >
-                          Reemplazar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => { setFeedback(null); setDeleteError(null); setDeleteTarget(secret) }}
-                          aria-label={`Eliminar el secreto ${name}`}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={name}>
+                    <TableRow className="hover:bg-muted/30">
+                      <TableHead scope="row" className="max-w-[12rem] break-words text-left font-medium text-foreground sm:max-w-none">{name}</TableHead>
+                      <TableCell>
+                        <code className="inline-block max-w-[12rem] break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground sm:max-w-none">{secretEnvVarName(name)}</code>
+                      </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">{secret.resolvedRefCount}</TableCell>
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">{formatTimestamp(secret.timestamps?.createdAt)}</TableCell>
+                      <TableCell className="hidden text-muted-foreground xl:table-cell">{formatTimestamp(secret.timestamps?.updatedAt)}</TableCell>
+                      <TableCell className="hidden max-w-[16rem] break-words text-muted-foreground md:table-cell">{secret.description ?? '—'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openReplace(secret)}
+                            aria-label={`Reemplazar el secreto ${name}`}
+                          >
+                            Reemplazar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => openDelete(secret)}
+                            aria-label={`Eliminar el secreto ${name}`}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {rowFeedback ? (
+                      <TableRow>
+                        <TableCell colSpan={7}>
+                          <Alert variant="success" role="status" aria-live="polite" data-testid="workspace-secrets-row-feedback">
+                            {rowFeedback.message}
+                          </Alert>
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
                 )
               })}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </section>
       ) : null}
 
       <SecretDialog
@@ -553,23 +660,25 @@ export function ConsoleWorkspaceSecretsPage() {
             </div>
             <div className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={replaceValueId}>Nuevo valor</Label>
+                <Label htmlFor={replaceValueId}>Nuevo valor del secreto</Label>
                 <Input
                   id={replaceValueId}
                   type="password"
                   autoComplete="new-password"
-                  aria-label="Nuevo valor del secreto"
                   aria-describedby={replaceValidation ? replaceValidationId : undefined}
+                  aria-invalid={replaceValidation ? true : undefined}
                   value={replaceValue}
-                  onChange={(event) => setReplaceValue(event.target.value)}
+                  onChange={(event) => {
+                    setReplaceValue(event.target.value)
+                    setReplaceValidation((current) => current ? null : current)
+                  }}
                   placeholder="••••••••"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={replaceDescriptionId}>Descripción (opcional)</Label>
+                <Label htmlFor={replaceDescriptionId}>Descripción del secreto (opcional)</Label>
                 <Input
                   id={replaceDescriptionId}
-                  aria-label="Nueva descripción del secreto"
                   value={replaceDescription}
                   onChange={(event) => setReplaceDescription(event.target.value)}
                 />
@@ -585,11 +694,11 @@ export function ConsoleWorkspaceSecretsPage() {
                 {replaceError}
               </Alert>
             ) : null}
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={closeReplace} disabled={replaceBusy}>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeReplace} disabled={replaceBusy}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={replaceBusy || replaceValue.length === 0}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={replaceBusy}>
                 {replaceBusy ? 'Reemplazando…' : 'Reemplazar'}
               </Button>
             </div>
@@ -597,41 +706,14 @@ export function ConsoleWorkspaceSecretsPage() {
         ) : null}
       </SecretDialog>
 
-      <SecretDialog
-        open={deleteTarget !== null}
-        label="Eliminar secreto"
-        describedById={deleteDescId}
-        busy={deleteBusy}
-        onClose={() => setDeleteTarget(null)}
-      >
-        {deleteTarget ? (
-          <div className="space-y-5">
-            <h2 className="text-lg font-semibold text-foreground">Eliminar &ldquo;{readSecretName(deleteTarget)}&rdquo;</h2>
-            <Alert
-              id={deleteDescId}
-              className="border-amber-500/40 bg-amber-500/10 text-amber-200"
-              data-testid="workspace-secrets-delete-warning"
-            >
-              {deleteTarget.resolvedRefCount > 0
-                ? `Atención: ${deleteTarget.resolvedRefCount} función(es) referencian este secreto. Al eliminarlo, la variable de entorno inyectada desaparecerá en su próximo despliegue y podría romper su funcionamiento.`
-                : 'Atención: si alguna función referencia este secreto, eliminarlo puede romperla en su próximo despliegue (el despliegue omite silenciosamente una referencia ausente).'}
-            </Alert>
-            {deleteError ? (
-              <Alert variant="destructive" data-testid="workspace-secrets-delete-error">
-                {deleteError}
-              </Alert>
-            ) : null}
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>
-                Cancelar
-              </Button>
-              <Button type="button" variant="destructive" onClick={() => void handleDelete()} disabled={deleteBusy}>
-                {deleteBusy ? 'Eliminando…' : 'Eliminar secreto'}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </SecretDialog>
+      <DestructiveConfirmationDialog
+        open={destructiveOp.isOpen}
+        config={destructiveOp.config}
+        opState={destructiveOp.opState}
+        confirmError={destructiveOp.confirmError}
+        onConfirm={() => void destructiveOp.handleConfirm()}
+        onCancel={destructiveOp.handleCancel}
+      />
     </section>
   )
 }

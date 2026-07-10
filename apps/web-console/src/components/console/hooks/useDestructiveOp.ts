@@ -13,7 +13,7 @@ interface UseDestructiveOpReturn {
   config: DestructiveOpConfig | null
   opState: DestructiveOpState
   confirmError: string | null
-  openDialog: (config: Omit<DestructiveOpConfig, 'cascadeImpact' | 'cascadeImpactError'>) => void
+  openDialog: (config: Omit<DestructiveOpConfig, 'cascadeImpactError'>) => void
   handleConfirm: () => Promise<void>
   handleCancel: () => void
 }
@@ -75,16 +75,21 @@ export function useDestructiveOp(): UseDestructiveOpReturn {
     resetState()
   }, [resetState])
 
-  const openDialog = useCallback((nextConfig: Omit<DestructiveOpConfig, 'cascadeImpact' | 'cascadeImpactError'>) => {
+  const openDialog = useCallback((nextConfig: Omit<DestructiveOpConfig, 'cascadeImpactError'>) => {
     impactAbortRef.current?.abort()
     const sequence = openSequenceRef.current + 1
     openSequenceRef.current = sequence
 
     setConfirmError(null)
     setIsOpen(true)
-    setConfig({ ...nextConfig, cascadeImpact: undefined, cascadeImpactError: false })
+    setConfig({ ...nextConfig, cascadeImpact: nextConfig.cascadeImpact, cascadeImpactError: false })
 
-    if (nextConfig.level !== 'CRITICAL' || !nextConfig.resourceId || !isCascadeImpactResourceType(nextConfig.resourceType)) {
+    if (
+      Array.isArray(nextConfig.cascadeImpact) ||
+      nextConfig.level !== 'CRITICAL' ||
+      !nextConfig.resourceId ||
+      !isCascadeImpactResourceType(nextConfig.resourceType)
+    ) {
       setOpState('ready')
       return
     }
