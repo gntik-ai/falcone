@@ -160,6 +160,27 @@ test('fix-759-11a: caller-supplied maskedEmail cannot persist the raw invitee ad
   assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
 });
 
+test('fix-759-11a-1: server mask alters one-character email local parts', async () => {
+  const rawEmail = 'a@example.com';
+  const store = fakeStore();
+  const res = await LOCAL_HANDLERS.createInvitation(ctx({
+    store,
+    body: {
+      email: rawEmail,
+      role: 'workspace_viewer',
+      workspaceId: 'wrk_alpha',
+    },
+  }));
+
+  assert.equal(res.statusCode, 202);
+  const insert = store.calls.find(([name]) => name === 'insertInvitation');
+  assert.ok(insert, 'handler must persist an invitation record');
+  const invitation = insert[1];
+  assert.equal(invitation.maskedEmail, '*@example.com');
+  assert.equal('email' in invitation, false);
+  assert.equal(JSON.stringify(invitation).includes(rawEmail), false);
+});
+
 test('fix-759-11b: hash-only invitations do not trust caller-supplied maskedEmail', async () => {
   const rawEmail = 'guest@example.com';
   const emailHash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';

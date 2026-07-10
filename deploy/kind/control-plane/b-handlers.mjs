@@ -303,7 +303,11 @@ function normalizeEmailHash(hash) {
 function maskEmail(email) {
   const [local = '', domain = ''] = String(email).trim().split('@');
   if (!local || !domain) return null;
-  const visibleLocal = local.length <= 2 ? local[0] ?? '*' : `${local[0]}${'*'.repeat(Math.min(local.length - 2, 6))}${local.at(-1)}`;
+  const visibleLocal = local.length === 1
+    ? '*'
+    : local.length === 2
+      ? `${local[0]}*`
+      : `${local[0]}${'*'.repeat(Math.min(local.length - 2, 6))}${local.at(-1)}`;
   return `${visibleLocal}@${domain}`;
 }
 
