@@ -49,4 +49,8 @@
   - Passed: `Change 'harden-workspace-secrets-console-ux' is valid`.
 - [x] 4.3 Run public API generation and confirm no tracked generated contract diff.
   - `npm run generate:public-api` passed and left no tracked generated diff.
-- [ ] 4.4 Run independent post-fix verifier and reviewer gates.
+- [x] 4.4 Run independent post-fix verifier and reviewer gates.
+  - Verifier: `VERDICT: CONFIRMED` for the hardened issue #772 implementation on
+    `dc1064ac4e5e000583916c885a0ad6375fbfb883`, with repeated focused tests,
+    live asset scans, and deployed SPA browser probes.
+  - Reviewer: `VERDICT: APPROVE`, 0 blocking findings.
