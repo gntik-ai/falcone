@@ -145,6 +145,30 @@ describe('ConsoleIamAccessPage', () => {
     })
   })
 
+  it('requires a username before submitting the create-user payload', async () => {
+    const user = userEvent.setup()
+    stubIamApi({
+      users: [createUser('usr-1', 'ada')],
+      roles: [createRole('tenant_admin')],
+      groups: [],
+      userRoles: { 'usr-1': [] },
+      userGroups: { 'usr-1': [] }
+    })
+
+    render(<ConsoleIamAccessPage />)
+
+    await screen.findByLabelText(/^usuario$/i)
+    const createButton = screen.getByRole('button', { name: /^crear usuario$/i })
+
+    expect(createButton).toBeDisabled()
+    await user.type(screen.getByLabelText(/email/i), 'email-only@example.test')
+    expect(createButton).toBeDisabled()
+    expect(findMutationCall('POST', '/v1/iam/realms/tenant-alpha/users')).toBeUndefined()
+
+    await user.type(screen.getByLabelText(/^usuario$/i), 'grace')
+    expect(createButton).toBeEnabled()
+  })
+
   it('creates roles and groups, refreshes the catalog, and exposes them as assignable options', async () => {
     const user = userEvent.setup()
     stubIamApi({
