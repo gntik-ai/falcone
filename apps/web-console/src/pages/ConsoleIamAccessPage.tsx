@@ -115,6 +115,7 @@ export function ConsoleIamAccessPage() {
   const [userGroups, setUserGroups] = useState<IamGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -151,6 +152,7 @@ export function ConsoleIamAccessPage() {
       setSelectedUserId(null)
       setUserRoles([])
       setUserGroups([])
+      setDetailError(null)
     }
 
     try {
@@ -194,6 +196,7 @@ export function ConsoleIamAccessPage() {
     const detailLoadSequence = detailLoadSequenceRef.current + 1
     detailLoadSequenceRef.current = detailLoadSequence
     setDetailLoading(true)
+    setDetailError(null)
     setMutationError(null)
     setUserRoles([])
     setUserGroups([])
@@ -206,6 +209,7 @@ export function ConsoleIamAccessPage() {
       if (detailLoadSequenceRef.current !== detailLoadSequence) return
       setUserRoles(rolesRes.items ?? [])
       setUserGroups(groupsRes.items ?? [])
+      setDetailError(null)
       if (options.successMessage) {
         setSuccessMessage(options.successMessage)
       }
@@ -214,7 +218,7 @@ export function ConsoleIamAccessPage() {
       if (detailLoadSequenceRef.current !== detailLoadSequence) return
       setUserRoles([])
       setUserGroups([])
-      setMutationError(errMsg(rawError, 'No se pudo cargar el detalle del usuario.'))
+      setDetailError(errMsg(rawError, 'No se pudo cargar el detalle del usuario.'))
     } finally {
       if (detailLoadSequenceRef.current === detailLoadSequence) {
         setDetailLoading(false)
@@ -231,6 +235,7 @@ export function ConsoleIamAccessPage() {
       setSelectedUserId(null)
       setUserRoles([])
       setUserGroups([])
+      setDetailError(null)
       setLoadError(null)
       return
     }
@@ -243,6 +248,7 @@ export function ConsoleIamAccessPage() {
       setDetailLoading(false)
       setUserRoles([])
       setUserGroups([])
+      setDetailError(null)
       return
     }
     void loadUserDetail(realm, selectedUserId)
@@ -877,6 +883,17 @@ export function ConsoleIamAccessPage() {
                     kind="loading"
                     title="Cargando detalle"
                     description="Consultando roles y grupos asignados al usuario seleccionado."
+                  />
+                </div>
+              ) : detailError ? (
+                <div className="mt-4">
+                  <ConsolePageState
+                    kind="error"
+                    title="No se pudo cargar el detalle"
+                    description={detailError}
+                    actionLabel="Reintentar detalle"
+                    onAction={() => void loadUserDetail(realm, getUserId(selectedUser))}
+                    icon={<AlertTriangle className="h-5 w-5" />}
                   />
                 </div>
               ) : (

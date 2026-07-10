@@ -291,15 +291,16 @@ describe('ConsoleIamAccessPage', () => {
 
   it('clears stale membership controls when selected-user detail loading fails', async () => {
     const user = userEvent.setup()
+    const detailErrorUsers: Record<string, unknown> = {
+      'usr-2': { status: 503, code: 'IAM_LIST_USER_ROLES_FAILED', message: 'detail backend unavailable' }
+    }
     stubIamApi({
       users: [createUser('usr-1', 'ada'), createUser('usr-2', 'grace')],
       roles: [createRole('tenant_admin')],
       groups: [createGroup('grp-1', 'soporte')],
       userRoles: { 'usr-1': ['tenant_admin'], 'usr-2': [] },
       userGroups: { 'usr-1': ['grp-1'], 'usr-2': [] },
-      detailErrorUsers: {
-        'usr-2': { status: 503, code: 'IAM_LIST_USER_ROLES_FAILED', message: 'detail backend unavailable' }
-      }
+      detailErrorUsers
     })
 
     render(<ConsoleIamAccessPage />)
@@ -313,10 +314,22 @@ describe('ConsoleIamAccessPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo cargar el detalle del usuario iam/i)
     expect(screen.queryByRole('button', { name: /quitar rol tenant_admin/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /quitar de grupo soporte/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/^sin roles\.$/i)).toBeInTheDocument()
-    expect(screen.getByText(/^sin grupos\.$/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/rol a asignar/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/grupo a asignar/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^sin roles\.$/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^sin grupos\.$/i)).not.toBeInTheDocument()
+    expect(findMutationCall('POST', '/users/usr-2/role-assignments')).toBeUndefined()
+    expect(findMutationCall('PUT', '/users/usr-2/groups/grp-1')).toBeUndefined()
     expect(findMutationCall('DELETE', '/users/usr-2/role-assignments')).toBeUndefined()
     expect(findMutationCall('DELETE', '/users/usr-2/groups/grp-1')).toBeUndefined()
+
+    delete detailErrorUsers['usr-2']
+    await user.click(screen.getByRole('button', { name: /reintentar detalle/i }))
+
+    expect(await screen.findByText(/^sin roles\.$/i)).toBeInTheDocument()
+    expect(await screen.findByText(/^sin grupos\.$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/rol a asignar/i)).toBeEnabled()
+    expect(screen.getByLabelText(/grupo a asignar/i)).toBeEnabled()
   })
 
   it('searches and paginates users and renders empty search state with ConsolePageState affordances', async () => {
