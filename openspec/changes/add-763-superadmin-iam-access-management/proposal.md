@@ -33,8 +33,8 @@ membership removals fired without confirmation.
 ## Non-Goals
 
 - No backend route changes; the required `/v1/iam/realms/{realmId}/...` routes already exist.
-- No OpenAPI, public route catalog, generated SDK, or shared type changes; the frontend now consumes
-  the existing contract and tests assert the exact endpoints.
+- OpenAPI, public route catalog, and generated family docs are updated to publish the existing IAM
+  group and membership endpoints consumed by this page.
 - No role/group deletion UI; issue #763 asks for creation and assignment catalog management.
 - No server-side IAM search or cursor pagination; the page provides client-side search/pagination
   over the loaded realm inventory.
@@ -53,6 +53,6 @@ membership removals fired without confirmation.
 ## Risks and Rollback
 
 - Risk is limited to the superadmin-only IAM Access route. The change calls existing IAM endpoints
-  with documented payloads and keeps generated contract artifacts untouched.
+  with documented payloads and keeps generated contract artifacts aligned.
 - Rollback is reverting `ConsoleIamAccessPage` and its focused tests, plus removing this OpenSpec
   change and the reference doc.

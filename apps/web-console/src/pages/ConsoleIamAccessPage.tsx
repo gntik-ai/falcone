@@ -292,7 +292,7 @@ export function ConsoleIamAccessPage() {
     const email = createUserForm.email.trim()
     const password = createUserForm.password.trim()
     const role = createUserForm.role.trim()
-    if (!username && !email) return
+    if (!username) return
 
     const body: { [key: string]: JsonValue } = {
       enabled: true,
@@ -594,6 +594,7 @@ export function ConsoleIamAccessPage() {
                     aria-describedby="iam-create-user-help"
                     disabled={busy}
                     placeholder="ada"
+                    required
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -610,7 +611,7 @@ export function ConsoleIamAccessPage() {
                   />
                 </div>
                 <p id="iam-create-user-help" className="text-xs leading-5 text-muted-foreground">
-                  Indica usuario, email o ambos; el realm aceptará el identificador disponible.
+                  Indica un usuario; el email es opcional.
                 </p>
                 <div className="space-y-1.5">
                   <Label htmlFor="iam-create-user-password">Contraseña temporal</Label>
@@ -637,7 +638,7 @@ export function ConsoleIamAccessPage() {
                     ))}
                   </Select>
                 </div>
-                <Button type="submit" disabled={busy || (!createUserForm.username.trim() && !createUserForm.email.trim())}>
+                <Button type="submit" disabled={busy || !createUserForm.username.trim()}>
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   {busy ? 'Creando…' : 'Crear usuario'}
                 </Button>

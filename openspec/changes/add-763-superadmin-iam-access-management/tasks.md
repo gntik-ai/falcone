@@ -4,8 +4,9 @@
   group memberships for existing users.
 - [x] 1.2 Confirm backend routes already exist for user create/delete/status and role/group create
   in `deploy/kind/control-plane/routes.mjs`.
-- [x] 1.3 Confirm no backend, OpenAPI, generated SDK, or shared-type change is required because the
-  console consumes the existing IAM endpoints.
+- [x] 1.3 Confirm no backend implementation change is required because the console consumes existing
+  IAM endpoints, while the public API artifacts must publish the existing group and membership
+  endpoints now exposed by the fuller UI.
 
 ## 2. Implement
 
@@ -31,6 +32,9 @@
 
 - [x] 4.1 Add this OpenSpec change and web-console spec delta.
 - [x] 4.2 Add reference documentation for `/console/iam-access` lifecycle behavior.
-- [x] 4.3 Run `pnpm --dir apps/web-console test src/pages/ConsoleIamAccessPage.test.tsx`.
-- [x] 4.4 Run `openspec validate add-763-superadmin-iam-access-management --strict`.
-- [x] 4.5 Run `git diff --check`.
+- [x] 4.3 Publish the existing IAM group and membership routes in OpenAPI, public route catalog, and
+  generated public API docs.
+- [x] 4.4 Run `pnpm --dir apps/web-console test src/pages/ConsoleIamAccessPage.test.tsx`.
+- [x] 4.5 Run `openspec validate add-763-superadmin-iam-access-management --strict`.
+- [x] 4.6 Run `npm run generate:public-api` / `npm run validate:public-api`.
+- [x] 4.7 Run `git diff --check`.

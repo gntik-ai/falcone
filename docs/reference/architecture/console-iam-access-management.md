@@ -16,10 +16,11 @@ The page lets a superadmin:
 - assign and remove realm roles through the existing user role-assignment routes;
 - add and remove user group membership through the existing user group routes.
 
-User creation posts the documented IAM create-user fields used by the runtime: `username`, optional
-`email`, `enabled: true`, `emailVerified: true`, optional `bootstrapCredentials.temporaryPassword`,
-and optional `realmRoles` for an initial role. The page deliberately does not post unsupported
-create-user fields such as `groups`, `metadata`, or bootstrap email delivery.
+User creation posts the documented IAM create-user fields used by the runtime: required `username`,
+optional `email`, `enabled: true`, `emailVerified: true`, optional
+`bootstrapCredentials.temporaryPassword`, and optional `realmRoles` for an initial role. The page
+deliberately does not post unsupported create-user fields such as `groups`, `metadata`, or
+bootstrap email delivery.
 
 ## Safety and state handling
 
@@ -36,7 +37,7 @@ post-mutation refetch.
 
 ## Contract note
 
-Issue #763 did not require backend or wire-contract changes. The required IAM endpoints already
-exist in the control-plane route map, and the console consumes those existing endpoints directly.
-OpenAPI, public-route catalog, generated SDK files, and shared generated types stay unchanged for
-this page-only completion.
+Issue #763 did not require backend implementation changes. The required IAM endpoints already exist
+in the control-plane route map, and the console consumes those existing endpoints directly. The
+OpenAPI source, public-route catalog, and generated public API family docs publish the existing group
+and membership routes so the fuller IAM page is wired to documented API surface.
