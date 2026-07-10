@@ -94,13 +94,27 @@ merely disabled) and replaced by a small amber "read-only" indicator carrying th
 | Page | Action | Gated on |
 | --- | --- | --- |
 | `ConsoleFlowsPage` | "Flujo nuevo" button + name input | `workspace.write` |
-| `ConsoleMembersPage` | "Crear usuario" toggle | `tenant.members.manage` |
+| `ConsoleMembersPage` | "Invitar usuario" wizard trigger + "Crear usuario" direct-create toggle | `tenant.members.manage` |
 | `ConsoleWorkspacesPage` | "Nueva área de trabajo" button | `tenant.workspaces.create` |
 | `ConsoleServiceAccountsPage` | Create / Revelar / Rotar / Revocar | `workspace.write` (extends the page's existing `writesBlocked` disable-with-reason mechanism, previously only for a non-active tenant) |
 
 `ConsoleWorkspacesPage` has no read content of its own beyond the create wizard (workspace inventory
 lives at `/console/workspaces/:workspaceId`), so hiding its CTA for a read-only role leaves an honest
 empty page rather than a wizard that blocks late with its trigger still enabled.
+
+### Members invite flow
+
+`ConsoleMembersPage` exposes two member-management paths to principals that satisfy
+`tenant.members.manage`:
+
+- **"Invitar usuario"** opens `InviteUserWizard`, which delegates `invite_member` to the same
+  permission source and submits `POST /v1/workspaces/{workspaceId}/invitations` with
+  email/role/message. This flow does not ask the owner to set a password.
+- **"Crear usuario"** keeps the direct Keycloak user-create panel for administrators that need to
+  provision a password-backed user immediately.
+
+For read-only roles (`tenant_viewer`, `tenant_developer`) both actions are hidden and the same
+read-only indicator is shown.
 
 ### Not yet covered (follow-up)
 

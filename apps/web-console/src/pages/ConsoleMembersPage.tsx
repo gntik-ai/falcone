@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
 import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
+import { InviteUserWizard } from '@/components/console/wizards/InviteUserWizard'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
 import { useConsolePermissions } from '@/lib/console-permissions'
@@ -97,6 +98,7 @@ export function ConsoleMembersPage() {
   const [usersReloadKey, setUsersReloadKey] = useState(0)
   const [rolesReloadKey, setRolesReloadKey] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const reloadUsers = useCallback(() => {
     setUsersReloadKey((current) => current + 1)
@@ -219,23 +221,43 @@ export function ConsoleMembersPage() {
             <Badge variant="secondary">Organización: {activeTenant.label}</Badge>
             <Badge variant="secondary">Realm: {realmId}</Badge>
             {canManageMembers ? (
-              <Button type="button" onClick={() => setCreateOpen((current) => !current)}>
-                {createOpen ? 'Cerrar' : 'Crear usuario'}
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setCreateOpen(false)
+                    setInviteOpen(true)
+                  }}
+                >
+                  Invitar usuario
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setInviteOpen(false)
+                    setCreateOpen((current) => !current)
+                  }}
+                >
+                  {createOpen ? 'Cerrar' : 'Crear usuario'}
+                </Button>
+              </>
             ) : (
-              // Page-level create CTA hidden (not disabled) for a role that can never use it (#761).
+              // Page-level member-management CTAs are hidden (not disabled) for a role that can never use them (#761).
               // Shared ReadOnlyActionBadge keeps the amber tone + Lock cue + sr-only recourse aligned
               // with the Flows/Workspaces indicators.
               <ReadOnlyActionBadge
                 testId="members-read-only-indicator"
                 roleLabel={highestRoleLabel}
-                deniedAction="crear usuarios"
+                deniedAction="gestionar miembros"
                 reason={membersManageDenyReason}
               />
             )}
           </div>
         </div>
       </header>
+
+      {canManageMembers ? <InviteUserWizard open={inviteOpen} onOpenChange={setInviteOpen} /> : null}
 
       {createOpen && canManageMembers ? (
         <CreateUserPanel
@@ -306,18 +328,24 @@ function CreateUserPanel({
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!username.trim() || !password.trim()) return
+    const body: Record<string, string | string[]> = {
+      username: username.trim(),
+      password: password.trim()
+    }
+    const trimmedEmail = email.trim()
+    if (trimmedEmail) {
+      body.email = trimmedEmail
+    }
+    if (role) {
+      body.roles = [role]
+    }
     setBusy(true)
     setError(null)
     setPermissionDenied(false)
     try {
       await requestConsoleSessionJson(`/v1/tenants/${encodeURIComponent(tenantId)}/users`, {
         method: 'POST',
-        body: {
-          username: username.trim(),
-          email: email.trim() || undefined,
-          password: password.trim(),
-          roles: role ? [role] : undefined
-        }
+        body
       })
       setUsername('')
       setEmail('')
