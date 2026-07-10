@@ -1,5 +1,6 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleContextProvider } from '@/lib/console-context'
@@ -303,7 +304,7 @@ describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () =>
   it.each([
     { label: 'tenant_viewer', platformRoles: ['tenant_viewer'] },
     { label: 'tenant_developer', platformRoles: ['tenant_developer'] }
-  ])('hides "Crear usuario" for $label and shows a read-only indicator instead — directory stays readable', async ({ platformRoles }) => {
+  ])('hides member-management actions for $label and shows a read-only indicator instead — directory stays readable', async ({ platformRoles }) => {
     stubMembersApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })],
       users: [createIamUser('usr_1', 'alice')]
@@ -313,13 +314,16 @@ describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () =>
 
     expect(await screen.findByText('alice')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /crear usuario/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /invitar usuario/i })).not.toBeInTheDocument()
     expect(screen.getByTestId('members-read-only-indicator')).toBeInTheDocument()
   })
 
   it.each([
-    { label: 'tenant_owner', platformRoles: ['tenant_owner'] },
-    { label: 'tenant_admin', platformRoles: ['tenant_admin'] }
-  ])('keeps "Crear usuario" available for $label', async ({ platformRoles }) => {
+    { label: 'tenant_owner', platformRoles: ['tenant_owner'], principalOverrides: { tenantIds: ['ten_alpha'] } },
+    { label: 'tenant_admin', platformRoles: ['tenant_admin'], principalOverrides: { tenantIds: ['ten_alpha'] } },
+    { label: 'workspace_owner', platformRoles: ['workspace_owner'], principalOverrides: {} },
+    { label: 'workspace_admin', platformRoles: ['workspace_admin'], principalOverrides: {} }
+  ])('keeps member-management actions available for $label', async ({ platformRoles, principalOverrides }) => {
     stubMembersApi({
       tenants: [createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })]
     })
@@ -327,9 +331,10 @@ describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () =>
     // tenant_owner/tenant_admin are tenant OPERATORS (#569's `isTenantOperator`): they resolve
     // their tenant via the own-scope singular endpoint using `principal.tenantIds`, not the
     // superadmin collection endpoint — so the session needs `tenantIds` for this fixture.
-    renderPage(sessionWithRoles(platformRoles, { tenantIds: ['ten_alpha'] }))
+    renderPage(sessionWithRoles(platformRoles, principalOverrides))
 
     expect(await screen.findByRole('button', { name: /crear usuario/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /invitar usuario/i })).toBeInTheDocument()
     expect(screen.queryByTestId('members-read-only-indicator')).not.toBeInTheDocument()
   })
 
@@ -372,6 +377,92 @@ describe('ConsoleMembersPage permission-aware "Crear usuario" CTA (#761)', () =>
 
     expect(await screen.findByRole('alert', { name: /acción restringida/i })).toBeInTheDocument()
     expect(screen.queryByText(/forbidden by rls policy/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
+  afterEach(() => {
+    cleanup()
+    fetchMock.mockReset()
+    vi.unstubAllGlobals()
+    clearConsoleShellSession()
+    window.localStorage.clear()
+  })
+
+  it('opens "Invitar usuario" from Members and submits an invitation without requiring a password', async () => {
+    const tenant = createTenant('ten_alpha', 'Tenant Alpha', { identityContext: { consoleUserRealm: 'realm-alpha' } })
+    const workspace = createWorkspace('wrk_a1', 'ten_alpha', 'Workspace Alpha')
+    const invitationBodies: Array<Record<string, unknown>> = []
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const parsedUrl = new URL(url, 'http://localhost')
+      const method = init?.method ?? 'GET'
+
+      if (method === 'POST' && parsedUrl.pathname === '/v1/tenants/ten_alpha/invitations') {
+        invitationBodies.push(parseRequestJsonBody(init?.body))
+        return createJsonResponse(202, {
+          commandId: 'cmd_759',
+          requestId: 'req_759',
+          entityType: 'invitation',
+          entityId: 'inv_759',
+          status: 'accepted',
+          acceptedEventType: 'iam.invitation.created',
+          desiredState: 'active',
+          correlationId: 'corr_759',
+          acceptedAt: '2099-03-28T18:00:00.000Z'
+        })
+      }
+
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha') return createJsonResponse(200, { tenant })
+      if (parsedUrl.pathname === '/v1/tenants') return createJsonResponse(200, { items: [tenant], page: {} })
+      if (parsedUrl.pathname === '/v1/workspaces') return createJsonResponse(200, { items: [workspace], page: {} })
+      if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/users') return createJsonResponse(200, { items: [], page: { size: 100 }, compatibility: createCompatibility() })
+      if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/roles') return createJsonResponse(200, { items: [createIamRole('workspace_admin')], page: { size: 100 }, compatibility: createCompatibility() })
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha/effective-capabilities') return createJsonResponse(200, { tenantId: 'ten_alpha', planId: null, resolvedAt: '2099-03-28T18:00:00.000Z', capabilities: {}, ttlHint: 60 })
+      if (parsedUrl.pathname === '/v1/metrics/tenants/ten_alpha/quotas') return createJsonResponse(200, { dimensions: [] })
+      if (parsedUrl.pathname === '/v1/metrics/tenants/ten_alpha/overview') return createJsonResponse(200, { hardLimitDimensions: [] })
+      if (parsedUrl.pathname === '/v1/metrics/workspaces/wrk_a1/quotas') return createJsonResponse(200, { dimensions: [] })
+      if (parsedUrl.pathname === '/v1/metrics/workspaces/wrk_a1/overview') return createJsonResponse(200, { hardLimitDimensions: [] })
+
+      return createJsonResponse(404, { message: 'Not found' })
+    })
+    const user = userEvent.setup()
+
+    renderPage(sessionWithRoles(['tenant_owner'], { tenantIds: ['ten_alpha'] }), { routeWorkspaceId: 'wrk_a1' })
+
+    await user.click(await screen.findByRole('button', { name: /invitar usuario/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /invitar usuario/i })
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText('wrk_a1')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^contraseña$/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.type(screen.getByLabelText(/email/i), 'guest@example.com')
+    expect(screen.queryByLabelText(/^contraseña$/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.selectOptions(screen.getByLabelText(/^rol$/i), 'workspace_admin')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await user.type(screen.getByLabelText(/mensaje/i), 'Invitación desde Members')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+
+    expect(within(dialog).getByText('guest@example.com')).toBeInTheDocument()
+    expect(within(dialog).getByText('workspace_admin')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^contraseña$/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/inv_759/i)
+    expect(invitationBodies).toHaveLength(1)
+    expect(invitationBodies[0]).toEqual({
+      email: 'guest@example.com',
+      role: 'workspace_admin',
+      message: 'Invitación desde Members',
+      workspaceId: 'wrk_a1'
+    })
+    expect(invitationBodies[0]).not.toHaveProperty('password')
   })
 })
 
@@ -448,7 +539,10 @@ function sessionWithRoles(
   }
 }
 
-function renderPage(session: ConsoleShellSession | null = baseSession) {
+function renderPage(
+  session: ConsoleShellSession | null = baseSession,
+  options: { routeWorkspaceId?: string | null } = {}
+) {
   vi.stubGlobal('fetch', fetchMock)
 
   if (session) {
@@ -458,9 +552,11 @@ function renderPage(session: ConsoleShellSession | null = baseSession) {
   }
 
   return render(
-    <ConsoleContextProvider session={session}>
-      <ConsoleMembersPage />
-    </ConsoleContextProvider>
+    <MemoryRouter>
+      <ConsoleContextProvider session={session} routeWorkspaceId={options.routeWorkspaceId}>
+        <ConsoleMembersPage />
+      </ConsoleContextProvider>
+    </MemoryRouter>
   )
 }
 
@@ -592,4 +688,13 @@ function createJsonResponse(status: number, body: unknown) {
     headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => body
   } as Response
+}
+
+function parseRequestJsonBody(body: BodyInit | null | undefined): Record<string, unknown> {
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  const parsed = JSON.parse(body) as unknown
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
 }

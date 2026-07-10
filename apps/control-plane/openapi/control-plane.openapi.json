@@ -9584,7 +9584,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InvitationWriteRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/InvitationWriteRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsoleInvitationWriteRequest"
+                  }
+                ]
               }
             }
           }
@@ -9688,8 +9695,12 @@
           "developer_external",
           "tenant_owner",
           "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
           "platform_team"
         ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "optional",
         "x-visibility": "public",
         "x-rate-limit-class": "control-write",
         "x-owning-service": "control_api"
@@ -60978,6 +60989,7 @@
               "platform_user",
               "tenant",
               "workspace",
+              "invitation",
               "external_application",
               "service_account",
               "managed_resource"
@@ -61443,8 +61455,9 @@
           },
           "emailHash": {
             "type": "string",
-            "minLength": 12,
-            "maxLength": 255
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
           },
           "maskedEmail": {
             "type": "string",
@@ -61537,8 +61550,9 @@
           },
           "emailHash": {
             "type": "string",
-            "minLength": 12,
-            "maxLength": 255
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[0-9A-Fa-f]{64}$"
           },
           "maskedEmail": {
             "type": "string",
@@ -61579,6 +61593,37 @@
           },
           "expirationPolicy": {
             "$ref": "#/components/schemas/ExpirationRule"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsoleInvitationWriteRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "role",
+          "workspaceId"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 5,
+            "maxLength": 255
+          },
+          "role": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500
           }
         },
         "additionalProperties": false

@@ -735,12 +735,12 @@ export async function installContextAuthMocks(page: Page, scenario: MockScenario
       }
 
       const tenantId = tenantInvitationsMatch[1]
-      const payload = (request.postDataJSON() ?? {}) as { email?: string; roleName?: string }
+      const payload = (request.postDataJSON() ?? {}) as { email?: string; role?: string; roleName?: string }
       const nextInvitation: MockInvitation = {
         invitationId: `inv_${tenantId}_${(invitationsByTenant[tenantId]?.length ?? 0) + 1}`,
         tenantId,
         email: payload.email ?? 'newmember@example.com',
-        roleName: payload.roleName ?? 'tenant_developer',
+        roleName: payload.role ?? payload.roleName ?? 'tenant_developer',
         state: 'pending'
       }
       invitationsByTenant[tenantId] = [...(invitationsByTenant[tenantId] ?? []), nextInvitation]

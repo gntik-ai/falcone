@@ -103,6 +103,26 @@ export async function ensureSchema(pool) {
       UNIQUE (workspace_id, slug)
     )`);
   await pool.query('CREATE INDEX IF NOT EXISTS external_applications_scope_idx ON external_applications (tenant_id, workspace_id, state)');
+  // ---- identity: tenant/workspace invitations ------------------------------
+  // POST /v1/tenants/{tenantId}/invitations is public-contract surface used by
+  // the web console. Persist masked email + hash only; never store the raw
+  // invitee address in the control-plane registry.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tenant_invitations (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      workspace_id TEXT,
+      email_hash TEXT NOT NULL,
+      masked_email TEXT,
+      role TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      expires_at TIMESTAMPTZ NOT NULL,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      target_bindings JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by TEXT
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS tenant_invitations_scope_idx ON tenant_invitations (tenant_id, workspace_id, status, created_at DESC)');
   // ---- data plane: one provisioned database per workspace ------------------
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workspace_databases (
@@ -828,6 +848,30 @@ export async function getWorkspace(pool, idOrSlug) {
        FROM workspaces WHERE id = $1 OR slug = $1 LIMIT 1`, [idOrSlug]);
   return rows[0] ?? null;
 }
+export async function insertInvitation(pool, invitation) {
+  const { rows } = await pool.query(
+    `INSERT INTO tenant_invitations (
+       id, tenant_id, workspace_id, email_hash, masked_email, role, status,
+       expires_at, metadata, target_bindings, created_by
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11)
+     RETURNING id, tenant_id, workspace_id, email_hash, masked_email, role,
+       status, expires_at, metadata, target_bindings, created_at, created_by`,
+    [
+      invitation.id,
+      invitation.tenantId,
+      invitation.workspaceId ?? null,
+      invitation.emailHash,
+      invitation.maskedEmail ?? null,
+      invitation.role,
+      invitation.status ?? 'pending',
+      invitation.expiresAt,
+      JSON.stringify(invitation.metadata ?? {}),
+      JSON.stringify(invitation.targetBindings ?? []),
+      invitation.createdBy ?? null
+    ]);
+  return rows[0] ?? null;
+}
 // List a tenant's first-class environments (#503): one entry per environment, each with its
 // workspaces + provisioned databases — proving multiple isolated environments per project, every
 // environment carrying its own isolated resource set (the per-workspace wsdb_* DB from D2/#502).
@@ -1047,7 +1091,7 @@ export async function purgeWorkspace(pool, workspaceId) {
   // Child rows first (every workspace-owned table is keyed by workspace_id), then the workspace.
   for (const t of ['fn_activations', 'fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics',
                    'workspace_buckets', 'workspace_databases', 'workspace_mongo_databases',
-                   'workspace_api_keys', 'service_accounts', 'external_applications']) {
+                   'workspace_api_keys', 'service_accounts', 'external_applications', 'tenant_invitations']) {
     await del(`DELETE FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
   }
   await del('DELETE FROM workspaces WHERE id = $1', [workspaceId]);
@@ -1075,7 +1119,7 @@ export async function purgeTenant(pool, tenantId) {
   if (workspaceIds.length) await del('DELETE FROM fn_activations WHERE workspace_id = ANY($1)', [workspaceIds]);
   for (const t of ['fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
                    'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
-                   'external_applications',
+                   'external_applications', 'tenant_invitations',
                    'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
                    'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements']) {
     await del(`DELETE FROM ${t} WHERE tenant_id = $1`, [tenantId]);

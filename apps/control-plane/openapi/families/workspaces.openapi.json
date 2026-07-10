@@ -1842,6 +1842,7 @@
               "platform_user",
               "tenant",
               "workspace",
+              "invitation",
               "external_application",
               "service_account",
               "managed_resource"

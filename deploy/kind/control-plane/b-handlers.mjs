@@ -2,7 +2,7 @@
 // management. These are REAL implementations of what the repo only stubs
 // (workflows/wf-con-002.mjs). Each handler: async (ctx) => { statusCode, body }
 // where ctx = { params, query, body, identity, pool, callerContext }.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { kcAdmin, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
@@ -271,6 +271,167 @@ async function listTenantUsers(ctx) {
 function canManageTenantId(identity, tenantId) {
   if (identity.actorType === 'superadmin' || identity.actorType === 'internal') return true;
   return ['tenant_owner', 'tenant_admin'].includes(identity.actorType) && identity.tenantId === tenantId;
+}
+
+const INVITATION_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INVITATION_EMAIL_HASH_RE = /^[0-9a-f]{64}$/i;
+const INVITATION_ROLE_ALIASES = new Map([
+  ['viewer', 'workspace_viewer'],
+  ['editor', 'workspace_developer']
+]);
+const INVITABLE_ROLES = new Set(TENANT_REALM_ROLES);
+
+function compactId(prefix) {
+  return `${prefix}_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+}
+
+function normalizeInvitationRole(role) {
+  const raw = String(role ?? '').trim();
+  return INVITATION_ROLE_ALIASES.get(raw) ?? raw;
+}
+
+function emailHash(email) {
+  return createHash('sha256').update(String(email).trim().toLowerCase()).digest('hex');
+}
+
+function normalizeEmailHash(hash) {
+  if (typeof hash !== 'string') return null;
+  const candidate = hash.trim();
+  return INVITATION_EMAIL_HASH_RE.test(candidate) ? candidate.toLowerCase() : null;
+}
+
+function maskEmail(email) {
+  const [local = '', domain = ''] = String(email).trim().split('@');
+  if (!local || !domain) return null;
+  const visibleLocal = local.length === 1
+    ? '*'
+    : local.length === 2
+      ? `${local[0]}*`
+      : `${local[0]}${'*'.repeat(Math.min(local.length - 2, 6))}${local.at(-1)}`;
+  return `${visibleLocal}@${domain}`;
+}
+
+function isWorkspaceInviteOperator(identity, workspaceId, tenantId) {
+  if (!identity || !workspaceId || identity.tenantId !== tenantId) return false;
+  const roles = new Set(identity.roles ?? []);
+  const isWorkspaceOperator = identity.actorType === 'workspace_admin'
+    || roles.has('workspace_owner')
+    || roles.has('workspace_admin');
+  if (!isWorkspaceOperator) return false;
+  const workspaceIds = new Set([identity.workspaceId, ...(identity.workspaceIds ?? [])].filter(Boolean).map(String));
+  return workspaceIds.has(workspaceId);
+}
+
+function invitationExpiresAt(body) {
+  const supplied = Date.parse(body.expiresAt ?? '');
+  if (Number.isFinite(supplied) && supplied > Date.now()) return new Date(supplied).toISOString();
+  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function invitationTargetBindings({ tenantId, workspaceId, role }) {
+  const bindings = [{ bindingType: 'tenant', bindingRef: tenantId }];
+  if (role.startsWith('workspace_')) {
+    bindings.push({ bindingType: 'workspace', bindingRef: workspaceId });
+  }
+  return bindings;
+}
+
+function invitationBody(body, { tenantId, workspaceId, actorId }) {
+  const role = normalizeInvitationRole(body.role ?? body.roleName);
+  if (!role) return { error: err(400, 'VALIDATION_ERROR', 'role is required') };
+  if (!INVITABLE_ROLES.has(role)) return { error: err(400, 'INVALID_ROLE', `unknown invitation role: ${role}`) };
+  const rawEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (rawEmail && !INVITATION_EMAIL_RE.test(rawEmail)) {
+    return { error: err(400, 'VALIDATION_ERROR', 'email must be a valid email address') };
+  }
+  const suppliedHash = normalizeEmailHash(body.emailHash);
+  const hasMalformedHash = typeof body.emailHash === 'string' && body.emailHash.trim() && !suppliedHash;
+  const hash = rawEmail ? emailHash(rawEmail) : suppliedHash;
+  if (!hash) {
+    return {
+      error: err(
+        400,
+        'VALIDATION_ERROR',
+        hasMalformedHash
+          ? 'emailHash must be a SHA-256 hex digest'
+          : 'email or emailHash is required'
+      )
+    };
+  }
+  if (role.startsWith('workspace_') && !workspaceId) {
+    return { error: err(400, 'VALIDATION_ERROR', 'workspaceId is required for workspace roles') };
+  }
+  const message = typeof body.message === 'string' && body.message.trim()
+    ? body.message.trim().slice(0, 500)
+    : null;
+  const metadata = {};
+  if (message) metadata.message = message;
+  const targetBindings = invitationTargetBindings({ tenantId, workspaceId, role });
+  return {
+    invitation: {
+      id: compactId('inv'),
+      tenantId,
+      workspaceId,
+      emailHash: hash,
+      maskedEmail: rawEmail ? maskEmail(rawEmail) : null,
+      role,
+      status: 'pending',
+      expiresAt: invitationExpiresAt(body),
+      metadata,
+      targetBindings,
+      createdBy: actorId
+    }
+  };
+}
+
+// POST /v1/tenants/{tenantId}/invitations — canonical public invitation route.
+// Tenant owners/admins can invite at tenant scope; workspace owners/admins can
+// invite only into a workspace explicitly bound to their verified token.
+async function createInvitation(ctx) {
+  const { params, body = {}, identity, pool } = ctx;
+  const st = ctx.store ?? store;
+  const tenant = await st.getTenant(pool, params.tenantId);
+  if (!tenant) return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
+
+  const workspaceId = body.workspaceId ?? null;
+  let workspace = null;
+  if (workspaceId) {
+    workspace = await st.getWorkspace(pool, workspaceId);
+    if (!workspace || workspace.tenant_id !== tenant.id) {
+      return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+    }
+  }
+
+  const isTenantManager = canManageTenant(identity, tenant);
+  const isWorkspaceOperator = isWorkspaceInviteOperator(identity, workspace?.id ?? workspaceId, tenant.id);
+  const allowed = isTenantManager || isWorkspaceOperator;
+  if (!allowed) return err(403, 'FORBIDDEN', 'requires tenant owner/admin or workspace owner/admin for the target workspace');
+
+  const parsed = invitationBody(body, {
+    tenantId: tenant.id,
+    workspaceId: workspace?.id ?? workspaceId,
+    actorId: identity?.sub ?? 'unknown'
+  });
+  if (parsed.error) return parsed.error;
+  if (!isTenantManager && !parsed.invitation.role.startsWith('workspace_')) {
+    return err(403, 'FORBIDDEN', 'workspace invite operators can only grant workspace roles');
+  }
+
+  const invitation = await st.insertInvitation(pool, parsed.invitation);
+  const acceptedAt = new Date().toISOString();
+  return ok(202, {
+    commandId: compactId('cmd'),
+    requestId: compactId('req'),
+    entityType: 'invitation',
+    entityId: invitation?.id ?? parsed.invitation.id,
+    tenantId: tenant.id,
+    workspaceId: workspace?.id ?? workspaceId ?? undefined,
+    status: 'accepted',
+    acceptedEventType: 'iam.invitation.created',
+    desiredState: 'active',
+    correlationId: ctx.callerContext?.correlationId ?? compactId('corr'),
+    acceptedAt
+  });
 }
 
 // ---- tenant offboarding (add-tenant-delete-purge-cascade #501) --------------
@@ -1430,6 +1591,7 @@ function consoleSession(ctx) {
 export const LOCAL_HANDLERS = {
   consoleSession,
   createTenant, listTenants, getTenant, deleteTenant, purgeTenant, listEnvironments, createTenantUser, listTenantUsers,
+  createInvitation,
   recordScopeEnforcementDenial,
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, promoteWorkspace, cloneWorkspace, deleteWorkspace,

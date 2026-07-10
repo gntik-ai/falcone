@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -58,6 +59,36 @@ function renderWizard(onSubmit = vi.fn()) {
           { label: 'Plan', value: data.plan ?? '' }
         ]}
         onSubmit={onSubmit}
+      />
+    </MemoryRouter>
+  )
+}
+
+function DeferredInitialDataWizard() {
+  const [open, setOpen] = useState(false)
+  const [initialName, setInitialName] = useState('')
+
+  return (
+    <MemoryRouter>
+      <button type="button" onClick={() => setInitialName('Workspace Alpha')}>
+        Resolver contexto
+      </button>
+      <button type="button" onClick={() => setOpen(true)}>
+        Abrir wizard
+      </button>
+      <WizardShell
+        open={open}
+        onOpenChange={setOpen}
+        title="Wizard"
+        description="desc"
+        context={{ tenantId: null, workspaceId: initialName || null, principalRoles: [] }}
+        steps={steps}
+        initialData={{ name: initialName }}
+        buildSummary={(data) => [
+          { label: 'Nombre', value: data.name ?? '' },
+          { label: 'Plan', value: data.plan ?? '' }
+        ]}
+        onSubmit={vi.fn()}
       />
     </MemoryRouter>
   )
@@ -152,5 +183,17 @@ describe('WizardShell', () => {
 
     expect(screen.getByRole('dialog', { name: /wizard/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre/i)).toHaveValue('Tenant A')
+  })
+
+  it('[#759] refresca initialData al abrir después de que el contexto asíncrono se resuelve', async () => {
+    const user = userEvent.setup()
+    render(<DeferredInitialDataWizard />)
+
+    await user.click(screen.getByRole('button', { name: /resolver contexto/i }))
+    await user.click(screen.getByRole('button', { name: /abrir wizard/i }))
+
+    expect(screen.getByRole('dialog', { name: /wizard/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/nombre/i)).toHaveValue('Workspace Alpha')
+    expect(screen.getByRole('button', { name: /siguiente/i })).toBeEnabled()
   })
 })

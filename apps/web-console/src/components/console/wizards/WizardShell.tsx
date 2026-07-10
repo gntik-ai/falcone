@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -30,10 +30,21 @@ export function WizardShell<TData>({
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [formData, setFormData] = useState<Partial<TData>>(initialData)
   const [submitState, setSubmitState] = useState<WizardSubmitState>({ status: 'idle' })
+  const wasOpenRef = useRef(open)
 
   const isSummary = currentStepIndex >= steps.length
   const currentStep = steps[Math.min(currentStepIndex, steps.length - 1)]
   const validation = useMemo(() => (currentStep ? currentStep.validate(formData) : { valid: true, fieldErrors: {} }), [currentStep, formData])
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      setCurrentStepIndex(0)
+      setFormData(initialData)
+      setSubmitState({ status: 'idle' })
+    }
+
+    wasOpenRef.current = open
+  }, [initialData, open])
 
   function close() {
     onOpenChange(false)
