@@ -82,8 +82,9 @@ describe('ConsolePlanDetailPage', () => {
   })
 
   it('renders plan detail tabs', async () => {
-    renderPage()
+    const { container } = renderPage()
     expect(await screen.findByText('Starter')).toBeInTheDocument()
+    expect(container.querySelector('main')).not.toBeInTheDocument()
     expect(screen.getByRole('tablist', { name: /detalle del plan/i })).toHaveAttribute('data-slot', 'tabs-list')
     expect(screen.getByRole('tab', { name: /información/i })).toHaveAttribute('data-slot', 'tabs-trigger')
     expect(screen.getByRole('tab', { name: /información/i })).toHaveAttribute('aria-selected', 'true')

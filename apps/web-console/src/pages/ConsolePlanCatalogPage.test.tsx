@@ -1,19 +1,39 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as planApi from '@/services/planManagementApi'
 import { ConsolePlanCatalogPage } from './ConsolePlanCatalogPage'
 
-vi.mock('@/services/planManagementApi', () => ({ listPlans: vi.fn().mockResolvedValue({ items: [{ id: 'p1', slug: 'starter', displayName: 'Starter', status: 'active', capabilities: {}, quotaDimensions: {}, assignedTenantCount: 2, updatedAt: '2026-03-31' }], total: 1, page: 1, pageSize: 20 }) }))
+const catalogPlan = { id: 'p1', slug: 'starter', displayName: 'Starter', status: 'active', capabilities: {}, quotaDimensions: {}, assignedTenantCount: 2, updatedAt: '2026-03-31' } as const
+const catalogResponse = { items: [catalogPlan], total: 1, page: 1, pageSize: 20 }
+
+vi.mock('@/services/planManagementApi', () => ({ listPlans: vi.fn() }))
+
+function renderCatalogWithRoutes() {
+  return render(
+    <MemoryRouter initialEntries={['/console/plans']}>
+      <Routes>
+        <Route path="/console/plans" element={<ConsolePlanCatalogPage />} />
+        <Route path="/console/plans/:planId" element={<h1>Detalle del plan abierto</h1>} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
 
 describe('ConsolePlanCatalogPage', () => {
+  beforeEach(() => {
+    vi.mocked(planApi.listPlans).mockReset()
+    vi.mocked(planApi.listPlans).mockResolvedValue(catalogResponse)
+  })
+
   it('renders catalog rows', async () => {
     render(<MemoryRouter><ConsolePlanCatalogPage /></MemoryRouter>)
     expect(await screen.findByText('starter')).toBeInTheDocument()
     expect(screen.getByText('Starter')).toBeInTheDocument()
   })
 
-  it('[#751] renders the catalog through the shared Table primitive with clickable row affordance', async () => {
+  it('[#751][#753] renders the catalog through the shared Table primitive with semantic plan links', async () => {
     const { container } = render(<MemoryRouter><ConsolePlanCatalogPage /></MemoryRouter>)
 
     const table = await screen.findByRole('table', { name: /catálogo de planes/i })
@@ -26,13 +46,26 @@ describe('ConsolePlanCatalogPage', () => {
     const slugCell = screen.getByText('starter').closest('[data-slot="table-cell"]')
     expect(slugCell).toBeInTheDocument()
     const row = slugCell?.closest('[data-slot="table-row"]')
-    expect(row).toHaveClass('cursor-pointer')
+    expect(row).not.toHaveClass('cursor-pointer')
     expect(row).toHaveClass('hover:bg-accent/40')
+    expect(screen.getByRole('link', { name: 'starter' })).toHaveAttribute('href', '/console/plans/p1')
+    expect(screen.getByRole('link', { name: /abrir plan starter/i })).toHaveAttribute('href', '/console/plans/p1')
+    expect(container.querySelector('main')).not.toBeInTheDocument()
+  })
+
+  it('[#753] opens a plan through a real keyboard-operable link', async () => {
+    const user = userEvent.setup()
+    renderCatalogWithRoutes()
+
+    const slugLink = await screen.findByRole('link', { name: 'starter' })
+    slugLink.focus()
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByRole('heading', { name: /detalle del plan abierto/i })).toBeInTheDocument()
   })
 
   it('keeps filtered empty states recoverable from the catalog page', async () => {
     const listPlans = vi.mocked(planApi.listPlans)
-    const catalogPlan = { id: 'p1', slug: 'starter', displayName: 'Starter', status: 'active', capabilities: {}, quotaDimensions: {}, assignedTenantCount: 2, updatedAt: '2026-03-31' } as const
     listPlans
       .mockResolvedValueOnce({ items: [catalogPlan], total: 1, page: 1, pageSize: 20 })
       .mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 20 })

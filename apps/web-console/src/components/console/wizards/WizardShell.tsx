@@ -45,7 +45,7 @@ export function WizardShell<TData>({
   const StepComponent = currentStep?.component
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())} closeOnInteractOutside={false}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

@@ -98,6 +98,7 @@ describe('ConsoleObservabilityPage', () => {
 
     expect(screen.getByLabelText('Categoría')).toBeInTheDocument()
     expect(screen.getByLabelText('Resultado')).toHaveDisplayValue('Todos')
+    expect(screen.getByLabelText('Resultado')).toHaveClass('h-11')
     expect(screen.getByRole('option', { name: 'Éxito' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Fallo' })).toBeInTheDocument()
   })

@@ -606,7 +606,7 @@ export function ConsoleStoragePage() {
   }
 
   return (
-    <main className="space-y-6" data-testid="console-storage-page">
+    <section className="space-y-6" data-testid="console-storage-page">
       <section className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Almacenamiento / objetos</h1>
         <p className="text-sm text-muted-foreground">Buckets, objetos, metadatos y uso del área de trabajo activa. Crear buckets, subir objetos y eliminar un bucket (con confirmación) están disponibles desde esta página.</p>
@@ -1149,6 +1149,6 @@ export function ConsoleStoragePage() {
         onConfirm={() => void destructiveOp.handleConfirm()}
         onCancel={destructiveOp.handleCancel}
       />
-    </main>
+    </section>
   )
 }

@@ -70,7 +70,7 @@ export function ConsoleRealtimePage() {
 
   if (loading) {
     return (
-      <main className="space-y-4">
+      <section className="space-y-4">
         <div
           data-testid="realtime-loading-skeleton"
           role="status"
@@ -78,13 +78,13 @@ export function ConsoleRealtimePage() {
           aria-busy="true"
           className="h-24 animate-pulse rounded-3xl border border-border bg-muted/40"
         />
-      </main>
+      </section>
     )
   }
 
   if (error) {
     return (
-      <main className="space-y-4">
+      <section className="space-y-4">
         <ConsolePageState
           kind="error"
           title="Error al cargar metadatos realtime del área de trabajo"
@@ -92,13 +92,13 @@ export function ConsoleRealtimePage() {
           actionLabel="Reintentar"
           onAction={() => setReloadToken((value) => value + 1)}
         />
-      </main>
+      </section>
     )
   }
 
   return (
     <CapabilityGate capability="realtime" mode="disable">
-      <main className="space-y-6">
+      <section className="space-y-6">
         <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tiempo real del área de trabajo</h1>
           <p className="mt-2 text-sm text-muted-foreground">Ejemplos de suscripción en tiempo real para navegador y servidor.</p>
@@ -109,7 +109,7 @@ export function ConsoleRealtimePage() {
           channelTypes={channelTypes}
           realtimeEnabled={data?.features?.realtime === true}
         />
-      </main>
+      </section>
     </CapabilityGate>
   )
 }

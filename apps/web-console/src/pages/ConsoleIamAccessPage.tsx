@@ -166,7 +166,7 @@ export function ConsoleIamAccessPage() {
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null
 
   return (
-    <main className="space-y-6" data-testid="console-iam-access-page">
+    <section className="space-y-6" data-testid="console-iam-access-page">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="space-y-2">
           <Badge variant="outline">IAM</Badge>
@@ -344,6 +344,6 @@ export function ConsoleIamAccessPage() {
           </section>
         </div>
       ) : null}
-    </main>
+    </section>
   )
 }

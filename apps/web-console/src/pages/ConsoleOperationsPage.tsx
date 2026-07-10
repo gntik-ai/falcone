@@ -6,6 +6,7 @@ import { OperationStatusBadge } from '@/components/console/OperationStatusBadge'
 import { OperationStatusBanner } from '@/components/console/OperationStatusBanner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { useConsoleContext } from '@/lib/console-context'
 import { useReconnectStateSync } from '@/lib/hooks/use-reconnect-state-sync'
 import { useOperations, type OperationFilters, type OperationSummary } from '@/lib/console-operations'
@@ -78,9 +79,8 @@ export function ConsoleOperationsPage() {
       <div className="grid gap-4 rounded-3xl border border-border bg-card p-4 md:grid-cols-3">
         <label className="space-y-2 text-sm">
           <span className="font-medium text-foreground">Estado</span>
-          <select
+          <Select
             aria-label="Filtrar por estado"
-            className="w-full rounded-xl border border-input bg-background px-3 py-2"
             value={status ?? ''}
             onChange={(event) => {
               setOffset(0)
@@ -94,14 +94,13 @@ export function ConsoleOperationsPage() {
             <option value="failed">Fallida</option>
             <option value="timed_out">Expirada</option>
             <option value="cancelled">Cancelada</option>
-          </select>
+          </Select>
         </label>
 
         <label className="space-y-2 text-sm">
           <span className="font-medium text-foreground">Tipo de operación</span>
-          <select
+          <Select
             aria-label="Filtrar por tipo de operación"
-            className="w-full rounded-xl border border-input bg-background px-3 py-2"
             value={operationType}
             onChange={(event) => {
               setOffset(0)
@@ -114,7 +113,7 @@ export function ConsoleOperationsPage() {
                 {item}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <label className="space-y-2 text-sm">

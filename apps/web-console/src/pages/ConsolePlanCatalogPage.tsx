@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PlanStatusBadge } from '@/components/console/PlanStatusBadge'
 import * as api from '@/services/planManagementApi'
+import { ArrowRight } from 'lucide-react'
 
 const statusFilterLabels: Record<api.PlanStatus | 'all', string> = {
   all: 'Todos',
@@ -45,11 +46,11 @@ export function ConsolePlanCatalogPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <section className="space-y-6" aria-labelledby="plan-catalog-heading">
       <header className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Catálogo de planes</h1>
+            <h1 id="plan-catalog-heading" className="text-2xl font-semibold tracking-tight text-foreground">Catálogo de planes</h1>
             <p className="text-sm text-muted-foreground">Revisa, filtra y abre los planes de facturación de plataforma disponibles para organizaciones.</p>
           </div>
           <Button type="button" onClick={() => navigate('/console/plans/new')}>Crear plan</Button>
@@ -85,19 +86,18 @@ export function ConsolePlanCatalogPage() {
               <TableHead scope="col">Estado</TableHead>
               <TableHead scope="col" className="text-right">Asignados</TableHead>
               <TableHead scope="col">Actualizado</TableHead>
+              <TableHead scope="col" className="text-right">Acción</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {state.items.map((plan) => (
               <TableRow
                 key={plan.id}
-                className="cursor-pointer transition-colors hover:bg-accent/40 focus-within:bg-accent/40"
-                onClick={() => navigate(`/console/plans/${plan.id}`)}
+                className="transition-colors hover:bg-accent/40 focus-within:bg-accent/40"
               >
                 <TableCell className="py-4 font-medium text-foreground">
                   <Link
                     to={`/console/plans/${plan.id}`}
-                    onClick={(event) => event.stopPropagation()}
                     className="rounded-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     {plan.slug}
@@ -107,6 +107,14 @@ export function ConsolePlanCatalogPage() {
                 <TableCell className="py-4"><PlanStatusBadge status={plan.status} /></TableCell>
                 <TableCell className="py-4 text-right tabular-nums text-foreground">{plan.assignedTenantCount ?? 0}</TableCell>
                 <TableCell className="py-4 text-muted-foreground">{plan.updatedAt ?? '—'}</TableCell>
+                <TableCell className="py-4 text-right">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/console/plans/${plan.id}`} aria-label={`Abrir plan ${plan.displayName}`}>
+                      Abrir
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -127,6 +135,6 @@ export function ConsolePlanCatalogPage() {
           </div>
         </ConsolePageState>
       )}
-    </main>
+    </section>
   )
 }

@@ -88,7 +88,7 @@ describe('DestructiveConfirmationDialog', () => {
     const onCancel = vi.fn()
     render(<DestructiveConfirmationDialog open config={buildConfig({ level: 'WARNING' })} opState="ready" confirmError={null} onConfirm={vi.fn()} onCancel={onCancel} />)
 
-    const overlay = screen.getByRole('alertdialog').parentElement?.parentElement?.parentElement
+    const overlay = screen.getByRole('alertdialog').closest('.fixed')
     if (!overlay) throw new Error('No overlay found')
 
     await user.click(overlay)

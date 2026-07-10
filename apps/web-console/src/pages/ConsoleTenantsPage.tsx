@@ -40,13 +40,13 @@ export function ConsoleTenantsPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <section className="space-y-6" aria-labelledby="tenant-management-heading">
       <header className="rounded-3xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-5">
           <div className="min-w-0 space-y-2">
             <Badge variant="outline" className="uppercase tracking-[0.14em]">Gobierno de organizaciones</Badge>
             <div className="space-y-1.5">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Gestión de organizaciones</h1>
+              <h1 id="tenant-management-heading" className="text-2xl font-semibold tracking-tight text-foreground">Gestión de organizaciones</h1>
               <p className="max-w-2xl text-sm leading-6 text-muted-foreground">Alta guiada y gobierno inicial de organizaciones de plataforma.</p>
             </div>
           </div>
@@ -179,6 +179,6 @@ export function ConsoleTenantsPage() {
       )}
 
       <CreateTenantWizard open={wizardOpen} onOpenChange={setWizardOpen} onCreated={() => void reloadTenants()} />
-    </main>
+    </section>
   )
 }

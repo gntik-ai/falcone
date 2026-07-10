@@ -16,6 +16,10 @@ recovery states.
   Tab stays within it, Escape closes it, and focus returns to the trigger.
 - The shell includes a skip-to-content link targeting and focusing `#console-main-content` for
   keyboard users who want to bypass repeated chrome.
+- The shell owns the only `<main>` landmark in authenticated console routes. Routed page
+  components render non-main containers inside it, so the skip target remains unambiguous for
+  assistive technology; see
+  [console-superadmin-accessibility-baseline.md](./console-superadmin-accessibility-baseline.md).
 
 ## Breadcrumbs
 

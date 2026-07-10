@@ -493,7 +493,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
     semanticErrors.length + serverErrors.length + (yamlBlocking ? yamlValidity.markers.length + 1 : 0)
 
   const renderCanvasSurface = (
-    <main ref={canvasRef} className="min-w-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
+    <section ref={canvasRef} className="min-w-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow
         nodes={decoratedNodes}
         edges={edges}
@@ -508,7 +508,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
         <Background gap={16} />
         <Controls />
       </ReactFlow>
-    </main>
+    </section>
   )
 
   const renderYamlSurface = (

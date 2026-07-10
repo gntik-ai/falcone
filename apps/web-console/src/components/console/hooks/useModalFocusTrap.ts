@@ -1,10 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 
-// Shared a11y primitive for the console's hand-rolled modals (the `ui/dialog.tsx` primitive is a
-// bare backdrop + click-to-close overlay and provides none of this itself). Used by
-// ConsoleWorkspaceSecretsPage's SecretDialog, DestructiveConfirmationDialog, and
-// ConsoleServiceAccountsPage's CredentialDisclosureDialog so the Tab-trap + focus-return semantics
-// live in exactly one place instead of being re-implemented per dialog.
+// Shared focus behavior for the console dialog primitive and the few remaining hand-rolled modals,
+// so Tab-trap + focus-return semantics live in one place instead of being reimplemented per dialog.
 export const MODAL_FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
