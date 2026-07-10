@@ -697,8 +697,8 @@ export function ConsoleIamAccessPage() {
             </form>
           </section>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-            <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="iam-users-heading" aria-busy={loading}>
+          <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+            <section className="min-w-0 rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="iam-users-heading" aria-busy={loading}>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 id="iam-users-heading" className="text-lg font-semibold">Usuarios ({filteredUsers.length})</h2>
@@ -761,13 +761,13 @@ export function ConsoleIamAccessPage() {
 
               {pagedUsers.length > 0 ? (
                 <>
-                  <Table containerClassName="mt-4" aria-label="Usuarios IAM del realm activo">
+                  <Table className="min-w-[32rem]" containerClassName="mt-4" aria-label="Usuarios IAM del realm activo">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Usuario</TableHead>
+                        <TableHead className="w-[9rem]">Usuario</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Acciones</TableHead>
+                        <TableHead className="w-[7rem]">Estado</TableHead>
+                        <TableHead className="w-[5.5rem] px-2 text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -789,33 +789,37 @@ export function ConsoleIamAccessPage() {
                               </button>
                               <span className="mt-1 block font-mono text-xs text-muted-foreground">{userId}</span>
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{user.email ?? 'sin email'}</TableCell>
+                            <TableCell className="break-words text-muted-foreground">{user.email ?? 'sin email'}</TableCell>
                             <TableCell>
                               <Badge variant={suspended ? 'outline' : 'secondary'}>{suspended ? 'suspendido' : 'activo'}</Badge>
                             </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-2">
+                            <TableCell className="px-2 text-right">
+                              <div className="flex justify-end gap-1.5">
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
+                                  className="w-9 px-0"
                                   data-focus-key={`status-user-row-${userId}`}
                                   disabled={busy}
+                                  title={suspended ? 'Habilitar' : 'Suspender'}
                                   onClick={() => void setUserStatus(user, suspended, `status-user-row-${userId}`)}
                                 >
                                   {suspended ? <UserCheck className="h-4 w-4" aria-hidden="true" /> : <UserMinus className="h-4 w-4" aria-hidden="true" />}
-                                  {suspended ? 'Habilitar' : 'Suspender'}
+                                  <span className="sr-only">{suspended ? 'Habilitar' : 'Suspender'}</span>
                                 </Button>
                                 <Button
                                   type="button"
                                   variant="destructive"
                                   size="sm"
+                                  className="w-9 px-0"
                                   data-focus-key={`delete-user-${userId}`}
                                   disabled={busy}
+                                  title="Eliminar"
                                   onClick={() => confirmDeleteUser(user)}
                                 >
                                   <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                  Eliminar
+                                  <span className="sr-only">Eliminar</span>
                                 </Button>
                               </div>
                             </TableCell>
@@ -842,7 +846,7 @@ export function ConsoleIamAccessPage() {
               ) : null}
             </section>
 
-            <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="iam-user-detail-heading">
+            <section className="min-w-0 rounded-3xl border border-border bg-card/70 p-6 shadow-sm" aria-labelledby="iam-user-detail-heading">
               <h2 id="iam-user-detail-heading" className="text-lg font-semibold">
                 {selectedUser ? `Acceso de ${selectedUser.username}` : 'Selecciona un usuario'}
               </h2>
@@ -865,8 +869,8 @@ export function ConsoleIamAccessPage() {
               ) : (
                 <div className="mt-4 space-y-6">
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background/40 p-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{selectedUser.email ?? 'sin email'}</p>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium text-foreground">{selectedUser.email ?? 'sin email'}</p>
                       <p className="mt-1 font-mono text-xs text-muted-foreground">{getUserId(selectedUser)}</p>
                     </div>
                     <Badge variant={isUserSuspended(selectedUser) ? 'outline' : 'secondary'}>
