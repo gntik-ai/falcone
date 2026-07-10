@@ -21,6 +21,8 @@ membership removals fired without confirmation.
 - Add focused web-console tests for lifecycle routes, catalog creation, confirmed membership
   removal, search/pagination/error retry, and success/focus behavior.
 - Add a reference doc for the superadmin IAM access page behavior and route contract.
+- Align the existing kind control-plane create-role handler with the documented `roleName`
+  payload while preserving legacy `name` compatibility.
 
 ## Capabilities
 
@@ -32,7 +34,7 @@ membership removals fired without confirmation.
 
 ## Non-Goals
 
-- No backend route changes; the required `/v1/iam/realms/{realmId}/...` routes already exist.
+- No new backend route surface; the required `/v1/iam/realms/{realmId}/...` routes already exist.
 - OpenAPI, public route catalog, and generated family docs are updated to publish the existing IAM
   group and membership endpoints consumed by this page.
 - No role/group deletion UI; issue #763 asks for creation and assignment catalog management.
@@ -52,7 +54,8 @@ membership removals fired without confirmation.
 
 ## Risks and Rollback
 
-- Risk is limited to the superadmin-only IAM Access route. The change calls existing IAM endpoints
-  with documented payloads and keeps generated contract artifacts aligned.
+- Risk is limited to the superadmin-only IAM Access route and the create-role handler contract. The
+  change calls existing IAM endpoints with documented payloads and keeps generated contract
+  artifacts aligned.
 - Rollback is reverting `ConsoleIamAccessPage` and its focused tests, plus removing this OpenSpec
   change and the reference doc.

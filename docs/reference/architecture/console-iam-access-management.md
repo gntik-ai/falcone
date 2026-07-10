@@ -41,7 +41,9 @@ post-mutation refetch.
 
 ## Contract note
 
-Issue #763 did not require backend implementation changes. The required IAM endpoints already exist
-in the control-plane route map, and the console consumes those existing endpoints directly. The
-OpenAPI source, public-route catalog, and generated public API family docs publish the existing group
-and membership routes so the fuller IAM page is wired to documented API surface.
+Issue #763 did not require new backend route surface. The required IAM endpoints already exist in
+the control-plane route map, and the console consumes those existing endpoints directly. The kind
+control-plane create-role handler accepts the documented `roleName` payload, while preserving legacy
+`name` compatibility for older callers. The OpenAPI source, public-route catalog, and generated
+public API family docs publish the existing group and membership routes so the fuller IAM page is
+wired to documented API surface.
