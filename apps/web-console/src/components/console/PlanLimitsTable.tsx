@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Save } from 'lucide-reac
 import type { LimitProfileRow } from '@/services/planManagementApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 export type PlanLimitRowStatus = {
@@ -99,126 +100,128 @@ export function PlanLimitsTable({
   }, [dimensions])
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[56rem] divide-y divide-border text-left text-sm" aria-busy={busyDimensionKey !== null}>
-        <caption className="sr-only">Límites del plan</caption>
-        <thead className="bg-muted/40">
-          <tr className="text-xs uppercase text-muted-foreground">
-            <th scope="col" className="px-4 py-3 font-medium">Dimensión</th>
-            <th scope="col" className="px-4 py-3 text-right font-medium">Valor</th>
-            <th scope="col" className="px-4 py-3 font-medium">Estado</th>
-            <th scope="col" className="px-4 py-3 font-medium">Origen</th>
-            <th scope="col" className="px-4 py-3 font-medium">Unidad</th>
-            <th scope="col" className="px-4 py-3 text-right font-medium"><span className="sr-only">Acciones</span></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/80">
-          {dimensions.map((dimension) => {
-            const isBusy = busyDimensionKey === dimension.dimensionKey
-            const controlId = safeControlId(dimension.dimensionKey)
-            const helpId = `${controlId}-limit-help`
-            const statusId = `${controlId}-limit-status`
-            const persistedValue = limitInputValue(dimension)
-            const draftValue = inputValues[dimension.dimensionKey] ?? persistedValue
-            const validation = validateDraftValue(draftValue)
-            const isDirty = validation.valid ? validation.value !== dimension.effectiveValue : draftValue.trim() !== persistedValue
-            const rowStatus = rowStatuses[dimension.dimensionKey]
-            const displayedStatus = formatRowStatus({ validation, isDirty, rowStatus })
-            const canSave = editable && !isBusy && validation.valid && isDirty
+    <Table
+      aria-busy={busyDimensionKey !== null}
+      containerClassName="border-border/70 bg-card/60 shadow-sm"
+      className="min-w-[56rem] text-left"
+    >
+      <TableCaption>Límites del plan</TableCaption>
+      <TableHeader className="bg-muted/40">
+        <TableRow>
+          <TableHead scope="col">Dimensión</TableHead>
+          <TableHead scope="col" className="text-right">Valor</TableHead>
+          <TableHead scope="col">Estado</TableHead>
+          <TableHead scope="col">Origen</TableHead>
+          <TableHead scope="col">Unidad</TableHead>
+          <TableHead scope="col" className="text-right"><span className="sr-only">Acciones</span></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody className="divide-border/80 bg-background/30">
+        {dimensions.map((dimension) => {
+          const isBusy = busyDimensionKey === dimension.dimensionKey
+          const controlId = safeControlId(dimension.dimensionKey)
+          const helpId = `${controlId}-limit-help`
+          const statusId = `${controlId}-limit-status`
+          const persistedValue = limitInputValue(dimension)
+          const draftValue = inputValues[dimension.dimensionKey] ?? persistedValue
+          const validation = validateDraftValue(draftValue)
+          const isDirty = validation.valid ? validation.value !== dimension.effectiveValue : draftValue.trim() !== persistedValue
+          const rowStatus = rowStatuses[dimension.dimensionKey]
+          const displayedStatus = formatRowStatus({ validation, isDirty, rowStatus })
+          const canSave = editable && !isBusy && validation.valid && isDirty
 
-            return (
-              <tr key={dimension.dimensionKey} aria-busy={isBusy} className="align-top transition-colors hover:bg-muted/30">
-                <th scope="row" className="max-w-[18rem] whitespace-normal break-words px-4 py-4 text-left font-medium text-foreground">{dimension.displayLabel}</th>
-                <td className="w-40 px-4 py-4 text-right tabular-nums">
-                  {editable ? (
-                    <div>
-                      <Input
-                        className="ml-auto h-9 w-32 rounded-md text-right tabular-nums"
-                        aria-label={`${dimension.displayLabel}: valor del límite`}
-                        aria-describedby={`${helpId} ${statusId}`}
-                        aria-invalid={!validation.valid}
-                        type="number"
-                        inputMode="numeric"
-                        min={-1}
-                        step={1}
-                        value={draftValue}
-                        disabled={isBusy}
-                        onChange={(event) => {
-                          const nextDraft = event.currentTarget.value
-                          setInputValues((current) => ({ ...current, [dimension.dimensionKey]: nextDraft }))
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape') {
-                            setInputValues((current) => ({ ...current, [dimension.dimensionKey]: persistedValue }))
-                          } else if (event.key === 'Enter' && canSave && validation.valid) {
-                            event.preventDefault()
-                            void onUpdate?.(dimension.dimensionKey, validation.value)
-                          }
-                        }}
-                      />
-                      <span id={helpId} className="sr-only">Usa -1 para indicar sin límite. Haz clic en Guardar para confirmar el cambio.</span>
-                    </div>
-                  ) : dimension.effectiveValue === -1 ? 'Sin límite' : String(dimension.effectiveValue)}
-                </td>
-                <td className="w-56 px-4 py-4">
-                  <span
-                    id={statusId}
-                    role={displayedStatus.role}
-                    aria-live={displayedStatus.role ? (displayedStatus.role === 'alert' ? 'assertive' : 'polite') : undefined}
-                    className={cn(
-                      'inline-flex min-h-8 max-w-full items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium leading-5',
-                      displayedStatus.tone === 'muted' && 'border-border bg-muted/30 text-muted-foreground',
-                      displayedStatus.tone === 'success' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100',
-                      displayedStatus.tone === 'warning' && 'border-amber-500/40 bg-amber-500/10 text-amber-100',
-                      displayedStatus.tone === 'destructive' && 'border-destructive/40 bg-destructive/10 text-destructive'
-                    )}
-                  >
-                    {displayedStatus.icon === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
-                    {displayedStatus.icon === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                    {displayedStatus.icon === 'error' ? <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                    <span>{displayedStatus.label}</span>
-                  </span>
-                </td>
-                <td className="px-4 py-4 text-muted-foreground">{formatLimitSource(dimension.source)}</td>
-                <td className="px-4 py-4 text-muted-foreground">{dimension.unit ?? 'count'}</td>
-                <td className="w-56 px-4 py-4">
-                  {editable ? (
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        className="min-w-[6.5rem] whitespace-nowrap"
-                        disabled={!canSave}
-                        aria-label={isBusy ? `Guardando límite de ${dimension.displayLabel}` : `Guardar límite de ${dimension.displayLabel}`}
-                        onClick={() => {
-                          if (!validation.valid || !isDirty) return
+          return (
+            <TableRow key={dimension.dimensionKey} aria-busy={isBusy} className="align-top hover:bg-muted/30">
+              <TableHead scope="row" className="max-w-[18rem] whitespace-normal break-words py-4 text-left font-medium text-foreground">{dimension.displayLabel}</TableHead>
+              <TableCell className="w-40 py-4 text-right tabular-nums">
+                {editable ? (
+                  <div>
+                    <Input
+                      className="ml-auto h-9 w-32 rounded-md text-right tabular-nums"
+                      aria-label={`${dimension.displayLabel}: valor del límite`}
+                      aria-describedby={`${helpId} ${statusId}`}
+                      aria-invalid={!validation.valid}
+                      type="number"
+                      inputMode="numeric"
+                      min={-1}
+                      step={1}
+                      value={draftValue}
+                      disabled={isBusy}
+                      onChange={(event) => {
+                        const nextDraft = event.currentTarget.value
+                        setInputValues((current) => ({ ...current, [dimension.dimensionKey]: nextDraft }))
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          setInputValues((current) => ({ ...current, [dimension.dimensionKey]: persistedValue }))
+                        } else if (event.key === 'Enter' && canSave && validation.valid) {
+                          event.preventDefault()
                           void onUpdate?.(dimension.dimensionKey, validation.value)
-                        }}
-                      >
-                        {isBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
-                        {isBusy ? 'Guardando' : 'Guardar'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="min-w-[7.25rem] whitespace-nowrap"
-                        disabled={isBusy}
-                        aria-label={`Restablecer límite de ${dimension.displayLabel} al valor predeterminado`}
-                        onClick={() => onResetRequest?.(dimension)}
-                      >
-                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                        Restablecer
-                      </Button>
-                    </div>
-                  ) : null}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+                        }
+                      }}
+                    />
+                    <span id={helpId} className="sr-only">Usa -1 para indicar sin límite. Haz clic en Guardar para confirmar el cambio.</span>
+                  </div>
+                ) : dimension.effectiveValue === -1 ? 'Sin límite' : String(dimension.effectiveValue)}
+              </TableCell>
+              <TableCell className="w-56 py-4">
+                <span
+                  id={statusId}
+                  role={displayedStatus.role}
+                  aria-live={displayedStatus.role ? (displayedStatus.role === 'alert' ? 'assertive' : 'polite') : undefined}
+                  className={cn(
+                    'inline-flex min-h-8 max-w-full items-center gap-2 whitespace-normal rounded-md border px-2.5 py-1 text-left text-xs font-medium leading-5',
+                    displayedStatus.tone === 'muted' && 'border-border bg-muted/30 text-muted-foreground',
+                    displayedStatus.tone === 'success' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100',
+                    displayedStatus.tone === 'warning' && 'border-amber-500/40 bg-amber-500/10 text-amber-100',
+                    displayedStatus.tone === 'destructive' && 'border-destructive/40 bg-destructive/10 text-destructive'
+                  )}
+                >
+                  {displayedStatus.icon === 'saving' ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" /> : null}
+                  {displayedStatus.icon === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+                  {displayedStatus.icon === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+                  <span className="min-w-0">{displayedStatus.label}</span>
+                </span>
+              </TableCell>
+              <TableCell className="py-4 text-muted-foreground">{formatLimitSource(dimension.source)}</TableCell>
+              <TableCell className="py-4 text-muted-foreground">{dimension.unit ?? 'count'}</TableCell>
+              <TableCell className="w-56 py-4">
+                {editable ? (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className="min-w-[6.5rem] whitespace-nowrap"
+                      disabled={!canSave}
+                      aria-label={isBusy ? `Guardando límite de ${dimension.displayLabel}` : `Guardar límite de ${dimension.displayLabel}`}
+                      onClick={() => {
+                        if (!validation.valid || !isDirty) return
+                        void onUpdate?.(dimension.dimensionKey, validation.value)
+                      }}
+                    >
+                      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+                      {isBusy ? 'Guardando' : 'Guardar'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-w-[7.25rem] whitespace-nowrap"
+                      disabled={isBusy}
+                      aria-label={`Restablecer límite de ${dimension.displayLabel} al valor predeterminado`}
+                      onClick={() => onResetRequest?.(dimension)}
+                    >
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                      Restablecer
+                    </Button>
+                  </div>
+                ) : null}
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
   )
 }
