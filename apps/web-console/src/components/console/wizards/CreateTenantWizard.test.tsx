@@ -70,6 +70,29 @@ describe('CreateTenantWizard', () => {
     expect(requestMock).toHaveBeenCalledWith('/v1/tenants', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ name: 'Tenant Nuevo', planId: '11111111-1111-4111-8111-111111111111', region: 'eu-west' }) }))
   })
 
+  it('[#751] distingue visualmente el paso actual de los pasos completados', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<MemoryRouter><CreateTenantWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
+
+    expect(container.querySelector('li[data-state="current"]')).toHaveTextContent('Nombre')
+    expect(container.querySelector('li[data-state="current"]')).toHaveTextContent(/paso actual/i)
+    expect(container.querySelectorAll('li[data-state="completed"]')).toHaveLength(0)
+    expect(container.querySelector('li[data-state="upcoming"]')).toHaveTextContent(/pendiente/i)
+
+    await user.type(screen.getByLabelText(/nombre de la organización/i), 'Tenant Nuevo')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+
+    const completedStep = container.querySelector('li[data-state="completed"]')
+    const currentStep = container.querySelector('li[data-state="current"]')
+    expect(completedStep).toHaveTextContent('Nombre')
+    expect(currentStep).toHaveTextContent('Plan')
+    expect(completedStep).toHaveTextContent(/completado/i)
+    expect(currentStep).toHaveTextContent(/paso actual/i)
+    expect(currentStep).toHaveAttribute('aria-current', 'step')
+    expect(currentStep).toHaveClass('bg-primary')
+    expect(completedStep).toHaveClass('bg-primary/10')
+  })
+
   it('[#752] tras una creación exitosa, invoca onCreated para que ConsoleTenantsPage refresque el inventario sin recarga manual', async () => {
     // ConsoleTenantsPage.tsx wires <CreateTenantWizard onCreated={() => void reloadTenants()} />.
     // Pin the wizard's half of that contract: a successful submit must call onCreated exactly
