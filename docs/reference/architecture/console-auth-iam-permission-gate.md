@@ -22,3 +22,9 @@ that console route remains superadmin-gated and hidden from their navigation. Fu
 can add tenant-owner own-realm role/client management, but it must do so by changing the backend
 authorization model and documenting the new supported route contract rather than reusing the
 superadmin-only platform pages unchanged.
+
+As of issue #763, the superadmin IAM Access page is a full realm IAM lifecycle surface rather than a
+membership-only helper: it can create/suspend/enable/delete realm users, create roles and groups, and
+assign/remove role and group memberships with destructive confirmations and standard console state
+handling. See `docs/reference/architecture/console-iam-access-management.md` for the supported
+actions and contract notes.
