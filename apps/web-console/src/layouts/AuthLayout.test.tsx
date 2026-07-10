@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -121,7 +121,7 @@ describe('AuthLayout [#731]', () => {
     router.navigate('/login')
 
     await screen.findByText('Login content')
-    expect(document.title).toBe('Acceso · Consola In Falcone')
+    await waitFor(() => expect(document.title).toBe('Acceso · Consola In Falcone'))
     // Same header element instance stays mounted across the route change (AuthLayout itself never
     // unmounts/remounts when moving within the unauthenticated funnel).
     expect(screen.getByRole('banner')).toBe(headerBeforeNavigation)
