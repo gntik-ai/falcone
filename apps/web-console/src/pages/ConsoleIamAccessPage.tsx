@@ -332,7 +332,7 @@ export function ConsoleIamAccessPage() {
     try {
       await requestConsoleSessionJson(`/v1/iam/realms/${encodeURIComponent(realm)}/roles`, {
         method: 'POST',
-        body: { name: roleName }
+        body: { roleName }
       })
       setCreateRoleForm({ name: '' })
       await loadCatalog(realm, {
@@ -385,7 +385,9 @@ export function ConsoleIamAccessPage() {
     if (!realm || !selectedUserId) return
     beginMutation()
     try {
-      await requestConsoleSessionJson(path, { method, body: body ?? ({} as JsonValue) })
+      const requestOptions: { method: typeof method; body?: JsonValue } = { method }
+      if (body !== undefined) requestOptions.body = body
+      await requestConsoleSessionJson(path, requestOptions)
       await loadUserDetail(realm, selectedUserId, { focusKey, successMessage: success })
     } catch (rawError) {
       setMutationError(errMsg(rawError, 'La operación de IAM no pudo completarse.'))

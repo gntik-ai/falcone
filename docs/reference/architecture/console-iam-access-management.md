@@ -22,6 +22,10 @@ optional `email`, `enabled: true`, `emailVerified: true`, optional
 deliberately does not post unsupported create-user fields such as `groups`, `metadata`, or
 bootstrap email delivery.
 
+Role creation posts the documented `roleName` field. Group creation posts `name`. User group
+membership add/remove routes are path-parameter operations and the page does not send a request
+body for those calls.
+
 ## Safety and state handling
 
 Membership removals are destructive access changes, so the page uses the shared

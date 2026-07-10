@@ -186,7 +186,7 @@ describe('ConsoleIamAccessPage', () => {
     await waitFor(() => {
       expect(requestConsoleSessionJsonMock).toHaveBeenCalledWith(
         '/v1/iam/realms/tenant-alpha/roles',
-        expect.objectContaining({ method: 'POST', body: { name: 'security_auditor' } })
+        expect.objectContaining({ method: 'POST', body: { roleName: 'security_auditor' } })
       )
     })
 
@@ -215,6 +215,8 @@ describe('ConsoleIamAccessPage', () => {
         expect.objectContaining({ method: 'PUT' })
       )
     })
+    const groupAddOptions = findMutationCall('PUT', '/groups/grp-soporte')?.[1] as { body?: JsonValue } | undefined
+    expect(groupAddOptions).not.toHaveProperty('body')
   })
 
   it('uses the IAM state field for stale suspended users in the detail controls', async () => {
@@ -276,6 +278,8 @@ describe('ConsoleIamAccessPage', () => {
     await waitFor(() => {
       expect(findMutationCall('DELETE', '/groups/grp-1')).toBeDefined()
     })
+    const groupRemoveOptions = findMutationCall('DELETE', '/groups/grp-1')?.[1] as { body?: JsonValue } | undefined
+    expect(groupRemoveOptions).not.toHaveProperty('body')
     await waitFor(() => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     })
@@ -499,9 +503,9 @@ function stubIamApi(overrides: Partial<IamApiState> = {}) {
     }
 
     if (method === 'POST' && url === '/v1/iam/realms/tenant-alpha/roles') {
-      const name = String(objectBody(options?.body).name ?? '')
+      const name = String(objectBody(options?.body).roleName ?? '')
       state.roles.push(createRole(name))
-      return { name }
+      return { roleName: name }
     }
 
     if (method === 'POST' && url === '/v1/iam/realms/tenant-alpha/groups') {
