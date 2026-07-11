@@ -58,11 +58,12 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   to OpenBao, preferably via Kubernetes auth when `BAO_TOKEN` is absent.
 - [x] Temporal: make persistence host release-aware, keep internal-only ClusterIP services, and
   register namespace/search attributes.
-- [ ] MCP: set `MCP_ENABLED=true`, configure a real runtime image/digest, bind RBAC to the serving
+- [x] MCP: set `MCP_ENABLED=true`, configure a real runtime image tag through `mcp.runtimeImage`, bind RBAC to the serving
   runtime ServiceAccount, and replace core in-memory MCP state with PostgreSQL-backed persistence.
-  RBAC is bound to the Helm-owned executor ServiceAccount and MCP registry/audit/rate state now
-  writes through a row-locked PostgreSQL store; the verified public runtime image/digest remains
-  blocked on image publication.
+  RBAC is bound to the Helm-owned executor ServiceAccount, MCP registry/audit/rate state now writes
+  through a row-locked PostgreSQL store, and default/OpenShift renders resolve
+  `in-falcone-mcp-runtime:0.3.0` from the single chart `mcp.runtimeImage` value block. Digest pinning
+  remains a fresh-install evidence step once the exact deployed manifest is recorded.
 
 ## T07: Update schema and validators
 
@@ -198,12 +199,27 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   `openspec validate make-all-services-core --strict`; `npm run validate:repo`; `git diff --check`.
 - Fresh clean-cluster install was intentionally not run in this implementer stage per orchestrator
   instruction.
-- GHCR publication of the coherent first-party `0.3.0` image set succeeded via GitHub Actions run
-  `29150940923` for:
+- The coherent first-party `0.3.0` image set is six images:
   `ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.3.0`,
+  `ghcr.io/gntik-ai/in-falcone-web-console:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.3.0`,
-  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0`, and
-  `ghcr.io/gntik-ai/in-falcone-web-console:0.3.0`.
+  `ghcr.io/gntik-ai/in-falcone-fn-runtime:0.3.0`, and
+  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0`. This branch does not publish images; the
+  OpenShift/Harbor docs require all six tags to be mirrored before a fresh all-core install. The
+  `fn-runtime:0.3.0` external manifest may be published after this commit.
 - Digest pinning and final release evidence remain intentionally unchecked until the clean
   fresh-cluster install records the exact manifests deployed from this branch.
+- Fifth-reviewer revision fixed the OpenShift/Harbor render blockers without publishing images or
+  touching a cluster: OpenShift values now resolve MCP, control-plane, web-console, and fn-runtime to
+  the coherent `0.3.0` release set; helper/operator images render through Harbor; MCP runtime image
+  remains sourced only from `mcp.runtimeImage`; the Harbor docs mirror is synchronized and treats
+  `fn-runtime:0.3.0` as part of the required six-image set without claiming publication.
+- Fifth-reviewer validation run: `helm dependency build charts/in-falcone`; `helm lint
+  charts/in-falcone --namespace review-ns`; default, custom namespace, OpenShift/Harbor, default
+  upgrade, and OpenShift upgrade `helm template` renders; Harbor render public-registry/stale-tag
+  scan; `node --test tests/blackbox/all-core-install-readiness.test.mjs`; focused MCP/runtime/unit
+  tests; `bash -n scripts/system-changes/make-all-services-core/*.sh`; `openspec validate
+  make-all-services-core --strict`; `npm run validate:repo`; `git diff --check`. `npm run lint:md`
+  and `npm run lint:snippets` still fail only on the pre-existing `README-loop-kit.md` formatting
+  issues and missing `docs/guides/realtime/frontend-quickstart.md`.

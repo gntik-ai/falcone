@@ -86,7 +86,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tls-bootstrap
-          image: {{ $b.image.repository }}:{{ $b.image.tag }}
+          image: {{ include "openbao.image" (dict "root" . "image" $b.image) | quote }}
           imagePullPolicy: {{ $b.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false

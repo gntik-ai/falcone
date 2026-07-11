@@ -13,7 +13,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migrate-secrets
-          image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          image: {{ include "openbao.image" (dict "root" . "image" .Values.openbao.image) | quote }}
           command: ["/bin/sh", "-ec"]
           args:
             - |

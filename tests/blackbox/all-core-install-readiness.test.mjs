@@ -19,6 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
 const KIND_VALUES = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
+const OPENSHIFT_VALUES = resolve(REPO_ROOT, 'deploy', 'openshift', 'values-openshift.yaml');
 const CUTOVER_SCRIPTS = resolve(REPO_ROOT, 'scripts', 'system-changes', 'make-all-services-core');
 
 function helmAvailable() {
@@ -281,6 +282,39 @@ test('all-core-006b: MCP runtime image and digest render from one chart value bl
   assert.match(out, /name:\s*in-falcone-runtime-env[\s\S]*MCP_RUNTIME_IMAGE:\s*"ghcr\.io\/example\/mcp-runtime:1\.2\.3"/, 'MCP runtime image must render from mcp.runtimeImage.repository/tag');
   assert.match(out, new RegExp(`MCP_RUNTIME_IMAGE_DIGEST:\\s*"${escapeRe(digest)}"`), 'MCP runtime digest must render from mcp.runtimeImage.digest');
   assert.doesNotMatch(out, /value:\s*ghcr\.io\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0/, 'control-plane/executor env must not hard-code MCP_RUNTIME_IMAGE outside the runtime env ConfigMap');
+});
+
+test('all-core-006d: OpenShift Harbor overlay renders Harbor-only coherent release images', SKIP, () => {
+  const out = assertRender(['-f', OPENSHIFT_VALUES, '--include-crds']);
+  const docs = parseAllDocuments(out).map((doc) => doc.toJSON()).filter(Boolean);
+  const images = imageList(docs);
+  assert.ok(images.length > 0, 'OpenShift render must contain workload images');
+  for (const image of images) {
+    assert.match(image, /^harbor\.example\.com\/falcone\//, `image must resolve to the configured Harbor registry: ${image}`);
+  }
+  assert.doesNotMatch(out, /\b(?:docker\.io|ghcr\.io|quay\.io|gcr\.io|registry\.k8s\.io)\//, 'Harbor render must not contain public registry references');
+  assert.doesNotMatch(out, /\bin-falcone-[^:\s"']+:(?:0\.1\.0|0\.2\.11|0\.6\.2|0\.9\.3)\b/, 'OpenShift first-party images must not mix stale tags');
+
+  for (const image of [
+    'in-falcone-control-plane',
+    'in-falcone-control-plane-executor',
+    'in-falcone-workflow-worker',
+    'in-falcone-web-console',
+  ]) {
+    assert.ok(images.includes(`harbor.example.com/falcone/gntik-ai/${image}:0.3.0`), `${image} must render from Harbor with the 0.3.0 release tag`);
+  }
+  assert.match(out, /name:\s*in-falcone-runtime-env[\s\S]*MCP_RUNTIME_IMAGE:\s*"harbor\.example\.com\/falcone\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0"/, 'OpenShift MCP runtime image must come from mcp.runtimeImage with the Harbor 0.3.0 tag');
+  assert.doesNotMatch(out, /name:\s*MCP_RUNTIME_IMAGE\s*\n\s*value:/, 'workloads must consume MCP_RUNTIME_IMAGE from the runtime env ConfigMap, not hard-code it in env');
+  assert.match(out, /name:\s*FN_RUNTIME_IMAGE[\s\S]*value:\s*harbor\.example\.com\/falcone\/gntik-ai\/in-falcone-fn-runtime:0\.3\.0/, 'OpenShift function runtime must use the Harbor 0.3.0 image');
+  assert.ok(images.includes('harbor.example.com/falcone/external-secrets/external-secrets:v0.9.0'), 'external-secrets operator images must render from Harbor');
+  assert.ok(images.includes('harbor.example.com/falcone/openbao/openbao:2.3.1'), 'OpenBao images must render from Harbor');
+  assert.ok(images.includes('harbor.example.com/falcone/alpine/k8s:1.32.2'), 'install/helper images must render from Harbor');
+});
+
+test('all-core-006e: OpenShift Harbor documentation mirrors stay synchronized', () => {
+  const installation = readFileSync(resolve(REPO_ROOT, 'docs', 'installation', 'openshift-airgapped-harbor.md'), 'utf8');
+  const site = readFileSync(resolve(REPO_ROOT, 'docs-site', 'operations', 'openshift-airgapped-harbor.md'), 'utf8');
+  assert.equal(site, installation, 'docs-site OpenShift Harbor guide must mirror docs/installation');
 });
 
 test('all-core-008: ESO cluster-scoped ownership preflight renders', SKIP, () => {

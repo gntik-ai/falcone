@@ -80,7 +80,7 @@ spec:
       securityContext: {runAsNonRoot: true, runAsUser: 472, fsGroup: 472}
       containers:
         - name: grafana
-          image: "{{ .Values.grafana.image.repository }}:{{ .Values.grafana.image.tag }}"
+          image: {{ include "in-falcone.imageNameWithTag" (dict "root" . "image" .Values.grafana.image) | quote }}
           imagePullPolicy: {{ .Values.grafana.image.pullPolicy | default "IfNotPresent" }}
           ports: [{name: http, containerPort: 3000}]
           env:

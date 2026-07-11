@@ -18,6 +18,8 @@
   no seed Job.
 */ -}}
 {{- if not .Values.seaweedfs.s3.enableAuth }}
+{{- $seaweedfsRepository := dig "global" "seaweedfs" "image" "name" "chrislusf/seaweedfs" .Values.seaweedfs -}}
+{{- $seaweedfsImage := dict "repository" $seaweedfsRepository "tag" "4.33" -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -51,8 +53,9 @@ spec:
       {{- end }}
       containers:
         - name: admin-seed
-          # Pinned to the seaweedfs subchart's app version (Chart.yaml dep seaweedfs-4.33.0).
-          image: chrislusf/seaweedfs:4.33
+          # Pinned to the seaweedfs subchart image selection so Harbor/airgap
+          # installs follow global.imageRegistry and the OpenShift overlay.
+          image: {{ include "in-falcone.imageNameWithTag" (dict "root" . "image" $seaweedfsImage) | quote }}
           imagePullPolicy: IfNotPresent
           env:
             - name: SW_MASTER

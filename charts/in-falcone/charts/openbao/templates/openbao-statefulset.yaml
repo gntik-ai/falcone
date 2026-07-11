@@ -19,7 +19,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: openbao
-          image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          image: {{ include "openbao.image" (dict "root" . "image" .Values.openbao.image) | quote }}
           imagePullPolicy: {{ .Values.openbao.image.pullPolicy }}
           args:
             - server

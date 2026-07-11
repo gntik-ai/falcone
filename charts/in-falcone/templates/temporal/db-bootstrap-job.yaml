@@ -35,7 +35,7 @@ spec:
       {{- end }}
       containers:
         - name: temporal-db-bootstrap
-          image: "{{ $t.dbBootstrap.image.repository }}:{{ $t.dbBootstrap.image.tag }}"
+          image: {{ include "in-falcone.temporal.image" (dict "root" $root "image" $t.dbBootstrap.image) | quote }}
           imagePullPolicy: {{ $t.dbBootstrap.image.pullPolicy | default "IfNotPresent" }}
           command:
             - /bin/sh

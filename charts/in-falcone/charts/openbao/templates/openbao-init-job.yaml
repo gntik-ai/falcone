@@ -14,7 +14,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: platform-credential-loader
-          image: "{{ .Values.openbao.credentialSync.image.repository }}:{{ .Values.openbao.credentialSync.image.tag }}"
+          image: {{ include "openbao.image" (dict "root" . "image" .Values.openbao.credentialSync.image) | quote }}
           imagePullPolicy: {{ .Values.openbao.credentialSync.image.pullPolicy }}
           command: ["/bin/sh", "-ec"]
           args:
@@ -78,7 +78,7 @@ spec:
             - name: recovery-out
               mountPath: /openbao-recovery
         - name: openbao-init
-          image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          image: {{ include "openbao.image" (dict "root" . "image" .Values.openbao.image) | quote }}
           imagePullPolicy: {{ .Values.openbao.image.pullPolicy }}
           command: ["/bin/sh", "-ec"]
           args:

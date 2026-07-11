@@ -1869,7 +1869,7 @@ keycloak:
   # postgresql Service host for ANY release name (no per-profile override needed).
   initContainers:
     - name: keycloak-db-init
-      image: "{{ .Values.database.initImage.repository }}:{{ .Values.database.initImage.tag }}"
+      image: '{{ include "component-wrapper.renderImage" (dict "Values" .Values "image" .Values.database.initImage "name" "keycloak database init") }}'
       imagePullPolicy: "{{ .Values.database.initImage.pullPolicy | default \"IfNotPresent\" }}"
       command:
         - /bin/sh
@@ -2435,12 +2435,12 @@ ferretdb:
     inline: {}
   # Engine-first hard gate (add-ferretdb-gateway task 7.3): block the gateway container
   # until the documentdb engine accepts connections AND the documentdb_api schema exists
-  # (loaded by the engine's CREATE EXTENSION init Job). Uses the engine image (psql +
-  # version-coupled). AIRGAP NOTE: initContainer images are NOT auto-rewritten by
-  # global.imageRegistry; mirror/override this image alongside the engine image.
+  # (loaded by the engine's CREATE EXTENSION init Job). Uses the version-coupled engine
+  # image (psql + documentdb client surface) and routes through the component image
+  # helper so global.imageRegistry rewrites it for Harbor/airgap installs.
   initContainers:
     - name: wait-for-documentdb
-      image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7
+      image: '{{ include "component-wrapper.renderImage" (dict "Values" .Values "image" (dict "repository" "ghcr.io/ferretdb/postgres-documentdb" "tag" "17-0.107.0-ferretdb-2.7.0" "digest" "sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7") "name" "ferretdb engine gate") }}'
       imagePullPolicy: IfNotPresent
       command:
         - /bin/bash
@@ -2729,11 +2729,10 @@ seaweedfs:
     # PostgreSQL service name. Superuser creds come from the postgresql Secret.
     initContainers: |-
       - name: wait-and-create-filer-db
-        # NOTE: docker.io/bitnami/postgresql:16 was removed in the bitnami -> bitnamilegacy
-        # image purge (NotFound on pull). Use the same non-root (UID 1001) bitnamilegacy
-        # postgres client image the umbrella already runs for postgresql, so pg_isready/psql
-        # are present and `runAsNonRoot: true` is satisfied.
-        image: docker.io/bitnamilegacy/postgresql:17.2.0
+        # Use the same non-root (UID 1001) bitnamilegacy postgres client image the
+        # umbrella already runs for postgresql, so pg_isready/psql are present and
+        # `runAsNonRoot: true` is satisfied.
+        image: '{{ if .Values.global.imageRegistry }}{{ trimSuffix "/" .Values.global.imageRegistry }}/bitnamilegacy/postgresql:17.2.0{{ else }}docker.io/bitnamilegacy/postgresql:17.2.0{{ end }}'
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

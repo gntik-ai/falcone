@@ -3,9 +3,10 @@
 > **Scope.** This is a single authoritative runbook for deploying the **entire Falcone
 > multitenant BaaS platform** on **OpenShift 4.14+** inside a locked‑down enterprise
 > network, using **plain declarative manifests applied with `oc apply -f` only** — no
-> Helm, Kustomize, Operators/OLM, or templating tools. Every image (including build
-> base images, init containers and sidecars) is pulled **exclusively from a private
-> Harbor registry**.
+> Helm, Kustomize, or templating tools for the Falcone manifests. OpenShift Serverless
+> is a prerequisite for the runtime-created Functions and MCP Knative Services. Every
+> image (including build base images, init containers and sidecars) is pulled
+> **exclusively from a private Harbor registry**.
 >
 > **How this guide was produced.** The manifests below were derived from the project's
 > own deployment source of truth — the umbrella Helm chart `charts/in-falcone` (its
@@ -85,7 +86,7 @@ message bus), and **operational core services** (observability, secrets manager,
 > (Knative).** The core install includes the executor, MCP routes/RBAC, and function
 > runtime image references. The executor creates a Knative `Service` per function/server
 > at runtime, which needs the **OpenShift Serverless Operator** + a `KnativeServing` CR
-> present on the cluster. Everything else in this guide is plain manifests.
+> present on the cluster before all-core verification.
 
 ### 1.2 Dependency / startup order (mermaid)
 
@@ -167,7 +168,7 @@ slot in after the data plane is healthy.
 
 2. **Privileges.**
    - *Namespace‑scoped* operator can apply everything in §4–§7 **except** the
-     ClusterRole/ClusterRoleBinding (OpenBao Kubernetes‑auth, optional) and the SCC
+     ClusterRole/ClusterRoleBinding (OpenBao Kubernetes‑auth) and the SCC
      binding, which need **cluster‑admin** (or a one‑time grant by cluster‑admin).
    - Creating the `Project`/`Namespace` needs the `self-provisioner` role or
      cluster‑admin.
@@ -193,7 +194,8 @@ slot in after the data plane is healthy.
    is required for the core. The few upstream images that pin a uid/fsGroup have those
    pins **removed** in this guide (see the per‑component notes) so `restricted-v2`
    admits them.
-6. **(Optional) OpenShift Serverless** for functions/MCP (see §1.1).
+6. **OpenShift Serverless** installed with a `KnativeServing` CR for functions/MCP
+   runtime creation (see §1.1).
 
 ---
 
@@ -249,14 +251,22 @@ Harbor targets for the built images:
 `.../in-falcone-workflow-worker:0.3.0`, `.../in-falcone-fn-runtime:0.3.0`,
 `.../in-falcone-mcp-runtime:0.3.0`.
 
+The shipped Helm OpenShift overlay preserves the GHCR organization path when
+`global.imageRegistry` rewrites first-party images, so that render expects
+`${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-*:0.3.0`. The plain manifests in
+this guide use the flat paths above. Mirror the six images to the exact path your
+manifests reference and do not mix both conventions in one install.
+
 Build bases to mirror (for BuildConfig): `node:22-alpine` and `node:22-slim`
 (to `${HARBOR}/${HARBOR_PROJECT}/library/...`).
 
-> **Unpinned/placeholder versions flagged (do not silently pick a tag):**
+> **Release image notes (do not silently pick a tag):**
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
-> - Falcone-built `0.3.0` images were published to GHCR by Actions run `29150940923`. Mirror those
->   exact tags to Harbor before install; do not invent digest pins until the fresh-cluster release
->   evidence records the manifests being deployed.
+> - The Falcone-built release set is six images at `0.3.0`: control-plane,
+>   control-plane-executor, web-console, workflow-worker, fn-runtime, and mcp-runtime.
+>   Mirror all six exact tags into Harbor before install. The `fn-runtime:0.3.0`
+>   external manifest may be published after this documentation change; do not run the
+>   all-core install until your Harbor contains that sixth image.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.
@@ -274,7 +284,6 @@ skopeo login ghcr.io
 skopeo login ${HARBOR}
 
 # Third-party (digest pins shown where the chart pins them)
-skopeo copy docker://docker.io/bitnamilegacy/postgresql:17.2.0          docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0
 skopeo copy docker://docker.io/bitnamilegacy/postgresql:17.2.0    docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0
 skopeo copy docker://docker.io/pgvector/pgvector:pg17             docker://${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17
 skopeo copy docker://ghcr.io/ferretdb/postgres-documentdb@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7 \
@@ -301,6 +310,15 @@ skopeo copy docker://docker.io/temporalio/ui:2.51.0            docker://${HARBOR
 # Build bases (only needed if you build in-cluster via BuildConfig — Appendix B)
 skopeo copy docker://docker.io/library/node:22-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine
 skopeo copy docker://docker.io/library/node:22-slim            docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-slim
+
+# Falcone-built release images. If a GHCR tag is not available yet, build it from
+# the listed Dockerfile on a connected CI/DMZ host and push the same 0.3.0 target tag.
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0          docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-control-plane:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.3.0 docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-control-plane-executor:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-web-console:0.3.0           docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-web-console:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-workflow-worker:0.3.0       docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-workflow-worker:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-fn-runtime:0.3.0            docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-fn-runtime:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0           docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-mcp-runtime:0.3.0
 ```
 
 > **Build‑from‑source images in air‑gap.** Building Falcone's own images in‑cluster
@@ -3597,7 +3615,7 @@ returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
 | Kafka CrashLoop / quorum errors | Multi‑broker on one StatefulSet with shared config/PVC | Use the single‑node config in §7.4, or deploy Strimzi for HA. |
 | Bootstrap Job times out at `wait-for-keycloak` | Keycloak not serving, or wrong internal URL/path | Confirm `falcone-keycloak` Ready and the script targets `…:8080/auth`; check the bootstrap script's namespace/DNS (§7.13 [VERIFY]). |
 | SeaweedFS install hangs at the bucket Job | NetworkPolicy dropped the Job's traffic to master/filer | Ensure the §4.2 SeaweedFS policy admits `batch.kubernetes.io/job-name: falcone-seaweedfs-bucket`. |
-| Functions/MCP fail to deploy | OpenShift Serverless (Knative) absent | Install the Serverless Operator + `KnativeServing`, or disable functions/MCP. |
+| Functions/MCP fail to deploy | OpenShift Serverless (Knative) absent | Install the Serverless Operator + `KnativeServing`, then retry the runtime-created workload. |
 | ImageStream trigger didn't roll out a Deployment | Deployments don't auto‑follow ImageStreams | Use direct Harbor image refs (default here), or add the `image.openshift.io/triggers` annotation (Appendix B). |
 | OpenBao pod CrashLoop `mlock` / `cannot allocate memory` | `IPC_LOCK` dropped under restricted SCC | `disable_mlock = true` is set in `openbao.hcl` (§8.1) — confirm it's applied. |
 
@@ -3621,8 +3639,8 @@ Changes made versus the raw chart render to achieve a clean air‑gap/OpenShift 
 2. **SeaweedFS s3 `hostPath` → `emptyDir`** for logs (restricted SCC forbids hostPath).
 3. **Removed pinned uid/fsGroup** on grafana (472), openbao (100/1000), documentdb (999),
    pgvector (999) so `restricted-v2` injects them from the namespace range.
-4. **Falcone-built images** must come from your Harbor project; do not deploy the old
-   `ghcr.io/example/…:0.1.0` placeholder or unverified public executor/worker/MCP-runtime tags.
+4. **Falcone-built images** must come from your Harbor project; do not deploy old
+   placeholders or unverified public first-party runtime tags.
 5. **SeaweedFS** mutable tag `4.33` → recommend the digest pin in §3.1.
 6. **Removed** the stray `kubernetes.io/ingress.class: nginx` annotation from Routes.
 7. **Namespace consolidation** — OpenBao (`secret-store`), SeaweedFS (`default`), ESO
@@ -3694,7 +3712,7 @@ metadata:
 
 Repeat the ImageStream/BuildConfig per build‑from‑source image
 (`in-falcone-control-plane-executor`, `in-falcone-web-console`,
-`in-falcone-workflow-worker`, `in-falcone-fn-runtime`) with the right
+`in-falcone-workflow-worker`, `in-falcone-fn-runtime`, `in-falcone-mcp-runtime`) with the right
 `dockerfilePath` and Harbor base (`node:22-alpine`, `node:22-slim`).
 
 ---
@@ -3704,16 +3722,17 @@ Repeat the ImageStream/BuildConfig per build‑from‑source image
 1. **Node‑level Harbor trust** (CA + any `ImageDigestMirrorSet`) is a cluster‑admin
    prerequisite — pull secrets alone don't establish registry TLS trust. *(§2)*
 2. **OpenShift Serverless (Knative)** must be present for the **functions** and **MCP**
-   capabilities; without it the platform runs but those features are disabled. This is
-   the only OLM/Operator dependency. *(§1.1)*
+   capabilities. This is the only OLM/Operator prerequisite for the all-core OpenShift
+   installation. *(§1.1)*
 3. **The three large generated ConfigMaps** (`realm.json`, `bootstrap.sh`,
    `gateway-policy.json`) are not inlined — generate them from the chart on a connected
    host and apply (§5.2). The realm export is **required** for bootstrap.
 4. **Build‑from‑source images** (`control-plane`, `control-plane-executor`,
-   `web-console`, `workflow-worker`, `fn-runtime`) must be pre‑built and pushed to Harbor
-   (recommended) or built via BuildConfig against an internal Git mirror. *(§3.1, App. B)*
-5. **Version pins to finalize:** SeaweedFS (use the digest, not `:4.33`), web‑console
-   real tag (`0.2.11` vs the `:0.1.0` placeholder), OpenBao (`2.3.1`). Mirror
+   `web-console`, `workflow-worker`, `fn-runtime`, `mcp-runtime`) must be pre‑built and
+   pushed to Harbor (recommended) or built via BuildConfig against an internal Git mirror.
+   *(§3.1, App. B)*
+5. **Production digest pins:** SeaweedFS should use the recorded digest rather than the
+   mutable `:4.33` tag; mirror the six first-party `0.3.0` images and OpenBao `2.3.1`
    by digest for production. *(§3.1)*
 6. **Executor backend env** (`PG*/MONGO*/STORAGE_S3*/KAFKA_BROKERS`,
    `CONTROL_PLANE_UPSTREAM`) and the **control‑plane `/healthz`** probe path are marked

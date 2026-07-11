@@ -34,7 +34,7 @@ data:
   # Logical-replication provisioning SQL, run once by the post-install init Job via `psql -f`
   # (add-ferretdb-realtime-cdc-remediation #460). Idempotent. :role / :pw / :pub are passed by the
   # Job via `psql -v` (client-side, safely quoted); %I/%L quote identifiers/literals server-side.
-  # Validated against ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0.
+  # Validated against the pinned FerretDB DocumentDB engine version in values.yaml.
   provision-logical-replication.sql: |
     -- 1. REPLICATION-privileged login role (distinct from falcone_app / per-tenant roles).
     SELECT format('CREATE ROLE %I LOGIN REPLICATION PASSWORD %L', :'role', :'pw')

@@ -41,8 +41,31 @@ global:
 
 mcp:
   runtimeImage:
-    repository: gntik-ai/in-falcone-mcp-runtime
-    tag: ""
+    repository: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+    tag: "0.3.0"
+
+# The vendored external-secrets chart templates its own images and does not use the
+# umbrella chart's global.imageRegistry helper, so the Harbor overlay sets those
+# operator image refs directly. Keep these aligned with the vendored chart appVersion.
+eso:
+  external-secrets:
+    image:
+      repository: "harbor.example.com/falcone/external-secrets/external-secrets"
+      tag: "v0.9.0"
+    imagePullSecrets:
+      - name: harbor-pull
+    webhook:
+      image:
+        repository: "harbor.example.com/falcone/external-secrets/external-secrets"
+        tag: "v0.9.0"
+      imagePullSecrets:
+        - name: harbor-pull
+    certController:
+      image:
+        repository: "harbor.example.com/falcone/external-secrets/external-secrets"
+        tag: "v0.9.0"
+      imagePullSecrets:
+        - name: harbor-pull
 
 # Functions run on Knative (provided by OpenShift Serverless): the control-plane
 # executor creates a Knative Service per function (scale-to-zero, HTTP invoke).
@@ -71,7 +94,7 @@ keycloak:
 controlPlane:
   image:
     repository: ghcr.io/gntik-ai/in-falcone-control-plane   # global.imageRegistry => harbor.example.com/falcone/gntik-ai/in-falcone-control-plane
-    tag: "0.6.2"
+    tag: "0.3.0"
   serviceAccount:
     # Function executor calls the k8s API (create/patch Knative Services), so the SA
     # token MUST be mounted here. The chart default is false (least-privilege baseline,
@@ -117,12 +140,12 @@ controlPlane:
     - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
     - { name: GATEWAY_SHARED_SECRET, valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } } }
     # Functions: the executor reads this to template each function's Knative Service.
-    - { name: FN_RUNTIME_IMAGE, value: "harbor.example.com/falcone/gntik-ai/in-falcone-fn-runtime:0.1.0" }
+    - { name: FN_RUNTIME_IMAGE, value: "harbor.example.com/falcone/gntik-ai/in-falcone-fn-runtime:0.3.0" }
 
 webConsole:
   image:
-    repository: in-falcone/in-falcone-web-console
-    tag: "0.2.11"
+    repository: ghcr.io/gntik-ai/in-falcone-web-console
+    tag: "0.3.0"
   podSecurityContext:                                       # SCC: let the namespace range set fsGroup
     fsGroup: null
     fsGroupChangePolicy: null
