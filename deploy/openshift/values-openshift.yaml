@@ -89,8 +89,9 @@ keycloak:
 # this overlay enables the SA token for Kubernetes/OpenBao calls + sets the env. NOTE: the
 # *HOST values below are <release>-<component> service DNS — they assume
 # `helm install <RELEASE>` with RELEASE matching the prefix (here: falcone). Adjust if
-# you use a different release name. Secret refs should be satisfied by ESO/OpenBao-
-# provisioned Secrets (the chart creates none).
+# you use a different release name. Core Secret refs are materialized by the chart's
+# OpenBao/ESO lifecycle; pre-create only external inputs such as Harbor pull secrets
+# or bring-your-own certificates.
 controlPlane:
   image:
     repository: ghcr.io/gntik-ai/in-falcone-control-plane   # global.imageRegistry => harbor.example.com/falcone/gntik-ai/in-falcone-control-plane
@@ -207,11 +208,11 @@ observability:
     fsGroup: null
     fsGroupChangePolicy: null
 
-# SeaweedFS (HA object-storage tier, add-seaweedfs-deployment #432) — OpenShift
-# restricted-v2 SCC + Harbor/airgap overlay. Disabled by default here; flip
-# seaweedfs.enabled: true to deploy. The base values carry NO SCC/fsGroup fields
-# (those live only in THIS overlay) so plain-Kubernetes/kind installs are
-# unaffected.
+# SeaweedFS (core object-storage tier, ADR-13) — OpenShift restricted-v2 SCC +
+# Harbor/airgap overlay. The master/volume/filer/S3 roles are always rendered by
+# the umbrella chart; this overlay only supplies SCC, TLS, sizing, and registry
+# settings. The base values carry NO SCC/fsGroup fields (those live only in THIS
+# overlay) so plain-Kubernetes/kind installs are unaffected.
 #
 # SCC: restricted-v2 injects uid + fsGroup from the namespace's assigned range,
 # so we must NOT pin fsGroup. The upstream sub-chart only emits a

@@ -43,6 +43,22 @@ service.
 - **THEN** chart/schema validation fails with a clear message that platform services are core and
   cannot be disabled
 
+#### Scenario: Core workload roles cannot be rendered with zero replicas
+
+- **WHEN** an operator supplies a zero-replica override for a core workload or role, including
+  component-wrapper aliases, Temporal server roles, OpenBao, SeaweedFS master/volume/filer/S3, or
+  the ESO controller/webhook/cert-controller
+- **THEN** chart/schema validation fails before a manifest with `replicas: 0` is accepted
+
+#### Scenario: Nested role disable switches are rejected
+
+- **WHEN** an operator supplies a nested disable/create override for a core role such as
+  `temporal.frontend.enabled=false`, `seaweedfs.master.enabled=false`,
+  `openbao.openbao.enabled=false`, `eso.external-secrets.webhook.create=false`, or
+  `eso.external-secrets.certController.create=false`
+- **THEN** chart/schema validation fails while helper toggles that do not remove a core workload, such
+  as volume-permission or resize hooks, remain configurable
+
 ### Requirement: Operational knobs remain configurable
 
 The deployment SHALL preserve configuration flags that change operating mode without removing a
@@ -144,6 +160,16 @@ rendered.
 - **WHEN** Temporal bootstrap completes
 - **THEN** the Temporal namespace `falcone-flows` exists, required search attributes are registered,
   server roles are Ready, and Temporal remains internal-only
+
+#### Scenario: Temporal schema lifecycle is install/upgrade safe
+
+- **WHEN** Temporal schema manifests are rendered for a fresh install
+- **THEN** the schema Job creates the dedicated databases if needed, runs `setup-schema -v 0.0`, and
+  then runs `update-schema` for primary and visibility schemas without suppressing errors
+- **WHEN** Temporal schema manifests are rendered for an upgrade
+- **THEN** the DB bootstrap hook runs before the schema hook, and the schema hook skips
+  `setup-schema -v 0.0` and runs only the versioned `update-schema` operations without unconditional
+  error suppression
 
 #### Scenario: OpenBao and workspace secrets are usable
 

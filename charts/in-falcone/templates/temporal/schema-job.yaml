@@ -47,6 +47,7 @@ spec:
               # NOTE: the admin-tools image is alpine-based and ships /bin/sh ONLY (no
               # bash). Keep this script POSIX-sh compatible (no arrays, no PIPESTATUS).
               SQL="temporal-sql-tool --ep ${SQL_HOST} --port ${SQL_PORT} --user ${SQL_USER} --password ${SQL_PASSWORD} --plugin ${SQL_PLUGIN}"
+              schema_lifecycle="{{ ternary "upgrade" "install" .Release.IsUpgrade }}"
 
               # Wait for PostgreSQL to accept connections before touching schemas.
               # temporal-sql-tool has no `ping`; `create-database` against the default
@@ -61,17 +62,30 @@ spec:
                 echo "waiting for postgres ${SQL_HOST}:${SQL_PORT} (${i}/60)"; sleep 5
               done
 
+              update_temporal_schema() {
+                db="$1"
+                dir="$2"
+                {{- if .Release.IsUpgrade }}
+                # Initial schema creation is not an upgrade operation: once
+                # schema_version exists, rerunning it can fail or mask a bad
+                # lifecycle. The pre-upgrade DB bootstrap hook has already ensured
+                # the role/databases exist.
+                echo "upgrading existing Temporal schema in ${db}"
+                {{- else }}
+                # Fresh installs start from empty dedicated databases. The DB bootstrap
+                # Job creates them first; create-database is retained here as an
+                # idempotent race guard while both normal install Jobs converge.
+                ${SQL} --database "${db}" create-database
+                ${SQL} --database "${db}" setup-schema -v 0.0
+                {{- end }}
+                ${SQL} --database "${db}" update-schema -d "${dir}"
+              }
+
               # Primary persistence database + schema.
-              ${SQL} --database "${SQL_DATABASE}" create-database || true
-              ${SQL} --database "${SQL_DATABASE}" setup-schema -v 0.0
-              ${SQL} --database "${SQL_DATABASE}" update-schema \
-                -d /etc/temporal/schema/postgresql/v12/temporal/versioned
+              update_temporal_schema "${SQL_DATABASE}" /etc/temporal/schema/postgresql/v12/temporal/versioned
 
               # SQL visibility database + schema (no Elasticsearch).
-              ${SQL} --database "${SQL_VISIBILITY_DATABASE}" create-database || true
-              ${SQL} --database "${SQL_VISIBILITY_DATABASE}" setup-schema -v 0.0
-              ${SQL} --database "${SQL_VISIBILITY_DATABASE}" update-schema \
-                -d /etc/temporal/schema/postgresql/v12/visibility/versioned
+              update_temporal_schema "${SQL_VISIBILITY_DATABASE}" /etc/temporal/schema/postgresql/v12/visibility/versioned
           env:
             - name: SQL_PLUGIN
               value: {{ $p.driver | quote }}

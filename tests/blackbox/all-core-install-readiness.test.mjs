@@ -44,6 +44,12 @@ function assertRender(args = []) {
   assert.equal(r.status, 0, `helm template must succeed.\nstderr: ${r.stderr}`);
   return r.stdout;
 }
+function assertHelmFails(args, pattern, label) {
+  const r = helmTemplate(args);
+  assert.notEqual(r.status, 0, `${label} must fail`);
+  assert.match(r.stderr, pattern, `${label} must explain the invalid all-core override.\nstderr: ${r.stderr}`);
+  return r;
+}
 function escapeRe(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -127,6 +133,104 @@ test('all-core-002: legacy enabled=false switches fail for every core service al
   }
 });
 
+test('all-core-002b: zero replicas fail closed for every core workload role', SKIP, () => {
+  const componentReplicas = [
+    'apisix',
+    'keycloak',
+    'postgresql',
+    'postgresqlVector',
+    'documentdb',
+    'ferretdb',
+    'kafka',
+    'observability',
+    'controlPlane',
+    'controlPlaneExecutor',
+    'webConsole',
+    'workflowWorker',
+  ];
+  for (const component of componentReplicas) {
+    assertHelmFails(
+      ['--set', `${component}.replicas=0`],
+      new RegExp(`${escapeRe(component)}\\.replicas|replicas.*(least|greater than or equal|minimum)`, 'i'),
+      `${component}.replicas=0`,
+    );
+  }
+
+  for (const role of ['frontend', 'history', 'matching', 'worker']) {
+    assertHelmFails(
+      ['--set', `temporal.${role}.replicas=0`],
+      new RegExp(`temporal\\.${role}\\.replicas|replicas.*(least|greater than or equal|minimum)`, 'i'),
+      `temporal.${role}.replicas=0`,
+    );
+  }
+
+  assertHelmFails(
+    ['--set', 'openbao.openbao.replicas=0'],
+    /openbao\.openbao\.replicas|replicas.*(least|greater than or equal|minimum)/i,
+    'openbao.openbao.replicas=0',
+  );
+
+  for (const role of ['master', 'volume', 'filer', 's3']) {
+    assertHelmFails(
+      ['--set', `seaweedfs.${role}.replicas=0`],
+      new RegExp(`seaweedfs\\.${role}\\.replicas|replicas.*(least|greater than or equal|minimum)`, 'i'),
+      `seaweedfs.${role}.replicas=0`,
+    );
+  }
+
+  for (const path of [
+    'eso.external-secrets.replicaCount',
+    'eso.external-secrets.webhook.replicaCount',
+    'eso.external-secrets.certController.replicaCount',
+  ]) {
+    assertHelmFails(
+      ['--set', `${path}=0`],
+      new RegExp(`${escapeRe(path)}|replicaCount.*(least|greater than or equal|minimum)`, 'i'),
+      `${path}=0`,
+    );
+  }
+});
+
+test('all-core-002c: nested core role disable toggles fail without blocking helper toggles', SKIP, () => {
+  for (const role of ['frontend', 'history', 'matching', 'worker']) {
+    assertHelmFails(
+      ['--set', `temporal.${role}.enabled=false`],
+      new RegExp(`temporal\\.${role}\\.enabled|server roles are core|enabled.*true`, 'i'),
+      `temporal.${role}.enabled=false`,
+    );
+  }
+  assertHelmFails(
+    ['--set', 'openbao.openbao.enabled=false'],
+    /openbao\.openbao\.enabled|OpenBao StatefulSet is core|enabled.*true/i,
+    'openbao.openbao.enabled=false',
+  );
+  for (const role of ['master', 'volume', 'filer', 's3']) {
+    assertHelmFails(
+      ['--set', `seaweedfs.${role}.enabled=false`],
+      new RegExp(`seaweedfs\\.${role}\\.enabled|storage role|enabled.*true`, 'i'),
+      `seaweedfs.${role}.enabled=false`,
+    );
+  }
+  for (const path of [
+    'eso.external-secrets.installCRDs',
+    'eso.external-secrets.webhook.create',
+    'eso.external-secrets.certController.create',
+  ]) {
+    assertHelmFails(
+      ['--set', `${path}=false`],
+      new RegExp(`${escapeRe(path)}|ESO|CRDs|enabled.*true`, 'i'),
+      `${path}=false`,
+    );
+  }
+
+  assertRender([
+    '--set', 'postgresql.volumePermissions.enabled=false',
+    '--set', 'seaweedfs.volume.resizeHook.enabled=false',
+    '--set', 'openbao.openbao.auditSidecar.enabled=false',
+    '--set', 'openbao.openbao.migration.enabled=false',
+  ]);
+});
+
 test('all-core-003: nested service.enabled=false fails for core service components', SKIP, () => {
   const serviceComponents = [
     'apisix',
@@ -182,11 +286,38 @@ test('all-core-005: Temporal DB bootstrap is wired before schema setup', SKIP, (
   const docs = renderDocs();
   const dbBootstrap = findDoc(docs, 'Job', 'falcone-temporal-db-bootstrap');
   const schema = findDoc(docs, 'Job', 'falcone-temporal-schema');
+  const schemaScript = commandText(schema);
   assert.equal(dbBootstrap?.metadata?.annotations?.['helm.sh/hook'], undefined, 'fresh-install DB bootstrap must be a normal Job because PostgreSQL belongs to the same release');
   assert.equal(schema?.metadata?.annotations?.['helm.sh/hook'], undefined, 'fresh-install schema setup must be a normal Job because PostgreSQL belongs to the same release');
   assert.match(out, /CREATE ROLE %I LOGIN CREATEDB PASSWORD %L/, 'Temporal bootstrap must create the role idempotently');
   assert.match(out, /name:\s*"in-falcone-temporal"[\s\S]*key:\s*"password"/, 'Temporal schema/bootstrap must use the generated Temporal Secret');
   assert.match(out, /SQL_USER[\s\S]*value:\s*"temporal"[\s\S]*SQL_PASSWORD[\s\S]*secretKeyRef:/, 'Temporal schema job must use the same role and Secret');
+  assert.match(schemaScript, /schema_lifecycle="install"/, 'fresh install schema Job must render the install lifecycle branch');
+  assert.match(schemaScript, /create-database[\s\S]*setup-schema -v 0\.0[\s\S]*update-schema/, 'fresh install schema Job must create/setup/update schemas in order');
+  assert.doesNotMatch(schemaScript, /\|\|\s*true/, 'fresh install schema Job must not hide temporal-sql-tool failures with unconditional || true');
+});
+
+test('all-core-005b: Temporal schema upgrade skips setup and runs only safe updates', SKIP, () => {
+  const installDocs = renderDocs();
+  const upgradeDocs = renderDocs(['--is-upgrade', '--set', 'deployment.upgrade.currentVersion=0.2.0']);
+  const installSchema = findDoc(installDocs, 'Job', 'falcone-temporal-schema');
+  const upgradeDbBootstrap = findDoc(upgradeDocs, 'Job', 'falcone-temporal-db-bootstrap');
+  const upgradeSchema = findDoc(upgradeDocs, 'Job', 'falcone-temporal-schema');
+  const installScript = commandText(installSchema);
+  const upgradeScript = commandText(upgradeSchema);
+
+  assert.equal(upgradeDbBootstrap?.metadata?.annotations?.['helm.sh/hook'], 'pre-upgrade', 'upgrade DB bootstrap must run before rollout');
+  assert.equal(upgradeSchema?.metadata?.annotations?.['helm.sh/hook'], 'pre-upgrade', 'upgrade schema Job must run before rollout');
+  assert.equal(upgradeDbBootstrap?.metadata?.annotations?.['helm.sh/hook-weight'], '-1', 'DB bootstrap must run before schema update on upgrade');
+  assert.equal(upgradeSchema?.metadata?.annotations?.['helm.sh/hook-weight'], '0', 'schema update must run after DB bootstrap on upgrade');
+  assert.match(installScript, /schema_lifecycle="install"/, 'install render must carry install lifecycle script');
+  assert.match(upgradeScript, /schema_lifecycle="upgrade"/, 'upgrade render must carry upgrade lifecycle script');
+  assert.notEqual(upgradeScript, installScript, 'fresh install and upgrade schema scripts must differ');
+  assert.match(upgradeScript, /\$\{SQL\} --database "\$\{db\}" update-schema -d "\$\{dir\}"/, 'upgrade schema helper must run update-schema for the supplied schema directory');
+  assert.match(upgradeScript, /update_temporal_schema "\$\{SQL_DATABASE\}" \/etc\/temporal\/schema\/postgresql\/v12\/temporal\/versioned/, 'upgrade schema Job must update the primary schema');
+  assert.match(upgradeScript, /update_temporal_schema "\$\{SQL_VISIBILITY_DATABASE\}" \/etc\/temporal\/schema\/postgresql\/v12\/visibility\/versioned/, 'upgrade schema Job must update the visibility schema');
+  assert.doesNotMatch(upgradeScript, /setup-schema -v 0\.0/, 'upgrade schema Job must not rerun setup-schema');
+  assert.doesNotMatch(upgradeScript, /\|\|\s*true/, 'upgrade schema Job must not hide temporal-sql-tool failures with unconditional || true');
 });
 
 test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable default image refs', SKIP, () => {

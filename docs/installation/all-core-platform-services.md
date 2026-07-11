@@ -30,6 +30,10 @@ The chart dependencies for these services are unconditional. Values such as
 `postgresqlVector.enabled=false`, `workflowWorker.enabled=false`,
 `controlPlaneExecutor.enabled=false`, `observability.enabled=false`, or
 `bootstrap.enabled=false` are stale and fail chart validation.
+The same fail-closed contract applies to core workload roles: zero-replica overrides such as
+`controlPlane.replicas=0`, `temporal.frontend.replicas=0`, `openbao.openbao.replicas=0`, and
+`seaweedfs.master.replicas=0` are invalid, as are nested core role disables such as
+`seaweedfs.master.enabled=false` or `eso.external-secrets.webhook.create=false`.
 
 ## Preserved Knobs
 
@@ -38,7 +42,8 @@ platform service:
 
 - Airgap, private registry, image, pull-secret, and transport security settings.
 - Public hostname topology and OpenShift mode.
-- Replicas, resources, probes, node selectors, tolerations, affinities, and security contexts.
+- Replica counts of at least one, resources, probes, node selectors, tolerations, affinities, and
+  security contexts.
 - Persistence sizing, storage class, and existing-claim selection.
 - Service object settings where disabling the Service would not make a core service unreachable.
 - NetworkPolicy emission.

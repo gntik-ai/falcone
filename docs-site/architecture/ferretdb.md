@@ -190,10 +190,10 @@ full design and implementation are owned by **`add-ferretdb-realtime-cdc-remedia
 
 ## Day-2 Operations
 
-**Enable / disable.** FerretDB + DocumentDB are chart components toggled by `ferretdb.enabled` /
-`documentdb.enabled` (both on by default). They are the sole document store; the former `mongodb`
-server component has been removed. The cutover and rollback runbooks below remain as the historical
-migration record.
+**Core service contract.** FerretDB + DocumentDB are always rendered by the umbrella chart and cannot
+be disabled with `ferretdb.enabled=false`, `documentdb.enabled=false`, or zero-replica overrides. They
+are the sole document store; the former `mongodb` server component has been removed. The cutover and
+rollback runbooks below remain as the historical migration record.
 
 **Health checks.** `helm upgrade --install` gates on rollout completion; after install:
 

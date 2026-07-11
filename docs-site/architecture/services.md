@@ -1,6 +1,6 @@
 # Services & Components
 
-This page describes **every architecture component** of In Falcone — what it does, where it lives in the repository / chart, and how it participates in tenant isolation. Components are packaged as dependencies of the umbrella Helm chart (`charts/in-falcone`), each wrapped by a shared `component-wrapper` subchart and toggled with `<component>.enabled`.
+This page describes **every architecture component** of In Falcone — what it does, where it lives in the repository / chart, and how it participates in tenant isolation. Core components are packaged as unconditional dependencies of the umbrella Helm chart (`charts/in-falcone`); legacy `<component>.enabled=false` service disables and zero-replica core overrides are rejected by chart validation.
 
 ```
 EDGE          CONTROL & DATA PLANE        DATA BACKENDS           PLATFORM

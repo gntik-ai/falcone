@@ -11,7 +11,7 @@ In Falcone is packaged as a single **umbrella Helm chart** (`charts/in-falcone`)
 > For a **fully air-gapped OpenShift install using only plain `oc apply` manifests (no Helm, Operators, or templating)** — every image (including build bases, init containers and sidecars) pulled from a private **Harbor** — see the dedicated, end-to-end [OpenShift Air-gapped (Harbor) guide](/operations/openshift-airgapped-harbor). It includes the full image-mirror table, every manifest, an ordered runbook, and OpenShift `restricted-v2` SCC fixes.
 
 > [!NOTE]
-> The chart is an **umbrella**: each platform component (gateway, identity, databases, storage, events, functions, control plane, console, observability) is a dependency wrapped by a shared `component-wrapper` subchart and toggled with `<component>.enabled`. You can run everything in one cluster or point a component at an external managed service.
+> The chart is an **umbrella**: the supported fresh-install shape renders the complete core platform (gateway, identity, databases, storage, events, functions runtime wiring, control plane, console, observability, secrets, Temporal, and MCP). Legacy `<component>.enabled=false` service disables and zero-replica core overrides are rejected; use values for sizing, storage, networking, security posture, and managed-service-compatible endpoints/Secrets instead.
 
 ## Prerequisites
 

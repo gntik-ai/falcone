@@ -14,10 +14,47 @@
 {{- if and (kindIs "map" .Values.temporal.ui) (hasKey .Values.temporal.ui "enabled") -}}
   {{- fail "temporal.ui.enabled is no longer supported: Temporal web is a core operator surface" -}}
 {{- end -}}
+{{- range $role := list "frontend" "history" "matching" "worker" }}
+  {{- $cfg := index $.Values.temporal $role | default dict -}}
+  {{- if not (kindIs "map" $cfg) -}}
+    {{- fail (printf "temporal.%s must be an object with replicas >= 1" $role) -}}
+  {{- end -}}
+  {{- if and (kindIs "map" $cfg) (hasKey $cfg "enabled") -}}
+    {{- fail (printf "temporal.%s.enabled is no longer supported: Temporal server roles are core" $role) -}}
+  {{- end -}}
+  {{- if lt (int ($cfg.replicas | default 0)) 1 -}}
+    {{- fail (printf "temporal.%s.replicas must be at least 1: Temporal server roles are core" $role) -}}
+  {{- end -}}
+{{- end -}}
+{{- $openbaoCore := .Values.openbao.openbao | default dict -}}
+{{- if not (kindIs "map" $openbaoCore) -}}
+  {{- fail "openbao.openbao must be an object with replicas >= 1" -}}
+{{- end -}}
+{{- if and (kindIs "map" $openbaoCore) (hasKey $openbaoCore "enabled") -}}
+  {{- fail "openbao.openbao.enabled is no longer supported: the OpenBao StatefulSet is core" -}}
+{{- end -}}
+{{- if lt (int ($openbaoCore.replicas | default 0)) 1 -}}
+  {{- fail "openbao.openbao.replicas must be at least 1: OpenBao is a core secrets workload" -}}
+{{- end -}}
+{{- range $role := list "master" "volume" "filer" "s3" }}
+  {{- $cfg := index $.Values.seaweedfs $role | default dict -}}
+  {{- if not (kindIs "map" $cfg) -}}
+    {{- fail (printf "seaweedfs.%s must be an object with enabled=true and replicas >= 1" $role) -}}
+  {{- end -}}
+  {{- if not ($cfg.enabled | default true) -}}
+    {{- fail (printf "seaweedfs.%s.enabled=false is no longer supported: SeaweedFS %s is a core storage role" $role $role) -}}
+  {{- end -}}
+  {{- if lt (int ($cfg.replicas | default 0)) 1 -}}
+    {{- fail (printf "seaweedfs.%s.replicas must be at least 1: SeaweedFS %s is a core storage role" $role $role) -}}
+  {{- end -}}
+{{- end -}}
 {{- range $components }}
   {{- $component := index $.Values . -}}
   {{- if not $component.image.repository -}}
     {{- fail (printf "%s.image.repository is required for core platform services" .) -}}
+  {{- end -}}
+  {{- if lt (int ($component.replicas | default 0)) 1 -}}
+    {{- fail (printf "%s.replicas must be at least 1: Falcone platform services are core and must render a running workload" .) -}}
   {{- end -}}
   {{- if and $component.persistence.enabled (not $component.persistence.existingClaim) (not $component.persistence.size) -}}
     {{- fail (printf "%s.persistence.size is required when persistence is enabled without existingClaim" .) -}}
@@ -105,6 +142,24 @@
   {{- fail "eso.eso.namespace and openbao.eso.namespace must match; ESO/OpenBao namespace wiring is a single install contract" -}}
 {{- end -}}
 {{- $externalSecretsValues := index .Values.eso "external-secrets" | default (dict) -}}
+{{- if lt (int ($externalSecretsValues.replicaCount | default 0)) 1 -}}
+  {{- fail "eso.external-secrets.replicaCount must be at least 1: the ESO controller is core" -}}
+{{- end -}}
+{{- if not ($externalSecretsValues.installCRDs | default true) -}}
+  {{- fail "eso.external-secrets.installCRDs=false is no longer supported: fresh installs must provision ESO CRDs" -}}
+{{- end -}}
+{{- range $role := list "webhook" "certController" }}
+  {{- $cfg := index $externalSecretsValues $role | default dict -}}
+  {{- if not (kindIs "map" $cfg) -}}
+    {{- fail (printf "eso.external-secrets.%s must be an object with create=true and replicaCount >= 1" $role) -}}
+  {{- end -}}
+  {{- if not ($cfg.create | default true) -}}
+    {{- fail (printf "eso.external-secrets.%s.create=false is no longer supported: ESO %s is core" $role $role) -}}
+  {{- end -}}
+  {{- if lt (int ($cfg.replicaCount | default 0)) 1 -}}
+    {{- fail (printf "eso.external-secrets.%s.replicaCount must be at least 1: ESO %s is core" $role $role) -}}
+  {{- end -}}
+{{- end -}}
 {{- if ne ($externalSecretsValues.namespaceOverride | default .Release.Namespace) (.Values.eso.eso.namespace | default "eso-system") -}}
   {{- fail "eso.external-secrets.namespaceOverride must match eso.eso.namespace so ESO pods run in the namespace protected by ESO NetworkPolicy and OpenBao auth" -}}
 {{- end -}}

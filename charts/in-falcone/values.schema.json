@@ -1692,10 +1692,50 @@
     },
     "temporal": {
       "type": "object",
+      "properties": {
+        "frontend": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "history": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "matching": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "worker": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "ui": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            }
+          },
+          "additionalProperties": true
+        }
+      },
       "additionalProperties": true
     },
     "seaweedfs": {
       "type": "object",
+      "properties": {
+        "master": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "volume": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "filer": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        },
+        "s3": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        }
+      },
       "additionalProperties": true
     },
     "grafana": {
@@ -1716,10 +1756,39 @@
     },
     "eso": {
       "type": "object",
+      "properties": {
+        "external-secrets": {
+          "type": "object",
+          "properties": {
+            "replicaCount": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "installCRDs": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            },
+            "webhook": {
+              "$ref": "#/definitions/coreCreateReplicaRole"
+            },
+            "certController": {
+              "$ref": "#/definitions/coreCreateReplicaRole"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
       "additionalProperties": true
     },
     "openbao": {
       "type": "object",
+      "properties": {
+        "openbao": {
+          "$ref": "#/definitions/coreEnabledReplicaRole"
+        }
+      },
       "additionalProperties": true
     },
     "mcp": {
@@ -1728,6 +1797,38 @@
     }
   },
   "definitions": {
+    "coreEnabledReplicaRole": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "coreCreateReplicaRole": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
     "image": {
       "type": "object",
       "required": [
@@ -1909,7 +2010,7 @@
         },
         "replicas": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "serviceAccount": {
           "type": "object",

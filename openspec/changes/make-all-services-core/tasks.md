@@ -71,6 +71,9 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   root service `enabled` requirements.
 - [x] Reject stale service-disable overrides in values files, while allowing classified operational
   flags such as NetworkPolicy, persistence mode, TLS mode, and unused upstream SeaweedFS roles.
+- [x] Reject zero-replica overrides for every core workload/role and reject nested core role disable
+  toggles for Temporal, OpenBao, SeaweedFS, and ESO while preserving helper toggles such as
+  volume-permission and resize hooks.
 - [x] Update `scripts/lib/deployment-chart.mjs`, `deployment-topology.mjs`, quality gates, and related
   validator fixtures so CI expects all-core services and no partial-service escape hatches.
 
@@ -100,6 +103,8 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
 - [x] Update render tests that currently assert default-off behavior for OpenBao/ESO, Temporal,
   workflow worker, control-plane executor, MCP, and pgvector.
 - [x] Add static tests for no dependency conditions and no core service disable keys.
+- [x] Add broad negative render tests for core zero replicas, nested role disable/create switches, and
+  Temporal install-vs-upgrade schema script differences.
 - [ ] Add fresh-install readiness checks for every Deployment, StatefulSet, Job, ClusterSecretStore,
   ExternalSecret, OpenBao health, Temporal namespace/search attributes, pgvector extension, workspace
   secrets, flows routes, MCP routes, and Prometheus scrape targets listed in `design.md`.
@@ -223,3 +228,20 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   make-all-services-core --strict`; `npm run validate:repo`; `git diff --check`. `npm run lint:md`
   and `npm run lint:snippets` still fail only on the pre-existing `README-loop-kit.md` formatting
   issues and missing `docs/guides/realtime/frontend-quickstart.md`.
+- Sixth-reviewer revision fixed the latest static blockers without touching a cluster: root and
+  component-wrapper schemas now require at least one replica for core workloads; template validation
+  rejects zero replicas and nested core role disables for component-wrapper aliases, Temporal server
+  roles, OpenBao, SeaweedFS master/volume/filer/S3, and ESO controller/webhook/cert-controller while
+  preserving helper toggles; Temporal schema install renders setup+update while upgrade renders
+  update-only after the DB bootstrap hook; stale FerretDB/SeaweedFS/OpenShift/site docs now describe
+  the all-core contract.
+- Sixth-reviewer validation run: `helm dependency build charts/in-falcone`; `jq empty` for root and
+  component-wrapper schemas; `helm lint charts/in-falcone --namespace review-ns`; default, custom,
+  OpenShift, default-upgrade, and OpenShift-upgrade `helm template` renders; explicit reviewer disable
+  probes for `controlPlane.replicas=0`, `temporal.frontend.replicas=0`,
+  `openbao.openbao.replicas=0`, and `seaweedfs.master.enabled=false` failed schema validation;
+  `node --test tests/blackbox/all-core-install-readiness.test.mjs
+  tests/blackbox/flows-temporal-helm.test.mjs
+  tests/blackbox/temporal-secret-password-substitution.test.mjs`; `openspec validate
+  make-all-services-core --strict`; `bash -n scripts/system-changes/make-all-services-core/*.sh`;
+  `npm run validate:repo`; `git diff --check`.

@@ -60,7 +60,7 @@ The significant architectural decisions visible in the codebase, captured as sho
 
 ## ADR-8 — Umbrella Helm chart with layered values
 
-**Decision.** Package everything as one umbrella chart of toggleable `component-wrapper` dependencies, configured by layered values (environment → customer → platform → airgap → local) and sizing profiles (all-in-one / standard / ha).
+**Decision.** Package the core platform as one umbrella chart with unconditional service dependencies, configured by layered values (environment → customer → platform → airgap → local) and sizing profiles (all-in-one / standard / ha).
 
 **Why.** One artifact serves dev, Kubernetes, OpenShift and air-gapped installs; layering keeps environment/customer/platform concerns separable and reviewable.
 
