@@ -58,6 +58,19 @@ assert_backup_covers_current_mappings() {
   [ "$missing" -eq 0 ] || return 1
 }
 
+merge_source_backup_into_target() {
+  local source_dir="$tmp/backup/source-kv"
+  [ -d "$source_dir" ] || return 0
+  echo "merging backed-up external source KV paths before mapped Kubernetes Secret overlay"
+  find "$source_dir" -type f -name '*.json' | sort | while read -r file; do
+    local rel path
+    rel="${file#$source_dir/}"
+    path="${rel%.json}"
+    merge_kv_backup_json "$path" "$file" "$tmp"
+    echo "merged external source KV path $SOURCE_KV_MOUNT/$path"
+  done
+}
+
 desired_file_for() {
   local path="$1" property="$2"
   printf '%s/%s/%s' "$tmp/desired" "$path" "$property"
@@ -120,6 +133,8 @@ if [ "$mismatches" -ne 0 ] && [ "$ALLOW_OVERWRITE" -ne 1 ]; then
   echo "refusing to overwrite $mismatches existing OpenBao value(s); rerun with --allow-overwrite and CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values after reviewing the verified backup" >&2
   exit 1
 fi
+
+merge_source_backup_into_target
 
 platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
   pairs=()

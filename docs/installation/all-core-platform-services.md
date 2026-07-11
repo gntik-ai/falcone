@@ -103,20 +103,31 @@ Existing clusters can have disabled-service overrides, manually created Kubernet
 Vault/OpenBao state, an external ESO owner, and PVCs owned by older revisions. Upgrade them through a
 controlled rollout:
 
-1. Set `KUBECONFIG`, `NAMESPACE`, `RELEASE`, `OPENBAO_NAMESPACE`, `BAO_ADDR`, `BAO_TOKEN`, and
-   `BAO_CACERT` for the intended cluster.
+1. Set `KUBECONFIG`, `NAMESPACE`, `RELEASE`, and `OPENBAO_NAMESPACE` for the intended cluster.
+   Set `SOURCE_BAO_ADDR`/`SOURCE_BAO_TOKEN` only when the old deployment used an external
+   Vault/OpenBao source. Set target `BAO_ADDR`/`BAO_TOKEN` only if target OpenBao already exists
+   and should be captured before rollout.
 2. Run `scripts/system-changes/make-all-services-core/backup-kv.sh --output /secure/path/falcone-kv-backup.tgz`.
 3. Run `scripts/system-changes/make-all-services-core/parity-check.sh --dry-run` to inspect
    Kubernetes Secret and OpenBao fingerprints without printing values.
 4. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --dry-run`.
 5. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`.
 6. Run `scripts/system-changes/make-all-services-core/parity-check.sh --strict`.
-7. Dry-run the Helm upgrade and inspect the rendered diff.
+7. Run `scripts/system-changes/make-all-services-core/diff-rollout.sh --chart charts/in-falcone`
+   with the same values files and `--set` overrides intended for rollout. The script uses
+   `helm diff upgrade --install` when the plugin is installed, otherwise it renders the chart and
+   runs `kubectl diff`.
 8. Apply the all-core chart only after operator approval.
 9. Run `scripts/system-changes/make-all-services-core/health-check.sh`.
 10. If any gate fails, run
     `scripts/system-changes/make-all-services-core/restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --apply --helm-rollback`,
     verify parity again, and rerun the health gate.
+
+The backup command refuses to overwrite an existing archive. It always captures source Kubernetes
+Secrets, Helm metadata, ESO objects, PVC references, and external source KV when configured; target
+OpenBao KV is marked absent when target `BAO_ADDR`/`BAO_TOKEN` are not supplied. Migration and
+initialization use merge semantics for KV paths, so unmapped properties already present at a path are
+preserved instead of being replaced by the mapped platform credential set.
 
 Rollback restores OpenBao KV paths, Kubernetes Secrets, ESO resources, and then returns the Helm
 release to the previous revision. It does not delete OpenBao, Temporal, pgvector, or any existing
@@ -127,17 +138,17 @@ is approved.
 
 Third-party defaults were verified with `docker manifest inspect` for
 `docker.io/bitnamilegacy/postgresql:17.2.0`, `docker.io/bitnamilegacy/kafka:3.9.0`,
-`docker.io/bitnamilegacy/kubectl:1.32.2`, and `docker.io/pgvector/pgvector:pg17`.
+`docker.io/bitnamilegacy/kubectl:1.32.2`, `docker.io/pgvector/pgvector:pg17`,
+`docker.io/apache/apisix:3.10.0-debian`, and
+`docker.io/prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62`.
 
 Falcone application images are buildable from this repository, and the tracked
-`.github/workflows/release-images.yml` workflow publishes the control-plane executor, web console,
-and workflow worker images on a release. The default chart and kind overlays point the unpublished
-project-owned runtime images at local `localhost:30500/in-falcone-*` aliases for repository-local
-validation instead of rendering public tags that currently do not exist. Public manifests for
-`ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
-`ghcr.io/gntik-ai/in-falcone-workflow-worker:0.1.0`,
-`ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0`, and
-`ghcr.io/gntik-ai/in-falcone-web-console:0.2.11` still return `manifest unknown`; publishing those
-images to GHCR or the target production registry is an external release blocker. The MCP runtime
-image also needs a verified production publication path before hosted MCP server creation can be
-called ready. Do not add digest pins for those images until their registry manifests are verified.
+`.github/workflows/release-images.yml` workflow publishes the control-plane, control-plane
+executor, web console, function runtime, workflow worker, and first-party MCP runtime images on a
+release. The base chart now renders coherent chart app-version release refs such as
+`ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0` instead of `localhost` aliases. The kind profiles
+still override those refs to `localhost:30500` for repository-local prebuild validation.
+
+The exact GHCR publication of the `0.3.0` first-party image set remains an external release gate for
+the orchestrator. Do not add digest pins for those images until their registry manifests are
+published and verified.

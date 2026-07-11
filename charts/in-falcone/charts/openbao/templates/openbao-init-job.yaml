@@ -159,6 +159,14 @@ spec:
               fi
 
               cred() { cat "/platform-creds/$1/$2"; }
+              kv_merge() {
+                path="$1"; shift
+                if bao kv get "$path" >/dev/null 2>&1; then
+                  bao kv patch "$path" "$@" >/dev/null
+                else
+                  bao kv put "$path" "$@" >/dev/null
+                fi
+              }
 
               bao auth enable kubernetes >/dev/null 2>&1 || true
               bao write auth/kubernetes/config \
@@ -196,24 +204,24 @@ spec:
                 bound_service_account_namespaces='{{ .Values.eso.namespace | default "eso-system" }}' \
                 policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }} >/dev/null
 
-              bao kv put secret/platform/postgresql \
+              kv_merge secret/platform/postgresql \
                 username="$(cred in-falcone-postgresql POSTGRESQL_USERNAME)" \
                 app-password="$(cred in-falcone-postgresql POSTGRESQL_PASSWORD)" \
-                root-password="$(cred in-falcone-postgresql POSTGRESQL_POSTGRES_PASSWORD)" >/dev/null
-              bao kv put secret/platform/postgresql-vector \
+                root-password="$(cred in-falcone-postgresql POSTGRESQL_POSTGRES_PASSWORD)"
+              kv_merge secret/platform/postgresql-vector \
                 username="$(cred in-falcone-postgresql-vector POSTGRES_USER)" \
                 password="$(cred in-falcone-postgresql-vector POSTGRES_PASSWORD)" \
-                database="$(cred in-falcone-postgresql-vector POSTGRES_DB)" >/dev/null
-              bao kv put secret/platform/documentdb \
+                database="$(cred in-falcone-postgresql-vector POSTGRES_DB)"
+              kv_merge secret/platform/documentdb \
                 username="$(cred in-falcone-documentdb POSTGRES_USER)" \
                 password="$(cred in-falcone-documentdb POSTGRES_PASSWORD)" \
                 database="$(cred in-falcone-documentdb POSTGRES_DB)" \
-                ferretdb-postgresql-url="$(cred in-falcone-ferretdb postgresql-url)" >/dev/null
-              bao kv put secret/platform/documentdb-replication \
+                ferretdb-postgresql-url="$(cred in-falcone-ferretdb postgresql-url)"
+              kv_merge secret/platform/documentdb-replication \
                 username=falcone_cdc_repl \
                 password="$(cred in-falcone-documentdb-replication password)" \
-                realtime-url="$(cred in-falcone-documentdb-replication realtime-url)" >/dev/null
-              bao kv put secret/platform/kafka \
+                realtime-url="$(cred in-falcone-documentdb-replication realtime-url)"
+              kv_merge secret/platform/kafka \
                 node-id="$(cred in-falcone-kafka KAFKA_CFG_NODE_ID)" \
                 KAFKA_CFG_NODE_ID="$(cred in-falcone-kafka KAFKA_CFG_NODE_ID)" \
                 KAFKA_CFG_PROCESS_ROLES="$(cred in-falcone-kafka KAFKA_CFG_PROCESS_ROLES)" \
@@ -221,31 +229,31 @@ spec:
                 KAFKA_CFG_CONTROLLER_QUORUM_VOTERS="$(cred in-falcone-kafka KAFKA_CFG_CONTROLLER_QUORUM_VOTERS)" \
                 KAFKA_CFG_LISTENERS="$(cred in-falcone-kafka KAFKA_CFG_LISTENERS)" \
                 KAFKA_CFG_ADVERTISED_LISTENERS="$(cred in-falcone-kafka KAFKA_CFG_ADVERTISED_LISTENERS)" \
-                KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP="$(cred in-falcone-kafka KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP)" >/dev/null
-              bao kv put secret/platform/s3 \
+                KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP="$(cred in-falcone-kafka KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP)"
+              kv_merge secret/platform/s3 \
                 access-key="$(cred in-falcone-storage s3_access_key)" \
-                secret-key="$(cred in-falcone-storage s3_secret_key)" >/dev/null
-              bao kv put secret/platform/encryption \
-                master-key="$(cred in-falcone-encryption master-key)" >/dev/null
-              bao kv put secret/platform/temporal \
+                secret-key="$(cred in-falcone-storage s3_secret_key)"
+              kv_merge secret/platform/encryption \
+                master-key="$(cred in-falcone-encryption master-key)"
+              kv_merge secret/platform/temporal \
                 username="$(cred in-falcone-temporal username)" \
                 password="$(cred in-falcone-temporal password)" \
                 database="$(cred in-falcone-temporal database)" \
-                visibility-database="$(cred in-falcone-temporal visibility-database)" >/dev/null
-              bao kv put secret/gateway/apisix \
-                admin-key="$(cred in-falcone-apisix-admin admin-key)" >/dev/null
-              bao kv put secret/gateway/shared \
-                secret="$(cred in-falcone-gateway-shared-secret secret)" >/dev/null
-              bao kv put secret/iam/keycloak \
+                visibility-database="$(cred in-falcone-temporal visibility-database)"
+              kv_merge secret/gateway/apisix \
+                admin-key="$(cred in-falcone-apisix-admin admin-key)"
+              kv_merge secret/gateway/shared \
+                secret="$(cred in-falcone-gateway-shared-secret secret)"
+              kv_merge secret/iam/keycloak \
                 admin-username="$(cred in-falcone-keycloak-admin username)" \
                 admin-password="$(cred in-falcone-keycloak-admin password)" \
-                db-password="$(cred in-falcone-postgresql POSTGRESQL_PASSWORD)" >/dev/null
-              bao kv put secret/iam/identity-client \
+                db-password="$(cred in-falcone-postgresql POSTGRESQL_PASSWORD)"
+              kv_merge secret/iam/identity-client \
                 client-id="$(cred in-falcone-identity-client client-id)" \
-                client-secret="$(cred in-falcone-identity-client client-secret)" >/dev/null
-              bao kv put secret/iam/superadmin \
+                client-secret="$(cred in-falcone-identity-client client-secret)"
+              kv_merge secret/iam/superadmin \
                 username=superadmin \
-                password="$(cred in-falcone-superadmin password)" >/dev/null
+                password="$(cred in-falcone-superadmin password)"
 
               echo "OpenBao configuration converged"
           volumeMounts:

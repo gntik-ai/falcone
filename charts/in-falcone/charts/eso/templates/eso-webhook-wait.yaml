@@ -9,7 +9,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: eso-webhook-wait
-  namespace: {{ .Values.eso.namespace }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "-6"
@@ -19,7 +19,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: eso-webhook-wait
-  namespace: {{ .Values.eso.namespace }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "-6"
@@ -36,7 +36,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: eso-webhook-wait
-  namespace: {{ .Values.eso.namespace }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "-6"
@@ -48,13 +48,13 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: eso-webhook-wait
-    namespace: {{ .Values.eso.namespace }}
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: eso-webhook-wait
-  namespace: {{ .Values.eso.namespace }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "-5"
@@ -89,7 +89,7 @@ spec:
             - |
               echo "waiting for the external-secrets webhook endpoint to be ready..."
               i=0
-              until kubectl -n {{ .Values.eso.namespace }} get endpoints eso-external-secrets-webhook \
+              until kubectl -n {{ .Release.Namespace }} get endpoints eso-external-secrets-webhook \
                       -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null | grep -q '[0-9]'; do
                 i=$((i+1)); [ "$i" -gt 60 ] && { echo "webhook endpoint not ready after 180s" >&2; exit 1; }
                 sleep 3

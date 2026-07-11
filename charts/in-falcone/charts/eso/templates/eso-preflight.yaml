@@ -94,6 +94,7 @@ spec:
               conflicts="$(kubectl get deploy -A -l app.kubernetes.io/name=external-secrets -o go-template='{{ "{{" }} range .items {{ "}}" }}{{ "{{" }} .metadata.namespace {{ "}}" }}/{{ "{{" }} .metadata.name {{ "}}" }} {{ "{{" }} end {{ "}}" }}' 2>/dev/null || true)"
               for item in $conflicts; do
                 case "$item" in
+                  {{ .Release.Namespace }}/*) ;;
                   {{ .Values.eso.namespace }}/*) ;;
                   *)
                     if [ "$adopt" != "true" ]; then

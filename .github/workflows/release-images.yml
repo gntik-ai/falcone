@@ -15,6 +15,7 @@ name: release-images
 #                                       zero-write — compatible with the restricted security profile)
 #   in-falcone-fn-runtime              deploy/kind/fn-runtime/Dockerfile     (nodejs function runtime)
 #   in-falcone-workflow-worker         services/workflow-worker/Dockerfile   (Temporal DSL worker)
+#   in-falcone-mcp-runtime             apps/mcp-runtime/Dockerfile           (first-party MCP JSON-RPC runtime)
 on:
   release:
     types: [published]
@@ -55,6 +56,8 @@ jobs:
             context: deploy/kind/fn-runtime
           - image: in-falcone-workflow-worker
             dockerfile: services/workflow-worker/Dockerfile
+          - image: in-falcone-mcp-runtime
+            dockerfile: apps/mcp-runtime/Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v4

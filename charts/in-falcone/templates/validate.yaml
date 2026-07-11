@@ -101,6 +101,22 @@
 {{- if eq (len .Values.bootstrap.secretResolution.sources) 0 -}}
   {{- fail "bootstrap.secretResolution.sources must define the required credential inputs" -}}
 {{- end -}}
+{{- if ne (.Values.eso.eso.namespace | default "eso-system") (.Values.openbao.eso.namespace | default "eso-system") -}}
+  {{- fail "eso.eso.namespace and openbao.eso.namespace must match; ESO/OpenBao namespace wiring is a single install contract" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.serviceAccountName | default "eso-openbao-auth") (.Values.openbao.eso.serviceAccountName | default "eso-openbao-auth") -}}
+  {{- fail "eso.eso.serviceAccountName and openbao.eso.serviceAccountName must match" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.tokenTTL | default "24h") (.Values.openbao.eso.tokenTTL | default "24h") -}}
+  {{- fail "eso.eso.tokenTTL and openbao.eso.tokenTTL must match" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.caProvider.namespace | default "secret-store") (.Values.openbao.openbao.namespace | default "secret-store") -}}
+  {{- fail "eso.eso.caProvider.namespace must match openbao.openbao.namespace" -}}
+{{- end -}}
+{{- $expectedOpenBaoAddress := printf "https://openbao.%s.svc.cluster.local:8200" (.Values.openbao.openbao.namespace | default "secret-store") -}}
+{{- if ne (.Values.eso.eso.vaultAddress | default $expectedOpenBaoAddress) $expectedOpenBaoAddress -}}
+  {{- fail (printf "eso.eso.vaultAddress must point at the configured OpenBao namespace (%s)" $expectedOpenBaoAddress) -}}
+{{- end -}}
 {{- if and .Release.IsUpgrade .Values.deployment.upgrade.allowInPlace -}}
   {{- $currentVersion := .Values.deployment.upgrade.currentVersion | default "" -}}
   {{- if eq $currentVersion "" -}}

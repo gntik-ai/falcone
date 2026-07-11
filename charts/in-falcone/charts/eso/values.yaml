@@ -1,9 +1,9 @@
-# The external-secrets operator's CRDs are vendored under this subchart's crds/ directory so Helm
-# installs them BEFORE any templates in the release (including this subchart's ClusterSecretStore /
-# ExternalSecret instances and the umbrella's other resources). Therefore the operator dependency must
-# NOT also render them as templates, or the two collide / race: keep installCRDs disabled here.
+# The external-secrets operator dependency is vendored under charts/external-secrets-0.9.0.tgz.
+# Use that chart's own templated CRDs as the single source of truth so conversion webhook service
+# names stay aligned with the operator/webhook resources rendered by the same dependency.
 external-secrets:
-  installCRDs: false
+  installCRDs: true
+  fullnameOverride: eso-external-secrets
 
 eso:
   # NOTE: the `vault*` value-keys name ESO's provider TYPE (provider.vault), which OpenBao is

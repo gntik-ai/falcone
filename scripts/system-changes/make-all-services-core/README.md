@@ -19,7 +19,10 @@ Required environment:
 - `NAMESPACE` for Falcone workload Secrets, default `falcone`.
 - `RELEASE` for the Helm release, default `falcone`.
 - `OPENBAO_NAMESPACE`, default `secret-store`.
-- `BAO_ADDR`, `BAO_TOKEN`, and optionally `BAO_CACERT` for the target OpenBao instance.
+- `BAO_ADDR`, `BAO_TOKEN`, and optionally `BAO_CACERT` for the target OpenBao instance when
+  running parity, migration, restore, or when capturing target KV that already exists. `backup-kv.sh`
+  can run without these before target OpenBao has been provisioned; the archive records target KV as
+  absent.
 - `SOURCE_BAO_ADDR`, `SOURCE_BAO_TOKEN`, optional `SOURCE_BAO_CACERT`, and optional
   `SOURCE_BAO_KV_MOUNT` when backing up an external Vault/OpenBao source.
 
@@ -30,7 +33,10 @@ Workflow:
 3. `./migrate-platform-secrets.sh --dry-run`
 4. `./migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`
 5. `./parity-check.sh --strict`
-6. `./health-check.sh`
+6. `./diff-rollout.sh --chart ../../../charts/in-falcone` with the same values and `--set` overrides
+   planned for the Helm rollout.
+7. Apply the Helm upgrade only after operator approval.
+8. `./health-check.sh`
 
 Rollback:
 
@@ -40,4 +46,5 @@ Rollback:
 4. `./health-check.sh` after workloads settle.
 
 The backup archive contains secret material, rendered Helm manifests, release values, and recovery
-material. Store it as a restricted operator artifact. The scripts never echo archive contents.
+material. `backup-kv.sh` refuses to overwrite an existing archive. Store it as a restricted operator
+artifact. The scripts never echo archive contents.

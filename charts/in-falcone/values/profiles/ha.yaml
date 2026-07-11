@@ -60,7 +60,9 @@ postgresql:
   persistence:
     size: 200Gi
 kafka:
-  replicas: 3
+  # Kafka stays single-broker until a dedicated chart/template implements per-pod
+  # KRaft identity, quorum voters, and PVCs. Do not fake HA with cloned node 0 pods.
+  replicas: 1
   persistence:
     size: 250Gi
 # SeaweedFS HA overrides (add-seaweedfs-deployment, D2/D3). master -> 3-node Raft

@@ -162,13 +162,50 @@ JSON
 write_grouped_kv() {
   local path="$1" tmp="$2"
   shift 2
-  local args=()
+  local merge_dir="$tmp/kv-merge/${path//\//_}"
+  local existing="$merge_dir/existing.json"
+  local merged="$merge_dir/merged.json"
+  mkdir -p "$merge_dir/files"
+  if bao kv get -format=json "$KV_MOUNT/$path" > "$merge_dir/raw.json" 2>/dev/null; then
+    jq '.data.data // {}' "$merge_dir/raw.json" > "$existing"
+  else
+    printf '{}\n' > "$existing"
+  fi
+  cp "$existing" "$merged"
   while [ "$#" -gt 0 ]; do
     local property="$1" file="$2"
-    args+=("${property}=@${file}")
+    local next="$merge_dir/next.json"
+    jq --arg property "$property" --rawfile value "$file" '. + {($property): $value}' "$merged" > "$next"
+    mv "$next" "$merged"
     shift 2
   done
+  local args=()
+  while IFS= read -r property; do
+    local value_file="$merge_dir/files/$(printf '%s' "$property" | sha256sum | awk '{print $1}')"
+    jq -jer --arg property "$property" '.[$property]' "$merged" > "$value_file"
+    chmod 0400 "$value_file"
+    args+=("${property}=@${value_file}")
+  done < <(jq -r 'keys[]' "$merged")
   bao kv put "$KV_MOUNT/$path" "${args[@]}" >/dev/null
+}
+
+merge_kv_backup_json() {
+  local path="$1" backup_json="$2" tmp="$3"
+  if jq -e '.absent == true' "$backup_json" >/dev/null 2>&1; then
+    return 0
+  fi
+  local merge_dir="$tmp/source-merge/${path//\//_}"
+  mkdir -p "$merge_dir/files"
+  local args=()
+  while IFS= read -r property; do
+    local value_file="$merge_dir/files/$(printf '%s' "$property" | sha256sum | awk '{print $1}')"
+    jq -jer --arg property "$property" '.data.data[$property]' "$backup_json" > "$value_file"
+    chmod 0400 "$value_file"
+    args+=("$property" "$value_file")
+  done < <(jq -r '.data.data | keys[]' "$backup_json")
+  if [ "${#args[@]}" -gt 0 ]; then
+    write_grouped_kv "$path" "$tmp" "${args[@]}"
+  fi
 }
 
 backup_kv_paths() {

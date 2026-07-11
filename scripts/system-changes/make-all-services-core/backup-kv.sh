@@ -15,9 +15,9 @@ while [ "$#" -gt 0 ]; do
 done
 : "${OUTPUT:?--output is required}"
 
+[ ! -e "$OUTPUT" ] || { echo "refusing to overwrite existing backup archive: $OUTPUT" >&2; exit 2; }
 require_base_tools
 require_helm
-require_bao
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -49,8 +49,17 @@ echo "backing up PVC inventory"
 capture_kubectl_json "$tmp/pvc/release-namespace-pvcs.json" -n "$NS" get pvc
 capture_kubectl_json "$tmp/pvc/openbao-namespace-pvcs.json" -n "$OPENBAO_NAMESPACE" get pvc
 
-echo "backing up target OpenBao mapped KV paths"
-backup_kv_paths "$tmp/kv"
+target_kv_captured=false
+if [ -n "${BAO_ADDR:-}" ] || [ -n "${BAO_TOKEN:-}" ]; then
+  require_bao
+  echo "backing up target OpenBao mapped KV paths"
+  backup_kv_paths "$tmp/kv"
+  target_kv_captured=true
+else
+  echo "target OpenBao not supplied; recording target KV as absent"
+  printf '{"absent":true,"reason":"target OpenBao not supplied before rollout","path":"%s"}\n' "$KV_MOUNT" > "$tmp/kv/target-openbao.absent.json"
+  chmod 0400 "$tmp/kv/target-openbao.absent.json"
+fi
 
 if [ -n "${SOURCE_BAO_ADDR:-}" ] || [ -n "${SOURCE_BAO_TOKEN:-}" ]; then
   echo "backing up external Vault/OpenBao mapped KV paths"
@@ -59,7 +68,7 @@ fi
 
 helm_revision="$(jq -r '.version // empty' "$tmp/helm/status.json")"
 cat > "$tmp/manifest.json" <<JSON
-{"backupVersion":$BACKUP_VERSION,"verified":true,"namespace":"$NS","release":"$RELEASE","helmRevision":"$helm_revision","openbaoNamespace":"$OPENBAO_NAMESPACE","kvMount":"$KV_MOUNT","sourceKvMount":"$SOURCE_KV_MOUNT","createdAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+{"backupVersion":$BACKUP_VERSION,"verified":true,"namespace":"$NS","release":"$RELEASE","helmRevision":"$helm_revision","openbaoNamespace":"$OPENBAO_NAMESPACE","kvMount":"$KV_MOUNT","targetKvCaptured":$target_kv_captured,"sourceKvMount":"$SOURCE_KV_MOUNT","createdAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 JSON
 verify_extracted_backup "$tmp"
 archive_paths=(manifest.json kv kubernetes helm eso pvc)

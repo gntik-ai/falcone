@@ -64,7 +64,7 @@ function draftForSource(serverId, source, resources) {
 export function createMcpEngine({
   selfBaseUrl = process.env.MCP_SELF_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 8080}`,
   gatewayBaseUrl = process.env.MCP_GATEWAY_BASE_URL ?? selfBaseUrl,
-  runtimeImage = process.env.MCP_RUNTIME_IMAGE ?? 'localhost:30500/in-falcone-mcp-runtime',
+  runtimeImage = process.env.MCP_RUNTIME_IMAGE ?? 'ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0',
   runtimeImageDigest = process.env.MCP_RUNTIME_IMAGE_DIGEST,
   plan = MCP_QUOTA_DEFAULTS[process.env.MCP_PLAN ?? 'standard'] ?? MCP_QUOTA_DEFAULTS.standard,
   fetchImpl = globalThis.fetch,

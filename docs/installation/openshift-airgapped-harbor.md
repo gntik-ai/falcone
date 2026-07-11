@@ -221,10 +221,10 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 | FerretDB gateway | `ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985` (v2.7.0) | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/ferretdb:2.7.0` | distroless |
 | Kafka | `bitnamilegacy/kafka:3.9.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0` | KRaft |
 | SeaweedFS | `chrislusf/seaweedfs:4.33` (`@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`) | docker.io | `${HARBOR}/${HARBOR_PROJECT}/chrislusf/seaweedfs:4.33` | master/volume/filer/s3 + seed/bucket Jobs. **Pin the digest.** |
-| Prometheus | `prom/prometheus:3.2.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1` | observability |
+| Prometheus | `prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:v3.2.1` | observability; pin the mirrored digest |
 | Grafana | `grafana/grafana:11.4.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0` | dashboards |
 | Keycloak | `quay.io/keycloak/keycloak:26.1.0` | quay.io | `${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0` | IdP |
-| APISIX | `apache/apisix:3.10.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0` | gateway |
+| APISIX | `apache/apisix:3.10.0-debian` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian` | gateway |
 | kubectl (bootstrap) | `bitnamilegacy/kubectl:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kubectl:1.32.2` | bootstrap + TLS‑bootstrap Jobs |
 | OpenBao | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | core secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
 | Node (OpenBao audit sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
@@ -236,25 +236,26 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 
 | Component | Image:tag (chart) | Dockerfile | Build base image(s) (also mirror) | Notes |
 |---|---|---|---|---|
-| control-plane (API) | `in-falcone-control-plane:0.6.2` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/server.mjs` — **[VERIFY]** exact API entrypoint vs executor |
-| control-plane-executor | `in-falcone-control-plane-executor:0.9.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/runtime/main.mjs`; built from **repo root** |
-| web-console | `in-falcone-web-console:0.2.11` | `apps/web-console/Dockerfile` | build `node:22-alpine`, runtime `nginx:1.27-alpine` | build and publish to Harbor; do not use the old `ghcr.io/example` placeholder |
-| workflow-worker | `in-falcone-workflow-worker:0.1.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc — Temporal core‑bridge) | core worker, built from repo root |
-| fn-runtime | `in-falcone-fn-runtime:0.1.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| control-plane (API) | `in-falcone-control-plane:0.3.0` | `deploy/kind/control-plane/Dockerfile` | `node:22-alpine` | release workflow build; validates JWT and dispatches `/v1/*` to real action modules |
+| control-plane-executor | `in-falcone-control-plane-executor:0.3.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | data-plane executor; built from repo root |
+| web-console | `in-falcone-web-console:0.3.0` | `deploy/release/web-console.Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
+| workflow-worker | `in-falcone-workflow-worker:0.3.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc - Temporal core-bridge) | core worker, built from repo root |
+| fn-runtime | `in-falcone-fn-runtime:0.3.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| mcp-runtime | `in-falcone-mcp-runtime:0.3.0` | `apps/mcp-runtime/Dockerfile` | `node:22-alpine` | first-party MCP JSON-RPC runtime |
 
 Harbor targets for the built images:
-`${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.6.2`,
-`…/in-falcone-control-plane-executor:0.9.0`, `…/in-falcone-web-console:0.2.11`,
-`…/in-falcone-workflow-worker:0.1.0`, `…/in-falcone-fn-runtime:0.1.0`.
+`${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.3.0`,
+`.../in-falcone-control-plane-executor:0.3.0`, `.../in-falcone-web-console:0.3.0`,
+`.../in-falcone-workflow-worker:0.3.0`, `.../in-falcone-fn-runtime:0.3.0`,
+`.../in-falcone-mcp-runtime:0.3.0`.
 
-Build bases to mirror (for BuildConfig): `node:22-alpine`, `node:22-slim`,
-`nginx:1.27-alpine` (→ `${HARBOR}/${HARBOR_PROJECT}/library/...`).
+Build bases to mirror (for BuildConfig): `node:22-alpine` and `node:22-slim`
+(to `${HARBOR}/${HARBOR_PROJECT}/library/...`).
 
 > **Unpinned/placeholder versions flagged (do not silently pick a tag):**
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
 > - Falcone-built images must be built and pushed to Harbor before install. Public manifests for
->   `in-falcone-control-plane-executor:0.9.0`, `in-falcone-workflow-worker:0.1.0`,
->   `in-falcone-mcp-runtime:0.1.0`, and `in-falcone-web-console:0.2.11` were not
+>   the coherent first-party image set, for example `in-falcone-control-plane:0.3.0`, were not
 >   verified, so do not invent digests for them.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
@@ -283,10 +284,11 @@ skopeo copy docker://ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b
 skopeo copy docker://docker.io/bitnamilegacy/kafka:3.9.0                docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0
 skopeo copy docker://docker.io/chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495 \
             docker://${HARBOR}/${HARBOR_PROJECT}/chrislusf/seaweedfs:4.33
-skopeo copy docker://docker.io/prom/prometheus:3.2.1             docker://${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1
+skopeo copy docker://docker.io/prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62 \
+            docker://${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:v3.2.1
 skopeo copy docker://docker.io/grafana/grafana:11.4.0           docker://${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0
 skopeo copy docker://quay.io/keycloak/keycloak:26.1.0          docker://${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0
-skopeo copy docker://docker.io/apache/apisix:3.10.0            docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0
+skopeo copy docker://docker.io/apache/apisix:3.10.0-debian     docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian
 skopeo copy docker://docker.io/bitnamilegacy/kubectl:1.32.2          docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kubectl:1.32.2
 
 # Core service support images
@@ -299,13 +301,12 @@ skopeo copy docker://docker.io/temporalio/ui:2.51.0            docker://${HARBOR
 # Build bases (only needed if you build in-cluster via BuildConfig — Appendix B)
 skopeo copy docker://docker.io/library/node:22-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine
 skopeo copy docker://docker.io/library/node:22-slim            docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-slim
-skopeo copy docker://docker.io/library/nginx:1.27-alpine       docker://${HARBOR}/${HARBOR_PROJECT}/library/nginx:1.27-alpine
 ```
 
 > **Build‑from‑source images in air‑gap.** Building Falcone's own images in‑cluster
 > (BuildConfig) requires both the base images in Harbor **and the repo source**.
 > Cloning from `github.com/gntik-ai/falcone` is typically **blocked** in air‑gap.
-> **Recommended:** build the five Falcone images on a connected/DMZ host (or your CI),
+> **Recommended:** build the six Falcone images on a connected/DMZ host (or your CI),
 > `skopeo copy` them into Harbor, and use only the `Deployment` manifests in §7 — no
 > BuildConfig on the cluster. Appendix B documents the BuildConfig alternative (needs an
 > internal Git mirror of the repo).
@@ -2312,7 +2313,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.6.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 8080, protocol: TCP }]
           env:
@@ -2335,7 +2336,7 @@ spec:
             - { name: MONGO_USER, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_USER } } }
             - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
             - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
-            - { name: FN_RUNTIME_IMAGE, value: "${HARBOR}/${HARBOR_PROJECT}/in-falcone-fn-runtime:0.1.0" }
+            - { name: FN_RUNTIME_IMAGE, value: "${HARBOR}/${HARBOR_PROJECT}/in-falcone-fn-runtime:0.3.0" }
           envFrom:
             - configMapRef: { name: falcone-control-plane-config }
             - configMapRef: { name: in-falcone-control-plane-config }
@@ -2402,7 +2403,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane-executor
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane-executor:0.9.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane-executor:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 8080 }]
           env:
@@ -2480,7 +2481,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: apisix
-          image: ${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 9080, protocol: TCP }
@@ -2538,7 +2539,7 @@ spec:
 
 ### 7.10 Web console — Deployment + Service
 
-nginx serving the built SPA; same‑origin `/v1` proxies to the gateway via the
+Node static server serving the built SPA; same-origin `/v1` proxies to the gateway via the
 `GATEWAY_UPSTREAM` env baked into the image (default `falcone-apisix:9080`).
 
 ```yaml
@@ -2565,7 +2566,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web-console
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-web-console:0.2.11
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-web-console:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 3000, protocol: TCP }]
           env:
@@ -2599,10 +2600,9 @@ spec:
   ports: [{ name: http, port: 3000, targetPort: 3000, protocol: TCP }]
 ```
 
-> **[VERIFY] nginx port under `restricted-v2`.** The image's `nginx.conf` listens on
-> `3000` (non‑privileged) — good for arbitrary‑uid. The stock `nginx:1.27-alpine` base
-> writes to `/var/cache/nginx` and `/var/run`; if you enable `readOnlyRootFilesystem`,
-> add `emptyDir` mounts for those paths. `readOnlyRootFilesystem` is left **off** here.
+> **[VERIFY] web-console port under `restricted-v2`.** The release image serves on
+> `3000` (non-privileged) with the repository static server and does not require nginx cache or
+> pid-file write paths.
 
 ### 7.11 Observability — Prometheus — Deployment + Service
 
@@ -2630,7 +2630,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: observability
-          image: ${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1
+          image: ${HARBOR}/${HARBOR_PROJECT}/prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62
           imagePullPolicy: IfNotPresent
           args:
             - --config.file=/etc/prometheus/prometheus.yml
@@ -3329,7 +3329,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: workflow-worker
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-workflow-worker:0.1.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-workflow-worker:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 8080 }]
           env:
@@ -3590,7 +3590,7 @@ returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
 | Pod rejected: `unable to validate against any security context constraint` / `runAsUser: Invalid value` | A pinned uid/fsGroup outside the namespace range under `restricted-v2` | Remove the pin (this guide already nulls them for grafana/openbao/documentdb/pgvector); or bind a dedicated SCC to that SA only. |
 | `hostPath` volume denied | restricted SCC forbids hostPath (upstream SeaweedFS s3 default) | Already fixed here (s3 logs use `emptyDir`); ensure you used the §7.5 s3 manifest, not the upstream one. |
 | PVC stuck `Pending` | StorageClass missing/!dynamic, or no RWO capacity | `oc get pvc -n falcone`; set `${OCP_STORAGECLASS}` to a valid dynamic RWO class; check quota. |
-| Build base image not found (BuildConfig) | `FROM` points at a public registry / base not mirrored | Mirror `node:22-alpine`, `node:22-slim`, `nginx:1.27-alpine` to Harbor and set the BuildConfig `strategy.dockerStrategy.from` to the Harbor path (Appendix B). |
+| Build base image not found (BuildConfig) | `FROM` points at a public registry / base not mirrored | Mirror `node:22-alpine` and `node:22-slim` to Harbor and set the BuildConfig `strategy.dockerStrategy.from` to the Harbor path (Appendix B). |
 | `documentdb-init` fails `documentdb absent from pg_available_extensions` | Wrong/mismatched DocumentDB image mirrored | Mirror the **digest‑pinned** `ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`. |
 | FerretDB CrashLoop / `logical decoding requires wal_level >= logical` | DocumentDB started without `wal_level=logical` | Ensure the `args` (command‑line `-c wal_level=logical`) in §7.2 are present (a `conf.d` GUC is ignored by this image). |
 | Keycloak 404 on `/auth/...` or OIDC issuer mismatch | `KC_HTTP_RELATIVE_PATH`/`KC_HOSTNAME` inconsistent with the Route + gateway config | Keep `/auth` consistent across Keycloak env, `in-falcone-gateway-config`, and the identity Route (§7.6 [VERIFY]). |
@@ -3675,7 +3675,7 @@ spec:
         kind: DockerImage
         name: ${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine   # base from Harbor
   output:
-    to: { kind: ImageStreamTag, name: "in-falcone-control-plane:0.6.2" }
+    to: { kind: ImageStreamTag, name: "in-falcone-control-plane:0.3.0" }
   # Builds pull the base via the 'builder' SA — ensure harbor-pull is linked (§3.3).
 ```
 
@@ -3688,14 +3688,14 @@ resolves:
 metadata:
   annotations:
     image.openshift.io/triggers: |
-      [{"from":{"kind":"ImageStreamTag","name":"in-falcone-control-plane:0.6.2","namespace":"falcone"},
+      [{"from":{"kind":"ImageStreamTag","name":"in-falcone-control-plane:0.3.0","namespace":"falcone"},
         "fieldPath":"spec.template.spec.containers[?(@.name==\"control-plane\")].image"}]
 ```
 
 Repeat the ImageStream/BuildConfig per build‑from‑source image
 (`in-falcone-control-plane-executor`, `in-falcone-web-console`,
 `in-falcone-workflow-worker`, `in-falcone-fn-runtime`) with the right
-`dockerfilePath` and Harbor base (`node:22-alpine`, `node:22-slim`, `nginx:1.27-alpine`).
+`dockerfilePath` and Harbor base (`node:22-alpine`, `node:22-slim`).
 
 ---
 

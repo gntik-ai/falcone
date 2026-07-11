@@ -166,13 +166,29 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   `npm run validate:repo`; `git diff --check`. `npm run lint:md` and `npm run lint:snippets`
   still fail only on the pre-existing `README-loop-kit.md` formatting issues and missing
   `docs/guides/realtime/frontend-quickstart.md` recorded above.
+- Third-reviewer revision addressed the remaining fresh-install contract blockers without applying
+  to a cluster: default APISIX and Prometheus refs now use verified pullable tags
+  `docker.io/apache/apisix:3.10.0-debian` and the Prometheus v3.2.1 manifest digest
+  `sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62`; base
+  first-party images no longer render `localhost` and use the coherent chart app-version release tag
+  `0.3.0`; the release workflow now includes a tracked production MCP runtime image build; the ESO
+  wrapper vendors the upstream `external-secrets` dependency and renders controller, webhook,
+  cert-controller, and CRDs; the umbrella chart creates/adopts configured auxiliary namespaces;
+  default Kafka is a valid single-broker KRaft topology; OpenBao init and migration write KV paths
+  with merge semantics and merge external source KV backup data before mapped Kubernetes Secret
+  overlays; backup works before target OpenBao exists, refuses existing output archives, and records
+  target KV as absent when credentials are not supplied; `diff-rollout.sh` adds a read-only
+  Helm/kubectl rollout diff gate.
+- Third-reviewer validation added focused regressions for nested ESO dependency/controller render,
+  auxiliary namespaces, pullable base refs/no localhost defaults, Kafka single-broker defaults,
+  KV merge/non-clobber helpers, target-absent backup/output refusal, and the rollout diff gate.
 - Fresh clean-cluster install was intentionally not run in this implementer stage per orchestrator
   instruction.
-- MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but these public manifests
-  still return `manifest unknown`: `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
-  `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.1.0`,
-  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0`, and
-  `ghcr.io/gntik-ai/in-falcone-web-console:0.2.11`. The chart now defaults the unpublished
-  project-owned runtime images to local `localhost:30500/in-falcone-*` aliases; the tracked release
-  workflow can publish executor/web-console/workflow-worker images on a release, but production/GHCR
-  publication and a verified MCP runtime publication path remain external release blockers.
+- MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but GHCR publication and digest
+  verification of the coherent first-party `0.3.0` image set remains an external release blocker:
+  `ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0`,
+  `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.3.0`,
+  `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.3.0`,
+  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0`, and
+  `ghcr.io/gntik-ai/in-falcone-web-console:0.3.0`. Do not check the MCP runtime-image/digest task
+  or add digest pins until those manifests are published and verified.
