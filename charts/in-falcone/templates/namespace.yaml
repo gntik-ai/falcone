@@ -1,21 +1,14 @@
 {{- $releaseNamespace := .Release.Namespace -}}
 {{- $esoNamespace := .Values.eso.eso.namespace | default "eso-system" -}}
 {{- $openbaoNamespace := .Values.openbao.openbao.namespace | default "secret-store" -}}
+{{- /*
+The release namespace is created by Helm's --create-namespace path before pre-install
+hooks run. Do not render it here: several pre-install hooks run in .Release.Namespace,
+and rendering the same Namespace as a normal chart resource conflicts with Helm's
+namespace auto-creation ownership. This template owns only auxiliary namespaces.
+*/ -}}
 {{- if .Values.global.createNamespace }}
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ $releaseNamespace }}
-  annotations:
-    meta.helm.sh/release-name: {{ .Release.Name | quote }}
-    meta.helm.sh/release-namespace: {{ .Release.Namespace | quote }}
-  labels:
-    {{- include "in-falcone.labels" . | nindent 4 }}
-    in-falcone.io/environment: {{ .Values.global.environment | quote }}
-    kubernetes.io/metadata.name: {{ $releaseNamespace | quote }}
-    openbao-access: "true"
 {{- if ne $esoNamespace $releaseNamespace }}
----
 apiVersion: v1
 kind: Namespace
 metadata:

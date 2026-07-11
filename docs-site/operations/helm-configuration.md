@@ -29,14 +29,14 @@ common → environment → customer → platform → airgap → localOverride �
 helm dependency build charts/in-falcone
 
 helm upgrade --install falcone charts/in-falcone \
-  -n falcone \
+  -n falcone --create-namespace \
   -f charts/in-falcone/values/prod.yaml \              # environment
   -f charts/in-falcone/values/customer-reference.yaml \ # customer
   -f charts/in-falcone/values/platform-kubernetes.yaml \# platform
   -f charts/in-falcone/values/profiles/standard.yaml    # sizing
 ```
 
-By default the chart renders Namespace resources for the release namespace plus ESO/OpenBao support namespaces (`global.createNamespace=true`). Do not add Helm namespace auto-creation to this command; for externally managed namespaces, set `global.createNamespace=false` and pre-create/adopt the required namespaces in the platform layer.
+Helm creates the release namespace before pre-install hooks run. By default the chart renders Namespace resources for the ESO/OpenBao support namespaces (`global.createNamespace=true`). For externally managed namespaces, omit Helm namespace auto-creation, set `global.createNamespace=false`, and pre-create/adopt the required namespaces in the platform layer.
 
 `config.inheritanceOrder` records this layering; `deployment.profile` selects the sizing profile.
 

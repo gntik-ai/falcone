@@ -110,15 +110,16 @@ function commandText(job) {
 
 test('all-core-001: arbitrary release namespace is used consistently', SKIP, () => {
   const out = assertRender();
-  assert.match(out, /kind:\s*Namespace[\s\S]*name:\s*review-ns/, 'Namespace resource must use .Release.Namespace');
+  const docs = parseAllDocuments(out).map((doc) => doc.toJSON()).filter(Boolean);
+  assert.equal(findDoc(docs, 'Namespace', 'review-ns'), undefined, 'release Namespace must be created by Helm --create-namespace, not rendered as a normal chart resource');
   assert.match(out, /namespace:\s*review-ns/, 'namespaced resources must render in the release namespace');
   assert.doesNotMatch(out, /namespace:\s*in-falcone-dev\b|name:\s*in-falcone-dev\b/, 'global.namespace must not leak into rendered manifests');
-  assert.match(out, /openbao-access:\s*"true"/, 'release namespace must be labeled for OpenBao NetworkPolicy ingress');
+  assert.match(out, /kind:\s*NetworkPolicy[\s\S]*name:\s*openbao-access-policy[\s\S]*kubernetes\.io\/metadata\.name:\s*review-ns/, 'OpenBao NetworkPolicy must allow the Helm-created release namespace by name');
 });
 
-test('all-core-001b: install docs do not mix chart-owned namespaces with Helm create-namespace', () => {
+test('all-core-001b: install docs use Helm create-namespace while the chart owns support namespaces', () => {
   const valuesDoc = parseAllDocuments(readFileSync(resolve(CHART_PATH, 'values.yaml'), 'utf8'))[0].toJSON();
-  assert.equal(valuesDoc.global?.createNamespace, true, 'default fresh installs must let the chart render required namespaces');
+  assert.equal(valuesDoc.global?.createNamespace, true, 'default fresh installs must let the chart render required support namespaces');
 
   const files = [
     'docs-site/guide/installation.md',
@@ -126,8 +127,9 @@ test('all-core-001b: install docs do not mix chart-owned namespaces with Helm cr
   ];
   for (const rel of files) {
     const text = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
-    assert.doesNotMatch(text, /--create-namespace\b/, `${rel} must not ask Helm to pre-create the release namespace`);
-    assert.match(text, /global\.createNamespace=true/, `${rel} must document chart-owned namespace creation`);
+    assert.match(text, /--create-namespace\b/, `${rel} must ask Helm to create the release namespace before pre-install hooks`);
+    assert.match(text, /global\.createNamespace=true/, `${rel} must document chart-owned support namespace creation`);
+    assert.match(text, /global\.createNamespace=false/, `${rel} must document the fully pre-created namespace path`);
   }
 });
 
@@ -429,7 +431,7 @@ test('all-core-007: ESO operator, webhook, cert-controller, CRDs, and auxiliary 
   assert.match(nestedLock, /name:\s*external-secrets[\s\S]*version:\s*0\.9\.0/, 'ESO wrapper must carry a nested lock for the vendored upstream chart');
   assert.match(vendoring, /unpacked chart/, 'ESO wrapper must document that the unpacked chart is intentionally tracked');
   const docs = renderDocs();
-  assert.ok(findDoc(docs, 'Namespace', 'review-ns'), 'release namespace must render for a fresh install');
+  assert.equal(findDoc(docs, 'Namespace', 'review-ns'), undefined, 'release namespace must be left to Helm --create-namespace so pre-install hooks can start without ownership conflicts');
   assert.ok(findDoc(docs, 'Namespace', 'eso-system'), 'ESO auth namespace must render for a fresh install');
   assert.ok(findDoc(docs, 'Namespace', 'secret-store'), 'OpenBao namespace must render for a fresh install');
   assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets')?.metadata?.namespace, 'eso-system', 'ESO controller Deployment must run in the configured ESO namespace');
