@@ -619,6 +619,18 @@ test('all-core-006d3: control plane wiring follows custom release and registry v
   assert.equal(env.PGHOST.value, 'hawk-postgresql');
   assert.equal(env.PGUSER.valueFrom?.secretKeyRef?.key, 'POSTGRESQL_USERNAME');
   assert.equal(env.KEYCLOAK_BASE_URL.value, 'http://hawk-keycloak:8080');
+  assert.equal(env.MONGO_HOST.value, 'hawk-ferretdb:27017');
+  assert.equal(env.MONGO_BACKEND.value, 'ferretdb');
+  assert.deepEqual(env.MONGO_USER.valueFrom?.secretKeyRef, { key: 'POSTGRES_USER', name: 'in-falcone-documentdb' });
+  assert.deepEqual(env.MONGO_PASSWORD.valueFrom?.secretKeyRef, { key: 'POSTGRES_PASSWORD', name: 'in-falcone-documentdb' });
+  assert.ok(findDoc(docs, 'Secret', 'in-falcone-documentdb'), 'custom render must create the documentdb credential Secret referenced by control plane');
+  const executor = findDoc(docs, 'Deployment', 'hawk-control-plane-executor');
+  assert.ok(executor, 'custom control-plane executor Deployment must render');
+  const executorEnv = Object.fromEntries(executor.spec.template.spec.containers[0].env.map((entry) => [entry.name, entry]));
+  assert.equal(executorEnv.MONGO_HOST.value, 'hawk-ferretdb:27017');
+  assert.equal(executorEnv.MONGO_BACKEND.value, 'ferretdb');
+  assert.deepEqual(executorEnv.MONGO_USER.valueFrom?.secretKeyRef, { key: 'POSTGRES_USER', name: 'in-falcone-documentdb' });
+  assert.deepEqual(executorEnv.MONGO_PASSWORD.valueFrom?.secretKeyRef, { key: 'POSTGRES_PASSWORD', name: 'in-falcone-documentdb' });
   assert.equal(env.STORAGE_S3_ENDPOINT.value, 'http://hawk-seaweedfs-s3:8333');
   assert.equal(env.STORAGE_S3_ACCESS_KEY.valueFrom?.secretKeyRef?.name, 'in-falcone-seaweedfs-s3-creds');
   assert.equal(env.KAFKA_BROKERS.value, 'hawk-kafka:9092');
@@ -627,11 +639,20 @@ test('all-core-006d3: control plane wiring follows custom release and registry v
   assert.doesNotMatch(serializedEnv, /localhost:30500|:0\.1\.0|falcone-storage|value\":\"falcone\"/);
 
   const openshiftDocs = renderDocs(['-f', OPENSHIFT_VALUES]);
+  const openshiftControlPlane = findDoc(openshiftDocs, 'Deployment', 'falcone-control-plane');
   assert.equal(
-    envValue(findDoc(openshiftDocs, 'Deployment', 'falcone-control-plane'), 'STORAGE_S3_ENDPOINT'),
+    envValue(openshiftControlPlane, 'STORAGE_S3_ENDPOINT'),
     'https://falcone-seaweedfs-s3:8334',
     'OpenShift control plane must use the release-derived TLS SeaweedFS endpoint',
   );
+  assert.equal(envValue(openshiftControlPlane, 'MONGO_HOST'), 'falcone-ferretdb:27017');
+  assert.equal(envValue(openshiftControlPlane, 'MONGO_BACKEND'), 'ferretdb');
+  const openshiftEnv = Object.fromEntries(openshiftControlPlane.spec.template.spec.containers[0].env.map((entry) => [entry.name, entry]));
+  assert.deepEqual(openshiftEnv.MONGO_USER.valueFrom?.secretKeyRef, { key: 'POSTGRES_USER', name: 'in-falcone-documentdb' });
+  assert.deepEqual(openshiftEnv.MONGO_PASSWORD.valueFrom?.secretKeyRef, { key: 'POSTGRES_PASSWORD', name: 'in-falcone-documentdb' });
+  const openshiftExecutor = findDoc(openshiftDocs, 'Deployment', 'falcone-control-plane-executor');
+  assert.equal(envValue(openshiftExecutor, 'MONGO_HOST'), 'falcone-ferretdb:27017');
+  assert.equal(envValue(openshiftExecutor, 'MONGO_BACKEND'), 'ferretdb');
 });
 
 test('all-core-006e: OpenShift Harbor documentation mirrors stay synchronized', () => {
