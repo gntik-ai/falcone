@@ -23,7 +23,7 @@
  *   bbx-c7-02  no container image references a legacy component
  *   bbx-c7-03  no env value pins a legacy host; control-plane/executor point at FerretDB + SeaweedFS
  *   bbx-c7-04  the chart-level validate guard fails the render if a legacy values stanza is set
- *   bbx-c7-05  shipped kind/APISIX deploy artifacts do not point at removed default services
+ *   bbx-c7-05  shipped deploy/docs artifacts do not point at removed default services
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -117,21 +117,26 @@ test('bbx-c7-04: validate guard fails the render when a legacy values stanza is 
 // -------------------------------------------------------------------------
 // bbx-c7-05: shipped deploy helpers/docs do not point at removed defaults
 // -------------------------------------------------------------------------
-test('bbx-c7-05: shipped kind/APISIX artifacts do not reference removed default service endpoints', () => {
+test('bbx-c7-05: shipped deploy/docs artifacts do not reference removed default service endpoints', () => {
   const files = [
     'deploy/apisix/routes/scheduling.yaml',
     'deploy/apisix/routes/webhooks.yaml',
+    'deploy/OPENSHIFT-HARBOR-REVIEW.md',
     'deploy/kind/README.md',
     'deploy/kind/control-plane/route-map.json',
     'deploy/kind/control-plane/storage-handlers.mjs',
     'deploy/kind/lan-forward.sh',
     'deploy/kind/ui-verify-mongo.mjs',
     'deploy/kind/ui-verify-storage.mjs',
+    'docs/reference/architecture/storage-object-io.md',
+    'docs-site/api/control-plane.md',
+    'docs-site/api/gateway.md',
   ];
   const forbidden = [
     /falcone-mongodb/,
     /in-falcone-mongodb/,
     /falcone-storage(?:-0)?/,
+    /http:\/\/falcone-storage:8333/,
     /minio-console/,
     /scheduling-management\.openwhisk/,
     /openwhisk-webhook-management/,
@@ -141,6 +146,13 @@ test('bbx-c7-05: shipped kind/APISIX artifacts do not reference removed default 
     /REAL MinIO/,
     /Needs MinIO/,
     /needs OpenWhisk/,
+    /mongodb,\s*kafka,\s*minio/i,
+    /Postgres\/Keycloak\/MinIO\/Mongo/,
+    /openwhisk\.enabled\s*:\s*false/i,
+    /chart still ships an?\s+[`*]*openwhisk/i,
+    /swap the OpenWhisk component/i,
+    /gateway public-surface registration in the route catalog is ongoing/i,
+    /registration in the route catalog is part of the ongoing work/i,
   ];
 
   const violations = [];
@@ -150,5 +162,5 @@ test('bbx-c7-05: shipped kind/APISIX artifacts do not reference removed default 
       if (pattern.test(text)) violations.push(`${rel}: ${pattern}`);
     }
   }
-  assert.deepEqual(violations, [], `removed default services must not survive in shipped deploy artifacts:\n${violations.join('\n')}`);
+  assert.deepEqual(violations, [], `removed default services must not survive in shipped deploy/docs artifacts:\n${violations.join('\n')}`);
 });

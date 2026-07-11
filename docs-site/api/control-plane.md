@@ -66,7 +66,8 @@ The tenant/workspace are resolved **from the credential**, in precedence order (
 
 ## Flows routes *(Preview)*
 
-Served by the control-plane runtime when Flows is enabled (`TEMPORAL_ADDRESS`). Workspace-scoped;
+Served by the control-plane runtime as part of the core install (`TEMPORAL_ADDRESS` is chart-wired
+to Temporal). Workspace-scoped;
 authoring is `structural_admin`, running/observing is `data_access`. See the
 [Flows guide](/guide/flows) and the [Workflow DSL Reference](/architecture/workflow-dsl-reference).
 
@@ -84,9 +85,8 @@ authoring is `structural_admin`, running/observing is `data_access`. See the
 ## MCP management routes *(Preview)*
 
 Served by the control-plane runtime as part of the core install (the chart sets `MCP_ENABLED=true`).
-Workspace-scoped;
-the tenant is credential-derived, so a cross-tenant read/call/audit returns `404`. See the
-[MCP guide](/guide/mcp) and [MCP Architecture](/architecture/mcp).
+Workspace-scoped; the tenant is credential-derived, so a cross-tenant read/call/audit returns `404`.
+See the [MCP guide](/guide/mcp) and [MCP Architecture](/architecture/mcp).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -98,8 +98,8 @@ the tenant is credential-derived, so a cross-tenant read/call/audit returns `404
 | POST | `…/servers/{serverId}/tool-calls` | Invoke a tool (control-plane-mediated) |
 | GET | `…/servers/{serverId}/audit` | Tenant-scoped audit trail |
 
-> Flows and MCP routes are served directly by the control-plane runtime; gateway public-surface
-> registration in the route catalog is part of the ongoing work.
+> Flows and MCP routes are served by the control-plane runtime and are present in the public route
+> catalogs under `/v1/flows` and `/v1/mcp`.
 
 ## Errors
 
