@@ -308,6 +308,11 @@ test('all-core-004: OpenBao seeding and ESO remoteRefs are aligned', SKIP, () =>
   assert.match(out, /--from-file=root-token=\/openbao-recovery\/root-token/, 'OpenBao recovery Secret must preserve the root token for partial init convergence');
   assert.match(out, /cp \/openbao-recovery-mounted\/root-token \/openbao-recovery\/root-token[\s\S]*\[ -s \/openbao-recovery\/unseal1 \] && \[ -s \/openbao-recovery\/root-token \]/, 'initialized recovery branches must not signal .ready without a root token');
   assert.match(out, /openbao-recovery-mounted\/root-token[\s\S]*openbao-init-role login failed/, 'OpenBao init must fall back to mounted recovery root token before Kubernetes-auth login failures');
+  const openbaoInit = findDoc(docs, 'Job', 'openbao-init');
+  assert.ok(openbaoInit, 'OpenBao init convergence Job must render');
+  assert.equal(openbaoInit.metadata?.annotations?.['helm.sh/hook'], 'post-install,post-upgrade');
+  assert.equal(openbaoInit.metadata?.annotations?.['helm.sh/hook-weight'], '-4');
+  assert.equal(openbaoInit.metadata?.annotations?.['helm.sh/hook-delete-policy'], 'before-hook-creation');
   const credentialHook = findDoc(docs, 'Job', 'falcone-in-falcone-credential-bootstrap');
   assert.ok(credentialHook, 'platform credential bootstrap hook must render');
   assert.equal(credentialHook.metadata?.annotations?.['helm.sh/hook'], 'pre-install,pre-upgrade');
