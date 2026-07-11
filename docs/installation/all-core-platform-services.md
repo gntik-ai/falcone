@@ -136,7 +136,11 @@ controlled rollout:
 The backup command refuses to overwrite an existing archive. It always captures source Kubernetes
 Secrets, Helm metadata, ESO objects, PVC references, the full external Vault/OpenBao KV-v2 tree when
 configured, and the full target OpenBao KV-v2 tree when target `BAO_ADDR`/`BAO_TOKEN` are supplied.
-Target OpenBao KV is marked absent when target credentials are not supplied. Migration and
+KV enumeration and object reads fail closed: authentication, network, or inconsistent listed-object
+failures abort the backup, and the final archive is published atomically only after verification.
+Only an explicit not-found response can represent an empty KV tree, so a partial capture is never
+marked `verified=true` or `targetKvCaptured=true`. Target OpenBao KV is marked absent when target
+credentials are not supplied. Migration and
 initialization use merge semantics for KV paths, so unmapped properties already present at a path are
 preserved instead of being replaced by the mapped platform credential set. Before any write, migration
 compares every external source path/property with the target using typed JSON equality and reports only

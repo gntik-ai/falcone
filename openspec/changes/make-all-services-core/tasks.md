@@ -256,3 +256,6 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   before any write, treats typed-JSON equality as idempotent, reports only identifiers and fingerprints,
   and gates every differing nested or unmapped property behind explicit overwrite confirmation plus a
   verified target KV capture.
+- [x] Ninth-reviewer revision makes recursive target/source KV backup enumeration and reads fail closed,
+  accepts only explicit not-found responses as empty trees, and atomically publishes the archive only
+  after complete capture and verification.

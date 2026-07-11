@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,6 +86,10 @@ function storeFor(mount) {
   return state[context][mount];
 }
 function kvList(ref) {
+  if (process.env.BAO_FAKE_LIST_FAIL_CONTEXT === context) {
+    console.error('permission denied');
+    process.exit(3);
+  }
   const [mount, rawPrefix] = splitRef(ref);
   const prefix = rawPrefix.replace(/^\\/+/, '');
   const store = storeFor(mount);
@@ -97,11 +101,18 @@ function kvList(ref) {
     const slash = rest.indexOf('/');
     entries.add(slash === -1 ? rest : rest.slice(0, slash + 1));
   }
-  if (entries.size === 0) process.exit(2);
+  if (entries.size === 0) {
+    console.error('No value found at ' + ref);
+    process.exit(2);
+  }
   console.log(JSON.stringify([...entries].sort()));
 }
 function kvGet(ref) {
   const [mount, path] = splitRef(ref);
+  if (process.env.BAO_FAKE_EXPORT_GET_FAIL_CONTEXT === context && process.env.BAO_FAKE_EXPORT_GET_FAIL_PATH === path) {
+    console.error('permission denied');
+    process.exit(3);
+  }
   if (context === 'target' && process.env.BAO_FAKE_GET_FAIL_PATH === path) {
     console.error('permission denied');
     process.exit(3);
@@ -317,6 +328,17 @@ test('all-core KV migration scripts recursively migrate source KV and restore ta
   assert.equal(secondApply.status, 0, `second apply must be idempotent\nstdout: ${secondApply.stdout}\nstderr: ${secondApply.stderr}`);
   assert.deepEqual(h.state().target, afterFirstApply, 'second apply must not mutate already-migrated KV data');
 
+  const failedRestoreList = h.run('restore-kv.sh', ['--backup', backup, '--apply'], {
+    ...baoEnv,
+    BAO_FAKE_LIST_FAIL_CONTEXT: 'target',
+  });
+  assert.notEqual(failedRestoreList.status, 0, 'exact restore must fail closed when current target KV enumeration fails');
+  assert.match(
+    `${failedRestoreList.stdout}\n${failedRestoreList.stderr}`,
+    /failed to enumerate current target KV paths; exact restore aborted before deletion/,
+  );
+  assert.deepEqual(h.state().target, afterFirstApply, 'failed restore enumeration must not delete or write target KV data');
+
   const failedRestore = h.run('restore-kv.sh', ['--backup', backup, '--apply'], {
     ...baoEnv,
     BAO_FAKE_DELETE_FAIL_PATH: 'workspace/acme/nested/api',
@@ -446,4 +468,51 @@ test('all-core KV migration refuses overwrite when backup did not capture target
   assert.notEqual(applyRun.status, 0, 'overwrite apply must fail without targetKvCaptured=true');
   assert.match(`${applyRun.stdout}\n${applyRun.stderr}`, /targetKvCaptured=true required/, 'failure must explain the target backup requirement');
   assert.deepEqual(h.state().target, before, 'failed overwrite must not write target KV data');
+});
+
+test('all-core KV backup fails closed on target and source list/get errors', async (t) => {
+  const cases = [
+    { name: 'target list', env: { BAO_FAKE_LIST_FAIL_CONTEXT: 'target' }, source: false },
+    {
+      name: 'target get',
+      env: { BAO_FAKE_EXPORT_GET_FAIL_CONTEXT: 'target', BAO_FAKE_EXPORT_GET_FAIL_PATH: 'target/path' },
+      source: false,
+    },
+    { name: 'source list', env: { BAO_FAKE_LIST_FAIL_CONTEXT: 'source' }, source: true },
+    {
+      name: 'source get',
+      env: { BAO_FAKE_EXPORT_GET_FAIL_CONTEXT: 'source', BAO_FAKE_EXPORT_GET_FAIL_PATH: 'source/path' },
+      source: true,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.name, (st) => {
+      const h = makeHarness(st, {
+        target: { secret: { 'target/path': { token: 'TARGET_BACKUP_SECRET' } } },
+        source: { secret: { 'source/path': { token: 'SOURCE_BACKUP_SECRET' } } },
+        kubernetes: makeKubernetesSecrets(),
+      });
+      const backup = join(h.root, `${testCase.name.replace(' ', '-')}.tgz`);
+      const env = {
+        BAO_ADDR: 'https://target-openbao.test',
+        BAO_TOKEN: 'target-token',
+        ...testCase.env,
+      };
+      if (testCase.source) {
+        env.SOURCE_BAO_ADDR = 'https://source-openbao.test';
+        env.SOURCE_BAO_TOKEN = 'source-token';
+      }
+
+      const result = h.run('backup-kv.sh', ['--output', backup], env);
+      assert.notEqual(result.status, 0, `${testCase.name} failure must abort backup creation`);
+      assert.match(`${result.stdout}\n${result.stderr}`, /refusing to record a partial tree/);
+      assert.equal(existsSync(backup), false, `${testCase.name} failure must not publish a final backup archive`);
+      assert.deepEqual(
+        readdirSync(h.root).filter((name) => name.includes('.tgz.partial.')),
+        [],
+        `${testCase.name} failure must clean temporary backup archives`,
+      );
+    });
+  }
 });

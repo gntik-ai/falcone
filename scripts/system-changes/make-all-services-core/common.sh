@@ -324,18 +324,38 @@ kv2_tree_list_paths() {
   else
     target="$mount/"
   fi
-  local listing
-  if ! listing="$(bao_with_env "$env_name" kv list -format=json "$target" 2>/dev/null)"; then
-    return 0
+  local listing error_file
+  error_file="$(mktemp)"
+  if ! listing="$(bao_with_env "$env_name" kv list -format=json "$target" 2>"$error_file")"; then
+    if grep -Eq '(^|[[:space:]])No value found at ' "$error_file"; then
+      rm -f "$error_file"
+      return 0
+    fi
+    rm -f "$error_file"
+    printf 'failed to list OpenBao KV path %q; refusing to record a partial tree\n' "$target" >&2
+    return 1
   fi
-  jq -r '.[]' <<<"$listing" | while IFS= read -r entry; do
+  rm -f "$error_file"
+  local entries_file
+  entries_file="$(mktemp)"
+  if ! jq -r 'if type == "array" then .[] else error("KV list response is not an array") end' \
+    <<<"$listing" > "$entries_file"; then
+    rm -f "$entries_file"
+    printf 'invalid OpenBao KV list response for path %q; refusing to record a partial tree\n' "$target" >&2
+    return 1
+  fi
+  while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     if [[ "$entry" == */ ]]; then
-      kv2_tree_list_paths "$mount" "$env_name" "${prefix}${entry}"
+      if ! kv2_tree_list_paths "$mount" "$env_name" "${prefix}${entry}"; then
+        rm -f "$entries_file"
+        return 1
+      fi
     else
       printf '%s\n' "${prefix}${entry}"
     fi
-  done
+  done < "$entries_file"
+  rm -f "$entries_file"
 }
 
 kv2_export_tree() {
@@ -346,25 +366,33 @@ kv2_export_tree() {
   jq -n --arg mount "$mount" --arg label "$label" --arg kvVersion "v2" \
     '{format:"falcone-openbao-kv-tree", kvVersion:$kvVersion, mount:$mount, label:$label}' \
     > "$out_dir/_tree.json"
-  kv2_tree_list_paths "$mount" "$env_name" "" | while IFS= read -r path; do
+  local paths_file="$out_dir/paths.txt"
+  if ! kv2_tree_list_paths "$mount" "$env_name" "" > "$paths_file"; then
+    return 1
+  fi
+  while IFS= read -r path; do
     [ -n "$path" ] || continue
     local hash raw object
     hash="$(printf '%s' "$path" | sha256sum | awk '{print $1}')"
     raw="$out_dir/objects/${hash}.raw.json"
     object="$out_dir/objects/${hash}.json"
-    if bao_with_env "$env_name" kv get -format=json "$mount/$path" > "$raw" 2>/dev/null; then
-      jq -n --arg mount "$mount" --arg path "$path" --arg kvVersion "v2" --slurpfile raw "$raw" \
-        '{format:"falcone-openbao-kv-entry", kvVersion:$kvVersion, mount:$mount, path:$path, raw:$raw[0]}' \
-        > "$object"
+    if ! bao_with_env "$env_name" kv get -format=json "$mount/$path" > "$raw" 2>"$raw.stderr"; then
       rm -f "$raw"
-      chmod 0400 "$object"
-      printf '%s\t%s\n' "$hash" "$path" >> "$index"
-      echo "backed up $label $mount/$path"
-    else
-      rm -f "$raw"
-      echo "warning: listed $label $mount/$path but could not read it; skipping" >&2
+      rm -f "$raw.stderr"
+      printf 'failed to read listed %s KV path %q; refusing to record a partial tree\n' \
+        "$label" "$mount/$path" >&2
+      return 1
     fi
-  done
+    rm -f "$raw.stderr"
+    jq -n --arg mount "$mount" --arg path "$path" --arg kvVersion "v2" --slurpfile raw "$raw" \
+      '{format:"falcone-openbao-kv-entry", kvVersion:$kvVersion, mount:$mount, path:$path, raw:$raw[0]}' \
+      > "$object"
+    rm -f "$raw"
+    chmod 0400 "$object"
+    printf '%s\t%s\n' "$hash" "$path" >> "$index"
+    echo "backed up $label $mount/$path"
+  done < "$paths_file"
+  rm -f "$paths_file"
   chmod 0400 "$out_dir/_tree.json" "$index"
 }
 
@@ -402,8 +430,13 @@ restore_kv_tree_exact() {
   local empty_bao_env=()
   local backup_paths="$tmp/backup-kv-paths.txt"
   local current_paths="$tmp/current-kv-paths.txt"
+  local listed_paths="$tmp/current-kv-paths.unsorted.txt"
   kv_tree_paths "$tree_dir" > "$backup_paths"
-  kv2_tree_list_paths "$KV_MOUNT" empty_bao_env "" | sort -u > "$current_paths"
+  if ! kv2_tree_list_paths "$KV_MOUNT" empty_bao_env "" > "$listed_paths"; then
+    echo "failed to enumerate current target KV paths; exact restore aborted before deletion" >&2
+    return 1
+  fi
+  sort -u "$listed_paths" > "$current_paths"
   comm -13 "$backup_paths" "$current_paths" | while IFS= read -r extra_path; do
     [ -n "$extra_path" ] || continue
     echo "deleting target-only KV path $KV_MOUNT/$extra_path"

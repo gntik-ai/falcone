@@ -70,7 +70,9 @@ Existing installs require a controlled rollout:
    external Vault/OpenBao state, resource headroom, and PVC inventory.
 2. Back up Kubernetes Secrets, full recursive external Vault/OpenBao KV-v2 trees, the target OpenBao
    KV-v2 tree when present, Helm values/manifests/history, ESO CRDs/resources, and PVC metadata.
-   Capture checksums without logging secret values.
+   Capture checksums without logging secret values. KV list/get errors fail closed, except an explicit
+   not-found response that proves an empty tree; publish the verified archive atomically so partial
+   target or source captures can never carry `verified=true` or `targetKvCaptured=true`.
 3. Migrate K8s Secret and Vault data into OpenBao idempotently. Import arbitrary external source
    KV-v2 paths/properties before overlaying mapped platform Secret values, preserve encryption master
    keys byte-identically, compare checksums, and stop on mismatch. A complete typed-JSON source/target

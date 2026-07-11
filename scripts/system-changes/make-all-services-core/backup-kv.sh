@@ -20,7 +20,12 @@ require_base_tools
 require_helm
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+archive_tmp=""
+cleanup() {
+  rm -rf "$tmp"
+  [ -z "$archive_tmp" ] || rm -f "$archive_tmp"
+}
+trap cleanup EXIT
 mkdir -p "$tmp/kv" "$tmp/kubernetes" "$tmp/helm" "$tmp/eso" "$tmp/pvc"
 
 echo "backing up Kubernetes Secrets in namespace $NS"
@@ -75,7 +80,11 @@ archive_paths=(manifest.json kv kubernetes helm eso pvc)
 if [ -d "$tmp/source-kv" ]; then
   archive_paths+=(source-kv)
 fi
-tar -C "$tmp" -czf "$OUTPUT" "${archive_paths[@]}"
-chmod 0600 "$OUTPUT"
+archive_tmp="$(mktemp "${OUTPUT}.partial.XXXXXX")"
+tar -C "$tmp" -czf "$archive_tmp" "${archive_paths[@]}"
+chmod 0600 "$archive_tmp"
+ln "$archive_tmp" "$OUTPUT"
+rm -f "$archive_tmp"
+archive_tmp=""
 echo "backup archive written: $OUTPUT"
 echo "archive contains secret material, Helm manifests, and recovery material; store it as a restricted operator artifact"
