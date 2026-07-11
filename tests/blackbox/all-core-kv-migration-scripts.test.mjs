@@ -126,6 +126,7 @@ function kvPut(ref, pairs) {
 }
 function kvDelete(ref) {
   const [mount, path] = splitRef(ref);
+  if (process.env.BAO_FAKE_DELETE_FAIL_PATH === path) process.exit(3);
   delete storeFor(mount)[path];
   save();
 }
@@ -308,6 +309,17 @@ test('all-core KV migration scripts recursively migrate source KV and restore ta
   const secondApply = h.run('migrate-platform-secrets.sh', ['--apply', '--backup', backup, '--allow-overwrite'], applyEnv);
   assert.equal(secondApply.status, 0, `second apply must be idempotent\nstdout: ${secondApply.stdout}\nstderr: ${secondApply.stderr}`);
   assert.deepEqual(h.state().target, afterFirstApply, 'second apply must not mutate already-migrated KV data');
+
+  const failedRestore = h.run('restore-kv.sh', ['--backup', backup, '--apply'], {
+    ...baoEnv,
+    BAO_FAKE_DELETE_FAIL_PATH: 'workspace/acme/nested/api',
+  });
+  assert.notEqual(failedRestore.status, 0, 'exact restore must fail when a target-only KV path cannot be deleted');
+  assert.match(
+    `${failedRestore.stdout}\n${failedRestore.stderr}`,
+    /failed to delete target-only KV path secret\/workspace\/acme\/nested\/api; exact restore aborted/,
+    'delete failure must identify the path and explain that exact restore aborted',
+  );
 
   const restoreRun = h.run('restore-kv.sh', ['--backup', backup, '--apply'], baoEnv);
   assert.equal(restoreRun.status, 0, `restore must succeed\nstdout: ${restoreRun.stdout}\nstderr: ${restoreRun.stderr}`);

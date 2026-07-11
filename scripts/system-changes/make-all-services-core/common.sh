@@ -358,7 +358,11 @@ restore_kv_tree_exact() {
   comm -13 "$backup_paths" "$current_paths" | while IFS= read -r extra_path; do
     [ -n "$extra_path" ] || continue
     echo "deleting target-only KV path $KV_MOUNT/$extra_path"
-    bao kv metadata delete "$KV_MOUNT/$extra_path" >/dev/null 2>&1 || bao kv delete "$KV_MOUNT/$extra_path" >/dev/null 2>&1 || true
+    if ! bao kv metadata delete "$KV_MOUNT/$extra_path" >/dev/null 2>&1 &&
+       ! bao kv delete "$KV_MOUNT/$extra_path" >/dev/null 2>&1; then
+      echo "failed to delete target-only KV path $KV_MOUNT/$extra_path; exact restore aborted" >&2
+      return 1
+    fi
   done
   find "$tree_dir/objects" -type f -name '*.json' | sort | while IFS= read -r entry; do
     local path
