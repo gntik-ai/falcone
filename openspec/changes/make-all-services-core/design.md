@@ -73,8 +73,10 @@ Existing installs require a controlled rollout:
    Capture checksums without logging secret values.
 3. Migrate K8s Secret and Vault data into OpenBao idempotently. Import arbitrary external source
    KV-v2 paths/properties before overlaying mapped platform Secret values, preserve encryption master
-   keys byte-identically, compare checksums, and stop on mismatch. Overwrite mode requires a verified
-   target KV backup (`targetKvCaptured=true`).
+   keys byte-identically, compare checksums, and stop on mismatch. A complete typed-JSON source/target
+   property preflight runs before any write; differing existing target properties fail closed without
+   exposing values. Overwrite mode requires the explicit confirmation phrase and a verified target KV
+   backup (`targetKvCaptured=true`).
 4. Apply the chart first on the test cluster. Wait for OpenBao/ESO, datastore Secrets, stateful
    services, Temporal, worker, executor, bootstrap, and runtime smoke gates.
 5. Roll back with exact target KV restore, backed-up Secrets, and the previous Helm revision if any

@@ -102,8 +102,15 @@ function kvList(ref) {
 }
 function kvGet(ref) {
   const [mount, path] = splitRef(ref);
+  if (context === 'target' && process.env.BAO_FAKE_GET_FAIL_PATH === path) {
+    console.error('permission denied');
+    process.exit(3);
+  }
   const value = storeFor(mount)[path];
-  if (!value) process.exit(2);
+  if (!value) {
+    console.error('No value found at ' + ref);
+    process.exit(2);
+  }
   console.log(JSON.stringify({ data: { data: value, metadata: { version: 1 } } }));
 }
 function kvPut(ref, pairs) {
@@ -326,6 +333,87 @@ test('all-core KV migration scripts recursively migrate source KV and restore ta
   assert.deepEqual(h.state().target, initialTarget, 'restore must return the target KV mount exactly to the captured backup tree');
 });
 
+test('all-core KV migration preflights nested source conflicts before any write', (t) => {
+  const initialTarget = {
+    secret: {
+      'unmapped/nested/path': {
+        collision: { owner: 'TARGET_OWNER_SECRET', weights: [1, 2] },
+        'tab\tline\nkey': 'TARGET_CONTROL_CHAR_SECRET',
+        'target-only': 'TARGET_ONLY_SECRET',
+      },
+    },
+  };
+  const h = makeHarness(t, {
+    target: JSON.parse(JSON.stringify(initialTarget)),
+    source: {
+      secret: {
+        'unmapped/nested/path': {
+          collision: { owner: 'SOURCE_OWNER_SECRET', weights: [3, 5] },
+          'tab\tline\nkey': 'SOURCE_CONTROL_CHAR_SECRET',
+          'source-only': 'SOURCE_ONLY_SECRET',
+        },
+      },
+    },
+    kubernetes: makeKubernetesSecrets(),
+  });
+  const backup = join(h.root, 'conflict-backup.tgz');
+  const baoEnv = {
+    BAO_ADDR: 'https://target-openbao.test',
+    BAO_TOKEN: 'target-token',
+    SOURCE_BAO_ADDR: 'https://source-openbao.test',
+    SOURCE_BAO_TOKEN: 'source-token',
+  };
+
+  const backupRun = h.run('backup-kv.sh', ['--output', backup], baoEnv);
+  assert.equal(backupRun.status, 0, `backup must succeed\nstdout: ${backupRun.stdout}\nstderr: ${backupRun.stderr}`);
+
+  const readFailure = h.run('migrate-platform-secrets.sh', ['--apply', '--backup', backup], {
+    ...baoEnv,
+    BAO_FAKE_GET_FAIL_PATH: 'unmapped/nested/path',
+  });
+  assert.notEqual(readFailure.status, 0, 'a target read error must fail closed instead of being treated as an absent path');
+  assert.match(`${readFailure.stdout}\n${readFailure.stderr}`, /refusing to treat the read error as an absent path/);
+  assert.deepEqual(h.state().target, initialTarget, 'a target read error must abort before any target KV write');
+
+  const dryRun = h.run('migrate-platform-secrets.sh', ['--dry-run', '--backup', backup], baoEnv);
+  assert.equal(dryRun.status, 0, `dry-run must succeed\nstdout: ${dryRun.stdout}\nstderr: ${dryRun.stderr}`);
+  const dryOutput = `${dryRun.stdout}\n${dryRun.stderr}`;
+  assert.match(dryOutput, /"path":"unmapped\/nested\/path","property":"collision","status":"conflict","sourceSha256":"[a-f0-9]{64}","targetSha256":"[a-f0-9]{64}"/);
+  assert.match(dryOutput, /"property":"tab\\tline\\nkey","status":"conflict"/);
+  assert.match(dryOutput, /source KV preflight summary: match=0 missing=1 conflict=2/);
+  for (const value of [
+    'TARGET_OWNER_SECRET',
+    'SOURCE_OWNER_SECRET',
+    'TARGET_CONTROL_CHAR_SECRET',
+    'SOURCE_CONTROL_CHAR_SECRET',
+    'TARGET_ONLY_SECRET',
+    'SOURCE_ONLY_SECRET',
+  ]) {
+    assert.equal(dryOutput.includes(value), false, `dry-run must not expose source or target value ${value}`);
+  }
+
+  const refused = h.run('migrate-platform-secrets.sh', ['--apply', '--backup', backup], baoEnv);
+  assert.notEqual(refused.status, 0, 'apply without overwrite approval must reject an arbitrary nested source conflict');
+  assert.match(`${refused.stdout}\n${refused.stderr}`, /refusing to overwrite 2 existing OpenBao value\(s\) from the external source KV tree/);
+  assert.deepEqual(h.state().target, initialTarget, 'conflict refusal must happen before any target KV write');
+
+  const overwrite = h.run('migrate-platform-secrets.sh', ['--apply', '--backup', backup, '--allow-overwrite'], {
+    ...baoEnv,
+    CONFIRM_SECRET_OVERWRITE: 'overwrite-existing-openbao-values',
+  });
+  assert.equal(overwrite.status, 0, `captured and explicitly confirmed overwrite must succeed\nstdout: ${overwrite.stdout}\nstderr: ${overwrite.stderr}`);
+  assert.deepEqual(h.state().target.secret['unmapped/nested/path'], {
+    collision: { owner: 'SOURCE_OWNER_SECRET', weights: [3, 5] },
+    'tab\tline\nkey': 'SOURCE_CONTROL_CHAR_SECRET',
+    'target-only': 'TARGET_ONLY_SECRET',
+    'source-only': 'SOURCE_ONLY_SECRET',
+  });
+
+  const restoreRun = h.run('restore-kv.sh', ['--backup', backup, '--apply'], baoEnv);
+  assert.equal(restoreRun.status, 0, `restore must succeed\nstdout: ${restoreRun.stdout}\nstderr: ${restoreRun.stderr}`);
+  assert.deepEqual(h.state().target, initialTarget, 'restore must exactly recover the captured target after an approved generic overwrite');
+});
+
 test('all-core KV migration refuses overwrite when backup did not capture target KV', (t) => {
   const h = makeHarness(t, {
     target: {
@@ -333,13 +421,20 @@ test('all-core KV migration refuses overwrite when backup did not capture target
         'platform/postgresql': { username: 'TARGET_OLD_USERNAME' },
       },
     },
-    source: { secret: {} },
+    source: {
+      secret: {
+        'unmapped/nested/path': { collision: 'SOURCE_COLLISION' },
+      },
+    },
     kubernetes: makeKubernetesSecrets({
       'in-falcone-postgresql/POSTGRESQL_USERNAME': 'K8S_USERNAME',
     }),
   });
   const backup = join(h.root, 'no-target-backup.tgz');
-  const backupRun = h.run('backup-kv.sh', ['--output', backup], {});
+  const backupRun = h.run('backup-kv.sh', ['--output', backup], {
+    SOURCE_BAO_ADDR: 'https://source-openbao.test',
+    SOURCE_BAO_TOKEN: 'source-token',
+  });
   assert.equal(backupRun.status, 0, `backup without target OpenBao must still succeed\nstdout: ${backupRun.stdout}\nstderr: ${backupRun.stderr}`);
 
   const before = h.state().target;

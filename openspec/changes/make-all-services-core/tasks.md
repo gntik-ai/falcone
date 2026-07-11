@@ -252,3 +252,7 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   deployment cutover tools now recursively export/import KV-v2 trees, require `targetKvCaptured=true`
   before `--allow-overwrite`, preserve arbitrary nested/unmapped external source paths/properties,
   and restore the captured target KV tree exactly.
+- [x] Eighth-reviewer revision preflights every external source KV path/property against the target
+  before any write, treats typed-JSON equality as idempotent, reports only identifiers and fingerprints,
+  and gates every differing nested or unmapped property behind explicit overwrite confirmation plus a
+  verified target KV capture.

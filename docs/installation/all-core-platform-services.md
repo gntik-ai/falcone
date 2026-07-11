@@ -138,9 +138,13 @@ Secrets, Helm metadata, ESO objects, PVC references, the full external Vault/Ope
 configured, and the full target OpenBao KV-v2 tree when target `BAO_ADDR`/`BAO_TOKEN` are supplied.
 Target OpenBao KV is marked absent when target credentials are not supplied. Migration and
 initialization use merge semantics for KV paths, so unmapped properties already present at a path are
-preserved instead of being replaced by the mapped platform credential set. An apply with
-`--allow-overwrite` refuses to run unless the verified backup has `targetKvCaptured=true`, ensuring
-every overwritten target path/property can be restored.
+preserved instead of being replaced by the mapped platform credential set. Before any write, migration
+compares every external source path/property with the target using typed JSON equality and reports only
+paths, property names, statuses, and SHA-256 fingerprints. Missing or identical target properties are
+safe; any differing target property fails the entire apply before the first write. An apply with
+`--allow-overwrite` additionally requires `CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values`
+and refuses to run unless the verified backup has `targetKvCaptured=true`, ensuring every overwritten
+target path/property can be restored.
 
 Rollback restores the captured target OpenBao KV tree exactly, restores Kubernetes Secrets and ESO
 resources, and then returns the Helm release to the previous revision. Exact KV restore can remove

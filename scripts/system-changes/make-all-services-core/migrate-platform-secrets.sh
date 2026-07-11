@@ -117,6 +117,18 @@ missing="$(awk '$3 == "missing" { n++ } END { print n + 0 }' "$tmp/diff.tsv")"
 matches="$(awk '$3 == "match" { n++ } END { print n + 0 }' "$tmp/diff.tsv")"
 echo "diff summary: match=$matches missing=$missing mismatch=$mismatches"
 
+source_conflicts=0
+source_dir="$tmp/backup/source-kv"
+if [ -d "$source_dir" ]; then
+  source_diff="$tmp/source-kv-diff.tsv"
+  preflight_kv_tree_conflicts "$source_dir" "$tmp" "$source_diff"
+  cat "$source_diff"
+  source_matches="$(jq -s 'map(select(.status == "match")) | length' "$source_diff")"
+  source_missing="$(jq -s 'map(select(.status == "missing")) | length' "$source_diff")"
+  source_conflicts="$(jq -s 'map(select(.status == "conflict")) | length' "$source_diff")"
+  echo "source KV preflight summary: match=$source_matches missing=$source_missing conflict=$source_conflicts"
+fi
+
 if [ "$APPLY" -ne 1 ]; then
   echo "dry-run only: no OpenBao writes performed"
   exit 0
@@ -129,6 +141,10 @@ if [ "$ALLOW_OVERWRITE" -eq 1 ]; then
 fi
 if [ "$mismatches" -ne 0 ] && [ "$ALLOW_OVERWRITE" -ne 1 ]; then
   echo "refusing to overwrite $mismatches existing OpenBao value(s); rerun with --allow-overwrite and CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values after reviewing the verified backup" >&2
+  exit 1
+fi
+if [ "$source_conflicts" -ne 0 ] && [ "$ALLOW_OVERWRITE" -ne 1 ]; then
+  echo "refusing to overwrite $source_conflicts existing OpenBao value(s) from the external source KV tree; rerun with --allow-overwrite and CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values after reviewing the verified backup" >&2
   exit 1
 fi
 

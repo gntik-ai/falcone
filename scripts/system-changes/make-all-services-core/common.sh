@@ -142,20 +142,73 @@ put_kv_data_json() {
   bao kv put "$KV_MOUNT/$path" "@${data_json}" >/dev/null
 }
 
+read_target_kv_data_or_empty() {
+  local path="$1" output="$2" work_prefix="$3"
+  if bao kv get -format=json "$KV_MOUNT/$path" > "$work_prefix.raw.json" 2> "$work_prefix.stderr"; then
+    jq '.data.data // {}' "$work_prefix.raw.json" > "$output"
+  elif grep -Eq '(^|[[:space:]])No value found at ' "$work_prefix.stderr"; then
+    printf '{}\n' > "$output"
+  else
+    printf 'failed to read target OpenBao KV path %q; refusing to treat the read error as an absent path\n' \
+      "$KV_MOUNT/$path" >&2
+    return 1
+  fi
+  rm -f "$work_prefix.raw.json" "$work_prefix.stderr"
+}
+
 merge_kv_data_json_into_target() {
   local path="$1" incoming_json="$2" tmp="$3"
   local merge_dir="$tmp/kv-json-merge/${path//\//_}"
   local existing="$merge_dir/existing.json"
   local merged="$merge_dir/merged.json"
   mkdir -p "$merge_dir"
-  if bao kv get -format=json "$KV_MOUNT/$path" > "$merge_dir/raw.json" 2>/dev/null; then
-    jq '.data.data // {}' "$merge_dir/raw.json" > "$existing"
-  else
-    printf '{}\n' > "$existing"
-  fi
+  read_target_kv_data_or_empty "$path" "$existing" "$merge_dir/read"
   jq -s '.[0] + .[1]' "$existing" "$incoming_json" > "$merged"
   chmod 0400 "$merged"
   put_kv_data_json "$path" "$merged"
+}
+
+preflight_kv_tree_conflicts() {
+  local tree_dir="$1" tmp="$2" output="$3"
+  : > "$output"
+  kv_tree_has_objects "$tree_dir" || return 0
+  find "$tree_dir/objects" -type f -name '*.json' | sort | while IFS= read -r entry; do
+    local path compare_dir incoming existing
+    path="$(jq -r '.path' "$entry")"
+    compare_dir="$tmp/tree-preflight/${path//\//_}"
+    incoming="$compare_dir/incoming.json"
+    existing="$compare_dir/existing.json"
+    mkdir -p "$compare_dir"
+    jq '.raw.data.data // {}' "$entry" > "$incoming"
+    read_target_kv_data_or_empty "$path" "$existing" "$compare_dir/read"
+    chmod 0400 "$incoming" "$existing"
+
+    jq -c 'keys[]' "$incoming" | while IFS= read -r property_json; do
+      local property source_hash target_hash status
+      property="$(jq -r '.' <<<"$property_json")"
+      source_hash="$(jq -cS --argjson property "$property_json" '.[$property]' "$incoming" | fingerprint)"
+      if ! jq -e --argjson property "$property_json" 'has($property)' "$existing" >/dev/null; then
+        status="missing"
+        target_hash="-"
+      elif jq -e --argjson property "$property_json" --slurpfile source "$incoming" \
+        '.[$property] == $source[0][$property]' "$existing" >/dev/null; then
+        status="match"
+        target_hash="$source_hash"
+      else
+        status="conflict"
+        target_hash="$(jq -cS --argjson property "$property_json" '.[$property]' "$existing" | fingerprint)"
+      fi
+      jq -cn \
+        --arg path "$path" \
+        --arg property "$property" \
+        --arg status "$status" \
+        --arg sourceSha256 "$source_hash" \
+        --arg targetSha256 "$target_hash" \
+        '{path:$path, property:$property, status:$status, sourceSha256:$sourceSha256, targetSha256:$targetSha256}' \
+        >> "$output"
+    done
+  done
+  chmod 0400 "$output"
 }
 
 platform_mappings_json() {
@@ -207,11 +260,7 @@ write_grouped_kv() {
   local existing="$merge_dir/existing.json"
   local merged="$merge_dir/merged.json"
   mkdir -p "$merge_dir/files"
-  if bao kv get -format=json "$KV_MOUNT/$path" > "$merge_dir/raw.json" 2>/dev/null; then
-    jq '.data.data // {}' "$merge_dir/raw.json" > "$existing"
-  else
-    printf '{}\n' > "$existing"
-  fi
+  read_target_kv_data_or_empty "$path" "$existing" "$merge_dir/read"
   cp "$existing" "$merged"
   while [ "$#" -gt 0 ]; do
     local property="$1" file="$2"
