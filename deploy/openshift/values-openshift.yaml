@@ -293,7 +293,7 @@ seaweedfsTls:
   bootstrap:
     enabled: true
     image:
-      repository: "harbor.example.com/falcone/bitnamilegacy/kubectl"
+      repository: "harbor.example.com/falcone/alpine/k8s"
       tag: "1.32.2"
 
 # Temporal (flows engine) — INTERNAL-ONLY and core. Temporal server pods are STATELESS
@@ -343,5 +343,5 @@ publicSurface:
 bootstrap:
   job:
     image:
-      repository: "harbor.example.com/falcone/bitnamilegacy/kubectl"
+      repository: "harbor.example.com/falcone/alpine/k8s"
       tag: "1.32.2"

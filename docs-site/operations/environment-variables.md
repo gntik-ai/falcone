@@ -63,11 +63,13 @@ The Flows API is registered **only when `TEMPORAL_ADDRESS` is set** (the executo
 
 ## MCP server hosting *(Preview)*
 
-The MCP management API (`/v1/mcp`) is registered **only when `MCP_ENABLED=true`**.
+The MCP management API (`/v1/mcp`) is part of the core install; the chart sets
+`MCP_ENABLED=true`. Setting it to `false` is a local diagnostic override, not a supported
+fresh-install baseline.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MCP_ENABLED` | — | Set to `true` to serve the MCP management API |
+| `MCP_ENABLED` | `true` in Helm values | Runtime gate for the MCP management API |
 | `MCP_SELF_BASE_URL` | `http://127.0.0.1:$PORT` | Base URL the engine self-calls to mediate tool calls |
 | `MCP_GATEWAY_BASE_URL` | (self URL) | Public base URL used to compute a server's endpoint |
 | `MCP_RUNTIME_IMAGE` | — | Platform MCP runtime image (digest-pinned for the registry) |

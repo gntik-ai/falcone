@@ -5,13 +5,13 @@ Operator procedures for the MCP server hosting capability. For the design see
 for the decision record see
 [ADR-12](/architecture/adrs#adr-12-mcp-server-hosting-runtime-gateway-oauth-and-isolation).
 
-## Deploy & enable
+## Configure
 
-The MCP runtime is a chart component, **off by default**. Enable it in the Helm values:
+The MCP chart wiring is part of the core Falcone baseline. Tune its NetworkPolicy and quota values
+in Helm values:
 
 ```yaml
 mcp:
-  enabled: true
   networkPolicy:
     enabled: true
     gatewayNamespaces: [knative-serving, kourier-system]
@@ -23,7 +23,7 @@ mcp:
     toolCallsPerMinutePerOAuthClient: 300
 ```
 
-This deploys the RBAC + the internal-only NetworkPolicy (`charts/in-falcone/templates/mcp/`). MCP
+The chart deploys the RBAC + the internal-only NetworkPolicy (`charts/in-falcone/templates/mcp/`). MCP
 servers themselves are Knative Services created per tenant; they require Knative Serving + Kourier
 (already used by functions). OpenShift overlays inherit the non-root `securityContext`.
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { collectContractViolations, isSemver, validateImagePolicy } from '../../scripts/lib/quality-gates.mjs';
+import { collectContractViolations, collectImageTargets, isSemver, validateImagePolicy } from '../../scripts/lib/quality-gates.mjs';
 
 test('isSemver accepts stable and prerelease versions', () => {
   assert.equal(isSemver('0.1.0'), true);
@@ -27,6 +27,41 @@ test('validateImagePolicy rejects mutable tags and missing repositories', () => 
     'controlPlane image tag must be semver-like (for example 0.1.0 or 0.1.0-rc1) when not digest-pinned; received latest.'
   ]);
 });
+
+test('collectImageTargets includes nested bootstrap helper images', () => {
+  const targets = collectImageTargets({
+    bootstrap: {
+      job: {
+        image: {
+          repository: 'docker.io/alpine/k8s',
+          tag: '1.32.2'
+        }
+      }
+    },
+    seaweedfsTls: {
+      bootstrap: {
+        enabled: false,
+        image: {
+          repository: 'docker.io/alpine/k8s',
+          tag: '1.32.2'
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(targets.map((target) => target.name), ['bootstrapJob', 'seaweedfsTlsBootstrap']);
+  assert.deepEqual(validateImagePolicy({
+    bootstrap: {
+      job: {
+        image: {
+          repository: 'docker.io/alpine/k8s',
+          tag: '1.32.2'
+        }
+      }
+    }
+  }), []);
+});
+
 
 test('collectContractViolations flags missing versioning, resilience, and error-envelope metadata', () => {
   const violations = collectContractViolations({

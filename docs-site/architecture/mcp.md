@@ -30,9 +30,9 @@ Each MCP server is a **Knative Service (ksvc)** in the tenant's namespace, carry
 `in-falcone.io/component: mcp-server` and `in-falcone.io/tenant: <tenantId>`. The deploy spec is a
 pure builder (`apps/control-plane/src/mcp-custom-hosting.mjs` → `buildCustomServerDeployment`):
 non-root, `min-scale: 0` (scale-to-zero), OpenShift-safe `securityContext`. The chart component
-(`charts/in-falcone/templates/mcp/`) ships RBAC + the NetworkPolicy, off by default
-(`mcp.enabled: false`). Supply-chain: the image must be **digest-pinned**, from an allow-listed
-registry, and signature-verified before deploy.
+(`charts/in-falcone/templates/mcp/`) ships RBAC + the NetworkPolicy as part of the core install.
+Supply-chain: custom hosted server images must be **digest-pinned**, from an allow-listed registry,
+and signature-verified before deploy.
 
 ## Gateway — reuse APISIX (ADR-3)
 

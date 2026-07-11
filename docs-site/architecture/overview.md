@@ -78,8 +78,8 @@ See [Security & Auth](/architecture/security) for the full model.
 
 ## AI-native layer (Flows & MCP) — *Preview*
 
-Two capabilities make a tenant's backend consumable by AI agents, both served by the control plane
-and both off by default:
+Two core capabilities make a tenant's backend consumable by AI agents; both are served by the
+control plane in a fresh install:
 
 ```
    Control Plane
@@ -91,12 +91,12 @@ and both off by default:
 ```
 
 - **Flows** — a durable [workflow engine](/guide/flows) on Temporal (chart components `temporal` +
-  `workflowWorker`, enabled by `TEMPORAL_ADDRESS`). Tenants author a YAML
+  `workflowWorker`, wired by the chart through `TEMPORAL_ADDRESS`). Tenants author a YAML
   [DSL](/architecture/workflow-dsl-reference); the control plane stores immutable versions and runs
   each execution as a Temporal workflow. Isolation is by server-generated workflow ids
   (`{tenantId}:{workspaceId}:{flowId}:{runUuid}`) prefix-checked on every command.
 - **MCP server hosting** — the control-plane runtime serves the [MCP](/guide/mcp) management API
-  (`mcp-engine`, enabled by `MCP_ENABLED`). Instant MCP and the official server are live (Preview);
+  through `mcp-engine` as part of the core install. Instant MCP and the official server are live (Preview);
   custom (BYO-image) hosting and workflows-as-tools are Experimental; per-tenant OAuth 2.1 + per-tool
   scopes via Keycloak; MCP-server pods are internal-only.
 

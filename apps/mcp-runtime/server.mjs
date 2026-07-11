@@ -1,19 +1,19 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { handleMcpMessage } from '../control-plane/src/mcp-official-server.mjs';
-import { BASE_SCOPE } from '../control-plane/src/mcp-official-catalog.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const FALCONE_API_BASE_URL = process.env.FALCONE_API_BASE_URL || 'http://falcone-control-plane:8080';
 const RUNTIME_VERSION = process.env.FALCONE_VERSION || '0.3.0';
 
-function headerList(value) {
+export function headerList(value) {
   if (!value) return [];
-  return String(value).split(',').map((item) => item.trim()).filter(Boolean);
+  const raw = Array.isArray(value) ? value.join(',') : String(value);
+  return raw.split(/[\s,]+/).map((item) => item.trim()).filter(Boolean);
 }
 
-function contextFromHeaders(headers = {}) {
-  const scopes = new Set([BASE_SCOPE, ...headerList(headers['x-auth-scopes']), ...headerList(headers['x-falcone-scopes'])]);
+export function contextFromHeaders(headers = {}) {
+  const scopes = new Set([...headerList(headers['x-auth-scopes']), ...headerList(headers['x-falcone-scopes'])]);
   return {
     tenantId: headers['x-tenant-id'] || headers['x-falcone-tenant-id'] || null,
     roles: [...headerList(headers['x-actor-roles']), ...headerList(headers['x-falcone-roles'])],

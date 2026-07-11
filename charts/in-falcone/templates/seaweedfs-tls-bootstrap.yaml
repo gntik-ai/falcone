@@ -97,6 +97,7 @@ spec:
       serviceAccountName: {{ .Release.Name }}-seaweedfs-tls-bootstrap
       securityContext:
         runAsNonRoot: true
+        runAsUser: 1000
         seccompProfile:
           type: RuntimeDefault
       containers:

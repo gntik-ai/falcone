@@ -30,6 +30,10 @@ trap 'rm -rf "$tmp"' EXIT
 extract_verified_backup "$BACKUP" "$tmp/backup"
 backup_dir="$tmp/backup"
 
+if [ "$MODE" = "--apply" ]; then
+  require_test_cluster_write_guard
+fi
+
 echo "restore plan for namespace=$NS release=$RELEASE mode=$MODE"
 echo "Kubernetes Secrets: $(jq '.items | length' "$backup_dir/kubernetes/secrets.apply.json") object(s)"
 echo "ESO ExternalSecrets: $(jq '.items | length' "$backup_dir/eso/externalsecrets.apply.json" 2>/dev/null || echo 0) object(s)"

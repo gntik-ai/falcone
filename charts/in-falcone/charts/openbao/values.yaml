@@ -31,9 +31,8 @@ openbao:
     clientCaSecretName: in-falcone-openbao-client-ca
     bootstrap:
       image:
-        # bitnami/* legacy images were relocated to the bitnamilegacy/* namespace; the original
-        # docker.io/bitnami/kubectl:1.32.2 reference now 404s and stalls the pre-install TLS hook.
-        repository: docker.io/bitnamilegacy/kubectl
+        # The bootstrap scripts require bash/curl/jq/kubectl/openssl; alpine/k8s carries the full set.
+        repository: docker.io/alpine/k8s
         tag: "1.32.2"
         pullPolicy: IfNotPresent
       days: 3650
@@ -43,7 +42,7 @@ openbao:
     clusterPort: 8201
   credentialSync:
     image:
-      repository: docker.io/bitnamilegacy/kubectl
+      repository: docker.io/alpine/k8s
       tag: "1.32.2"
       pullPolicy: IfNotPresent
   recovery:

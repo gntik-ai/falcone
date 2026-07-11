@@ -83,7 +83,8 @@ authoring is `structural_admin`, running/observing is `data_access`. See the
 
 ## MCP management routes *(Preview)*
 
-Served by the control-plane runtime when MCP hosting is enabled (`MCP_ENABLED`). Workspace-scoped;
+Served by the control-plane runtime as part of the core install (the chart sets `MCP_ENABLED=true`).
+Workspace-scoped;
 the tenant is credential-derived, so a cross-tenant read/call/audit returns `404`. See the
 [MCP guide](/guide/mcp) and [MCP Architecture](/architecture/mcp).
 

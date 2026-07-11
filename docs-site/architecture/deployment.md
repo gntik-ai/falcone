@@ -1,6 +1,6 @@
 # Deployment Topology
 
-In Falcone ships as a single **umbrella Helm chart** (`charts/in-falcone`, `Chart.yaml` `apiVersion: v2`). Each platform component is a dependency aliased onto a shared `component-wrapper` subchart and gated by `<component>.enabled`, so one chart can produce anything from an all-in-one demo to a fully split, HA production install.
+In Falcone ships as a single **umbrella Helm chart** (`charts/in-falcone`, `Chart.yaml` `apiVersion: v2`). The supported fresh-install shape is the complete core platform. Profiles and values tune sizing, storage, networking, images, and security posture; legacy `<component>.enabled=false` switches for core services are rejected by chart validation.
 
 ## Chart structure
 
@@ -21,7 +21,7 @@ charts/in-falcone/
 └── charts/component-wrapper/  # shared wrapper subchart
 ```
 
-Component aliases (each toggleable): `apisix`, `keycloak`, `postgresql`, `ferretdb`, `documentdb` (the FerretDB + DocumentDB document store), `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`, `workflowWorker` + `temporal` (the [Flows](/architecture/flows) engine, **off by default**), `mcp` ([MCP server hosting](/architecture/mcp), **off by default**), plus `eso` + `openbao` for secret management. Functions run on **Knative** (provisioned by the control-plane executor, migrated off OpenWhisk) and have no datastore component of their own.
+Core component aliases: `apisix`, `keycloak`, `postgresql`, `postgresqlVector`, `ferretdb`, `documentdb` (the FerretDB + DocumentDB document store), `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`, `workflowWorker` + `temporal` (the [Flows](/architecture/flows) engine), `mcp` ([MCP server hosting](/architecture/mcp)), plus `eso` + `openbao` for secret management. Functions run on **Knative** (provisioned by the control-plane executor, migrated off OpenWhisk) and have no datastore component of their own.
 
 > **Data & storage layer.** Object storage is **SeaweedFS** (`seaweedfs`, S3-compatible, Apache-2.0) — see [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs) and the [SeaweedFS Storage Runbook](/architecture/seaweedfs) — replacing the former MinIO `storage` component (removed). The document store is **FerretDB + DocumentDB** (`ferretdb` + `documentdb`, MongoDB-wire-compatible, Apache-2.0 + MIT) — see [ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb) and the [FerretDB Document-Store Runbook](/architecture/ferretdb) — replacing the former **MongoDB** server component (removed). See the [Roadmap](/guide/roadmap).
 
@@ -81,7 +81,7 @@ On install/upgrade a **hook job** (`<release>-bootstrap`) reconciles the gateway
 
 ## Runtime footprint (example)
 
-A representative deployed namespace runs: the APISIX gateway, the control plane + executor, the web console, Keycloak, PostgreSQL, FerretDB + DocumentDB (the document store), Kafka, SeaweedFS, and observability — plus the bootstrap job. When the AI-native capabilities are enabled it also runs **Temporal + the workflow-worker** (Flows) and the **MCP runtime** (per-tenant Knative ksvcs); both are off by default. Components you point at an external managed service can be disabled (`<component>.enabled: false`).
+A representative deployed namespace runs: the APISIX gateway, the control plane + executor, the web console, Keycloak, PostgreSQL + pgvector, FerretDB + DocumentDB (the document store), Kafka, SeaweedFS, observability, OpenBao/ESO, **Temporal + the workflow-worker** (Flows), the MCP runtime wiring, and the bootstrap job. Managed-service integrations must keep the same runtime contracts and Secret references; do not disable a core component with `<component>.enabled=false`.
 
 > [!TIP]
 > The repository's `deploy/kind/` directory contains a hand-built real runtime used for live validation on a kind cluster (gateway, durable saga control plane, data plane). It is a faithful but development-oriented topology; production installs use the umbrella chart with the profiles above.

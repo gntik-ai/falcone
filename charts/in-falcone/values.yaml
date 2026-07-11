@@ -207,7 +207,7 @@ bootstrap:
     name: ""
   job:
     image:
-      repository: docker.io/bitnamilegacy/kubectl
+      repository: docker.io/alpine/k8s
       tag: 1.32.2
       pullPolicy: IfNotPresent
     # Raised from 1 (fix-bootstrap-job-coldstart-retry, #558): on a COLD fresh `helm install`
@@ -237,6 +237,8 @@ bootstrap:
     securityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true
+      runAsUser: 1000
+      runAsGroup: 1000
       runAsNonRoot: true
       capabilities:
         drop:
@@ -2928,7 +2930,7 @@ seaweedfsTls:
     enabled: false
     # Image used by the pre-install hook to run openssl + kubectl.
     image:
-      repository: docker.io/bitnamilegacy/kubectl
+      repository: docker.io/alpine/k8s
       tag: "1.32.2"
       pullPolicy: IfNotPresent
     # CA subject common name and cert validity (days).

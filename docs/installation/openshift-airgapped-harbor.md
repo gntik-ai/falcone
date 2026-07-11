@@ -225,7 +225,7 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 | Grafana | `grafana/grafana:11.4.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0` | dashboards |
 | Keycloak | `quay.io/keycloak/keycloak:26.1.0` | quay.io | `${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0` | IdP |
 | APISIX | `apache/apisix:3.10.0-debian` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian` | gateway |
-| kubectl (bootstrap) | `bitnamilegacy/kubectl:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kubectl:1.32.2` | bootstrap + TLS‑bootstrap Jobs |
+| bootstrap helper | `alpine/k8s:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2` | bootstrap + TLS‑bootstrap Jobs; includes bash, curl, jq, kubectl, and openssl |
 | OpenBao | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | core secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
 | Node (OpenBao audit sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
 | Temporal server | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
@@ -254,9 +254,9 @@ Build bases to mirror (for BuildConfig): `node:22-alpine` and `node:22-slim`
 
 > **Unpinned/placeholder versions flagged (do not silently pick a tag):**
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
-> - Falcone-built images must be built and pushed to Harbor before install. Public manifests for
->   the coherent first-party image set, for example `in-falcone-control-plane:0.3.0`, were not
->   verified, so do not invent digests for them.
+> - Falcone-built `0.3.0` images were published to GHCR by Actions run `29150940923`. Mirror those
+>   exact tags to Harbor before install; do not invent digest pins until the fresh-cluster release
+>   evidence records the manifests being deployed.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.
@@ -289,7 +289,7 @@ skopeo copy docker://docker.io/prom/prometheus@sha256:6927e0919a144aa7616fd0137d
 skopeo copy docker://docker.io/grafana/grafana:11.4.0           docker://${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0
 skopeo copy docker://quay.io/keycloak/keycloak:26.1.0          docker://${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0
 skopeo copy docker://docker.io/apache/apisix:3.10.0-debian     docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian
-skopeo copy docker://docker.io/bitnamilegacy/kubectl:1.32.2          docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kubectl:1.32.2
+skopeo copy docker://docker.io/alpine/k8s:1.32.2                    docker://${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
 
 # Core service support images
 skopeo copy docker://docker.io/openbao/openbao:2.3.1           docker://${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1
@@ -2746,7 +2746,7 @@ spec:
 ### 7.13 Bootstrap Job (Keycloak realm + APISIX routes)
 
 Runs **last**, after Keycloak and APISIX are Ready. It imports the realm and pushes the
-gateway routes. Uses the `bitnamilegacy/kubectl` image + the two large ConfigMaps from §5.2.
+gateway routes. Uses the `alpine/k8s` helper image + the two large ConfigMaps from §5.2.
 
 ```yaml
 apiVersion: batch/v1
@@ -2769,7 +2769,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       initContainers:
         - name: wait-for-keycloak
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kubectl:1.32.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
@@ -2789,7 +2789,7 @@ spec:
             runAsNonRoot: true
       containers:
         - name: bootstrap
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kubectl:1.32.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "/bootstrap/script/bootstrap.sh"]
           env:

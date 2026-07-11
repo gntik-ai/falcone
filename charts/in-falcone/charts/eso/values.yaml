@@ -15,7 +15,7 @@ eso:
   # before the ClusterSecretStore/ExternalSecret hooks apply (avoids a "connection refused" race).
   webhookWait:
     image:
-      repository: docker.io/bitnamilegacy/kubectl
+      repository: docker.io/alpine/k8s
       tag: "1.32.2"
       pullPolicy: IfNotPresent
   vaultAuthPath: kubernetes

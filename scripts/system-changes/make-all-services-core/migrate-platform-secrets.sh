@@ -128,6 +128,7 @@ if [ "$APPLY" -ne 1 ]; then
   exit 0
 fi
 
+require_test_cluster_write_guard
 assert_backup_covers_current_mappings
 if [ "$mismatches" -ne 0 ] && [ "$ALLOW_OVERWRITE" -ne 1 ]; then
   echo "refusing to overwrite $mismatches existing OpenBao value(s); rerun with --allow-overwrite and CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values after reviewing the verified backup" >&2

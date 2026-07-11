@@ -248,8 +248,8 @@ PVCs are retained by default, so a `seaweedfs.enabled=false` rollback never dest
 ## Observability
 
 SeaweedFS plugs into Falcone's existing Prometheus-based stack
-([Observability](/operations/observability)). Metrics are **off by default**
-(`global.seaweedfs.monitoring.enabled: false`); enabling it renders a **ServiceMonitor per
+([Observability](/operations/observability)). The all-core install renders the Prometheus-based
+observability stack; when SeaweedFS monitoring is enabled in values it renders a **ServiceMonitor per
 component**:
 
 | Component | ServiceMonitor | Metrics port | Path |

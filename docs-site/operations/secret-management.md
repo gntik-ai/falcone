@@ -8,7 +8,7 @@ Falcone keeps secret **values** out of git and out of values files. The chart re
 OpenBao  ──(External Secrets Operator)──▶  Kubernetes Secret  ──(secretRefs / secretKeyRef)──▶  Pods
 ```
 
-- `openbao` (chart alias) — the secret backend (image `openbao/openbao`, CLI `bao`). The dev compose stack runs OpenBao in `-dev` mode; production points ESO at your OpenBao. Disabled by default — opt in via `openbao.enabled=true` (the kind self-signed TLS path is `deploy/kind/values-kind-vault.yaml`).
+- `openbao` (chart alias) — the core secret backend (image `openbao/openbao`, CLI `bao`). Fresh Helm installs provision it by default with self-signed TLS unless you select the cert-manager mode for clusters that already run cert-manager.
 - `eso` (chart alias) — the External Secrets Operator, which materializes OpenBao KV paths into namespaced Kubernetes Secrets. Its `ClusterSecretStore` (`openbao-backend`) uses ESO's `vault` provider type, which is the OpenBao-compatible client (the KV v2 REST surface is byte-compatible).
 - `config.secretRefs` — the chart's map of which existing Secret + keys feed each component.
 
@@ -25,7 +25,9 @@ config:
     gatewayTls:             { existingSecret: in-falcone-dev-api-tls, keys: [tls.crt, tls.key] }
 ```
 
-To use an externally managed credential, set `existingSecret` to your Secret (and disable the in-cluster component if you're pointing at a managed service).
+To use an externally managed credential, set `existingSecret` to your Secret and keep the OpenBao/ESO
+contract coherent. Core components are not disabled with `<component>.enabled=false`; managed-service
+paths must still provide the expected Secret keys and chart/runtime wiring.
 
 ## Sensitive material is mounted by reference, never inlined
 

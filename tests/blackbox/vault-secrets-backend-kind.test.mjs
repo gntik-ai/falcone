@@ -169,6 +169,6 @@ test('bbx-c6-05: opt-in render uses the openbao/openbao image + bao init Job, ne
   assert.match(initJob, /bao operator init/, 'the init Job must initialize OpenBao with the bao CLI');
   assert.match(initJob, /bao secrets enable -path=secret kv-v2/, 'the init Job must enable the KV v2 mount');
   assert.match(initJob, /bao auth enable kubernetes/, 'the init Job must enable Kubernetes auth');
-  assert.match(initJob, /bao kv put secret\/platform\/postgresql/, 'the init Job must seed the platform secret paths');
+  assert.match(initJob, /kv_merge secret\/platform\/postgresql/, 'the init Job must seed the platform secret paths through the non-clobbering KV merge helper');
   assert.doesNotMatch(initJob, /(^|[^a-z])vault (operator|secrets|auth|kv|policy|audit) /, 'the init Job must use the bao CLI, not vault');
 });

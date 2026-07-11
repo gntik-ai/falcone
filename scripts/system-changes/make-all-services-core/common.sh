@@ -29,6 +29,26 @@ require_bao() {
   : "${BAO_TOKEN:?BAO_TOKEN is required}"
 }
 
+require_test_cluster_write_guard() {
+  local expected="${TEST_CLUSTER_CONTEXT:-}"
+  local confirm="${CONFIRM_TEST_CLUSTER:-}"
+  local phrase="apply-to-explicit-test-cluster"
+  [ -n "$expected" ] || {
+    echo "refusing write: TEST_CLUSTER_CONTEXT must name the exact test kubectl context" >&2
+    exit 2
+  }
+  local current
+  current="$(kubectl config current-context 2>/dev/null || true)"
+  [ "$current" = "$expected" ] || {
+    echo "refusing write: current kubectl context '$current' does not match TEST_CLUSTER_CONTEXT '$expected'" >&2
+    exit 2
+  }
+  [ "$confirm" = "$phrase" ] || {
+    echo "refusing write: set CONFIRM_TEST_CLUSTER=$phrase after verifying this is the test cluster" >&2
+    exit 2
+  }
+}
+
 fingerprint() {
   sha256sum | awk '{print $1}'
 }

@@ -76,8 +76,8 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   of a Harbor install) `validate.yaml` *requires* the field, so the chart could not
   render at all on the Harbor path. Fixed: the template now normalizes
   `imagePullSecrets` ({name} maps) + `pullSecretNames` (strings) into one string list.
-- **Bootstrap image bypasses the registry rewrite.** The bootstrap job's kubectl image
-  (`docker.io/bitnami/kubectl`) is referenced outside the component-wrapper helper, so
+- **Bootstrap image bypasses the registry rewrite.** The bootstrap job's helper image
+  (`docker.io/alpine/k8s:1.32.2`) is referenced outside the component-wrapper helper, so
   `global.imageRegistry` does NOT rewrite it → an egress leak in airgap. Worked around in
   the values by pinning `bootstrap.job.image.repository` to Harbor; the chart should
   route this (and any other top-level image) through the same image helper.
@@ -180,10 +180,10 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
 
 Product chart components:
 `docker.io/apache/apisix`, `quay.io/keycloak/keycloak`,
-`docker.io/bitnami/postgresql`, `docker.io/bitnami/mongodb`, `docker.io/bitnami/kafka`,
-`docker.io/minio/minio`, `docker.io/prom/prometheus`, `docker.io/bitnami/kubectl`,
-`docker.io/library/busybox`, and the two app images (control-plane, web-console).
-(Drop `docker.io/apache/openwhisk-controller` after the Knative swap.)
+`docker.io/bitnamilegacy/postgresql`, `docker.io/bitnamilegacy/kafka`,
+`docker.io/alpine/k8s`, `docker.io/prom/prometheus`, `docker.io/library/busybox`,
+and the Falcone app images (control-plane, executor, web-console, workflow-worker,
+function runtime, MCP runtime).
 
 Functions / Knative (if self-managing rather than the Operator):
 `gcr.io/knative-releases/knative.dev/serving/cmd/{controller,autoscaler,activator,webhook,queue}`,

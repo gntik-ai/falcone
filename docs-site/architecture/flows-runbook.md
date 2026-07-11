@@ -1,6 +1,6 @@
 # Flows Runbook (Temporal Operations)
 
-Operational procedures for the **flows** capability — deploying and enabling the internal Temporal
+Operational procedures for the **flows** capability — configuring and operating the internal Temporal
 engine and the DSL interpreter worker, upgrading the Temporal schema, accessing the operator-only
 Web UI, managing the namespace and search attributes, scaling the worker, and recovering from the
 common failure modes. For the design see [Flows Architecture](/architecture/flows); for tenant
@@ -9,16 +9,13 @@ usage see [Flows](/guide/flows).
 Temporal is **internal-only**: no Ingress / Route / APISIX route is rendered for it anywhere, and
 its Web UI is reachable **only** by an operator `kubectl port-forward`.
 
-## Deploy & enable
+## Configure
 
-Flows are **off by default**. Enable two components in the umbrella chart
-(`charts/in-falcone`): the Temporal engine and the interpreter worker.
+Flows are part of the core Falcone baseline. The umbrella chart renders the Temporal engine and the
+interpreter worker by default; tune their values and keep the control-plane/worker labels that the
+Temporal NetworkPolicy admits.
 
 ```yaml
-temporal:
-  enabled: true            # default: false
-workflowWorker:
-  enabled: true            # default: false
 controlPlane:
   # the flow API only registers when TEMPORAL_ADDRESS is set on the control plane
   env:

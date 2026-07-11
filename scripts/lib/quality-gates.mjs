@@ -130,13 +130,26 @@ export function collectContractViolations(document) {
 }
 
 export function collectImageTargets(values) {
-  return Object.entries(values ?? {})
+  const targets = Object.entries(values ?? {})
     .filter(([, section]) => section && typeof section === 'object' && 'image' in section)
     .map(([name, section]) => ({
       name,
       image: section.image ?? {},
       enabled: section.enabled !== false
     }));
+
+  const nestedTargets = [
+    ['bootstrapJob', values?.bootstrap?.job?.image],
+    ['seaweedfsTlsBootstrap', values?.seaweedfsTls?.bootstrap?.image]
+  ];
+
+  for (const [name, image] of nestedTargets) {
+    if (image && typeof image === 'object') {
+      targets.push({ name, image, enabled: true });
+    }
+  }
+
+  return targets;
 }
 
 export function validateImagePolicy(values) {

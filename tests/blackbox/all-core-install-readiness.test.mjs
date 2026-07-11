@@ -25,6 +25,10 @@ function helmAvailable() {
   return spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;
 }
 const SKIP = helmAvailable() ? false : { skip: 'helm binary not available on PATH' };
+function dockerAvailable() {
+  return spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).status === 0;
+}
+const DOCKER_SKIP = dockerAvailable() ? false : { skip: 'docker daemon not available on PATH' };
 
 function helmTemplate(args = []) {
   return spawnSync('helm', ['template', 'falcone', CHART_PATH, '--namespace', 'review-ns', ...args], {
@@ -47,6 +51,42 @@ function renderDocs(args = []) {
 }
 function findDoc(docs, kind, name) {
   return docs.find((doc) => doc.kind === kind && doc.metadata?.name === name);
+}
+function imageList(docs) {
+  const images = [];
+  for (const doc of docs) {
+    const podSpecs = [
+      doc.kind === 'Pod' ? doc.spec : null,
+      doc.spec?.template?.spec,
+      doc.spec?.jobTemplate?.spec?.template?.spec,
+    ].filter(Boolean);
+    for (const podSpec of podSpecs) {
+      for (const container of [...(podSpec.initContainers ?? []), ...(podSpec.containers ?? [])]) {
+        if (container.image) images.push(container.image);
+      }
+    }
+  }
+  return images;
+}
+function hookKinds(docs, hooks) {
+  return docs.filter((doc) => {
+    const hook = doc.metadata?.annotations?.['helm.sh/hook'];
+    return typeof hook === 'string' && hooks.some((entry) => hook.split(',').includes(entry));
+  });
+}
+function envValue(job, name) {
+  const containers = job.spec?.template?.spec?.containers ?? [];
+  for (const container of containers) {
+    const env = container.env ?? [];
+    const match = env.find((entry) => entry.name === name);
+    if (match) return match.value;
+  }
+  return undefined;
+}
+function commandText(job) {
+  return (job.spec?.template?.spec?.containers ?? [])
+    .flatMap((container) => container.command ?? [])
+    .join('\n');
 }
 
 test('all-core-001: arbitrary release namespace is used consistently', SKIP, () => {
@@ -146,19 +186,22 @@ test('all-core-005: Temporal DB bootstrap is wired before schema setup', SKIP, (
 
 test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable default image refs', SKIP, () => {
   const base = assertRender();
+  const baseImages = imageList(parseAllDocuments(base).map((doc) => doc.toJSON()).filter(Boolean));
   assert.match(base, /route-2018-mcp\.json:[\s\S]*"uri": "\/v1\/mcp\/\*"/, 'bootstrap payload must include the MCP APISIX route');
   assert.match(base, /falcone-control-plane-executor\.review-ns\.svc\.cluster\.local:8080/, 'MCP route must target the Helm-owned executor service');
   assert.match(base, /kind:\s*RoleBinding[\s\S]*name:\s*falcone-mcp-runtime[\s\S]*namespace:\s*review-ns[\s\S]*kind:\s*ServiceAccount[\s\S]*name:\s*falcone-control-plane-executor[\s\S]*namespace:\s*review-ns/, 'MCP RBAC must bind the executor service account in the release namespace');
   assert.doesNotMatch(base, /ghcr\.io\/example/, 'fresh install values must not use example image repositories');
   assert.doesNotMatch(base, /localhost:30500\/in-falcone-/, 'fresh install base values must not render localhost-only project images');
   assert.doesNotMatch(base, /image:\s*['"]?docker\.io\/bitnami\/(postgresql:17\.2\.0|kafka:3\.9\.0|kubectl:1\.32\.2)/, 'fresh install must not render removed bitnami image tags');
+  const removedKubectlImage = ['docker.io', 'bitnamilegacy', 'kubectl:1.32.2'].join('/');
+  assert.equal(baseImages.includes(removedKubectlImage), false, 'bootstrap jobs must not use kubectl-only images without bash/curl/jq');
   assert.doesNotMatch(base, /image:\s*"docker\.io\/apache\/apisix:3\.10\.0"/, 'fresh install must not render the missing APISIX tag');
   assert.doesNotMatch(base, /image:\s*"docker\.io\/prom\/prometheus:3\.2\.1"/, 'fresh install must not render the missing Prometheus tag');
   assert.match(base, /image:\s*"docker\.io\/apache\/apisix:3\.10\.0-debian"/, 'APISIX must use the verified pullable Debian tag');
   assert.match(base, /image:\s*"docker\.io\/prom\/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62"/, 'Prometheus must use the verified v3.2.1 manifest digest');
   assert.match(base, /image:\s*"docker\.io\/bitnamilegacy\/postgresql:17\.2\.0"/, 'PostgreSQL must use the verified bitnamilegacy image');
   assert.match(base, /image:\s*"docker\.io\/bitnamilegacy\/kafka:3\.9\.0"/, 'Kafka must use the verified bitnamilegacy image');
-  assert.match(base, /image:\s*"docker\.io\/bitnamilegacy\/kubectl:1\.32\.2"/, 'bootstrap jobs must use the verified bitnamilegacy kubectl image');
+  assert.ok(baseImages.includes('docker.io/alpine/k8s:1.32.2'), 'bootstrap jobs must use the verified alpine/k8s image with bash, curl, jq, and kubectl');
   const releaseTag = '0.3.0';
   for (const image of [
     'in-falcone-control-plane',
@@ -186,6 +229,19 @@ test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable def
   const mcpDockerfile = readFileSync(resolve(REPO_ROOT, 'apps', 'mcp-runtime', 'Dockerfile'), 'utf8');
   assert.match(releaseWorkflow, /image:\s*in-falcone-mcp-runtime[\s\S]*dockerfile:\s*apps\/mcp-runtime\/Dockerfile/, 'release workflow must publish the MCP runtime image');
   assert.match(mcpDockerfile, /COPY apps\/control-plane\/src\/mcp-official-server\.mjs/, 'MCP runtime image must build from the production MCP server modules');
+});
+
+test('all-core-006c: bootstrap image contains required command-line tools', DOCKER_SKIP, () => {
+  const r = spawnSync('docker', [
+    'run',
+    '--rm',
+    '--entrypoint',
+    '/bin/sh',
+    'docker.io/alpine/k8s:1.32.2',
+    '-ec',
+    'for c in bash curl jq kubectl; do command -v "$c" >/dev/null || exit 1; done',
+  ], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  assert.equal(r.status, 0, `alpine/k8s bootstrap image must contain bash, curl, jq, and kubectl.\nstdout: ${r.stdout}\nstderr: ${r.stderr}`);
 });
 
 test('all-core-007: ESO operator, webhook, cert-controller, CRDs, and auxiliary namespaces render', SKIP, () => {
@@ -225,11 +281,13 @@ test('all-core-006b: MCP runtime image and digest render from one chart value bl
 
 test('all-core-008: ESO cluster-scoped ownership preflight renders', SKIP, () => {
   const out = assertRender();
+  const docs = parseAllDocuments(out).map((doc) => doc.toJSON()).filter(Boolean);
+  const esoPreflight = findDoc(docs, 'Job', 'eso-preflight');
   assert.match(out, /kind:\s*Job[\s\S]*name:\s*eso-preflight/, 'ESO ownership preflight Job must render');
   assert.match(out, /resources:\s*\["clustersecretstores"\]/, 'preflight must inspect ClusterSecretStore ownership');
   assert.match(out, /resources:\s*\["deployments"\]/, 'preflight must inspect cluster ESO deployments');
   assert.match(out, /adoptExisting/, 'preflight must expose the explicit adoptExisting override');
-  assert.match(out, /review-ns\/\*\) ;;/, 'preflight must allow the release-owned ESO operator deployment');
+  assert.match(commandText(esoPreflight), /namespace="review-ns"[\s\S]*\$\{namespace\}\/\*\) ;;/, 'preflight must allow the release-owned ESO operator deployment');
   assert.match(out, /set eso\.eso\.clusterOwnership\.adoptExisting=true/, 'preflight must fail closed on unowned cluster-scoped stores');
 });
 
@@ -253,6 +311,44 @@ test('all-core-009: OpenBao, ESO, and runtime env honor custom secret namespaces
   assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets')?.metadata?.namespace, 'custom-eso', 'ESO controller must run in the configured ESO namespace');
   assert.doesNotMatch(out, /bound_service_account_namespaces='eso-system'/, 'custom ESO namespace must not leave the auth role hard-coded to eso-system');
   assert.doesNotMatch(out, /https:\/\/openbao\.secret-store\.svc\.cluster\.local:8200/, 'custom OpenBao namespace must not leave workload or ESO addresses hard-coded to secret-store');
+});
+
+test('all-core-009d: pre-install hooks run in the release namespace while targeting configured auxiliary namespaces', SKIP, () => {
+  const docs = renderDocs([
+    '--set', 'seaweedfsTls.bootstrap.enabled=true',
+    '--set', 'eso.eso.namespace=custom-eso',
+    '--set', 'eso.external-secrets.namespaceOverride=custom-eso',
+    '--set', 'openbao.eso.namespace=custom-eso',
+    '--set', 'openbao.openbao.namespace=custom-store',
+    '--set', 'eso.eso.caProvider.namespace=custom-store',
+  ]);
+  for (const doc of hookKinds(docs, ['pre-install', 'pre-upgrade'])) {
+    if (doc.kind === 'ClusterRole' || doc.kind === 'ClusterRoleBinding') continue;
+    assert.equal(doc.metadata?.namespace, 'review-ns', `${doc.kind}/${doc.metadata?.name} pre-install hook must run in the release namespace`);
+  }
+
+  const openbaoTls = findDoc(docs, 'Job', 'openbao-tls-bootstrap');
+  assert.ok(openbaoTls, 'OpenBao TLS bootstrap Job must render');
+  assert.equal(openbaoTls.metadata?.namespace, 'review-ns', 'OpenBao TLS bootstrap Job must run in the release namespace');
+  assert.equal(envValue(openbaoTls, 'NS'), 'custom-store', 'OpenBao TLS bootstrap must still write the server cert into the configured OpenBao namespace');
+  assert.equal(envValue(openbaoTls, 'CLIENT_NS'), 'review-ns', 'OpenBao client CA copy must target the release namespace');
+  assert.match(commandText(openbaoTls), /ensure_namespace "\$NS"/, 'OpenBao TLS bootstrap must create/adopt the configured target namespace before writing the TLS secret');
+
+  const esoPreflight = findDoc(docs, 'Job', 'eso-preflight');
+  assert.ok(esoPreflight, 'ESO ownership preflight Job must render');
+  assert.equal(esoPreflight.metadata?.namespace, 'review-ns', 'ESO preflight Job must run in the release namespace');
+  assert.match(commandText(esoPreflight), /eso_namespace="custom-eso"/, 'ESO preflight must still evaluate the configured ESO operator namespace');
+
+  const temporalDb = findDoc(docs, 'Job', 'falcone-temporal-db-bootstrap');
+  const temporalSchema = findDoc(docs, 'Job', 'falcone-temporal-schema');
+  assert.equal(temporalDb?.metadata?.namespace, 'review-ns', 'Temporal DB bootstrap pre-install hook must run in the release namespace');
+  assert.equal(temporalSchema?.metadata?.namespace, 'review-ns', 'Temporal schema pre-install hook must run in the release namespace');
+
+  const seaweedResizeHook = readFileSync(resolve(CHART_PATH, 'charts', 'seaweedfs', 'templates', 'volume', 'volume-resize-hook.yaml'), 'utf8');
+  const seaweedValues = readFileSync(resolve(CHART_PATH, 'charts', 'seaweedfs', 'values.yaml'), 'utf8');
+  assert.match(seaweedResizeHook, /volume-resize-hook[\s\S]*namespace: \{\{ \.Release\.Namespace \}\}/, 'SeaweedFS resize hook resources must explicitly run in the release namespace when the live-state condition renders them');
+  assert.match(seaweedResizeHook, /subjects:[\s\S]*namespace: \{\{ \.Release\.Namespace \}\}/, 'SeaweedFS resize hook RoleBinding subject must use the release namespace');
+  assert.match(seaweedValues, /resizeHook:[\s\S]*image: docker\.io\/alpine\/k8s:1\.32\.2/, 'SeaweedFS resize hook must use the verified alpine/k8s helper image');
 });
 
 test('all-core-009b: mismatched ESO operator namespace fails closed', SKIP, () => {
@@ -316,6 +412,11 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
   assert.match(openbaoInit, /kv_merge\(\)[\s\S]*bao kv get "\$path"[\s\S]*bao kv patch "\$path"[\s\S]*bao kv put "\$path"/, 'OpenBao init must patch existing KV paths and only put on first creation');
 
   assert.match(migrate, /--apply requires --backup/, 'migration apply must require a verified backup');
+  assert.match(common, /require_test_cluster_write_guard\(\)/, 'common helpers must define the explicit test-cluster write guard');
+  assert.match(common, /TEST_CLUSTER_CONTEXT/, 'write guard must require an explicit target context');
+  assert.match(common, /kubectl config current-context/, 'write guard must compare the active kubectl context exactly');
+  assert.match(common, /CONFIRM_TEST_CLUSTER[\s\S]*phrase="apply-to-explicit-test-cluster"/, 'write guard must require the unambiguous confirmation phrase');
+  assert.match(migrate, /require_test_cluster_write_guard[\s\S]*assert_backup_covers_current_mappings/, 'migration apply must pass the test-cluster guard before OpenBao writes');
   assert.match(migrate, /CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values/, 'migration overwrite mode must require an explicit guard');
   assert.match(migrate, /refusing to overwrite/, 'migration must fail closed on destination mismatch');
   assert.match(migrate, /diff summary: match=\$matches missing=\$missing mismatch=\$mismatches/, 'migration dry-run must report a real destination diff');
@@ -323,6 +424,7 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
 
   assert.match(restore, /helm -n "\$NS" rollback "\$RELEASE" "\$revision"/, 'restore must provide executable Helm rollback for the configured release');
   assert.match(restore, /kubectl -n "\$NS" apply -f "\$backup_dir\/kubernetes\/secrets\.apply\.json"/, 'restore must restore Kubernetes Secrets from the backup');
+  assert.match(restore, /\[ "\$MODE" = "--apply" \][\s\S]*require_test_cluster_write_guard/, 'restore apply/helm rollback path must pass the test-cluster guard before writes');
 
   assert.match(health, /app\.kubernetes\.io\/instance=\$RELEASE/, 'health check must select workloads by release label');
   assert.doesNotMatch(health, /deploy\/falcone-|statefulset\/falcone-/, 'health check must not hard-code the falcone release name');

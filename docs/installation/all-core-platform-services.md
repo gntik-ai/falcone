@@ -142,7 +142,7 @@ is approved.
 
 Third-party defaults were verified with `docker manifest inspect` for
 `docker.io/bitnamilegacy/postgresql:17.2.0`, `docker.io/bitnamilegacy/kafka:3.9.0`,
-`docker.io/bitnamilegacy/kubectl:1.32.2`, `docker.io/pgvector/pgvector:pg17`,
+`docker.io/alpine/k8s:1.32.2`, `docker.io/pgvector/pgvector:pg17`,
 `docker.io/apache/apisix:3.10.0-debian`, and
 `docker.io/prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62`.
 
@@ -153,6 +153,8 @@ release. The base chart now renders coherent chart app-version release refs such
 `ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0` instead of `localhost` aliases. The kind profiles
 still override those refs to `localhost:30500` for repository-local prebuild validation.
 
-The exact GHCR publication of the `0.3.0` first-party image set remains an external release gate for
-the orchestrator. Do not add digest pins for those images until their registry manifests are
-published and verified.
+The coherent `0.3.0` first-party image set was published to GHCR by GitHub Actions run
+`29150940923`: `in-falcone-control-plane`, `in-falcone-control-plane-executor`,
+`in-falcone-workflow-worker`, `in-falcone-mcp-runtime`, and `in-falcone-web-console`. Digest pins are
+still intentionally deferred until a clean fresh-cluster install captures the exact manifests used
+for release evidence.

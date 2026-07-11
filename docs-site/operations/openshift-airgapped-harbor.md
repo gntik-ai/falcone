@@ -26,7 +26,7 @@
 | `${OCP_STORAGECLASS}` | Default RWO CSI StorageClass on the cluster | `ocs-storagecluster-ceph-rbd` |
 
 - **Namespace:** the whole platform installs into a single Project named **`falcone`**.
-  (The chart spreads optional add‑ons across `secret-store` / `default` / `eso-system`;
+  (The chart can spread core support services across `secret-store` / `default` / `eso-system`;
   this guide consolidates everything into `falcone` for a plain‑manifest install and
   notes the adjustments.)
 - **Labels:** every object carries `app.kubernetes.io/part-of: falcone`,
@@ -221,41 +221,44 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 | PostgreSQL + pgvector (opt) | `pgvector/pgvector:pg17` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17` | optional vector search |
 | DocumentDB engine | `ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7` | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0` | digest‑pinned; reused by `documentdb-init` Job + `ferretdb` init container |
 | FerretDB gateway | `ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985` (v2.7.0) | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/ferretdb:2.7.0` | distroless |
-| Kafka | `bitnami/kafka:3.9.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kafka:3.9.0` | KRaft |
+| Kafka | `bitnamilegacy/kafka:3.9.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0` | KRaft |
 | SeaweedFS | `chrislusf/seaweedfs:4.33` (`@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`) | docker.io | `${HARBOR}/${HARBOR_PROJECT}/chrislusf/seaweedfs:4.33` | master/volume/filer/s3 + seed/bucket Jobs. **Pin the digest.** |
-| Prometheus | `prom/prometheus:3.2.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1` | observability |
+| Prometheus | `prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:v3.2.1` | observability; pin the mirrored digest |
 | Grafana | `grafana/grafana:11.4.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0` | dashboards |
 | Keycloak | `quay.io/keycloak/keycloak:26.1.0` | quay.io | `${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0` | IdP |
-| APISIX | `apache/apisix:3.10.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0` | gateway |
-| kubectl (bootstrap) | `bitnami/kubectl:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2` | bootstrap + TLS‑bootstrap Jobs |
-| OpenBao (opt) | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
+| APISIX | `apache/apisix:3.10.0-debian` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian` | gateway |
+| bootstrap helper | `alpine/k8s:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2` | bootstrap + TLS‑bootstrap Jobs; includes bash, curl, jq, kubectl, and openssl |
+| OpenBao | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | core secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
 | Node (OpenBao audit sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
-| Temporal server (opt) | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
-| Temporal admin‑tools (opt) | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
-| Temporal UI (opt) | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
+| Temporal server | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
+| Temporal admin‑tools | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
+| Temporal UI | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
 
 #### Falcone images built from source (push to Harbor; see Appendix B for BuildConfig)
 
 | Component | Image:tag (chart) | Dockerfile | Build base image(s) (also mirror) | Notes |
 |---|---|---|---|---|
-| control-plane (API) | `in-falcone-control-plane:0.6.2` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/server.mjs` — **[VERIFY]** exact API entrypoint vs executor |
-| control-plane-executor | `in-falcone-control-plane-executor:0.9.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/runtime/main.mjs`; built from **repo root** |
-| web-console | `in-falcone-web-console:0.2.11` | `apps/web-console/Dockerfile` | build `node:22-alpine`, runtime `nginx:1.27-alpine` | **[VERIFY]** chart default tag is the placeholder `ghcr.io/example/in-falcone-web-console:0.1.0`; the real tag (`0.2.11`) comes from the OpenShift overlay — pin a real published tag |
-| workflow-worker (opt) | `in-falcone-workflow-worker:0.1.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc — Temporal core‑bridge) | built from repo root |
-| fn-runtime (opt) | `in-falcone-fn-runtime:0.1.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| control-plane (API) | `in-falcone-control-plane:0.3.0` | `deploy/kind/control-plane/Dockerfile` | `node:22-alpine` | release workflow build; validates JWT and dispatches `/v1/*` to real action modules |
+| control-plane-executor | `in-falcone-control-plane-executor:0.3.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | data-plane executor; built from repo root |
+| web-console | `in-falcone-web-console:0.3.0` | `deploy/release/web-console.Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
+| workflow-worker | `in-falcone-workflow-worker:0.3.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc — Temporal core‑bridge) | core worker, built from repo root |
+| fn-runtime | `in-falcone-fn-runtime:0.3.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| mcp-runtime | `in-falcone-mcp-runtime:0.3.0` | `apps/mcp-runtime/Dockerfile` | `node:22-alpine` | first-party MCP JSON-RPC runtime |
 
 Harbor targets for the built images:
-`${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.6.2`,
-`…/in-falcone-control-plane-executor:0.9.0`, `…/in-falcone-web-console:0.2.11`,
-`…/in-falcone-workflow-worker:0.1.0`, `…/in-falcone-fn-runtime:0.1.0`.
+`${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.3.0`,
+`.../in-falcone-control-plane-executor:0.3.0`, `.../in-falcone-web-console:0.3.0`,
+`.../in-falcone-workflow-worker:0.3.0`, `.../in-falcone-fn-runtime:0.3.0`,
+`.../in-falcone-mcp-runtime:0.3.0`.
 
-Build bases to mirror (for BuildConfig): `node:22-alpine`, `node:22-slim`,
-`nginx:1.27-alpine` (→ `${HARBOR}/${HARBOR_PROJECT}/library/...`).
+Build bases to mirror (for BuildConfig): `node:22-alpine` and `node:22-slim`
+(to `${HARBOR}/${HARBOR_PROJECT}/library/...`).
 
 > **Unpinned/placeholder versions flagged (do not silently pick a tag):**
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
-> - `web-console` chart default `ghcr.io/example/in-falcone-web-console:0.1.0` is a
->   placeholder — use the real `0.2.11` (or your published) tag.
+> - Falcone-built `0.3.0` images were published to GHCR by Actions run `29150940923`. Mirror those
+>   exact tags to Harbor before install; do not invent digest pins until the fresh-cluster release
+>   evidence records the manifests being deployed.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.
@@ -273,23 +276,23 @@ skopeo login ghcr.io
 skopeo login ${HARBOR}
 
 # Third-party (digest pins shown where the chart pins them)
-skopeo copy docker://docker.io/bitnami/postgresql:17.2.0          docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/postgresql:17.2.0
 skopeo copy docker://docker.io/bitnamilegacy/postgresql:17.2.0    docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0
 skopeo copy docker://docker.io/pgvector/pgvector:pg17             docker://${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17
 skopeo copy docker://ghcr.io/ferretdb/postgres-documentdb@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7 \
             docker://${HARBOR}/${HARBOR_PROJECT}/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
 skopeo copy docker://ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985 \
             docker://${HARBOR}/${HARBOR_PROJECT}/ferretdb/ferretdb:2.7.0
-skopeo copy docker://docker.io/bitnami/kafka:3.9.0                docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/kafka:3.9.0
+skopeo copy docker://docker.io/bitnamilegacy/kafka:3.9.0          docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0
 skopeo copy docker://docker.io/chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495 \
             docker://${HARBOR}/${HARBOR_PROJECT}/chrislusf/seaweedfs:4.33
-skopeo copy docker://docker.io/prom/prometheus:3.2.1             docker://${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1
+skopeo copy docker://docker.io/prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62 \
+            docker://${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:v3.2.1
 skopeo copy docker://docker.io/grafana/grafana:11.4.0           docker://${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0
 skopeo copy docker://quay.io/keycloak/keycloak:26.1.0          docker://${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0
-skopeo copy docker://docker.io/apache/apisix:3.10.0            docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0
-skopeo copy docker://docker.io/bitnami/kubectl:1.32.2          docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
+skopeo copy docker://docker.io/apache/apisix:3.10.0-debian     docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian
+skopeo copy docker://docker.io/alpine/k8s:1.32.2              docker://${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
 
-# Optional add-ons
+# Core service support images
 skopeo copy docker://docker.io/openbao/openbao:2.3.1           docker://${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1
 skopeo copy docker://docker.io/library/node:20-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine
 skopeo copy docker://docker.io/temporalio/server:1.31.1        docker://${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1
@@ -299,7 +302,6 @@ skopeo copy docker://docker.io/temporalio/ui:2.51.0            docker://${HARBOR
 # Build bases (only needed if you build in-cluster via BuildConfig — Appendix B)
 skopeo copy docker://docker.io/library/node:22-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine
 skopeo copy docker://docker.io/library/node:22-slim            docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-slim
-skopeo copy docker://docker.io/library/nginx:1.27-alpine       docker://${HARBOR}/${HARBOR_PROJECT}/library/nginx:1.27-alpine
 ```
 
 > **Build‑from‑source images in air‑gap.** Building Falcone's own images in‑cluster
@@ -2734,7 +2736,7 @@ spec:
 ### 7.13 Bootstrap Job (Keycloak realm + APISIX routes)
 
 Runs **last**, after Keycloak and APISIX are Ready. It imports the realm and pushes the
-gateway routes. Uses the `bitnami/kubectl` image + the two large ConfigMaps from §5.2.
+gateway routes. Uses the `alpine/k8s` helper image + the two large ConfigMaps from §5.2.
 
 ```yaml
 apiVersion: batch/v1
@@ -2757,7 +2759,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       initContainers:
         - name: wait-for-keycloak
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
@@ -2777,7 +2779,7 @@ spec:
             runAsNonRoot: true
       containers:
         - name: bootstrap
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "/bootstrap/script/bootstrap.sh"]
           env:
@@ -3514,12 +3516,11 @@ oc wait --for=condition=complete job/falcone-bootstrap --timeout=900s  # CHECKPO
 oc apply -f manifests/34-observability.yaml
 oc apply -f manifests/50-routes.yaml
 
-# 5. Optional add-ons (§8) — apply only what you need.
-# Temporal: schema Job -> servers -> bootstrap Job -> worker
-#   oc apply -f manifests/90-optional-temporal.yaml
-#   oc wait --for=condition=complete job/falcone-temporal-schema --timeout=600s
-#   oc rollout status deployment/falcone-temporal-frontend --timeout=300s
-#   oc wait --for=condition=complete job/falcone-temporal-bootstrap --timeout=600s
+# 5. Core workflow layer (§8): schema Job -> servers -> bootstrap Job -> worker
+oc apply -f manifests/90-temporal.yaml
+oc wait --for=condition=complete job/falcone-temporal-schema --timeout=600s
+oc rollout status deployment/falcone-temporal-frontend --timeout=300s
+oc wait --for=condition=complete job/falcone-temporal-bootstrap --timeout=600s
 ```
 
 > **Why this order:** PostgreSQL must be Ready before Keycloak (DB init), DocumentDB (CDC

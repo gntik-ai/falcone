@@ -11,6 +11,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "in-falcone.temporal.fullname" $root }}-schema
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "schema") | nindent 4 }}
   annotations:

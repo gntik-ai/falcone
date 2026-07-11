@@ -158,7 +158,7 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   eso.eso.namespace=custom-eso --set openbao.eso.namespace=custom-eso`; `helm lint
   charts/in-falcone --namespace review-ns`; `docker manifest inspect` for
   `docker.io/bitnamilegacy/postgresql:17.2.0`, `docker.io/bitnamilegacy/kafka:3.9.0`,
-  `docker.io/bitnamilegacy/kubectl:1.32.2`, `docker.io/pgvector/pgvector:pg17`, and
+  `docker.io/alpine/k8s:1.32.2`, `docker.io/pgvector/pgvector:pg17`, and
   `docker.io/pgvector/pgvector@sha256:815bf5378222044da3b34d98e6a5fdac37b15c428b67d09c7c2d90a038e597bf`;
   `node --test tests/blackbox/all-core-install-readiness.test.mjs`; focused `node --test`
   coverage for pgvector, OpenBao/ESO, kind advanced profile, Prometheus completeness, and Temporal
@@ -198,11 +198,12 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   `openspec validate make-all-services-core --strict`; `npm run validate:repo`; `git diff --check`.
 - Fresh clean-cluster install was intentionally not run in this implementer stage per orchestrator
   instruction.
-- MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but GHCR publication and digest
-  verification of the coherent first-party `0.3.0` image set remains an external release blocker:
+- GHCR publication of the coherent first-party `0.3.0` image set succeeded via GitHub Actions run
+  `29150940923` for:
   `ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0`, and
-  `ghcr.io/gntik-ai/in-falcone-web-console:0.3.0`. Do not check the MCP runtime-image/digest task
-  or add digest pins until those manifests are published and verified.
+  `ghcr.io/gntik-ai/in-falcone-web-console:0.3.0`.
+- Digest pinning and final release evidence remain intentionally unchecked until the clean
+  fresh-cluster install records the exact manifests deployed from this branch.

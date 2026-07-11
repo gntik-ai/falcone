@@ -13,9 +13,9 @@ In Falcone is configured through the umbrella chart `charts/in-falcone`. This pa
 | `platform` | `target` (kubernetes/openshift), `network.exposureKind`, `securityProfile` |
 | `config` | ConfigMap names + `secretRefs` (existing-secret references) + inheritance order |
 | `bootstrap` | Reconcile payload (gateway routes, realm), lock/marker ConfigMaps |
-| `apisix`, `keycloak`, `postgresql`, `ferretdb`, `documentdb`, `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole` | Per-component config (each toggled by `<component>.enabled`). `ferretdb` + `documentdb` are the document store ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)); `seaweedfs` is the object store ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)). The former `mongodb` and `storage` (MinIO) components have been removed; functions run on Knative (provisioned by the control-plane executor — no datastore component). |
+| `apisix`, `keycloak`, `postgresql`, `postgresqlVector`, `ferretdb`, `documentdb`, `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`, `workflowWorker`, `temporal`, `mcp` | Core component config. Fresh installs always render the complete platform; legacy `<component>.enabled=false` disables are rejected by chart validation. `ferretdb` + `documentdb` are the document store ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)); `seaweedfs` is the object store ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)). The former `mongodb` and `storage` (MinIO) components have been removed; functions run on Knative (provisioned by the control-plane executor — no datastore component). |
 | `gatewayPolicy` | Gateway routing/scope/rate-limit policy |
-| `eso`, `openbao` | Secret management (External Secrets Operator + OpenBao). Both off by default; opt in via `openbao.enabled`/`eso.enabled` |
+| `eso`, `openbao` | Core secret management (External Secrets Operator + OpenBao). Fresh installs provision both and wire workload Secrets through the `openbao-backend` `ClusterSecretStore`. |
 
 ## Composing values
 
@@ -38,28 +38,17 @@ helm upgrade --install falcone charts/in-falcone \
 
 `config.inheritanceOrder` records this layering; `deployment.profile` selects the sizing profile.
 
-## Enabling / disabling components
+## Component defaults
 
-Point a component at an external managed service by disabling its in-cluster copy:
+Falcone's supported fresh-install shape is the complete core platform. The chart rejects
+`<component>.enabled=false` for core components, including datastores, OpenBao/ESO, Temporal,
+workflow worker, MCP wiring, pgvector, the control-plane executor, web console, bootstrap, and
+observability. Component values now tune sizing, images, storage, networking, and security settings;
+they do not opt core services out of the baseline.
 
-```yaml
-postgresql:
-  enabled: false        # use an external Postgres instead
-config:
-  secretRefs:
-    postgresCredentials:
-      existingSecret: my-external-postgres   # supply username/password/database
-```
-
-The **AI-native capabilities are off by default** and are enabled by their own component toggles
-(set the matching runtime env from [Environment Variables](/operations/environment-variables)):
-
-```yaml
-temporal:        { enabled: true }   # Flows engine — also set TEMPORAL_ADDRESS on the executor
-workflowWorker:  { enabled: true }   # the DSL interpreter worker
-mcp:             { enabled: true }   # MCP server hosting (RBAC + internal-only NetworkPolicy);
-                                     # set MCP_ENABLED=true on the executor to serve /v1/mcp
-```
+External managed-service integrations must preserve the same application contracts and supply the
+required `config.secretRefs`. Do not remove a core component by setting `enabled=false`; add or use
+a documented managed-service path that keeps the chart validation and runtime wiring coherent.
 
 Object storage is the `seaweedfs` component (**SeaweedFS**, S3-compatible, Apache-2.0;
 [ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), which replaced the

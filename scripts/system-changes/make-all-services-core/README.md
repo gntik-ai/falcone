@@ -25,13 +25,17 @@ Required environment:
   absent.
 - `SOURCE_BAO_ADDR`, `SOURCE_BAO_TOKEN`, optional `SOURCE_BAO_CACERT`, and optional
   `SOURCE_BAO_KV_MOUNT` when backing up an external Vault/OpenBao source.
+- Apply-mode writes require an explicit test-cluster guard. Set `TEST_CLUSTER_CONTEXT` to the
+  exact output of `kubectl config current-context` for the test cluster and set
+  `CONFIRM_TEST_CLUSTER=apply-to-explicit-test-cluster`. The guard is not required for dry-run,
+  parity, backup, health, or diff commands.
 
 Workflow:
 
 1. `./backup-kv.sh --output /secure/path/falcone-kv-backup.tgz`
 2. `./parity-check.sh --dry-run`
 3. `./migrate-platform-secrets.sh --dry-run`
-4. `./migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`
+4. `TEST_CLUSTER_CONTEXT=<test-context> CONFIRM_TEST_CLUSTER=apply-to-explicit-test-cluster ./migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`
 5. `./parity-check.sh --strict`
 6. `./diff-rollout.sh --chart ../../../charts/in-falcone` with the same values and `--set` overrides
    planned for the Helm rollout.
@@ -41,7 +45,7 @@ Workflow:
 Rollback:
 
 1. `./restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --dry-run`
-2. `./restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --apply --helm-rollback`
+2. `TEST_CLUSTER_CONTEXT=<test-context> CONFIRM_TEST_CLUSTER=apply-to-explicit-test-cluster ./restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --apply --helm-rollback`
 3. `./parity-check.sh --strict`
 4. `./health-check.sh` after workloads settle.
 

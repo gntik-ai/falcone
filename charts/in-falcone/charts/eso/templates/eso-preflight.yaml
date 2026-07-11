@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: eso-preflight
-  namespace: {{ .Values.eso.namespace }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-20"
@@ -35,7 +35,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: eso-preflight
-    namespace: {{ .Values.eso.namespace }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -45,7 +45,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: eso-preflight
-  namespace: {{ .Values.eso.namespace }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-19"
@@ -81,6 +81,7 @@ spec:
               adopt={{ .Values.eso.clusterOwnership.adoptExisting | default false | quote }}
               release={{ .Release.Name | quote }}
               namespace={{ .Release.Namespace | quote }}
+              eso_namespace={{ .Values.eso.namespace | quote }}
               if kubectl get clustersecretstore openbao-backend >/dev/null 2>&1; then
                 owner="$(kubectl get clustersecretstore openbao-backend -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-name}' 2>/dev/null || true)"
                 owner_ns="$(kubectl get clustersecretstore openbao-backend -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-namespace}' 2>/dev/null || true)"
@@ -94,11 +95,11 @@ spec:
               conflicts="$(kubectl get deploy -A -l app.kubernetes.io/name=external-secrets -o go-template='{{ "{{" }} range .items {{ "}}" }}{{ "{{" }} .metadata.namespace {{ "}}" }}/{{ "{{" }} .metadata.name {{ "}}" }} {{ "{{" }} end {{ "}}" }}' 2>/dev/null || true)"
               for item in $conflicts; do
                 case "$item" in
-                  {{ .Release.Namespace }}/*) ;;
-                  {{ .Values.eso.namespace }}/*) ;;
+                  ${namespace}/*) ;;
+                  ${eso_namespace}/*) ;;
                   *)
                     if [ "$adopt" != "true" ]; then
-                      echo "external-secrets controller already exists outside {{ .Values.eso.namespace }}: ${item}; coordinate ownership or set eso.eso.clusterOwnership.adoptExisting=true for an adoption rollout" >&2
+                      echo "external-secrets controller already exists outside ${eso_namespace}: ${item}; coordinate ownership or set eso.eso.clusterOwnership.adoptExisting=true for an adoption rollout" >&2
                       exit 1
                     fi
                     ;;
