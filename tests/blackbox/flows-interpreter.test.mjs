@@ -11,8 +11,8 @@
  *     node-ID naming convention helper, deterministic-only code)
  *   - the activity-interface contract (input envelope shape downstream #360 plugs into)
  *   - the Dockerfile (node:22-slim base — @temporalio/core-bridge ships a glibc native binary that cannot load on Alpine/musl — USER node, build-from-root)
- *   - the umbrella helm chart renders the worker Deployment (flows-worker label, non-root,
- *     probes) when workflowWorker.enabled=true, and renders nothing by default
+ *   - the umbrella helm chart renders the core worker Deployment (flows-worker label, non-root,
+ *     probes) by default
  *
  * Tests that shell out to `helm` self-skip when the binary is absent (repo precedent:
  * tests/blackbox/flows-temporal-helm.test.mjs).
@@ -25,8 +25,8 @@
  *   bbx-flows-interp-005  workflow code uses no non-deterministic host API (Date.now/Math.random/fetch)
  *   bbx-flows-interp-006  activity-interface contract envelope shape is exported + documented
  *   bbx-flows-interp-007  Dockerfile: node:22-slim base (glibc for core-bridge), USER node, build from repo root
- *   bbx-flows-interp-008  helm: workflowWorker disabled by default → no worker Deployment
- *   bbx-flows-interp-009  helm: workflowWorker.enabled=true → worker Deployment w/ flows-worker label
+ *   bbx-flows-interp-008  helm: default core install renders the worker Deployment
+ *   bbx-flows-interp-009  helm: worker Deployment carries the flows-worker label
  *   bbx-flows-interp-010  helm: worker pod spec is non-root with liveness+readiness probes
  *   bbx-flows-interp-011  helm: values.schema.json accepts workflowWorker (lint/template exit 0)
  *   bbx-flows-interp-012  retry-policy + duration mapping helpers exposed per the normative contract
@@ -197,22 +197,22 @@ test('bbx-flows-interp-007: Dockerfile uses node:22-slim, USER node, builds from
 });
 
 // ---------------------------------------------------------------------------
-// bbx-flows-interp-008: helm — disabled by default
+// bbx-flows-interp-008: helm — core by default
 // ---------------------------------------------------------------------------
-test('bbx-flows-interp-008: workflowWorker disabled by default renders no worker Deployment', SKIP, () => {
+test('bbx-flows-interp-008: default core install renders one workflow-worker Deployment', SKIP, () => {
   const r = helmTemplate();
   assert.equal(r.status, 0, `helm template (defaults) must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
-  const workerDocs = docs.filter((d) => /workflow-worker/.test(docName(d)));
-  assert.equal(workerDocs.length, 0, `expected no workflow-worker resources by default, found: ${workerDocs.map(docName).join(', ')}`);
+  const deployments = docs.filter((d) => docKind(d) === 'Deployment' && /workflow-worker/.test(docName(d)));
+  assert.equal(deployments.length, 1, `expected one workflow-worker Deployment by default, found ${deployments.length}`);
 });
 
 // ---------------------------------------------------------------------------
-// bbx-flows-interp-009: helm — enabled → worker Deployment with flows-worker label
+// bbx-flows-interp-009: helm — worker Deployment with flows-worker label
 // ---------------------------------------------------------------------------
-test('bbx-flows-interp-009: workflowWorker.enabled=true renders a worker Deployment with the flows-worker label', SKIP, () => {
-  const r = helmTemplate(['--set', 'workflowWorker.enabled=true']);
-  assert.equal(r.status, 0, `helm template (enabled) must exit 0.\nstderr: ${r.stderr}`);
+test('bbx-flows-interp-009: workflowWorker renders a worker Deployment with the flows-worker label', SKIP, () => {
+  const r = helmTemplate();
+  assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
   const deployments = docs.filter((d) => docKind(d) === 'Deployment' && /workflow-worker/.test(docName(d)));
   assert.equal(deployments.length, 1, `expected exactly one workflow-worker Deployment, found ${deployments.length}`);
@@ -228,7 +228,7 @@ test('bbx-flows-interp-009: workflowWorker.enabled=true renders a worker Deploym
 // bbx-flows-interp-010: helm — non-root worker with probes
 // ---------------------------------------------------------------------------
 test('bbx-flows-interp-010: worker pod spec is non-root with liveness + readiness probes', SKIP, () => {
-  const r = helmTemplate(['--set', 'workflowWorker.enabled=true']);
+  const r = helmTemplate();
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
   const dep = docs.find((d) => docKind(d) === 'Deployment' && /workflow-worker/.test(docName(d)));
@@ -244,8 +244,8 @@ test('bbx-flows-interp-010: worker pod spec is non-root with liveness + readines
 test('bbx-flows-interp-011: values.schema.json accepts workflowWorker (lint + template exit 0)', SKIP, () => {
   const lint = helmLint();
   assert.equal(lint.status, 0, `helm lint must exit 0.\nstderr: ${lint.stderr}\nstdout: ${lint.stdout}`);
-  const tmpl = helmTemplate(['--set', 'workflowWorker.enabled=true']);
-  assert.equal(tmpl.status, 0, `helm template (workflowWorker enabled) must exit 0.\nstderr: ${tmpl.stderr}`);
+  const tmpl = helmTemplate();
+  assert.equal(tmpl.status, 0, `helm template must exit 0.\nstderr: ${tmpl.stderr}`);
 
   // The schema file itself must declare the property referencing the shared component definition.
   const schema = JSON.parse(read(resolve(CHART_PATH, 'values.schema.json')));

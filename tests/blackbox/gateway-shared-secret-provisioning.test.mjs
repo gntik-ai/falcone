@@ -19,7 +19,7 @@
  * Scenario coverage (capability: gateway / spec.md):
  *   bbx-d3-01  chart provisions a Secret `in-falcone-gateway-shared-secret` with a non-empty `secret`
  *   bbx-d3-02  apisix Deployment wires GATEWAY_SHARED_SECRET from that Secret via secretKeyRef
- *   bbx-d3-03  executor Deployment (when enabled) wires GATEWAY_SHARED_SECRET from the same Secret
+ *   bbx-d3-03  core executor Deployment wires GATEWAY_SHARED_SECRET from the same Secret
  *   bbx-d3-04  gatewaySharedSecret.create=false → no chart-managed Secret is rendered (BYO)
  */
 import test from 'node:test';
@@ -97,13 +97,13 @@ test('bbx-d3-02: apisix Deployment wires GATEWAY_SHARED_SECRET via secretKeyRef'
 // -------------------------------------------------------------------------
 // bbx-d3-03: the executor consumes the same secret (gateway-trust end to end)
 // -------------------------------------------------------------------------
-test('bbx-d3-03: executor Deployment wires GATEWAY_SHARED_SECRET via secretKeyRef when enabled', SKIP, () => {
-  const r = helmTemplate(['--set', 'controlPlaneExecutor.enabled=true']);
+test('bbx-d3-03: core executor Deployment wires GATEWAY_SHARED_SECRET via secretKeyRef', SKIP, () => {
+  const r = helmTemplate();
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const exec = splitDocs(r.stdout).find(
     (d) => /(^|\n)kind:\s*Deployment/.test(d) && docName(d) === 'falcone-control-plane-executor',
   );
-  assert.ok(exec, 'expected a falcone-control-plane-executor Deployment when enabled');
+  assert.ok(exec, 'expected a core falcone-control-plane-executor Deployment');
   assert.ok(wiresGatewaySecret(exec), 'executor must source GATEWAY_SHARED_SECRET from the shared Secret');
 });
 

@@ -1,7 +1,7 @@
 {{- /*
   Real Prometheus scrape config (add-falcone-metrics-scrape-and-dashboards, #499). The
   observability component previously mounted no config and ran Prometheus' default (it scraped only
-  itself). This ConfigMap is a real prometheus.yml that scrapes the control-plane and cp-executor
+  itself). This ConfigMap is a real prometheus.yml that scrapes the control-plane and executor
   /metrics endpoints (the falcone_* HTTP metrics) plus the APISIX gateway; the observability values
   mount it at /etc/prometheus and set --config.file. Targets use the chart's component service-name
   helper (release-name + componentId), matching the deployed services.
@@ -33,7 +33,7 @@ data:
           - targets: ['{{ $cp }}']
             labels:
               component: control-plane
-      - job_name: falcone-cp-executor
+      - job_name: falcone-control-plane-executor
         metrics_path: /metrics
         static_configs:
           - targets: ['{{ printf "%s.%s.svc.cluster.local:%v" (include "in-falcone.componentServiceNameByAlias" (dict "root" . "component" "controlPlaneExecutor")) $ns ((.Values.controlPlaneExecutor.service).port | default 8080) }}']
@@ -50,9 +50,8 @@ data:
         Namespace-scoped Kubernetes pod service-discovery: scrape ANY Falcone pod that opts in via
         the `prometheus.io/scrape: "true"` annotation, reading its metrics port/path from
         `prometheus.io/port` + `prometheus.io/path` (defaults /metrics). This covers every current
-        AND future metrics-exposing component (control-plane, cp-executor, ...) without hardcoding a
-        per-target job, and includes the cp-executor even when it is applied out-of-band of the chart
-        (as long as it runs in the release namespace carrying the annotation). Components WITHOUT a
+        AND future metrics-exposing component (control-plane, executor, ...) without hardcoding a
+        per-target job. Components WITHOUT a
         /metrics endpoint (e.g. workflow-worker, which serves only /livez+/readyz) are simply not
         annotated, so they are never scraped — no dead targets.
       */}}

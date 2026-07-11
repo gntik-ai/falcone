@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-policy-init
+  namespace: {{ .Values.openbao.namespace }}
+data:
+  init.hcl: |
+    path "sys/auth" {
+      capabilities = ["read"]
+    }
+    path "sys/auth/*" {
+      capabilities = ["create", "read", "update", "delete", "sudo"]
+    }
+    path "sys/mounts" {
+      capabilities = ["read"]
+    }
+    path "sys/mounts/*" {
+      capabilities = ["create", "read", "update", "delete", "sudo"]
+    }
+    path "sys/audit" {
+      capabilities = ["read"]
+    }
+    path "sys/audit/*" {
+      capabilities = ["create", "read", "update", "delete", "sudo"]
+    }
+    path "sys/policies/acl/*" {
+      capabilities = ["create", "read", "update", "delete", "list"]
+    }
+    path "auth/kubernetes/config" {
+      capabilities = ["create", "read", "update", "delete", "sudo"]
+    }
+    path "auth/kubernetes/role/*" {
+      capabilities = ["create", "read", "update", "delete", "list"]
+    }
+    path "secret/data/*" {
+      capabilities = ["create", "update", "read", "delete"]
+    }
+    path "secret/metadata/*" {
+      capabilities = ["list", "read", "delete"]
+    }

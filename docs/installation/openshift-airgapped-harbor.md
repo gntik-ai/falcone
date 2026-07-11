@@ -26,9 +26,9 @@
 | `${OCP_STORAGECLASS}` | Default RWO CSI StorageClass on the cluster | `ocs-storagecluster-ceph-rbd` |
 
 - **Namespace:** the whole platform installs into a single Project named **`falcone`**.
-  (The chart spreads optional add‑ons across `secret-store` / `default` / `eso-system`;
-  this guide consolidates everything into `falcone` for a plain‑manifest install and
-  notes the adjustments.)
+  (The Helm chart uses separate namespaces for OpenBao and ESO ownership; this guide
+  consolidates everything into `falcone` for a plain‑manifest install and notes the
+  adjustments.)
 - **Labels:** every object carries `app.kubernetes.io/part-of: falcone`,
   `app.kubernetes.io/name: <component>`, and `app.kubernetes.io/component: <component>`.
   NetworkPolicies select on `app.kubernetes.io/name`, so keep these labels intact.
@@ -49,7 +49,7 @@
 Falcone is a modular, multitenant Backend‑as‑a‑Service. The platform decomposes into a
 **stateless application tier** (API control plane, data‑plane executor, gateway, auth,
 web console), a **stateful data plane** (relational DB, document store, object storage,
-message bus), and **operational add‑ons** (observability, secrets manager, flows engine).
+message bus), and **operational core services** (observability, secrets manager, flows engine).
 
 ### 1.1 Component inventory (what gets deployed)
 
@@ -71,7 +71,7 @@ message bus), and **operational add‑ons** (observability, secrets manager, flo
 | `grafana` | Deployment | Dashboards over Prometheus. |
 | Bootstrap / init Jobs | Job | Keycloak realm + APISIX routes; DocumentDB extension + logical replication; SeaweedFS bucket + admin identity. |
 
-**Optional add‑ons** (each section clearly marked; install only if the capability is needed)
+**Core platform services and runtime-managed capabilities**
 
 | Component | Kind | Purpose |
 |---|---|---|
@@ -81,13 +81,11 @@ message bus), and **operational add‑ons** (observability, secrets manager, flo
 | MCP runtime RBAC + NetworkPolicy | Role/RoleBinding/NetworkPolicy | Hosting of per‑tenant MCP servers as Knative Services. |
 | Functions runtime (`fn-runtime`) | (Knative, created at runtime) | The executor templates a Knative Service per function; image referenced via `FN_RUNTIME_IMAGE`. **Requires OpenShift Serverless.** |
 
-> **[VERIFY] Functions & MCP require OpenShift Serverless (Knative).** Functions and
-> hosted MCP servers are not static manifests — the executor creates a Knative `Service`
-> per function/server at runtime. This needs the **OpenShift Serverless Operator** + a
-> `KnativeServing` CR present on the cluster. That operator is the *one* OLM dependency
-> Falcone assumes; if your environment forbids Operators entirely, functions/MCP must be
-> disabled and the platform runs without the serverless capability. Everything else in
-> this guide is plain manifests.
+> **[VERIFY] Runtime-created Functions & MCP workloads require OpenShift Serverless
+> (Knative).** The core install includes the executor, MCP routes/RBAC, and function
+> runtime image references. The executor creates a Knative `Service` per function/server
+> at runtime, which needs the **OpenShift Serverless Operator** + a `KnativeServing` CR
+> present on the cluster. Everything else in this guide is plain manifests.
 
 ### 1.2 Dependency / startup order (mermaid)
 
@@ -153,8 +151,8 @@ graph TD
 `kafka`, `seaweedfs`) → init Jobs (`documentdb-init`, SeaweedFS seed/bucket) →
 `keycloak` → `ferretdb` → `control-plane` → `control-plane-executor` → `apisix` →
 `web-console` → bootstrap Job (realm + routes) → `prometheus`/`grafana` → Routes.
-Optional add‑ons (`openbao`, `temporal`, `postgresql-vector`, MCP) slot in after the
-data plane is healthy.
+OpenBao, Temporal, `postgresql-vector`, and MCP RBAC/routes are baseline services and
+slot in after the data plane is healthy.
 
 ---
 
@@ -218,7 +216,7 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 |---|---|---|---|---|
 | PostgreSQL (shared) | `bitnami/postgresql:17.2.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/postgresql:17.2.0` | also the Keycloak DB‑init initContainer image |
 | PostgreSQL (filer DB init) | `bitnamilegacy/postgresql:17.2.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0` | SeaweedFS filer init container (the `bitnami`→`bitnamilegacy` purge) — **[VERIFY]** you may standardize on one tag if you patch the manifest |
-| PostgreSQL + pgvector (opt) | `pgvector/pgvector:pg17` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17` | optional vector search |
+| PostgreSQL + pgvector | `pgvector/pgvector:pg17` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17` | core vector search datastore |
 | DocumentDB engine | `ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7` | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0` | digest‑pinned; reused by `documentdb-init` Job + `ferretdb` init container |
 | FerretDB gateway | `ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985` (v2.7.0) | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/ferretdb:2.7.0` | distroless |
 | Kafka | `bitnami/kafka:3.9.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kafka:3.9.0` | KRaft |
@@ -228,11 +226,11 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 | Keycloak | `quay.io/keycloak/keycloak:26.1.0` | quay.io | `${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0` | IdP |
 | APISIX | `apache/apisix:3.10.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0` | gateway |
 | kubectl (bootstrap) | `bitnami/kubectl:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2` | bootstrap + TLS‑bootstrap Jobs |
-| OpenBao (opt) | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
+| OpenBao | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | core secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
 | Node (OpenBao audit sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
-| Temporal server (opt) | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
-| Temporal admin‑tools (opt) | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
-| Temporal UI (opt) | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
+| Temporal server | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
+| Temporal admin‑tools | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
+| Temporal UI | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
 
 #### Falcone images built from source (push to Harbor; see Appendix B for BuildConfig)
 
@@ -240,9 +238,9 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 |---|---|---|---|---|
 | control-plane (API) | `in-falcone-control-plane:0.6.2` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/server.mjs` — **[VERIFY]** exact API entrypoint vs executor |
 | control-plane-executor | `in-falcone-control-plane-executor:0.9.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/runtime/main.mjs`; built from **repo root** |
-| web-console | `in-falcone-web-console:0.2.11` | `apps/web-console/Dockerfile` | build `node:22-alpine`, runtime `nginx:1.27-alpine` | **[VERIFY]** chart default tag is the placeholder `ghcr.io/example/in-falcone-web-console:0.1.0`; the real tag (`0.2.11`) comes from the OpenShift overlay — pin a real published tag |
-| workflow-worker (opt) | `in-falcone-workflow-worker:0.1.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc — Temporal core‑bridge) | built from repo root |
-| fn-runtime (opt) | `in-falcone-fn-runtime:0.1.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| web-console | `in-falcone-web-console:0.2.11` | `apps/web-console/Dockerfile` | build `node:22-alpine`, runtime `nginx:1.27-alpine` | build and publish to Harbor; do not use the old `ghcr.io/example` placeholder |
+| workflow-worker | `in-falcone-workflow-worker:0.1.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc — Temporal core‑bridge) | core worker, built from repo root |
+| fn-runtime | `in-falcone-fn-runtime:0.1.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
 
 Harbor targets for the built images:
 `${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.6.2`,
@@ -254,8 +252,10 @@ Build bases to mirror (for BuildConfig): `node:22-alpine`, `node:22-slim`,
 
 > **Unpinned/placeholder versions flagged (do not silently pick a tag):**
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
-> - `web-console` chart default `ghcr.io/example/in-falcone-web-console:0.1.0` is a
->   placeholder — use the real `0.2.11` (or your published) tag.
+> - Falcone-built images must be built and pushed to Harbor before install. Public manifests for
+>   `in-falcone-control-plane-executor:0.9.0`, `in-falcone-workflow-worker:0.1.0`,
+>   `in-falcone-mcp-runtime:0.1.0`, and `in-falcone-web-console:0.2.11` were not
+>   verified, so do not invent digests for them.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.
@@ -289,7 +289,7 @@ skopeo copy docker://quay.io/keycloak/keycloak:26.1.0          docker://${HARBOR
 skopeo copy docker://docker.io/apache/apisix:3.10.0            docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0
 skopeo copy docker://docker.io/bitnami/kubectl:1.32.2          docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
 
-# Optional add-ons
+# Core service support images
 skopeo copy docker://docker.io/openbao/openbao:2.3.1           docker://${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1
 skopeo copy docker://docker.io/library/node:20-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine
 skopeo copy docker://docker.io/temporalio/server:1.31.1        docker://${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1
@@ -578,9 +578,9 @@ for sa in falcone-control-plane falcone-control-plane-executor falcone-apisix \
 done
 ```
 
-> **[VERIFY] Optional add‑ons that pin a uid.** Upstream `grafana` (uid 472) and
+> **[VERIFY] Core images that pin a uid.** Upstream `grafana` (uid 472) and
 > `openbao` (uid 100) images pin a non‑root uid that is **outside** the namespace range
-> and therefore **rejected by `restricted-v2`**. In §7/§ add‑ons these pins are removed
+> and therefore **rejected by `restricted-v2`**. In the core manifests these pins are removed
 > (let the SCC inject the uid). If a specific image truly needs a fixed uid, create a
 > dedicated SCC with `runAsUser: MustRunAs <uid>` and bind it to that SA only — do not
 > use `anyuid` broadly.
@@ -967,7 +967,7 @@ data:
         static_configs:
           - targets: ['falcone-control-plane.falcone.svc.cluster.local:8080']
             labels: { component: control-plane }
-      - job_name: falcone-cp-executor
+      - job_name: falcone-control-plane-executor
         metrics_path: /metrics
         static_configs:
           - targets: ['falcone-control-plane-executor.falcone.svc.cluster.local:8080']
@@ -1203,8 +1203,8 @@ spec:
   resources: { requests: { storage: 20Gi } }
 ```
 
-> The optional `postgresql-vector` (10Gi) and `openbao` (data 10Gi + audit 2Gi) PVCs are
-> included in their respective add‑on sections (§8).
+> The `postgresql-vector` (10Gi) and `openbao` (data 10Gi + audit 2Gi) PVCs are part of the
+> core baseline and are included in their respective sections (§8).
 
 ---
 
@@ -2895,10 +2895,10 @@ spec:
 
 ---
 
-## 8. Optional add‑ons
+## 8. Core service manifests
 
-Install only the capabilities you need. Each is self‑contained and slots in after the
-core data plane is healthy.
+These services are part of the baseline. Each is self-contained and slots in after the
+core data plane is healthy in this plain-manifest install.
 
 ### 8.1 OpenBao (secrets manager)
 
@@ -3428,7 +3428,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata: { name: falcone-mcp-runtime, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: falcone-mcp-runtime }
-subjects: [{ kind: ServiceAccount, name: falcone-control-plane, namespace: falcone }]
+subjects: [{ kind: ServiceAccount, name: falcone-control-plane-executor, namespace: falcone }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -3473,7 +3473,7 @@ manifests/
   34-observability.yaml       # §7.11 + §7.12 grafana
   40-bootstrap.yaml           # §7.13
   50-routes.yaml              # §7.14
-  90-optional-*.yaml          # §8 add-ons
+  90-core-*.yaml              # §8 core service supplements
 ```
 
 ```bash
@@ -3526,12 +3526,12 @@ oc wait --for=condition=complete job/falcone-bootstrap --timeout=900s  # CHECKPO
 oc apply -f manifests/34-observability.yaml
 oc apply -f manifests/50-routes.yaml
 
-# 5. Optional add-ons (§8) — apply only what you need.
+# 5. Core service manifests (§8) — apply as part of the baseline.
 # Temporal: schema Job -> servers -> bootstrap Job -> worker
-#   oc apply -f manifests/90-optional-temporal.yaml
-#   oc wait --for=condition=complete job/falcone-temporal-schema --timeout=600s
-#   oc rollout status deployment/falcone-temporal-frontend --timeout=300s
-#   oc wait --for=condition=complete job/falcone-temporal-bootstrap --timeout=600s
+oc apply -f manifests/90-core-temporal.yaml
+oc wait --for=condition=complete job/falcone-temporal-schema --timeout=600s
+oc rollout status deployment/falcone-temporal-frontend --timeout=300s
+oc wait --for=condition=complete job/falcone-temporal-bootstrap --timeout=600s
 ```
 
 > **Why this order:** PostgreSQL must be Ready before Keycloak (DB init), DocumentDB (CDC
@@ -3621,7 +3621,8 @@ Changes made versus the raw chart render to achieve a clean air‑gap/OpenShift 
 2. **SeaweedFS s3 `hostPath` → `emptyDir`** for logs (restricted SCC forbids hostPath).
 3. **Removed pinned uid/fsGroup** on grafana (472), openbao (100/1000), documentdb (999),
    pgvector (999) so `restricted-v2` injects them from the namespace range.
-4. **web‑console tag** `ghcr.io/example/…:0.1.0` (placeholder) → real `…:0.2.11`.
+4. **Falcone-built images** must come from your Harbor project; do not deploy the old
+   `ghcr.io/example/…:0.1.0` placeholder or unverified public executor/worker/MCP-runtime tags.
 5. **SeaweedFS** mutable tag `4.33` → recommend the digest pin in §3.1.
 6. **Removed** the stray `kubernetes.io/ingress.class: nginx` annotation from Routes.
 7. **Namespace consolidation** — OpenBao (`secret-store`), SeaweedFS (`default`), ESO

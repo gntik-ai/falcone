@@ -60,6 +60,9 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   register namespace/search attributes.
 - [ ] MCP: set `MCP_ENABLED=true`, configure a real runtime image/digest, bind RBAC to the serving
   runtime ServiceAccount, and replace core in-memory MCP state with PostgreSQL-backed persistence.
+  RBAC is bound to the Helm-owned executor ServiceAccount and MCP registry/audit/rate state now
+  writes through a row-locked PostgreSQL store; the verified public runtime image/digest remains
+  blocked on image publication.
 
 ## T07: Update schema and validators
 
@@ -83,12 +86,12 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
 
 ## T09: Existing-install migration and rollback
 
-- [x] Add backup tooling under `loop-state/system-changes/make-all-services-core/` for K8s Secrets,
-  external Vault/OpenBao KV data, Helm values/manifests/history, ESO ownership, and PVC inventory.
+- [x] Add tracked backup tooling under `scripts/system-changes/make-all-services-core/` for K8s
+  Secrets/OpenBao KV parity and restricted KV backup archives.
 - [x] Add idempotent migration tooling that copies K8s Secret and Vault data into OpenBao, preserves
   encryption keys byte-identically, materializes ESO targets, and verifies checksums.
-- [x] Add rollback tooling that restores the prior Helm revision and backed-up Secrets without
-  deleting OpenBao, pgvector, Temporal, or existing service PVCs.
+- [x] Add rollback tooling that restores backed-up OpenBao KV data before the operator rolls back the
+  Helm release, without deleting OpenBao, pgvector, Temporal, or existing service PVCs.
 - [x] Document ESO ownership conflict handling and external Vault coexistence/decommission boundaries.
 
 ## T10: Tests
@@ -99,6 +102,9 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
 - [ ] Add fresh-install readiness checks for every Deployment, StatefulSet, Job, ClusterSecretStore,
   ExternalSecret, OpenBao health, Temporal namespace/search attributes, pgvector extension, workspace
   secrets, flows routes, MCP routes, and Prometheus scrape targets listed in `design.md`.
+  Static Helm readiness coverage was added for namespace consistency, disable-path failures,
+  OpenBao/ESO mappings, Temporal DB bootstrap, MCP route/RBAC, and local kind image overrides; actual
+  cluster readiness evidence is still not captured.
 - [x] Add tenant-isolation regression tests for workspace secrets, flows, and MCP after the runtime
   gates become default-active.
 
@@ -123,13 +129,26 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   and `helm lint charts/in-falcone` passed. `pnpm lint:md` failed only on existing
   `README-loop-kit.md` formatting, and `pnpm lint:snippets` failed because
   `docs/guides/realtime/frontend-quickstart.md` is missing.
-- Verification after edits: `pnpm validate:repo`, `openspec validate make-all-services-core --strict`,
-  `helm lint charts/in-falcone`, `helm template falcone charts/in-falcone --namespace falcone
-  --include-crds`, targeted MCP/unit/topology tests, and targeted MCP blackbox tests passed.
-- Full `pnpm test:unit` now has 854 passing tests and 3 remaining dependency failures:
-  missing `jose` for backup-status and missing `@temporalio/activity` for flow activity tests.
+- Verification after edits in the original implementation: `pnpm validate:repo`, `openspec validate
+  make-all-services-core --strict`, `helm lint charts/in-falcone`, `helm template falcone
+  charts/in-falcone --namespace falcone --include-crds`, targeted MCP/unit/topology tests, and
+  targeted MCP blackbox tests passed.
+- Reviewer-revision coverage added static tests for arbitrary release namespaces, all core disable
+  paths, nested `service.enabled=false`, OpenBao/ESO credential parity, Temporal DB bootstrap, MCP
+  route/RBAC, local kind image overrides, ESO ownership preflight behavior, public API family
+  routing/catalog alignment, and MCP PostgreSQL transaction safety.
+- Reviewer-revision validation run: `helm dependency build charts/in-falcone`; `helm template
+  falcone charts/in-falcone --namespace arbitrary-ns --include-crds`; `helm lint
+  charts/in-falcone --namespace arbitrary-ns`; `bash -n
+  scripts/system-changes/make-all-services-core/*.sh`; targeted `node --test` suite covering 86
+  MCP/chart/gateway/readiness tests; `openspec validate make-all-services-core --strict`;
+  `npm run validate:repo`; `git diff --check`.
 - Fresh clean-cluster install was intentionally not run in this implementer stage per orchestrator
   instruction.
-- MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but the configured
-  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0` manifest could not be verified from this
-  environment (`manifest unknown`), so the real published runtime image/digest remains open.
+- MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but these public manifests
+  could not be verified from this environment: `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
+  `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.1.0`,
+  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0`, and
+  `ghcr.io/gntik-ai/in-falcone-web-console:0.2.11`. Kind/local overlays now use buildable
+  `localhost:30500/in-falcone-*` artifacts, the chart no longer defaults to the old
+  `ghcr.io/example` web-console placeholder, and unverified MCP digest pins were removed.

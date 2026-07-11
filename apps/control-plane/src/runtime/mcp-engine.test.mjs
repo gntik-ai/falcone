@@ -36,6 +36,36 @@ function fakeStateStore() {
   };
 }
 
+function transactionalStateStore() {
+  let state = null;
+  let saves = 0;
+  let tail = Promise.resolve();
+  const clone = (value) => value ? structuredClone(value) : null;
+  return {
+    get saves() { return saves; },
+    async ensureSchema() {},
+    async loadState() { return clone(state); },
+    async saveState(next) {
+      state = clone(next);
+      saves += 1;
+    },
+    async withStateTransaction(mutator) {
+      let release;
+      const previous = tail;
+      tail = new Promise((resolve) => { release = resolve; });
+      await previous;
+      try {
+        const outcome = await mutator(clone(state) ?? {});
+        state = clone(outcome.state);
+        saves += 1;
+        return outcome.result;
+      } finally {
+        release();
+      }
+    },
+  };
+}
+
 test('full loop: create (instant) → curate → publish → get (endpoint+tools+version) → call → audit', async () => {
   const e = engine();
   const created = await e.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'Acme', source: 'instant' } });
@@ -126,4 +156,24 @@ test('durable store: a published MCP server survives engine restart', async () =
   assert.equal(view.status, 'published');
   assert.equal(view.activeVersion, 'v1');
   assert.ok(view.tools.length > 0);
+});
+
+test('durable store: stale replica writes preserve another replica server', async () => {
+  const store = transactionalStateStore();
+  const stale = createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST, store });
+  const peer = createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST, store });
+
+  // Simulate a replica that has already loaded an empty snapshot before a peer writes.
+  const initiallyEmpty = await stale.executeMcp({ operation: 'list_servers', identity: A, workspaceId: A.workspaceId });
+  assert.deepEqual(initiallyEmpty.items, []);
+
+  const peerServer = await peer.executeMcp({ operation: 'create_server', identity: B, workspaceId: B.workspaceId, body: { name: 'peer', source: 'instant' } });
+  const staleServer = await stale.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'stale', source: 'instant' } });
+
+  const verifier = createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST, store });
+  const aList = await verifier.executeMcp({ operation: 'list_servers', identity: A, workspaceId: A.workspaceId });
+  const bList = await verifier.executeMcp({ operation: 'list_servers', identity: B, workspaceId: B.workspaceId });
+  assert.equal(aList.items.some((s) => s.serverId === staleServer.serverId), true);
+  assert.equal(bList.items.some((s) => s.serverId === peerServer.serverId), true);
+  assert.ok(store.saves >= 2);
 });

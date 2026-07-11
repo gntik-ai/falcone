@@ -4,25 +4,94 @@ metadata:
   name: openbao-init
   namespace: {{ .Values.openbao.namespace }}
 spec:
+  backoffLimit: 6
   template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao-init
     spec:
       serviceAccountName: openbao
       restartPolicy: OnFailure
       containers:
+        - name: platform-credential-loader
+          image: "{{ .Values.openbao.credentialSync.image.repository }}:{{ .Values.openbao.credentialSync.image.tag }}"
+          imagePullPolicy: {{ .Values.openbao.credentialSync.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              release_ns={{ .Release.Namespace | quote }}
+              openbao_ns={{ .Values.openbao.namespace | quote }}
+              recovery_secret={{ .Values.openbao.recovery.secretName | quote }}
+
+              copy_secret() {
+                secret="$1"; shift
+                dir="/platform-creds/${secret}"
+                mkdir -p "$dir"
+                i=0
+                until kubectl -n "$release_ns" get secret "$secret" >/dev/null 2>&1; do
+                  i=$((i+1)); [ "$i" -gt 120 ] && { echo "secret/${secret} not found in ${release_ns}" >&2; exit 1; }
+                  sleep 2
+                done
+                for key in "$@"; do
+                  kubectl -n "$release_ns" get secret "$secret" \
+                    -o go-template='{{ "{{" }} index .data "'"$key"'" {{ "}}" }}' | base64 -d > "${dir}/${key}"
+                  chmod 0400 "${dir}/${key}"
+                done
+              }
+
+              copy_secret in-falcone-postgresql POSTGRESQL_USERNAME POSTGRESQL_PASSWORD POSTGRESQL_POSTGRES_PASSWORD
+              copy_secret in-falcone-postgresql-vector POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB
+              copy_secret in-falcone-documentdb POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB
+              copy_secret in-falcone-ferretdb postgresql-url
+              copy_secret in-falcone-documentdb-replication password realtime-url
+              copy_secret in-falcone-kafka KAFKA_CFG_NODE_ID KAFKA_CFG_PROCESS_ROLES KAFKA_CFG_CONTROLLER_LISTENER_NAMES KAFKA_CFG_CONTROLLER_QUORUM_VOTERS KAFKA_CFG_LISTENERS KAFKA_CFG_ADVERTISED_LISTENERS KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              copy_secret in-falcone-storage s3_access_key s3_secret_key
+              copy_secret in-falcone-keycloak-admin username password
+              copy_secret in-falcone-identity-client client-id client-secret KC_BOOTSTRAP_ADMIN_USERNAME KC_BOOTSTRAP_ADMIN_PASSWORD
+              copy_secret in-falcone-superadmin password
+              copy_secret in-falcone-apisix-admin admin-key
+              copy_secret in-falcone-gateway-shared-secret secret
+              copy_secret in-falcone-temporal username password database visibility-database
+              copy_secret in-falcone-encryption master-key
+              touch /platform-creds/.ready
+
+              i=0
+              until [ -f /openbao-recovery/.ready ] || [ -f /openbao-recovery/.skip ]; do
+                i=$((i+1)); [ "$i" -gt 300 ] && { echo "openbao recovery decision was not produced" >&2; exit 1; }
+                sleep 1
+              done
+              if [ -f /openbao-recovery/.skip ]; then
+                exit 0
+              fi
+              kubectl -n "$openbao_ns" create secret generic "$recovery_secret" \
+                --from-file=unseal1=/openbao-recovery/unseal1 \
+                --from-file=unseal2=/openbao-recovery/unseal2 \
+                --from-file=unseal3=/openbao-recovery/unseal3 \
+                --from-file=unseal4=/openbao-recovery/unseal4 \
+                --from-file=unseal5=/openbao-recovery/unseal5 \
+                --from-file=root-token=/openbao-recovery/root-token \
+                --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+              touch /platform-creds/.recovery-saved
+          volumeMounts:
+            - name: platform-creds
+              mountPath: /platform-creds
+            - name: recovery-out
+              mountPath: /openbao-recovery
         - name: openbao-init
           image: "{{ .Values.openbao.image.repository }}:{{ .Values.openbao.image.tag }}"
+          imagePullPolicy: {{ .Values.openbao.image.pullPolicy }}
           command: ["/bin/sh", "-ec"]
           args:
             - |
               export BAO_ADDR="https://openbao.{{ .Values.openbao.namespace }}.svc.cluster.local:8200"
               export BAO_CACERT=/openbao/tls/ca.crt
 
-              # Wait for the server's TLS listener to ANSWER before acting. This is the key robustness
-              # fix: it stops the Job from racing pod startup and dying mid-init (which previously left
-              # the server initialized-but-sealed, and the old `if initialized: exit 0` guard then
-              # "succeeded" while sealed). NOTE: `bao status` EXITS NON-ZERO (2) when the server is
-              # sealed/uninitialized — which is the normal pre-init state — so we must test for a
-              # PARSEABLE response (the "initialized" field), not a zero exit code.
+              i=0
+              until [ -f /platform-creds/.ready ]; do
+                i=$((i+1)); [ "$i" -gt 180 ] && { echo "platform credentials were not loaded" >&2; exit 1; }
+                sleep 1
+              done
+
               i=0; until bao status -format=json 2>/dev/null | grep -q '"initialized"'; do
                 i=$((i+1)); [ "$i" -gt 90 ] && { echo "openbao not reachable after 180s" >&2; exit 1; }; sleep 2; done
 
@@ -30,86 +99,153 @@ spec:
               initialized=$(printf '%s' "$status" | sed -n 's/.*"initialized"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n1)
               sealed=$(printf '%s' "$status" | sed -n 's/.*"sealed"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n1)
 
-              if [ "$initialized" = "true" ] && [ "$sealed" = "false" ]; then
-                # Already fully bootstrapped by a previous successful run (config was applied then).
-                echo "OpenBao already initialized and unsealed; nothing to do"
-                exit 0
-              elif [ "$initialized" = "true" ] && [ "$sealed" = "true" ]; then
-                # Initialized but sealed and we hold no keys (init keys are single-use, printed once).
-                # Fail LOUDLY so the operator notices, rather than silently passing with a sealed server.
-                echo "ERROR: OpenBao is initialized but SEALED and init keys are not available to this Job." >&2
-                echo "       A prior init must have completed unseal in the same run; if you see this on a" >&2
-                echo "       fresh install, delete the openbao PVCs and re-install so init runs cleanly." >&2
-                exit 1
-              else
-                # `bao ... -format=json` emits PRETTY (multi-line) JSON, so the unseal_keys_b64 array
-                # spans several lines. Flatten newlines first so the single-line extractors below match
-                # (the previous line-based sed silently produced EMPTY keys -> `unseal ""` failed under
-                # set -e -> the server was left initialized-but-sealed).
+              if [ "$initialized" = "false" ]; then
                 init_json=$(bao operator init -format=json -key-shares={{ .Values.openbao.initShares }} -key-threshold={{ .Values.openbao.initThreshold }} | tr -d '\n')
-                # Extract every quoted element of the unseal_keys_b64 array, in order.
                 keys=$(printf '%s' "$init_json" | sed -n 's/.*"unseal_keys_b64"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p' | grep -o '"[^"]*"' | tr -d '"')
-                unseal1=$(printf '%s\n' "$keys" | sed -n '1p')
-                unseal2=$(printf '%s\n' "$keys" | sed -n '2p')
-                unseal3=$(printf '%s\n' "$keys" | sed -n '3p')
                 root_token=$(printf '%s' "$init_json" | sed -n 's/.*"root_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-                [ -n "$unseal1" ] && [ -n "$unseal2" ] && [ -n "$unseal3" ] && [ -n "$root_token" ] || {
-                  echo "FATAL: failed to parse init output (unseal keys / root token empty)" >&2; exit 1; }
-                bao operator unseal "$unseal1"
-                bao operator unseal "$unseal2"
-                bao operator unseal "$unseal3"
+                n=1
+                printf '%s\n' "$keys" | while IFS= read -r key; do
+                  [ -n "$key" ] || continue
+                  printf '%s' "$key" > "/openbao-recovery/unseal${n}"
+                  chmod 0400 "/openbao-recovery/unseal${n}"
+                  n=$((n+1))
+                done
+                printf '%s' "$root_token" > /openbao-recovery/root-token
+                chmod 0400 /openbao-recovery/root-token
+                [ -s /openbao-recovery/unseal1 ] && [ -s /openbao-recovery/unseal2 ] && [ -s /openbao-recovery/unseal3 ] && [ -n "$root_token" ] || {
+                  echo "FATAL: failed to parse init output" >&2; exit 1; }
+                touch /openbao-recovery/.ready
+                i=0
+                until [ -f /platform-creds/.recovery-saved ]; do
+                  i=$((i+1)); [ "$i" -gt 120 ] && { echo "recovery Secret was not saved" >&2; exit 1; }
+                  sleep 1
+                done
+                bao operator unseal "$(cat /openbao-recovery/unseal1)" >/dev/null
+                bao operator unseal "$(cat /openbao-recovery/unseal2)" >/dev/null
+                bao operator unseal "$(cat /openbao-recovery/unseal3)" >/dev/null
                 export BAO_TOKEN="$root_token"
+              elif [ "$sealed" = "true" ]; then
+                for key in /openbao-recovery-mounted/unseal1 /openbao-recovery-mounted/unseal2 /openbao-recovery-mounted/unseal3; do
+                  [ -s "$key" ] || { echo "OpenBao is sealed and recovery Secret {{ .Values.openbao.recovery.secretName }} is incomplete" >&2; exit 1; }
+                  bao operator unseal "$(cat "$key")" >/dev/null
+                done
+                cp /openbao-recovery-mounted/unseal* /openbao-recovery/ 2>/dev/null || true
+                if [ -s /openbao-recovery/unseal1 ]; then
+                  touch /openbao-recovery/.ready
+                else
+                  touch /openbao-recovery/.skip
+                fi
+              else
+                cp /openbao-recovery-mounted/unseal* /openbao-recovery/ 2>/dev/null || true
+                if [ -s /openbao-recovery/unseal1 ]; then
+                  touch /openbao-recovery/.ready
+                else
+                  touch /openbao-recovery/.skip
+                fi
               fi
-              # Configure (runs only on the fresh-init path, holding the root token). All steps are
-              # idempotent (enable has || true; writes are upserts).
-              bao auth enable kubernetes || true
-              # k8s auth config. token_reviewer_jwt is the openbao SA token (granted
-              # authentication.k8s.io/tokenreviews by the openbao-kubernetes-auth ClusterRole) used to
-              # call the TokenReview API. NOTE: this call goes to the kube API server, so the OpenBao
-              # pod's egress NetworkPolicy MUST permit it (see openbao-networkpolicy.yaml) or every
-              # login times out -> 403 "permission denied".
-              bao write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-              bao secrets enable -path=secret kv-v2 || true
-              bao audit enable file file_path=/openbao/audit/openbao-audit.log || true
-              for policy in platform tenant functions gateway iam; do
-                bao policy write "$policy" "/config/policies/${policy}.hcl"
+
+              if [ -z "${BAO_TOKEN:-}" ]; then
+                if [ -s /openbao-recovery-mounted/root-token ]; then
+                  BAO_TOKEN="$(cat /openbao-recovery-mounted/root-token)"
+                else
+                  login_json=$(bao write -format=json auth/kubernetes/login role=openbao-init-role jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" 2>/dev/null || true)
+                  BAO_TOKEN=$(printf '%s' "$login_json" | sed -n 's/.*"client_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                fi
+                [ -n "$BAO_TOKEN" ] || {
+                  echo "OpenBao is initialized but no recovery root token is mounted and openbao-init-role login failed; restore the recovery Secret or recover manually" >&2; exit 1; }
+                export BAO_TOKEN
+              fi
+
+              cred() { cat "/platform-creds/$1/$2"; }
+
+              bao auth enable kubernetes >/dev/null 2>&1 || true
+              bao write auth/kubernetes/config \
+                kubernetes_host="https://kubernetes.default.svc:443" \
+                kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" >/dev/null
+              bao secrets enable -path=secret kv-v2 >/dev/null 2>&1 || true
+              bao audit enable file file_path=/openbao/audit/openbao-audit.log >/dev/null 2>&1 || true
+              for policy in init platform tenant functions gateway iam; do
+                bao policy write "$policy" "/config/policies/${policy}.hcl" >/dev/null
               done
-              bao write auth/kubernetes/role/platform-role bound_service_account_names='*' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=platform ttl=24h
-              bao write auth/kubernetes/role/gateway-role bound_service_account_names='{{ .Release.Name }}-apisix' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=gateway ttl=24h
-              bao write auth/kubernetes/role/iam-role bound_service_account_names='{{ .Release.Name }}-keycloak' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=iam ttl=24h
-              bao write auth/kubernetes/role/workspace-secrets-role bound_service_account_names='{{ .Release.Name }}-control-plane,{{ .Release.Name }}-control-plane-executor' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=functions ttl=24h
-              bao write auth/kubernetes/role/eso-role bound_service_account_names='{{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}' bound_service_account_namespaces='eso-system' policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }}
-              random_alnum() {
-                head -c "${1:-32}" /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "${2:-48}"
-              }
-              pg_app_password="$(random_alnum 48 48)"
-              pg_root_password="$(random_alnum 48 48)"
-              pgvector_password="$(random_alnum 48 48)"
-              documentdb_password="$(random_alnum 48 48)"
-              documentdb_repl_password="$(random_alnum 48 48)"
-              kafka_admin_password="$(random_alnum 48 48)"
-              s3_access_key="$(random_alnum 24 20)"
-              s3_secret_key="$(random_alnum 48 40)"
-              keycloak_admin_password="$(random_alnum 48 48)"
-              identity_client_secret="$(random_alnum 48 48)"
-              superadmin_password="$(random_alnum 48 48)"
-              apisix_admin_key="$(random_alnum 48 48)"
-              gateway_shared_secret="$(random_alnum 48 48)"
-              temporal_password="$(random_alnum 48 48)"
-              encryption_master_key="$(random_alnum 48 44)"
-              bao kv put secret/platform/postgresql username=falcone app-password="$pg_app_password" root-password="$pg_root_password"
-              bao kv put secret/platform/postgresql-vector username=falcone_vector_admin password="$pgvector_password" database=in_falcone_vector
-              bao kv put secret/platform/documentdb username=falcone_doc_admin password="$documentdb_password" database=in_falcone ferretdb-postgresql-url="postgres://falcone_doc_admin:${documentdb_password}@{{ .Release.Name }}-documentdb.{{ .Release.Namespace }}.svc.cluster.local:5432/postgres?sslmode=disable"
-              bao kv put secret/platform/documentdb-replication username=falcone_cdc_repl password="$documentdb_repl_password" realtime-url="postgres://falcone_cdc_repl:${documentdb_repl_password}@{{ .Release.Name }}-documentdb.{{ .Release.Namespace }}.svc.cluster.local:5432/postgres?sslmode=disable"
-              bao kv put secret/platform/kafka admin-password="$kafka_admin_password" inter-broker-secret="$(random_alnum 32 32)"
-              bao kv put secret/platform/s3 access-key="$s3_access_key" secret-key="$s3_secret_key"
-              bao kv put secret/platform/encryption master-key="$encryption_master_key"
-              bao kv put secret/platform/temporal username=temporal password="$temporal_password" database=temporal visibility-database=temporal_visibility
-              bao kv put secret/gateway/apisix admin-key="$apisix_admin_key" dashboard-password="$(random_alnum 32 32)" etcd-password="$(random_alnum 32 32)"
-              bao kv put secret/gateway/shared secret="$gateway_shared_secret"
-              bao kv put secret/iam/keycloak admin-username=admin admin-password="$keycloak_admin_password" db-password="$pg_app_password"
-              bao kv put secret/iam/identity-client client-id=in-falcone-gateway client-secret="$identity_client_secret"
-              bao kv put secret/iam/superadmin username=superadmin password="$superadmin_password"
+
+              bao write auth/kubernetes/role/openbao-init-role \
+                bound_service_account_names='openbao' \
+                bound_service_account_namespaces='{{ .Values.openbao.namespace }}' \
+                policies=init ttl=1h >/dev/null
+              bao write auth/kubernetes/role/platform-role \
+                bound_service_account_names='{{ .Release.Name }}-control-plane,{{ .Release.Name }}-control-plane-executor,{{ .Release.Name }}-workflow-worker,{{ .Release.Name }}-in-falcone-bootstrap' \
+                bound_service_account_namespaces='{{ .Release.Namespace }}' \
+                policies=platform ttl=24h >/dev/null
+              bao write auth/kubernetes/role/gateway-role \
+                bound_service_account_names='{{ .Release.Name }}-apisix' \
+                bound_service_account_namespaces='{{ .Release.Namespace }}' \
+                policies=gateway ttl=24h >/dev/null
+              bao write auth/kubernetes/role/iam-role \
+                bound_service_account_names='{{ .Release.Name }}-keycloak' \
+                bound_service_account_namespaces='{{ .Release.Namespace }}' \
+                policies=iam ttl=24h >/dev/null
+              bao write auth/kubernetes/role/workspace-secrets-role \
+                bound_service_account_names='{{ .Release.Name }}-control-plane,{{ .Release.Name }}-control-plane-executor' \
+                bound_service_account_namespaces='{{ .Release.Namespace }}' \
+                policies=functions ttl=24h >/dev/null
+              bao write auth/kubernetes/role/eso-role \
+                bound_service_account_names='{{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}' \
+                bound_service_account_namespaces='eso-system' \
+                policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }} >/dev/null
+
+              bao kv put secret/platform/postgresql \
+                username="$(cred in-falcone-postgresql POSTGRESQL_USERNAME)" \
+                app-password="$(cred in-falcone-postgresql POSTGRESQL_PASSWORD)" \
+                root-password="$(cred in-falcone-postgresql POSTGRESQL_POSTGRES_PASSWORD)" >/dev/null
+              bao kv put secret/platform/postgresql-vector \
+                username="$(cred in-falcone-postgresql-vector POSTGRES_USER)" \
+                password="$(cred in-falcone-postgresql-vector POSTGRES_PASSWORD)" \
+                database="$(cred in-falcone-postgresql-vector POSTGRES_DB)" >/dev/null
+              bao kv put secret/platform/documentdb \
+                username="$(cred in-falcone-documentdb POSTGRES_USER)" \
+                password="$(cred in-falcone-documentdb POSTGRES_PASSWORD)" \
+                database="$(cred in-falcone-documentdb POSTGRES_DB)" \
+                ferretdb-postgresql-url="$(cred in-falcone-ferretdb postgresql-url)" >/dev/null
+              bao kv put secret/platform/documentdb-replication \
+                username=falcone_cdc_repl \
+                password="$(cred in-falcone-documentdb-replication password)" \
+                realtime-url="$(cred in-falcone-documentdb-replication realtime-url)" >/dev/null
+              bao kv put secret/platform/kafka \
+                node-id="$(cred in-falcone-kafka KAFKA_CFG_NODE_ID)" \
+                KAFKA_CFG_NODE_ID="$(cred in-falcone-kafka KAFKA_CFG_NODE_ID)" \
+                KAFKA_CFG_PROCESS_ROLES="$(cred in-falcone-kafka KAFKA_CFG_PROCESS_ROLES)" \
+                KAFKA_CFG_CONTROLLER_LISTENER_NAMES="$(cred in-falcone-kafka KAFKA_CFG_CONTROLLER_LISTENER_NAMES)" \
+                KAFKA_CFG_CONTROLLER_QUORUM_VOTERS="$(cred in-falcone-kafka KAFKA_CFG_CONTROLLER_QUORUM_VOTERS)" \
+                KAFKA_CFG_LISTENERS="$(cred in-falcone-kafka KAFKA_CFG_LISTENERS)" \
+                KAFKA_CFG_ADVERTISED_LISTENERS="$(cred in-falcone-kafka KAFKA_CFG_ADVERTISED_LISTENERS)" \
+                KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP="$(cred in-falcone-kafka KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP)" >/dev/null
+              bao kv put secret/platform/s3 \
+                access-key="$(cred in-falcone-storage s3_access_key)" \
+                secret-key="$(cred in-falcone-storage s3_secret_key)" >/dev/null
+              bao kv put secret/platform/encryption \
+                master-key="$(cred in-falcone-encryption master-key)" >/dev/null
+              bao kv put secret/platform/temporal \
+                username="$(cred in-falcone-temporal username)" \
+                password="$(cred in-falcone-temporal password)" \
+                database="$(cred in-falcone-temporal database)" \
+                visibility-database="$(cred in-falcone-temporal visibility-database)" >/dev/null
+              bao kv put secret/gateway/apisix \
+                admin-key="$(cred in-falcone-apisix-admin admin-key)" >/dev/null
+              bao kv put secret/gateway/shared \
+                secret="$(cred in-falcone-gateway-shared-secret secret)" >/dev/null
+              bao kv put secret/iam/keycloak \
+                admin-username="$(cred in-falcone-keycloak-admin username)" \
+                admin-password="$(cred in-falcone-keycloak-admin password)" \
+                db-password="$(cred in-falcone-postgresql POSTGRESQL_PASSWORD)" >/dev/null
+              bao kv put secret/iam/identity-client \
+                client-id="$(cred in-falcone-identity-client client-id)" \
+                client-secret="$(cred in-falcone-identity-client client-secret)" >/dev/null
+              bao kv put secret/iam/superadmin \
+                username=superadmin \
+                password="$(cred in-falcone-superadmin password)" >/dev/null
+
+              echo "OpenBao configuration converged"
           volumeMounts:
             - name: tls
               mountPath: /openbao/tls
@@ -117,13 +253,33 @@ spec:
             - name: policies
               mountPath: /config/policies
               readOnly: true
+            - name: platform-creds
+              mountPath: /platform-creds
+              readOnly: true
+            - name: recovery-out
+              mountPath: /openbao-recovery
+            - name: recovery-mounted
+              mountPath: /openbao-recovery-mounted
+              readOnly: true
       volumes:
         - name: tls
           secret:
             secretName: {{ .Values.openbao.tls.secretName }}
+        - name: platform-creds
+          emptyDir:
+            medium: Memory
+        - name: recovery-out
+          emptyDir:
+            medium: Memory
+        - name: recovery-mounted
+          secret:
+            secretName: {{ .Values.openbao.recovery.secretName }}
+            optional: true
         - name: policies
           projected:
             sources:
+              - configMap:
+                  name: openbao-policy-init
               - configMap:
                   name: openbao-policy-platform
               - configMap:

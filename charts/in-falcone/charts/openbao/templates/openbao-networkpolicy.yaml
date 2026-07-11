@@ -23,6 +23,9 @@ spec:
               kubernetes.io/metadata.name: eso-system
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+        - namespaceSelector:
+            matchLabels:
               {{ .Values.openbao.networkPolicy.allowedNamespaceLabel }}: "true"
       ports:
         - protocol: TCP

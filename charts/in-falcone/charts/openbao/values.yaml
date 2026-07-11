@@ -40,6 +40,13 @@ openbao:
     type: ClusterIP
     port: 8200
     clusterPort: 8201
+  credentialSync:
+    image:
+      repository: docker.io/bitnamilegacy/kubectl
+      tag: "1.32.2"
+      pullPolicy: IfNotPresent
+  recovery:
+    secretName: openbao-recovery
   unsealMethod: shamir
   initShares: 5
   initThreshold: 3

@@ -20,7 +20,7 @@
 */ -}}
 {{- $b := .Values.seaweedfsTls.bootstrap -}}
 {{- $prefix := printf "%s-seaweedfs" .Release.Name -}}
-{{- $ns := .Values.global.namespace -}}
+{{- $ns := .Release.Namespace -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

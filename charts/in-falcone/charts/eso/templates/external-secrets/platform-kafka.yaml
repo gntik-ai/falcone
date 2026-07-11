@@ -13,3 +13,15 @@ spec:
   data:
     - secretKey: KAFKA_CFG_NODE_ID
       remoteRef: { key: platform/kafka, property: node-id }
+    - secretKey: KAFKA_CFG_PROCESS_ROLES
+      remoteRef: { key: platform/kafka, property: KAFKA_CFG_PROCESS_ROLES }
+    - secretKey: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+      remoteRef: { key: platform/kafka, property: KAFKA_CFG_CONTROLLER_LISTENER_NAMES }
+    - secretKey: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+      remoteRef: { key: platform/kafka, property: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS }
+    - secretKey: KAFKA_CFG_LISTENERS
+      remoteRef: { key: platform/kafka, property: KAFKA_CFG_LISTENERS }
+    - secretKey: KAFKA_CFG_ADVERTISED_LISTENERS
+      remoteRef: { key: platform/kafka, property: KAFKA_CFG_ADVERTISED_LISTENERS }
+    - secretKey: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+      remoteRef: { key: platform/kafka, property: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP }

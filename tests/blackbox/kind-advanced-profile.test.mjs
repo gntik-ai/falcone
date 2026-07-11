@@ -2,9 +2,9 @@
  * Black-box regression suite for spec change add-kind-profile-advanced-capabilities
  * (live E2E campaign 2026-06-17).
  *
- * Drives the PUBLIC chart surface ONLY via `helm template`, layering the advanced kind overlay on
- * the base kind profile and asserting that the Flows (Temporal), MCP and realtime-capable executor
- * are enabled and wired. The acceptance scenarios themselves were live-verified on test-cluster-b
+ * Drives the PUBLIC chart surface ONLY via `helm template`, layering the compatibility advanced
+ * kind overlay on the base kind profile and asserting that the core Flows (Temporal), MCP and
+ * realtime-capable executor wiring remains intact. The acceptance scenarios themselves were live-verified on test-cluster-b
  * (flows .../task-types + .../flows → 200, /v1/mcp/.../servers → 200, realtime SSE subscribe +
  * `event: insert` delivery); this suite locks the overlay wiring deterministically.
  *
@@ -13,11 +13,12 @@
  * Scenario coverage (capability: tenant-provisioning / spec.md):
  *   bbx-adv-01  the advanced overlay enables Temporal + the workflow-worker (Flows backend)
  *   bbx-adv-02  the executor is wired with TEMPORAL_ADDRESS (Flows routes register) + MCP_ENABLED
- *   bbx-adv-03  the MCP hosting component is enabled
+ *   bbx-adv-03  MCP hosting is served by the core executor; no separate runtime Deployment renders
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,8 +71,12 @@ test('bbx-adv-02: executor wired with TEMPORAL_ADDRESS (Flows register) + MCP_EN
 });
 
 // -------------------------------------------------------------------------
-// bbx-adv-03: the MCP hosting component is enabled
+// bbx-adv-03: MCP hosting is served by the core executor
 // -------------------------------------------------------------------------
-test('bbx-adv-03: MCP hosting component is enabled', SKIP, () => {
-  assert.ok(named(render(), 'falcone-mcp-runtime'), 'the MCP runtime component must render');
+test('bbx-adv-03: MCP route/RBAC render without a separate runtime Deployment', SKIP, () => {
+  const out = render();
+  const apisix = readFileSync(resolve(REPO_ROOT, 'deploy', 'kind', 'apisix', 'apisix.yaml'), 'utf8');
+  assert.match(apisix, /id:\s*"2018-mcp"[\s\S]*uri:\s*"\/v1\/mcp\/\*"[\s\S]*falcone-control-plane-executor\.falcone\.svc\.cluster\.local:8080/, 'the standalone kind MCP gateway route must target the core executor');
+  assert.match(out, /name:\s*falcone-mcp-runtime[\s\S]*kind:\s*ServiceAccount[\s\S]*name:\s*falcone-control-plane-executor/, 'MCP RBAC must bind the core executor service account');
+  assert.doesNotMatch(out, /kind:\s*Deployment[\s\S]*name:\s*falcone-mcp-runtime\b/, 'MCP must not depend on a separate runtime Deployment');
 });

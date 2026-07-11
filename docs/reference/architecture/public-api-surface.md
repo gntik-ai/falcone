@@ -36,8 +36,10 @@ Native operator passthrough routes under `/_native/*` are documented separately 
 | --- | --- | --- | ---: | --- | --- |
 | auth | auth_control | auth_control | 131072 | control_plane | mutations |
 | events | event_gateway | event_gateway | 262144 | event_gateway | mutations |
+| flows | provisioning | provisioning | 1048576 | provisioning | mutations |
 | functions | provisioning | provisioning | 1048576 | provisioning | mutations |
 | iam | tenant_control | tenant_control | 262144 | control_plane | mutations |
+| mcp | provisioning | provisioning | 1048576 | provisioning | mutations |
 | metrics | observability | observability | 65536 | observability | safe_reads |
 | mongo | provisioning | provisioning | 1048576 | provisioning | mutations |
 | mongo-capture-tenant-summary | realtime | realtime | 131072 | realtime | mutations |
@@ -87,6 +89,15 @@ Workspace-scoped event topics with controlled HTTP publish, SSE delivery, replay
 | POST | `/v1/events/workspaces/{workspaceId}/bridges` | workspace | event_bridge | Register a workspace-scoped managed event bridge from PostgreSQL, MongoDB, storage, OpenWhisk, or IAM into Kafka |
 | GET | `/v1/events/workspaces/{workspaceId}/bridges/{bridgeId}` | workspace | event_bridge | Fetch the normalized state for one managed event bridge |
 | GET | `/v1/events/workspaces/{workspaceId}/inventory` | workspace | event_inventory | Fetch one workspace Kafka topic inventory with naming, ACL, quota, and KRaft governance visibility |
+
+## Flows
+
+Workspace-scoped workflow definition, schedule, execution, event, and trigger management backed by the Temporal workflow engine.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/flows/workspaces/{workspaceId}/flows` | workspace | flow_definition | List workflow definitions for one workspace |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows` | workspace | flow_definition | Create or import a workflow definition for one workspace |
 
 ## Functions
 
@@ -201,6 +212,15 @@ Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, an
 | PUT | `/v1/iam/tenant-roles/{roleId}` | tenant | iam_custom_role | Replace a tenant custom RBAC role's bound actions with the same validation as create |
 | GET | `/v1/iam/tenants/{tenantId}/activity` | tenant | tenant | Query actor-rich IAM lifecycle activity for one tenant. |
 | GET | `/v1/iam/workspaces/{workspaceId}/activity` | workspace | workspace | Query actor-rich IAM lifecycle activity for one workspace context. |
+
+## MCP
+
+Workspace-scoped MCP server publishing, version curation, and tool-call mediation through the control-plane executor.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/mcp/workspaces/{workspaceId}/servers` | workspace | mcp_server | List MCP servers for one workspace |
+| POST | `/v1/mcp/workspaces/{workspaceId}/servers` | workspace | mcp_server | Create an MCP server draft for one workspace |
 
 ## Metrics
 

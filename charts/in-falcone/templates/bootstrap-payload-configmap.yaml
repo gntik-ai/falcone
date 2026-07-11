@@ -176,7 +176,7 @@ data:
 {{- $_ := set (index $plugins "request-validation") "header_schema" (dict "type" "object" "required" $requiredHeaders "properties" $schemaProps) -}}
 {{- end }}
 {{- if hasKey $plugins "proxy-rewrite" }}
-{{- $_ := set (index $plugins "proxy-rewrite") "headers" (dict
+{{- $rewriteHeaders := dict
   "X-Gateway-Managed-Route" "true"
   $.Values.gatewayPolicy.correlation.headerName (printf "$http_%s" (lower (replace "-" "_" $.Values.gatewayPolicy.correlation.headerName)))
   $.Values.gatewayPolicy.correlation.requestIdHeader "$request_id"
@@ -190,7 +190,11 @@ data:
   $.Values.gatewayPolicy.claimsPropagation.headers.planId "$jwt_claim_plan_id"
   $.Values.gatewayPolicy.claimsPropagation.headers.scopes "$jwt_claim_scope"
   $.Values.gatewayPolicy.claimsPropagation.headers.roles "$jwt_claim_realm_access_roles"
-) -}}
+ -}}
+{{- if or .upstream.dataPlane .upstream.requiresExecutor }}
+{{- $_ := set $rewriteHeaders "x-gateway-auth" "${{GATEWAY_SHARED_SECRET}}" -}}
+{{- end }}
+{{- $_ := set (index $plugins "proxy-rewrite") "headers" $rewriteHeaders -}}
 {{- end }}
 {{- if hasKey $plugins "authz-keycloak" }}
 {{- $authz := index $plugins "authz-keycloak" -}}

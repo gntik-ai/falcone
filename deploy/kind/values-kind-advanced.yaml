@@ -95,13 +95,13 @@ controlPlaneExecutor:
     - { name: MONGO_DATABASE, value: postgres }
     - { name: MONGO_USER, value: falcone }
     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
+    - { name: REALTIME_DOCUMENTDB_URL, valueFrom: { secretKeyRef: { name: in-falcone-documentdb-replication, key: realtime-url, optional: true } } }
     - { name: KAFKA_BROKERS, value: falcone-kafka:9092 }
     - { name: TEMPORAL_ADDRESS, value: falcone-temporal-frontend:7233 }
     - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
     - { name: TEMPORAL_TASK_QUEUE, value: flows-main }
     - { name: MCP_ENABLED, value: "true" }
     - { name: MCP_RUNTIME_IMAGE, value: localhost:30500/in-falcone-mcp-runtime }
-    - { name: MCP_RUNTIME_IMAGE_DIGEST, value: "sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42" }
     - { name: BAO_ADDR, value: "https://openbao.secret-store.svc.cluster.local:8200" }
     - { name: BAO_KV_MOUNT, value: secret }
     - { name: BAO_KUBERNETES_AUTH_ROLE, value: workspace-secrets-role }

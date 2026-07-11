@@ -42,7 +42,6 @@ test('bbx-swfs-netpol-01: the netpol template admits the bucket-hook by Job-name
 test('bbx-swfs-netpol-02: rendered netpol allows {release}-bucket-hook on the storage tier', SKIP, () => {
   const r = spawnSync('helm', [
     'template', 'rel', CHART,
-    '--set', 'seaweedfs.enabled=true',
     '--set', 'seaweedfs.networkPolicy.enabled=true',
     '--show-only', 'templates/seaweedfs-networkpolicy.yaml',
   ], { encoding: 'utf8' });

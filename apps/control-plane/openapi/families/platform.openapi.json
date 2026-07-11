@@ -39,7 +39,9 @@
             "functions",
             "storage",
             "metrics",
-            "websockets"
+            "websockets",
+            "flows",
+            "mcp"
           ],
           "type": "string"
         }

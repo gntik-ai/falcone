@@ -1,0 +1,37 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: platform-temporal-credentials
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-temporal, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: username
+      remoteRef: { key: platform/temporal, property: username }
+    - secretKey: password
+      remoteRef: { key: platform/temporal, property: password }
+    - secretKey: database
+      remoteRef: { key: platform/temporal, property: database }
+    - secretKey: visibility-database
+      remoteRef: { key: platform/temporal, property: visibility-database }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: platform-encryption-key
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-encryption, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: master-key
+      remoteRef: { key: platform/encryption, property: master-key }

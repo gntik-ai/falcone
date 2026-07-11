@@ -82,7 +82,6 @@ controlPlane:
     - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
     - { name: MCP_ENABLED, value: "true" }
     - { name: MCP_RUNTIME_IMAGE, value: "harbor.example.com/falcone/gntik-ai/in-falcone-mcp-runtime" }
-    - { name: MCP_RUNTIME_IMAGE_DIGEST, value: "sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42" }
     - { name: BAO_ADDR, value: "https://openbao.secret-store.svc.cluster.local:8200" }
     - { name: BAO_KV_MOUNT, value: secret }
     - { name: BAO_KUBERNETES_AUTH_ROLE, value: workspace-secrets-role }

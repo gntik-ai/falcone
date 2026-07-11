@@ -1437,6 +1437,40 @@ bootstrap:
             dataPlane: true
             requiresExecutor: true
             sse: true
+        - routeId: "2017-flows"
+          name: public-api-flows
+          uri: /v1/flows/*
+          methods: *a2
+          priority: 245
+          labels:
+            gateway.in-falcone.io/route-kind: product_api
+            gateway.in-falcone.io/family: flows
+            gateway.in-falcone.io/tenant-binding: required
+            gateway.in-falcone.io/workspace-binding: required
+            gateway.in-falcone.io/plan-capabilities: workflows.temporal
+            gateway.in-falcone.io/audit-required: "false"
+          plugins: *a3w
+          upstream:
+            component: controlPlane
+            port: 8080
+            requiresExecutor: true
+        - routeId: "2018-mcp"
+          name: public-api-mcp
+          uri: /v1/mcp/*
+          methods: *a2
+          priority: 244
+          labels:
+            gateway.in-falcone.io/route-kind: product_api
+            gateway.in-falcone.io/family: mcp
+            gateway.in-falcone.io/tenant-binding: required
+            gateway.in-falcone.io/workspace-binding: required
+            gateway.in-falcone.io/plan-capabilities: mcp.hosting
+            gateway.in-falcone.io/audit-required: "false"
+          plugins: *a3w
+          upstream:
+            component: controlPlane
+            port: 8080
+            requiresExecutor: true
         # ---- API-key issuance/management → executor (OPT-IN). Admin (JWT) identity only;
         #      the executor rejects key-managed-by-key (403). Matches just the api-keys
         #      subpath at higher priority than the generic /v1/workspaces/* route. ----
@@ -3203,8 +3237,6 @@ controlPlane:
       value: "true"
     - name: MCP_RUNTIME_IMAGE
       value: ghcr.io/gntik-ai/in-falcone-mcp-runtime
-    - name: MCP_RUNTIME_IMAGE_DIGEST
-      value: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
     - name: BAO_ADDR
       value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
@@ -3304,10 +3336,9 @@ controlPlaneExecutor:
   ports:
     - name: http
       containerPort: 8080
-  # Prometheus pod-discovery hint (add-deploy-completeness-cluster, #562): the cp-executor
+  # Prometheus pod-discovery hint (add-deploy-completeness-cluster, #562): the executor
   # exposes its HTTP metrics at /metrics (runtime/server.mjs), so annotate it for the
-  # namespace-scoped kubernetes_sd pod-discovery scrape job (it is scraped even when applied
-  # out-of-band of the chart, as long as it runs in the release namespace with this annotation).
+  # namespace-scoped kubernetes_sd pod-discovery scrape job.
   podAnnotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8080"
@@ -3348,6 +3379,12 @@ controlPlaneExecutor:
         secretKeyRef:
           name: in-falcone-documentdb
           key: POSTGRES_DB
+    - name: REALTIME_DOCUMENTDB_URL
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb-replication
+          key: realtime-url
+          optional: true
     - name: KAFKA_BROKERS
       value: "{{ .Release.Name }}-kafka:9092"
     - name: TEMPORAL_ADDRESS
@@ -3360,8 +3397,6 @@ controlPlaneExecutor:
       value: "true"
     - name: MCP_RUNTIME_IMAGE
       value: ghcr.io/gntik-ai/in-falcone-mcp-runtime
-    - name: MCP_RUNTIME_IMAGE_DIGEST
-      value: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
     - name: BAO_ADDR
       value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
@@ -3445,8 +3480,8 @@ webConsole:
     workload:
       kind: Deployment
   image:
-    repository: ghcr.io/example/in-falcone-web-console
-    tag: 0.1.0
+    repository: ghcr.io/gntik-ai/in-falcone-web-console
+    tag: 0.2.11
     pullPolicy: IfNotPresent
   replicas: 2
   serviceAccount:
@@ -4174,6 +4209,20 @@ gatewayPolicy:
       requestValidationProfile: realtime
       planCapabilityAnyOf:
         - data.kafka.topics
+    flows:
+      tenantBinding: required
+      workspaceBinding: required
+      qosProfile: provisioning
+      requestValidationProfile: provisioning
+      planCapabilityAnyOf:
+        - workflows.temporal
+    mcp:
+      tenantBinding: required
+      workspaceBinding: required
+      qosProfile: provisioning
+      requestValidationProfile: provisioning
+      planCapabilityAnyOf:
+        - mcp.hosting
   accessMatrix:
     personas:
       - id: workspace_owner
@@ -4582,6 +4631,15 @@ temporal:
       tag: "1.31.1"
       pullPolicy: IfNotPresent
 
+  # PostgreSQL client image used by the pre-schema DB bootstrap Job. It creates/updates
+  # the Temporal role and both databases from Kubernetes Secrets before temporal-sql-tool
+  # attempts schema setup.
+  dbBootstrap:
+    image:
+      repository: docker.io/bitnamilegacy/postgresql
+      tag: "17.2.0"
+      pullPolicy: IfNotPresent
+
   # admin-tools image used by the post-install/post-upgrade bootstrap Job
   # (registers the default namespace + custom search attributes via the temporal CLI).
   adminTools:
@@ -4615,11 +4673,9 @@ temporal:
     host: "{{ .Release.Name }}-postgresql"
     port: 5432
     user: temporal
-    # Plaintext default for dev/sandbox; production should set existingSecret +
-    # passwordSecretKey to source the password from a Secret instead.
-    password: temporal
-    existingSecret: ""
-    passwordSecretKey: ""
+    password: ""
+    existingSecret: in-falcone-temporal
+    passwordSecretKey: password
     # Dedicated databases (NOT schemas inside in_falcone) for primary + visibility.
     database: temporal
     visibilityDatabase: temporal_visibility
@@ -4751,7 +4807,6 @@ mcp:
   runtimeImage:
     repository: ghcr.io/gntik-ai/in-falcone-mcp-runtime
     tag: 0.1.0
-    digest: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
     pullPolicy: IfNotPresent
   persistence:
     provider: postgresql

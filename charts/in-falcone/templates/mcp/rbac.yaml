@@ -1,16 +1,16 @@
 {{- /*
   RBAC for MCP server hosting (ADR-12: reuse Knative — each MCP server = a ksvc).
-  Grants the control-plane ServiceAccount the namespace-scoped permissions to manage
+  Grants the executor ServiceAccount the namespace-scoped permissions to manage
   per-tenant MCP-server Knative Services plus the internal-only NetworkPolicies and
   scoped RBAC those servers need. Namespace-scoped (not cluster-wide / not privileged).
-  Bound to the control-plane ServiceAccount, mirroring templates/control-plane-rbac.yaml.
+  Bound to the executor ServiceAccount because the executor serves /v1/mcp.
 */ -}}
-{{- $saName := default (printf "%s-control-plane" .Release.Name) .Values.controlPlane.serviceAccount.name -}}
+{{- $saName := default (printf "%s-control-plane-executor" .Release.Name) .Values.controlPlaneExecutor.serviceAccount.name -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ .Release.Name }}-mcp-runtime
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
 rules:
@@ -35,7 +35,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ .Release.Name }}-mcp-runtime
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
 roleRef:
@@ -45,4 +45,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ $saName }}
-    namespace: {{ .Values.global.namespace }}
+    namespace: {{ .Release.Namespace }}

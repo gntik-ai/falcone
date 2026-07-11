@@ -22,7 +22,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ .Release.Name }}-seaweedfs-admin-seed
-  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
     app.kubernetes.io/component: seaweedfs-admin-seed
@@ -56,7 +56,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: SW_MASTER
-              value: "{{ .Release.Name }}-seaweedfs-master.{{ .Values.global.namespace | default .Release.Namespace }}:9333"
+              value: "{{ .Release.Name }}-seaweedfs-master.{{ .Release.Namespace }}:9333"
             - name: ADMIN_ACCESS_KEY
               valueFrom:
                 secretKeyRef:

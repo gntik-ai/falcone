@@ -2,8 +2,8 @@
 # - Replaces chart-pinned images that no longer exist on public registries
 #   (Bitnami purged public tags -> bitnamilegacy; apisix/prometheus/seaweedfs tag
 #   conventions; functions execute on Knative Services, not a standalone runtime).
-# - Points the two placeholder app images (ghcr.io/example/...) at the
-#   in-cluster registry (NodePort 30500; containerd allows plain-HTTP localhost).
+# - Points Falcone-built app images at the in-cluster registry (NodePort 30500;
+#   containerd allows plain-HTTP localhost).
 # - Installs into namespace `falcone` (shared cluster; musematic untouched).
 global:
   namespace: falcone
@@ -134,8 +134,6 @@ controlPlane:
       value: "true"
     - name: MCP_RUNTIME_IMAGE
       value: localhost:30500/in-falcone-mcp-runtime
-    - name: MCP_RUNTIME_IMAGE_DIGEST
-      value: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
     - name: BAO_ADDR
       value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
@@ -249,6 +247,18 @@ controlPlane:
       value: kind-dev-webhook-signing-key-do-not-use-in-prod
     - name: WEBHOOK_MAX_SUBSCRIPTIONS_PER_WORKSPACE
       value: "25"
+controlPlaneExecutor:
+  image:
+    repository: localhost:30500/in-falcone-control-plane-executor
+    tag: "0.9.3"
+    pullPolicy: IfNotPresent
+
+workflowWorker:
+  image:
+    repository: localhost:30500/in-falcone-workflow-worker
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
 webConsole:
   image:
     repository: localhost:30500/in-falcone-web-console

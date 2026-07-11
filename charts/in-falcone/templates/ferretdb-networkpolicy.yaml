@@ -18,7 +18,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ .Release.Name }}-ferretdb-internal-only
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
     app.kubernetes.io/component: ferretdb
@@ -56,6 +56,6 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.global.namespace }}
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
         - podSelector: {}
 {{- end }}

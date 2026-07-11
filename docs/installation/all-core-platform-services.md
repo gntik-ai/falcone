@@ -100,16 +100,33 @@ Existing clusters can have disabled-service overrides, manually created Kubernet
 Vault/OpenBao state, an external ESO owner, and PVCs owned by older revisions. Upgrade them through a
 controlled rollout:
 
-1. Set `EXPECTED_CONTEXT`, `NS`, and `RELEASE` for the intended test cluster.
-2. Run `loop-state/system-changes/make-all-services-core/backup.sh`.
-3. Review the backup directory, Helm history, ESO ownership, and PVC inventory.
-4. Run `loop-state/system-changes/make-all-services-core/migrate-secrets-to-openbao.sh` with
-   `BAO_ADDR`, `BAO_TOKEN`, and `BAO_CACERT`.
-5. Dry-run the Helm upgrade and inspect the rendered diff.
-6. Apply the all-core chart only after operator approval.
-7. Run `loop-state/system-changes/make-all-services-core/health-check.sh`.
-8. If any gate fails, run `loop-state/system-changes/make-all-services-core/rollback.sh`.
+1. Set `KUBECONFIG`, `NAMESPACE`, `OPENBAO_NAMESPACE`, `BAO_ADDR`, `BAO_TOKEN`, and `BAO_CACERT`
+   for the intended cluster.
+2. Run `scripts/system-changes/make-all-services-core/backup-kv.sh --output /secure/path/falcone-kv-backup.tgz`.
+3. Run `scripts/system-changes/make-all-services-core/parity-check.sh --dry-run` to inspect
+   Kubernetes Secret and OpenBao fingerprints without printing values.
+4. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --dry-run`.
+5. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --apply`.
+6. Run `scripts/system-changes/make-all-services-core/parity-check.sh --strict`.
+7. Dry-run the Helm upgrade and inspect the rendered diff.
+8. Apply the all-core chart only after operator approval.
+9. Run `scripts/system-changes/make-all-services-core/health-check.sh`.
+10. If any gate fails, run `scripts/system-changes/make-all-services-core/restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --apply`,
+    verify parity again, and then roll back the Helm release.
 
-Rollback restores the previous Helm revision and backed-up Kubernetes Secrets. It does not delete
-OpenBao, Temporal, pgvector, or any existing service PVC. Keep those PVCs until the failed rollout is
-understood and a separate decommission step is approved.
+Rollback restores OpenBao KV paths from the restricted backup archive and then returns the Helm
+release to the previous revision. It does not delete OpenBao, Temporal, pgvector, or any existing
+service PVC. Keep those PVCs until the failed rollout is understood and a separate decommission step
+is approved.
+
+## Image Publication Status
+
+Third-party images in the chart can be mirrored by tag or digest per the air-gapped guide. Falcone
+application images are buildable from this repository, and kind/campaign overlays use
+`localhost:30500/in-falcone-*` images for local validation. As of this change, public manifests for
+`ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
+`ghcr.io/gntik-ai/in-falcone-workflow-worker:0.1.0`,
+`ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0`, and
+`ghcr.io/gntik-ai/in-falcone-web-console:0.2.11` were not verified, so production or
+air-gapped installs must build and publish those artifacts into the target registry and override the
+image values. Do not add digest pins until the registry manifest is verified.

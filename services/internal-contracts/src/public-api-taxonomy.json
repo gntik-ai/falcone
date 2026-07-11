@@ -172,6 +172,38 @@
       "apisix_route_class": "event"
     },
     {
+      "id": "flows",
+      "title": "Flows",
+      "prefix": "/v1/flows",
+      "summary": "Workspace-scoped workflow definition, schedule, execution, event, and trigger management backed by the Temporal workflow engine.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "workflow_definition",
+        "workflow_execution_request",
+        "workflow_execution_event",
+        "audit_record"
+      ],
+      "downstream_adapters": [
+        "temporal",
+        "postgresql",
+        "kafka"
+      ],
+      "resource_scopes": [
+        "workspace",
+        "workflow"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "data-control"
+    },
+    {
       "id": "functions",
       "title": "Functions",
       "prefix": "/v1/functions",
@@ -226,6 +258,36 @@
       ],
       "visibility": "public",
       "apisix_route_class": "control"
+    },
+    {
+      "id": "mcp",
+      "title": "MCP",
+      "prefix": "/v1/mcp",
+      "summary": "Workspace-scoped MCP server publishing, version curation, and tool-call mediation through the control-plane executor.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "mcp_server_definition",
+        "mcp_tool_invocation",
+        "audit_record"
+      ],
+      "downstream_adapters": [
+        "postgresql",
+        "mcp-runtime"
+      ],
+      "resource_scopes": [
+        "workspace",
+        "mcp_server"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "data-control"
     },
     {
       "id": "metrics",

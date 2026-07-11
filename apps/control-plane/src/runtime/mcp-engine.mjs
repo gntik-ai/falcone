@@ -15,8 +15,10 @@
 // cross-tenant reads, so a server created by tenant A is invisible/unreachable to tenant B.
 //
 // State: process-local maps with an optional durable store. The default executor wires a Postgres
-// store on the control-plane metadata pool, so MCP servers, published versions, audit records, and
-// quota windows survive restarts while the reviewed curation/registry logic remains unchanged.
+// store on the control-plane metadata pool. State-changing operations are run through the store's
+// row-locked transaction API when present, so multiple executor replicas reload the latest snapshot
+// before writing and cannot clobber each other's MCP servers, versions, audit records, or rate
+// windows with stale whole-snapshot saves.
 import { randomUUID } from 'node:crypto';
 import { generateInstantManifest } from '../mcp-instant-generator.mjs';
 import { OFFICIAL_TOOLS, BASE_SCOPE } from '../mcp-official-catalog.mjs';
@@ -77,6 +79,15 @@ export function createMcpEngine({
   const key = (tid, sid) => `${tid}::${sid}`;
   let loaded = false;
   let dirty = false;
+  let inStoreTransaction = false;
+  const mutatingOperations = new Set([
+    'create_server',
+    'curate_server',
+    'publish_version',
+    'approve_version',
+    'call_tool',
+    'delete_server',
+  ]);
 
   function snapshot() {
     return {
@@ -99,14 +110,16 @@ export function createMcpEngine({
   }
 
   async function ensureLoaded() {
-    if (loaded || !store) return;
+    if (!store || inStoreTransaction) return;
+    if (loaded && !store.withStateTransaction) return;
     const state = await store.loadState();
-    if (state) hydrate(state);
+    hydrate(state ?? {});
     loaded = true;
   }
 
   async function persistIfDirty() {
     if (!store || !dirty) return;
+    if (inStoreTransaction) return;
     await store.saveState(snapshot());
     dirty = false;
   }
@@ -259,6 +272,26 @@ export function createMcpEngine({
   }
 
   async function executeMcp(params = {}) {
+    if (
+      store?.withStateTransaction &&
+      mutatingOperations.has(params.operation) &&
+      !inStoreTransaction
+    ) {
+      return store.withStateTransaction(async (state) => {
+        hydrate(state ?? {});
+        loaded = true;
+        dirty = false;
+        inStoreTransaction = true;
+        try {
+          const result = await executeMcp(params);
+          const next = snapshot();
+          dirty = false;
+          return { state: next, result };
+        } finally {
+          inStoreTransaction = false;
+        }
+      });
+    }
     await ensureLoaded();
     const { operation, identity, workspaceId, serverId, version, body = {} } = params;
     const tid = identity?.tenantId;

@@ -22,6 +22,8 @@ eso:
   refreshInterval: 1h
   tokenTTL: 24h
   namespace: eso-system
+  clusterOwnership:
+    adoptExisting: false
   caProvider:
     name: openbao-server-tls
     key: ca.crt

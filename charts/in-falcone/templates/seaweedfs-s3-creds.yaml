@@ -32,7 +32,7 @@
   do NOT rotate the credentials. The Secrets also carry
   helm.sh/resource-policy: keep so an accidental uninstall does not drop them.
 */ -}}
-{{- $ns := .Values.global.namespace -}}
+{{- $ns := .Release.Namespace -}}
 {{- $credsName := .Values.seaweedfsS3Creds.secretName -}}
 {{- $configName := .Values.seaweedfsS3Creds.configSecretName -}}
 {{- $identityName := .Values.seaweedfsS3Creds.identityName -}}

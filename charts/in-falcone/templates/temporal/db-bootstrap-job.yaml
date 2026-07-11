@@ -1,0 +1,93 @@
+{{- $root := . -}}
+{{- $t := .Values.temporal -}}
+{{- $p := $t.persistence -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "in-falcone.temporal.fullname" $root }}-db-bootstrap
+  labels:
+    {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "db-bootstrap") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ $t.jobs.backoffLimit }}
+  activeDeadlineSeconds: {{ $t.jobs.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $t.jobs.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "db-bootstrap") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      {{- include "in-falcone.temporal.imagePullSecrets" $root | nindent 6 }}
+      {{- with $t.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: temporal-db-bootstrap
+          image: "{{ $t.dbBootstrap.image.repository }}:{{ $t.dbBootstrap.image.tag }}"
+          imagePullPolicy: {{ $t.dbBootstrap.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              i=0
+              until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U postgres >/dev/null 2>&1; do
+                i=$((i + 1)); [ "$i" -gt 90 ] && { echo "postgres ${PGHOST}:${PGPORT} not ready" >&2; exit 1; }
+                sleep 2
+              done
+
+              psql -v ON_ERROR_STOP=1 \
+                -v temporal_user="${TEMPORAL_USER}" \
+                -v temporal_password="${TEMPORAL_PASSWORD}" \
+                -v temporal_db="${TEMPORAL_DB}" \
+                -v visibility_db="${TEMPORAL_VISIBILITY_DB}" <<'SQL'
+              SELECT format('CREATE ROLE %I LOGIN CREATEDB PASSWORD %L', :'temporal_user', :'temporal_password')
+              WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'temporal_user')\gexec
+              SELECT format('ALTER ROLE %I WITH LOGIN CREATEDB PASSWORD %L', :'temporal_user', :'temporal_password')\gexec
+              SELECT format('CREATE DATABASE %I OWNER %I', :'temporal_db', :'temporal_user')
+              WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'temporal_db')\gexec
+              SELECT format('CREATE DATABASE %I OWNER %I', :'visibility_db', :'temporal_user')
+              WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'visibility_db')\gexec
+              SELECT format('ALTER DATABASE %I OWNER TO %I', :'temporal_db', :'temporal_user')\gexec
+              SELECT format('ALTER DATABASE %I OWNER TO %I', :'visibility_db', :'temporal_user')\gexec
+              SQL
+              echo "Temporal database bootstrap converged"
+          env:
+            - name: PGHOST
+              value: {{ tpl $p.host $root | quote }}
+            - name: PGPORT
+              value: {{ $p.port | quote }}
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: in-falcone-postgresql
+                  key: POSTGRESQL_POSTGRES_PASSWORD
+            - name: PGDATABASE
+              value: postgres
+            - name: TEMPORAL_USER
+              value: {{ $p.user | quote }}
+            - name: TEMPORAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $p.existingSecret | quote }}
+                  key: {{ $p.passwordSecretKey | quote }}
+            - name: TEMPORAL_DB
+              value: {{ $p.database | quote }}
+            - name: TEMPORAL_VISIBILITY_DB
+              value: {{ $p.visibilityDatabase | quote }}
+          {{- with $t.jobs.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
