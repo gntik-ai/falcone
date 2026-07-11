@@ -69,6 +69,22 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 {{- printf "%s-apisix-admin" (include "in-falcone.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "in-falcone.openbaoNamespace" -}}
+{{- .Values.openbao.openbao.namespace | default "secret-store" -}}
+{{- end -}}
+
+{{- define "in-falcone.openbaoAddress" -}}
+{{- $port := 8200 -}}
+{{- with .Values.openbao.openbao.service -}}
+{{- $port = .port | default 8200 -}}
+{{- end -}}
+{{- printf "https://openbao.%s.svc.cluster.local:%v" (include "in-falcone.openbaoNamespace" .) $port -}}
+{{- end -}}
+
+{{- define "in-falcone.runtimeEnvConfigMapName" -}}
+{{- .Values.config.configMapNames.runtimeEnv | default "in-falcone-runtime-env" -}}
+{{- end -}}
+
 {{- define "in-falcone.bootstrapOneShotHash" -}}
 {{- toJson (dict "keycloak" .Values.bootstrap.oneShot.keycloak "governanceCatalog" .Values.bootstrap.oneShot.governanceCatalog "internalNamespaces" .Values.bootstrap.oneShot.internalNamespaces) | sha256sum -}}
 {{- end -}}
@@ -107,6 +123,32 @@ temporal.io/role: {{ .role }}
 app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/name: temporal-{{ .role }}
 temporal.io/role: {{ .role }}
+{{- end -}}
+
+{{- define "in-falcone.normalizeRepository" -}}
+{{- $repository := .repository -}}
+{{- $globalRegistry := trimSuffix "/" (default "" .Values.global.imageRegistry) -}}
+{{- if or (eq $globalRegistry "") (eq $repository $globalRegistry) (hasPrefix (printf "%s/" $globalRegistry) $repository) -}}
+{{- $repository -}}
+{{- else -}}
+{{- $segments := splitList "/" $repository -}}
+{{- $first := first $segments -}}
+{{- $hasRegistry := or (contains "." $first) (contains ":" $first) (eq $first "localhost") -}}
+{{- if and $hasRegistry (gt (len $segments) 1) -}}
+{{- printf "%s/%s" $globalRegistry (join "/" (rest $segments)) -}}
+{{- else -}}
+{{- printf "%s/%s" $globalRegistry $repository -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "in-falcone.imageNameWithTag" -}}
+{{- $repo := include "in-falcone.normalizeRepository" (dict "Values" .root.Values "repository" .image.repository) -}}
+{{- if .image.tag -}}
+{{- printf "%s:%s" $repo .image.tag -}}
+{{- else -}}
+{{- $repo -}}
+{{- end -}}
 {{- end -}}
 
 {{- /* Registry rewrite — mirrors component-wrapper.normalizeRepository so

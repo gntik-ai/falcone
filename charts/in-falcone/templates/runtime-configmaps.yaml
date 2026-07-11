@@ -1,6 +1,19 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: {{ include "in-falcone.runtimeEnvConfigMapName" . }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+data:
+  BAO_ADDR: {{ include "in-falcone.openbaoAddress" . | quote }}
+  MCP_RUNTIME_IMAGE: {{ include "in-falcone.imageNameWithTag" (dict "root" . "image" .Values.mcp.runtimeImage) | quote }}
+{{- with .Values.mcp.runtimeImage.digest }}
+  MCP_RUNTIME_IMAGE_DIGEST: {{ . | quote }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: {{ .Values.config.configMapNames.gateway }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}

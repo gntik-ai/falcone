@@ -68,7 +68,11 @@ present:
 
 - pgvector PostgreSQL: 1 StatefulSet replica and a 10 Gi PVC.
 - OpenBao: 1 StatefulSet replica and data/audit PVCs.
-- ESO: operator, webhook, and cert-controller workloads through the bundled chart.
+- ESO: operator, webhook, and cert-controller workloads through the bundled chart. They run in
+  `eso.eso.namespace` (default `eso-system`); keep `eso.external-secrets.namespaceOverride`,
+  `eso.eso.namespace`, and `openbao.eso.namespace` equal when customizing the ESO namespace so
+  OpenBao auth and ESO egress NetworkPolicy protect the namespace that actually contains the
+  operator pods.
 - Temporal: four server role Deployments, Temporal web, schema and bootstrap jobs.
 - Workflow worker: 2 replicas by default.
 - Control-plane executor: 2 replicas by default.

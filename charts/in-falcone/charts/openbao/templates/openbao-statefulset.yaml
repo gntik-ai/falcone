@@ -26,9 +26,9 @@ spec:
             - -config=/openbao/config/openbao.hcl
           env:
             - name: BAO_ADDR
-              value: https://openbao.secret-store.svc.cluster.local:8200
+              value: {{ include "openbao.address" . | quote }}
             - name: BAO_API_ADDR
-              value: https://openbao.secret-store.svc.cluster.local:8200
+              value: {{ include "openbao.address" . | quote }}
             - name: BAO_CACERT
               value: /openbao/tls/ca.crt
             - name: BAO_SKIP_VERIFY

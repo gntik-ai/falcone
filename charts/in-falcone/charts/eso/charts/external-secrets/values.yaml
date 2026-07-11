@@ -29,6 +29,7 @@ crds:
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
 
 # -- Additional labels added to all helm chart resources.
 commonLabels: {}

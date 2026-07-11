@@ -24,6 +24,15 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 
 {{/*
+Namespace where external-secrets operator resources are installed. The upstream 0.9.0 chart used
+.Release.Namespace directly; Falcone vendors it unpacked and carries this small override so the
+operator can run in the same namespace that the OpenBao auth and NetworkPolicy values protect.
+*/}}
+{{- define "external-secrets.namespace" -}}
+{{- .Values.namespaceOverride | default .Release.Namespace -}}
+{{- end }}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "external-secrets.chart" -}}

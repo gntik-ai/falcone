@@ -21,6 +21,11 @@
 # via envFrom, so these values are ADDED on top of the base executor env (the data-plane wiring set
 # by the base profile) without replacing it.
 
+mcp:
+  runtimeImage:
+    repository: localhost:30500/in-falcone-mcp-runtime
+    tag: ""
+
 # ---- Temporal (durable workflow engine for Flows) -------------------------------------------
 temporal:
   persistence:
@@ -101,8 +106,6 @@ controlPlaneExecutor:
     - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
     - { name: TEMPORAL_TASK_QUEUE, value: flows-main }
     - { name: MCP_ENABLED, value: "true" }
-    - { name: MCP_RUNTIME_IMAGE, value: localhost:30500/in-falcone-mcp-runtime }
-    - { name: BAO_ADDR, value: "https://openbao.secret-store.svc.cluster.local:8200" }
     - { name: BAO_KV_MOUNT, value: secret }
     - { name: BAO_KUBERNETES_AUTH_ROLE, value: workspace-secrets-role }
     - { name: NODE_EXTRA_CA_CERTS, value: /openbao/tls/ca.crt }

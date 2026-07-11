@@ -182,6 +182,20 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
 - Third-reviewer validation added focused regressions for nested ESO dependency/controller render,
   auxiliary namespaces, pullable base refs/no localhost defaults, Kafka single-broker defaults,
   KV merge/non-clobber helpers, target-absent backup/output refusal, and the rollout diff gate.
+- Fourth-reviewer revision fixed the remaining code blockers without publishing images or touching a
+  cluster: OpenBao/ESO namespace-derived addresses, cert SANs, ESO operator namespace topology, ESO
+  NetworkPolicy, control-plane/executor `BAO_ADDR`, and MCP runtime image env now render from chart
+  values; the hosted MCP JSON-RPC path now enforces the caller's actual scopes for mutating hosted
+  tools and does not self-grant tool scopes; the ESO wrapper's unpacked external-secrets dependency
+  has a nested lock/provenance note.
+- Fourth-reviewer validation run: `helm dependency build charts/in-falcone`; `helm lint
+  charts/in-falcone --namespace review-ns`; default `helm template ... --include-crds`; custom
+  namespace `helm template ... --set eso.eso.namespace=custom-eso --set
+  eso.external-secrets.namespaceOverride=custom-eso --set openbao.eso.namespace=custom-eso --set
+  openbao.openbao.namespace=custom-store --set eso.eso.caProvider.namespace=custom-store`; mismatch
+  namespace render failed closed as expected; focused MCP tests including the new negative hosted
+  JSON-RPC write-scope regression; `node --test tests/blackbox/all-core-install-readiness.test.mjs`;
+  `openspec validate make-all-services-core --strict`; `npm run validate:repo`; `git diff --check`.
 - Fresh clean-cluster install was intentionally not run in this implementer stage per orchestrator
   instruction.
 - MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but GHCR publication and digest

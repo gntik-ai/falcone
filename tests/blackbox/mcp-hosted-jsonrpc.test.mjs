@@ -25,8 +25,9 @@ import assert from 'node:assert/strict';
 
 import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
 import { createMcpEngine } from '../../apps/control-plane/src/runtime/mcp-engine.mjs';
+import { BASE_SCOPE } from '../../apps/control-plane/src/mcp-official-catalog.mjs';
 
-const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
+const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app', scopes: [BASE_SCOPE] };
 const SELF = 'http://exec.local';
 const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 const PG = { database: 'app', name: 'public', tables: [{ name: 'orders', columns: [{ name: 'id', type: 'bigint' }, { name: 'total', type: 'numeric' }] }] };
@@ -64,12 +65,13 @@ test.before(async () => {
 test.after(async () => { await new Promise((r) => cp.close(r)); });
 
 // JSON-RPC POST against a hosted server's /rpc endpoint with gateway-injected trusted identity.
-function rpc(message, { tenantId = A.tenantId, workspaceId = A.workspaceId, sid = serverId, auth = true } = {}) {
+function rpc(message, { tenantId = A.tenantId, workspaceId = A.workspaceId, sid = serverId, auth = true, scopes = [BASE_SCOPE] } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (auth) {
     headers['x-tenant-id'] = tenantId;
     headers['x-workspace-id'] = workspaceId;
     headers['x-auth-subject'] = 'user:agent';
+    headers['x-actor-scopes'] = scopes.join(' ');
   }
   return fetch(`${baseUrl}/v1/mcp/workspaces/${workspaceId}/servers/${sid}/rpc`, {
     method: 'POST', headers, body: JSON.stringify(message),

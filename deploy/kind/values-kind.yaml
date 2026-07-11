@@ -9,6 +9,10 @@ global:
   namespace: falcone
   createNamespace: false
   imagePullSecrets: []
+mcp:
+  runtimeImage:
+    repository: localhost:30500/in-falcone-mcp-runtime
+    tag: ""
 bootstrap:
   job:
     image:
@@ -132,10 +136,6 @@ controlPlane:
       value: falcone-flows
     - name: MCP_ENABLED
       value: "true"
-    - name: MCP_RUNTIME_IMAGE
-      value: localhost:30500/in-falcone-mcp-runtime
-    - name: BAO_ADDR
-      value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
       value: secret
     - name: BAO_KUBERNETES_AUTH_ROLE

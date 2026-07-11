@@ -104,6 +104,10 @@
 {{- if ne (.Values.eso.eso.namespace | default "eso-system") (.Values.openbao.eso.namespace | default "eso-system") -}}
   {{- fail "eso.eso.namespace and openbao.eso.namespace must match; ESO/OpenBao namespace wiring is a single install contract" -}}
 {{- end -}}
+{{- $externalSecretsValues := index .Values.eso "external-secrets" | default (dict) -}}
+{{- if ne ($externalSecretsValues.namespaceOverride | default .Release.Namespace) (.Values.eso.eso.namespace | default "eso-system") -}}
+  {{- fail "eso.external-secrets.namespaceOverride must match eso.eso.namespace so ESO pods run in the namespace protected by ESO NetworkPolicy and OpenBao auth" -}}
+{{- end -}}
 {{- if ne (.Values.eso.eso.serviceAccountName | default "eso-openbao-auth") (.Values.openbao.eso.serviceAccountName | default "eso-openbao-auth") -}}
   {{- fail "eso.eso.serviceAccountName and openbao.eso.serviceAccountName must match" -}}
 {{- end -}}

@@ -1,14 +1,16 @@
-# The external-secrets operator dependency is vendored under charts/external-secrets-0.9.0.tgz.
+# The external-secrets operator dependency is vendored unpacked under charts/external-secrets/.
 # Use that chart's own templated CRDs as the single source of truth so conversion webhook service
-# names stay aligned with the operator/webhook resources rendered by the same dependency.
+# names stay aligned with the operator/webhook resources rendered by the same dependency. A nested
+# Chart.lock records the upstream chart provenance; the unpacked chart remains intentionally tracked.
 external-secrets:
   installCRDs: true
   fullnameOverride: eso-external-secrets
+  namespaceOverride: eso-system
 
 eso:
   # NOTE: the `vault*` value-keys name ESO's provider TYPE (provider.vault), which OpenBao is
   # served by — they are NOT a HashiCorp Vault product reference. Only the VALUES point at OpenBao.
-  vaultAddress: https://openbao.secret-store.svc.cluster.local:8200
+  vaultAddress: ""
   # Image for the post-install Job that waits for the external-secrets admission webhook to be ready
   # before the ClusterSecretStore/ExternalSecret hooks apply (avoids a "connection refused" race).
   webhookWait:

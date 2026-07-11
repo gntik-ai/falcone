@@ -12,11 +12,11 @@ spec:
   issuerRef:
     name: {{ .Values.openbao.tls.issuerRef.name }}
     kind: {{ .Values.openbao.tls.issuerRef.kind }}
-  commonName: openbao.secret-store.svc.cluster.local
+  commonName: {{ include "openbao.serviceHost" . }}
   dnsNames:
     - openbao
-    - openbao.secret-store
-    - openbao.secret-store.svc
-    - openbao.secret-store.svc.cluster.local
-    - openbao-internal.secret-store.svc.cluster.local
+    - openbao.{{ include "openbao.namespace" . }}
+    - openbao.{{ include "openbao.namespace" . }}.svc
+    - {{ include "openbao.serviceHost" . }}
+    - {{ include "openbao.internalServiceHost" . }}
 {{- end }}

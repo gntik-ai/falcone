@@ -168,7 +168,9 @@ test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable def
   ]) {
     assert.match(base, new RegExp(`image:\\s*"ghcr\\.io/gntik-ai/${image}:${escapeRe(releaseTag)}"`), `${image} must use the chart app release tag`);
   }
-  assert.match(base, /value:\s*ghcr\.io\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0/, 'default MCP runtime env must use the chart app release tag');
+  assert.match(base, /name:\s*in-falcone-runtime-env[\s\S]*MCP_RUNTIME_IMAGE:\s*"ghcr\.io\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0"/, 'default MCP runtime env must use the chart app release tag from the runtime env ConfigMap');
+  assert.match(base, /name:\s*falcone-control-plane[\s\S]*envFrom:[\s\S]*name:\s*in-falcone-runtime-env/, 'control-plane must consume the parent-rendered runtime env ConfigMap');
+  assert.match(base, /name:\s*falcone-control-plane-executor[\s\S]*envFrom:[\s\S]*name:\s*in-falcone-runtime-env/, 'executor must consume the parent-rendered runtime env ConfigMap');
   assert.doesNotMatch(base, /ghcr\.io\/gntik-ai\/in-falcone-[^:\s"]+:(0\.1\.0|0\.2\.11|0\.6\.2|0\.9\.3)/, 'first-party defaults must not mix stale component tags');
   const valuesYaml = readFileSync(resolve(CHART_PATH, 'values.yaml'), 'utf8');
   assert.match(valuesYaml, /mcp:\n[\s\S]*runtimeImage:\n[\s\S]*repository:\s*ghcr\.io\/gntik-ai\/in-falcone-mcp-runtime\n[\s\S]*tag:\s*0\.3\.0/, 'mcp.runtimeImage values must use the chart app release tag');
@@ -177,7 +179,7 @@ test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable def
   assert.match(kind, /image:\s*"localhost:30500\/in-falcone-control-plane-executor:0\.9\.3"/, 'kind overlay must use the local executor image');
   assert.match(kind, /image:\s*"localhost:30500\/in-falcone-workflow-worker:0\.1\.0"/, 'kind overlay must use the local workflow-worker image');
   assert.match(kind, /image:\s*"localhost:30500\/in-falcone-web-console:0\.2\.11"/, 'kind overlay must use the local web-console image');
-  assert.match(kind, /value:\s*localhost:30500\/in-falcone-mcp-runtime/, 'kind overlay must use the local MCP runtime image');
+  assert.match(kind, /MCP_RUNTIME_IMAGE:\s*"localhost:30500\/in-falcone-mcp-runtime"/, 'kind overlay must use the local MCP runtime image via mcp.runtimeImage');
   assert.doesNotMatch(kind, /MCP_RUNTIME_IMAGE_DIGEST/, 'kind overlay must not carry an unverified MCP runtime digest');
 
   const releaseWorkflow = readFileSync(resolve(REPO_ROOT, '.github', 'workflows', 'release-images.yml'), 'utf8');
@@ -188,21 +190,37 @@ test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable def
 
 test('all-core-007: ESO operator, webhook, cert-controller, CRDs, and auxiliary namespaces render', SKIP, () => {
   const vendoredChart = readFileSync(resolve(CHART_PATH, 'charts', 'eso', 'charts', 'external-secrets', 'Chart.yaml'), 'utf8');
+  const nestedLock = readFileSync(resolve(CHART_PATH, 'charts', 'eso', 'Chart.lock'), 'utf8');
+  const vendoring = readFileSync(resolve(CHART_PATH, 'charts', 'eso', 'VENDORING.md'), 'utf8');
   assert.match(vendoredChart, /name:\s*external-secrets/, 'ESO wrapper must vendor the upstream external-secrets chart');
   assert.match(vendoredChart, /version:\s*0\.9\.0/, 'vendored external-secrets chart version must match the wrapper dependency pin');
+  assert.match(nestedLock, /name:\s*external-secrets[\s\S]*version:\s*0\.9\.0/, 'ESO wrapper must carry a nested lock for the vendored upstream chart');
+  assert.match(vendoring, /unpacked chart/, 'ESO wrapper must document that the unpacked chart is intentionally tracked');
   const docs = renderDocs();
   assert.ok(findDoc(docs, 'Namespace', 'review-ns'), 'release namespace must render for a fresh install');
   assert.ok(findDoc(docs, 'Namespace', 'eso-system'), 'ESO auth namespace must render for a fresh install');
   assert.ok(findDoc(docs, 'Namespace', 'secret-store'), 'OpenBao namespace must render for a fresh install');
-  assert.ok(findDoc(docs, 'Deployment', 'eso-external-secrets'), 'ESO controller Deployment must render');
-  assert.ok(findDoc(docs, 'Deployment', 'eso-external-secrets-webhook'), 'ESO admission webhook Deployment must render');
-  assert.ok(findDoc(docs, 'Deployment', 'eso-external-secrets-cert-controller'), 'ESO cert-controller Deployment must render');
+  assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets')?.metadata?.namespace, 'eso-system', 'ESO controller Deployment must run in the configured ESO namespace');
+  assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets-webhook')?.metadata?.namespace, 'eso-system', 'ESO admission webhook Deployment must run in the configured ESO namespace');
+  assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets-cert-controller')?.metadata?.namespace, 'eso-system', 'ESO cert-controller Deployment must run in the configured ESO namespace');
   assert.ok(findDoc(docs, 'CustomResourceDefinition', 'externalsecrets.external-secrets.io'), 'ExternalSecret CRD must render from the vendored dependency');
   assert.ok(findDoc(docs, 'CustomResourceDefinition', 'clustersecretstores.external-secrets.io'), 'ClusterSecretStore CRD must render from the vendored dependency');
   const out = assertRender();
   assert.doesNotMatch(out, /eso-crd-extract-external-secrets-webhook/, 'stale extracted CRD webhook names must not render');
   assert.doesNotMatch(out, /namespace:\s*default\b/, 'CRD conversion webhooks must not point at the default namespace');
-  assert.match(out, /kubectl -n review-ns get endpoints eso-external-secrets-webhook/, 'webhook wait Job must wait for the actual release-owned webhook Service');
+  assert.match(out, /kubectl -n eso-system get endpoints eso-external-secrets-webhook/, 'webhook wait Job must wait in the namespace where the webhook Service runs');
+});
+
+test('all-core-006b: MCP runtime image and digest render from one chart value block', SKIP, () => {
+  const digest = `sha256:${'a'.repeat(64)}`;
+  const out = assertRender([
+    '--set', 'mcp.runtimeImage.repository=ghcr.io/example/mcp-runtime',
+    '--set', 'mcp.runtimeImage.tag=1.2.3',
+    '--set', `mcp.runtimeImage.digest=${digest}`,
+  ]);
+  assert.match(out, /name:\s*in-falcone-runtime-env[\s\S]*MCP_RUNTIME_IMAGE:\s*"ghcr\.io\/example\/mcp-runtime:1\.2\.3"/, 'MCP runtime image must render from mcp.runtimeImage.repository/tag');
+  assert.match(out, new RegExp(`MCP_RUNTIME_IMAGE_DIGEST:\\s*"${escapeRe(digest)}"`), 'MCP runtime digest must render from mcp.runtimeImage.digest');
+  assert.doesNotMatch(out, /value:\s*ghcr\.io\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0/, 'control-plane/executor env must not hard-code MCP_RUNTIME_IMAGE outside the runtime env ConfigMap');
 });
 
 test('all-core-008: ESO cluster-scoped ownership preflight renders', SKIP, () => {
@@ -215,15 +233,49 @@ test('all-core-008: ESO cluster-scoped ownership preflight renders', SKIP, () =>
   assert.match(out, /set eso\.eso\.clusterOwnership\.adoptExisting=true/, 'preflight must fail closed on unowned cluster-scoped stores');
 });
 
-test('all-core-009: OpenBao auth and RBAC honor a custom ESO namespace', SKIP, () => {
+test('all-core-009: OpenBao, ESO, and runtime env honor custom secret namespaces', SKIP, () => {
   const out = assertRender([
+    '--set', 'eso.eso.namespace=custom-eso',
+    '--set', 'eso.external-secrets.namespaceOverride=custom-eso',
+    '--set', 'openbao.eso.namespace=custom-eso',
+    '--set', 'openbao.openbao.namespace=custom-store',
+    '--set', 'eso.eso.caProvider.namespace=custom-store',
+  ]);
+  const docs = parseAllDocuments(out).map((doc) => doc.toJSON()).filter(Boolean);
+  assert.match(out, /name:\s*eso-openbao-auth[\s\S]*namespace:\s*custom-eso/, 'OpenBao must render ESO auth ServiceAccount in the configured ESO namespace');
+  assert.match(out, /bound_service_account_namespaces='custom-eso'/, 'OpenBao Kubernetes auth role for ESO must bind the configured ESO namespace');
+  assert.match(out, /BAO_ADDR:\s*"https:\/\/openbao\.custom-store\.svc\.cluster\.local:8200"/, 'runtime env must point workloads at the configured OpenBao namespace');
+  assert.match(out, /api_addr\s*=\s*"https:\/\/openbao\.custom-store\.svc\.cluster\.local:8200"/, 'OpenBao api_addr must use the configured OpenBao namespace');
+  assert.match(out, /cluster_addr\s*=\s*"https:\/\/\$\(HOSTNAME\)\.openbao-internal\.custom-store\.svc\.cluster\.local:8201"/, 'OpenBao cluster_addr must use the configured OpenBao namespace');
+  assert.match(out, /server:\s*"https:\/\/openbao\.custom-store\.svc\.cluster\.local:8200"/, 'ESO ClusterSecretStore must use the configured OpenBao namespace');
+  assert.match(out, /kubernetes\.io\/metadata\.name:\s*custom-eso/, 'OpenBao NetworkPolicy must allow the configured ESO namespace');
+  assert.match(out, /kubernetes\.io\/metadata\.name:\s*"custom-store"/, 'ESO NetworkPolicy must allow egress to the configured OpenBao namespace');
+  assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets')?.metadata?.namespace, 'custom-eso', 'ESO controller must run in the configured ESO namespace');
+  assert.doesNotMatch(out, /bound_service_account_namespaces='eso-system'/, 'custom ESO namespace must not leave the auth role hard-coded to eso-system');
+  assert.doesNotMatch(out, /https:\/\/openbao\.secret-store\.svc\.cluster\.local:8200/, 'custom OpenBao namespace must not leave workload or ESO addresses hard-coded to secret-store');
+});
+
+test('all-core-009b: mismatched ESO operator namespace fails closed', SKIP, () => {
+  const r = helmTemplate([
     '--set', 'eso.eso.namespace=custom-eso',
     '--set', 'openbao.eso.namespace=custom-eso',
   ]);
-  assert.match(out, /name:\s*eso-openbao-auth[\s\S]*namespace:\s*custom-eso/, 'OpenBao must render ESO auth ServiceAccount in the configured ESO namespace');
-  assert.match(out, /bound_service_account_namespaces='custom-eso'/, 'OpenBao Kubernetes auth role for ESO must bind the configured ESO namespace');
-  assert.match(out, /kubernetes\.io\/metadata\.name:\s*custom-eso/, 'OpenBao NetworkPolicy must allow the configured ESO namespace');
-  assert.doesNotMatch(out, /bound_service_account_namespaces='eso-system'/, 'custom ESO namespace must not leave the auth role hard-coded to eso-system');
+  assert.notEqual(r.status, 0, 'custom ESO auth namespace without matching operator namespace override must fail');
+  assert.match(r.stderr, /namespaceOverride must match eso\.eso\.namespace/, 'validation must explain the protected ESO namespace contract');
+});
+
+test('all-core-009c: cert-manager OpenBao certificate SANs honor custom namespace', SKIP, () => {
+  const out = assertRender([
+    '--set', 'openbao.openbao.tls.mode=cert-manager',
+    '--set', 'eso.eso.namespace=custom-eso',
+    '--set', 'eso.external-secrets.namespaceOverride=custom-eso',
+    '--set', 'openbao.eso.namespace=custom-eso',
+    '--set', 'openbao.openbao.namespace=custom-store',
+    '--set', 'eso.eso.caProvider.namespace=custom-store',
+  ]);
+  assert.match(out, /commonName:\s*openbao\.custom-store\.svc\.cluster\.local/, 'OpenBao Certificate commonName must use the configured namespace');
+  assert.match(out, /dnsNames:[\s\S]*openbao\.custom-store[\s\S]*openbao\.custom-store\.svc[\s\S]*openbao\.custom-store\.svc\.cluster\.local[\s\S]*openbao-internal\.custom-store\.svc\.cluster\.local/, 'OpenBao Certificate SANs must use the configured namespace');
+  assert.doesNotMatch(out, /openbao\.secret-store\.svc\.cluster\.local/, 'custom cert-manager SANs must not retain secret-store');
 });
 
 test('all-core-010: Kafka default and supported profiles are valid single-broker KRaft', SKIP, () => {

@@ -163,6 +163,7 @@ config:
     gateway: in-falcone-gateway-config
     controlPlane: in-falcone-control-plane-config
     webConsole: in-falcone-web-console-config
+    runtimeEnv: in-falcone-runtime-env
   secretRefs:
     gatewayTls:
       existingSecret: in-falcone-dev-api-tls
@@ -3239,10 +3240,6 @@ controlPlane:
       value: falcone-flows
     - name: MCP_ENABLED
       value: "true"
-    - name: MCP_RUNTIME_IMAGE
-      value: ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0
-    - name: BAO_ADDR
-      value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
       value: secret
     - name: BAO_KUBERNETES_AUTH_ROLE
@@ -3252,6 +3249,7 @@ controlPlane:
   envFromSecrets: []
   envFromConfigMaps:
     - in-falcone-control-plane-config
+    - in-falcone-runtime-env
   persistence:
     enabled: false
     existingClaim: ""
@@ -3399,10 +3397,6 @@ controlPlaneExecutor:
       value: flows-main
     - name: MCP_ENABLED
       value: "true"
-    - name: MCP_RUNTIME_IMAGE
-      value: ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0
-    - name: BAO_ADDR
-      value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
       value: secret
     - name: BAO_KUBERNETES_AUTH_ROLE
@@ -3422,7 +3416,8 @@ controlPlaneExecutor:
       cpu: 1
       memory: 1Gi
   envFromSecrets: []
-  envFromConfigMaps: []
+  envFromConfigMaps:
+    - in-falcone-runtime-env
   persistence:
     enabled: false
     existingClaim: ""
@@ -4578,12 +4573,14 @@ gatewayPolicy:
 # Core infrastructure sub-charts. OpenBao is the canonical platform/workspace secret
 # backend, and ESO materializes the Kubernetes Secrets consumed by workloads.
 eso:
+  external-secrets:
+    namespaceOverride: eso-system
   eso:
     namespace: eso-system
     serviceAccountName: eso-openbao-auth
     refreshInterval: 1h
     tokenTTL: 24h
-    vaultAddress: https://openbao.secret-store.svc.cluster.local:8200
+    vaultAddress: ""
     vaultAuthPath: kubernetes
     vaultAuthRole: eso-role
     caProvider:

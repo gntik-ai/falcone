@@ -2,9 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMcpEngine } from './mcp-engine.mjs';
+import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
 
-const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
-const B = { tenantId: 'ten-b', workspaceId: 'ws-b', actorId: 'actor-b', roleName: 'falcone_app' };
+const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app', scopes: [BASE_SCOPE] };
+const B = { tenantId: 'ten-b', workspaceId: 'ws-b', actorId: 'actor-b', roleName: 'falcone_app', scopes: [BASE_SCOPE] };
 const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 
 // A fake runtime self-call so tool-calls don't need a live HTTP server.
@@ -84,7 +85,9 @@ test('full loop: create (instant) → curate → publish → get (endpoint+tools
   assert.ok(view.endpoint.includes(sid));
   assert.ok(view.tools.length > 0);
 
-  const call = await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: view.tools[0].name, arguments: { workspaceId: A.workspaceId } } });
+  const readTool = view.tools.find((t) => !t.mutates);
+  assert.ok(readTool, 'expected a read tool in the published manifest');
+  const call = await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: readTool.name, arguments: { workspaceId: A.workspaceId } } });
   assert.ok(Array.isArray(call.content));
 
   const audit = await e.executeMcp({ operation: 'list_audit', identity: A, workspaceId: A.workspaceId, serverId: sid });
@@ -176,4 +179,30 @@ test('durable store: stale replica writes preserve another replica server', asyn
   assert.equal(aList.items.some((s) => s.serverId === staleServer.serverId), true);
   assert.equal(bList.items.some((s) => s.serverId === peerServer.serverId), true);
   assert.ok(store.saves >= 2);
+});
+
+test('hosted JSON-RPC refuses mutating official tools without caller write scope and does not fetch', async () => {
+  const fetchImpl = fakeFetch();
+  const e = createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl, runtimeImageDigest: TEST_DIGEST });
+  const created = await e.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'official', source: 'official' } });
+  const sid = created.serverId;
+  await e.executeMcp({ operation: 'publish_version', identity: A, workspaceId: A.workspaceId, serverId: sid, version: 'v1', body: { version: 'v1' } });
+
+  const before = fetchImpl.calls.length;
+  const out = await e.executeMcpRpc({
+    identity: { ...A, scopes: [BASE_SCOPE] },
+    workspaceId: A.workspaceId,
+    serverId: sid,
+    message: {
+      jsonrpc: '2.0',
+      id: 42,
+      method: 'tools/call',
+      params: { name: 'create_workspace', arguments: { slug: 'blocked' } },
+    },
+  });
+
+  assert.equal(out.id, 42);
+  assert.equal(out.result.isError, true);
+  assert.match(out.result.content[0].text, /mcp:falcone:workspaces:write/);
+  assert.equal(fetchImpl.calls.length, before, 'missing write scope must not issue the upstream POST');
 });

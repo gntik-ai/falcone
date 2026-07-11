@@ -243,11 +243,12 @@ export function createMcpEngine({
     const activeRecord = registered.versions.find((v) => v.version === registered.activeVersion);
     const tool = (activeRecord?.tools ?? []).find((t) => t.name === toolName);
     if (!tool) return { content: [{ type: 'text', text: `unknown tool: ${toolName}` }], isError: true };
-    // Read tools need the base scope; a mutating tool needs its explicit scope. The tenant owns the
-    // server, so the granted scopes are the base scope + the tool's own scope.
+    // Hosted MCP calls must enforce the caller's actual granted scopes. The server owner controls
+    // what tools are published, but publication must not synthesize authority for a later caller.
     const toolScope = tool.scope ?? tool.suggestedScope ?? null;
-    const granted = new Set([BASE_SCOPE, ...(toolScope ? [toolScope] : [])]);
+    const granted = new Set(Array.isArray(identity.scopes) ? identity.scopes : []);
     if (!granted.has(BASE_SCOPE)) return { content: [{ type: 'text', text: `missing required scope: ${BASE_SCOPE}` }], isError: true };
+    if (tool.mutates && !toolScope) return { content: [{ type: 'text', text: 'mutating tool is missing an explicit required scope' }], isError: true };
     if (tool.mutates && toolScope && !granted.has(toolScope)) return { content: [{ type: 'text', text: `mutating tool requires scope: ${toolScope}` }], isError: true };
 
     const call = resolveCall(entry, tool, args);
@@ -257,6 +258,8 @@ export function createMcpEngine({
       'x-workspace-id': entry.workspaceId,
       'x-auth-subject': identity.actorId ?? 'mcp',
       'x-pg-role': identity.roleName ?? 'falcone_app',
+      ...(Array.isArray(identity.scopes) ? { 'x-actor-scopes': identity.scopes.join(' ') } : {}),
+      ...(Array.isArray(identity.roles) ? { 'x-actor-roles': identity.roles.join(',') } : {}),
       'content-type': 'application/json',
       accept: 'application/json',
     };
