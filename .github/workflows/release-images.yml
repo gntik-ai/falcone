@@ -28,6 +28,10 @@ on:
         description: 'Also tag/push :latest'
         type: boolean
         default: false
+      publish_fn_runtime:
+        description: 'Publish the function runtime image in this manual run'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -132,6 +136,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build and push ${{ matrix.image }}
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context || '.' }}
