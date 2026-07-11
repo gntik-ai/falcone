@@ -264,9 +264,8 @@ Build bases to mirror (for BuildConfig): `node:22-alpine` and `node:22-slim`
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
 > - The Falcone-built release set is six images at `0.3.0`: control-plane,
 >   control-plane-executor, web-console, workflow-worker, fn-runtime, and mcp-runtime.
->   Mirror all six exact tags into Harbor before install. The `fn-runtime:0.3.0`
->   external manifest may be published after this documentation change; do not run the
->   all-core install until your Harbor contains that sixth image.
+>   GitHub Actions run `29152340476` published all six GHCR manifests, including
+>   `fn-runtime:0.3.0`. Mirror all six exact tags into Harbor before install.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.

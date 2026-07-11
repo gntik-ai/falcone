@@ -205,16 +205,16 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   `ghcr.io/gntik-ai/in-falcone-web-console:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.3.0`,
   `ghcr.io/gntik-ai/in-falcone-fn-runtime:0.3.0`, and
-  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0`. This branch does not publish images; the
-  OpenShift/Harbor docs require all six tags to be mirrored before a fresh all-core install. The
-  `fn-runtime:0.3.0` external manifest may be published after this commit.
+  `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0`. Authorized GitHub Actions run `29152340476`
+  published all six manifests, and `docker manifest inspect` verified `fn-runtime:0.3.0`.
+  OpenShift/Harbor installs still require all six tags to be mirrored before installation.
 - Digest pinning and final release evidence remain intentionally unchecked until the clean
   fresh-cluster install records the exact manifests deployed from this branch.
-- Fifth-reviewer revision fixed the OpenShift/Harbor render blockers without publishing images or
-  touching a cluster: OpenShift values now resolve MCP, control-plane, web-console, and fn-runtime to
+- Fifth-reviewer revision fixed the OpenShift/Harbor render blockers without touching a cluster:
+  OpenShift values now resolve MCP, control-plane, web-console, and fn-runtime to
   the coherent `0.3.0` release set; helper/operator images render through Harbor; MCP runtime image
   remains sourced only from `mcp.runtimeImage`; the Harbor docs mirror is synchronized and treats
-  `fn-runtime:0.3.0` as part of the required six-image set without claiming publication.
+  `fn-runtime:0.3.0` as part of the required six-image set and records the six-image publication run.
 - Fifth-reviewer validation run: `helm dependency build charts/in-falcone`; `helm lint
   charts/in-falcone --namespace review-ns`; default, custom namespace, OpenShift/Harbor, default
   upgrade, and OpenShift upgrade `helm template` renders; Harbor render public-registry/stale-tag
