@@ -1,4 +1,4 @@
-// Headless-Chromium verification of the MongoDB page, wired to REAL MongoDB.
+// Headless-Chromium verification of the MongoDB-compatible page, wired to REAL FerretDB/DocumentDB.
 import { chromium } from 'playwright';
 
 const GW = process.env.GW || 'http://192.168.1.132:31908';

@@ -45,4 +45,4 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "scheduling-management.openwhisk.svc.cluster.local:80": 1
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1

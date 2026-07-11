@@ -193,7 +193,7 @@ export async function ensureSchema(pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (workspace_id, topic_name)
     )`);
-  // ---- data plane: function registry (execution pends OpenWhisk) -----------
+  // ---- data plane: function registry (execution pends executor/Knative) ----
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workspace_functions (
       id TEXT PRIMARY KEY,

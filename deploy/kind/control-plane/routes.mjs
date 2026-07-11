@@ -236,7 +236,7 @@ export const routes = [
   // engine-dispatched DB provisioning (postgresql | mongodb) — the SPA wizard target
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/databases', localHandler: 'provisionDatabaseGeneric', auth: 'authenticated' },
 
-  // ---- domain B: object storage (REAL MinIO/S3 via SigV4) -------------------
+  // ---- domain B: object storage (REAL SeaweedFS/S3 via SigV4) ---------------
   { method: 'GET',  path: '/v1/storage/buckets', localHandler: 'storageListBuckets', auth: 'authenticated' },
   { method: 'POST', path: '/v1/storage/workspaces/{workspaceId}/buckets', localHandler: 'storageProvisionBucket', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/storage/workspaces/{workspaceId}/usage', localHandler: 'storageWorkspaceUsage', auth: 'authenticated' },

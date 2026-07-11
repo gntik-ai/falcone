@@ -267,10 +267,11 @@ this control-plane serves. To make the shell usable end-to-end:
   columns + indexes (incl. a compound index) + RLS flags. (Distinct from my custom
   "Workspace DB" page which provisions a per-workspace DB.) `ConsolePostgresPage` was
   lazy (React #426) → eager import.
-- The repo's **MongoDB** page (`/console/mongo`) is wired to **REAL MongoDB**
-  (`falcone-mongodb:27017`). `mongo-handlers.mjs` uses the official `mongodb` driver
-  (added to the image; `MONGO_*` env via secretKeyRef). Endpoints: list databases
-  (system dbs hidden, real `db.stats()`), collections (real counts/sizes/validation),
+- The repo's **MongoDB-compatible document** page (`/console/mongo`) is wired to
+  **REAL FerretDB over DocumentDB** (`falcone-ferretdb:27017`). `mongo-handlers.mjs`
+  uses the official `mongodb` driver against the MongoDB wire protocol (`MONGO_*`
+  env via secretKeyRef). Endpoints: list databases (system dbs hidden, real
+  `db.stats()`), collections (real counts/sizes/validation),
   collection detail, indexes, views, and documents (skip/limit cursor, BSON made
   JSON-safe — ObjectId→hex, Date→ISO). The **documents** view is workspace-addressed
   (`/v1/mongo/workspaces/{workspaceId}/data/{db}/collections/{col}/documents`) and is scoped
@@ -399,7 +400,7 @@ this control-plane serves. To make the shell usable end-to-end:
   dedicated, rotatable credential.
 - **iam-tenant-roles** (custom-role CRUD) expects a custom store, not a pg Pool —
   excluded until an adapter is written.
-- **secret-rotation** needs Vault wiring; **data-plane consoles**
+- **secret-rotation** needs OpenBao wiring; **data-plane consoles**
   (postgres/mongo/storage/events) need live data sources.
 - Migration `094` partially failed (references `api_keys` from an unincluded
   migration) → the 3 privilege-domain/scope-enforcement routes may 500.
@@ -413,14 +414,15 @@ this control-plane serves. To make the shell usable end-to-end:
 
 ## What is deployed
 
-Release `falcone` (`helm status falcone -n falcone` → `deployed`). 15 pods Running:
+Release `falcone` (`helm status falcone -n falcone` → `deployed`). Core pods Running:
 
 | Component | Kind | Image used (overridden in `values-kind.yaml`) |
 |---|---|---|
 | postgresql | StatefulSet | `bitnamilegacy/postgresql:17.2.0` |
-| mongodb | StatefulSet | `bitnamilegacy/mongodb:8.0.0` |
+| documentdb | StatefulSet | `ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0` |
+| ferretdb | Deployment | `ghcr.io/ferretdb/ferretdb:2.7.0` |
 | kafka (KRaft, 1 broker) | StatefulSet | `bitnamilegacy/kafka:3.9.0` |
-| storage (SeaweedFS) | StatefulSet | `chrislusf/seaweedfs:4.33` |
+| seaweedfs | StatefulSet/Deployment | `chrislusf/seaweedfs:4.33` |
 | keycloak | Deployment | `quay.io/keycloak/keycloak:26.1.0` |
 | apisix (gateway) | Deployment | `apache/apisix:3.10.0-debian` |
 | observability (Prometheus) | Deployment | `prom/prometheus:v3.2.1` |

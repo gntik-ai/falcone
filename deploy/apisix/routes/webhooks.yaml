@@ -10,4 +10,4 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "openwhisk-webhook-management:80": 1
+        "falcone-control-plane.falcone.svc.cluster.local:8080": 1

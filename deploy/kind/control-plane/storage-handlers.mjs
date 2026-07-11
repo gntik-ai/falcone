@@ -1,27 +1,27 @@
-// Console storage (object store) handlers — REAL MinIO/S3 (kind deploy).
+// Console storage (object store) handlers — REAL SeaweedFS/S3 (kind deploy).
 //
-// MinIO runs as `falcone-storage:9000`. The web-console Storage page reads buckets,
-// objects, object metadata, and per-workspace usage. We talk to MinIO over the S3
-// REST API with AWS Signature V4 (pure node:crypto — no SDK). Buckets are mapped to
-// a workspace via the `workspace_buckets` table (provisioned through this control
-// plane), so the page's `bucket.workspaceId === activeWorkspaceId` filter works and
-// usage is workspace-scoped.
+// SeaweedFS exposes an S3-compatible gateway at `falcone-seaweedfs-s3:8333`. The
+// web-console Storage page reads buckets, objects, object metadata, and per-workspace
+// usage over the S3 REST API with AWS Signature V4 (pure node:crypto — no SDK).
+// Buckets are mapped to a workspace via the `workspace_buckets` table (provisioned
+// through this control plane), so the page's `bucket.workspaceId === activeWorkspaceId`
+// filter works and usage is workspace-scoped.
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, workspaceIdentityName } from './seaweedfs-identity.mjs';
 import { checkBucketQuota, checkByteQuota, usageLimits, dimensionStatus, STORAGE_QUOTA_EXCEEDED } from './storage-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 
-// Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, MinIO 9000,
-// or any S3-compatible backend). Legacy MINIO_* names remain as backward-compatible
-// fallbacks; a single startup deprecation notice fires when they are used.
-const ENDPOINT = (process.env.STORAGE_S3_ENDPOINT || process.env.MINIO_ENDPOINT || 'http://falcone-storage:9000').replace(/\/+$/, '');
+// Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, or any
+// S3-compatible backend). Legacy MINIO_* names remain as backward-compatible fallbacks;
+// a single startup deprecation notice fires when they are used.
+const ENDPOINT = (process.env.STORAGE_S3_ENDPOINT || process.env.MINIO_ENDPOINT || 'http://falcone-seaweedfs-s3:8333').replace(/\/+$/, '');
 const ACCESS = process.env.STORAGE_S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY || '';
 const SECRET = process.env.STORAGE_S3_SECRET_KEY || process.env.MINIO_SECRET_KEY || '';
 const REGION = process.env.STORAGE_S3_REGION || process.env.MINIO_REGION || 'us-east-1';
 // Endpoint baked into PRESIGNED URLs handed back to the CALLER (#676). The control plane
 // reaches the S3 gateway over the in-cluster ClusterIP (ENDPOINT, e.g.
-// http://falcone-storage:8333), which is NOT resolvable from outside the cluster — a
+// http://falcone-seaweedfs-s3:8333), which is NOT resolvable from outside the cluster — a
 // presigned URL signed against it would be useless to an external app. STORAGE_S3_PUBLIC_ENDPOINT
 // lets an operator point presigned URLs at an externally-routable S3 gateway address while
 // the control plane keeps using the internal endpoint for its own SigV4 traffic. The SigV4
