@@ -4,8 +4,7 @@ global:
   environment: dev
   createNamespace: true
   imageRegistry: ""
-  imagePullSecrets:
-    - name: ghcr-reader
+  imagePullSecrets: []
   airgap:
     enabled: false
   privateRegistry:
@@ -207,7 +206,7 @@ bootstrap:
     name: ""
   job:
     image:
-      repository: docker.io/bitnami/kubectl
+      repository: docker.io/bitnamilegacy/kubectl
       tag: 1.32.2
       pullPolicy: IfNotPresent
     # Raised from 1 (fix-bootstrap-job-coldstart-retry, #558): on a COLD fresh `helm install`
@@ -1777,7 +1776,7 @@ keycloak:
     # Defaults to the bundled postgresql image; private-registry/airgap installs that
     # remap postgresql.image must remap this too.
     initImage:
-      repository: docker.io/bitnami/postgresql
+      repository: docker.io/bitnamilegacy/postgresql
       tag: 17.2.0
       pullPolicy: IfNotPresent
   serviceAccount:
@@ -1938,20 +1937,20 @@ postgresql:
     workload:
       kind: StatefulSet
   image:
-    repository: docker.io/bitnami/postgresql
+    repository: docker.io/bitnamilegacy/postgresql
     tag: 17.2.0
     pullPolicy: IfNotPresent
   # dedicatedTenantImage: recommended image for operator-provisioned dedicated-DB
   # tenant Postgres instances (database_per_tenant — e.g. the dpf_01regulateddedicated
   # deployment profile / profileClass "dedicated", capability pvc_01pgdedicated).
   # Such tenants may enable the `vector` extension for KNN similarity search, which the
-  # default bitnami/postgresql image above does NOT bundle; the provisioning pre-flight
+  # default PostgreSQL image above does NOT bundle; the provisioning pre-flight
   # (postgres-applier.mjs) rejects `CREATE EXTENSION vector` on an image that lacks the
   # pgvector control files. This key is an OPERATOR CONTRACT — a named, greppable record
   # of the recommended image — NOT a value the chart templates apply automatically.
   # Dedicated-DB instances are operator-provisioned (not per-tenant StatefulSets rendered
   # by this chart); set this image in your own provisioning tooling. The shared-instance
-  # default `postgresql.image` (bitnami/postgresql) is unaffected.
+  # default `postgresql.image` is unaffected.
   dedicatedTenantImage:
     repository: pgvector/pgvector
     tag: pg17
@@ -2539,7 +2538,7 @@ kafka:
     workload:
       kind: StatefulSet
   image:
-    repository: docker.io/bitnami/kafka
+    repository: docker.io/bitnamilegacy/kafka
     tag: 3.9.0
     pullPolicy: IfNotPresent
   replicas: 3
@@ -2924,7 +2923,7 @@ seaweedfsTls:
     enabled: false
     # Image used by the pre-install hook to run openssl + kubectl.
     image:
-      repository: docker.io/bitnami/kubectl
+      repository: docker.io/bitnamilegacy/kubectl
       tag: "1.32.2"
       pullPolicy: IfNotPresent
     # CA subject common name and cert validity (days).
@@ -3236,7 +3235,7 @@ controlPlane:
     - name: MCP_ENABLED
       value: "true"
     - name: MCP_RUNTIME_IMAGE
-      value: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+      value: localhost:30500/in-falcone-mcp-runtime
     - name: BAO_ADDR
       value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
@@ -3318,8 +3317,8 @@ controlPlaneExecutor:
     workload:
       kind: Deployment
   image:
-    repository: ghcr.io/gntik-ai/in-falcone-control-plane-executor
-    tag: 0.9.0
+    repository: localhost:30500/in-falcone-control-plane-executor
+    tag: 0.9.3
     pullPolicy: IfNotPresent
   replicas: 2
   serviceAccount:
@@ -3396,7 +3395,7 @@ controlPlaneExecutor:
     - name: MCP_ENABLED
       value: "true"
     - name: MCP_RUNTIME_IMAGE
-      value: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+      value: localhost:30500/in-falcone-mcp-runtime
     - name: BAO_ADDR
       value: https://openbao.secret-store.svc.cluster.local:8200
     - name: BAO_KV_MOUNT
@@ -3480,7 +3479,7 @@ webConsole:
     workload:
       kind: Deployment
   image:
-    repository: ghcr.io/gntik-ai/in-falcone-web-console
+    repository: localhost:30500/in-falcone-web-console
     tag: 0.2.11
     pullPolicy: IfNotPresent
   replicas: 2
@@ -3624,7 +3623,7 @@ workflowWorker:
     workload:
       kind: Deployment
   image:
-    repository: ghcr.io/gntik-ai/in-falcone-workflow-worker
+    repository: localhost:30500/in-falcone-workflow-worker
     tag: 0.1.0
     pullPolicy: IfNotPresent
   replicas: 2
@@ -4589,6 +4588,7 @@ eso:
 
 openbao:
   eso:
+    namespace: eso-system
     serviceAccountName: eso-openbao-auth
     tokenTTL: 24h
   openbao:
@@ -4805,7 +4805,7 @@ temporal:
 # ---------------------------------------------------------------------------
 mcp:
   runtimeImage:
-    repository: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+    repository: localhost:30500/in-falcone-mcp-runtime
     tag: 0.1.0
     pullPolicy: IfNotPresent
   persistence:

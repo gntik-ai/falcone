@@ -3,8 +3,11 @@ set -euo pipefail
 set +x
 
 NS="${NAMESPACE:-falcone}"
+RELEASE="${RELEASE:-falcone}"
 OPENBAO_NAMESPACE="${OPENBAO_NAMESPACE:-secret-store}"
 KV_MOUNT="${BAO_KV_MOUNT:-secret}"
+SOURCE_KV_MOUNT="${SOURCE_BAO_KV_MOUNT:-$KV_MOUNT}"
+BACKUP_VERSION=2
 
 need() {
   command -v "$1" >/dev/null 2>&1 || { echo "missing required tool: $1" >&2; exit 1; }
@@ -14,6 +17,10 @@ require_base_tools() {
   need kubectl
   need jq
   need sha256sum
+}
+
+require_helm() {
+  need helm
 }
 
 require_bao() {
@@ -52,6 +59,50 @@ bao_value() {
 bao_fingerprint() {
   local path="$1" property="$2"
   bao_value "$path" "$property" | fingerprint
+}
+
+sanitize_kubernetes_list() {
+  jq '
+    del(.metadata.resourceVersion, .metadata.selfLink, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields)
+    | .items = ((.items // []) | map(
+        del(
+          .metadata.resourceVersion,
+          .metadata.selfLink,
+          .metadata.uid,
+          .metadata.creationTimestamp,
+          .metadata.managedFields,
+          .metadata.ownerReferences,
+          .status
+        )
+      ))
+  '
+}
+
+capture_kubectl_json() {
+  local output="$1"
+  shift
+  if kubectl "$@" -o json > "$output" 2>"$output.stderr"; then
+    rm -f "$output.stderr"
+  else
+    jq -n --arg command "kubectl $*" --rawfile stderr "$output.stderr" \
+      '{absent:true, command:$command, stderr:$stderr}' > "$output"
+    rm -f "$output.stderr"
+  fi
+  chmod 0400 "$output"
+}
+
+write_secret_checksums() {
+  local output="$1"
+  : > "$output"
+  kubectl -n "$NS" get secrets -o json \
+    | jq -r '.items[] | .metadata.name as $name | (.data // {}) | keys[] | [$name, .] | @tsv' \
+    | while IFS=$'\t' read -r secret key; do
+        local len hash
+        len="$(secret_length "$secret" "$key")"
+        hash="$(secret_fingerprint "$secret" "$key")"
+        printf '%s\t%s\t%s\t%s\t%s\n' "$NS" "$secret" "$key" "$len" "$hash"
+      done >> "$output"
+  chmod 0400 "$output"
 }
 
 print_mapping_header() {
@@ -118,4 +169,68 @@ write_grouped_kv() {
     shift 2
   done
   bao kv put "$KV_MOUNT/$path" "${args[@]}" >/dev/null
+}
+
+backup_kv_paths() {
+  local out_dir="$1"
+  mkdir -p "$out_dir"
+  platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
+    mkdir -p "$out_dir/$(dirname "$path")"
+    if bao kv get -format=json "$KV_MOUNT/$path" > "$out_dir/$path.json" 2>/dev/null; then
+      chmod 0400 "$out_dir/$path.json"
+      echo "backed up $KV_MOUNT/$path"
+    else
+      echo "missing $KV_MOUNT/$path (recorded as absent)"
+      printf '{"absent":true,"path":"%s"}\n' "$path" > "$out_dir/$path.json"
+      chmod 0400 "$out_dir/$path.json"
+    fi
+  done
+}
+
+backup_source_kv_paths() {
+  local out_dir="$1"
+  : "${SOURCE_BAO_ADDR:?SOURCE_BAO_ADDR is required when backing up an external source}"
+  : "${SOURCE_BAO_TOKEN:?SOURCE_BAO_TOKEN is required when backing up an external source}"
+  mkdir -p "$out_dir"
+  local source_env=("BAO_ADDR=$SOURCE_BAO_ADDR" "BAO_TOKEN=$SOURCE_BAO_TOKEN")
+  if [ -n "${SOURCE_BAO_CACERT:-}" ]; then
+    source_env+=("BAO_CACERT=$SOURCE_BAO_CACERT")
+  fi
+  platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
+    mkdir -p "$out_dir/$(dirname "$path")"
+    if env "${source_env[@]}" bao kv get -format=json "$SOURCE_KV_MOUNT/$path" > "$out_dir/$path.json" 2>/dev/null; then
+      chmod 0400 "$out_dir/$path.json"
+      echo "backed up external $SOURCE_KV_MOUNT/$path"
+    else
+      echo "missing external $SOURCE_KV_MOUNT/$path (recorded as absent)"
+      printf '{"absent":true,"path":"%s"}\n' "$path" > "$out_dir/$path.json"
+      chmod 0400 "$out_dir/$path.json"
+    fi
+  done
+}
+
+verify_extracted_backup() {
+  local dir="$1"
+  [ -f "$dir/manifest.json" ] || { echo "backup manifest.json missing" >&2; return 1; }
+  jq -e --arg ns "$NS" --arg release "$RELEASE" --argjson minVersion "$BACKUP_VERSION" '
+    (.backupVersion >= $minVersion)
+    and (.verified == true)
+    and (.namespace == $ns)
+    and (.release == $release)
+  ' "$dir/manifest.json" >/dev/null || {
+    echo "backup manifest does not match namespace=$NS release=$RELEASE or is not verified" >&2
+    return 1
+  }
+  [ -f "$dir/kubernetes/secrets.apply.json" ] || { echo "backup missing kubernetes/secrets.apply.json" >&2; return 1; }
+  [ -f "$dir/kubernetes/secret-checksums.tsv" ] || { echo "backup missing kubernetes/secret-checksums.tsv" >&2; return 1; }
+  [ -f "$dir/helm/values.yaml" ] || { echo "backup missing helm/values.yaml" >&2; return 1; }
+  [ -f "$dir/helm/manifest.yaml" ] || { echo "backup missing helm/manifest.yaml" >&2; return 1; }
+  [ -d "$dir/kv" ] || { echo "backup missing kv/" >&2; return 1; }
+}
+
+extract_verified_backup() {
+  local backup="$1" dir="$2"
+  mkdir -p "$dir"
+  tar -C "$dir" -xzf "$backup"
+  verify_extracted_backup "$dir"
 }

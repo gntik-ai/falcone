@@ -130,14 +130,16 @@ spec:
                   bao operator unseal "$(cat "$key")" >/dev/null
                 done
                 cp /openbao-recovery-mounted/unseal* /openbao-recovery/ 2>/dev/null || true
-                if [ -s /openbao-recovery/unseal1 ]; then
+                cp /openbao-recovery-mounted/root-token /openbao-recovery/root-token 2>/dev/null || true
+                if [ -s /openbao-recovery/unseal1 ] && [ -s /openbao-recovery/root-token ]; then
                   touch /openbao-recovery/.ready
                 else
                   touch /openbao-recovery/.skip
                 fi
               else
                 cp /openbao-recovery-mounted/unseal* /openbao-recovery/ 2>/dev/null || true
-                if [ -s /openbao-recovery/unseal1 ]; then
+                cp /openbao-recovery-mounted/root-token /openbao-recovery/root-token 2>/dev/null || true
+                if [ -s /openbao-recovery/unseal1 ] && [ -s /openbao-recovery/root-token ]; then
                   touch /openbao-recovery/.ready
                 else
                   touch /openbao-recovery/.skip
@@ -191,7 +193,7 @@ spec:
                 policies=functions ttl=24h >/dev/null
               bao write auth/kubernetes/role/eso-role \
                 bound_service_account_names='{{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}' \
-                bound_service_account_namespaces='eso-system' \
+                bound_service_account_namespaces='{{ .Values.eso.namespace | default "eso-system" }}' \
                 policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }} >/dev/null
 
               bao kv put secret/platform/postgresql \

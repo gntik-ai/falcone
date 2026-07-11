@@ -94,39 +94,50 @@ OpenBao is initialized and unsealed, Temporal namespace/search attributes exist,
 return `SECRETS_BACKEND_DISABLED`, pgvector can create the `vector` extension, and Prometheus scrapes
 the executor.
 
+The implementer stage does not apply to a cluster; the orchestrator/devops verification step must
+run the clean install and attach this evidence before the fresh-install tasks are checked off.
+
 ## Existing-Install Upgrade
 
 Existing clusters can have disabled-service overrides, manually created Kubernetes Secrets, external
 Vault/OpenBao state, an external ESO owner, and PVCs owned by older revisions. Upgrade them through a
 controlled rollout:
 
-1. Set `KUBECONFIG`, `NAMESPACE`, `OPENBAO_NAMESPACE`, `BAO_ADDR`, `BAO_TOKEN`, and `BAO_CACERT`
-   for the intended cluster.
+1. Set `KUBECONFIG`, `NAMESPACE`, `RELEASE`, `OPENBAO_NAMESPACE`, `BAO_ADDR`, `BAO_TOKEN`, and
+   `BAO_CACERT` for the intended cluster.
 2. Run `scripts/system-changes/make-all-services-core/backup-kv.sh --output /secure/path/falcone-kv-backup.tgz`.
 3. Run `scripts/system-changes/make-all-services-core/parity-check.sh --dry-run` to inspect
    Kubernetes Secret and OpenBao fingerprints without printing values.
 4. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --dry-run`.
-5. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --apply`.
+5. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`.
 6. Run `scripts/system-changes/make-all-services-core/parity-check.sh --strict`.
 7. Dry-run the Helm upgrade and inspect the rendered diff.
 8. Apply the all-core chart only after operator approval.
 9. Run `scripts/system-changes/make-all-services-core/health-check.sh`.
-10. If any gate fails, run `scripts/system-changes/make-all-services-core/restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --apply`,
-    verify parity again, and then roll back the Helm release.
+10. If any gate fails, run
+    `scripts/system-changes/make-all-services-core/restore-kv.sh --backup /secure/path/falcone-kv-backup.tgz --apply --helm-rollback`,
+    verify parity again, and rerun the health gate.
 
-Rollback restores OpenBao KV paths from the restricted backup archive and then returns the Helm
+Rollback restores OpenBao KV paths, Kubernetes Secrets, ESO resources, and then returns the Helm
 release to the previous revision. It does not delete OpenBao, Temporal, pgvector, or any existing
 service PVC. Keep those PVCs until the failed rollout is understood and a separate decommission step
 is approved.
 
 ## Image Publication Status
 
-Third-party images in the chart can be mirrored by tag or digest per the air-gapped guide. Falcone
-application images are buildable from this repository, and kind/campaign overlays use
-`localhost:30500/in-falcone-*` images for local validation. As of this change, public manifests for
+Third-party defaults were verified with `docker manifest inspect` for
+`docker.io/bitnamilegacy/postgresql:17.2.0`, `docker.io/bitnamilegacy/kafka:3.9.0`,
+`docker.io/bitnamilegacy/kubectl:1.32.2`, and `docker.io/pgvector/pgvector:pg17`.
+
+Falcone application images are buildable from this repository, and the tracked
+`.github/workflows/release-images.yml` workflow publishes the control-plane executor, web console,
+and workflow worker images on a release. The default chart and kind overlays point the unpublished
+project-owned runtime images at local `localhost:30500/in-falcone-*` aliases for repository-local
+validation instead of rendering public tags that currently do not exist. Public manifests for
 `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
 `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.1.0`,
 `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0`, and
-`ghcr.io/gntik-ai/in-falcone-web-console:0.2.11` were not verified, so production or
-air-gapped installs must build and publish those artifacts into the target registry and override the
-image values. Do not add digest pins until the registry manifest is verified.
+`ghcr.io/gntik-ai/in-falcone-web-console:0.2.11` still return `manifest unknown`; publishing those
+images to GHCR or the target production registry is an external release blocker. The MCP runtime
+image also needs a verified production publication path before hosted MCP server creation can be
+called ready. Do not add digest pins for those images until their registry manifests are verified.

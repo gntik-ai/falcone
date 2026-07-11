@@ -49,8 +49,8 @@ async function loadValidateImportBundle() {
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 
-// Vault-backed workspace-secret store (add-vault-secret-consumption, #612). Null when Vault is not
-// configured (VAULT_ADDR/VAULT_TOKEN unset) — the secrets API then reports the backend disabled and
+// OpenBao-backed workspace-secret store (add-vault-secret-consumption, #612). Null when OpenBao is not
+// configured (BAO_ADDR/BAO_TOKEN or compatible VAULT_* env unset) — the secrets API reports the backend disabled and
 // function deploys ignore secret refs, so default behaviour is unchanged.
 const vaultStore = vaultStoreFromEnv();
 
@@ -274,13 +274,13 @@ async function fnDeploy(ctx) {
   // Per-(tenant, workspace) ksvc name so two tenants' same-named workspaces never
   // collide on a shared Knative Service (P0 ISO-FUNCTIONS).
   const name = ksvcNameForWorkspace(ws, actionName);
-  // Resolve any declared workspace-secret references from Vault and inject them as env vars
-  // (add-vault-secret-consumption, #612). The values are read from THIS workspace's own Vault path,
+  // Resolve any declared workspace-secret references from OpenBao and inject them as env vars
+  // (add-vault-secret-consumption, #612). The values are read from THIS workspace's own KV path,
   // so a function only ever sees its own tenant/workspace secrets.
   let secretEnv = [];
   const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
   if (Array.isArray(secretRefs) && secretRefs.length > 0) {
-    if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the Vault backend (not configured)');
+    if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
     try { secretEnv = await vaultStore.resolveEnv(ws.tenant_id, ws.id, secretRefs); }
     catch (e) { return err(502, 'SECRET_RESOLVE_FAILED', String(e.message ?? e)); }
   }

@@ -49,3 +49,5 @@ spec:
   data:
     - secretKey: password
       remoteRef: { key: platform/documentdb-replication, property: password }
+    - secretKey: realtime-url
+      remoteRef: { key: platform/documentdb-replication, property: realtime-url }

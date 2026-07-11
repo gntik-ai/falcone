@@ -143,12 +143,36 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   scripts/system-changes/make-all-services-core/*.sh`; targeted `node --test` suite covering 86
   MCP/chart/gateway/readiness tests; `openspec validate make-all-services-core --strict`;
   `npm run validate:repo`; `git diff --check`.
+- Second-reviewer revision fixed the remaining static blockers without applying to a cluster:
+  default third-party images now render verified `bitnamilegacy` tags, default unpublished
+  project-owned runtime images render local buildable aliases, OpenBao recovery only writes the
+  recovery Secret when root-token material is present, OpenBao/ESO auth honors a configured ESO
+  namespace, ESO syncs `in-falcone-documentdb-replication/realtime-url`, and existing-install
+  backup/migration/restore scripts now require verified backups, compare destination fingerprints,
+  fail closed on overwrite, restore Kubernetes Secrets/ESO resources, and can execute a
+  release-name-safe Helm rollback.
+- Second-reviewer validation run: `bash -n scripts/system-changes/make-all-services-core/*.sh`;
+  `helm dependency build charts/in-falcone`; `helm template falcone charts/in-falcone --namespace
+  review-ns --include-crds`;
+  `helm template falcone charts/in-falcone --namespace review-ns --set
+  eso.eso.namespace=custom-eso --set openbao.eso.namespace=custom-eso`; `helm lint
+  charts/in-falcone --namespace review-ns`; `docker manifest inspect` for
+  `docker.io/bitnamilegacy/postgresql:17.2.0`, `docker.io/bitnamilegacy/kafka:3.9.0`,
+  `docker.io/bitnamilegacy/kubectl:1.32.2`, `docker.io/pgvector/pgvector:pg17`, and
+  `docker.io/pgvector/pgvector@sha256:815bf5378222044da3b34d98e6a5fdac37b15c428b67d09c7c2d90a038e597bf`;
+  `node --test tests/blackbox/all-core-install-readiness.test.mjs`; focused `node --test`
+  coverage for pgvector, OpenBao/ESO, kind advanced profile, Prometheus completeness, and Temporal
+  Secret substitution; `openspec validate make-all-services-core --strict`;
+  `npm run validate:repo`; `git diff --check`. `npm run lint:md` and `npm run lint:snippets`
+  still fail only on the pre-existing `README-loop-kit.md` formatting issues and missing
+  `docs/guides/realtime/frontend-quickstart.md` recorded above.
 - Fresh clean-cluster install was intentionally not run in this implementer stage per orchestrator
   instruction.
 - MCP runtime wiring and PostgreSQL-backed MCP state are implemented, but these public manifests
-  could not be verified from this environment: `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
+  still return `manifest unknown`: `ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.9.0`,
   `ghcr.io/gntik-ai/in-falcone-workflow-worker:0.1.0`,
   `ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.1.0`, and
-  `ghcr.io/gntik-ai/in-falcone-web-console:0.2.11`. Kind/local overlays now use buildable
-  `localhost:30500/in-falcone-*` artifacts, the chart no longer defaults to the old
-  `ghcr.io/example` web-console placeholder, and unverified MCP digest pins were removed.
+  `ghcr.io/gntik-ai/in-falcone-web-console:0.2.11`. The chart now defaults the unpublished
+  project-owned runtime images to local `localhost:30500/in-falcone-*` aliases; the tracked release
+  workflow can publish executor/web-console/workflow-worker images on a release, but production/GHCR
+  publication and a verified MCP runtime publication path remain external release blockers.

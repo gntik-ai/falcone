@@ -8,7 +8,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}
-  namespace: eso-system
+  namespace: {{ .Values.eso.namespace | default "eso-system" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -32,7 +32,7 @@ subjects:
     namespace: {{ .Values.openbao.namespace }}
   - kind: ServiceAccount
     name: {{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}
-    namespace: eso-system
+    namespace: {{ .Values.eso.namespace | default "eso-system" }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

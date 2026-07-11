@@ -1,4 +1,5 @@
 eso:
+  namespace: "eso-system"
   serviceAccountName: "eso-openbao-auth"
   tokenTTL: "24h"
 

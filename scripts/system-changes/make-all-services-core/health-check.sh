@@ -16,23 +16,30 @@ kubectl -n "$NS" get externalsecret -o json \
       [ "$status" = "True" ] || exit 1
     done
 
-echo "checking core workload rollouts"
-for workload in \
-  deploy/falcone-control-plane \
-  deploy/falcone-control-plane-executor \
-  deploy/falcone-workflow-worker \
-  deploy/falcone-temporal-frontend \
-  deploy/falcone-temporal-history \
-  deploy/falcone-temporal-matching \
-  deploy/falcone-temporal-worker \
-  statefulset/falcone-postgresql \
-  statefulset/falcone-postgresql-vector \
-  statefulset/falcone-documentdb \
-  statefulset/falcone-kafka; do
+echo "checking ClusterSecretStore readiness"
+kubectl get clustersecretstore openbao-backend -o json \
+  | jq -e '((.status.conditions // [])[]? | select(.type=="Ready") | .status) == "True"' >/dev/null
+
+echo "checking release-owned workload rollouts for release $RELEASE"
+mapfile -t workloads < <(kubectl -n "$NS" get deploy,statefulset -l "app.kubernetes.io/instance=$RELEASE" -o name | sort)
+if [ "${#workloads[@]}" -eq 0 ]; then
+  echo "no release-owned Deployments/StatefulSets found for release $RELEASE in namespace $NS" >&2
+  exit 1
+fi
+for workload in "${workloads[@]}"; do
   kubectl -n "$NS" rollout status "$workload" --timeout=30s
 done
 
 kubectl -n "$OPENBAO_NAMESPACE" rollout status statefulset/openbao --timeout=30s
+
+echo "checking completed release-owned Jobs"
+kubectl -n "$NS" get job -l "app.kubernetes.io/instance=$RELEASE" -o json \
+  | jq -r '.items[] | select(((.status.succeeded // 0) < 1) and ((.status.conditions // []) | map(select(.type=="Complete" and .status=="True")) | length == 0)) | .metadata.name' \
+  | while read -r job; do
+      [ -z "$job" ] && continue
+      echo "job/$job is not complete" >&2
+      exit 1
+    done
 
 echo "checking OpenBao status without printing unseal or token material"
 kubectl -n "$OPENBAO_NAMESPACE" exec statefulset/openbao -- bao status >/dev/null

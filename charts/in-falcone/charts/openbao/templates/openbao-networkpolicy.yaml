@@ -20,7 +20,7 @@ spec:
               kubernetes.io/metadata.name: {{ .Values.openbao.namespace }}
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: eso-system
+              kubernetes.io/metadata.name: {{ .Values.eso.namespace | default "eso-system" }}
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: {{ .Release.Namespace }}
