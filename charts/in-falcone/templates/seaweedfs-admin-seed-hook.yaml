@@ -38,7 +38,10 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "in-falcone.labels" . | nindent 8 }}
+        helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/part-of: in-falcone
         # Admit through the master/filer NetworkPolicies (intra-SeaweedFS ingress is
         # allowed from app.kubernetes.io/name: seaweedfs).
         app.kubernetes.io/name: seaweedfs

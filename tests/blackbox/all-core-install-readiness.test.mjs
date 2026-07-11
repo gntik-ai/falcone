@@ -79,6 +79,14 @@ function imageList(docs) {
   }
   return images;
 }
+function podSpecEntries(docs) {
+  const entries = [];
+  for (const doc of docs) {
+    const podSpec = doc.kind === 'Pod' ? doc.spec : doc.spec?.template?.spec;
+    if (podSpec) entries.push({ doc, podSpec });
+  }
+  return entries;
+}
 function hookKinds(docs, hooks) {
   return docs.filter((doc) => {
     const hook = doc.metadata?.annotations?.['helm.sh/hook'];
@@ -548,10 +556,82 @@ test('all-core-006d: OpenShift Harbor overlay renders Harbor-only coherent relea
   }
   assert.match(out, /name:\s*in-falcone-runtime-env[\s\S]*MCP_RUNTIME_IMAGE:\s*"harbor\.example\.com\/falcone\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0"/, 'OpenShift MCP runtime image must come from mcp.runtimeImage with the Harbor 0.3.0 tag');
   assert.doesNotMatch(out, /name:\s*MCP_RUNTIME_IMAGE\s*\n\s*value:/, 'workloads must consume MCP_RUNTIME_IMAGE from the runtime env ConfigMap, not hard-code it in env');
-  assert.match(out, /name:\s*FN_RUNTIME_IMAGE[\s\S]*value:\s*harbor\.example\.com\/falcone\/gntik-ai\/in-falcone-fn-runtime:0\.3\.0/, 'OpenShift function runtime must use the Harbor 0.3.0 image');
+  assert.equal(envValue(findDoc(docs, 'Deployment', 'falcone-control-plane'), 'FN_RUNTIME_IMAGE'), 'harbor.example.com/falcone/gntik-ai/in-falcone-fn-runtime:0.3.0', 'OpenShift function runtime must use the Harbor 0.3.0 image');
   assert.ok(images.includes('harbor.example.com/falcone/external-secrets/external-secrets:v0.9.0'), 'external-secrets operator images must render from Harbor');
   assert.ok(images.includes('harbor.example.com/falcone/openbao/openbao:2.3.1'), 'OpenBao images must render from Harbor');
   assert.ok(images.includes('harbor.example.com/falcone/alpine/k8s:1.32.2'), 'install/helper images must render from Harbor');
+});
+
+test('all-core-006d2: every OpenShift pod is restricted-v2 and Harbor-pull coherent', SKIP, () => {
+  for (const valuesPath of [resolve(CHART_PATH, 'values.yaml'), OPENSHIFT_VALUES]) {
+    const source = parseAllDocuments(readFileSync(valuesPath, 'utf8'));
+    assert.deepEqual(source.flatMap((doc) => doc.errors), [], `${valuesPath} must not contain duplicate mapping keys`);
+  }
+  const docs = renderDocs(['-f', OPENSHIFT_VALUES, '--include-crds']);
+  const entries = podSpecEntries(docs);
+  assert.ok(entries.length > 0, 'OpenShift render must contain pod specs');
+  for (const { doc, podSpec } of entries) {
+    const ref = `${doc.kind}/${doc.metadata?.namespace ?? 'review-ns'}/${doc.metadata?.name}`;
+    for (const key of ['runAsUser', 'runAsGroup', 'fsGroup']) {
+      assert.notEqual(typeof podSpec.securityContext?.[key], 'number', `${ref} must let restricted-v2 assign pod ${key}`);
+    }
+    for (const container of [...(podSpec.initContainers ?? []), ...(podSpec.containers ?? [])]) {
+      for (const key of ['runAsUser', 'runAsGroup']) {
+        assert.notEqual(typeof container.securityContext?.[key], 'number', `${ref}/${container.name} must let restricted-v2 assign ${key}`);
+      }
+    }
+    for (const volume of podSpec.volumes ?? []) {
+      assert.equal(volume.hostPath, undefined, `${ref} must not use hostPath volumes`);
+    }
+    const hasHarborImage = [...(podSpec.initContainers ?? []), ...(podSpec.containers ?? [])]
+      .some((container) => container.image?.startsWith('harbor.example.com/falcone/'));
+    if (hasHarborImage) {
+      assert.ok((podSpec.imagePullSecrets ?? []).some((secret) => secret.name === 'harbor-pull'), `${ref} must carry the Harbor pull secret`);
+    }
+  }
+  for (const [kind, name] of [
+    ['Deployment', 'falcone-grafana'],
+    ['StatefulSet', 'openbao'],
+    ['Job', 'openbao-init'],
+    ['Job', 'eso-preflight'],
+    ['Job', 'eso-webhook-wait'],
+    ['Job', 'openbao-tls-bootstrap'],
+    ['Job', 'falcone-seaweedfs-tls-bootstrap'],
+  ]) {
+    const doc = findDoc(docs, kind, name);
+    assert.ok(doc, `${kind}/${name} must render`);
+    assert.ok(doc.spec.template.spec.imagePullSecrets?.some((secret) => secret.name === 'harbor-pull'), `${kind}/${name} must carry harbor-pull`);
+  }
+});
+
+test('all-core-006d3: control plane wiring follows custom release and registry values', SKIP, () => {
+  const result = spawnSync('helm', [
+    'template', 'hawk', CHART_PATH, '--namespace', 'tenant-x',
+    '--set', 'global.imageRegistry=registry.example.test/team',
+  ], { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 96 * 1024 * 1024 });
+  assert.equal(result.status, 0, `custom release render must succeed\n${result.stderr}`);
+  const parsed = parseAllDocuments(result.stdout);
+  assert.deepEqual(parsed.flatMap((doc) => doc.errors), [], 'rendered YAML must not contain duplicate mapping keys');
+  const docs = parsed.map((doc) => doc.toJSON()).filter(Boolean);
+  const deployment = findDoc(docs, 'Deployment', 'hawk-control-plane');
+  assert.ok(deployment, 'custom control-plane Deployment must render');
+  const env = Object.fromEntries(deployment.spec.template.spec.containers[0].env.map((entry) => [entry.name, entry]));
+  assert.equal(env.PGHOST.value, 'hawk-postgresql');
+  assert.equal(env.PGUSER.valueFrom?.secretKeyRef?.key, 'POSTGRESQL_USERNAME');
+  assert.equal(env.KEYCLOAK_BASE_URL.value, 'http://hawk-keycloak:8080');
+  assert.equal(env.STORAGE_S3_ENDPOINT.value, 'http://hawk-seaweedfs-s3:8333');
+  assert.equal(env.STORAGE_S3_ACCESS_KEY.valueFrom?.secretKeyRef?.name, 'in-falcone-seaweedfs-s3-creds');
+  assert.equal(env.KAFKA_BROKERS.value, 'hawk-kafka:9092');
+  assert.equal(env.FN_RUNTIME_IMAGE.value, 'registry.example.test/team/gntik-ai/in-falcone-fn-runtime:0.3.0');
+  const serializedEnv = JSON.stringify(deployment.spec.template.spec.containers[0].env);
+  assert.doesNotMatch(serializedEnv, /localhost:30500|:0\.1\.0|falcone-storage|value\":\"falcone\"/);
+
+  const openshiftDocs = renderDocs(['-f', OPENSHIFT_VALUES]);
+  assert.equal(
+    envValue(findDoc(openshiftDocs, 'Deployment', 'falcone-control-plane'), 'STORAGE_S3_ENDPOINT'),
+    'https://falcone-seaweedfs-s3:8334',
+    'OpenShift control plane must use the release-derived TLS SeaweedFS endpoint',
+  );
 });
 
 test('all-core-006e: OpenShift Harbor documentation mirrors stay synchronized', () => {

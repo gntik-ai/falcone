@@ -12,6 +12,8 @@ spec:
     spec:
       serviceAccountName: openbao
       restartPolicy: OnFailure
+      {{- include "openbao.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.openbao.jobPodSecurityContext | nindent 8 }}
       containers:
         - name: platform-credential-loader
           image: {{ include "openbao.image" (dict "root" . "image" .Values.openbao.credentialSync.image) | quote }}

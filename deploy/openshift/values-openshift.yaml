@@ -38,6 +38,7 @@ global:
     seccompProfile:
       type: RuntimeDefault
     fsGroup: null                   # <- unset: let the SCC inject it (was 1001)
+    openshiftRestricted: true
 
 mcp:
   runtimeImage:
@@ -54,18 +55,61 @@ eso:
       tag: "v0.9.0"
     imagePullSecrets:
       - name: harbor-pull
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      fsGroup: null
+      seccompProfile: { type: RuntimeDefault }
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      allowPrivilegeEscalation: false
+      capabilities: { drop: ["ALL"] }
     webhook:
       image:
         repository: "harbor.example.com/falcone/external-secrets/external-secrets"
         tag: "v0.9.0"
       imagePullSecrets:
         - name: harbor-pull
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: null
+        runAsGroup: null
+        fsGroup: null
+        seccompProfile: { type: RuntimeDefault }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: null
+        runAsGroup: null
+        allowPrivilegeEscalation: false
+        capabilities: { drop: ["ALL"] }
     certController:
       image:
         repository: "harbor.example.com/falcone/external-secrets/external-secrets"
         tag: "v0.9.0"
       imagePullSecrets:
         - name: harbor-pull
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: null
+        runAsGroup: null
+        fsGroup: null
+        seccompProfile: { type: RuntimeDefault }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: null
+        runAsGroup: null
+        allowPrivilegeEscalation: false
+        capabilities: { drop: ["ALL"] }
+  eso:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      fsGroup: null
+      seccompProfile: { type: RuntimeDefault }
 
 # Functions run on Knative (provided by OpenShift Serverless): the control-plane
 # executor creates a Knative Service per function (scale-to-zero, HTTP invoke).
@@ -85,13 +129,9 @@ keycloak:
     fsGroup: null
     fsGroupChangePolicy: null
 
-# Control-plane runtime. The chart ships the executor RBAC as core infrastructure;
-# this overlay enables the SA token for Kubernetes/OpenBao calls + sets the env. NOTE: the
-# *HOST values below are <release>-<component> service DNS — they assume
-# `helm install <RELEASE>` with RELEASE matching the prefix (here: falcone). Adjust if
-# you use a different release name. Core Secret refs are materialized by the chart's
-# OpenBao/ESO lifecycle; pre-create only external inputs such as Harbor pull secrets
-# or bring-your-own certificates.
+# Control-plane runtime. Core service DNS, credential refs, and the function runtime
+# image are wired in the base chart from the actual release and registry values. This
+# overlay only adds OpenShift/Harbor-specific image and SCC settings.
 controlPlane:
   image:
     repository: ghcr.io/gntik-ai/in-falcone-control-plane   # global.imageRegistry => harbor.example.com/falcone/gntik-ai/in-falcone-control-plane
@@ -104,44 +144,19 @@ controlPlane:
   podSecurityContext:                                       # SCC: let the namespace range set fsGroup
     fsGroup: null
     fsGroupChangePolicy: null
-  env:
-    - { name: NODE_ENV, value: production }
-    - { name: ROUTE_MAP_FILE, value: /app/route-map.runtime.json }
-    - { name: TEMPORAL_ADDRESS, value: "falcone-temporal-frontend:7233" }
-    - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
-    - { name: MCP_ENABLED, value: "true" }
-    - { name: BAO_KV_MOUNT, value: secret }
-    - { name: BAO_KUBERNETES_AUTH_ROLE, value: workspace-secrets-role }
-    - { name: NODE_EXTRA_CA_CERTS, value: /openbao/tls/ca.crt }
-    - { name: PGHOST, value: falcone-postgresql }
-    - { name: PGPORT, value: "5432" }
-    - { name: PGUSER, value: falcone }
-    - { name: PGDATABASE, value: in_falcone }
-    - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
-    - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
-    - { name: KEYCLOAK_BASE_URL, value: "http://falcone-keycloak:8080" }
-    - { name: KEYCLOAK_ADMIN_USERNAME, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: username } } }
-    - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: password } } }
-    # Provider-neutral S3 endpoint (STORAGE_S3_* authoritative), pointed at the
-    # SeaweedFS S3 gateway (path-style; HTTPS port 8334 per the SCC overlay below).
-    # SeaweedFS replaced MinIO (ADR-13); enable the `seaweedfs` component below. The
-    # in-falcone-storage Secret key names are the SeaweedFS S3 access/secret keys.
-    - { name: STORAGE_S3_ENDPOINT, value: "https://falcone-seaweedfs-s3:8334" }
-    - { name: STORAGE_S3_ACCESS_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: s3_access_key } } }
-    - { name: STORAGE_S3_SECRET_KEY, valueFrom: { secretKeyRef: { name: in-falcone-storage, key: s3_secret_key } } }
-    # Document store: FerretDB gateway over the DocumentDB (PostgreSQL) engine — MongoDB
-    # wire-protocol. The gateway passes the DocumentDB Postgres credentials to the engine.
-    - { name: MONGO_HOST, value: "falcone-ferretdb:27017" }
-    - { name: MONGO_BACKEND, value: ferretdb }
-    # FerretDB v2 delegates auth to Postgres: MONGO_USER must be the documentdb admin role,
-    # sourced from the same secret as the password (not a hardcoded `falcone`, which mismatched
-    # the admin role and failed the handshake — finding F2).
-    - { name: MONGO_USER, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_USER } } }
-    - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
-    - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
-    - { name: GATEWAY_SHARED_SECRET, valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } } }
-    # Functions: the executor reads this to template each function's Knative Service.
-    - { name: FN_RUNTIME_IMAGE, value: "harbor.example.com/falcone/gntik-ai/in-falcone-fn-runtime:0.3.0" }
+  coreServices:
+    storageS3Scheme: https
+    storageS3Port: 8334
+
+controlPlaneExecutor:
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile: { type: RuntimeDefault }
+
+workflowWorker:
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile: { type: RuntimeDefault }
 
 webConsole:
   image:
@@ -167,6 +182,13 @@ postgresql:
   podSecurityContext:
     fsGroup: null
     fsGroupChangePolicy: null
+postgresqlVector:
+  volumePermissions: { enabled: false }
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+    runAsUser: null
+    runAsNonRoot: true
 # DocumentDB engine (add-ferretdb-documentdb-engine). Same SCC treatment as the other
 # stateful datastores: null the per-component fsGroup so restricted-v2 injects it from
 # the namespace range. runAsNonRoot + seccompProfile RuntimeDefault come from
@@ -207,6 +229,13 @@ observability:
   podSecurityContext:
     fsGroup: null
     fsGroupChangePolicy: null
+grafana:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null
+    seccompProfile: { type: RuntimeDefault }
 
 # SeaweedFS (core object-storage tier, ADR-13) — OpenShift restricted-v2 SCC +
 # Harbor/airgap overlay. The master/volume/filer/S3 roles are always rendered by
@@ -296,6 +325,8 @@ seaweedfs:
     # Disable plaintext on the S3 gateway: expose the HTTPS port (8334) backed by
     # the in-cluster cert; consumers use https://<release>-seaweedfs-s3:8334. (task 8.3)
     httpsPort: 8334
+    logs:
+      type: emptyDir
     podSecurityContext:
       enabled: true
       runAsNonRoot: true
@@ -319,6 +350,34 @@ seaweedfsTls:
     image:
       repository: "harbor.example.com/falcone/alpine/k8s"
       tag: "1.32.2"
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      fsGroup: null
+      seccompProfile: { type: RuntimeDefault }
+
+openbao:
+  openbao:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      fsGroup: null
+      seccompProfile: { type: RuntimeDefault }
+    jobPodSecurityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      fsGroup: null
+      seccompProfile: { type: RuntimeDefault }
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities: { drop: ["ALL"] }
 
 # Temporal (flows engine) — INTERNAL-ONLY and core. Temporal server pods are STATELESS
 # (durable state lives in PostgreSQL), so
@@ -369,3 +428,10 @@ bootstrap:
     image:
       repository: "harbor.example.com/falcone/alpine/k8s"
       tag: "1.32.2"
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsUser: null
+      runAsGroup: null
+      runAsNonRoot: true
+      capabilities: { drop: ["ALL"] }

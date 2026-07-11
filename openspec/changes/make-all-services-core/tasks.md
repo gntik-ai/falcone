@@ -259,3 +259,7 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
 - [x] Ninth-reviewer revision makes recursive target/source KV backup enumeration and reads fail closed,
   accepts only explicit not-found responses as empty trees, and atomically publishes the archive only
   after complete capture and verification.
+- [x] DevOps remediation renders every OpenShift pod without fixed UID/GID/fsGroup or hostPath,
+  propagates the single Harbor pull-secret source to all private-image workloads and hooks, wires the
+  main control plane to release-derived core services and registry-derived function runtime, and removes
+  duplicate bootstrap/SeaweedFS labels; object-level render tests cover the full PodSpec set.

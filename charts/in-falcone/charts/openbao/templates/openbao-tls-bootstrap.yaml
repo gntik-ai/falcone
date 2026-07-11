@@ -79,11 +79,8 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: openbao-tls-bootstrap
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "openbao.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.openbao.jobPodSecurityContext | nindent 8 }}
       containers:
         - name: tls-bootstrap
           image: {{ include "openbao.image" (dict "root" . "image" $b.image) | quote }}

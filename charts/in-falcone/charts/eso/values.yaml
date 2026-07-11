@@ -18,6 +18,16 @@ eso:
       repository: docker.io/alpine/k8s
       tag: "1.32.2"
       pullPolicy: IfNotPresent
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
   vaultAuthPath: kubernetes
   vaultAuthRole: eso-role
   serviceAccountName: eso-openbao-auth

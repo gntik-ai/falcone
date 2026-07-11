@@ -6,6 +6,20 @@ eso:
 openbao:
   namespace: secret-store
   replicas: 1
+  podSecurityContext:
+    fsGroup: 1000
+  jobPodSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
   image:
     repository: openbao/openbao
     tag: "2.3.1"

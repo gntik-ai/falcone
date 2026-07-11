@@ -2498,7 +2498,6 @@ ferretdb:
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
         runAsNonRoot: true
-        runAsUser: 999
         capabilities:
           drop:
             - ALL
@@ -2932,6 +2931,11 @@ seaweedfsTls:
       repository: docker.io/alpine/k8s
       tag: "1.32.2"
       pullPolicy: IfNotPresent
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
     # CA subject common name and cert validity (days).
     commonName: "Falcone SeaweedFS CA"
     days: 3650
@@ -3000,6 +3004,18 @@ grafana:
     repository: docker.io/grafana/grafana
     tag: 11.4.0
     pullPolicy: IfNotPresent
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 472
+    fsGroup: 472
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
   resources:
     requests: { cpu: 100m, memory: 128Mi }
     limits: { cpu: 500m, memory: 512Mi }
@@ -3205,13 +3221,17 @@ controlPlane:
     # Core runtime needs its ServiceAccount token for OpenBao Kubernetes auth and
     # chart-owned function/MCP management paths.
     automountToken: true
-  # Function executor (Knative): RBAC + the per-function runtime image. The data-plane
-  # connection env (PG/KEYCLOAK/STORAGE_S3/MONGO/KAFKA host+secret refs) is environment-
-  # specific (release-prefixed service DNS + external secrets) and lives in the overlay
-  # values (deploy/kind/values-kind.yaml, deploy/openshift/values-openshift.yaml).
-  # The per-function runtime image is read by the executor from the FN_RUNTIME_IMAGE
-  # env var (set in the overlay: kind -> localhost:30500, OpenShift -> Harbor).
-  functionExecutor: {}
+  # Function executor (Knative): the runtime image is normalized through the same
+  # registry source as every chart workload, so custom releases and Harbor installs
+  # do not need to replace the complete control-plane environment.
+  functionExecutor:
+    runtimeImage:
+      repository: ghcr.io/gntik-ai/in-falcone-fn-runtime
+      tag: 0.3.0
+      pullPolicy: IfNotPresent
+  coreServices:
+    storageS3Scheme: http
+    storageS3Port: 8333
   service:
     enabled: true
     type: ClusterIP
@@ -3247,6 +3267,52 @@ controlPlane:
       value: workspace-secrets-role
     - name: NODE_EXTRA_CA_CERTS
       value: /openbao/tls/ca.crt
+    - name: PGHOST
+      value: "{{ .Release.Name }}-postgresql"
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_USERNAME
+    - name: PGDATABASE
+      value: in_falcone
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    - name: KEYCLOAK_JWKS_URL
+      value: "http://{{ .Release.Name }}-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs"
+    - name: KEYCLOAK_BASE_URL
+      value: "http://{{ .Release.Name }}-keycloak:8080"
+    - name: KEYCLOAK_ADMIN_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: username
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-keycloak-admin
+          key: password
+    - name: STORAGE_S3_ENDPOINT
+      value: "{{ .Values.coreServices.storageS3Scheme }}://{{ .Release.Name }}-seaweedfs-s3:{{ .Values.coreServices.storageS3Port }}"
+    - name: STORAGE_S3_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-seaweedfs-s3-creds
+          key: s3AccessKey
+    - name: STORAGE_S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-seaweedfs-s3-creds
+          key: s3SecretKey
+    - name: KAFKA_BROKERS
+      value: "{{ .Release.Name }}-kafka:9092"
+    - name: FN_RUNTIME_IMAGE
+      value: '{{ include "component-wrapper.renderImage" (dict "Values" .Values "image" .Values.functionExecutor.runtimeImage "name" "function runtime") }}'
   envFromSecrets: []
   envFromConfigMaps:
     - in-falcone-control-plane-config

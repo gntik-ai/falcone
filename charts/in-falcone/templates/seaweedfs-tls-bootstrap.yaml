@@ -95,11 +95,8 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ .Release.Name }}-seaweedfs-tls-bootstrap
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "in-falcone.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.seaweedfsTls.bootstrap.podSecurityContext | nindent 8 }}
       containers:
         - name: tls-bootstrap
           image: {{ .Values.seaweedfsTls.bootstrap.image.repository }}:{{ .Values.seaweedfsTls.bootstrap.image.tag }}

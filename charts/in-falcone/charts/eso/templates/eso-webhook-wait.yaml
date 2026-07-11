@@ -69,20 +69,13 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: eso-webhook-wait
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "eso.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.eso.podSecurityContext | nindent 8 }}
       containers:
         - name: wait
           image: {{ include "eso.image" (dict "root" . "image" .Values.eso.webhookWait.image) | quote }}
           imagePullPolicy: {{ .Values.eso.webhookWait.image.pullPolicy }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
+          securityContext: {{- toYaml .Values.eso.securityContext | nindent 12 }}
           command:
             - /bin/sh
             - -ec

@@ -19,3 +19,19 @@
 {{- $repo := include "eso.normalizeRepository" (dict "Values" .root.Values "repository" .image.repository) -}}
 {{- printf "%s:%s" $repo .image.tag -}}
 {{- end -}}
+{{- define "eso.imagePullSecrets" -}}
+{{- $secrets := list -}}
+{{- range (default (list) .Values.global.imagePullSecrets) -}}
+  {{- $secrets = append $secrets (.name | default .) -}}
+{{- end -}}
+{{- range (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+  {{- $secrets = append $secrets . -}}
+{{- end -}}
+{{- $secrets = $secrets | uniq -}}
+{{- if gt (len $secrets) 0 }}
+imagePullSecrets:
+{{- range $secrets }}
+  - name: {{ . }}
+{{- end }}
+{{- end -}}
+{{- end -}}

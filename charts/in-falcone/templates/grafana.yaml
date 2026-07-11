@@ -77,11 +77,13 @@ spec:
     metadata:
       labels: {app.kubernetes.io/name: grafana, app.kubernetes.io/instance: {{ .Release.Name }}}
     spec:
-      securityContext: {runAsNonRoot: true, runAsUser: 472, fsGroup: 472}
+      {{- include "in-falcone.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.grafana.podSecurityContext | nindent 8 }}
       containers:
         - name: grafana
           image: {{ include "in-falcone.imageNameWithTag" (dict "root" . "image" .Values.grafana.image) | quote }}
           imagePullPolicy: {{ .Values.grafana.image.pullPolicy | default "IfNotPresent" }}
+          securityContext: {{- toYaml .Values.grafana.securityContext | nindent 12 }}
           ports: [{name: http, containerPort: 3000}]
           env:
             - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "true"}

@@ -173,6 +173,23 @@ temporal.io/role: {{ .role }}
 {{- end -}}
 {{- end -}}
 
+{{- define "in-falcone.imagePullSecrets" -}}
+{{- $secrets := list -}}
+{{- range (default (list) .Values.global.imagePullSecrets) -}}
+  {{- $secrets = append $secrets (.name | default .) -}}
+{{- end -}}
+{{- range (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+  {{- $secrets = append $secrets . -}}
+{{- end -}}
+{{- $secrets = $secrets | uniq -}}
+{{- if gt (len $secrets) 0 }}
+imagePullSecrets:
+{{- range $secrets }}
+  - name: {{ . }}
+{{- end }}
+{{- end -}}
+{{- end -}}
+
 {{- /* Registry rewrite — mirrors component-wrapper.normalizeRepository so
        global.imageRegistry (Harbor) + airgap installs work for Temporal too, WITHOUT
        depending on the component-wrapper sub-chart's _helpers.tpl being loaded (those

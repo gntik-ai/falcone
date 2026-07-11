@@ -164,6 +164,13 @@ Third-party defaults were verified with `docker manifest inspect` for
 `docker.io/apache/apisix:3.10.0-debian`, and
 `docker.io/prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62`.
 
+The OpenShift/Harbor overlay leaves UID, GID, and fsGroup assignment to restricted-v2,
+uses no hostPath volumes, and attaches the configured Harbor pull secret to every rendered
+pod, including Grafana, OpenBao, ESO lifecycle hooks, and SeaweedFS TLS bootstrap. The base
+control-plane values derive PostgreSQL, Keycloak, SeaweedFS S3, Kafka, and function-runtime
+wiring from the actual Helm release and global registry, so custom release names and namespaces
+do not require a replacement environment list.
+
 Falcone application images are buildable from this repository, and the tracked
 `.github/workflows/release-images.yml` workflow publishes the control-plane, control-plane
 executor, web console, function runtime, workflow worker, and first-party MCP runtime images on a

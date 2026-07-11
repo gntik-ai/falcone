@@ -4,8 +4,11 @@ kind: Service
 metadata:
   name: {{ include "in-falcone.apisixAdminServiceName" . }}
   labels:
-    {{- include "in-falcone.labels" . | nindent 4 }}
+    helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
     app.kubernetes.io/name: apisix
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/part-of: in-falcone
     in-falcone.io/component: bootstrap
     in-falcone.io/managed-lifecycle: reconcile
   {{- with .Values.bootstrap.reconcile.apisix.adminService.annotations }}
