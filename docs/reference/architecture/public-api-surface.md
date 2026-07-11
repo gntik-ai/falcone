@@ -167,6 +167,9 @@ Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, an
 | GET | `/v1/iam/realms/{realmId}/clients/{clientId}` | workspace | iam_client | Fetch one managed IAM client |
 | PUT | `/v1/iam/realms/{realmId}/clients/{clientId}` | workspace | iam_client | Replace the mutable settings of one managed IAM client |
 | PATCH | `/v1/iam/realms/{realmId}/clients/{clientId}/status` | workspace | iam_client | Activate or deactivate one managed IAM client |
+| GET | `/v1/iam/realms/{realmId}/groups` | tenant | iam_group | List managed realm groups |
+| POST | `/v1/iam/realms/{realmId}/groups` | tenant | iam_group | Create one managed realm group |
+| GET | `/v1/iam/realms/{realmId}/groups/{groupId}/members` | tenant | iam_group_membership | List managed IAM users that belong to one realm group |
 | GET | `/v1/iam/realms/{realmId}/roles` | tenant | iam_role | List managed realm roles |
 | POST | `/v1/iam/realms/{realmId}/roles` | tenant | iam_role | Create one managed realm role |
 | DELETE | `/v1/iam/realms/{realmId}/roles/{roleName}` | tenant | iam_role | Delete one managed realm role |
@@ -184,6 +187,12 @@ Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, an
 | GET | `/v1/iam/realms/{realmId}/users/{iamUserId}` | tenant | iam_user | Fetch one managed IAM user |
 | PUT | `/v1/iam/realms/{realmId}/users/{iamUserId}` | tenant | iam_user | Replace the mutable settings of one managed IAM user |
 | POST | `/v1/iam/realms/{realmId}/users/{iamUserId}/credential-resets` | tenant | iam_user | Reset one managed IAM user password or required actions without exposing provider-native payloads |
+| GET | `/v1/iam/realms/{realmId}/users/{iamUserId}/groups` | tenant | iam_group_membership | List realm groups assigned to one managed IAM user |
+| DELETE | `/v1/iam/realms/{realmId}/users/{iamUserId}/groups/{groupId}` | tenant | iam_group_membership | Remove one managed IAM user from a realm group |
+| PUT | `/v1/iam/realms/{realmId}/users/{iamUserId}/groups/{groupId}` | tenant | iam_group_membership | Add one managed IAM user to a realm group |
+| DELETE | `/v1/iam/realms/{realmId}/users/{iamUserId}/role-assignments` | tenant | iam_role_assignment | Remove realm roles from one managed IAM user |
+| POST | `/v1/iam/realms/{realmId}/users/{iamUserId}/role-assignments` | tenant | iam_role_assignment | Assign realm roles to one managed IAM user |
+| GET | `/v1/iam/realms/{realmId}/users/{iamUserId}/roles` | tenant | iam_role_assignment | List realm roles assigned to one managed IAM user |
 | PATCH | `/v1/iam/realms/{realmId}/users/{iamUserId}/status` | tenant | iam_user | Activate or deactivate one managed IAM user |
 | GET | `/v1/iam/tenant-roles` | tenant | iam_custom_role | List tenant-authored custom RBAC roles scoped to the caller |
 | POST | `/v1/iam/tenant-roles` | tenant | iam_custom_role | Create a tenant-authored custom RBAC role bounded by the creator's permissions |

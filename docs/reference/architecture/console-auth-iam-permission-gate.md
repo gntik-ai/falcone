@@ -10,8 +10,9 @@ those routes, the web console treats both platform IAM pages as superadmin-only:
 
 - the Auth and IAM Access navigation items are visible only to sessions whose `platformRoles` include
   `superadmin`;
-- direct non-superadmin access to `/console/auth` and `/console/iam-access` is redirected to
-  `/console/my-plan` before the platform IAM page mounts;
+- direct non-superadmin access to `/console/auth` and `/console/iam-access` renders an explicit
+  access-denied state inside the console shell, preserving the route and offering `/console/my-plan`
+  as a follow-up action;
 - neither page must be shown to tenant owners as an actionable destination that can only render `403
   requires superadmin`.
 
@@ -22,3 +23,9 @@ that console route remains superadmin-gated and hidden from their navigation. Fu
 can add tenant-owner own-realm role/client management, but it must do so by changing the backend
 authorization model and documenting the new supported route contract rather than reusing the
 superadmin-only platform pages unchanged.
+
+As of issue #763, the superadmin IAM Access page is a full realm IAM lifecycle surface rather than a
+membership-only helper: it can create/suspend/enable/delete realm users, create roles and groups, and
+assign/remove role and group memberships with destructive confirmations and standard console state
+handling. See `docs/reference/architecture/console-iam-access-management.md` for the supported
+actions and contract notes.

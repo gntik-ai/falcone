@@ -91,6 +91,22 @@ test('iamCreateUser still accepts legacy roles and credentials payloads', async 
   ]);
 });
 
+test('iamCreateUser rejects missing username before mutating Keycloak', async () => {
+  for (const body of [
+    { email: 'email-only@example.test' },
+    { username: '   ', email: 'blank-username@example.test' },
+  ]) {
+    const kc = fakeKc();
+
+    const res = await LOCAL_HANDLERS.iamCreateUser(ctx(body, kc));
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.code, 'VALIDATION_ERROR');
+    assert.equal(res.body.message, 'username required');
+    assert.equal(kc.calls.length, 0);
+  }
+});
+
 test('iamCreateUser rejects create fields it cannot apply instead of returning 201 and dropping them', async () => {
   const kc = fakeKc();
   const res = await LOCAL_HANDLERS.iamCreateUser(ctx({

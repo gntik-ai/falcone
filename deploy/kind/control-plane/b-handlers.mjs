@@ -1087,7 +1087,8 @@ function unsupportedIamCreateFields(body = {}) {
 
 async function iamCreateUser(ctx) {
   const { params, body, identity } = ctx;
-  if (!body.username && !body.email) return err(400, 'VALIDATION_ERROR', 'username or email required');
+  const username = typeof body.username === 'string' ? body.username.trim() : '';
+  if (!username) return err(400, 'VALIDATION_ERROR', 'username required');
   const unsupported = unsupportedIamCreateFields(body);
   if (unsupported.length > 0) {
     return err(400, 'UNSUPPORTED_FIELD', `unsupported create-user fields: ${unsupported.join(', ')}`);
@@ -1099,7 +1100,7 @@ async function iamCreateUser(ctx) {
     const requiredActions = requiredActionsFromBody(body);
     const attributes = body.attributes && typeof body.attributes === 'object' ? body.attributes : {};
     const id = await kc.createUser(params.realmId, {
-      username: body.username ?? body.email,
+      username,
       email: body.email ?? null,
       firstName: body.firstName ?? null,
       lastName: body.lastName ?? null,
@@ -1113,7 +1114,7 @@ async function iamCreateUser(ctx) {
     if (realmRoles.length) await kc.assignRealmRoles(params.realmId, id, realmRoles);
     return ok(201, {
       userId: id,
-      username: body.username ?? body.email,
+      username,
       realm: params.realmId,
       roles: realmRoles,
       realmRoles,
@@ -1136,11 +1137,16 @@ async function iamListRoles(ctx) {
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
 async function iamCreateRole(ctx) {
-  if (!ctx.body.name) return err(400, 'VALIDATION_ERROR', 'name required');
+  const roleName = typeof ctx.body?.roleName === 'string' && ctx.body.roleName.trim()
+    ? ctx.body.roleName.trim()
+    : typeof ctx.body?.name === 'string' && ctx.body.name.trim()
+      ? ctx.body.name.trim()
+      : '';
+  if (!roleName) return err(400, 'VALIDATION_ERROR', 'roleName required');
   const kc = ctx.kcAdmin ?? kcAdmin;
   try {
-    await kc.createRealmRole(ctx.params.realmId, ctx.body.name);
-    return ok(201, { name: ctx.body.name, realm: ctx.params.realmId });
+    await kc.createRealmRole(ctx.params.realmId, roleName);
+    return ok(201, { name: roleName, roleName, realm: ctx.params.realmId });
   } catch (e) {
     return kcBackedErr(e, 'IAM_CREATE_ROLE_FAILED');
   }
