@@ -1,4 +1,4 @@
-{{- if and .Values.mcp.enabled .Values.mcp.networkPolicy.enabled }}
+{{- if .Values.mcp.networkPolicy.enabled }}
 {{- /*
   Internal-only NetworkPolicy for hosted MCP-server pods (label
   `in-falcone.io/component: mcp-server`). Inbound is allowed ONLY from the Knative

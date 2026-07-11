@@ -1,4 +1,4 @@
-{{- if and .Values.seaweedfs.enabled .Values.seaweedfsTls.bootstrap.enabled }}
+{{- if .Values.seaweedfsTls.bootstrap.enabled }}
 {{- /*
   SeaweedFS inter-component TLS bootstrap (add-seaweedfs-deployment, task 8.2 / OQ-3).
 

@@ -1,4 +1,3 @@
-{{- if .Values.documentdb.enabled }}
 {{- /*
   DocumentDB engine SERVER-START GUC overrides (add-ferretdb-documentdb-engine).
 
@@ -71,5 +70,4 @@ data:
     DROP EVENT TRIGGER IF EXISTS falcone_documents_ri_full_trg;
     CREATE EVENT TRIGGER falcone_documents_ri_full_trg ON ddl_command_end
       WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION falcone_documents_ri_full();
-{{- end }}
 {{- end }}

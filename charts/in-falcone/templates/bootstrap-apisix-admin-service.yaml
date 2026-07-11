@@ -1,4 +1,4 @@
-{{- if and .Values.bootstrap.enabled .Values.apisix.enabled .Values.bootstrap.reconcile.apisix.adminService.enabled }}
+{{- if .Values.bootstrap.reconcile.apisix.adminService.enabled }}
 apiVersion: v1
 kind: Service
 metadata:

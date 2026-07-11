@@ -424,8 +424,8 @@ function collectValuesViolations(topology) {
       }
 
       const bootstrap = values?.bootstrap ?? {};
-      if (!bootstrap?.enabled) {
-        violations.push(`Resolved values for ${environmentId}/${platformId} must keep bootstrap.enabled=true.`);
+      if (Object.prototype.hasOwnProperty.call(bootstrap, 'enabled')) {
+        violations.push(`Resolved values for ${environmentId}/${platformId} must not include bootstrap.enabled.`);
       }
 
       if (bootstrap?.lock?.name === bootstrap?.markers?.name) {

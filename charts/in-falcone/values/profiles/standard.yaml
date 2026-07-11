@@ -10,5 +10,3 @@ controlPlane:
   replicas: 2
 webConsole:
   replicas: 2
-observability:
-  enabled: true

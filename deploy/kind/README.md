@@ -494,10 +494,10 @@ Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
   than the browser URL, because `KC_HOSTNAME` is unset. Real browser login flows
   would need `KC_HOSTNAME`/`KC_PROXY` tuning; the discovery + routing themselves
   work.
-- **bootstrap hook disabled** (`bootstrap.enabled=false`): its one-shot Keycloak
-  phase already ran successfully (state is live); its reconcile phase is
-  structurally incompatible with standalone APISIX, so the hook is disabled to let
-  Helm converge.
+- **bootstrap hook**: bootstrap is now core and always rendered. In the standalone
+  APISIX kind profile, `values-kind.yaml` keeps the Keycloak phase active and gives
+  the APISIX reconcile phase only a non-active placeholder route so Helm converges
+  without calling the absent Admin API.
 - **images**: chart-pinned Bitnami/apisix/seaweedfs/prometheus tags were purged from
   public registries; `values-kind.yaml` repins to working equivalents.
 

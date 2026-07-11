@@ -35,8 +35,7 @@ data:
 {{- $mode := .Values.gatewayPolicy.passthrough.mode -}}
 {{- $routes := list -}}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
-{{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled. */ -}}
-{{- if and (or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes)) (or (not .upstream.requiresExecutor) ($.Values.controlPlaneExecutor).enabled) }}
+{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
 {{- $routes = append $routes (dict "routeId" .routeId "name" .name "uri" .uri) -}}
 {{- end }}
 {{- end }}

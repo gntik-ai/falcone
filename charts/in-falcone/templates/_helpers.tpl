@@ -165,7 +165,7 @@ imagePullSecrets:
 - name: DB_PORT
   value: {{ $p.port | quote }}
 - name: POSTGRES_SEEDS
-  value: {{ $p.host | quote }}
+  value: {{ tpl $p.host . | quote }}
 - name: POSTGRES_USER
   value: {{ $p.user | quote }}
 - name: POSTGRES_PWD

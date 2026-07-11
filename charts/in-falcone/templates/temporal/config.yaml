@@ -1,4 +1,3 @@
-{{- if .Values.temporal.enabled }}
 {{- $root := . -}}
 {{- $t := .Values.temporal -}}
 {{- /*
@@ -133,4 +132,3 @@ data:
     limit.maxIDLength:
       - value: 255
         constraints: {}
-{{- end }}

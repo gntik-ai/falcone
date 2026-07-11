@@ -1,4 +1,4 @@
-{{- if and .Values.documentdb.enabled .Values.documentdb.initJob.enabled }}
+{{- if .Values.documentdb.initJob.enabled }}
 {{- /*
   DocumentDB extension init Job (add-ferretdb-documentdb-engine, task 3.1).
 

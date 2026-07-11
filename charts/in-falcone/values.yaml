@@ -202,7 +202,6 @@ config:
         - access-key
         - secret-key
 bootstrap:
-  enabled: true
   serviceAccount:
     create: true
     name: ""
@@ -1620,7 +1619,6 @@ bootstrap:
             component: keycloak
             port: 8080
 apisix:
-  enabled: true
   wrapper:
     componentId: apisix
     workload:
@@ -1714,7 +1712,6 @@ apisix:
         drop:
           - ALL
 keycloak:
-  enabled: true
   wrapper:
     componentId: keycloak
     workload:
@@ -1902,7 +1899,6 @@ keycloak:
         drop:
           - ALL
 postgresql:
-  enabled: true
   wrapper:
     componentId: postgresql
     workload:
@@ -1925,6 +1921,7 @@ postgresql:
   dedicatedTenantImage:
     repository: pgvector/pgvector
     tag: pg17
+    digest: sha256:815bf5378222044da3b34d98e6a5fdac37b15c428b67d09c7c2d90a038e597bf
     pullPolicy: IfNotPresent
   replicas: 1
   serviceAccount:
@@ -2000,20 +1997,18 @@ postgresql:
         drop:
           - ALL
 
-# Dedicated pgvector Postgres (add-pgvector-image-for-vector-search, #602). OPT-IN dedicated-DB
-# instance on the pgvector/pgvector image, for tenants that enable the `vector` extension for KNN
+# Dedicated pgvector Postgres (add-pgvector-image-for-vector-search, #602). Core dedicated-DB
+# instance on the pgvector/pgvector image for tenants that use the `vector` extension for KNN
 # similarity search — which the shared bitnami `postgresql` instance deliberately lacks (vector is a
 # dedicated-DB capability by design; the provisioning pre-flight rejects CREATE EXTENSION vector on
 # the shared instance with an actionable message naming this image). This realises the
 # `postgresql.dedicatedTenantImage` operator contract as an actually-deployable instance. A
 # dedicated-DB workspace whose connection DSN resolves to this instance gets working
 # `CREATE EXTENSION vector` + KNN (proven real-stack in tests/env/executor/vector-search-knn-rls).
-# Disabled by default — the shared bitnami instance is unaffected, so the default install is
-# unchanged. Uses the OFFICIAL postgres image contract (POSTGRES_*, /var/lib/postgresql, uid 999),
+# Uses the OFFICIAL postgres image contract (POSTGRES_*, /var/lib/postgresql, uid 999),
 # like the documentdb engine. Admin creds come from the operator-supplied in-falcone-postgresql-vector
 # Secret (POSTGRES_USER/POSTGRES_PASSWORD), mirroring in-falcone-postgresql / in-falcone-documentdb.
 postgresqlVector:
-  enabled: false
   wrapper:
     componentId: postgresql-vector
     workload:
@@ -2021,6 +2016,7 @@ postgresqlVector:
   image:
     repository: pgvector/pgvector
     tag: pg17
+    digest: sha256:815bf5378222044da3b34d98e6a5fdac37b15c428b67d09c7c2d90a038e597bf
     pullPolicy: IfNotPresent
   replicas: 1
   serviceAccount:
@@ -2105,7 +2101,6 @@ postgresqlVector:
           - ALL
 
 documentdb:
-  enabled: true
   wrapper:
     componentId: documentdb
     workload:
@@ -2283,9 +2278,8 @@ documentdb:
 # FerretDB gateway — stateless MongoDB-wire-protocol proxy that translates to SQL
 # against the documentdb engine. Rendered by the component-wrapper sub-chart (alias
 # `ferretdb` in Chart.yaml) as a Deployment (no PVC, >=2 replicas, HPA-ready).
-# OFF by default; deploy alongside mongodb during the MongoDB -> FerretDB cutover
-# (add-ferretdb-gateway). Tenants never reach this Service; only the control-plane /
-# CDC bridge consume it via MONGO_URI (repoint deferred to add-ferretdb-data-access-cutover).
+# Tenants never reach this Service; only the control-plane / executor / workflow worker /
+# CDC bridge consume it via MONGO_URI.
 #
 # VERSION COUPLING: the gateway image tag 2.7.0 is paired with the documentdb engine
 # 0.107.0-ferretdb-2.7.0 (MongoDB wire protocol 7.0, maxWireVersion 21, buildInfo
@@ -2295,7 +2289,6 @@ documentdb:
 # applied (documentdb_api schema present) before the gateway connects — enforced by the
 # engine-gate initContainer below + the readiness probe.
 ferretdb:
-  enabled: true
   wrapper:
     componentId: ferretdb
     workload:
@@ -2507,7 +2500,6 @@ ferretdb:
       - control-plane-executor
       - workflow-worker
 kafka:
-  enabled: true
   wrapper:
     componentId: kafka
     workload:
@@ -2591,8 +2583,6 @@ kafka:
           - ALL
 seaweedfs:
   # Default-active object store after the MinIO -> SeaweedFS cutover (ADR-13).
-  enabled: true
-
   global:
     # Inherit the umbrella registry/pull-secret conventions. The OpenShift
     # overlay rewrites the image registry to Harbor + injects the pull secret.
@@ -2967,7 +2957,6 @@ gatewaySharedSecret:
 grafana:
   # Grafana for Falcone dashboards (#499). Provisioned with a Prometheus datasource (the
   # observability service) + the Falcone dashboards in templates/grafana.yaml.
-  enabled: true
   image:
     repository: docker.io/grafana/grafana
     tag: 11.4.0
@@ -2977,7 +2966,6 @@ grafana:
     limits: { cpu: 500m, memory: 512Mi }
 
 observability:
-  enabled: true
   wrapper:
     componentId: observability
     workload:
@@ -3162,7 +3150,6 @@ observability:
         drop:
           - ALL
 controlPlane:
-  enabled: true
   wrapper:
     componentId: control-plane
     workload:
@@ -3175,20 +3162,16 @@ controlPlane:
   serviceAccount:
     create: true
     name: ""
-    # Least-privilege baseline: SA token NOT mounted by default (enforced by
-    # scripts/validate-deployment-chart.mjs for every component). The function
-    # executor needs the token to create Knative Services via the k8s API, so
-    # overlays that enable functions set this to true (deploy/kind/values-kind.yaml,
-    # deploy/openshift/values-openshift.yaml). RBAC: templates/control-plane-rbac.yaml.
-    automountToken: false
+    # Core runtime needs its ServiceAccount token for OpenBao Kubernetes auth and
+    # chart-owned function/MCP management paths.
+    automountToken: true
   # Function executor (Knative): RBAC + the per-function runtime image. The data-plane
   # connection env (PG/KEYCLOAK/STORAGE_S3/MONGO/KAFKA host+secret refs) is environment-
   # specific (release-prefixed service DNS + external secrets) and lives in the overlay
   # values (deploy/kind/values-kind.yaml, deploy/openshift/values-openshift.yaml).
-  functionExecutor:
-    enabled: true   # gates templates/control-plane-rbac.yaml (ksvc/jobs/pods RBAC)
-    # The per-function runtime image is read by the executor from the FN_RUNTIME_IMAGE
-    # env var (set in the overlay: kind -> localhost:30500, OpenShift -> Harbor).
+  # The per-function runtime image is read by the executor from the FN_RUNTIME_IMAGE
+  # env var (set in the overlay: kind -> localhost:30500, OpenShift -> Harbor).
+  functionExecutor: {}
   service:
     enabled: true
     type: ClusterIP
@@ -3212,6 +3195,24 @@ controlPlane:
       value: production
     - name: DEPLOYMENT_PROFILE
       value: dev
+    - name: TEMPORAL_ADDRESS
+      value: "{{ .Release.Name }}-temporal-frontend:7233"
+    - name: TEMPORAL_NAMESPACE
+      value: falcone-flows
+    - name: MCP_ENABLED
+      value: "true"
+    - name: MCP_RUNTIME_IMAGE
+      value: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+    - name: MCP_RUNTIME_IMAGE_DIGEST
+      value: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
+    - name: BAO_ADDR
+      value: https://openbao.secret-store.svc.cluster.local:8200
+    - name: BAO_KV_MOUNT
+      value: secret
+    - name: BAO_KUBERNETES_AUTH_ROLE
+      value: workspace-secrets-role
+    - name: NODE_EXTRA_CA_CERTS
+      value: /openbao/tls/ca.crt
   envFromSecrets: []
   envFromConfigMaps:
     - in-falcone-control-plane-config
@@ -3244,8 +3245,14 @@ controlPlane:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-  extraVolumes: []
-  extraVolumeMounts: []
+  extraVolumes:
+    - name: openbao-ca
+      secret:
+        secretName: in-falcone-openbao-client-ca
+  extraVolumeMounts:
+    - name: openbao-ca
+      mountPath: /openbao/tls
+      readOnly: true
   config:
     inline:
       openapiPath: /control-plane/openapi
@@ -3268,17 +3275,12 @@ controlPlane:
 
 # Control-plane EXECUTOR: the runnable data control-plane (apps/control-plane) that
 # EXECUTES the adapter plans against the workspace backends (Postgres/Mongo/Kafka +
-# Functions). OPT-IN (disabled by default): when enabled, the data-plane APISIX routes
-# (upstream.dataPlane:true — /v1/postgres|mongo|events|functions/*) are sent here instead
-# of the default control-plane (see templates/bootstrap-payload-configmap.yaml). The data
-# connection env (PG*/MONGO_*/KAFKA_BROKERS via secretKeyRef) is environment-specific and
-# set in the overlay. The executor serves the data-plane + DDL slice and TRANSPARENTLY
-# PROXIES every other path under those prefixes (browse/inventory/management routes) to the
-# legacy control-plane via CONTROL_PLANE_UPSTREAM — so enabling the executor keeps the full
-# product API working. Set CONTROL_PLANE_UPSTREAM in the overlay (required when enabling);
-# if it is unset the executor 404s the non-data-plane routes.
+# Functions). Helm owns it as part of the core baseline. Data-plane APISIX routes
+# (upstream.dataPlane:true — /v1/postgres|mongo|events|functions/*) and executor-required
+# routes are always sent here (see templates/bootstrap-payload-configmap.yaml). The executor
+# serves the data-plane + DDL slice and TRANSPARENTLY PROXIES every other path under those
+# prefixes (browse/inventory/management routes) to the control-plane via CONTROL_PLANE_UPSTREAM.
 controlPlaneExecutor:
-  enabled: false
   wrapper:
     componentId: control-plane-executor
     workload:
@@ -3291,7 +3293,7 @@ controlPlaneExecutor:
   serviceAccount:
     create: true
     name: ""
-    automountToken: false
+    automountToken: true
   service:
     enabled: true
     type: ClusterIP
@@ -3310,41 +3312,119 @@ controlPlaneExecutor:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8080"
     prometheus.io/path: /metrics
-  # Data connection env is environment-specific (release-prefixed DNS + external secrets);
-  # set it in the overlay, e.g.:
-  #   env:
-  #     # REQUIRED: where to proxy non-data-plane (browse/inventory/management) routes.
-  #     - { name: CONTROL_PLANE_UPSTREAM, value: http://<release>-control-plane:8080 }
-  #     - { name: PGHOST, value: <release>-postgresql }
-  #     - { name: PGUSER, value: falcone }
-  #     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
-  #     - { name: MONGO_HOST, value: <release>-ferretdb:27017 }
-  #     - { name: MONGO_USER, value: falcone }
-  #     - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
-  #     - { name: KAFKA_BROKERS, value: <release>-kafka:9092 }
-  #     # Optional: verify Bearer JWTs in the executor (Keycloak/OIDC). Enables admin/user
-  #     # auth WITHOUT the gateway injecting x-tenant-id (e.g. API-key issuance via an
-  #     # OIDC-less gateway). Unset → the executor trusts gateway-injected identity headers.
-  #     - { name: KEYCLOAK_JWKS_URL, value: "http://<release>-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
-  #     # - { name: KEYCLOAK_ISSUER, value: "https://iam.<env>.in-falcone.example.com/realms/in-falcone-platform" }
-  #     # - { name: KEYCLOAK_AUDIENCE, value: in-falcone-console }
-  #     # REQUIRED (security): shared secret between the APISIX gateway and the executor.
-  #     # When set, the executor only trusts x-tenant-id/x-workspace-id identity headers
-  #     # that arrive with a matching x-gateway-auth header (injected by APISIX after
-  #     # authentication). Without this env var the executor runs in legacy dev mode
-  #     # (header-only identity trusted unconditionally) — NEVER leave unset in production.
-  #     # The same secret value MUST be configured in the APISIX standalone route table
-  #     # (proxy-rewrite x-gateway-auth) so that gateway-forwarded requests carry the signal.
-  #     - { name: GATEWAY_SHARED_SECRET, valueFrom: { secretKeyRef: { name: in-falcone-gateway-shared-secret, key: secret } } }
-  # Default-wire the chart-managed gateway shared secret so the executor enforces gateway trust
-  # when enabled (fix-apisix-gateway-shared-secret-provisioning, D3). Overlays that REPLACE this
-  # list with the environment-specific data-connection env (above) MUST include this entry.
+  # Core data-plane wiring. The component-wrapper tpl-renders env values so release-prefixed
+  # service DNS names resolve for any Helm release name.
   env:
+    - name: CONTROL_PLANE_UPSTREAM
+      value: "http://{{ .Release.Name }}-control-plane:8080"
+    - name: PGHOST
+      value: "{{ .Release.Name }}-postgresql"
+    - name: PGUSER
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_USERNAME
+    - name: PGDATABASE
+      value: in_falcone
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
+    - name: MONGO_HOST
+      value: "{{ .Release.Name }}-ferretdb:27017"
+    - name: MONGO_USER
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb
+          key: POSTGRES_USER
+    - name: MONGO_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb
+          key: POSTGRES_PASSWORD
+    - name: MONGO_DATABASE
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-documentdb
+          key: POSTGRES_DB
+    - name: KAFKA_BROKERS
+      value: "{{ .Release.Name }}-kafka:9092"
+    - name: TEMPORAL_ADDRESS
+      value: "{{ .Release.Name }}-temporal-frontend:7233"
+    - name: TEMPORAL_NAMESPACE
+      value: falcone-flows
+    - name: TEMPORAL_TASK_QUEUE
+      value: flows-main
+    - name: MCP_ENABLED
+      value: "true"
+    - name: MCP_RUNTIME_IMAGE
+      value: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+    - name: MCP_RUNTIME_IMAGE_DIGEST
+      value: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
+    - name: BAO_ADDR
+      value: https://openbao.secret-store.svc.cluster.local:8200
+    - name: BAO_KV_MOUNT
+      value: secret
+    - name: BAO_KUBERNETES_AUTH_ROLE
+      value: workspace-secrets-role
+    - name: NODE_EXTRA_CA_CERTS
+      value: /openbao/tls/ca.crt
     - name: GATEWAY_SHARED_SECRET
       valueFrom:
         secretKeyRef:
           name: in-falcone-gateway-shared-secret
           key: secret
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  envFromSecrets: []
+  envFromConfigMaps: []
+  persistence:
+    enabled: false
+    existingClaim: ""
+    size: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: /srv/control-plane-executor
+    annotations: {}
+  podLabels:
+    app.kubernetes.io/component: control-plane-executor
+  podSecurityContext: {}
+  extraVolumes:
+    - name: openbao-ca
+      secret:
+        secretName: in-falcone-openbao-client-ca
+  extraVolumeMounts:
+    - name: openbao-ca
+      mountPath: /openbao/tls
+      readOnly: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    inline: {}
+  initContainers: []
+  volumePermissions:
+    enabled: false
+    image:
+      repository: docker.io/library/busybox
+      tag: 1.36.1
+      pullPolicy: IfNotPresent
+    command: []
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
   readinessProbe:
     httpGet:
       path: /healthz
@@ -3360,7 +3440,6 @@ controlPlaneExecutor:
         - ALL
 
 webConsole:
-  enabled: true
   wrapper:
     componentId: web-console
     workload:
@@ -3499,14 +3578,12 @@ webConsole:
 # Temporal DSL interpreter worker (change: add-flows-dsl-interpreter-worker / #359).
 # Hosts the generic DslInterpreterWorkflow + harness activities; polls the Temporal
 # task queue and makes ONLY outbound gRPC calls to the Temporal frontend (no inbound
-# business traffic — the HTTP port serves probes only). Disabled by default; rollback is
-# re-setting workflowWorker.enabled: false.
+# business traffic — the HTTP port serves probes only).
 #
 # LABEL CONTRACT: the pod MUST carry app.kubernetes.io/component: flows-worker so the
 # Temporal frontend NetworkPolicy (templates/temporal/networkpolicy.yaml) admits it on
 # port 7233. That label is injected here via podLabels.
 workflowWorker:
-  enabled: false
   wrapper:
     componentId: workflow-worker
     workload:
@@ -3533,26 +3610,29 @@ workflowWorker:
   # NetworkPolicy label contract — admits this pod to the Temporal frontend on 7233.
   podLabels:
     app.kubernetes.io/component: flows-worker
-  # Connection env is environment-specific (release-prefixed Temporal frontend DNS);
-  # set it in the overlay, e.g.:
-  #   env:
-  #     - { name: TEMPORAL_ADDRESS, value: <release>-temporal-frontend:7233 }
-  #     - { name: TEMPORAL_NAMESPACE, value: falcone-flows }
-  #     - { name: TEMPORAL_TASK_QUEUE, value: flows-main }
-  #     # Postgres for the db.query activity — point at the database that holds the
-  #     # workspace_databases registry (the control-plane's PGDATABASE). Without it the
-  #     # worker DSN falls back to localhost/falcone_app and db.query → UPSTREAM_UNAVAILABLE.
-  #     - { name: PGHOST, value: <release>-postgresql }
-  #     - { name: PGUSER, value: falcone }
-  #     - { name: PGDATABASE, value: in_falcone }
-  #     - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: <release>-postgresql, key: POSTGRESQL_PASSWORD } } }
   env:
+    - name: TEMPORAL_ADDRESS
+      value: "{{ .Release.Name }}-temporal-frontend:7233"
     - name: TEMPORAL_NAMESPACE
       value: falcone-flows
     - name: TEMPORAL_TASK_QUEUE
       value: flows-main
     - name: WORKER_HEALTH_PORT
       value: "8080"
+    - name: PGHOST
+      value: "{{ .Release.Name }}-postgresql"
+    - name: PGUSER
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_USERNAME
+    - name: PGDATABASE
+      value: in_falcone
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: in-falcone-postgresql
+          key: POSTGRESQL_PASSWORD
   resources:
     requests:
       cpu: 100m
@@ -3599,6 +3679,32 @@ workflowWorker:
     capabilities:
       drop:
         - ALL
+  envFromSecrets: []
+  envFromConfigMaps: []
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraVolumes: []
+  extraVolumeMounts: []
+  config:
+    inline: {}
+  initContainers: []
+  volumePermissions:
+    enabled: false
+    image:
+      repository: docker.io/library/busybox
+      tag: 1.36.1
+      pullPolicy: IfNotPresent
+    command: []
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
 
 gatewayPolicy:
   version: 2026-03-24
@@ -4416,19 +4522,39 @@ gatewayPolicy:
         routeId: keycloak_admin
         expect: allow
 
-# Optional infrastructure sub-charts — disabled by default; opt-in for operators
-# who want OpenBao secret storage or External Secrets Operator integration.
+# Core infrastructure sub-charts. OpenBao is the canonical platform/workspace secret
+# backend, and ESO materializes the Kubernetes Secrets consumed by workloads.
 eso:
-  enabled: false
+  eso:
+    namespace: eso-system
+    serviceAccountName: eso-openbao-auth
+    refreshInterval: 1h
+    tokenTTL: 24h
+    vaultAddress: https://openbao.secret-store.svc.cluster.local:8200
+    vaultAuthPath: kubernetes
+    vaultAuthRole: eso-role
+    caProvider:
+      name: openbao-server-tls
+      key: ca.crt
+      namespace: secret-store
 
 openbao:
-  enabled: false
+  eso:
+    serviceAccountName: eso-openbao-auth
+    tokenTTL: 24h
+  openbao:
+    namespace: secret-store
+    tls:
+      enabled: true
+      # Default to self-signed bootstrap so kind/default fresh installs do not require cert-manager.
+      mode: self-signed
+      clientCaSecretName: in-falcone-openbao-client-ca
 
 # ---------------------------------------------------------------------------
 # Temporal — durable workflow (flows) engine. INTERNAL-ONLY platform component.
 # ADR-11: shared namespace + custom search attributes for tenancy; PostgreSQL SQL
 # visibility (NO Elasticsearch); Web UI operator-only (kubectl port-forward, never
-# tenant-exposed). Disabled by default — opt-in for the flows capability.
+# tenant-exposed). Always installed as part of the core baseline.
 #
 # NOTE ON RENDERING (deviation from the original design.md component-wrapper sketch):
 # Temporal is a four-role server (frontend/history/matching/worker) plus a Web UI,
@@ -4437,12 +4563,10 @@ openbao:
 # release alias and therefore cannot express four role Deployments. Temporal is
 # instead rendered by first-class umbrella templates under
 # templates/temporal/** (the same approach used by the platform bootstrap Job),
-# all gated by `temporal.enabled`. Image references still flow through the shared
+# rendered unconditionally. Image references still flow through the shared
 # `component-wrapper.normalizeRepository` helper so `global.imageRegistry` (Harbor)
 # rewriting and the airgap path keep working.
 temporal:
-  enabled: false
-
   # Server image — pinned to a Temporal release that supports PostgreSQL SQL
   # advanced visibility + custom search attributes (ADR-11). Routed through the
   # global.imageRegistry rewrite helper for Harbor/airgap installs.
@@ -4468,7 +4592,6 @@ temporal:
 
   # Web UI image — deployed but NEVER exposed externally (operator port-forward only).
   ui:
-    enabled: true
     image:
       repository: docker.io/temporalio/ui
       tag: "2.51.0"
@@ -4489,7 +4612,7 @@ temporal:
   # from the platform `in_falcone` database to avoid schema/migration coupling.
   persistence:
     driver: postgres12
-    host: in-falcone-postgresql
+    host: "{{ .Release.Name }}-postgresql"
     port: 5432
     user: temporal
     # Plaintext default for dev/sandbox; production should set existingSecret +
@@ -4619,14 +4742,20 @@ temporal:
 
 # ---------------------------------------------------------------------------
 # MCP server hosting (ADR-12). Reuses Knative (each MCP server = a ksvc), so this
-# component installs NO new runtime — it only grants the control-plane the RBAC to
-# manage per-tenant MCP-server ksvcs + internal-only NetworkPolicies, and ships the
-# NetworkPolicy template for hosted MCP-server pods. Default OFF until the inbound
-# gateway (#389) and isolation/quotas (#399) land. The per-tenant footprint is
+# component installs NO new runtime — it grants the serving runtime RBAC to manage
+# per-tenant MCP-server ksvcs + internal-only NetworkPolicies, and ships the
+# NetworkPolicy template for hosted MCP-server pods. The per-tenant footprint is
 # applied by the provisioning saga at tenant-creation time.
 # ---------------------------------------------------------------------------
 mcp:
-  enabled: false
+  runtimeImage:
+    repository: ghcr.io/gntik-ai/in-falcone-mcp-runtime
+    tag: 0.1.0
+    digest: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
+    pullPolicy: IfNotPresent
+  persistence:
+    provider: postgresql
+    database: in_falcone
   networkPolicy:
     enabled: true
     # Namespaces allowed to reach MCP-server pods (the Knative ingress/activator path).

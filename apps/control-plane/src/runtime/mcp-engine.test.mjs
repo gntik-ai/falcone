@@ -5,6 +5,7 @@ import { createMcpEngine } from './mcp-engine.mjs';
 
 const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
 const B = { tenantId: 'ten-b', workspaceId: 'ws-b', actorId: 'actor-b', roleName: 'falcone_app' };
+const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 
 // A fake runtime self-call so tool-calls don't need a live HTTP server.
 function fakeFetch() {
@@ -18,7 +19,21 @@ function fakeFetch() {
 }
 
 function engine() {
-  return createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch() });
+  return createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST });
+}
+
+function fakeStateStore() {
+  let state = null;
+  let saves = 0;
+  return {
+    get saves() { return saves; },
+    async ensureSchema() {},
+    async loadState() { return state ? structuredClone(state) : null; },
+    async saveState(next) {
+      state = structuredClone(next);
+      saves += 1;
+    },
+  };
 }
 
 test('full loop: create (instant) → curate → publish → get (endpoint+tools+version) → call → audit', async () => {
@@ -80,7 +95,7 @@ test('version pinning: a tool-description change is held for review, then served
 });
 
 test('quota: server-count limit is enforced (429 QUOTA_EXCEEDED with dimension)', async () => {
-  const e = createMcpEngine({ fetchImpl: fakeFetch(), plan: { maxServersPerTenant: 1, maxToolsPerServer: 50, toolCallsPerMinutePerServer: 600, toolCallsPerMinutePerOAuthClient: 300, mode: 'enforced' } });
+  const e = createMcpEngine({ fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST, plan: { maxServersPerTenant: 1, maxToolsPerServer: 50, toolCallsPerMinutePerServer: 600, toolCallsPerMinutePerOAuthClient: 300, mode: 'enforced' } });
   await e.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'one', source: 'instant' } });
   await assert.rejects(
     () => e.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'two', source: 'instant' } }),
@@ -95,4 +110,20 @@ test('delete removes the server (subsequent get → 404)', async () => {
   const del = await e.executeMcp({ operation: 'delete_server', identity: A, workspaceId: A.workspaceId, serverId: sid });
   assert.equal(del.deleted, true);
   await assert.rejects(() => e.executeMcp({ operation: 'get_server', identity: A, workspaceId: A.workspaceId, serverId: sid }), (err) => err.statusCode === 404);
+});
+
+test('durable store: a published MCP server survives engine restart', async () => {
+  const store = fakeStateStore();
+  const e1 = createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST, store });
+  const created = await e1.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'durable', source: 'instant' } });
+  const sid = created.serverId;
+  await e1.executeMcp({ operation: 'curate_server', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { decisions: {} } });
+  await e1.executeMcp({ operation: 'publish_version', identity: A, workspaceId: A.workspaceId, serverId: sid, version: 'v1', body: { version: 'v1' } });
+  assert.ok(store.saves >= 3);
+
+  const e2 = createMcpEngine({ selfBaseUrl: 'http://cp.local', gatewayBaseUrl: 'https://gw.local', fetchImpl: fakeFetch(), runtimeImageDigest: TEST_DIGEST, store });
+  const view = await e2.executeMcp({ operation: 'get_server', identity: A, workspaceId: A.workspaceId, serverId: sid });
+  assert.equal(view.status, 'published');
+  assert.equal(view.activeVersion, 'v1');
+  assert.ok(view.tools.length > 0);
 });

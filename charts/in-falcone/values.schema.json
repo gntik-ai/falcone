@@ -13,9 +13,20 @@
     "apisix",
     "keycloak",
     "postgresql",
+    "postgresqlVector",
+    "documentdb",
+    "ferretdb",
     "kafka",
+    "seaweedfs",
+    "grafana",
     "observability",
     "controlPlane",
+    "controlPlaneExecutor",
+    "workflowWorker",
+    "eso",
+    "openbao",
+    "temporal",
+    "mcp",
     "webConsole"
   ],
   "properties": {
@@ -596,6 +607,9 @@
         }
       ]
     },
+    "postgresqlVector": {
+      "$ref": "#/definitions/component"
+    },
     "kafka": {
       "$ref": "#/definitions/component"
     },
@@ -609,6 +623,9 @@
       "$ref": "#/definitions/component"
     },
     "controlPlane": {
+      "$ref": "#/definitions/component"
+    },
+    "controlPlaneExecutor": {
       "$ref": "#/definitions/component"
     },
     "workflowWorker": {
@@ -841,7 +858,6 @@
     "bootstrap": {
       "type": "object",
       "required": [
-        "enabled",
         "serviceAccount",
         "job",
         "lock",
@@ -851,9 +867,6 @@
         "reconcile"
       ],
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
         "serviceAccount": {
           "type": "object",
           "required": [
@@ -1680,6 +1693,38 @@
     "temporal": {
       "type": "object",
       "additionalProperties": true
+    },
+    "seaweedfs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "grafana": {
+      "type": "object",
+      "required": [
+        "image",
+        "resources"
+      ],
+      "properties": {
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      },
+      "additionalProperties": true
+    },
+    "eso": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "openbao": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": true
     }
   },
   "definitions": {
@@ -1809,7 +1854,6 @@
     "component": {
       "type": "object",
       "required": [
-        "enabled",
         "wrapper",
         "image",
         "replicas",
@@ -1818,9 +1862,6 @@
         "persistence"
       ],
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
         "wrapper": {
           "type": "object",
           "required": [

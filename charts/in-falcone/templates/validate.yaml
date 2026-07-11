@@ -1,13 +1,29 @@
 {{- define "in-falcone.validate" -}}
-{{- $components := list "apisix" "keycloak" "postgresql" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "webConsole" -}}
+{{- $components := list "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker" -}}
+{{- $coreServiceAliases := list "bootstrap" "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "seaweedfs" "grafana" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker" "eso" "openbao" "temporal" "mcp" -}}
 {{- $supportedExposureKinds := list "Ingress" "LoadBalancer" "Route" -}}
+{{- range $alias := $coreServiceAliases }}
+  {{- $block := index $.Values $alias -}}
+  {{- if and (kindIs "map" $block) (hasKey $block "enabled") -}}
+    {{- fail (printf "%s.enabled is no longer supported: Falcone platform services are core and cannot be disabled individually" $alias) -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (kindIs "map" .Values.controlPlane.functionExecutor) (hasKey .Values.controlPlane.functionExecutor "enabled") -}}
+  {{- fail "controlPlane.functionExecutor.enabled is no longer supported: function executor RBAC is core" -}}
+{{- end -}}
+{{- if and (kindIs "map" .Values.temporal.ui) (hasKey .Values.temporal.ui "enabled") -}}
+  {{- fail "temporal.ui.enabled is no longer supported: Temporal web is a core operator surface" -}}
+{{- end -}}
 {{- range $components }}
   {{- $component := index $.Values . -}}
-  {{- if and $component.enabled (not $component.image.repository) -}}
-    {{- fail (printf "%s.image.repository is required when the component is enabled" .) -}}
+  {{- if not $component.image.repository -}}
+    {{- fail (printf "%s.image.repository is required for core platform services" .) -}}
   {{- end -}}
-  {{- if and $component.enabled $component.persistence.enabled (not $component.persistence.existingClaim) (not $component.persistence.size) -}}
+  {{- if and $component.persistence.enabled (not $component.persistence.existingClaim) (not $component.persistence.size) -}}
     {{- fail (printf "%s.persistence.size is required when persistence is enabled without existingClaim" .) -}}
+  {{- end -}}
+  {{- if and (not $component.service.enabled) (has . (list "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker")) -}}
+    {{- fail (printf "%s.service.enabled=false would make a core platform service unreachable" .) -}}
   {{- end -}}
 {{- end -}}
 {{- /* finding D8/C.7: refuse to render any legacy migration-era component. FerretDB superseded
@@ -42,8 +58,8 @@
 {{- end -}}
 {{- range $surface, $binding := .Values.publicSurface.bindings -}}
   {{- $component := index $.Values $binding.component -}}
-  {{- if and (not $binding.serviceName) (not $component.enabled) -}}
-    {{- fail (printf "publicSurface.bindings.%s needs either an enabled component or an explicit serviceName" $surface) -}}
+  {{- if and (not $binding.serviceName) (not $component) -}}
+    {{- fail (printf "publicSurface.bindings.%s references missing component %s" $surface $binding.component) -}}
   {{- end -}}
   {{- if and (eq $.Values.platform.network.exposureKind "LoadBalancer") $binding.serviceName -}}
     {{- fail (printf "publicSurface.bindings.%s cannot use explicit serviceName when exposureKind=LoadBalancer" $surface) -}}
@@ -79,19 +95,11 @@
 {{- if eq (len (.Values.gatewayPolicy.internalRequests.requiredHeaders | default (list))) 0 -}}
   {{- fail "gatewayPolicy.internalRequests.requiredHeaders must declare the hardened downstream trust headers" -}}
 {{- end -}}
-{{- if .Values.bootstrap.enabled -}}
-  {{- if eq .Values.bootstrap.lock.name .Values.bootstrap.markers.name -}}
-    {{- fail "bootstrap.lock.name and bootstrap.markers.name must be different resources" -}}
-  {{- end -}}
-  {{- if not .Values.keycloak.enabled -}}
-    {{- fail "bootstrap requires keycloak.enabled=true for the default realm/superadmin flow" -}}
-  {{- end -}}
-  {{- if not .Values.apisix.enabled -}}
-    {{- fail "bootstrap requires apisix.enabled=true for the default APISIX route reconciliation flow" -}}
-  {{- end -}}
-  {{- if eq (len .Values.bootstrap.secretResolution.sources) 0 -}}
-    {{- fail "bootstrap.secretResolution.sources must define the required credential inputs" -}}
-  {{- end -}}
+{{- if eq .Values.bootstrap.lock.name .Values.bootstrap.markers.name -}}
+  {{- fail "bootstrap.lock.name and bootstrap.markers.name must be different resources" -}}
+{{- end -}}
+{{- if eq (len .Values.bootstrap.secretResolution.sources) 0 -}}
+  {{- fail "bootstrap.secretResolution.sources must define the required credential inputs" -}}
 {{- end -}}
 {{- if and .Release.IsUpgrade .Values.deployment.upgrade.allowInPlace -}}
   {{- $currentVersion := .Values.deployment.upgrade.currentVersion | default "" -}}

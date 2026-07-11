@@ -1,6 +1,6 @@
 {{- /* finding D7/C.6: render the cert-manager Certificate ONLY in cert-manager mode. On a cluster
   without cert-manager (e.g. kind) this CRD is absent, so rendering it unconditionally aborted the
-  release whenever openbao.enabled=true. The self-signed bootstrap Job covers the kind path. */ -}}
+  release. The self-signed bootstrap Job covers the kind path for core OpenBao. */ -}}
 {{- if eq (.Values.openbao.tls.mode | default "cert-manager") "cert-manager" }}
 apiVersion: cert-manager.io/v1
 kind: Certificate

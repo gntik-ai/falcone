@@ -1,4 +1,3 @@
-{{- if and .Values.controlPlane.enabled .Values.controlPlane.functionExecutor.enabled }}
 {{- /*
   RBAC for the control-plane function executor: it manages a Knative Service per
   function (deploy = create/patch ksvc, invoke = HTTP) and reads execution logs.
@@ -45,4 +44,3 @@ subjects:
   - kind: ServiceAccount
     name: {{ $saName }}
     namespace: {{ .Values.global.namespace }}
-{{- end }}

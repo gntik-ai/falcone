@@ -2,16 +2,14 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: platform-kafka-credentials
-  namespace: kafka
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
 spec:
   refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
   secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
-  target: { name: platform-kafka-credentials, immutable: true }
+  target: { name: in-falcone-kafka, creationPolicy: Merge, immutable: false }
   data:
-    - secretKey: admin-password
-      remoteRef: { key: platform/kafka, property: admin-password }
-    - secretKey: inter-broker-secret
-      remoteRef: { key: platform/kafka, property: inter-broker-secret }
+    - secretKey: KAFKA_CFG_NODE_ID
+      remoteRef: { key: platform/kafka, property: node-id }

@@ -1,4 +1,3 @@
-{{- if .Values.bootstrap.enabled }}
 {{- /* Brute-force detection (#668): `realm.bruteForce` is authored as a nested sub-block (so it can
        carry comments + a single source of truth), but Keycloak's RealmRepresentation expects the
        fields at the TOP level. Build the realm-create payload by lifting the bruteForce fields onto
@@ -61,13 +60,10 @@ data:
 {{ toPrettyJson .Values.bootstrap.oneShot.internalNamespaces | nindent 4 }}
 {{- $mode := .Values.gatewayPolicy.passthrough.mode -}}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
-{{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled —
-       only the executor verifies anon/service keys; the control-plane cannot. */ -}}
-{{- if and (or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes)) (or (not .upstream.requiresExecutor) ($.Values.controlPlaneExecutor).enabled) }}
-{{- /* Data-plane routes (upstream.dataPlane: true) go to the dedicated control-plane
-       executor when it is enabled; otherwise they stay on the default control-plane. */ -}}
+{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
+{{- /* Data-plane and executor-required routes always go to the Helm-owned executor. */ -}}
 {{- $upstreamComponent := .upstream.component -}}
-{{- if and (.upstream.dataPlane) ($.Values.controlPlaneExecutor).enabled -}}
+{{- if or .upstream.dataPlane .upstream.requiresExecutor -}}
 {{- $upstreamComponent = "controlPlaneExecutor" -}}
 {{- end -}}
 {{- $routeBody := dict "name" .name "priority" .priority "uri" .uri "upstream" (dict "type" "roundrobin" "nodes" (dict (printf "%s.%s.svc.cluster.local:%v" (include "in-falcone.componentServiceNameByAlias" (dict "root" $ "component" $upstreamComponent "serviceName" (.upstream.serviceName | default ""))) $.Release.Namespace .upstream.port) 1)) -}}
@@ -208,6 +204,5 @@ data:
 {{- end }}
   route-{{ .routeId }}.json: |
 {{ toPrettyJson $routeBody | nindent 4 }}
-{{- end }}
 {{- end }}
 {{- end }}

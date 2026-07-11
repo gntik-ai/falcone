@@ -10,14 +10,6 @@ global:
   createNamespace: false
   imagePullSecrets: []
 bootstrap:
-  # The one-shot Keycloak provisioning (realm in-falcone-platform + roles +
-  # client scopes + in-falcone-console/in-falcone-gateway clients + superadmin)
-  # already completed successfully on an earlier revision and is live in Keycloak.
-  # The hook's *reconcile* phase is structurally incompatible with this profile
-  # (it PUTs routes to an APISIX Admin API that does not exist under
-  # APISIX_STAND_ALONE=true), so it can never complete. Disable the hook so Helm
-  # converges; the keycloak state it created persists.
-  enabled: false
   job:
     image:
       # needs kubectl AND curl AND bash (the bootstrap script drives the
@@ -133,6 +125,25 @@ controlPlane:
       value: http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs
     - name: ROUTE_MAP_FILE
       value: /app/route-map.runtime.json
+    # Core flows/MCP/secrets surfaces are active by default.
+    - name: TEMPORAL_ADDRESS
+      value: falcone-temporal-frontend:7233
+    - name: TEMPORAL_NAMESPACE
+      value: falcone-flows
+    - name: MCP_ENABLED
+      value: "true"
+    - name: MCP_RUNTIME_IMAGE
+      value: localhost:30500/in-falcone-mcp-runtime
+    - name: MCP_RUNTIME_IMAGE_DIGEST
+      value: sha256:6f2d5b0f7dfb5a6b8a9ef0f8f613f2a511de80c92eaedc6f2fd3ed871b3f5f42
+    - name: BAO_ADDR
+      value: https://openbao.secret-store.svc.cluster.local:8200
+    - name: BAO_KV_MOUNT
+      value: secret
+    - name: BAO_KUBERNETES_AUTH_ROLE
+      value: workspace-secrets-role
+    - name: NODE_EXTRA_CA_CERTS
+      value: /openbao/tls/ca.crt
     # Domain B: Keycloak admin client (create tenant realms + users). Admin creds
     # from the in-falcone-keycloak-admin Secret (no plaintext).
     - name: KEYCLOAK_BASE_URL

@@ -1,4 +1,3 @@
-{{- if .Values.observability.enabled }}
 {{- /*
   Real Prometheus scrape config (add-falcone-metrics-scrape-and-dashboards, #499). The
   observability component previously mounted no config and ran Prometheus' default (it scraped only
@@ -34,14 +33,12 @@ data:
           - targets: ['{{ $cp }}']
             labels:
               component: control-plane
-      {{- if (.Values.controlPlaneExecutor).enabled }}
       - job_name: falcone-cp-executor
         metrics_path: /metrics
         static_configs:
           - targets: ['{{ printf "%s.%s.svc.cluster.local:%v" (include "in-falcone.componentServiceNameByAlias" (dict "root" . "component" "controlPlaneExecutor")) $ns ((.Values.controlPlaneExecutor.service).port | default 8080) }}']
             labels:
               component: executor
-      {{- end }}
       - job_name: falcone-apisix
         metrics_path: {{ .Values.gatewayPolicy.observability.gatewayMetrics.metricsPath | default "/apisix/prometheus/metrics" | quote }}
         static_configs:
@@ -87,4 +84,3 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
-{{- end }}

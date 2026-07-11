@@ -17,7 +17,7 @@
   static-config path (enableAuth=true) seeds identities via the mounted file and needs
   no seed Job.
 */ -}}
-{{- if and .Values.seaweedfs.enabled (not .Values.seaweedfs.s3.enableAuth) }}
+{{- if not .Values.seaweedfs.s3.enableAuth }}
 apiVersion: batch/v1
 kind: Job
 metadata:

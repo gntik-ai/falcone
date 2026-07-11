@@ -23,6 +23,7 @@ import { createMcpEngine } from '../../apps/control-plane/src/runtime/mcp-engine
 
 const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
 const SELF = 'http://exec.local';
+const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 
 // A capturing fake runtime self-call that mirrors the real executor: the root `/` returns the
 // executor INDEX (`{"service":"in-falcone-control-plane"}`) — the exact symptom of the bug — while a
@@ -42,7 +43,7 @@ function captureFetch() {
 
 function enginePair() {
   const fetchImpl = captureFetch();
-  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl });
+  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl, runtimeImageDigest: TEST_DIGEST });
   return { e, fetchImpl };
 }
 

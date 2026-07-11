@@ -1,3 +1,4 @@
+{{- if .Values.openbao.migration.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -31,3 +32,4 @@ spec:
         - name: tls
           secret:
             secretName: {{ .Values.openbao.tls.secretName }}
+{{- end }}

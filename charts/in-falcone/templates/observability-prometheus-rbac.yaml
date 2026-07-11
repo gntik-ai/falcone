@@ -1,4 +1,3 @@
-{{- if .Values.observability.enabled }}
 {{- /*
   RBAC for the Prometheus Kubernetes pod service-discovery scrape job
   (add-deploy-completeness-cluster, #562). The widened scrape config
@@ -40,4 +39,3 @@ subjects:
   - kind: ServiceAccount
     name: {{ $saName }}
     namespace: {{ .Values.global.namespace }}
-{{- end }}

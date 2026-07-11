@@ -25,6 +25,7 @@ import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier, deriveRealmTopology } from './jwt-verify.mjs';
 import { createSaRevocationCheck } from './sa-revocation.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
+import { createMcpPostgresStore } from './mcp-pg-store.mjs';
 import { withPostgresSsl, resolveKafkaSecurity } from '../../../../services/internal-contracts/src/transport-security.mjs';
 // Temporal-FREE list of first-party task-type names (add-flows-activity-catalog / #360).
 // Feeds the flows validate/publish endpoints' FLW-E006 check so a flow definition that
@@ -340,16 +341,18 @@ const flowMonitoringExecutor = flowExecutor && process.env.FLOWS_ENABLED !== 'fa
     })
   : undefined;
 
-// MCP server hosting management engine (change: add-mcp-control-plane-runtime). Enabled ONLY when
-// MCP_ENABLED=true; it composes the pure MCP control-plane modules with an in-memory per-tenant
-// store (the cp-executor runs single-replica) and self-calls this runtime to mediate tool calls.
+// MCP server hosting management engine (change: add-mcp-control-plane-runtime). Enabled when
+// MCP_ENABLED=true; it composes the pure MCP control-plane modules with a Postgres-backed per-tenant
+// store on the metadata pool and self-calls this runtime to mediate tool calls.
 // When unset, no /v1/mcp routes are registered and an MCP path falls through to 404 / upstream proxy.
+const mcpStateStore = createMcpPostgresStore({ pool: keyPool });
 const mcpEngine = process.env.MCP_ENABLED === 'true'
   ? createMcpEngine({
       selfBaseUrl: process.env.MCP_SELF_BASE_URL ?? `http://127.0.0.1:${PORT}`,
       gatewayBaseUrl: process.env.MCP_GATEWAY_BASE_URL,
       runtimeImage: process.env.MCP_RUNTIME_IMAGE,
       runtimeImageDigest: process.env.MCP_RUNTIME_IMAGE_DIGEST,
+      store: mcpStateStore,
     })
   : undefined;
 
@@ -377,7 +380,7 @@ const server = createControlPlaneServer({
 });
 
 // Initialise all metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve()])
+Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve(), mcpEngine?.ensureSchema() ?? Promise.resolve()])
   .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
   // Wire + START the platform-event trigger consumer AFTER the schemas exist, so the on-boot
   // subscription can read already-persisted registrations (a flow published in a prior process).

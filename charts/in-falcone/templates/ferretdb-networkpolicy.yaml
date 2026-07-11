@@ -1,4 +1,4 @@
-{{- if and .Values.ferretdb.enabled .Values.ferretdb.networkPolicy.enabled }}
+{{- if .Values.ferretdb.networkPolicy.enabled }}
 {{- /*
   Internal-only NetworkPolicy for the FerretDB gateway (add-ferretdb-gateway, task 3.2).
 

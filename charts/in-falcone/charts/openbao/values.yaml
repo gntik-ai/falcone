@@ -20,13 +20,14 @@ openbao:
     #                   default, for clusters that run cert-manager).
     #   self-signed  -> a pre-install/pre-upgrade hook Job generates a self-signed CA + server
     #                   cert with openssl and writes <secretName> directly. KIND-COMPATIBLE: no
-    #                   cert-manager required, so `openbao.enabled=true` no longer aborts the release.
+    #                   cert-manager required for the core OpenBao service.
     # The Secret carries tls.crt/tls.key/ca.crt; ESO's caProvider reads its ca.crt to trust OpenBao.
     mode: cert-manager
     issuerRef:
       name: selfsigned-issuer
       kind: ClusterIssuer
     # Used only when mode=self-signed.
+    clientCaSecretName: in-falcone-openbao-client-ca
     bootstrap:
       image:
         # bitnami/* legacy images were relocated to the bitnamilegacy/* namespace; the original
@@ -77,4 +78,4 @@ openbao:
   metrics:
     enabled: true
   migration:
-    enabled: true
+    enabled: false

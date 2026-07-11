@@ -19,6 +19,7 @@ import { generateFromFlows } from '../../apps/control-plane/src/mcp-instant-gene
 
 const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
 const SELF = 'http://exec.local';
+const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 
 function captureFetch() {
   const calls = [];
@@ -36,7 +37,7 @@ function captureFetch() {
 
 function enginePair() {
   const fetchImpl = captureFetch();
-  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl });
+  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl, runtimeImageDigest: TEST_DIGEST });
   return { e, fetchImpl };
 }
 

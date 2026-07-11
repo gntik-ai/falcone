@@ -1,4 +1,4 @@
-{{- if and .Values.temporal.enabled .Values.temporal.networkPolicy.enabled }}
+{{- if .Values.temporal.networkPolicy.enabled }}
 {{- $root := . -}}
 {{- $t := .Values.temporal -}}
 {{- /*

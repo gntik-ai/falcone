@@ -14,9 +14,9 @@
 // the rest of the runtime resolves from the gateway headers). The registry accessors reject
 // cross-tenant reads, so a server created by tenant A is invisible/unreachable to tenant B.
 //
-// State: in-memory, process-local. The cp-executor runs single-replica; a Postgres-backed store is
-// the tracked follow-up (mirroring how flows began on the metadata pool). Quotas/curation/registry
-// logic is unchanged — only where the state lives differs.
+// State: process-local maps with an optional durable store. The default executor wires a Postgres
+// store on the control-plane metadata pool, so MCP servers, published versions, audit records, and
+// quota windows survive restarts while the reviewed curation/registry logic remains unchanged.
 import { randomUUID } from 'node:crypto';
 import { generateInstantManifest } from '../mcp-instant-generator.mjs';
 import { OFFICIAL_TOOLS, BASE_SCOPE } from '../mcp-official-catalog.mjs';
@@ -63,17 +63,59 @@ export function createMcpEngine({
   selfBaseUrl = process.env.MCP_SELF_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 8080}`,
   gatewayBaseUrl = process.env.MCP_GATEWAY_BASE_URL ?? selfBaseUrl,
   runtimeImage = process.env.MCP_RUNTIME_IMAGE ?? 'localhost:30500/in-falcone-mcp-runtime',
-  runtimeImageDigest = process.env.MCP_RUNTIME_IMAGE_DIGEST ?? `sha256:${'a'.repeat(64)}`,
+  runtimeImageDigest = process.env.MCP_RUNTIME_IMAGE_DIGEST,
   plan = MCP_QUOTA_DEFAULTS[process.env.MCP_PLAN ?? 'standard'] ?? MCP_QUOTA_DEFAULTS.standard,
   fetchImpl = globalThis.fetch,
   clock = () => Date.now(),
+  store,
 } = {}) {
   const registry = createRegistry();
   const servers = new Map(); // `${tenantId}::${serverId}` -> { serverId, name, source, tenantId, workspaceId, draft, curated }
   const auditLog = []; // audit events (each carries scope.tenant_id)
   const rateWindows = new Map(); // rateKey -> { count, windowStart }
-  const pinnedImage = `${runtimeImage}@${runtimeImageDigest}`;
+  const pinnedImage = runtimeImageDigest ? `${runtimeImage}@${runtimeImageDigest}` : runtimeImage;
   const key = (tid, sid) => `${tid}::${sid}`;
+  let loaded = false;
+  let dirty = false;
+
+  function snapshot() {
+    return {
+      registry,
+      servers: [...servers.values()],
+      auditLog,
+      rateWindows: [...rateWindows.entries()],
+    };
+  }
+
+  function hydrate(state = {}) {
+    registry.servers = state.registry?.servers ?? {};
+    servers.clear();
+    for (const entry of state.servers ?? []) {
+      if (entry?.tenantId && entry?.serverId) servers.set(key(entry.tenantId, entry.serverId), entry);
+    }
+    auditLog.splice(0, auditLog.length, ...(state.auditLog ?? []));
+    rateWindows.clear();
+    for (const [k, v] of state.rateWindows ?? []) rateWindows.set(k, v);
+  }
+
+  async function ensureLoaded() {
+    if (loaded || !store) return;
+    const state = await store.loadState();
+    if (state) hydrate(state);
+    loaded = true;
+  }
+
+  async function persistIfDirty() {
+    if (!store || !dirty) return;
+    await store.saveState(snapshot());
+    dirty = false;
+  }
+
+  async function changed(result) {
+    dirty = true;
+    await persistIfDirty();
+    return result;
+  }
 
   function tenantServers(identity, workspaceId) {
     return [...servers.values()].filter((s) => s.tenantId === identity.tenantId && (!workspaceId || s.workspaceId === workspaceId));
@@ -217,6 +259,7 @@ export function createMcpEngine({
   }
 
   async function executeMcp(params = {}) {
+    await ensureLoaded();
     const { operation, identity, workspaceId, serverId, version, body = {} } = params;
     const tid = identity?.tenantId;
     if (!tid) throw httpError(401, 'UNAUTHENTICATED', 'Missing tenant identity');
@@ -236,7 +279,7 @@ export function createMcpEngine({
         const sid = `srv-${slug(body.name ?? source)}-${randomUUID().slice(0, 8)}`;
         const draft = draftForSource(sid, source, body.resources);
         servers.set(key(tid, sid), { serverId: sid, name: body.name ?? sid, source, tenantId: tid, workspaceId, draft, curated: null });
-        return { serverId: sid, status: 'draft', name: body.name ?? sid, generatedFrom: draft.generatedFrom };
+        return changed({ serverId: sid, status: 'draft', name: body.name ?? sid, generatedFrom: draft.generatedFrom });
       }
 
       case 'get_server':
@@ -245,7 +288,7 @@ export function createMcpEngine({
       case 'curate_server': {
         const entry = requireServer(identity, serverId);
         entry.curated = applyCuration(entry.draft, body ?? {});
-        return { serverId, status: 'curated', tools: entry.curated.tools, violations: entry.curated.violations };
+        return changed({ serverId, status: 'curated', tools: entry.curated.tools, violations: entry.curated.violations });
       }
 
       case 'publish_version': {
@@ -262,7 +305,7 @@ export function createMcpEngine({
         if (!record.requiresReview) { activateVersion(registry, tid, serverId, v, { approved: false }); activated = true; }
         audit('server_published', { serverId });
         const active = getServer(registry, tid, serverId)?.activeVersion ?? null;
-        return { serverId, version: v, requiresReview: record.requiresReview, status: record.requiresReview ? 'requires_review' : 'active', activeVersion: active, activated };
+        return changed({ serverId, version: v, requiresReview: record.requiresReview, status: record.requiresReview ? 'requires_review' : 'active', activeVersion: active, activated });
       }
 
       case 'approve_version': {
@@ -270,7 +313,7 @@ export function createMcpEngine({
         const result = activateVersion(registry, tid, serverId, version, { approved: true });
         if (!result.ok) throw httpError(404, 'MCP_VERSION_NOT_FOUND', result.violations?.[0]?.message ?? 'Version not found.', { errors: result.violations });
         audit('scopes_changed', { serverId });
-        return { serverId, approvedVersion: version, activeVersion: getServer(registry, tid, serverId)?.activeVersion ?? null };
+        return changed({ serverId, approvedVersion: version, activeVersion: getServer(registry, tid, serverId)?.activeVersion ?? null });
       }
 
       case 'call_tool': {
@@ -284,7 +327,7 @@ export function createMcpEngine({
         const result = await invokeTool(identity, entry, registered, body.name, body.arguments ?? {});
         const telemetry = mcpToolCallTelemetry({ tenantId: tid, workspaceId: entry.workspaceId, serverId, toolName: body.name, oauthClientId, latencyMs: clock() - started, status: result.isError ? 'error' : 'ok' });
         recordAudit({ ...mcpAuditEvent({ tenantId: tid, workspaceId: entry.workspaceId, oauthClientId, action: 'scopes_changed', serverId, correlationId: randomUUID(), eventId: randomUUID(), eventTimestamp: new Date(clock()).toISOString() }), action: { category: 'tool_invocation', id: `mcp.tool_call.${body.name}` }, detail: telemetry.log });
-        return { result, content: result.content, toolName: body.name };
+        return changed({ result, content: result.content, toolName: body.name });
       }
 
       case 'list_audit': {
@@ -300,7 +343,7 @@ export function createMcpEngine({
         const reg = registry.servers[key(tid, serverId)];
         if (reg) delete registry.servers[key(tid, serverId)];
         audit('server_unpublished', { serverId: entry.serverId });
-        return { serverId, deleted: true };
+        return changed({ serverId, deleted: true });
       }
 
       default:
@@ -319,6 +362,7 @@ export function createMcpEngine({
   //   Deferred (tracked, not in this change): Streamable-HTTP SSE transport, sessions, resources/*,
   //   prompts/* — a standard client can list+call tools over plain JSON-RPC POST without them.
   async function executeMcpRpc({ identity, workspaceId, serverId, message } = {}) {
+    await ensureLoaded();
     const { id, method, params } = message ?? {};
     const isNotification = id === undefined || id === null;
     if (!identity?.tenantId) throw httpError(401, 'UNAUTHENTICATED', 'Missing tenant identity');
@@ -368,5 +412,5 @@ export function createMcpEngine({
     }
   }
 
-  return { executeMcp, executeMcpRpc };
+  return { executeMcp, executeMcpRpc, ensureSchema: () => store?.ensureSchema?.() ?? Promise.resolve() };
 }

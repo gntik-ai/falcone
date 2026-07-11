@@ -1,4 +1,3 @@
-{{- if and .Values.temporal.enabled .Values.temporal.ui.enabled }}
 {{- $root := . -}}
 {{- $t := .Values.temporal -}}
 {{- $ui := $t.ui -}}
@@ -54,4 +53,3 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-{{- end }}

@@ -74,17 +74,42 @@ spec:
               for policy in platform tenant functions gateway iam; do
                 bao policy write "$policy" "/config/policies/${policy}.hcl"
               done
-              bao write auth/kubernetes/role/platform-role bound_service_account_names='*' bound_service_account_namespaces='postgresql,documentdb,kafka,s3-compat' policies=platform ttl=24h
-              bao write auth/kubernetes/role/gateway-role bound_service_account_names='*' bound_service_account_namespaces='apisix' policies=gateway ttl=24h
-              bao write auth/kubernetes/role/iam-role bound_service_account_names='*' bound_service_account_namespaces='keycloak' policies=iam ttl=24h
+              bao write auth/kubernetes/role/platform-role bound_service_account_names='*' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=platform ttl=24h
+              bao write auth/kubernetes/role/gateway-role bound_service_account_names='{{ .Release.Name }}-apisix' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=gateway ttl=24h
+              bao write auth/kubernetes/role/iam-role bound_service_account_names='{{ .Release.Name }}-keycloak' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=iam ttl=24h
+              bao write auth/kubernetes/role/workspace-secrets-role bound_service_account_names='{{ .Release.Name }}-control-plane,{{ .Release.Name }}-control-plane-executor' bound_service_account_namespaces='{{ .Release.Namespace }}' policies=functions ttl=24h
               bao write auth/kubernetes/role/eso-role bound_service_account_names='{{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}' bound_service_account_namespaces='eso-system' policies=platform,functions,gateway,iam ttl={{ .Values.eso.tokenTTL | default "24h" }}
-              bao kv put secret/platform/postgresql root-password=dummy-root-password app-password=dummy-app-password
-              bao kv put secret/platform/documentdb root-password=dummy-root-password app-password=dummy-app-password
-              bao kv put secret/platform/kafka admin-password=dummy-admin-password inter-broker-secret=dummy-inter-broker-secret
-              bao kv put secret/platform/s3 access-key=dummy-access-key secret-key=dummy-secret-key
-              bao kv put secret/platform/encryption master-key=REPLACE_WITH_32_BYTE_KEY
-              bao kv put secret/gateway/apisix admin-key=dummy-admin-key dashboard-password=dummy-dashboard-password etcd-password=dummy-etcd-password
-              bao kv put secret/iam/keycloak admin-password=dummy-admin-password db-password=dummy-db-password
+              random_alnum() {
+                head -c "${1:-32}" /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "${2:-48}"
+              }
+              pg_app_password="$(random_alnum 48 48)"
+              pg_root_password="$(random_alnum 48 48)"
+              pgvector_password="$(random_alnum 48 48)"
+              documentdb_password="$(random_alnum 48 48)"
+              documentdb_repl_password="$(random_alnum 48 48)"
+              kafka_admin_password="$(random_alnum 48 48)"
+              s3_access_key="$(random_alnum 24 20)"
+              s3_secret_key="$(random_alnum 48 40)"
+              keycloak_admin_password="$(random_alnum 48 48)"
+              identity_client_secret="$(random_alnum 48 48)"
+              superadmin_password="$(random_alnum 48 48)"
+              apisix_admin_key="$(random_alnum 48 48)"
+              gateway_shared_secret="$(random_alnum 48 48)"
+              temporal_password="$(random_alnum 48 48)"
+              encryption_master_key="$(random_alnum 48 44)"
+              bao kv put secret/platform/postgresql username=falcone app-password="$pg_app_password" root-password="$pg_root_password"
+              bao kv put secret/platform/postgresql-vector username=falcone_vector_admin password="$pgvector_password" database=in_falcone_vector
+              bao kv put secret/platform/documentdb username=falcone_doc_admin password="$documentdb_password" database=in_falcone ferretdb-postgresql-url="postgres://falcone_doc_admin:${documentdb_password}@{{ .Release.Name }}-documentdb.{{ .Release.Namespace }}.svc.cluster.local:5432/postgres?sslmode=disable"
+              bao kv put secret/platform/documentdb-replication username=falcone_cdc_repl password="$documentdb_repl_password" realtime-url="postgres://falcone_cdc_repl:${documentdb_repl_password}@{{ .Release.Name }}-documentdb.{{ .Release.Namespace }}.svc.cluster.local:5432/postgres?sslmode=disable"
+              bao kv put secret/platform/kafka admin-password="$kafka_admin_password" inter-broker-secret="$(random_alnum 32 32)"
+              bao kv put secret/platform/s3 access-key="$s3_access_key" secret-key="$s3_secret_key"
+              bao kv put secret/platform/encryption master-key="$encryption_master_key"
+              bao kv put secret/platform/temporal username=temporal password="$temporal_password" database=temporal visibility-database=temporal_visibility
+              bao kv put secret/gateway/apisix admin-key="$apisix_admin_key" dashboard-password="$(random_alnum 32 32)" etcd-password="$(random_alnum 32 32)"
+              bao kv put secret/gateway/shared secret="$gateway_shared_secret"
+              bao kv put secret/iam/keycloak admin-username=admin admin-password="$keycloak_admin_password" db-password="$pg_app_password"
+              bao kv put secret/iam/identity-client client-id=in-falcone-gateway client-secret="$identity_client_secret"
+              bao kv put secret/iam/superadmin username=superadmin password="$superadmin_password"
           volumeMounts:
             - name: tls
               mountPath: /openbao/tls

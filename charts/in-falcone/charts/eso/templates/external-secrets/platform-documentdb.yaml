@@ -2,16 +2,50 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: platform-documentdb-credentials
-  namespace: documentdb
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
 spec:
   refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
   secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
-  target: { name: platform-documentdb-credentials, immutable: true }
+  target: { name: in-falcone-documentdb, creationPolicy: Merge, immutable: false }
   data:
-    - secretKey: root-password
-      remoteRef: { key: platform/documentdb, property: root-password }
-    - secretKey: app-password
-      remoteRef: { key: platform/documentdb, property: app-password }
+    - secretKey: POSTGRES_USER
+      remoteRef: { key: platform/documentdb, property: username }
+    - secretKey: POSTGRES_PASSWORD
+      remoteRef: { key: platform/documentdb, property: password }
+    - secretKey: POSTGRES_DB
+      remoteRef: { key: platform/documentdb, property: database }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: platform-ferretdb-credentials
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-ferretdb, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: postgresql-url
+      remoteRef: { key: platform/documentdb, property: ferretdb-postgresql-url }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: platform-documentdb-replication
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-documentdb-replication, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: password
+      remoteRef: { key: platform/documentdb-replication, property: password }

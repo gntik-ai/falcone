@@ -1,4 +1,3 @@
-{{- if .Values.seaweedfs.enabled }}
 {{- /*
   SeaweedFS S3 gateway credentials (add-seaweedfs-deployment, design D7;
   scoping hardened by add-seaweedfs-per-tenant-identities, #553).
@@ -111,4 +110,18 @@ metadata:
     "helm.sh/resource-policy": keep
 stringData:
   seaweedfs_s3_config: {{ toJson $identities | quote }}
-{{- end }}
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: in-falcone-storage
+  namespace: {{ $ns }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+  annotations:
+    "helm.sh/resource-policy": keep
+stringData:
+  s3_access_key: {{ $accessKey | quote }}
+  s3_secret_key: {{ $secretKey | quote }}

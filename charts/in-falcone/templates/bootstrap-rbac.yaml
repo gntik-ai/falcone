@@ -1,4 +1,3 @@
-{{- if .Values.bootstrap.enabled }}
 {{- if .Values.bootstrap.serviceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
@@ -43,4 +42,3 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ include "in-falcone.fullname" . }}-bootstrap
-{{- end }}

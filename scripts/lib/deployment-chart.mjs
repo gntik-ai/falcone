@@ -24,6 +24,27 @@ export const REQUIRED_COMPONENT_ALIASES = [
   'webConsole',
   'workflowWorker'
 ];
+export const CORE_SERVICE_ALIASES = [
+  'bootstrap',
+  'apisix',
+  'keycloak',
+  'postgresql',
+  'postgresqlVector',
+  'documentdb',
+  'ferretdb',
+  'kafka',
+  'seaweedfs',
+  'grafana',
+  'observability',
+  'controlPlane',
+  'controlPlaneExecutor',
+  'webConsole',
+  'workflowWorker',
+  'eso',
+  'openbao',
+  'temporal',
+  'mcp'
+];
 export const REQUIRED_VALUE_LAYERS = ['common', 'environment', 'customer', 'platform', 'airgap', 'localOverride'];
 export const RECOMMENDED_DEPLOYMENT_PROFILES = ['all-in-one', 'standard', 'ha'];
 export const SUPPORTED_TLS_MODES = ['clusterManaged', 'external'];
@@ -178,8 +199,8 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     return;
   }
 
-  if (!bootstrap.enabled) {
-    violations.push('bootstrap.enabled must remain true for the platform deployment baseline.');
+  if (Object.prototype.hasOwnProperty.call(bootstrap, 'enabled')) {
+    violations.push('bootstrap.enabled is no longer supported because bootstrap is core.');
   }
 
   if (!bootstrap?.job?.image?.repository) {
@@ -239,12 +260,10 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
     }
   }
 
-  if (!values?.keycloak?.enabled) {
-    violations.push('bootstrap baseline requires keycloak.enabled=true.');
-  }
-
-  if (!values?.apisix?.enabled) {
-    violations.push('bootstrap baseline requires apisix.enabled=true.');
+  for (const alias of ['keycloak', 'apisix']) {
+    if (!values?.[alias]) {
+      violations.push(`bootstrap baseline requires ${alias} core values to be present.`);
+    }
   }
 
   const governanceCatalog = bootstrap?.oneShot?.governanceCatalog ?? {};
@@ -543,9 +562,27 @@ export function collectDeploymentChartViolations(
       violations.push(`Dependency ${alias} must use the local wrapper repository file://./charts/component-wrapper.`);
     }
 
-    if (dependency.condition !== `${alias}.enabled`) {
-      violations.push(`Dependency ${alias} must be gated by ${alias}.enabled.`);
+    if ('condition' in dependency) {
+      violations.push(`Dependency ${alias} must not declare a condition; platform services are core.`);
     }
+  }
+
+  for (const alias of CORE_SERVICE_ALIASES) {
+    const block = values?.[alias];
+    if (block && typeof block === 'object' && Object.prototype.hasOwnProperty.call(block, 'enabled')) {
+      violations.push(`${alias}.enabled must not be present in root values; platform services are core.`);
+    }
+  }
+
+  if (
+    values?.controlPlane?.functionExecutor &&
+    Object.prototype.hasOwnProperty.call(values.controlPlane.functionExecutor, 'enabled')
+  ) {
+    violations.push('controlPlane.functionExecutor.enabled must not be present; function executor RBAC is core.');
+  }
+
+  if (values?.temporal?.ui && Object.prototype.hasOwnProperty.call(values.temporal.ui, 'enabled')) {
+    violations.push('temporal.ui.enabled must not be present; Temporal web is core.');
   }
 
   for (const alias of REQUIRED_COMPONENT_ALIASES) {
@@ -559,20 +596,25 @@ export function collectDeploymentChartViolations(
       violations.push(`Component ${alias} must define wrapper.componentId.`);
     }
 
-    if (component?.enabled && !component?.image?.repository) {
-      violations.push(`Component ${alias} must define image.repository when enabled.`);
+    if (!component?.image?.repository) {
+      violations.push(`Component ${alias} must define image.repository.`);
     }
 
-    if (component?.enabled && !component?.service?.portName) {
-      violations.push(`Component ${alias} must define service.portName when enabled.`);
+    if (!component?.service?.portName) {
+      violations.push(`Component ${alias} must define service.portName.`);
     }
 
-    if (component?.enabled && component?.persistence?.enabled && !component?.persistence?.existingClaim && !component?.persistence?.size) {
+    if (component?.persistence?.enabled && !component?.persistence?.existingClaim && !component?.persistence?.size) {
       violations.push(`Component ${alias} must define persistence.size when persistence is enabled without existingClaim.`);
     }
 
-    if (component?.serviceAccount?.automountToken !== false) {
+    const tokenRequiredAliases = new Set(['controlPlane', 'controlPlaneExecutor']);
+    if (!tokenRequiredAliases.has(alias) && component?.serviceAccount?.automountToken !== false) {
       violations.push(`Component ${alias} must disable serviceAccount automountToken by default.`);
+    }
+
+    if (tokenRequiredAliases.has(alias) && component?.serviceAccount?.automountToken !== true) {
+      violations.push(`Component ${alias} must enable serviceAccount automountToken for Kubernetes/OpenBao auth.`);
     }
 
     if (component?.securityContext?.runAsNonRoot !== true) {
@@ -729,8 +771,8 @@ export function collectDeploymentChartViolations(
 
   for (const [surface, binding] of Object.entries(values?.publicSurface?.bindings ?? {})) {
     const component = values?.[binding.component];
-    if (!binding.serviceName && component?.enabled === false) {
-      violations.push(`Public surface ${surface} requires an explicit serviceName when ${binding.component} is disabled.`);
+    if (!binding.serviceName && !component) {
+      violations.push(`Public surface ${surface} references missing component ${binding.component}.`);
     }
   }
 

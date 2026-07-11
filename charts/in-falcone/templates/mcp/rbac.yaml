@@ -1,4 +1,3 @@
-{{- if and .Values.controlPlane.enabled .Values.mcp.enabled }}
 {{- /*
   RBAC for MCP server hosting (ADR-12: reuse Knative — each MCP server = a ksvc).
   Grants the control-plane ServiceAccount the namespace-scoped permissions to manage
@@ -47,4 +46,3 @@ subjects:
   - kind: ServiceAccount
     name: {{ $saName }}
     namespace: {{ .Values.global.namespace }}
-{{- end }}

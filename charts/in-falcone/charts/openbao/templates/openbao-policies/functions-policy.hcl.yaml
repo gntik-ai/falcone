@@ -11,3 +11,9 @@ data:
     path "secret/metadata/functions/*" {
       capabilities = ["list", "read"]
     }
+    path "secret/data/falcone/workspace-secrets/*" {
+      capabilities = ["create", "update", "read", "delete"]
+    }
+    path "secret/metadata/falcone/workspace-secrets/*" {
+      capabilities = ["list", "read", "delete"]
+    }

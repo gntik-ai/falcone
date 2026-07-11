@@ -1,4 +1,4 @@
-{{- if and .Values.seaweedfs.enabled .Values.seaweedfs.networkPolicy.enabled }}
+{{- if .Values.seaweedfs.networkPolicy.enabled }}
 {{- /*
   Internal-only NetworkPolicy for the SeaweedFS object-storage tier
   (add-seaweedfs-deployment, design D9).

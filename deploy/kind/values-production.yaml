@@ -49,10 +49,8 @@ global:
 controlPlane:
   transportSecurityClient: true
 controlPlaneExecutor:
-  enabled: true
   transportSecurityClient: true
 workflowWorker:
-  enabled: true
   transportSecurityClient: true
 
 # Datastore-side TLS chart toggles (already supported by the chart/subcharts).

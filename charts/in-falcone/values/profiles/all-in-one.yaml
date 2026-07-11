@@ -12,8 +12,6 @@ controlPlane:
   replicas: 1
 webConsole:
   replicas: 1
-observability:
-  enabled: false
 postgresql:
   persistence:
     size: 10Gi

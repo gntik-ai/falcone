@@ -28,6 +28,7 @@ import { createMcpEngine } from '../../apps/control-plane/src/runtime/mcp-engine
 
 const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
 const SELF = 'http://exec.local';
+const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 const PG = { database: 'app', name: 'public', tables: [{ name: 'orders', columns: [{ name: 'id', type: 'bigint' }, { name: 'total', type: 'numeric' }] }] };
 
 // Capturing self-call fake: the root `/` returns the executor INDEX (the bug symptom), a real
@@ -48,7 +49,7 @@ let cp; let baseUrl; let fetchImpl; let serverId;
 
 test.before(async () => {
   fetchImpl = captureFetch();
-  const engine = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl });
+  const engine = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl, runtimeImageDigest: TEST_DIGEST });
   // Publish an instant postgres server for tenant A / ws-a (create → curate → publish v1).
   const created = await engine.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'orders-mcp', source: 'instant', resources: { postgres: PG } } });
   serverId = created.serverId;
