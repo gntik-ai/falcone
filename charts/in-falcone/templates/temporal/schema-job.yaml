@@ -2,10 +2,9 @@
 {{- $t := .Values.temporal -}}
 {{- $p := $t.persistence -}}
 {{- /*
-  Schema setup/upgrade Job. Runs temporal-sql-tool (bundled in the admin-tools image)
-  as a Helm pre-install,pre-upgrade hook so the persistence + visibility schemas are
-  ready BEFORE the Temporal server pods become available. SQL visibility on PostgreSQL,
-  no Elasticsearch. hook-delete-policy keeps the namespace clean between upgrades.
+  Schema setup/upgrade Job. On fresh install this is a normal Job because PostgreSQL is created by
+  the same release; its connectivity loop waits until the DB bootstrap creates the role/databases.
+  On upgrades, where PostgreSQL already exists, it runs before workload rollout.
 */ -}}
 apiVersion: batch/v1
 kind: Job
@@ -14,10 +13,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "schema") | nindent 4 }}
+  {{- if .Release.IsUpgrade }}
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook: pre-upgrade
     helm.sh/hook-weight: "0"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  {{- end }}
 spec:
   backoffLimit: {{ $t.jobs.backoffLimit }}
   activeDeadlineSeconds: {{ $t.jobs.activeDeadlineSeconds }}

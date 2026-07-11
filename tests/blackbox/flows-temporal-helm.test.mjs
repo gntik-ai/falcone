@@ -175,7 +175,7 @@ test('bbx-flows-helm-004: no Elasticsearch resource is rendered for Temporal', S
 // -------------------------------------------------------------------------
 // bbx-flows-helm-005: schema-tool Job
 // -------------------------------------------------------------------------
-test('bbx-flows-helm-005: schema Job uses temporal-sql-tool as a helm hook', SKIP, () => {
+test('bbx-flows-helm-005: schema Job uses temporal-sql-tool with a fresh-install-safe lifecycle', SKIP, () => {
   const r = renderEnabled();
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
@@ -189,11 +189,7 @@ test('bbx-flows-helm-005: schema Job uses temporal-sql-tool as a helm hook', SKI
   const schemaJob = jobs.find((d) => /schema/.test(docName(d)) || /temporal-sql-tool/.test(d));
   assert.ok(schemaJob, `expected a Temporal schema Job, jobs found: ${jobs.map(docName).join(', ')}`);
   assert.match(schemaJob, /temporal-sql-tool/, 'schema Job must use the temporal-sql-tool image');
-  assert.match(
-    schemaJob,
-    /helm\.sh\/hook:\s*["']?[^"'\n]*pre-install[^"'\n]*pre-upgrade|helm\.sh\/hook:\s*["']?[^"'\n]*pre-upgrade[^"'\n]*pre-install/,
-    'schema Job must be a pre-install,pre-upgrade hook'
-  );
+  assert.doesNotMatch(schemaJob, /helm\.sh\/hook:/, 'fresh-install schema setup must be a normal Job so same-release PostgreSQL can start first');
   assert.match(schemaJob, /backoffLimit:\s*3/, 'schema Job must set backoffLimit: 3');
 });
 
@@ -205,7 +201,7 @@ test('bbx-flows-helm-006: bootstrap Job registers namespace + five Keyword searc
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
   const jobs = docs.filter((d) => docKind(d) === 'Job' && isTemporalDoc(d));
-  const bootstrapJob = jobs.find((d) => /bootstrap/.test(docName(d)));
+  const bootstrapJob = jobs.find((d) => /temporal-bootstrap$/.test(docName(d)));
   assert.ok(bootstrapJob, `expected a Temporal bootstrap Job, jobs: ${jobs.map(docName).join(', ')}`);
   assert.match(
     bootstrapJob,

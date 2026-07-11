@@ -8,10 +8,14 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.temporal.roleLabels" (dict "root" $root "role" "db-bootstrap") | nindent 4 }}
+  {{- if .Release.IsUpgrade }}
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    # Fresh installs need PostgreSQL from this same release, so the install form is a normal Job.
+    # During upgrades PostgreSQL already exists and the convergence can safely run before rollout.
+    helm.sh/hook: pre-upgrade
     helm.sh/hook-weight: "-1"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  {{- end }}
 spec:
   backoffLimit: {{ $t.jobs.backoffLimit }}
   activeDeadlineSeconds: {{ $t.jobs.activeDeadlineSeconds }}

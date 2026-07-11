@@ -178,7 +178,11 @@ test('all-core-004: OpenBao seeding and ESO remoteRefs are aligned', SKIP, () =>
 
 test('all-core-005: Temporal DB bootstrap is wired before schema setup', SKIP, () => {
   const out = assertRender();
-  assert.match(out, /name:\s*falcone-temporal-db-bootstrap[\s\S]*helm\.sh\/hook-weight:\s*"-1"/, 'Temporal DB bootstrap must run before schema hook');
+  const docs = renderDocs();
+  const dbBootstrap = findDoc(docs, 'Job', 'falcone-temporal-db-bootstrap');
+  const schema = findDoc(docs, 'Job', 'falcone-temporal-schema');
+  assert.equal(dbBootstrap?.metadata?.annotations?.['helm.sh/hook'], undefined, 'fresh-install DB bootstrap must be a normal Job because PostgreSQL belongs to the same release');
+  assert.equal(schema?.metadata?.annotations?.['helm.sh/hook'], undefined, 'fresh-install schema setup must be a normal Job because PostgreSQL belongs to the same release');
   assert.match(out, /CREATE ROLE %I LOGIN CREATEDB PASSWORD %L/, 'Temporal bootstrap must create the role idempotently');
   assert.match(out, /name:\s*"in-falcone-temporal"[\s\S]*key:\s*"password"/, 'Temporal schema/bootstrap must use the generated Temporal Secret');
   assert.match(out, /SQL_USER[\s\S]*value:\s*"temporal"[\s\S]*SQL_PASSWORD[\s\S]*secretKeyRef:/, 'Temporal schema job must use the same role and Secret');
@@ -341,8 +345,8 @@ test('all-core-009d: pre-install hooks run in the release namespace while target
 
   const temporalDb = findDoc(docs, 'Job', 'falcone-temporal-db-bootstrap');
   const temporalSchema = findDoc(docs, 'Job', 'falcone-temporal-schema');
-  assert.equal(temporalDb?.metadata?.namespace, 'review-ns', 'Temporal DB bootstrap pre-install hook must run in the release namespace');
-  assert.equal(temporalSchema?.metadata?.namespace, 'review-ns', 'Temporal schema pre-install hook must run in the release namespace');
+  assert.equal(temporalDb?.metadata?.namespace, 'review-ns', 'Temporal DB bootstrap install Job must run in the release namespace');
+  assert.equal(temporalSchema?.metadata?.namespace, 'review-ns', 'Temporal schema install Job must run in the release namespace');
 
   const seaweedResizeHook = readFileSync(resolve(CHART_PATH, 'charts', 'seaweedfs', 'templates', 'volume', 'volume-resize-hook.yaml'), 'utf8');
   const seaweedValues = readFileSync(resolve(CHART_PATH, 'charts', 'seaweedfs', 'values.yaml'), 'utf8');
