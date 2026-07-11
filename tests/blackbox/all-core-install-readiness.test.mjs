@@ -104,7 +104,7 @@ function envValue(job, name) {
 }
 function commandText(job) {
   return (job.spec?.template?.spec?.containers ?? [])
-    .flatMap((container) => container.command ?? [])
+    .flatMap((container) => [...(container.command ?? []), ...(container.args ?? [])])
     .join('\n');
 }
 
@@ -284,6 +284,7 @@ test('all-core-003: nested service.enabled=false fails for core service componen
 
 test('all-core-004: OpenBao seeding and ESO remoteRefs are aligned', SKIP, () => {
   const out = assertRender();
+  const docs = renderDocs();
   const expected = [
     ['KAFKA_CFG_NODE_ID', 'platform/kafka', 'node-id'],
     ['KAFKA_CFG_PROCESS_ROLES', 'platform/kafka', 'KAFKA_CFG_PROCESS_ROLES'],
@@ -307,7 +308,63 @@ test('all-core-004: OpenBao seeding and ESO remoteRefs are aligned', SKIP, () =>
   assert.match(out, /--from-file=root-token=\/openbao-recovery\/root-token/, 'OpenBao recovery Secret must preserve the root token for partial init convergence');
   assert.match(out, /cp \/openbao-recovery-mounted\/root-token \/openbao-recovery\/root-token[\s\S]*\[ -s \/openbao-recovery\/unseal1 \] && \[ -s \/openbao-recovery\/root-token \]/, 'initialized recovery branches must not signal .ready without a root token');
   assert.match(out, /openbao-recovery-mounted\/root-token[\s\S]*openbao-init-role login failed/, 'OpenBao init must fall back to mounted recovery root token before Kubernetes-auth login failures');
-  assert.doesNotMatch(out, /randAlphaNum/, 'OpenBao init must not generate unrelated credential values');
+  const credentialHook = findDoc(docs, 'Job', 'falcone-in-falcone-credential-bootstrap');
+  assert.ok(credentialHook, 'platform credential bootstrap hook must render');
+  assert.equal(credentialHook.metadata?.annotations?.['helm.sh/hook'], 'pre-install,pre-upgrade');
+  assert.equal(credentialHook.metadata?.annotations?.['helm.sh/hook-weight'], '-30');
+  const credentialScript = commandText(credentialHook);
+  assert.match(credentialScript, /random_alnum\(\)/, 'platform credentials must be generated inside the hook pod');
+  assert.match(credentialScript, /kubectl -n "\$release_ns" create secret generic "\$secret_name"/, 'credential hook must create/adopt Kubernetes Secrets in-cluster');
+  for (const secretName of [
+    'in-falcone-postgresql',
+    'in-falcone-postgresql-vector',
+    'in-falcone-documentdb',
+    'in-falcone-ferretdb',
+    'in-falcone-documentdb-replication',
+    'in-falcone-kafka',
+    'in-falcone-storage',
+    'in-falcone-seaweedfs-s3-creds',
+    'in-falcone-seaweedfs-s3-config',
+    'falcone-seaweedfs-db-secret',
+    'in-falcone-keycloak-admin',
+    'in-falcone-identity-client',
+    'in-falcone-superadmin',
+    'in-falcone-apisix-admin',
+    'in-falcone-gateway-shared-secret',
+    'in-falcone-temporal',
+    'in-falcone-encryption',
+  ]) {
+    assert.equal(findDoc(docs, 'Secret', secretName), undefined, `${secretName} must be created by the credential hook, not rendered with live data`);
+  }
+  for (const secretName of [
+    'in-falcone-postgresql',
+    'in-falcone-postgresql-vector',
+    'in-falcone-documentdb',
+    'in-falcone-ferretdb',
+    'in-falcone-documentdb-replication',
+    'in-falcone-kafka',
+    'in-falcone-storage',
+    'in-falcone-keycloak-admin',
+    'in-falcone-identity-client',
+    'in-falcone-superadmin',
+    'in-falcone-apisix-admin',
+    'in-falcone-temporal',
+    'in-falcone-encryption',
+  ]) {
+    assert.match(credentialScript, new RegExp(`begin_secret ${escapeRe(secretName)}\\b`), `${secretName} must be covered by the credential hook`);
+  }
+  assert.match(credentialScript, /begin_secret "\$S3_CREDS_SECRET" seaweedfs-s3/, 'SeaweedFS S3 credential Secret must be covered by the credential hook');
+  assert.match(credentialScript, /begin_secret "\$S3_CONFIG_SECRET" seaweedfs-s3/, 'SeaweedFS S3 config Secret must be covered by the credential hook');
+  assert.match(credentialScript, /seaweed_db_secret="\$\{RELEASE_NAME\}-seaweedfs-db-secret"[\s\S]*begin_secret "\$seaweed_db_secret" seaweedfs/, 'SeaweedFS DB Secret must be covered by the credential hook');
+  assert.match(credentialScript, /begin_secret "\$GATEWAY_SHARED_SECRET_NAME" gateway/, 'gateway shared Secret must be covered by the credential hook when chart-managed');
+  assert.doesNotMatch(out, /randAlphaNum/, 'default render must not use Helm-side random credential generation');
+  for (const renderArgs of [[], ['--include-crds']]) {
+    const renderedDocs = renderArgs.length === 0 ? docs : parseAllDocuments(assertRender(renderArgs)).map((doc) => doc.toJSON()).filter(Boolean);
+    for (const secret of renderedDocs.filter((doc) => doc.kind === 'Secret')) {
+      assert.equal(secret.stringData, undefined, `${secret.metadata?.name} must not render inline stringData for args ${renderArgs.join(' ') || '(base)'}`);
+      assert.equal(secret.data, undefined, `${secret.metadata?.name} must not render inline data for args ${renderArgs.join(' ') || '(base)'}`);
+    }
+  }
 });
 
 test('all-core-005: Temporal DB bootstrap is wired before schema setup', SKIP, () => {
@@ -640,7 +697,10 @@ test('all-core-006d3: control plane wiring follows custom release and registry v
   assert.equal(env.MONGO_BACKEND.value, 'ferretdb');
   assert.deepEqual(env.MONGO_USER.valueFrom?.secretKeyRef, { key: 'POSTGRES_USER', name: 'in-falcone-documentdb' });
   assert.deepEqual(env.MONGO_PASSWORD.valueFrom?.secretKeyRef, { key: 'POSTGRES_PASSWORD', name: 'in-falcone-documentdb' });
-  assert.ok(findDoc(docs, 'Secret', 'in-falcone-documentdb'), 'custom render must create the documentdb credential Secret referenced by control plane');
+  assert.equal(findDoc(docs, 'Secret', 'in-falcone-documentdb'), undefined, 'custom render must not inline the documentdb credential Secret');
+  const credentialHook = findDoc(docs, 'Job', 'hawk-in-falcone-credential-bootstrap');
+  assert.ok(credentialHook, 'custom release must render the credential bootstrap hook');
+  assert.match(commandText(credentialHook), /begin_secret in-falcone-documentdb documentdb/, 'credential hook must create the documentdb Secret referenced by control plane');
   const executor = findDoc(docs, 'Deployment', 'hawk-control-plane-executor');
   assert.ok(executor, 'custom control-plane executor Deployment must render');
   const executorEnv = Object.fromEntries(executor.spec.template.spec.containers[0].env.map((entry) => [entry.name, entry]));
@@ -784,9 +844,12 @@ test('all-core-010: Kafka default and supported profiles are valid single-broker
     assert.ok(kafka, 'Kafka StatefulSet must render');
     assert.equal(kafka.spec?.replicas, 1, `Kafka must default to one broker for args ${args.join(' ') || '(base)'}`);
   }
-  const out = assertRender();
-  assert.match(out, /name:\s*in-falcone-kafka[\s\S]*KAFKA_CFG_NODE_ID:\s*"0"/, 'Kafka Secret must seed node id 0 for the single broker');
-  assert.match(out, /KAFKA_CFG_CONTROLLER_QUORUM_VOTERS:\s*"0@127\.0\.0\.1:9093"/, 'single-broker KRaft quorum must use node 0 only');
+  const credentialHook = findDoc(renderDocs(), 'Job', 'falcone-in-falcone-credential-bootstrap');
+  assert.ok(credentialHook, 'credential bootstrap hook must render');
+  const credentialScript = commandText(credentialHook);
+  assert.match(credentialScript, /begin_secret in-falcone-kafka kafka/, 'Kafka Secret must be created by the credential hook');
+  assert.match(credentialScript, /KAFKA_CFG_NODE_ID 0/, 'Kafka Secret must seed node id 0 for the single broker');
+  assert.match(credentialScript, /KAFKA_CFG_CONTROLLER_QUORUM_VOTERS 0@127\.0\.0\.1:9093/, 'single-broker KRaft quorum must use node 0 only');
 });
 
 test('all-core-011: existing-install cutover scripts fail closed, merge KV data, and are release-name safe', () => {

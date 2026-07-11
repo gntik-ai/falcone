@@ -178,9 +178,9 @@ config:
     postgresCredentials:
       existingSecret: in-falcone-postgresql
       keys:
-        - username
-        - password
-        - database
+        - POSTGRESQL_USERNAME
+        - POSTGRESQL_PASSWORD
+        - POSTGRESQL_POSTGRES_PASSWORD
     # Document-store credentials feed MONGO_USER/MONGO_PASSWORD/MONGO_DATABASE for the
     # control-plane's connection to the FerretDB gateway (which passes them through to the
     # DocumentDB engine). After the MongoDB-server -> FerretDB cutover these come from the
@@ -194,13 +194,18 @@ config:
     kafkaCredentials:
       existingSecret: in-falcone-kafka
       keys:
-        - username
-        - password
+        - KAFKA_CFG_NODE_ID
+        - KAFKA_CFG_PROCESS_ROLES
+        - KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+        - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+        - KAFKA_CFG_LISTENERS
+        - KAFKA_CFG_ADVERTISED_LISTENERS
+        - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
     objectStorageCredentials:
       existingSecret: in-falcone-storage
       keys:
-        - access-key
-        - secret-key
+        - s3_access_key
+        - s3_secret_key
 bootstrap:
   serviceAccount:
     create: true
@@ -2943,12 +2948,10 @@ seaweedfsTls:
 # ---------------------------------------------------------------------------
 # SeaweedFS S3 credential Secret (add-seaweedfs-deployment, D7).
 #
-# A chart-created Secret `in-falcone-seaweedfs-s3-creds` (keys `s3AccessKey` /
-# `s3SecretKey`) is generated on first install (randAlphaNum) and is the SINGLE
-# source of truth for the S3 gateway credentials — see
-# templates/seaweedfs-s3-creds.yaml. A lookup-based regeneration guard keeps the
-# values STABLE across re-installs/upgrades (no rotation). The same values are
-# rendered into the SeaweedFS identities JSON Secret
+# The pre-install credential bootstrap hook creates/adopts
+# `in-falcone-seaweedfs-s3-creds` (keys `s3AccessKey` / `s3SecretKey`) inside the
+# cluster without rendering live values in Helm output. The same values are
+# written into the SeaweedFS identities JSON Secret
 # (`in-falcone-seaweedfs-s3-config`, key `seaweedfs_s3_config`) consumed by the
 # gateway (seaweedfs.s3.existingConfigSecret above).
 #
@@ -2989,9 +2992,11 @@ gatewaySharedSecret:
   # Chart-managed shared secret bridging the APISIX gateway and the control-plane executor
   # (fix-apisix-gateway-shared-secret-provisioning, D3). APISIX signs forwarded requests with
   # `x-gateway-auth: ${{GATEWAY_SHARED_SECRET}}` and reads the value from its process env; the
-  # executor trusts gateway-injected identity headers only when x-gateway-auth matches its own
-  # GATEWAY_SHARED_SECRET. Without it APISIX CrashLoops on config load. Wired into apisix.env and
-  # controlPlaneExecutor.env via secretKeyRef on the fixed name below.
+    # executor trusts gateway-injected identity headers only when x-gateway-auth matches its own
+    # GATEWAY_SHARED_SECRET. Without it APISIX CrashLoops on config load. The pre-install
+    # credential bootstrap hook creates/adopts this Secret without rendering the value in Helm
+    # output; apisix.env and controlPlaneExecutor.env consume it via secretKeyRef on the fixed
+    # name below.
   # Set create=false and pre-create a Secret named `secretName` to supply your own value.
   create: true
   secretName: in-falcone-gateway-shared-secret

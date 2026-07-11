@@ -1,26 +1,37 @@
 # Secret Management
 
-Falcone keeps secret **values** out of git and out of values files. The chart references existing Kubernetes Secrets by name (`config.secretRefs`), and those Secrets are sourced from **OpenBao** (the open-source HashiCorp Vault fork) via the **External Secrets Operator (ESO)**.
+Falcone keeps secret **values** out of git, values files, and rendered Helm manifests. Workloads
+reference Kubernetes Secrets by name (`config.secretRefs` / `secretKeyRef`). On a fresh install a
+pre-install credential bootstrap hook creates or adopts those Secrets **inside the cluster** without
+printing their values in `helm template`, `helm diff`, or Helm release manifests. The OpenBao init job
+then copies the same values into OpenBao, and the External Secrets Operator (ESO) keeps the Kubernetes
+Secrets reconciled from OpenBao after the secret backend is ready.
 
 ## Model
 
 ```
-OpenBao  ──(External Secrets Operator)──▶  Kubernetes Secret  ──(secretRefs / secretKeyRef)──▶  Pods
+credential bootstrap hook ──▶ Kubernetes Secret ──▶ Pods
+                                     │
+                                     ▼
+OpenBao  ──(External Secrets Operator)──▶ Kubernetes Secret
 ```
 
 - `openbao` (chart alias) — the core secret backend (image `openbao/openbao`, CLI `bao`). Fresh Helm installs provision it by default with self-signed TLS unless you select the cert-manager mode for clusters that already run cert-manager.
 - `eso` (chart alias) — the External Secrets Operator, which materializes OpenBao KV paths into namespaced Kubernetes Secrets. Its `ClusterSecretStore` (`openbao-backend`) uses ESO's `vault` provider type, which is the OpenBao-compatible client (the KV v2 REST surface is byte-compatible).
-- `config.secretRefs` — the chart's map of which existing Secret + keys feed each component.
+- `templates/platform-credentials.yaml` — the pre-install hook that creates/adopts the initial
+  platform Secrets in-cluster. It generates missing values with the bootstrap image and reuses
+  existing Secret keys on upgrades.
+- `config.secretRefs` — the chart's map of which Secret + keys feed each component.
 
 ## secretRefs
 
 ```yaml
 config:
   secretRefs:
-    postgresCredentials:    { existingSecret: in-falcone-postgresql, keys: [username, password, database] }
-    mongoCredentials:       { existingSecret: in-falcone-documentdb, keys: [username, password, database] }
-    kafkaCredentials:       { existingSecret: in-falcone-kafka,      keys: [username, password] }
-    objectStorageCredentials:{ existingSecret: in-falcone-storage,   keys: [access-key, secret-key] }
+    postgresCredentials:    { existingSecret: in-falcone-postgresql, keys: [POSTGRESQL_USERNAME, POSTGRESQL_PASSWORD, POSTGRESQL_POSTGRES_PASSWORD] }
+    mongoCredentials:       { existingSecret: in-falcone-documentdb, keys: [POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB] }
+    kafkaCredentials:       { existingSecret: in-falcone-kafka, keys: [KAFKA_CFG_NODE_ID, KAFKA_CFG_PROCESS_ROLES, KAFKA_CFG_CONTROLLER_LISTENER_NAMES, KAFKA_CFG_CONTROLLER_QUORUM_VOTERS, KAFKA_CFG_LISTENERS, KAFKA_CFG_ADVERTISED_LISTENERS, KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP] }
+    objectStorageCredentials:{ existingSecret: in-falcone-storage, keys: [s3_access_key, s3_secret_key] }
     identityClient:         { existingSecret: in-falcone-identity-client, keys: [client-id, client-secret] }
     gatewayTls:             { existingSecret: in-falcone-dev-api-tls, keys: [tls.crt, tls.key] }
 ```
@@ -31,12 +42,16 @@ paths must still provide the expected Secret keys and chart/runtime wiring.
 
 ## Sensitive material is mounted by reference, never inlined
 
-The platform never embeds secret values in manifests or values. Generated material is created as a Secret and consumed via `secretKeyRef`. The document store is **FerretDB over DocumentDB-on-PostgreSQL**, so there is **no replica-set keyfile** — the gateway authenticates to its engine with Postgres credentials. For example, the DocumentDB engine password the FerretDB gateway connects with:
+The platform never embeds secret values in manifests or values. Generated material is created by the
+credential bootstrap hook as a Secret and consumed via `secretKeyRef`; `helm template` should show the
+hook logic, not the generated passwords or DSNs. The document store is **FerretDB over
+DocumentDB-on-PostgreSQL**, so there is **no replica-set keyfile** — the gateway authenticates to its
+engine with Postgres credentials. For example, when supplying an externally managed DocumentDB Secret:
 
 ```bash
 openssl rand -hex 24 | tr -d '\n' | \
   kubectl create secret generic in-falcone-documentdb \
-    --from-file=password=/dev/stdin -n falcone
+    --from-file=POSTGRES_PASSWORD=/dev/stdin -n falcone
 # referenced via secretKeyRef (it feeds FERRETDB_POSTGRESQL_URL / MONGO_URI), not an inline value
 ```
 
