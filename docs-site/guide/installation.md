@@ -92,11 +92,13 @@ Use the **Ingress** exposure profile. It assumes an ingress controller (e.g. ing
 helm dependency build charts/in-falcone
 
 helm upgrade --install falcone charts/in-falcone \
-  --namespace falcone --create-namespace \
+  --namespace falcone \
   -f charts/in-falcone/values/prod.yaml \
   -f charts/in-falcone/values/platform-kubernetes.yaml \
   -f charts/in-falcone/values/profiles/standard.yaml
 ```
+
+The chart owns namespace creation by default (`global.createNamespace=true`), including the release namespace and the ESO/OpenBao support namespaces. Do not combine this path with Helm namespace auto-creation; if your cluster team pre-creates namespaces, set `global.createNamespace=false` and keep the required labels/ownership in that platform layer.
 
 The `platform-kubernetes.yaml` profile sets:
 
@@ -139,11 +141,13 @@ OpenShift uses **Routes** instead of Ingress and a stricter security context. La
 helm dependency build charts/in-falcone
 
 helm upgrade --install falcone charts/in-falcone \
-  --namespace falcone --create-namespace \
+  --namespace falcone \
   -f charts/in-falcone/values/prod.yaml \
   -f charts/in-falcone/values/platform-openshift.yaml \
   -f charts/in-falcone/values/profiles/standard.yaml
 ```
+
+As with Kubernetes, the default chart path creates the release, ESO, and OpenBao namespaces itself. OpenShift/GitOps environments that require pre-created Projects should disable chart namespace creation with `global.createNamespace=false` and provide the Projects, pull secrets, SCC bindings, and namespace labels outside Helm.
 
 The OpenShift profile sets:
 
@@ -208,7 +212,7 @@ Workflow:
 helm dependency build charts/in-falcone
 
 helm upgrade --install falcone charts/in-falcone \
-  --namespace falcone --create-namespace \
+  --namespace falcone \
   -f charts/in-falcone/values/prod.yaml \
   -f charts/in-falcone/values/platform-kubernetes.yaml \
   -f charts/in-falcone/values/profiles/standard.yaml \

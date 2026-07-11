@@ -116,6 +116,21 @@ test('all-core-001: arbitrary release namespace is used consistently', SKIP, () 
   assert.match(out, /openbao-access:\s*"true"/, 'release namespace must be labeled for OpenBao NetworkPolicy ingress');
 });
 
+test('all-core-001b: install docs do not mix chart-owned namespaces with Helm create-namespace', () => {
+  const valuesDoc = parseAllDocuments(readFileSync(resolve(CHART_PATH, 'values.yaml'), 'utf8'))[0].toJSON();
+  assert.equal(valuesDoc.global?.createNamespace, true, 'default fresh installs must let the chart render required namespaces');
+
+  const files = [
+    'docs-site/guide/installation.md',
+    'docs-site/operations/helm-configuration.md',
+  ];
+  for (const rel of files) {
+    const text = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
+    assert.doesNotMatch(text, /--create-namespace\b/, `${rel} must not ask Helm to pre-create the release namespace`);
+    assert.match(text, /global\.createNamespace=true/, `${rel} must document chart-owned namespace creation`);
+  }
+});
+
 test('all-core-002: legacy enabled=false switches fail for every core service alias', SKIP, () => {
   const aliases = [
     'bootstrap',
