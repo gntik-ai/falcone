@@ -62,6 +62,13 @@
   {{- if and (not $component.service.enabled) (has . (list "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker")) -}}
     {{- fail (printf "%s.service.enabled=false would make a core platform service unreachable" .) -}}
   {{- end -}}
+  {{- $sa := $component.serviceAccount | default dict -}}
+  {{- if and (hasKey $sa "create") (eq $sa.create false) (eq ($sa.name | default "") "") -}}
+    {{- fail (printf "%s.serviceAccount.name is required when %s.serviceAccount.create=false; core ServiceAccounts must not implicitly fall back to the default ServiceAccount" . .) -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (hasKey .Values.bootstrap.serviceAccount "create") (eq .Values.bootstrap.serviceAccount.create false) (eq (.Values.bootstrap.serviceAccount.name | default "") "") -}}
+  {{- fail "bootstrap.serviceAccount.name is required when bootstrap.serviceAccount.create=false; core ServiceAccounts must not implicitly fall back to the default ServiceAccount" -}}
 {{- end -}}
 {{- /* finding D8/C.7: refuse to render any legacy migration-era component. FerretDB superseded
    MongoDB, SeaweedFS superseded MinIO, and Knative superseded OpenWhisk; a values stanza for any

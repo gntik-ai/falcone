@@ -38,26 +38,12 @@ echo "restore plan for namespace=$NS release=$RELEASE mode=$MODE"
 echo "Kubernetes Secrets: $(jq '.items | length' "$backup_dir/kubernetes/secrets.apply.json") object(s)"
 echo "ESO ExternalSecrets: $(jq '.items | length' "$backup_dir/eso/externalsecrets.apply.json" 2>/dev/null || echo 0) object(s)"
 
-find "$backup_dir/kv" -type f -name '*.json' | sort | while read -r file; do
-  rel="${file#$backup_dir/kv/}"
-  path="${rel%.json}"
-  if jq -e '.absent == true' "$file" >/dev/null 2>&1; then
-    echo "skip absent backup marker $KV_MOUNT/$path"
-    continue
-  fi
-  props="$(jq -r '.data.data | keys[]' "$file")"
-  echo "restore candidate $KV_MOUNT/$path ($(printf '%s\n' "$props" | sed '/^$/d' | wc -l | tr -d ' ') properties)"
-  [ "$MODE" = "--apply" ] || continue
-  args=()
-  while read -r property; do
-    [ -n "$property" ] || continue
-    value_file="$tmp/${path//\//_}.${property}"
-    jq -jer --arg property "$property" '.data.data[$property]' "$file" > "$value_file"
-    chmod 0400 "$value_file"
-    args+=("$property" "$value_file")
-  done <<<"$props"
-  write_grouped_kv "$path" "$tmp" "${args[@]}"
-done
+if kv_tree_is_captured "$backup_dir/kv"; then
+  echo "OpenBao KV restore candidates: $(kv_tree_paths "$backup_dir/kv" | wc -l | tr -d ' ') path(s)"
+else
+  echo "OpenBao KV restore candidates: target KV was not captured"
+fi
+[ "$MODE" = "--apply" ] && restore_kv_tree_exact "$backup_dir/kv" "$tmp"
 
 if [ "$MODE" = "--apply" ]; then
   echo "restoring Kubernetes Secrets"

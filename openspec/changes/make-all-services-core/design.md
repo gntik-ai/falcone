@@ -45,7 +45,7 @@ unused upstream SeaweedFS roles that Falcone does not consume.
   plus `tenantId`, `workspaceId`, `flowId`, `flowVersion`, and `triggerType` search attributes.
 - **MCP:** always renders RBAC/NetworkPolicy and sets `MCP_ENABLED=true` for the runtime that serves
   `/v1/mcp/*`. It must use a real configured runtime image digest and a PostgreSQL-backed persistence
-  store for server registry/audit/rate state; the in-memory store remains a test seam only.
+  store for server registry/audit/rate state; the memory store remains a test seam only.
 - **Bootstrap:** always renders and remains idempotent. It must not need an operator to disable it for
   convergence; standalone APISIX mode skips admin API calls while the Job still provisions Keycloak and
   governance state.
@@ -68,14 +68,17 @@ Existing installs require a controlled rollout:
 
 1. Preflight the active kube-context, current Helm values, disabled-service overrides, ESO ownership,
    external Vault/OpenBao state, resource headroom, and PVC inventory.
-2. Back up Kubernetes Secrets, external Vault/OpenBao KV paths, Helm values/manifests/history, ESO
-   CRDs/resources, and PVC metadata. Capture checksums without logging secret values.
-3. Migrate K8s Secret and Vault data into OpenBao idempotently. Preserve encryption master keys
-   byte-identically, compare checksums, and stop on mismatch.
+2. Back up Kubernetes Secrets, full recursive external Vault/OpenBao KV-v2 trees, the target OpenBao
+   KV-v2 tree when present, Helm values/manifests/history, ESO CRDs/resources, and PVC metadata.
+   Capture checksums without logging secret values.
+3. Migrate K8s Secret and Vault data into OpenBao idempotently. Import arbitrary external source
+   KV-v2 paths/properties before overlaying mapped platform Secret values, preserve encryption master
+   keys byte-identically, compare checksums, and stop on mismatch. Overwrite mode requires a verified
+   target KV backup (`targetKvCaptured=true`).
 4. Apply the chart first on the test cluster. Wait for OpenBao/ESO, datastore Secrets, stateful
    services, Temporal, worker, executor, bootstrap, and runtime smoke gates.
-5. Roll back with the previous Helm revision and backed-up Secrets if any gate fails. Do not delete
-   new or existing PVCs during rollback.
+5. Roll back with exact target KV restore, backed-up Secrets, and the previous Helm revision if any
+   gate fails. Do not delete new or existing PVCs during rollback.
 
 ## Acceptance Evidence
 

@@ -5,7 +5,7 @@
   the standalone deploy/kind/control-plane/executor-rbac.yaml so the chart is
   self-contained. Bound to the control-plane ServiceAccount.
 */ -}}
-{{- $saName := default (printf "%s-control-plane" .Release.Name) .Values.controlPlane.serviceAccount.name -}}
+{{- $saName := include "in-falcone.componentServiceAccountName" (dict "root" . "component" "controlPlane") -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

@@ -49,6 +49,28 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 {{- end -}}
 {{- end -}}
 
+{{- define "in-falcone.componentServiceAccountName" -}}
+{{- $root := .root -}}
+{{- $componentName := .component -}}
+{{- $component := index $root.Values $componentName -}}
+{{- $serviceAccount := $component.serviceAccount | default dict -}}
+{{- $create := true -}}
+{{- if hasKey $serviceAccount "create" -}}
+{{- $create = $serviceAccount.create -}}
+{{- end -}}
+{{- $componentId := $component.wrapper.componentId | default $componentName -}}
+{{- $defaultName := printf "%s-%s" $root.Release.Name $componentId | trunc 63 | trimSuffix "-" -}}
+{{- if $create -}}
+{{- default $defaultName $serviceAccount.name -}}
+{{- else -}}
+{{- default "default" $serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "in-falcone.openbaoAuthIdentitiesConfigMapName" -}}
+{{- .Values.openbao.openbao.authIdentitiesConfigMapName | default "openbao-auth-identities" -}}
+{{- end -}}
+
 {{- define "in-falcone.bootstrapPayloadConfigMapName" -}}
 {{- printf "%s-bootstrap-payload" (include "in-falcone.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

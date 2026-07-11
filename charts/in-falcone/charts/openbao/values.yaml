@@ -47,6 +47,7 @@ openbao:
       pullPolicy: IfNotPresent
   recovery:
     secretName: openbao-recovery
+  authIdentitiesConfigMapName: openbao-auth-identities
   unsealMethod: shamir
   initShares: 5
   initThreshold: 3

@@ -21,8 +21,8 @@ These have landed and are documented; they remain **Preview** under the not-prod
 
 ## MCP — next increments — *in progress / planned*
 
-- **Durable, multi-replica server registry** — replace the current in-memory store with a
-  Postgres-backed registry on the metadata pool.
+- **PostgreSQL store hardening** — add operator dashboards, retention controls, and migration
+  runbooks around the shipped durable MCP registry/version/audit/rate-limit store.
 - **Custom (BYO-image) hosting on the live path** — the deploy-spec builder + supply-chain checks
   exist; wire a per-server Knative ksvc into the create path.
 - **Workflows-as-MCP-tools** — wire the (built, tested) flow→Task mapping into the live management

@@ -13,8 +13,9 @@ This page is the tenant/developer guide. For how it works internally see
 ::: warning Status — Preview
 The MCP management API is **served live** by the control-plane runtime under `/v1/mcp` (epic #386;
 wired in by the runtime integration). **Instant MCP** and the **official server** work end-to-end
-(create → curate → publish → call → observe). Server state is currently **in-memory and
-single-replica** (a durable, multi-replica registry is on the [Roadmap](/guide/roadmap)). **Custom
+(create → curate → publish → call → observe). Server registry, version, audit, and rate-limit state
+is **durable in PostgreSQL** through the control-plane metadata pool; the memory store is now only
+a test seam. **Custom
 (bring-your-own-image) hosting** and **workflows-as-MCP-tools** exist as built, tested modules but
 are **not yet wired into the live create path** — see their notes below. This is **Preview** under
 the platform's [not-production-ready](/) posture.

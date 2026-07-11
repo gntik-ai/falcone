@@ -52,7 +52,7 @@ capture_kubectl_json "$tmp/pvc/openbao-namespace-pvcs.json" -n "$OPENBAO_NAMESPA
 target_kv_captured=false
 if [ -n "${BAO_ADDR:-}" ] || [ -n "${BAO_TOKEN:-}" ]; then
   require_bao
-  echo "backing up target OpenBao mapped KV paths"
+  echo "backing up target OpenBao KV-v2 tree"
   backup_kv_paths "$tmp/kv"
   target_kv_captured=true
 else
@@ -62,7 +62,7 @@ else
 fi
 
 if [ -n "${SOURCE_BAO_ADDR:-}" ] || [ -n "${SOURCE_BAO_TOKEN:-}" ]; then
-  echo "backing up external Vault/OpenBao mapped KV paths"
+  echo "backing up external Vault/OpenBao KV-v2 tree"
   backup_source_kv_paths "$tmp/source-kv"
 fi
 

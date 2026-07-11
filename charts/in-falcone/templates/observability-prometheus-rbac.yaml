@@ -8,7 +8,7 @@
   a ClusterRole) — discovery is restricted to this release's namespace, so Prometheus
   never sees pods in other namespaces/tenants. Bound to the observability SA.
 */ -}}
-{{- $saName := default (printf "%s-observability" .Release.Name) .Values.observability.serviceAccount.name -}}
+{{- $saName := include "in-falcone.componentServiceAccountName" (dict "root" . "component" "observability") -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

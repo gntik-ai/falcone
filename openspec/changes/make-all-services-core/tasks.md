@@ -59,7 +59,7 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
 - [x] Temporal: make persistence host release-aware, keep internal-only ClusterIP services, and
   register namespace/search attributes.
 - [x] MCP: set `MCP_ENABLED=true`, configure a real runtime image tag through `mcp.runtimeImage`, bind RBAC to the serving
-  runtime ServiceAccount, and replace core in-memory MCP state with PostgreSQL-backed persistence.
+  runtime ServiceAccount, and replace core process-local MCP state with PostgreSQL-backed persistence.
   RBAC is bound to the Helm-owned executor ServiceAccount, MCP registry/audit/rate state now writes
   through a row-locked PostgreSQL store, and default/OpenShift renders resolve
   `in-falcone-mcp-runtime:0.3.0` from the single chart `mcp.runtimeImage` value block. Digest pinning
@@ -245,3 +245,10 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   tests/blackbox/temporal-secret-password-substitution.test.mjs`; `openspec validate
   make-all-services-core --strict`; `bash -n scripts/system-changes/make-all-services-core/*.sh`;
   `npm run validate:repo`; `git diff --check`.
+- Seventh-reviewer revision fixed the latest independent-review blockers without touching a cluster:
+  parent chart ServiceAccount resolution now drives function RBAC, MCP RBAC, observability RBAC, and
+  OpenBao Kubernetes auth through a rendered identity ConfigMap; unnamed external core
+  ServiceAccounts fail closed. MCP docs now describe the durable PostgreSQL-backed store. Existing
+  deployment cutover tools now recursively export/import KV-v2 trees, require `targetKvCaptured=true`
+  before `--allow-overwrite`, preserve arbitrary nested/unmapped external source paths/properties,
+  and restore the captured target KV tree exactly.

@@ -113,7 +113,7 @@ breached `dimension`. The full MCP E2E suite (`tests/e2e/specs/mcp/`) passes aga
 | --- | --- |
 | Instant MCP + official server (create → curate → publish → call → audit) | **Preview** — live via `/v1/mcp` |
 | Registry / versioning / rug-pull review, per-tenant quotas + rate limits, observability/audit | **Preview** — composed into the engine |
-| Server state | **In-memory, single-replica** — a Postgres-backed registry on the metadata pool is the next increment (mirrors how flows began) |
+| Server state | **Durable PostgreSQL store** — registry, versions, audit, and rate-limit state use the control-plane metadata pool; the memory store is only a unit-test seam |
 | Custom (BYO-image) hosting | **Experimental** — `mcp-custom-hosting` builds the ksvc deploy-spec + supply-chain checks (spike-proven), but the engine does not deploy a per-server ksvc on the live create path |
 | Workflows-as-MCP-tools | **Experimental** — `mcp-workflows-tools` mapping is built/tested but not wired into the engine |
 | Tool-call connectivity | The control-plane **mediates** tool calls today; a per-server ksvc + direct MCP-protocol connection is a follow-up |

@@ -115,7 +115,8 @@ controlled rollout:
 1. Set `KUBECONFIG`, `NAMESPACE`, `RELEASE`, and `OPENBAO_NAMESPACE` for the intended cluster.
    Set `SOURCE_BAO_ADDR`/`SOURCE_BAO_TOKEN` only when the old deployment used an external
    Vault/OpenBao source. Set target `BAO_ADDR`/`BAO_TOKEN` only if target OpenBao already exists
-   and should be captured before rollout.
+   and should be captured before rollout; this target capture is mandatory if migration will run
+   with `--allow-overwrite`.
 2. Run `scripts/system-changes/make-all-services-core/backup-kv.sh --output /secure/path/falcone-kv-backup.tgz`.
 3. Run `scripts/system-changes/make-all-services-core/parity-check.sh --dry-run` to inspect
    Kubernetes Secret and OpenBao fingerprints without printing values.
@@ -133,15 +134,19 @@ controlled rollout:
     verify parity again, and rerun the health gate.
 
 The backup command refuses to overwrite an existing archive. It always captures source Kubernetes
-Secrets, Helm metadata, ESO objects, PVC references, and external source KV when configured; target
-OpenBao KV is marked absent when target `BAO_ADDR`/`BAO_TOKEN` are not supplied. Migration and
+Secrets, Helm metadata, ESO objects, PVC references, the full external Vault/OpenBao KV-v2 tree when
+configured, and the full target OpenBao KV-v2 tree when target `BAO_ADDR`/`BAO_TOKEN` are supplied.
+Target OpenBao KV is marked absent when target credentials are not supplied. Migration and
 initialization use merge semantics for KV paths, so unmapped properties already present at a path are
-preserved instead of being replaced by the mapped platform credential set.
+preserved instead of being replaced by the mapped platform credential set. An apply with
+`--allow-overwrite` refuses to run unless the verified backup has `targetKvCaptured=true`, ensuring
+every overwritten target path/property can be restored.
 
-Rollback restores OpenBao KV paths, Kubernetes Secrets, ESO resources, and then returns the Helm
-release to the previous revision. It does not delete OpenBao, Temporal, pgvector, or any existing
-service PVC. Keep those PVCs until the failed rollout is understood and a separate decommission step
-is approved.
+Rollback restores the captured target OpenBao KV tree exactly, restores Kubernetes Secrets and ESO
+resources, and then returns the Helm release to the previous revision. Exact KV restore can remove
+KV paths created after the backup so the secret mount matches the captured target state; it does not
+delete OpenBao, Temporal, pgvector, or any existing service PVC. Keep those PVCs until the failed
+rollout is understood and a separate decommission step is approved.
 
 ## Image Publication Status
 
@@ -159,7 +164,8 @@ release. The base chart now renders coherent chart app-version release refs such
 still override those refs to `localhost:30500` for repository-local prebuild validation.
 
 The coherent `0.3.0` first-party image set was published to GHCR by GitHub Actions run
-`29150940923`: `in-falcone-control-plane`, `in-falcone-control-plane-executor`,
-`in-falcone-workflow-worker`, `in-falcone-mcp-runtime`, and `in-falcone-web-console`. Digest pins are
-still intentionally deferred until a clean fresh-cluster install captures the exact manifests used
-for release evidence.
+`29152340476`: `in-falcone-control-plane`, `in-falcone-control-plane-executor`,
+`in-falcone-web-console`, `in-falcone-workflow-worker`, `in-falcone-fn-runtime`, and
+`in-falcone-mcp-runtime`. OpenShift/Harbor installs must mirror all six `0.3.0` tags, including
+`fn-runtime`, before installation. Digest pins are still intentionally deferred until a clean
+fresh-cluster install captures the exact manifests used for release evidence.

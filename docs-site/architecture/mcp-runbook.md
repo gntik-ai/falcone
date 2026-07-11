@@ -91,12 +91,14 @@ The specs probe whether the control-plane serves the MCP management API and **sk
 reason** when it is absent — so they never report a false green. They execute the full loop the
 moment the routes are wired.
 
-## Pending integration
+## Runtime state and verification
 
-The control-plane runtime (`apps/control-plane/src/runtime/server.mjs`) does not yet serve
-`/v1/mcp/...` management routes — the MCP modules are pure logic and contracts. Wiring them into the
-runtime as live HTTP handlers is the remaining step that flips the E2E gate green and lets the
-platform serve the management API end to end.
+The control-plane runtime (`apps/control-plane/src/runtime/server.mjs`) serves `/v1/mcp/...`
+management routes when the core chart sets `MCP_ENABLED=true`. Registry, version, audit, and
+rate-limit state is durable in PostgreSQL through the control-plane metadata pool; the memory
+store is retained only for unit tests. Operational verification should create, curate, publish, call,
+and audit a server, then restart the control-plane/executor and confirm the server record and audit
+history remain available.
 
 ## Common failure modes
 
@@ -107,4 +109,4 @@ platform serve the management API end to end.
 | Deploy rejected | image unpinned / unsigned / disallowed registry | pin by digest, sign, and allow-list the registry |
 | New version not serving | tool description/scope changed → held for review | approve the version, or roll back |
 | Tool calls returning 429 | per-server / per-OAuth-client rate limit | raise the plan limit or back off; check the `mcp` audit for the breach |
-| `/v1/mcp` returns 404 | management routes not wired into the runtime yet | see *Pending integration* above |
+| `/v1/mcp` returns 404 | `MCP_ENABLED` absent/false, stale gateway route, or unhealthy control-plane runtime | confirm the core chart rendered `MCP_ENABLED=true`, the `/v1/mcp/*` gateway route, and healthy control-plane pods |

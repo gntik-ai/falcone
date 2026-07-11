@@ -7,7 +7,7 @@ RELEASE="${RELEASE:-falcone}"
 OPENBAO_NAMESPACE="${OPENBAO_NAMESPACE:-secret-store}"
 KV_MOUNT="${BAO_KV_MOUNT:-secret}"
 SOURCE_KV_MOUNT="${SOURCE_BAO_KV_MOUNT:-$KV_MOUNT}"
-BACKUP_VERSION=2
+BACKUP_VERSION=3
 
 need() {
   command -v "$1" >/dev/null 2>&1 || { echo "missing required tool: $1" >&2; exit 1; }
@@ -137,6 +137,27 @@ print_mapping_fingerprint() {
   printf '%-42s %-34s %-14s %s\n' "${secret}/${secret_key}" "${path}/${property}" "$len" "$hash"
 }
 
+put_kv_data_json() {
+  local path="$1" data_json="$2"
+  bao kv put "$KV_MOUNT/$path" "@${data_json}" >/dev/null
+}
+
+merge_kv_data_json_into_target() {
+  local path="$1" incoming_json="$2" tmp="$3"
+  local merge_dir="$tmp/kv-json-merge/${path//\//_}"
+  local existing="$merge_dir/existing.json"
+  local merged="$merge_dir/merged.json"
+  mkdir -p "$merge_dir"
+  if bao kv get -format=json "$KV_MOUNT/$path" > "$merge_dir/raw.json" 2>/dev/null; then
+    jq '.data.data // {}' "$merge_dir/raw.json" > "$existing"
+  else
+    printf '{}\n' > "$existing"
+  fi
+  jq -s '.[0] + .[1]' "$existing" "$incoming_json" > "$merged"
+  chmod 0400 "$merged"
+  put_kv_data_json "$path" "$merged"
+}
+
 platform_mappings_json() {
   cat <<'JSON'
 [
@@ -199,14 +220,8 @@ write_grouped_kv() {
     mv "$next" "$merged"
     shift 2
   done
-  local args=()
-  while IFS= read -r property; do
-    local value_file="$merge_dir/files/$(printf '%s' "$property" | sha256sum | awk '{print $1}')"
-    jq -jer --arg property "$property" '.[$property]' "$merged" > "$value_file"
-    chmod 0400 "$value_file"
-    args+=("${property}=@${value_file}")
-  done < <(jq -r 'keys[]' "$merged")
-  bao kv put "$KV_MOUNT/$path" "${args[@]}" >/dev/null
+  chmod 0400 "$merged"
+  put_kv_data_json "$path" "$merged"
 }
 
 merge_kv_backup_json() {
@@ -215,33 +230,148 @@ merge_kv_backup_json() {
     return 0
   fi
   local merge_dir="$tmp/source-merge/${path//\//_}"
-  mkdir -p "$merge_dir/files"
-  local args=()
-  while IFS= read -r property; do
-    local value_file="$merge_dir/files/$(printf '%s' "$property" | sha256sum | awk '{print $1}')"
-    jq -jer --arg property "$property" '.data.data[$property]' "$backup_json" > "$value_file"
-    chmod 0400 "$value_file"
-    args+=("$property" "$value_file")
-  done < <(jq -r '.data.data | keys[]' "$backup_json")
-  if [ "${#args[@]}" -gt 0 ]; then
-    write_grouped_kv "$path" "$tmp" "${args[@]}"
+  local incoming="$merge_dir/incoming.json"
+  mkdir -p "$merge_dir"
+  jq '.data.data // {}' "$backup_json" > "$incoming"
+  chmod 0400 "$incoming"
+  merge_kv_data_json_into_target "$path" "$incoming" "$tmp"
+}
+
+bao_with_env() {
+  local env_name="$1"
+  shift
+  local -n bao_env_ref="$env_name"
+  if [ "${#bao_env_ref[@]}" -gt 0 ]; then
+    env "${bao_env_ref[@]}" bao "$@"
+  else
+    bao "$@"
   fi
+}
+
+kv_tree_has_objects() {
+  local tree_dir="$1"
+  [ -d "$tree_dir/objects" ] && find "$tree_dir/objects" -type f -name '*.json' -print -quit | grep -q .
+}
+
+kv_tree_is_captured() {
+  local tree_dir="$1"
+  [ -f "$tree_dir/_tree.json" ]
+}
+
+kv_tree_paths() {
+  local tree_dir="$1"
+  kv_tree_has_objects "$tree_dir" || return 0
+  find "$tree_dir/objects" -type f -name '*.json' -print0 \
+    | sort -z \
+    | xargs -0 -r jq -r '.path' \
+    | sort -u
+}
+
+kv2_tree_list_paths() {
+  local mount="$1" env_name="$2" prefix="${3:-}"
+  local target
+  if [ -n "$prefix" ]; then
+    target="$mount/$prefix"
+  else
+    target="$mount/"
+  fi
+  local listing
+  if ! listing="$(bao_with_env "$env_name" kv list -format=json "$target" 2>/dev/null)"; then
+    return 0
+  fi
+  jq -r '.[]' <<<"$listing" | while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    if [[ "$entry" == */ ]]; then
+      kv2_tree_list_paths "$mount" "$env_name" "${prefix}${entry}"
+    else
+      printf '%s\n' "${prefix}${entry}"
+    fi
+  done
+}
+
+kv2_export_tree() {
+  local out_dir="$1" mount="$2" env_name="$3" label="$4"
+  mkdir -p "$out_dir/objects"
+  local index="$out_dir/index.tsv"
+  : > "$index"
+  jq -n --arg mount "$mount" --arg label "$label" --arg kvVersion "v2" \
+    '{format:"falcone-openbao-kv-tree", kvVersion:$kvVersion, mount:$mount, label:$label}' \
+    > "$out_dir/_tree.json"
+  kv2_tree_list_paths "$mount" "$env_name" "" | while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    local hash raw object
+    hash="$(printf '%s' "$path" | sha256sum | awk '{print $1}')"
+    raw="$out_dir/objects/${hash}.raw.json"
+    object="$out_dir/objects/${hash}.json"
+    if bao_with_env "$env_name" kv get -format=json "$mount/$path" > "$raw" 2>/dev/null; then
+      jq -n --arg mount "$mount" --arg path "$path" --arg kvVersion "v2" --slurpfile raw "$raw" \
+        '{format:"falcone-openbao-kv-entry", kvVersion:$kvVersion, mount:$mount, path:$path, raw:$raw[0]}' \
+        > "$object"
+      rm -f "$raw"
+      chmod 0400 "$object"
+      printf '%s\t%s\n' "$hash" "$path" >> "$index"
+      echo "backed up $label $mount/$path"
+    else
+      rm -f "$raw"
+      echo "warning: listed $label $mount/$path but could not read it; skipping" >&2
+    fi
+  done
+  chmod 0400 "$out_dir/_tree.json" "$index"
+}
+
+write_kv_json_exact() {
+  local path="$1" entry_json="$2" tmp="$3"
+  local merge_dir="$tmp/kv-exact/${path//\//_}"
+  local data_file="$merge_dir/data.json"
+  mkdir -p "$merge_dir"
+  jq '.raw.data.data // {}' "$entry_json" > "$data_file"
+  chmod 0400 "$data_file"
+  put_kv_data_json "$path" "$data_file"
+}
+
+merge_kv_tree_into_target() {
+  local tree_dir="$1" tmp="$2"
+  kv_tree_has_objects "$tree_dir" || return 0
+  find "$tree_dir/objects" -type f -name '*.json' | sort | while IFS= read -r entry; do
+    local path merge_dir incoming
+    path="$(jq -r '.path' "$entry")"
+    merge_dir="$tmp/tree-merge/${path//\//_}"
+    incoming="$merge_dir/incoming.json"
+    mkdir -p "$merge_dir"
+    jq '.raw.data.data // {}' "$entry" > "$incoming"
+    chmod 0400 "$incoming"
+    merge_kv_data_json_into_target "$path" "$incoming" "$tmp"
+  done
+}
+
+restore_kv_tree_exact() {
+  local tree_dir="$1" tmp="$2"
+  kv_tree_is_captured "$tree_dir" || {
+    echo "backup has no target OpenBao KV tree; skipping OpenBao KV restore"
+    return 0
+  }
+  local empty_bao_env=()
+  local backup_paths="$tmp/backup-kv-paths.txt"
+  local current_paths="$tmp/current-kv-paths.txt"
+  kv_tree_paths "$tree_dir" > "$backup_paths"
+  kv2_tree_list_paths "$KV_MOUNT" empty_bao_env "" | sort -u > "$current_paths"
+  comm -13 "$backup_paths" "$current_paths" | while IFS= read -r extra_path; do
+    [ -n "$extra_path" ] || continue
+    echo "deleting target-only KV path $KV_MOUNT/$extra_path"
+    bao kv metadata delete "$KV_MOUNT/$extra_path" >/dev/null 2>&1 || bao kv delete "$KV_MOUNT/$extra_path" >/dev/null 2>&1 || true
+  done
+  find "$tree_dir/objects" -type f -name '*.json' | sort | while IFS= read -r entry; do
+    local path
+    path="$(jq -r '.path' "$entry")"
+    write_kv_json_exact "$path" "$entry" "$tmp"
+    echo "restored $KV_MOUNT/$path exactly"
+  done
 }
 
 backup_kv_paths() {
   local out_dir="$1"
-  mkdir -p "$out_dir"
-  platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
-    mkdir -p "$out_dir/$(dirname "$path")"
-    if bao kv get -format=json "$KV_MOUNT/$path" > "$out_dir/$path.json" 2>/dev/null; then
-      chmod 0400 "$out_dir/$path.json"
-      echo "backed up $KV_MOUNT/$path"
-    else
-      echo "missing $KV_MOUNT/$path (recorded as absent)"
-      printf '{"absent":true,"path":"%s"}\n' "$path" > "$out_dir/$path.json"
-      chmod 0400 "$out_dir/$path.json"
-    fi
-  done
+  local empty_bao_env=()
+  kv2_export_tree "$out_dir" "$KV_MOUNT" empty_bao_env "target"
 }
 
 backup_source_kv_paths() {
@@ -253,17 +383,7 @@ backup_source_kv_paths() {
   if [ -n "${SOURCE_BAO_CACERT:-}" ]; then
     source_env+=("BAO_CACERT=$SOURCE_BAO_CACERT")
   fi
-  platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
-    mkdir -p "$out_dir/$(dirname "$path")"
-    if env "${source_env[@]}" bao kv get -format=json "$SOURCE_KV_MOUNT/$path" > "$out_dir/$path.json" 2>/dev/null; then
-      chmod 0400 "$out_dir/$path.json"
-      echo "backed up external $SOURCE_KV_MOUNT/$path"
-    else
-      echo "missing external $SOURCE_KV_MOUNT/$path (recorded as absent)"
-      printf '{"absent":true,"path":"%s"}\n' "$path" > "$out_dir/$path.json"
-      chmod 0400 "$out_dir/$path.json"
-    fi
-  done
+  kv2_export_tree "$out_dir" "$SOURCE_KV_MOUNT" source_env "external source"
 }
 
 verify_extracted_backup() {
@@ -283,6 +403,19 @@ verify_extracted_backup() {
   [ -f "$dir/helm/values.yaml" ] || { echo "backup missing helm/values.yaml" >&2; return 1; }
   [ -f "$dir/helm/manifest.yaml" ] || { echo "backup missing helm/manifest.yaml" >&2; return 1; }
   [ -d "$dir/kv" ] || { echo "backup missing kv/" >&2; return 1; }
+}
+
+backup_captured_target_kv() {
+  local dir="$1"
+  jq -e '.targetKvCaptured == true' "$dir/manifest.json" >/dev/null
+}
+
+require_backup_captured_target_kv_for_overwrite() {
+  local dir="$1"
+  backup_captured_target_kv "$dir" || {
+    echo "refusing --allow-overwrite: verified backup did not capture target OpenBao KV (targetKvCaptured=true required)" >&2
+    return 1
+  }
 }
 
 extract_verified_backup() {

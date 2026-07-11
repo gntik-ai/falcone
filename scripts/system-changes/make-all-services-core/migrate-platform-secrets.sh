@@ -62,13 +62,7 @@ merge_source_backup_into_target() {
   local source_dir="$tmp/backup/source-kv"
   [ -d "$source_dir" ] || return 0
   echo "merging backed-up external source KV paths before mapped Kubernetes Secret overlay"
-  find "$source_dir" -type f -name '*.json' | sort | while read -r file; do
-    local rel path
-    rel="${file#$source_dir/}"
-    path="${rel%.json}"
-    merge_kv_backup_json "$path" "$file" "$tmp"
-    echo "merged external source KV path $SOURCE_KV_MOUNT/$path"
-  done
+  merge_kv_tree_into_target "$source_dir" "$tmp"
 }
 
 desired_file_for() {
@@ -77,7 +71,7 @@ desired_file_for() {
 }
 
 build_desired_files() {
-  platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
+  platform_mappings_json | jq -r '.[][2]' | sort -u | while read -r path; do
     mkdir -p "$tmp/desired/$path"
     platform_mappings_json | jq -cr --arg path "$path" '.[] | select(.[2] == $path)' | while read -r row; do
       local secret secret_key property file
@@ -130,6 +124,9 @@ fi
 
 require_test_cluster_write_guard
 assert_backup_covers_current_mappings
+if [ "$ALLOW_OVERWRITE" -eq 1 ]; then
+  require_backup_captured_target_kv_for_overwrite "$tmp/backup"
+fi
 if [ "$mismatches" -ne 0 ] && [ "$ALLOW_OVERWRITE" -ne 1 ]; then
   echo "refusing to overwrite $mismatches existing OpenBao value(s); rerun with --allow-overwrite and CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values after reviewing the verified backup" >&2
   exit 1
@@ -137,7 +134,7 @@ fi
 
 merge_source_backup_into_target
 
-platform_mappings_json | jq -r '.[].2' | sort -u | while read -r path; do
+platform_mappings_json | jq -r '.[][2]' | sort -u | while read -r path; do
   pairs=()
   while read -r row; do
     property="$(jq -r '.[3]' <<<"$row")"

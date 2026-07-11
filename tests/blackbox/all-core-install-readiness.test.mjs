@@ -59,6 +59,10 @@ function renderDocs(args = []) {
 function findDoc(docs, kind, name) {
   return docs.find((doc) => doc.kind === kind && doc.metadata?.name === name);
 }
+function roleBindingSubject(docs, name) {
+  const binding = findDoc(docs, 'RoleBinding', name);
+  return binding?.subjects?.find((subject) => subject.kind === 'ServiceAccount');
+}
 function imageList(docs) {
   const images = [];
   for (const doc of docs) {
@@ -363,8 +367,21 @@ test('all-core-006: Helm owns the /v1/mcp route, executor RBAC, and pullable def
 
   const releaseWorkflow = readFileSync(resolve(REPO_ROOT, '.github', 'workflows', 'release-images.yml'), 'utf8');
   const mcpDockerfile = readFileSync(resolve(REPO_ROOT, 'apps', 'mcp-runtime', 'Dockerfile'), 'utf8');
+  const allCoreInstallDoc = readFileSync(resolve(REPO_ROOT, 'docs', 'installation', 'all-core-platform-services.md'), 'utf8');
   assert.match(releaseWorkflow, /image:\s*in-falcone-mcp-runtime[\s\S]*dockerfile:\s*apps\/mcp-runtime\/Dockerfile/, 'release workflow must publish the MCP runtime image');
   assert.match(mcpDockerfile, /COPY apps\/control-plane\/src\/mcp-official-server\.mjs/, 'MCP runtime image must build from the production MCP server modules');
+  assert.match(allCoreInstallDoc, /GitHub Actions run\s*\n`29152340476`/, 'all-core install docs must record the six-image publication run');
+  for (const image of [
+    'in-falcone-control-plane',
+    'in-falcone-control-plane-executor',
+    'in-falcone-web-console',
+    'in-falcone-workflow-worker',
+    'in-falcone-fn-runtime',
+    'in-falcone-mcp-runtime',
+  ]) {
+    assert.match(allCoreInstallDoc, new RegExp(`${escapeRe(image)}[\\s\\S]*0\\.3\\.0|0\\.3\\.0[\\s\\S]*${escapeRe(image)}`), `all-core install docs must list ${image}:0.3.0`);
+  }
+  assert.doesNotMatch(allCoreInstallDoc, /29150940923/, 'all-core install docs must not retain the stale five-image Actions run');
 });
 
 test('all-core-006c: bootstrap image contains required command-line tools', DOCKER_SKIP, () => {
@@ -413,6 +430,101 @@ test('all-core-006b: MCP runtime image and digest render from one chart value bl
   assert.match(out, /name:\s*in-falcone-runtime-env[\s\S]*MCP_RUNTIME_IMAGE:\s*"ghcr\.io\/example\/mcp-runtime:1\.2\.3"/, 'MCP runtime image must render from mcp.runtimeImage.repository/tag');
   assert.match(out, new RegExp(`MCP_RUNTIME_IMAGE_DIGEST:\\s*"${escapeRe(digest)}"`), 'MCP runtime digest must render from mcp.runtimeImage.digest');
   assert.doesNotMatch(out, /value:\s*ghcr\.io\/gntik-ai\/in-falcone-mcp-runtime:0\.3\.0/, 'control-plane/executor env must not hard-code MCP_RUNTIME_IMAGE outside the runtime env ConfigMap');
+});
+
+test('all-core-006f: core ServiceAccount overrides propagate to RBAC and OpenBao auth', SKIP, () => {
+  const defaultDocs = renderDocs();
+  assert.equal(roleBindingSubject(defaultDocs, 'falcone-function-executor')?.name, 'falcone-control-plane', 'default function RBAC must bind the rendered control-plane ServiceAccount');
+  assert.equal(roleBindingSubject(defaultDocs, 'falcone-mcp-runtime')?.name, 'falcone-control-plane-executor', 'default MCP RBAC must bind the rendered executor ServiceAccount');
+  assert.equal(roleBindingSubject(defaultDocs, 'falcone-prometheus-pod-discovery')?.name, 'falcone-observability', 'default observability RBAC must bind the rendered observability ServiceAccount');
+  const defaultIdentities = findDoc(defaultDocs, 'ConfigMap', 'openbao-auth-identities')?.data;
+  assert.equal(defaultIdentities?.['platform-service-account-names'], 'falcone-control-plane,falcone-control-plane-executor,falcone-workflow-worker,falcone-in-falcone-bootstrap');
+  assert.equal(defaultIdentities?.['workspace-secrets-service-account-names'], 'falcone-control-plane,falcone-control-plane-executor');
+  assert.equal(defaultIdentities?.['gateway-service-account-name'], 'falcone-apisix');
+  assert.equal(defaultIdentities?.['iam-service-account-name'], 'falcone-keycloak');
+
+  const customDocs = renderDocs([
+    '--set', 'controlPlane.serviceAccount.name=custom-cp',
+    '--set', 'controlPlaneExecutor.serviceAccount.name=custom-exec',
+    '--set', 'workflowWorker.serviceAccount.name=custom-worker',
+    '--set', 'apisix.serviceAccount.name=custom-gateway',
+    '--set', 'keycloak.serviceAccount.name=custom-iam',
+    '--set', 'observability.serviceAccount.name=custom-prometheus',
+    '--set', 'bootstrap.serviceAccount.name=custom-bootstrap',
+  ]);
+  assert.equal(roleBindingSubject(customDocs, 'falcone-function-executor')?.name, 'custom-cp', 'custom function RBAC must bind the custom control-plane ServiceAccount');
+  assert.equal(roleBindingSubject(customDocs, 'falcone-mcp-runtime')?.name, 'custom-exec', 'custom MCP RBAC must bind the custom executor ServiceAccount');
+  assert.equal(roleBindingSubject(customDocs, 'falcone-prometheus-pod-discovery')?.name, 'custom-prometheus', 'custom observability RBAC must bind the custom observability ServiceAccount');
+  const customIdentities = findDoc(customDocs, 'ConfigMap', 'openbao-auth-identities')?.data;
+  assert.equal(customIdentities?.['platform-service-account-names'], 'custom-cp,custom-exec,custom-worker,custom-bootstrap');
+  assert.equal(customIdentities?.['workspace-secrets-service-account-names'], 'custom-cp,custom-exec');
+  assert.equal(customIdentities?.['gateway-service-account-name'], 'custom-gateway');
+  assert.equal(customIdentities?.['iam-service-account-name'], 'custom-iam');
+
+  const existingDocs = renderDocs([
+    '--set', 'controlPlane.serviceAccount.create=false',
+    '--set', 'controlPlane.serviceAccount.name=existing-cp',
+    '--set', 'controlPlaneExecutor.serviceAccount.create=false',
+    '--set', 'controlPlaneExecutor.serviceAccount.name=existing-exec',
+    '--set', 'workflowWorker.serviceAccount.create=false',
+    '--set', 'workflowWorker.serviceAccount.name=existing-worker',
+    '--set', 'apisix.serviceAccount.create=false',
+    '--set', 'apisix.serviceAccount.name=existing-gateway',
+    '--set', 'keycloak.serviceAccount.create=false',
+    '--set', 'keycloak.serviceAccount.name=existing-iam',
+    '--set', 'observability.serviceAccount.create=false',
+    '--set', 'observability.serviceAccount.name=existing-prometheus',
+    '--set', 'bootstrap.serviceAccount.create=false',
+    '--set', 'bootstrap.serviceAccount.name=existing-bootstrap',
+  ]);
+  assert.equal(roleBindingSubject(existingDocs, 'falcone-function-executor')?.name, 'existing-cp', 'existing function RBAC must bind the named external control-plane ServiceAccount');
+  assert.equal(roleBindingSubject(existingDocs, 'falcone-mcp-runtime')?.name, 'existing-exec', 'existing MCP RBAC must bind the named external executor ServiceAccount');
+  assert.equal(roleBindingSubject(existingDocs, 'falcone-prometheus-pod-discovery')?.name, 'existing-prometheus', 'existing observability RBAC must bind the named external observability ServiceAccount');
+  assert.equal(findDoc(existingDocs, 'ServiceAccount', 'existing-cp'), undefined, 'create=false must not render the external control-plane ServiceAccount');
+  const existingIdentities = findDoc(existingDocs, 'ConfigMap', 'openbao-auth-identities')?.data;
+  assert.equal(existingIdentities?.['platform-service-account-names'], 'existing-cp,existing-exec,existing-worker,existing-bootstrap');
+  assert.equal(existingIdentities?.['workspace-secrets-service-account-names'], 'existing-cp,existing-exec');
+  assert.equal(existingIdentities?.['gateway-service-account-name'], 'existing-gateway');
+  assert.equal(existingIdentities?.['iam-service-account-name'], 'existing-iam');
+
+  const out = assertRender([
+    '--set', 'controlPlane.serviceAccount.name=custom-cp',
+    '--set', 'controlPlaneExecutor.serviceAccount.name=custom-exec',
+  ]);
+  assert.match(out, /bound_service_account_names="\$\(auth_identity workspace-secrets-service-account-names\)"/, 'OpenBao auth roles must read the parent-rendered identity map at runtime');
+  assert.doesNotMatch(out, /bound_service_account_names='falcone-control-plane,falcone-control-plane-executor'/, 'OpenBao auth roles must not retain stale hard-coded control-plane identities');
+});
+
+test('all-core-006g: unnamed external core ServiceAccounts fail closed', SKIP, () => {
+  for (const component of ['apisix', 'keycloak', 'postgresql', 'postgresqlVector', 'documentdb', 'ferretdb', 'kafka', 'observability', 'controlPlane', 'controlPlaneExecutor', 'webConsole', 'workflowWorker']) {
+    assertHelmFails(
+      ['--set', `${component}.serviceAccount.create=false`],
+      new RegExp(`${escapeRe(component)}\\.serviceAccount\\.name is required|default ServiceAccount`, 'i'),
+      `${component}.serviceAccount.create=false`,
+    );
+  }
+  assertHelmFails(
+    ['--set', 'bootstrap.serviceAccount.create=false'],
+    /bootstrap\.serviceAccount\.name is required|default ServiceAccount/i,
+    'bootstrap.serviceAccount.create=false',
+  );
+});
+
+test('all-core-006h: MCP docs describe durable PostgreSQL state', () => {
+  const docs = [
+    'docs-site/architecture/mcp.md',
+    'docs-site/guide/mcp.md',
+    'docs-site/architecture/mcp-runbook.md',
+    'docs-site/architecture/adrs.md',
+    'docs-site/architecture/services.md',
+    'docs-site/guide/roadmap.md',
+  ];
+  for (const rel of docs) {
+    const text = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
+    assert.doesNotMatch(text, /in-memory[^.\n]*(single-replica|Postgres-backed registry on the metadata pool is the next increment)/i, `${rel} must not describe MCP state as in-memory/single-replica`);
+    assert.doesNotMatch(text, /does not yet serve\s+`\/v1\/mcp|management routes not wired into the runtime yet/i, `${rel} must not claim live MCP routes are still unwired`);
+    assert.match(text, /(durable|durably|persist)[\s\S]{0,120}PostgreSQL|PostgreSQL[\s\S]{0,120}(durable|durably|persist)/i, `${rel} must describe MCP state as PostgreSQL-backed`);
+  }
 });
 
 test('all-core-006d: OpenShift Harbor overlay renders Harbor-only coherent release images', SKIP, () => {
@@ -577,7 +689,10 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
 
   assert.match(common, /cp "\$existing" "\$merged"/, 'KV helper must start from existing target data');
   assert.match(common, /jq --arg property "\$property" --rawfile value "\$file" '\. \+ \{\(\$property\): \$value\}'/, 'KV helper must overlay mapped properties without dropping unmapped ones');
-  assert.match(common, /merge_kv_backup_json/, 'common helpers must support merging backed-up external source KV');
+  assert.match(common, /kv2_export_tree/, 'common helpers must recursively export KV-v2 trees');
+  assert.match(common, /merge_kv_tree_into_target/, 'common helpers must merge backed-up external source KV trees');
+  assert.match(common, /restore_kv_tree_exact/, 'common helpers must restore the captured target KV tree exactly');
+  assert.match(common, /write_kv_json_exact/, 'common helpers must write backup JSON without preserving post-backup properties');
   assert.match(openbaoInit, /kv_merge\(\)[\s\S]*bao kv get "\$path"[\s\S]*bao kv patch "\$path"[\s\S]*bao kv put "\$path"/, 'OpenBao init must patch existing KV paths and only put on first creation');
 
   assert.match(migrate, /--apply requires --backup/, 'migration apply must require a verified backup');
@@ -587,12 +702,15 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
   assert.match(common, /CONFIRM_TEST_CLUSTER[\s\S]*phrase="apply-to-explicit-test-cluster"/, 'write guard must require the unambiguous confirmation phrase');
   assert.match(migrate, /require_test_cluster_write_guard[\s\S]*assert_backup_covers_current_mappings/, 'migration apply must pass the test-cluster guard before OpenBao writes');
   assert.match(migrate, /CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values/, 'migration overwrite mode must require an explicit guard');
+  assert.match(migrate, /require_backup_captured_target_kv_for_overwrite/, 'migration overwrite mode must require targetKvCaptured=true in the verified backup');
   assert.match(migrate, /refusing to overwrite/, 'migration must fail closed on destination mismatch');
   assert.match(migrate, /diff summary: match=\$matches missing=\$missing mismatch=\$mismatches/, 'migration dry-run must report a real destination diff');
   assert.match(migrate, /merge_source_backup_into_target/, 'migration must deliberately merge backed-up external source KV before applying mapped overlays');
+  assert.match(migrate, /merge_kv_tree_into_target/, 'migration must import the full external source KV tree, not only mapped platform paths');
 
   assert.match(restore, /helm -n "\$NS" rollback "\$RELEASE" "\$revision"/, 'restore must provide executable Helm rollback for the configured release');
   assert.match(restore, /kubectl -n "\$NS" apply -f "\$backup_dir\/kubernetes\/secrets\.apply\.json"/, 'restore must restore Kubernetes Secrets from the backup');
+  assert.match(restore, /restore_kv_tree_exact/, 'restore must restore the captured target OpenBao KV tree exactly');
   assert.match(restore, /\[ "\$MODE" = "--apply" \][\s\S]*require_test_cluster_write_guard/, 'restore apply/helm rollback path must pass the test-cluster guard before writes');
 
   assert.match(health, /app\.kubernetes\.io\/instance=\$RELEASE/, 'health check must select workloads by release label');

@@ -10,8 +10,13 @@ Principles:
 - `migrate-platform-secrets.sh --apply` refuses to run without a verified backup archive from `backup-kv.sh`.
 - Existing OpenBao values are compared by fingerprint before any write. Mismatches fail closed unless
   `--allow-overwrite` is paired with `CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values`.
-- Rollback restores OpenBao KV paths, Kubernetes Secrets, ESO resources, and can execute a Helm rollback
-  to the backed-up release revision before parity is rechecked.
+- `--allow-overwrite` also requires the verified backup to have captured target OpenBao KV
+  (`targetKvCaptured=true`), so every overwritten target path/property is recoverable.
+- Backup captures recursive KV-v2 trees, not only the mapped platform paths. External source
+  Vault/OpenBao trees are imported losslessly before mapped Kubernetes Secret values are overlaid.
+- Rollback restores the captured target OpenBao KV tree exactly, restores Kubernetes Secrets and ESO
+  resources, and can execute a Helm rollback to the backed-up release revision before parity is
+  rechecked.
 
 Required environment:
 
@@ -22,7 +27,8 @@ Required environment:
 - `BAO_ADDR`, `BAO_TOKEN`, and optionally `BAO_CACERT` for the target OpenBao instance when
   running parity, migration, restore, or when capturing target KV that already exists. `backup-kv.sh`
   can run without these before target OpenBao has been provisioned; the archive records target KV as
-  absent.
+  absent. If migration will use `--allow-overwrite`, these target credentials must be supplied to
+  the backup step so the archive records `targetKvCaptured=true`.
 - `SOURCE_BAO_ADDR`, `SOURCE_BAO_TOKEN`, optional `SOURCE_BAO_CACERT`, and optional
   `SOURCE_BAO_KV_MOUNT` when backing up an external Vault/OpenBao source.
 - Apply-mode writes require an explicit test-cluster guard. Set `TEST_CLUSTER_CONTEXT` to the
@@ -50,5 +56,7 @@ Rollback:
 4. `./health-check.sh` after workloads settle.
 
 The backup archive contains secret material, rendered Helm manifests, release values, and recovery
-material. `backup-kv.sh` refuses to overwrite an existing archive. Store it as a restricted operator
-artifact. The scripts never echo archive contents.
+material. `backup-kv.sh` refuses to overwrite an existing archive. Exact KV rollback can delete KV
+paths created after the backup so the target mount returns to the captured state; it does not delete
+OpenBao or PVCs. Store the archive as a restricted operator artifact. The scripts never echo archive
+contents.
