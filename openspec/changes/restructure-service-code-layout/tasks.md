@@ -19,6 +19,6 @@ Agents: migration-surveyor → migration-mapper → fixer (maker) → verifier +
 - [x] Add and run service-catalog/repository-layout validation for the exact issue #900 acceptance
   scenario.
 - [x] Run focused local validation/build checks that can execute without a live cluster.
-- [ ] Independent verifier + migration-reviewer review after the maker commit.
+- [x] Independent verifier + migration-reviewer review after the maker commit.
 
 Feeds change 4: the service catalog becomes the backbone of the devops/developer docs.
