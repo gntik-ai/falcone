@@ -23,7 +23,7 @@ mcp:
     toolCallsPerMinutePerOAuthClient: 300
 ```
 
-The chart deploys the RBAC + the internal-only NetworkPolicy (`charts/in-falcone/templates/mcp/`). MCP
+The chart deploys the RBAC + the internal-only NetworkPolicy (`../falcone-charts/charts/in-falcone/templates/mcp/`). MCP
 servers themselves are Knative Services created per tenant; they require Knative Serving + Kourier
 (already used by functions). OpenShift overlays inherit the non-root `securityContext`.
 

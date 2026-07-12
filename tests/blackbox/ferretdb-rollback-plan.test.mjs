@@ -102,7 +102,7 @@ test('bbx-fdb-rb-F: helper scripts exist, are executable, and parse with a usage
 });
 
 test('bbx-fdb-rb-G: chart mongodb stanza carries the read-only retention + PVC-keep comments', () => {
-  const values = read('charts/in-falcone/values.yaml');
+  const values = read('../falcone-charts/charts/in-falcone/values.yaml');
   // The retention comment block must mention the rollback window and PVC retention.
   assert.match(values, /rollback/i);
   assert.match(values, /resource-policy:\s*keep|do not.*reclaim|retain.*PVC|READ-ONLY/i);

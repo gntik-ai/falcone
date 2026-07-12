@@ -12,7 +12,9 @@ import { execFileSync } from 'node:child_process';
 import { parse, parseAllDocuments } from 'yaml';
 
 const REPO = new URL('../../', import.meta.url).pathname;
-const overlay = parse(readFileSync(`${REPO}deploy/kind/values-production.yaml`, 'utf8'));
+const CHARTS_REPO = `${REPO}../falcone-charts/`;
+const overlay = parse(readFileSync(`${CHARTS_REPO}deploy/kind/values-production.yaml`, 'utf8'));
+const defaults = parse(readFileSync(`${CHARTS_REPO}charts/in-falcone/values.yaml`, 'utf8'));
 
 test('bbx-tls-prod-01: global.transportSecurity is enabled with a CA secret and mount path', () => {
   const ts = overlay.global.transportSecurity;
@@ -42,9 +44,9 @@ test('bbx-tls-prod-04: only the app runtimes opt into the TLS injection', () => 
   assert.equal(overlay.controlPlane.transportSecurityClient, true);
   assert.equal(overlay.controlPlaneExecutor.transportSecurityClient, true);
   assert.equal(overlay.workflowWorker.transportSecurityClient, true);
-  // executor + worker are also turned on by the production profile.
-  assert.equal(overlay.controlPlaneExecutor.enabled, true);
-  assert.equal(overlay.workflowWorker.enabled, true);
+  // Core components are unconditional; no values-level enabled switch is accepted.
+  assert.equal(Object.hasOwn(defaults.controlPlaneExecutor, 'enabled'), false);
+  assert.equal(Object.hasOwn(defaults.workflowWorker, 'enabled'), false);
 });
 
 test('bbx-tls-prod-05: datastore TLS chart toggles are flipped on', () => {
@@ -54,8 +56,7 @@ test('bbx-tls-prod-05: datastore TLS chart toggles are flipped on', () => {
 });
 
 test('bbx-tls-prod-06: the chart default (no overlay) does NOT enable transport security', () => {
-  const base = parse(readFileSync(`${REPO}charts/in-falcone/values.yaml`, 'utf8'));
-  assert.equal(base.global.transportSecurity.enabled, false, 'plaintext is the chart default');
+  assert.equal(defaults.global.transportSecurity.enabled, false, 'plaintext is the chart default');
 });
 
 // Render the chart with the overlay and assert the TLS env + CA volume land on exactly the three
@@ -64,9 +65,9 @@ test('bbx-tls-prod-07: helm renders the TLS env + CA mount onto the three app po
   let rendered;
   try {
     rendered = execFileSync('helm', [
-      'template', 'in-falcone', `${REPO}charts/in-falcone`,
-      '-f', `${REPO}deploy/kind/values-kind.yaml`,
-      '-f', `${REPO}deploy/kind/values-production.yaml`,
+      'template', 'in-falcone', `${CHARTS_REPO}charts/in-falcone`,
+      '-f', `${CHARTS_REPO}deploy/kind/values-kind.yaml`,
+      '-f', `${CHARTS_REPO}deploy/kind/values-production.yaml`,
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch {
     t.skip('helm not available');

@@ -1,6 +1,6 @@
 # Helm review — deploying Falcone to OpenShift with a private Harbor (restricted network)
 
-Scope: `charts/in-falcone` (the product chart) + the runtime pieces added under
+Scope: `../falcone-charts/charts/in-falcone` (the product chart) + the runtime pieces added under
 `deploy/kind/` (control-plane, web-console, fn-runtime, Knative functions). Goal:
 is this valid for a production OpenShift install pulling **only** from the company
 Harbor, with restricted egress? This is a code-grounded assessment, not a guess.
@@ -8,14 +8,14 @@ Harbor, with restricted egress? This is a code-grounded assessment, not a guess.
 ## Verdict
 
 **The product chart is OpenShift/Harbor-ready at render level** — the historical
-OpenShift blockers have been folded into `charts/in-falcone` and the OpenShift
+OpenShift blockers have been folded into `../falcone-charts/charts/in-falcone` and the OpenShift
 overlay. The default install now renders the all-core baseline with OpenBao, ESO,
 Temporal, DocumentDB/FerretDB, SeaweedFS, the control-plane executor, workflow worker,
 MCP runtime wiring, and Knative-backed function execution. Remaining production gates
 are clean-cluster evidence, exact Harbor mirror validation, and final digest pinning
 from the manifests actually installed.
 
-**Do NOT reuse `deploy/kind/values-kind.yaml` on OpenShift** — it is kind-only
+**Do NOT reuse `../falcone-charts/deploy/kind/values-kind.yaml` on OpenShift** — it is kind-only
 (`localhost:30500`, `bitnamilegacy/*`, hardcoded `runAsUser: 636/1000/65534`,
 NodePort, local-registry overrides). It exists to work around
 a kind cluster on a futuristic kernel; it would fail or be insecure on OpenShift.
@@ -25,7 +25,7 @@ Use a new `values-openshift.yaml` driving the chart's existing `global.*` knobs
 ## Productionization status (what this pass changed)
 
 The review's P0/P1 chart-side blockers have now been **implemented in the chart**
-(`charts/in-falcone`) + the OpenShift overlay (`deploy/openshift/values-openshift.yaml`),
+(`../falcone-charts/charts/in-falcone`) + the OpenShift overlay (`../falcone-charts/deploy/openshift/values-openshift.yaml`),
 all re-validated by `helm lint` + `helm template` (see updated numbers below) AND
 regression-deployed to kind (the kind path still renders + runs; the executor RBAC is
 now chart-managed and the control-plane + a live Knative function are unaffected):
@@ -57,7 +57,7 @@ now chart-managed and the control-plane + a live Knative function are unaffected
 
 ## Validation performed (not just opinion)
 
-`helm lint` + `helm template` against the chart with `deploy/openshift/values-openshift.yaml`:
+`helm lint` + `helm template` against the chart with `../falcone-charts/deploy/openshift/values-openshift.yaml`:
 - **Renders cleanly**: 58 objects, `helm lint` 0 failures.
 - **Harbor rewrite works**: every workload image resolves to `harbor.example.com/falcone/...`
   (apisix, keycloak, postgresql, documentdb, ferretdb, kafka, seaweedfs, prometheus,

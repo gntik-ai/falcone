@@ -17,11 +17,11 @@ import { parseAllDocuments } from 'yaml';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
-const KIND_VALUES = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
-const OPENSHIFT_VALUES = resolve(REPO_ROOT, 'deploy', 'openshift', 'values-openshift.yaml');
-const E2E_FLOWS_VALUES = resolve(REPO_ROOT, 'tests', 'e2e', 'values-flows-e2e.yaml');
-const E2E_FERRETDB_VALUES = resolve(REPO_ROOT, 'tests', 'e2e', 'values-ferretdb-realtime-e2e.yaml');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
+const KIND_VALUES = resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'kind', 'values-kind.yaml');
+const OPENSHIFT_VALUES = resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'openshift', 'values-openshift.yaml');
+const E2E_FLOWS_VALUES = resolve(REPO_ROOT, '..', 'falcone-charts', 'tests', 'e2e', 'values-flows-e2e.yaml');
+const E2E_FERRETDB_VALUES = resolve(REPO_ROOT, '..', 'falcone-charts', 'tests', 'e2e', 'values-ferretdb-realtime-e2e.yaml');
 const CUTOVER_SCRIPTS = resolve(REPO_ROOT, 'scripts', 'system-changes', 'make-all-services-core');
 
 function helmAvailable() {
@@ -702,7 +702,7 @@ test('all-core-006d2: every OpenShift pod is restricted-v2 and Harbor-pull coher
 });
 
 test('all-core-006d4: production SeaweedFS TLS render does not inline JWT signing keys', SKIP, () => {
-  const docs = renderDocs(['-f', resolve(REPO_ROOT, 'deploy', 'kind', 'values-production.yaml')]);
+  const docs = renderDocs(['-f', resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'kind', 'values-production.yaml')]);
   const seaweedSecurity = findDoc(docs, 'ConfigMap', 'falcone-seaweedfs-security-config');
   assert.ok(seaweedSecurity, 'production TLS render must include SeaweedFS security config');
   assert.doesNotMatch(seaweedSecurity.data?.['security.toml'] ?? '', /\[jwt\.signing\]|key = "[^"]+"/, 'production TLS render must not inline Helm-generated SeaweedFS JWT signing keys');
@@ -913,8 +913,8 @@ test('all-core-009c: cert-manager OpenBao certificate SANs honor custom namespac
 test('all-core-010: Kafka default and supported profiles are valid single-broker KRaft', SKIP, () => {
   for (const args of [
     [],
-    ['-f', resolve(REPO_ROOT, 'charts', 'in-falcone', 'values', 'profiles', 'standard.yaml')],
-    ['-f', resolve(REPO_ROOT, 'charts', 'in-falcone', 'values', 'profiles', 'ha.yaml')],
+    ['-f', resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone', 'values', 'profiles', 'standard.yaml')],
+    ['-f', resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone', 'values', 'profiles', 'ha.yaml')],
   ]) {
     const docs = renderDocs(args);
     const kafka = findDoc(docs, 'StatefulSet', 'falcone-kafka');
@@ -936,7 +936,7 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
   const restore = readFileSync(resolve(CUTOVER_SCRIPTS, 'restore-kv.sh'), 'utf8');
   const health = readFileSync(resolve(CUTOVER_SCRIPTS, 'health-check.sh'), 'utf8');
   const diff = readFileSync(resolve(CUTOVER_SCRIPTS, 'diff-rollout.sh'), 'utf8');
-  const openbaoInit = readFileSync(resolve(REPO_ROOT, 'charts', 'in-falcone', 'charts', 'openbao', 'templates', 'openbao-init-job.yaml'), 'utf8');
+  const openbaoInit = readFileSync(resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone', 'charts', 'openbao', 'templates', 'openbao-init-job.yaml'), 'utf8');
 
   assert.match(backup, /helm -n "\$NS" get values "\$RELEASE" --all -o yaml/, 'backup must capture Helm values for the configured release');
   assert.match(backup, /write_secret_checksums/, 'backup must capture Kubernetes Secret fingerprints');

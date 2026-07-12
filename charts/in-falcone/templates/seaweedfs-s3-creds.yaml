@@ -1,7 +1,0 @@
-{{- /*
-  SeaweedFS S3 credentials are created by templates/platform-credentials.yaml.
-
-  Keep this filename as a breadcrumb for chart readers and older review notes,
-  but do not render Secret stringData here: helm template/diff/release manifests
-  must not expose the live S3 access key, secret key, or identities JSON.
-*/ -}}

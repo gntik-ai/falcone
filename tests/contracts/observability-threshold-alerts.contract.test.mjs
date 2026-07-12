@@ -48,7 +48,7 @@ test('architecture index and task summary document the threshold-alert baseline'
 
 test('migration defines the last-known posture table', () => {
   const migration = readFileSync(
-    'charts/in-falcone/bootstrap/migrations/20260328-002-quota-threshold-alert-posture-store.sql',
+    '../falcone-charts/charts/in-falcone/bootstrap/migrations/20260328-002-quota-threshold-alert-posture-store.sql',
     'utf8'
   );
 

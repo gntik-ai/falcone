@@ -1,6 +1,6 @@
 # Services & Components
 
-This page describes **every architecture component** of In Falcone — what it does, where it lives in the repository / chart, and how it participates in tenant isolation. Core components are packaged as unconditional dependencies of the umbrella Helm chart (`charts/in-falcone`); legacy `<component>.enabled=false` service disables and zero-replica core overrides are rejected by chart validation.
+This page describes **every architecture component** of In Falcone — what it does, where it lives in the repository / chart, and how it participates in tenant isolation. Core components are packaged as unconditional dependencies of the umbrella Helm chart (`../falcone-charts/charts/in-falcone`); legacy `<component>.enabled=false` service disables and zero-replica core overrides are rejected by chart validation.
 
 ```
 EDGE          CONTROL & DATA PLANE        DATA BACKENDS           PLATFORM
@@ -187,6 +187,6 @@ Prometheus-based metrics with per-tenant usage and quota signals surfaced in the
 
 ## Bootstrap & Provisioning
 
-**Templates:** `charts/in-falcone/templates/bootstrap-payload-configmap.yaml`, `NOTES.txt` · **Service:** `services/provisioning-orchestrator/`
+**Templates:** `../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml`, `NOTES.txt` · **Service:** `services/provisioning-orchestrator/`
 
 On install/upgrade a **bootstrap hook job** reconciles the gateway routes, the identity realm and the initial platform configuration. It is **idempotent**, guarded by a lock ConfigMap and recorded by a marker ConfigMap, so repeated upgrades are safe. The provisioning orchestrator handles per-workspace database/schema creation and migrations (e.g. the admin/data privilege separation migration).

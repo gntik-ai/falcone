@@ -23,7 +23,7 @@ Full MinIO → SeaweedFS cutover + MinIO decommission executed on the kind clust
 
 ## Chart defects fixed to make the SeaweedFS deployment functional
 
-These were blocking and are now patched in `charts/in-falcone/values.yaml` (belong to `add-seaweedfs-deployment`):
+These were blocking and are now patched in `../falcone-charts/charts/in-falcone/values.yaml` (belong to `add-seaweedfs-deployment`):
 
 1. **Filer DB-init image** (`seaweedfs.filer.initContainers`): `docker.io/bitnami/postgresql:16` was removed in the bitnami→bitnamilegacy purge (ImagePullBackOff). Now `docker.io/bitnamilegacy/postgresql:17.2.0`.
 2. **Replication unsatisfiable on dev topology**: dev/base used `001` (one same-rack replica → needs a 2nd volume server) with a single volume server, so every object PUT failed with 500 InternalError. Now `000` (master.defaultReplication, global.replicationPlacement, filer.defaultReplicaPlacement).

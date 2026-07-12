@@ -1,11 +1,11 @@
 # Deployment Topology
 
-In Falcone ships as a single **umbrella Helm chart** (`charts/in-falcone`, `Chart.yaml` `apiVersion: v2`). The supported fresh-install shape is the complete core platform. Profiles and values tune sizing, storage, networking, images, and security posture; legacy `<component>.enabled=false` switches for core services are rejected by chart validation.
+In Falcone ships as a single **umbrella Helm chart** (`../falcone-charts/charts/in-falcone`, `Chart.yaml` `apiVersion: v2`). The supported fresh-install shape is the complete core platform. Profiles and values tune sizing, storage, networking, images, and security posture; legacy `<component>.enabled=false` switches for core services are rejected by chart validation.
 
 ## Chart structure
 
 ```
-charts/in-falcone/
+../falcone-charts/charts/in-falcone/
 ├── Chart.yaml                 # umbrella; dependencies aliased to component-wrapper
 ├── values.yaml                # all component sections + platform/publicSurface/bootstrap
 ├── values.schema.json         # strict schema (validated on install/upgrade)

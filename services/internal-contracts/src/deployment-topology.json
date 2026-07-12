@@ -337,8 +337,8 @@
     }
   },
   "packaging_guidance": {
-    "umbrella_chart": "charts/in-falcone",
-    "component_wrapper_chart": "charts/in-falcone/charts/component-wrapper",
+    "umbrella_chart": "../falcone-charts/charts/in-falcone",
+    "component_wrapper_chart": "../falcone-charts/charts/in-falcone/charts/component-wrapper",
     "supported_install_modes": [
       "umbrella",
       "component_only",
@@ -363,7 +363,7 @@
       "standard",
       "ha"
     ],
-    "profile_values_path": "charts/in-falcone/values/profiles/{profile}.yaml"
+    "profile_values_path": "../falcone-charts/charts/in-falcone/values/profiles/{profile}.yaml"
   },
   "exposure_matrix": {
     "supported_tls_modes": [

@@ -32,7 +32,7 @@ import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
 const STANDARD_SCOPES = ['roles', 'basic', 'profile'];
 const CUSTOM_SCOPES = ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles'];
 

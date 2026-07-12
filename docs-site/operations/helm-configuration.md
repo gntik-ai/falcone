@@ -1,6 +1,6 @@
 # Helm Configuration
 
-In Falcone is configured through the umbrella chart `charts/in-falcone`. This page covers the structure of `values.yaml` and how to compose it. For full install walkthroughs see [Installation](/guide/installation).
+In Falcone is configured through the umbrella chart `../falcone-charts/charts/in-falcone`. This page covers the structure of `values.yaml` and how to compose it. For full install walkthroughs see [Installation](/guide/installation).
 
 ## Top-level value sections
 
@@ -26,14 +26,15 @@ common → environment → customer → platform → airgap → localOverride �
 ```
 
 ```bash
-helm dependency build charts/in-falcone
+git clone https://github.com/gntik-ai/falcone-charts.git ../falcone-charts
+helm dependency build ../falcone-charts/charts/in-falcone
 
-helm upgrade --install falcone charts/in-falcone \
+helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
   -n falcone --create-namespace \
-  -f charts/in-falcone/values/prod.yaml \              # environment
-  -f charts/in-falcone/values/customer-reference.yaml \ # customer
-  -f charts/in-falcone/values/platform-kubernetes.yaml \# platform
-  -f charts/in-falcone/values/profiles/standard.yaml    # sizing
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \              # environment
+  -f ../falcone-charts/charts/in-falcone/values/customer-reference.yaml \ # customer
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \# platform
+  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml    # sizing
 ```
 
 Helm creates the release namespace before pre-install hooks run. By default the chart renders Namespace resources for the ESO/OpenBao support namespaces (`global.createNamespace=true`). For externally managed namespaces, omit Helm namespace auto-creation, set `global.createNamespace=false`, and pre-create/adopt the required namespaces in the platform layer.
@@ -84,7 +85,7 @@ The chart ships a strict `values.schema.json`, validated on `helm install/upgrad
 ## Inspecting a render
 
 ```bash
-helm template falcone charts/in-falcone -f <your values> | less
+helm template falcone ../falcone-charts/charts/in-falcone -f <your values> | less
 ```
 
 This is the fastest way to confirm exposure objects, bootstrap payload and image references before applying.

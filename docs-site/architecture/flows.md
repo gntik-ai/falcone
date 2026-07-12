@@ -222,7 +222,7 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
   ListWorkflows + Terminate) and deletes `flow_versions`, `flow_schedules`,
   `flow_trigger_secrets`, `flow_trigger_registrations`, and `flow_definitions`, so no Temporal
   state, schedule, or per-trigger secret outlives the tenant. RLS migrations
-  (`charts/in-falcone/bootstrap/migrations/2026…flow*.sql`) scope the metadata tables under
+  (`../falcone-charts/charts/in-falcone/bootstrap/migrations/2026…flow*.sql`) scope the metadata tables under
   `falcone_app`.
 
 ## Links

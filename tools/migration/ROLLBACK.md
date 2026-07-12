@@ -16,7 +16,7 @@ stays in force for the rollback retention window.
 
 | # | Prerequisite | State (verified for this change) |
 |---|--------------|----------------------------------|
-| 1.1 | Side-by-side chart toggle | `seaweedfs.enabled` in `charts/in-falcone/values.yaml:2157` (default `false`). The toggle comment states *"rollback = set it back to false, MinIO is untouched"*. MinIO `storage` component (`charts/in-falcone/values.yaml:2043`) is independent and stays `enabled: true`. **Available** (`add-seaweedfs-deployment`, archived). |
+| 1.1 | Side-by-side chart toggle | `seaweedfs.enabled` in `../falcone-charts/charts/in-falcone/values.yaml:2157` (default `false`). The toggle comment states *"rollback = set it back to false, MinIO is untouched"*. MinIO `storage` component (`../falcone-charts/charts/in-falcone/values.yaml:2043`) is independent and stays `enabled: true`. **Available** (`add-seaweedfs-deployment`, archived). |
 | 1.2 | Cutover runbook | `tools/migration/RUNBOOK.md` + `migrate.sh` / `snapshot.sh` / `compare-snapshots.sh` (`add-seaweedfs-data-migration-runbook`, branch `feat/seaweedfs-data-migration-runbook`; merges before this change per epic #430 resolution order). |
 | 1.3 | Per-tenant smoke / parity gate | `tests/env/validation/run-validation.sh` → `parity-check.mjs` + `smoke-storage.mjs` (`add-seaweedfs-migration-validation`). Black-box: `tests/blackbox/seaweedfs-migration-validation.test.mjs`. The entrypoint honours `S3_ENDPOINT` and is explicitly built to *"gate … the rollback-plan go/no-go"*. **Present & runnable.** |
 | 1.4 | Rollback window length **N** | **Default N = 7 days.** Counts from cutover completion (section 1 of the cutover runbook) to the decommission gate (section 5 here). **Confirm with the ops team before cutover and record the agreed value below.** |
@@ -39,7 +39,7 @@ After cutover the following invariants hold for the whole window:
   reach MinIO. MinIO is effectively **READ-ONLY** — it exists only as the rollback
   target.
 
-These invariants are annotated at the source in `charts/in-falcone/values.yaml`
+These invariants are annotated at the source in `../falcone-charts/charts/in-falcone/values.yaml`
 above the `storage:` block.
 
 ---
@@ -77,7 +77,7 @@ Execute **in order**. Do not skip the smoke gate.
      `http://falcone-storage:9000`.
    - Credentials from secret `in-falcone-storage` (`MINIO_ROOT_USER` /
      `MINIO_ROOT_PASSWORD`; legacy `MINIO_*` fallbacks already wired in
-     `deploy/kind/values-kind.yaml`).
+     `../falcone-charts/deploy/kind/values-kind.yaml`).
    - Set `seaweedfs.enabled: false` (or leave SeaweedFS running but stop routing to
      it — re-pointing `STORAGE_S3_ENDPOINT` is the authoritative switch; the toggle
      governs whether SeaweedFS pods stay up).
@@ -160,7 +160,7 @@ Only proceed when **both**: (a) the rollback window N has elapsed with no trigge
 - **5.2** Delete the MinIO PVC. **⚠ POINT-OF-NO-RETURN** — re-read section 3b and
   confirm the section-4.3 gate result is green before executing. After this, rollback
   is only possible via backup restore.
-- **5.3** Disable the side-by-side chart toggle: in `charts/in-falcone/values.yaml` set
+- **5.3** Disable the side-by-side chart toggle: in `../falcone-charts/charts/in-falcone/values.yaml` set
   the end state (SeaweedFS sole backend) — `seaweedfs.enabled: true`, MinIO `storage`
   component removed/`enabled: false`. Commit the chart change.
 - **5.4** Record the decommission outcome below.

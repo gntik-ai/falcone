@@ -6,7 +6,6 @@ coverage/
 .env
 .env.*
 !.env.example
-charts/in-falcone/values/local.yaml
 .agents/
 .codex/
 .specify/

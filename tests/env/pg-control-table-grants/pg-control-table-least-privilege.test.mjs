@@ -163,7 +163,7 @@ test('PG-3 breach (pre-fix): falcone_service has SELECT on workspace_api_keys', 
 // ---- Apply the revoke migration ----------------------------------------------
 test('apply the revoke-control-table-grants migration', async () => {
   await admin.query(
-    sql('charts/in-falcone/bootstrap/migrations/20260616-007-revoke-data-role-control-table-grants.sql'),
+    sql('../falcone-charts/charts/in-falcone/bootstrap/migrations/20260616-007-revoke-data-role-control-table-grants.sql'),
   );
 
   // Confirm the migration reports REVOKE completed without error (no exception means OK).

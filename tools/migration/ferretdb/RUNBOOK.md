@@ -115,7 +115,7 @@ Apply via Helm upgrade / pod restart, honouring **engine-first startup order** â
 `postgres-documentdb` engine must be Ready before the `ferretdb` gateway starts:
 
 ```bash
-helm upgrade <release> charts/in-falcone -f <values> --set ... --wait
+helm upgrade <release> ../falcone-charts/charts/in-falcone -f <values> --set ... --wait
 # or, for a pre-deployed stack:
 kubectl rollout restart deploy/<release>-control-plane -n "$NS"
 ```

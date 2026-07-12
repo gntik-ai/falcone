@@ -30,7 +30,7 @@ test('chart values layers and topology packaging guidance stay aligned', () => {
   assert.deepEqual(topology.configuration_policy.optional_helm_value_layers, ['profile']);
   assert.deepEqual(topology.packaging_guidance.component_aliases, REQUIRED_COMPONENT_ALIASES);
   assert.deepEqual(topology.packaging_guidance.deployment_profiles, RECOMMENDED_DEPLOYMENT_PROFILES);
-  assert.equal(topology.packaging_guidance.profile_values_path, 'charts/in-falcone/values/profiles/{profile}.yaml');
+  assert.equal(topology.packaging_guidance.profile_values_path, '../falcone-charts/charts/in-falcone/values/profiles/{profile}.yaml');
   assert.ok(topology.packaging_guidance.supported_install_modes.includes('component_only'));
 });
 

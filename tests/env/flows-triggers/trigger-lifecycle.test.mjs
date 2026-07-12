@@ -42,7 +42,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 // Register the five flow custom search attributes (Keyword) on the test namespace if absent — the
 // production `falcone-flows` namespace gets these from the Helm bootstrap job
-// (charts/in-falcone/templates/temporal/bootstrap-job.yaml), but the harness `default` namespace
+// (../falcone-charts/charts/in-falcone/templates/temporal/bootstrap-job.yaml), but the harness `default` namespace
 // does not, so visibility queries by tenantId/triggerType would otherwise be rejected. Idempotent.
 async function ensureSearchAttributes(connection) {
   const Keyword = 2; // enums.v1.IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD (TEXT=1, KEYWORD=2)

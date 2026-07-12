@@ -44,7 +44,7 @@ Workflow:
 3. `./migrate-platform-secrets.sh --dry-run`
 4. `TEST_CLUSTER_CONTEXT=<test-context> CONFIRM_TEST_CLUSTER=apply-to-explicit-test-cluster ./migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`
 5. `./parity-check.sh --strict`
-6. `./diff-rollout.sh --chart ../../../charts/in-falcone` with the same values and `--set` overrides
+6. `./diff-rollout.sh --chart ../../../../falcone-charts/charts/in-falcone` with the same values and `--set` overrides
    planned for the Helm rollout.
 7. Apply the Helm upgrade only after operator approval.
 8. `./health-check.sh`
