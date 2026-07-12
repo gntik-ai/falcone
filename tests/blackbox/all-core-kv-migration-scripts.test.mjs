@@ -287,7 +287,7 @@ if (resource.startsWith('clustersecretstore')) {
   const stores = state.clusterSecretStores || {};
   if (name) {
     if (!stores[name]) {
-      console.error('NotFound');
+      console.error('Error from server (NotFound): ' + resource + ' "' + name + '" not found');
       process.exit(1);
     }
     print(stores[name]);
@@ -520,6 +520,14 @@ test('all-core KV migration scripts recursively migrate source KV and restore ta
   const backupRun = h.run('backup-kv.sh', ['--output', backup], baoEnv);
   assert.equal(backupRun.status, 0, `backup must succeed\nstdout: ${backupRun.stdout}\nstderr: ${backupRun.stderr}`);
 
+  const mappedReadFailure = h.run('migrate-platform-secrets.sh', ['--apply', '--backup', backup], {
+    ...baoEnv,
+    BAO_FAKE_GET_FAIL_PATH: 'platform/postgresql',
+  });
+  assert.notEqual(mappedReadFailure.status, 0, 'a mapped target read error must fail closed before any target KV write');
+  assert.match(`${mappedReadFailure.stdout}\n${mappedReadFailure.stderr}`, /refusing to treat the read error as an absent path/);
+  assert.deepEqual(h.state().target, initialTarget, 'a mapped target read error must not be treated as a missing mapped property');
+
   const dryRun = h.run('migrate-platform-secrets.sh', ['--dry-run', '--backup', backup], baoEnv);
   assert.equal(dryRun.status, 0, `dry-run must succeed\nstdout: ${dryRun.stdout}\nstderr: ${dryRun.stderr}`);
   const dryOutput = `${dryRun.stdout}\n${dryRun.stderr}`;
@@ -717,6 +725,11 @@ test('all-core KV backup fails closed on Kubernetes capture errors', async (t) =
       resource: 'clustersecretstore.external-secrets.io/openbao-backend',
       stderr: 'Error from server (NotFound): the server could not find the requested resource (get clustersecretstores.external-secrets.io openbao-backend)',
     },
+    {
+      name: 'ClusterSecretStore generic NotFound',
+      resource: 'clustersecretstore.external-secrets.io/openbao-backend',
+      stderr: 'NotFound',
+    },
   ];
 
   for (const testCase of cases) {
@@ -754,7 +767,12 @@ test('all-core KV restore rolls back Kubernetes and Helm without target OpenBao'
   assert.equal(archivedStore.status, 0, `cluster store absence marker must be extractable\nstderr: ${archivedStore.stderr}`);
   assert.deepEqual(
     JSON.parse(archivedStore.stdout),
-    { absent: true, reason: 'NotFound', command: 'kubectl get clustersecretstore.external-secrets.io openbao-backend', stderr: 'NotFound\n' },
+    {
+      absent: true,
+      reason: 'NotFound',
+      command: 'kubectl get clustersecretstore.external-secrets.io openbao-backend',
+      stderr: 'Error from server (NotFound): clustersecretstore.external-secrets.io "openbao-backend" not found\n',
+    },
     'optional missing ClusterSecretStore must be the only Kubernetes absent marker',
   );
 

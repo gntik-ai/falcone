@@ -129,10 +129,17 @@ verify_scoped_clustersecretstores() {
 
 kubectl_error_is_named_not_found() {
   local stderr_file="$1"
+  local resource="$2"
+  local name="$3"
+  [ "$name" = "openbao-backend" ] || return 1
+  case "$resource" in
+    clustersecretstore|clustersecretstores|clustersecretstore.external-secrets.io|clustersecretstores.external-secrets.io) ;;
+    *) return 1 ;;
+  esac
   grep -Eqi \
     'the server could not find the requested resource|doesn'\''t have a resource type|resource type|no matches for kind|forbidden|unauthorized|unable to connect|connection refused|i/o timeout|timed out|tls|certificate|no configuration has been provided|current-context' \
     "$stderr_file" && return 1
-  grep -Eqi 'Error from server \(NotFound\):.*"[^"]+" not found|(^|[[:space:]])NotFound($|[[:space:]])|[[:space:]]not found[[:space:]]*$' \
+  grep -Eqi 'Error from server \(NotFound\):.*"openbao-backend" not found' \
     "$stderr_file"
 }
 
@@ -164,11 +171,22 @@ capture_kubectl_json() {
 capture_optional_kubectl_json() {
   local output="$1"
   shift
+  local kubectl_args=("$@")
+  local resource=""
+  local name=""
+  local i
+  for ((i = 0; i < ${#kubectl_args[@]}; i++)); do
+    if [ "${kubectl_args[$i]}" = "get" ]; then
+      resource="${kubectl_args[$((i + 1))]:-}"
+      name="${kubectl_args[$((i + 2))]:-}"
+      break
+    fi
+  done
   if kubectl "$@" -o json > "$output" 2>"$output.stderr"; then
     rm -f "$output.stderr"
   else
     local status=$?
-    if kubectl_error_is_named_not_found "$output.stderr"; then
+    if kubectl_error_is_named_not_found "$output.stderr" "$resource" "$name"; then
       jq -n --arg command "kubectl $*" --rawfile stderr "$output.stderr" \
         '{absent:true, reason:"NotFound", command:$command, stderr:$stderr}' > "$output"
       rm -f "$output.stderr"

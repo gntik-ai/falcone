@@ -263,3 +263,7 @@ Command: `/system-change` - issue #898 - implementer handoff from the architect 
   propagates the single Harbor pull-secret source to all private-image workloads and hooks, wires the
   main control plane to release-derived core services and registry-derived function runtime, and removes
   duplicate bootstrap/SeaweedFS labels; object-level render tests cover the full PodSpec set.
+- [x] Tenth-reviewer rollback hardening restricts optional Kubernetes absence capture to the explicit
+  named `ClusterSecretStore/openbao-backend` NotFound case, restores Kubernetes/ESO/Helm rollback state
+  independently of target OpenBao availability, and preflights every mapped target KV path with
+  fail-closed read handling before migration writes.

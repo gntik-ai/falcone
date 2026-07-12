@@ -10,6 +10,7 @@ Principles:
 - `migrate-platform-secrets.sh --apply` refuses to run without a verified backup archive from `backup-kv.sh`.
 - Existing OpenBao values are compared by fingerprint before any write. Mismatches fail closed unless
   `--allow-overwrite` is paired with `CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values`.
+  Target read errors fail closed; only explicit absent KV paths/properties are reported as missing.
 - `--allow-overwrite` also requires the verified backup to have captured target OpenBao KV
   (`targetKvCaptured=true`), so every overwritten target path/property is recoverable.
 - Backup captures recursive KV-v2 trees, not only the mapped platform paths. External source

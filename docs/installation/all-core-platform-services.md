@@ -148,7 +148,8 @@ initialization use merge semantics for KV paths, so unmapped properties already 
 preserved instead of being replaced by the mapped platform credential set. Before any write, migration
 compares every external source path/property with the target using typed JSON equality and reports only
 paths, property names, statuses, and SHA-256 fingerprints. Missing or identical target properties are
-safe; any differing target property fails the entire apply before the first write. An apply with
+safe; target OpenBao read errors fail closed before any write instead of being treated as missing.
+Any differing target property fails the entire apply before the first write. An apply with
 `--allow-overwrite` additionally requires `CONFIRM_SECRET_OVERWRITE=overwrite-existing-openbao-values`
 and refuses to run unless the verified backup has `targetKvCaptured=true`, ensuring every overwritten
 target path/property can be restored.

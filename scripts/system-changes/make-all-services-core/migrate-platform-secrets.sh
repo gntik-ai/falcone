@@ -70,6 +70,11 @@ desired_file_for() {
   printf '%s/%s/%s' "$tmp/desired" "$path" "$property"
 }
 
+target_file_for() {
+  local path="$1"
+  printf '%s/%s.json' "$tmp/target/${path%/*}" "${path##*/}"
+}
+
 build_desired_files() {
   platform_mappings_json | jq -r '.[][2]' | sort -u | while read -r path; do
     mkdir -p "$tmp/desired/$path"
@@ -85,7 +90,19 @@ build_desired_files() {
   done
 }
 
+build_target_files() {
+  platform_mappings_json | jq -r '.[][2]' | sort -u | while read -r path; do
+    local target_file read_dir
+    target_file="$(target_file_for "$path")"
+    read_dir="$tmp/target-read/${path//\//_}"
+    mkdir -p "$(dirname "$target_file")" "$read_dir"
+    read_target_kv_data_or_empty "$path" "$target_file" "$read_dir/read"
+    chmod 0400 "$target_file"
+  done
+}
+
 build_desired_files
+build_target_files
 
 echo "namespace=$NS openbao_namespace=$OPENBAO_NAMESPACE kv_mount=$KV_MOUNT mode=$MODE"
 mismatches=0
@@ -98,10 +115,14 @@ platform_mappings_json | jq -cr '.[]' | while read -r row; do
   path="$(jq -r '.[2]' <<<"$row")"
   property="$(jq -r '.[3]' <<<"$row")"
   desired_file="$(desired_file_for "$path" "$property")"
+  target_file="$(target_file_for "$path")"
   k_hash="$(fingerprint < "$desired_file")"
-  if ! b_hash="$(bao_fingerprint "$path" "$property" 2>/dev/null)"; then
+  if ! jq -e --arg property "$property" 'has($property)' "$target_file" >/dev/null; then
     status=missing
     missing=$((missing + 1))
+  elif ! b_hash="$(jq -er --arg property "$property" '.[$property]' "$target_file" | fingerprint)"; then
+    echo "failed to hash target OpenBao KV property $KV_MOUNT/$path/$property" >&2
+    exit 1
   elif [ "$k_hash" = "$b_hash" ]; then
     status=match
     matches=$((matches + 1))
