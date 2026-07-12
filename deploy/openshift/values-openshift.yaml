@@ -273,6 +273,15 @@ seaweedfs:
       # cert-manager is present — set certificates.externalCertificates.enabled
       # accordingly. (task 8.1)
       enableSecurity: true
+      # Keep mTLS enabled without asking the vendored chart to generate JWT
+      # signing keys in Helm output. Tenant-facing S3 identities are issued by
+      # Falcone at runtime; this overlay must not render Helm-side random secrets.
+      securityConfig:
+        jwtSigning:
+          volumeWrite: false
+          volumeRead: false
+          filerWrite: false
+          filerRead: false
   certificates:
     externalCertificates:
       # Consume the bootstrap-hook-provided cert Secrets instead of cert-manager.

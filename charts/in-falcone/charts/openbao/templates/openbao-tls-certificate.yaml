@@ -1,6 +1,11 @@
-{{- /* finding D7/C.6: render the cert-manager Certificate ONLY in cert-manager mode. On a cluster
-  without cert-manager (e.g. kind) this CRD is absent, so rendering it unconditionally aborted the
-  release. The self-signed bootstrap Job covers the kind path for core OpenBao. */ -}}
+{{- /* finding D7/C.6: render cert-manager Certificates ONLY in cert-manager mode. On a cluster
+  without cert-manager (e.g. kind) these CRDs are absent, so rendering them unconditionally aborted
+  the release. The self-signed bootstrap Job covers the kind path for core OpenBao.
+
+  Runtime pods mount .Values.openbao.tls.clientCaSecretName in the release namespace. The
+  self-signed hook creates that CA copy directly; cert-manager mode must create it too or core
+  runtimes remain Pending on a missing Secret.
+*/ -}}
 {{- if eq (.Values.openbao.tls.mode | default "cert-manager") "cert-manager" }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -9,6 +14,24 @@ metadata:
   namespace: {{ .Values.openbao.namespace }}
 spec:
   secretName: {{ .Values.openbao.tls.secretName }}
+  issuerRef:
+    name: {{ .Values.openbao.tls.issuerRef.name }}
+    kind: {{ .Values.openbao.tls.issuerRef.kind }}
+  commonName: {{ include "openbao.serviceHost" . }}
+  dnsNames:
+    - openbao
+    - openbao.{{ include "openbao.namespace" . }}
+    - openbao.{{ include "openbao.namespace" . }}.svc
+    - {{ include "openbao.serviceHost" . }}
+    - {{ include "openbao.internalServiceHost" . }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.openbao.tls.clientCaSecretName | default "in-falcone-openbao-client-ca" }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  secretName: {{ .Values.openbao.tls.clientCaSecretName | default "in-falcone-openbao-client-ca" }}
   issuerRef:
     name: {{ .Values.openbao.tls.issuerRef.name }}
     kind: {{ .Values.openbao.tls.issuerRef.kind }}

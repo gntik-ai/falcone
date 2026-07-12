@@ -61,6 +61,14 @@ seaweedfs:
   global:
     seaweedfs:
       enableSecurity: true
+      # Enable inter-component mTLS without rendering upstream Helm-side random
+      # JWT signing keys into the SeaweedFS security ConfigMap.
+      securityConfig:
+        jwtSigning:
+          volumeWrite: false
+          volumeRead: false
+          filerWrite: false
+          filerRead: false
 seaweedfsTls:
   bootstrap:
     enabled: true

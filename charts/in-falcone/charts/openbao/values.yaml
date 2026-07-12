@@ -41,7 +41,8 @@ openbao:
     issuerRef:
       name: selfsigned-issuer
       kind: ClusterIssuer
-    # Used only when mode=self-signed.
+    # Runtime namespace CA bundle Secret. In self-signed mode the bootstrap hook copies the
+    # server CA here; in cert-manager mode a Certificate creates the Secret in the release namespace.
     clientCaSecretName: in-falcone-openbao-client-ca
     bootstrap:
       image:

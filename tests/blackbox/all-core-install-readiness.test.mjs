@@ -310,9 +310,10 @@ test('all-core-004: OpenBao seeding and ESO remoteRefs are aligned', SKIP, () =>
   assert.match(out, /openbao-recovery-mounted\/root-token[\s\S]*openbao-init-role login failed/, 'OpenBao init must fall back to mounted recovery root token before Kubernetes-auth login failures');
   const openbaoInit = findDoc(docs, 'Job', 'openbao-init');
   assert.ok(openbaoInit, 'OpenBao init convergence Job must render');
-  assert.equal(openbaoInit.metadata?.annotations?.['helm.sh/hook'], 'post-install,post-upgrade');
-  assert.equal(openbaoInit.metadata?.annotations?.['helm.sh/hook-weight'], '-4');
-  assert.equal(openbaoInit.metadata?.annotations?.['helm.sh/hook-delete-policy'], 'before-hook-creation');
+  const openbaoInitHook = assertRender(['--show-only', 'charts/openbao/templates/openbao-init-job.yaml', '--debug']);
+  assert.match(openbaoInitHook, /"helm\.sh\/hook":\s*post-install,post-upgrade/);
+  assert.match(openbaoInitHook, /"helm\.sh\/hook-weight":\s*"-4"/);
+  assert.match(openbaoInitHook, /"helm\.sh\/hook-delete-policy":\s*before-hook-creation/);
   const credentialHook = findDoc(docs, 'Job', 'falcone-in-falcone-credential-bootstrap');
   assert.ok(credentialHook, 'platform credential bootstrap hook must render');
   assert.equal(credentialHook.metadata?.annotations?.['helm.sh/hook'], 'pre-install,pre-upgrade');
@@ -647,6 +648,9 @@ test('all-core-006d2: every OpenShift pod is restricted-v2 and Harbor-pull coher
     assert.deepEqual(source.flatMap((doc) => doc.errors), [], `${valuesPath} must not contain duplicate mapping keys`);
   }
   const docs = renderDocs(['-f', OPENSHIFT_VALUES, '--include-crds']);
+  const seaweedSecurity = findDoc(docs, 'ConfigMap', 'falcone-seaweedfs-security-config');
+  assert.ok(seaweedSecurity, 'OpenShift render must include SeaweedFS security config for mTLS');
+  assert.doesNotMatch(seaweedSecurity.data?.['security.toml'] ?? '', /\[jwt\.signing\]|key = "[^"]+"/, 'OpenShift render must not inline Helm-generated SeaweedFS JWT signing keys');
   const entries = podSpecEntries(docs);
   assert.ok(entries.length > 0, 'OpenShift render must contain pod specs');
   for (const { doc, podSpec } of entries) {
@@ -681,6 +685,13 @@ test('all-core-006d2: every OpenShift pod is restricted-v2 and Harbor-pull coher
     assert.ok(doc, `${kind}/${name} must render`);
     assert.ok(doc.spec.template.spec.imagePullSecrets?.some((secret) => secret.name === 'harbor-pull'), `${kind}/${name} must carry harbor-pull`);
   }
+});
+
+test('all-core-006d4: production SeaweedFS TLS render does not inline JWT signing keys', SKIP, () => {
+  const docs = renderDocs(['-f', resolve(REPO_ROOT, 'deploy', 'kind', 'values-production.yaml')]);
+  const seaweedSecurity = findDoc(docs, 'ConfigMap', 'falcone-seaweedfs-security-config');
+  assert.ok(seaweedSecurity, 'production TLS render must include SeaweedFS security config');
+  assert.doesNotMatch(seaweedSecurity.data?.['security.toml'] ?? '', /\[jwt\.signing\]|key = "[^"]+"/, 'production TLS render must not inline Helm-generated SeaweedFS JWT signing keys');
 });
 
 test('all-core-006d3: control plane wiring follows custom release and registry values', SKIP, () => {
@@ -825,14 +836,21 @@ test('all-core-009b: mismatched ESO operator namespace fails closed', SKIP, () =
 });
 
 test('all-core-009c: cert-manager OpenBao certificate SANs honor custom namespace', SKIP, () => {
-  const out = assertRender([
+  const args = [
     '--set', 'openbao.openbao.tls.mode=cert-manager',
     '--set', 'eso.eso.namespace=custom-eso',
     '--set', 'eso.external-secrets.namespaceOverride=custom-eso',
     '--set', 'openbao.eso.namespace=custom-eso',
     '--set', 'openbao.openbao.namespace=custom-store',
     '--set', 'eso.eso.caProvider.namespace=custom-store',
-  ]);
+  ];
+  const out = assertRender(args);
+  const docs = renderDocs([...args, '--show-only', 'charts/openbao/templates/openbao-tls-certificate.yaml']);
+  const serverCert = findDoc(docs, 'Certificate', 'openbao-server-tls');
+  const clientCaCert = findDoc(docs, 'Certificate', 'in-falcone-openbao-client-ca');
+  assert.equal(serverCert?.metadata?.namespace, 'custom-store', 'OpenBao server Certificate must render in the configured OpenBao namespace');
+  assert.equal(clientCaCert?.metadata?.namespace, 'review-ns', 'OpenBao client CA Certificate must render in the release namespace for runtime mounts');
+  assert.equal(clientCaCert?.spec?.secretName, 'in-falcone-openbao-client-ca', 'cert-manager mode must create the client CA Secret mounted by runtimes');
   assert.match(out, /commonName:\s*openbao\.custom-store\.svc\.cluster\.local/, 'OpenBao Certificate commonName must use the configured namespace');
   assert.match(out, /dnsNames:[\s\S]*openbao\.custom-store[\s\S]*openbao\.custom-store\.svc[\s\S]*openbao\.custom-store\.svc\.cluster\.local[\s\S]*openbao-internal\.custom-store\.svc\.cluster\.local/, 'OpenBao Certificate SANs must use the configured namespace');
   assert.doesNotMatch(out, /openbao\.secret-store\.svc\.cluster\.local/, 'custom cert-manager SANs must not retain secret-store');
