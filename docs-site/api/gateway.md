@@ -1,63 +1,81 @@
-# API Reference — Gateway & Routing
+# API Reference: Gateway & Routing
 
-The APISIX gateway is the single entry point. It classifies each request by credential, enforces the route's privilege domain, rate-limits per key, and injects verified identity headers before forwarding. Route definitions are catalogued in `deploy/gateway-config/public-route-catalog.json`; policy is built in `scripts/lib/gateway-policy.mjs`.
+APISIX is the public entry point. The route source is the chart bootstrap payload, backed by:
+
+```text
+../falcone-charts/charts/in-falcone/values.yaml
+../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml
+deploy/gateway-config/public-route-catalog.json
+```
+
+The bootstrap job `falcone-in-falcone-bootstrap` reconciles the gateway routes on install and
+upgrade.
 
 ## Credential classification
 
-| Credential | How it's matched | Routed to |
+| Credential | Public form | Resolution |
 | --- | --- | --- |
-| API key | `apikey` header matching `^flc_` (route `vars`) | Executor (data plane) |
-| Bearer JWT | validated `Authorization: Bearer …` | Control plane / data plane with injected identity |
+| Bearer JWT | `Authorization: Bearer <jwt>` | JWT is verified, roles/scopes are read from claims, tenant realm tokens derive tenant identity from the verified issuer. |
+| API key | `apikey: flc_...`, `x-api-key: flc_...`, or `Authorization: ApiKey flc_...` | Executor verifies the key and resolves tenant, workspace, DB role, and scopes. |
+| SSE query key | `?apikey=flc_...` | Accepted only for SSE routes where browser `EventSource` cannot set headers. |
 
-The gateway accepts the key in several forms downstream (`apikey:`, `x-api-key:`, `Authorization: ApiKey/Bearer flc_…`), and `?apikey=` for SSE — but the canonical public form is the **`apikey` header**.
+Downstream services must not trust client-supplied `x-tenant-id` or `x-workspace-id` headers. The
+executor only trusts gateway-injected headers when the configured gateway trust signal is valid, or
+when running in the dev/test mode that has no gateway shared secret configured.
 
-## Anon vs service keys
+## Route destinations
 
-| | `flc_anon_…` | `flc_service_…` |
-| --- | --- | --- |
-| Audience | browser / public | server-side / CI |
-| Privilege | read-mostly, bound to a non-`BYPASSRLS` DB role (RLS applies) | elevated within the tenant |
-| SSE via `?apikey=` | yes | not recommended (don't expose) |
+The chart bootstrap template sends data-plane and executor-required routes to the
+`controlPlaneExecutor` upstream. Control-plane management routes go to `controlPlane`.
 
-Mint keys with `POST /v1/api-keys` (`structural_admin`); revoke with `DELETE /v1/api-keys/{id}`. The key encodes the `(tenant, workspace, DB role, scopes)` it resolves to.
+Examples:
 
-## Identity injection
+| Route family | Destination |
+| --- | --- |
+| `/v1/tenants`, `/v1/workspaces`, workspace service accounts, governed function actions | Control plane runtime. |
+| `/v1/postgres/...`, `/v1/mongo/...`, `/v1/events/...`, `/v1/realtime/...`, `/v1/flows/...`, `/v1/mcp/...` | Control-plane executor runtime. |
 
-After validating a token, the gateway injects trusted context and **strips any client-supplied** equivalents:
+## Workspace binding and cross-tenant checks
 
-```
-x-tenant-id      x-workspace-id     x-auth-subject     x-pg-role
-```
+The executor enforces:
 
-Downstream services trust these only when no stronger credential (API key / verified JWT) was presented — see the [precedence rules](/architecture/overview#identity-resolution-precedence).
-
-## Scope enforcement
-
-Each route declares a `privilege_domain` (`structural_admin` | `data_access`); function routes add a `function_deployment` sub-domain. A custom plugin rejects callers whose verified scope doesn't permit the route's domain (`403`). Specs: `deploy/gateway-config/tests/plugins/scope-enforcement-*`.
+- API-key credentials bind to a specific workspace.
+- JWTs with a `workspace_id` claim must match the workspace in the URL.
+- Workspace-addressed structural writes verify the workspace belongs to the caller's tenant.
+- Cross-tenant reads are hidden as forbidden or not found depending on the route's contract.
 
 ## Rate limiting
 
-APISIX `limit-count`, configured for **per-key** buckets:
+APISIX route policy uses route plugins declared through the chart/gateway policy. The gateway
+supports per-key rate-limit buckets. Higher-level tenant and workspace quota checks are enforced in
+the control-plane/executor route handlers.
 
-```yaml
-plugins:
-  limit-count:
-    key_type: var_combination     # per-key; `var` alone would key globally
-    key: $http_apikey
-    count: <N>
-    time_window: <seconds>
-    policy: local                  # node-local (≈ N× with N gateway replicas)
-    # policy: redis                # globally exact, needs Redis
-    rejected_code: 429
-```
+## Public exposure
 
-- `policy: local` — fast, no dependency, but the effective limit scales with gateway replica count.
-- `policy: redis` — globally exact across replicas, at the cost of a Redis dependency.
+Public exposure is selected by `platform.network.exposureKind`:
 
-Per-tenant **quotas** (from the plan's `quota_policy`) provide higher-level resource limits on top of rate limiting.
+| Value | Rendered object |
+| --- | --- |
+| `Ingress` | Kubernetes `Ingress`, such as `falcone-in-falcone-public`. |
+| `LoadBalancer` | Kubernetes `Service` of type `LoadBalancer`. |
+| `Route` | OpenShift Routes, such as `falcone-in-falcone-api`, `falcone-in-falcone-console`, `falcone-in-falcone-identity`, and `falcone-in-falcone-realtime`. |
 
-## Exposure
+OpenShift Route values set `haproxy.router.openshift.io/timeout: 30s`, which matters for SSE
+traffic.
 
-Routes are published as Kubernetes **Ingress** or OpenShift **Routes** depending on `platform.network.exposureKind`. Realtime routes get an extended timeout (SSE). The bootstrap job reconciles routes from the chart on install/upgrade.
+## Service accounts and API keys
 
-> **Flows & MCP *(Preview)*.** The [Flows](/api/control-plane#flows-routes-preview) (`/v1/flows`) and [MCP management](/api/control-plane#mcp-management-routes-preview) (`/v1/mcp`) surfaces are served by the **control-plane runtime** and are registered in the public route catalogs. Hosted **MCP-server pods are internal-only** (NetworkPolicy) — agents reach them over Streamable HTTP through the gateway with an OAuth 2.1 token, never directly.
+Current workspace service-account routes are documented in
+[Control Plane](/api/control-plane#service-accounts-and-credentials). Executor API-key management is
+workspace-addressed in the runtime. Do not use stale examples that mint credentials with
+`POST /v1/api-keys`.
+
+## Preview surfaces
+
+Flows and MCP are Preview but are part of the current route catalog/runtime:
+
+- Flows: `/v1/flows/workspaces/{workspaceId}/...`
+- MCP: `/v1/mcp/workspaces/{workspaceId}/...`
+
+Hosted MCP server pods are internal-only and run on Knative; agents reach them through the gateway
+and control-plane mediation.

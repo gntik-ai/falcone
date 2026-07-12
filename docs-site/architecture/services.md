@@ -109,7 +109,8 @@ The relational data engine. Tenant isolation rests on **Row-Level Security**:
 - The application connects as a **non-`BYPASSRLS` role** (`falcone_app`, with `anon`/`service` variants). Because RLS does not apply to superusers/`BYPASSRLS` roles, using a constrained role is what makes the policy actually enforce.
 - The executor sets the tenant context (`SET LOCAL`) and role per request, so policies filter every statement — including ones a bug forgot to scope.
 
-RLS is only meaningfully testable against a real Postgres (see the [docker-compose stack](/guide/installation#docker-compose-local)).
+RLS is only meaningfully testable against a real Postgres. For the local backend stack, run
+`docker compose up -d` from `tests/env` as described in [Contributing](/contributing/).
 
 ---
 

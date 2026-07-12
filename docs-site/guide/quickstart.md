@@ -1,207 +1,285 @@
-# Quickstart: a TODO app in React
+# Quickstart: kind
 
-This guide builds a small **TODO list** React app on top of In Falcone. You will:
+This is the shortest path to a running Falcone platform and a first tenant/workspace on a local
+kind cluster.
 
-1. Provision a tenant, a workspace and a `todos` collection.
-2. Mint an **anon API key** to use from the browser.
-3. Wire a React frontend to the **data API** through the gateway.
-4. (Bonus) make the list **realtime** with Server-Sent Events.
+Time estimate: 20-45 minutes on a machine that can pull the chart images.
 
-> [!NOTE]
-> This assumes a running platform — either the [docker-compose stack](/guide/installation#docker-compose-local) or a [cluster install](/guide/installation#kubernetes). We'll call the gateway `https://api.example.test`; replace it with your `publicSurface.hostnames.api`.
-
-## 1. Provision (control plane)
-
-Provisioning uses the **`structural_admin`** routes, authenticated with an admin Bearer token from Keycloak. You can do all of this from the [web console](/guide/what-is-falcone#a-guided-tour-of-a-real-deployment) (Tenants → create, then Database → create collection, then Service Accounts → create key) — or via the API:
-
-```bash
-export API=https://api.example.test
-export ADMIN="Bearer $(your-keycloak-token)"
-
-# Create a tenant
-curl -sX POST $API/v1/tenants -H "authorization: $ADMIN" \
-  -H 'content-type: application/json' \
-  -d '{"name":"Acme","slug":"acme"}'
-
-# Create a workspace inside it
-curl -sX POST $API/v1/workspaces -H "authorization: $ADMIN" \
-  -H 'content-type: application/json' \
-  -d '{"tenantSlug":"acme","name":"todo-app"}'
-
-# Define the `todos` collection (schema)
-curl -sX POST $API/v1/schemas -H "authorization: $ADMIN" \
-  -H 'content-type: application/json' \
-  -d '{
-        "collection":"todos",
-        "fields":[
-          {"name":"title","type":"text"},
-          {"name":"done","type":"boolean","default":false}
-        ]
-      }'
-```
-
-### Mint an anon API key
-
-The **anon key** (`flc_anon_…`) is a low-privilege, read-mostly credential safe to ship in a frontend. The gateway routes requests by the `apikey` header, and the executor binds the key to a **non-`BYPASSRLS` database role**, so PostgreSQL Row-Level Security still scopes every query to this tenant.
-
-```bash
-curl -sX POST $API/v1/api-keys -H "authorization: $ADMIN" \
-  -H 'content-type: application/json' \
-  -d '{"workspace":"todo-app","type":"anon"}'
-# → { "id": "...", "key": "flc_anon_XXXXXXXXXXXXXXXX", "type": "anon" }
-```
-
-Copy the returned `key`. (For privileged server-side work you'd mint a `service` key — `flc_service_…` — instead, and **never** expose it to the browser.)
+This quickstart uses the real umbrella Helm chart from the sibling `falcone-charts` repository. It
+does not use the repo's `deploy/kind/values-kind.yaml` overlay, which is specific to the internal
+test cluster and local registry workflow.
 
 > [!IMPORTANT]
-> Authenticate data-plane calls with the **`apikey` header** — `apikey: flc_anon_…` — not `Authorization`. The gateway routes anon/service traffic by that header.
+> Use a new, clean kind cluster for this path. The current all-core chart installs and owns the
+> External Secrets Operator CRDs and validating webhooks; it does not support sharing them with a
+> different Helm release. Do not run this quickstart in a cluster that already has External Secrets
+> installed by another release.
 
-## 2. Create the React app
+## Prerequisites
 
-```bash
-npm create vite@latest todo-app -- --template react
-cd todo-app
-npm install
-```
+Install:
 
-Add the key to `.env.local` (Vite exposes `VITE_*` to the client):
+- Docker or another kind-supported container runtime.
+- `kind`
+- `kubectl`
+- Helm 3
+- `curl`
+- `jq`
 
-```ini
-VITE_FALCONE_API=https://api.example.test
-VITE_FALCONE_ANON_KEY=flc_anon_XXXXXXXXXXXXXXXX
-```
-
-### A tiny data-API client
-
-The data API is REST over the `todos` collection:
-
-| Action | Request |
-| --- | --- |
-| List | `GET /v1/collections/todos/documents` |
-| Create | `POST /v1/collections/todos/documents` (document as JSON body) |
-| Update | `PUT /v1/collections/todos/documents/{id}` |
-| Delete | `DELETE /v1/collections/todos/documents/{id}` |
-| Filter | `GET /v1/collections/todos/documents?done=eq.false&order=created_at.desc` |
-
-`src/falcone.js`:
-
-```js
-const BASE = import.meta.env.VITE_FALCONE_API
-const KEY = import.meta.env.VITE_FALCONE_ANON_KEY
-
-async function call(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      'content-type': 'application/json',
-      // The gateway routes anon/service traffic by the `apikey` header.
-      apikey: KEY,
-      ...options.headers,
-    },
-  })
-  if (!res.ok) throw new Error(`Falcone ${res.status}: ${await res.text()}`)
-  return res.status === 204 ? null : res.json()
-}
-
-export const todos = {
-  list: () => call('/v1/collections/todos/documents?order=created_at.desc'),
-  create: (title) =>
-    call('/v1/collections/todos/documents', {
-      method: 'POST',
-      body: JSON.stringify({ title, done: false }),
-    }),
-  toggle: (id, done) =>
-    call(`/v1/collections/todos/documents/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ done }),
-    }),
-  remove: (id) =>
-    call(`/v1/collections/todos/documents/${id}`, { method: 'DELETE' }),
-}
-```
-
-### The component
-
-`src/App.jsx`:
-
-```jsx
-import { useEffect, useState } from 'react'
-import { todos } from './falcone'
-
-export default function App() {
-  const [items, setItems] = useState([])
-  const [title, setTitle] = useState('')
-
-  const refresh = () => todos.list().then((r) => setItems(r.data ?? r))
-  useEffect(() => { refresh() }, [])
-
-  async function add(e) {
-    e.preventDefault()
-    if (!title.trim()) return
-    await todos.create(title.trim())
-    setTitle('')
-    refresh()
-  }
-
-  return (
-    <main style={{ maxWidth: 480, margin: '3rem auto', fontFamily: 'system-ui' }}>
-      <h1>TODO</h1>
-      <form onSubmit={add} style={{ display: 'flex', gap: 8 }}>
-        <input value={title} onChange={(e) => setTitle(e.target.value)}
-               placeholder="What needs doing?" style={{ flex: 1 }} />
-        <button>Add</button>
-      </form>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {items.map((t) => (
-          <li key={t.id} style={{ display: 'flex', gap: 8, padding: '6px 0' }}>
-            <input type="checkbox" checked={!!t.done}
-                   onChange={() => todos.toggle(t.id, !t.done).then(refresh)} />
-            <span style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none' }}>
-              {t.title}
-            </span>
-            <button onClick={() => todos.remove(t.id).then(refresh)}>✕</button>
-          </li>
-        ))}
-      </ul>
-    </main>
-  )
-}
-```
-
-Run it:
+Start from the application repository root:
 
 ```bash
-npm run dev
+pwd
 ```
 
-You now have a working multi-tenant TODO app. Every request carries the anon key; the platform resolves the tenant **from the key**, and RLS guarantees you only ever see Acme's todos.
+Expected shape:
 
-## 3. (Bonus) Make it realtime
+```text
+.../falcone
+```
 
-Instead of polling with `refresh()`, subscribe to live changes over **Server-Sent Events**. Because a browser `EventSource` cannot set headers, realtime routes accept the anon key as a `?apikey=` query parameter (read-only, low-privilege by design):
+Clone the chart as a sibling if it is not already present:
 
-```js
-export function subscribeTodos(onChange) {
-  const url = new URL(`${BASE}/v1/events/subscribe`)
-  url.searchParams.set('collection', 'todos')
-  url.searchParams.set('apikey', KEY)
-  const es = new EventSource(url)
-  es.onmessage = (e) => onChange(JSON.parse(e.data))
-  return () => es.close()
+```bash
+test -d ../falcone-charts || git clone https://github.com/gntik-ai/falcone-charts.git ../falcone-charts
+helm dependency build ../falcone-charts/charts/in-falcone
+```
+
+Expected result:
+
+```text
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update...
+```
+
+Helm may print a shorter "Saving charts" response when dependencies are already present.
+
+## 1. Create a kind cluster
+
+```bash
+kind create cluster --name falcone
+kubectl cluster-info --context kind-falcone
+```
+
+Expected result:
+
+```text
+Kubernetes control plane is running at ...
+```
+
+## 2. Install the platform
+
+The command layers the chart's dev environment, Kubernetes platform values, and all-in-one sizing
+profile. It keeps `--create-namespace` and `global.createNamespace=true` because Helm owns this
+local namespace from scratch.
+
+```bash
+helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
+  --namespace falcone --create-namespace \
+  -f ../falcone-charts/charts/in-falcone/values/dev.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/all-in-one.yaml \
+  --set global.createNamespace=true \
+  --set publicSurface.tls.mode=external \
+  --set publicSurface.hostnames.api=api.127.0.0.1.nip.io \
+  --set publicSurface.hostnames.console=console.127.0.0.1.nip.io \
+  --set publicSurface.hostnames.identity=iam.127.0.0.1.nip.io \
+  --set publicSurface.hostnames.realtime=realtime.127.0.0.1.nip.io \
+  --wait --wait-for-jobs --timeout 30m
+```
+
+Expected result:
+
+```text
+Release "falcone" does not exist. Installing it now.
+NAME: falcone
+NAMESPACE: falcone
+STATUS: deployed
+```
+
+If the release already exists, Helm prints `Release "falcone" has been upgraded`.
+
+## 3. Verify readiness
+
+```bash
+kubectl -n falcone get pods
+kubectl -n falcone wait --for=condition=complete job/falcone-in-falcone-bootstrap --timeout=15m
+kubectl -n falcone rollout status deploy/falcone-control-plane --timeout=5m
+kubectl -n falcone rollout status deploy/falcone-control-plane-executor --timeout=5m
+kubectl -n falcone rollout status deploy/falcone-web-console --timeout=5m
+kubectl -n falcone rollout status deploy/falcone-keycloak --timeout=5m
+```
+
+Expected results include:
+
+```text
+job.batch/falcone-in-falcone-bootstrap condition met
+deployment "falcone-control-plane" successfully rolled out
+deployment "falcone-control-plane-executor" successfully rolled out
+deployment "falcone-web-console" successfully rolled out
+deployment "falcone-keycloak" successfully rolled out
+```
+
+## 4. Port-forward the console and APIs
+
+In one terminal, expose the console:
+
+```bash
+kubectl -n falcone port-forward svc/falcone-web-console 3000:3000
+```
+
+In a second terminal, expose the control-plane API:
+
+```bash
+kubectl -n falcone port-forward svc/falcone-control-plane 8080:8080
+```
+
+In a third terminal, expose Keycloak for token issuance:
+
+```bash
+kubectl -n falcone port-forward svc/falcone-keycloak 8081:8080
+```
+
+Verify the control-plane health endpoint:
+
+```bash
+curl -sS http://127.0.0.1:8080/readyz
+```
+
+Expected result:
+
+```json
+{"status":"ok"}
+```
+
+Open the console at:
+
+```text
+http://127.0.0.1:3000/
+```
+
+## 5. Get the bootstrap superadmin token
+
+The chart creates a `superadmin` user in the `in-falcone-platform` realm. The password is generated
+into the `in-falcone-superadmin` Secret.
+
+```bash
+export SUPERADMIN_PASSWORD="$(
+  kubectl -n falcone get secret in-falcone-superadmin \
+    -o jsonpath='{.data.password}' | base64 -d
+)"
+
+export TOKEN="$(
+  curl -sS -X POST \
+    http://127.0.0.1:8081/realms/in-falcone-platform/protocol/openid-connect/token \
+    -H 'content-type: application/x-www-form-urlencoded' \
+    -d grant_type=password \
+    -d client_id=in-falcone-console \
+    -d username=superadmin \
+    --data-urlencode "password=${SUPERADMIN_PASSWORD}" \
+    -d scope=openid | jq -r .access_token
+)"
+
+test "$TOKEN" != "null" && test -n "$TOKEN"
+```
+
+Expected result: the final `test` command exits with status `0` and prints nothing.
+
+## 6. Create a tenant and project workspace
+
+Falcone's current runtime creates tenants with `POST /v1/tenants` and workspaces with
+`POST /v1/tenants/{tenantId}/workspaces`. A workspace is the project boundary; its `environment`
+field is the stage.
+
+```bash
+export API=http://127.0.0.1:8080
+
+curl -sS -X POST "$API/v1/tenants" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{
+        "displayName":"Acme Quickstart",
+        "slug":"acme-quickstart",
+        "ownerUsername":"acme-owner",
+        "ownerEmail":"acme-owner@example.test",
+        "ownerPassword":"Falcone-quickstart-ChangeMe-1"
+      }' \
+  | tee /tmp/falcone-tenant.json
+
+export TENANT_ID="$(jq -r '.tenantId' /tmp/falcone-tenant.json)"
+
+curl -sS -X POST "$API/v1/tenants/$TENANT_ID/workspaces" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"displayName":"Acme Dev","slug":"acme-dev","environment":"dev"}' \
+  | tee /tmp/falcone-workspace.json
+
+export WORKSPACE_ID="$(jq -r '.workspaceId' /tmp/falcone-workspace.json)"
+```
+
+Expected tenant output includes:
+
+```json
+{
+  "tenantId": "...",
+  "displayName": "Acme Quickstart",
+  "slug": "acme-quickstart",
+  "state": "active",
+  "iamRealm": "..."
 }
 ```
 
-```jsx
-useEffect(() => {
-  refresh()
-  return subscribeTodos(() => refresh())   // re-fetch whenever this tenant's todos change
-}, [])
+The example owner password is only for this local evaluation cluster. Do not reuse it in shared
+environments.
+
+Expected workspace output includes:
+
+```json
+{
+  "workspaceId": "...",
+  "tenantId": "...",
+  "displayName": "Acme Dev",
+  "slug": "acme-dev",
+  "state": "active",
+  "environment": "dev"
+}
 ```
 
-Changes made by *this tenant* — from another browser tab, a teammate, or a server-side `service` key — now appear instantly. Other tenants' changes never arrive: the realtime pipeline matches on the verified tenant inside the source (a consumer-side `tenantId` filter on the document store's Postgres logical-replication stream). See [Realtime Subscriptions](/api/realtime) for the full model.
+Verify you can read the workspace:
 
-## Where to go next
+```bash
+curl -sS "$API/v1/workspaces/$WORKSPACE_ID" \
+  -H "authorization: Bearer $TOKEN" \
+  | jq '{workspaceId, tenantId, displayName, slug, environment, state}'
+```
 
-- [Data API reference](/api/postgresql) — filtering, ordering, keyset pagination.
-- [Gateway & keys](/api/gateway) — anon vs service keys, JWT issuance, rate limiting.
-- [Security model](/architecture/security) — how tenant isolation is enforced end-to-end.
+Expected result:
+
+```json
+{
+  "workspaceId": "...",
+  "tenantId": "...",
+  "displayName": "Acme Dev",
+  "slug": "acme-dev",
+  "environment": "dev",
+  "state": "active"
+}
+```
+
+You now have a running local platform, console access, and a first tenant/project workspace.
+
+## Teardown
+
+Delete the Helm release and kind cluster:
+
+```bash
+helm uninstall falcone --namespace falcone
+kubectl delete namespace falcone --ignore-not-found
+kind delete cluster --name falcone
+```
+
+## Next steps
+
+- [Developer End-to-End](/guide/developer-end-to-end) deploys a function and creates a Flow.
+- [Kubernetes Install](/operations/kubernetes-install) adapts the chart to a remote Kubernetes cluster.
+- [OpenShift Install](/operations/openshift-install) covers Routes, restricted-v2, and Harbor.

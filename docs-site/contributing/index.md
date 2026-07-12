@@ -10,7 +10,9 @@ Bring up the real backends with docker-compose and run the suites against them:
 cd tests/env && docker compose up -d      # Postgres, FerretDB + DocumentDB, Keycloak, Redpanda, SeaweedFS, OpenBao, APISIX
 ```
 
-See [Installation → Docker Compose](/guide/installation#docker-compose-local).
+This compose stack is for development and test backends. The supported platform installation paths
+are [kind Quickstart](/guide/quickstart), [Kubernetes Install](/operations/kubernetes-install), and
+[OpenShift Install](/operations/openshift-install).
 
 ## Test suites
 

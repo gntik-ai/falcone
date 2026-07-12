@@ -1,6 +1,15 @@
 # Backup & Restore
 
-In Falcone supports **per-tenant** backup and restore across the tenant's resource domains: IAM, PostgreSQL metadata, MongoDB metadata, Kafka and object storage. The behaviour is exercised by the restore workflow suite (`tests/e2e/workflows/restore/`).
+Falcone has two backup layers:
+
+- **Tenant-level artifacts** for tenant resources and restore workflows.
+- **Platform backup evidence** for Helm state, Kubernetes Secrets, External Secrets/OpenBao state,
+  and rollback support during platform migrations.
+
+Use both layers for disaster recovery. Tenant artifacts are not a replacement for infrastructure
+backups of PostgreSQL, DocumentDB, Kafka, SeaweedFS, OpenBao, and PersistentVolumes.
+
+## Tenant-level restore
 
 ## Per-tenant artifact
 
@@ -40,8 +49,65 @@ npm run test:e2e:restore
 
 This drives the restore behaviour against the workflow harness and can write a suite manifest report.
 
+## Platform backup and rollback evidence
+
+The all-core platform migration scripts under
+`scripts/system-changes/make-all-services-core/` provide the current repo-grounded platform backup
+and rollback workflow:
+
+| Script | Purpose |
+| --- | --- |
+| `backup-kv.sh` | Create a backup archive for platform KV/Secrets and migration evidence. |
+| `parity-check.sh` | Check source/target parity without mutating the install when run with `--dry-run`. |
+| `migrate-platform-secrets.sh` | Migrate platform secrets with `--dry-run` or `--apply`. |
+| `diff-rollout.sh` | Render/diff a rollout against a chart path. |
+| `restore-kv.sh` | Restore from a backup archive, with `--dry-run`, `--apply`, and optional Helm rollback support. |
+
+Create a platform backup archive:
+
+```bash
+scripts/system-changes/make-all-services-core/backup-kv.sh \
+  --output /secure/path/falcone-kv-backup.tgz
+```
+
+Run a parity check before changing the platform:
+
+```bash
+scripts/system-changes/make-all-services-core/parity-check.sh --dry-run
+```
+
+Dry-run a restore:
+
+```bash
+scripts/system-changes/make-all-services-core/restore-kv.sh \
+  --backup /secure/path/falcone-kv-backup.tgz \
+  --dry-run
+```
+
+Apply a restore only after reviewing the dry-run output:
+
+```bash
+scripts/system-changes/make-all-services-core/restore-kv.sh \
+  --backup /secure/path/falcone-kv-backup.tgz \
+  --apply
+```
+
+When a Helm rollback is required, include the rollback flag and, if needed, a revision:
+
+```bash
+scripts/system-changes/make-all-services-core/restore-kv.sh \
+  --backup /secure/path/falcone-kv-backup.tgz \
+  --apply \
+  --helm-rollback \
+  --revision <helm-revision>
+```
+
 ## Recommended practice
 
 - Schedule per-tenant backups so each tenant can be restored independently — this is what keeps restore from being an all-or-nothing platform operation.
 - Always restore through the preflight when the target tenant differs from the source, so identifiers are remapped rather than colliding.
 - Treat the underlying backends (PostgreSQL, the FerretDB + DocumentDB document store, object storage, Kafka) with your standard infrastructure backup tooling in addition to the tenant-level artifact, for full disaster recovery. The document store's durable state lives in the DocumentDB engine's PostgreSQL volume, so back it up as a Postgres instance.
+- Back up Helm values, rendered manifests, Kubernetes Secrets, ExternalSecret resources, OpenBao KV
+  state, and PersistentVolumes before chart upgrades or migration scripts.
+- Do not paste real credentials into issue comments, docs, or terminal transcripts. Use placeholders
+  when sharing evidence.
