@@ -51,7 +51,7 @@ test('bootstrap contract keeps one-shot catalogs and upgrade reconciliation expl
   const topology = readDeploymentTopology();
   const domainModel = readDomainModel();
 
-  assert.equal(values.bootstrap.enabled, true);
+  assert.equal(Object.hasOwn(values.bootstrap, 'enabled'), false);
   assert.deepEqual(values.bootstrap.secretResolution.supportedStrategies, ['kubernetesSecret', 'env', 'externalRef']);
   assert.deepEqual(topology.bootstrap_policy.one_shot_resources, [
     'superadmin',

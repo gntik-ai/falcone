@@ -52,8 +52,8 @@ test('resolved environment overlays preserve the same public route semantics acr
   assert.deepEqual(kubernetesValues.publicSurface.hostnames, openshiftValues.publicSurface.hostnames);
   assert.equal(kubernetesValues.platform.network.exposureKind, 'Ingress');
   assert.equal(openshiftValues.platform.network.exposureKind, 'Route');
-  assert.equal(kubernetesValues.bootstrap.enabled, true);
-  assert.equal(openshiftValues.bootstrap.enabled, true);
+  assert.equal(Object.hasOwn(kubernetesValues.bootstrap, 'enabled'), false);
+  assert.equal(Object.hasOwn(openshiftValues.bootstrap, 'enabled'), false);
 });
 
 test('deployment topology bootstrap policy documents secret resolution and restore guardrails', () => {

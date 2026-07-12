@@ -1460,6 +1460,7 @@ bootstrap:
           upstream:
             component: controlPlane
             port: 8080
+            dataPlane: true
             requiresExecutor: true
         - routeId: "2018-mcp"
           name: public-api-mcp
@@ -1477,6 +1478,7 @@ bootstrap:
           upstream:
             component: controlPlane
             port: 8080
+            dataPlane: true
             requiresExecutor: true
         # ---- API-key issuance/management → executor (OPT-IN). Admin (JWT) identity only;
         #      the executor rejects key-managed-by-key (403). Matches just the api-keys
