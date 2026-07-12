@@ -1,6 +1,6 @@
 # Installation
 
-In Falcone is packaged as a single **umbrella Helm chart** (`charts/in-falcone`) plus a **docker-compose stack** (`tests/env/docker-compose.yml`) for local development. This page covers four deployment targets:
+In Falcone is packaged as a single **umbrella Helm chart** (`../falcone-charts/charts/in-falcone`) plus a **docker-compose stack** (`tests/env/docker-compose.yml`) for local development. This page covers four deployment targets:
 
 - [Docker Compose](#docker-compose-local) — fastest path, for development
 - [Kubernetes](#kubernetes) — Ingress-based exposure
@@ -25,7 +25,8 @@ In Falcone is packaged as a single **umbrella Helm chart** (`charts/in-falcone`)
 The umbrella chart pulls file-based subcharts, so always build dependencies first:
 
 ```bash
-helm dependency build charts/in-falcone
+git clone https://github.com/gntik-ai/falcone-charts.git ../falcone-charts
+helm dependency build ../falcone-charts/charts/in-falcone
 ```
 
 ## Values layering
@@ -39,7 +40,7 @@ The chart is designed to be configured by **layering values files**, applied lef
 5. **airgap** — `airgap.yaml` (only when air-gapped)
 6. **local override** — `local.example.yaml` (last-mile, never committed secrets)
 
-Deployment **profiles** under `charts/in-falcone/values/profiles/` size the install:
+Deployment **profiles** under `../falcone-charts/charts/in-falcone/values/profiles/` size the install:
 
 | Profile | Use |
 | --- | --- |
@@ -89,13 +90,13 @@ docker compose down -v
 Use the **Ingress** exposure profile. It assumes an ingress controller (e.g. ingress-nginx) is installed.
 
 ```bash
-helm dependency build charts/in-falcone
+helm dependency build ../falcone-charts/charts/in-falcone
 
-helm upgrade --install falcone charts/in-falcone \
+helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
   --namespace falcone --create-namespace \
-  -f charts/in-falcone/values/prod.yaml \
-  -f charts/in-falcone/values/platform-kubernetes.yaml \
-  -f charts/in-falcone/values/profiles/standard.yaml
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml
 ```
 
 Helm creates the release namespace before pre-install hooks run. The chart then owns the ESO/OpenBao support namespaces by default (`global.createNamespace=true`). If your cluster team pre-creates all namespaces, omit `--create-namespace`, set `global.createNamespace=false`, and keep the required labels/ownership in that platform layer.
@@ -138,13 +139,13 @@ kubectl -n falcone get pods
 OpenShift uses **Routes** instead of Ingress and a stricter security context. Layer `platform-openshift.yaml`:
 
 ```bash
-helm dependency build charts/in-falcone
+helm dependency build ../falcone-charts/charts/in-falcone
 
-helm upgrade --install falcone charts/in-falcone \
+helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
   --namespace falcone --create-namespace \
-  -f charts/in-falcone/values/prod.yaml \
-  -f charts/in-falcone/values/platform-openshift.yaml \
-  -f charts/in-falcone/values/profiles/standard.yaml
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-openshift.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml
 ```
 
 As with Kubernetes, Helm creates the release Project first and the chart creates the ESO/OpenBao support Projects. OpenShift/GitOps environments that require pre-created Projects should disable chart namespace creation with `global.createNamespace=false` and provide the Projects, pull secrets, SCC bindings, and namespace labels outside Helm.
@@ -209,14 +210,14 @@ Workflow:
 3. **Install**, layering the airgap file last (before any local override):
 
 ```bash
-helm dependency build charts/in-falcone
+helm dependency build ../falcone-charts/charts/in-falcone
 
-helm upgrade --install falcone charts/in-falcone \
+helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
   --namespace falcone --create-namespace \
-  -f charts/in-falcone/values/prod.yaml \
-  -f charts/in-falcone/values/platform-kubernetes.yaml \
-  -f charts/in-falcone/values/profiles/standard.yaml \
-  -f charts/in-falcone/values/airgap.yaml
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/airgap.yaml
 ```
 
 For OpenShift air-gapped installs, swap `platform-kubernetes.yaml` for `platform-openshift.yaml`.

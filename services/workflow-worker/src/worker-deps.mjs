@@ -51,7 +51,7 @@ export function buildDataDsn(env = process.env) {
  * Build the `loadFlowDefinition` activity dependency: the load-by-reference resolver used by
  * the `sub-flow` DSL node (`DslInterpreterWorkflow.runSubFlow` → child `executeChild` with a
  * reference input → child resolves the definition via this dependency). Reads the IMMUTABLE
- * published snapshot from `flow_versions` (charts/in-falcone/bootstrap/migrations/
+ * published snapshot from `flow_versions` (../falcone-charts/charts/in-falcone/bootstrap/migrations/
  * 20260612-003-flow-definitions-and-versions.sql), scoped to the parent's tenant + workspace.
  *
  * SELF-CONTAINED on purpose: it uses ONLY the `pg` pool (no createFlowStore import — that

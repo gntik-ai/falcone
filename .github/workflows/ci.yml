@@ -13,6 +13,7 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
+  FALCONE_CHARTS_REF: '9aab27e7695e20156b7a4f61b5f2f789f59ee59a'
 
 jobs:
   quality:
@@ -20,6 +21,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout deployment charts
+        uses: actions/checkout@v4
+        with:
+          repository: gntik-ai/falcone-charts
+          ref: ${{ env.FALCONE_CHARTS_REF }}
+          path: falcone-charts
+
+      - name: Expose sibling charts checkout
+        run: ln -sfn "$GITHUB_WORKSPACE/falcone-charts" "$GITHUB_WORKSPACE/../falcone-charts"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -175,6 +186,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout deployment charts
+        uses: actions/checkout@v4
+        with:
+          repository: gntik-ai/falcone-charts
+          ref: ${{ env.FALCONE_CHARTS_REF }}
+          path: falcone-charts
+
+      - name: Expose sibling charts checkout
+        run: ln -sfn "$GITHUB_WORKSPACE/falcone-charts" "$GITHUB_WORKSPACE/../falcone-charts"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

@@ -221,7 +221,7 @@ function createPostgresTriggerStore(pool) {
   return {
     async ensureSchema() {
       // Authoritative schema + RLS live in the .sql migrations
-      // (charts/in-falcone/bootstrap/migrations/20260612-005,-006). ensureSchema mirrors
+      // (../falcone-charts/charts/in-falcone/bootstrap/migrations/20260612-005,-006). ensureSchema mirrors
       // flow-executor.mjs so a standalone metadata pool boots without the Helm migration job.
       await pool.query(`CREATE TABLE IF NOT EXISTS flow_trigger_secrets (
         id text NOT NULL DEFAULT gen_random_uuid()::text,

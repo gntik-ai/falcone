@@ -1,6 +1,6 @@
 # Falcone on kind (test-cluster-b)
 
-Full Helm install of the `charts/in-falcone` chart onto the kind cluster at
+Full Helm install of the `../falcone-charts/charts/in-falcone` chart onto the kind cluster at
 **192.168.1.135** (kubeconfig: `../../kubeconfig-test-cluster-b.yaml`), namespace
 **`falcone`**, plus LAN exposure of the front-doors.
 

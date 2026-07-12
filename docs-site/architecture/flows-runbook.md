@@ -29,7 +29,7 @@ workflowWorker:
     app.kubernetes.io/component: flows-worker    # required: admitted by the Temporal NetworkPolicy
 ```
 
-Key `temporal.*` values (`charts/in-falcone/values.yaml`):
+Key `temporal.*` values (`../falcone-charts/charts/in-falcone/values.yaml`):
 
 | Value | Default | Notes |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ history — so it has no persistence and no inbound business traffic.
 
 ### OpenShift overlay
 
-`deploy/openshift/values-openshift.yaml` carries Temporal security-context tuning for the core
+`../falcone-charts/deploy/openshift/values-openshift.yaml` carries Temporal security-context tuning for the core
 server roles. It nulls `podSecurityContext.{runAsUser,runAsGroup,fsGroup}` so restricted-v2 injects the
 namespace-range UID/GID; it asserts `runAsNonRoot` + `seccompProfile`. The chart default pins
 `runAsUser/runAsGroup: 1000` (for plain-Kubernetes / kind non-root verification, since the
@@ -195,7 +195,7 @@ requires CJS output; do not flip it to `"type":"module"`.
 > `temporal.persistence.numHistoryShards` (default `512`, rendered into
 > `templates/temporal/config.yaml`).
 > On small / CPU-constrained clusters (kind), 512 shards can make the history pod time out at
-> startup — the E2E values (`tests/e2e/values-flows-e2e.yaml`) use `4`. Pick the production value
+> startup — the E2E values (`../falcone-charts/tests/e2e/values-flows-e2e.yaml`) use `4`. Pick the production value
 > once, up front: set it at first install and never change it for that database.
 
 ## Backup & restore of the Temporal database
@@ -217,7 +217,7 @@ them up **alongside** the platform PostgreSQL with the same infrastructure tooli
 ## E2E suite
 
 The end-to-end Playwright suite for flows lives under `tests/e2e/specs/flows/` with the minimal
-stack values `tests/e2e/values-flows-e2e.yaml` (all-core chart, with Temporal + control plane +
+stack values `../falcone-charts/tests/e2e/values-flows-e2e.yaml` (all-core chart, with Temporal + control plane +
 worker + console tuned for the kind cluster; gateway is bypassed by the specs proxying `/v1/*`
 directly to the control plane).
 Covered flows: design+publish, run+observe, version pinning, failure+retry, human approval,

@@ -9,7 +9,7 @@
 > **exclusively from a private Harbor registry**.
 >
 > **How this guide was produced.** The manifests below were derived from the project's
-> own deployment source of truth — the umbrella Helm chart `charts/in-falcone` (its
+> own deployment source of truth — the umbrella Helm chart `../falcone-charts/charts/in-falcone` (its
 > `values.yaml`, sub‑chart templates and the component‑wrapper workload template), the
 > service `Dockerfile`s, and `tests/env/docker-compose.yml`. Helm was used **only as an
 > off‑cluster extraction aid** to confirm exact env vars, ports, probes and image tags;
@@ -207,7 +207,7 @@ Every image below must be copied into Harbor **before** any manifest is applied.
 
 ### 3.1 Authoritative image version table
 
-Versions are taken verbatim from `charts/in-falcone/values.yaml` (and the
+Versions are taken verbatim from `../falcone-charts/charts/in-falcone/values.yaml` (and the
 `Dockerfile` `FROM` lines for build bases). **Mirror by digest where shown** — the
 `ferretdb`/`documentdb` images are already digest‑pinned in the chart; `seaweedfs` is
 tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
@@ -1168,7 +1168,7 @@ carry large generated payloads. Extract them from the chart render and apply as 
 > To produce these three on a connected/DMZ host from this repo:
 >
 > ```bash
-> helm template falcone charts/in-falcone \
+> helm template falcone ../falcone-charts/charts/in-falcone \
 >   -s templates/bootstrap-payload-configmap.yaml \
 >   -s templates/bootstrap-script-configmap.yaml \
 >   -s templates/runtime-configmaps.yaml \

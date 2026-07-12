@@ -7,7 +7,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 
 REPO_ROOT="$(cd "$HERE/../../.." && pwd)"
-CHART="${CHART:-$REPO_ROOT/charts/in-falcone}"
+CHART="${CHART:-$REPO_ROOT/../falcone-charts/charts/in-falcone}"
 VALUES_ARGS=()
 SET_ARGS=()
 while [ "$#" -gt 0 ]; do
@@ -15,7 +15,7 @@ while [ "$#" -gt 0 ]; do
     --chart) CHART="${2:?missing --chart value}"; shift 2 ;;
     -f|--values) VALUES_ARGS+=("-f" "${2:?missing values file}"); shift 2 ;;
     --set) SET_ARGS+=("--set" "${2:?missing --set value}"); shift 2 ;;
-    *) echo "usage: $0 [--chart charts/in-falcone] [-f values.yaml ...] [--set key=value ...]" >&2; exit 2 ;;
+    *) echo "usage: $0 [--chart ../falcone-charts/charts/in-falcone] [-f values.yaml ...] [--set key=value ...]" >&2; exit 2 ;;
   esac
 done
 

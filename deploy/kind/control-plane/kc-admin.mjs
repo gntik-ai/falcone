@@ -443,14 +443,14 @@ export const kcAdmin = {
   }
 };
 
-// The standard per-tenant realm roles (charts/in-falcone values: tenantRealmTemplate.requiredRealmRoles).
+// The standard per-tenant realm roles (../falcone-charts/charts/in-falcone values: tenantRealmTemplate.requiredRealmRoles).
 export const TENANT_REALM_ROLES = [
   'tenant_owner', 'tenant_admin', 'tenant_developer', 'tenant_viewer',
   'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
   'workspace_auditor', 'workspace_viewer', 'workspace_service_account'
 ];
 
-// The standard per-tenant realm client scopes (charts/in-falcone values:
+// The standard per-tenant realm client scopes (../falcone-charts/charts/in-falcone values:
 // tenantRealmTemplate.requiredClientScopes). Applied to every provisioned tenant realm
 // by createRealm (mirrors TENANT_REALM_ROLES) so realms no longer drift from the template (#568).
 export const TENANT_REALM_SCOPES = [

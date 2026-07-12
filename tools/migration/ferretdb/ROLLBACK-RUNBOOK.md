@@ -32,7 +32,7 @@ Verify before relying on this runbook:
 - `apps/control-plane/src/runtime/realtime-executor.mjs` and
   `services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` are **pgoutput-only** in the current
   build (no `collection.watch()`); restoring realtime requires the **pre-#460 image** redeploy.
-- The chart `mongodb:` stanza (`charts/in-falcone/values.yaml`, line 1792, `enabled: true`)
+- The chart `mongodb:` stanza (`../falcone-charts/charts/in-falcone/values.yaml`, line 1792, `enabled: true`)
   keeps MongoDB deployable and its PVC retained during the window.
 
 ## Trigger conditions
@@ -132,12 +132,12 @@ the event is missed — `rollback-mongo-check.mjs` does this.
 - Delete the FerretDB gateway deployment.
 - Delete the FerretDB Postgres (DocumentDB) engine StatefulSet **and its PVC** (the separate
   retention item).
-- Disable the FerretDB side-by-side toggle in `charts/in-falcone/values.yaml`.
+- Disable the FerretDB side-by-side toggle in `../falcone-charts/charts/in-falcone/values.yaml`.
 
 **If FerretDB is confirmed the definitive target (no rollback needed):**
 - Delete the MongoDB StatefulSet.
 - Delete the MongoDB PVC — **point-of-no-return; confirm the gate result first.**
-- Disable the MongoDB side-by-side toggle in `charts/in-falcone/values.yaml`.
+- Disable the MongoDB side-by-side toggle in `../falcone-charts/charts/in-falcone/values.yaml`.
 
 **ENGINE-FIRST ordering:** if the FerretDB stack is restarted at any point during the window, the
 Postgres DocumentDB engine MUST be healthy before the FerretDB gateway starts (the gateway depends

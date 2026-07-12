@@ -167,7 +167,7 @@ test('bbx-568-06: superadmin may configure any project realm', async () => {
 test('bbx-568-07: createRealm applies the template required client scopes (no drift)', async () => {
   assert.ok(Array.isArray(TENANT_REALM_SCOPES) && TENANT_REALM_SCOPES.length > 0,
     'TENANT_REALM_SCOPES must enumerate the chart tenantRealmTemplate.requiredClientScopes');
-  // The chart template scopes (charts/in-falcone values: tenantRealmTemplate.requiredClientScopes).
+  // The chart template scopes (../falcone-charts/charts/in-falcone values: tenantRealmTemplate.requiredClientScopes).
   for (const s of ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles']) {
     assert.ok(TENANT_REALM_SCOPES.includes(s), `missing template scope ${s}`);
   }

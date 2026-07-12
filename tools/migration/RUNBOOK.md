@@ -1,6 +1,6 @@
 # MinIO → SeaweedFS Cutover Runbook
 
-Operator-executable, gated cutover from the bundled MinIO (`charts/in-falcone/values.yaml`,
+Operator-executable, gated cutover from the bundled MinIO (`../falcone-charts/charts/in-falcone/values.yaml`,
 `storage.enabled: true`) to SeaweedFS. Run the steps **in order**. Each step has an
 **Action**, a **Gate** (observable condition that must hold before advancing), and a
 **Rollback** (what to do if the gate fails). **Do not advance past a failed gate.**
@@ -111,7 +111,7 @@ for SeaweedFS are supplied by `add-seaweedfs-deployment`; only the provider sele
 changes here.)
 
 ```sh
-helm upgrade falcone charts/in-falcone --reuse-values \
+helm upgrade falcone ../falcone-charts/charts/in-falcone --reuse-values \
   --set storage.config.inline.provider=s3-compatible \
   --set storage.config.inline.providerType=seaweedfs \
   --set storage.config.inline.providerSelectionMode=explicit \
@@ -172,7 +172,7 @@ sync is one-directional (MinIO→SeaweedFS) and MinIO was only frozen (not delet
 MinIO remains the source of truth until traffic is switched.
 
 ```sh
-helm upgrade falcone charts/in-falcone --reuse-values \
+helm upgrade falcone ../falcone-charts/charts/in-falcone --reuse-values \
   --set storage.config.inline.provider=s3-compatible \
   --set storage.config.inline.providerType=minio \
   --set storage.config.inline.providerSelectionMode=explicit \

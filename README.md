@@ -257,8 +257,10 @@ cd tests/env
 ```
 
 > For a full production-grade deployment (functions runtime, the control-plane and
-> the web console), use the Helm charts under `helm/` and `charts/` on a Kubernetes
-> cluster — see the manifests in `deploy/`.
+> the web console), use the Helm charts in the companion
+> [`gntik-ai/falcone-charts`](https://github.com/gntik-ai/falcone-charts) repository
+> on a Kubernetes cluster — see the manifests in `deploy/` and the
+> [installation guide](docs-site/guide/installation.md).
 
 ---
 
@@ -271,7 +273,8 @@ services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
                  scheduling-engine, provisioning-orchestrator, backup-status,
                  workflow-worker (Flows DSL interpreter), audit, adapters,
                  internal-contracts, …
-charts/ helm/    Kubernetes / Helm deployment (incl. temporal, workflowWorker, mcp components)
+../falcone-charts/  Companion repository for Kubernetes / Helm deployment (incl. temporal,
+                    workflowWorker, mcp components)
 deploy/          APISIX routes, kind/OpenShift bootstrap
 tests/           blackbox (contract) · e2e (Playwright, incl. mcp specs) · env (Compose stack)
 ```

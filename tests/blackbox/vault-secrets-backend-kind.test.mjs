@@ -39,8 +39,8 @@ import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
-const KIND_VAULT_OVERLAY = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind-vault.yaml');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
+const KIND_VAULT_OVERLAY = resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'kind', 'values-kind-vault.yaml');
 
 function helmAvailable() {
   return spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;

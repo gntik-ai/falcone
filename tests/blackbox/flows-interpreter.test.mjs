@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SVC = resolve(REPO_ROOT, 'services', 'workflow-worker');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
 
 function read(p) {
   return readFileSync(p, 'utf8');

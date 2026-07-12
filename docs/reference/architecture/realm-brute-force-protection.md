@@ -51,13 +51,13 @@ recognised false (`false`/`0`/`no`/`off`).
 | `REALM_BRUTE_FORCE_QUICK_LOGIN_CHECK_MS` | `1000` | `quickLoginCheckMilliSeconds` |
 | `REALM_BRUTE_FORCE_MAX_DELTA_SECONDS` | `43200` | `maxDeltaTimeSeconds` |
 
-The kind profile sets the primary knobs in `deploy/kind/values-kind.yaml` (the control-plane `env:`
+The kind profile sets the primary knobs in `../falcone-charts/deploy/kind/values-kind.yaml` (the control-plane `env:`
 list).
 
 ### Platform realm (Helm chart)
 
 The platform realm's brute-force settings live under
-`bootstrap.oneShot.keycloak.realm.bruteForce` in `charts/in-falcone/values.yaml`, with the same
+`bootstrap.oneShot.keycloak.realm.bruteForce` in `../falcone-charts/charts/in-falcone/values.yaml`, with the same
 defaults. Override them per environment in your values file, for example:
 
 ```yaml
@@ -101,8 +101,8 @@ environment variables and chart values above.
 - `deploy/kind/control-plane/kc-admin.mjs` — `bruteForceRealmConfig(env)` (pure, exported) resolves
   the fields from env; `createRealm` spreads the resolved `DEFAULT_BRUTE_FORCE` into the realm
   representation.
-- `charts/in-falcone/values.yaml` — the `bootstrap.oneShot.keycloak.realm.bruteForce` defaults.
-- `charts/in-falcone/templates/bootstrap-payload-configmap.yaml` — lifts the `bruteForce` fields onto
+- `../falcone-charts/charts/in-falcone/values.yaml` — the `bootstrap.oneShot.keycloak.realm.bruteForce` defaults.
+- `../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml` — lifts the `bruteForce` fields onto
   the realm-create payload and emits `brute-force.json`.
-- `charts/in-falcone/templates/bootstrap-script-configmap.yaml` — `ensure_keycloak_brute_force`
+- `../falcone-charts/charts/in-falcone/templates/bootstrap-script-configmap.yaml` — `ensure_keycloak_brute_force`
   (idempotent PUT), invoked after the user-profile relax step.
