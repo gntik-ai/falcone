@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
 const LEGACY = /mongodb|minio|openwhisk/i;
 const WORKLOAD_KINDS = ['Deployment', 'StatefulSet', 'DaemonSet', 'Service', 'Job', 'CronJob'];
 

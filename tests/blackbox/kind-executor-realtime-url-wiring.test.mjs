@@ -14,8 +14,8 @@ import { parseAllDocuments } from 'yaml';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
-const KIND_VALUES = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
+const KIND_VALUES = resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'kind', 'values-kind.yaml');
 
 const REPLICATION_SECRET = 'in-falcone-documentdb-replication';
 const REALTIME_KEY = 'realtime-url';

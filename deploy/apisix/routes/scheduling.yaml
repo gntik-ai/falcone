@@ -15,7 +15,7 @@ routes:
       # Anti-spoofing: callers MUST NOT supply identity headers themselves. Any
       # request carrying these headers is rejected (maxLength: 0); the gateway is
       # the sole source of identity, set from the verified token by proxy-rewrite
-      # below. Mirrors gatewayPolicy.claimsPropagation in charts/in-falcone.
+      # below. Mirrors gatewayPolicy.claimsPropagation in ../falcone-charts/charts/in-falcone.
       request-validation:
         header_schema:
           type: object

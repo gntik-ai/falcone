@@ -91,9 +91,9 @@ remove a core service.
 Before handing a branch to review, render and lint the chart:
 
 ```sh
-helm dependency build charts/in-falcone
-helm lint charts/in-falcone
-helm template falcone charts/in-falcone --namespace falcone --include-crds >/tmp/falcone-render.yaml
+helm dependency build ../falcone-charts/charts/in-falcone
+helm lint ../falcone-charts/charts/in-falcone
+helm template falcone ../falcone-charts/charts/in-falcone --namespace falcone --include-crds >/tmp/falcone-render.yaml
 ```
 
 A clean install must show Ready or Complete conditions for the core Deployments, StatefulSets, Jobs,
@@ -123,7 +123,7 @@ controlled rollout:
 4. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --dry-run`.
 5. Run `scripts/system-changes/make-all-services-core/migrate-platform-secrets.sh --apply --backup /secure/path/falcone-kv-backup.tgz`.
 6. Run `scripts/system-changes/make-all-services-core/parity-check.sh --strict`.
-7. Run `scripts/system-changes/make-all-services-core/diff-rollout.sh --chart charts/in-falcone`
+7. Run `scripts/system-changes/make-all-services-core/diff-rollout.sh --chart ../falcone-charts/charts/in-falcone`
    with the same values files and `--set` overrides intended for rollout. The script uses
    `helm diff upgrade --install` when the plugin is installed, otherwise it renders the chart and
    runs `kubectl diff`.

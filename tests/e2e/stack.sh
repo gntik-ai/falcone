@@ -106,7 +106,7 @@ case "${1:-up}" in
     # ---- FerretDB image pre-pull (add-ferretdb-document-store-e2e #464, task 8.1) ----
     # When E2E_FERRETDB=true, pre-pull the DocumentDB engine + FerretDB gateway images so the kind
     # nodes do not hit ImagePullBackOff on first deploy. DocumentDB and FerretDB are core in the
-    # in-falcone chart; tests/e2e/values-ferretdb-realtime-e2e.yaml only tunes realtime replication
+    # in-falcone chart; ../falcone-charts/tests/e2e/values-ferretdb-realtime-e2e.yaml only tunes realtime replication
     # and control-plane env — NOT a separate Helm release or E2E_DOCUMENT_BACKEND block.
     # ENGINE-FIRST ordering is enforced by the chart's documentdb readiness dependency; healthy()
     # then waits on every Deployment and StatefulSet (both FerretDB components included). Best-effort.

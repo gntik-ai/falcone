@@ -45,8 +45,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..', '..', '..');
 const require = createRequire(import.meta.url);
 
-const DEFS_MIGRATION = 'charts/in-falcone/bootstrap/migrations/20260612-003-flow-definitions-and-versions.sql';
-const RLS_MIGRATION = 'charts/in-falcone/bootstrap/migrations/20260612-004-flow-rls.sql';
+const DEFS_MIGRATION = '../falcone-charts/charts/in-falcone/bootstrap/migrations/20260612-003-flow-definitions-and-versions.sql';
+const RLS_MIGRATION = '../falcone-charts/charts/in-falcone/bootstrap/migrations/20260612-004-flow-rls.sql';
 function sql(relPath) {
   return readFileSync(resolve(REPO, relPath), 'utf8');
 }

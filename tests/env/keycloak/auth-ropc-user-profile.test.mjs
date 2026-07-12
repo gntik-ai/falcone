@@ -5,7 +5,7 @@
 // (ROPC) with invalid_grant "Account is not fully set up" — EVEN with requiredActions:[] — so no
 // newly-created principal but the bootstrap superadmin can authenticate. The fix relaxes the
 // realm's user profile so those attributes are optional; the chart bootstrap PUTs the same
-// config (charts/in-falcone: bootstrap.oneShot.keycloak.userProfile +
+// config (../falcone-charts/charts/in-falcone: bootstrap.oneShot.keycloak.userProfile +
 // templates/bootstrap-script-configmap.yaml::ensure_keycloak_user_profile) and the runtime does
 // the same for tenant realms (deploy/kind/control-plane/kc-admin.mjs::relaxUserProfile). This
 // proves the mechanism end-to-end against a real KC 26: RED before the relax, GREEN after.

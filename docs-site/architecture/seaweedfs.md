@@ -7,7 +7,7 @@ the cutover and rollback procedures see the migration runbooks linked under
 [Day-2 Operations](#day-2-operations).
 
 > **Migration status.** SeaweedFS is the object store (ADR-13), deployed by the umbrella
-> chart (`charts/in-falcone/charts/seaweedfs`) and enabled by default. The migration off
+> chart (`../falcone-charts/charts/in-falcone/charts/seaweedfs`) and enabled by default. The migration off
 > MinIO is **complete**: the former MinIO `storage` component has been removed from the
 > chart and the cutover/rollback window is closed. The local Docker Compose dev stack
 > (`tests/env/docker-compose.yml`) runs SeaweedFS (the `seaweedfs` all-in-one service on
@@ -18,7 +18,7 @@ the cutover and rollback procedures see the migration runbooks linked under
 
 SeaweedFS is a multi-process distributed object store. Falcone deploys four components by
 default — **master**, **volume**, **filer**, and the **S3 gateway** — as a sub-chart of the
-umbrella chart (`charts/in-falcone/Chart.yaml`). The filer's
+umbrella chart (`../falcone-charts/charts/in-falcone/Chart.yaml`). The filer's
 metadata is stored in the existing in-cluster **PostgreSQL** tier (the SeaweedFS `postgres2`
 backend) rather than in a new stateful dependency. All services are **ClusterIP only** — no
 tenant-facing exposure; tenant object traffic reaches the S3 gateway through Falcone's data
@@ -54,8 +54,8 @@ The gRPC ports (19333 / 18080 / 18888) carry intra-cluster control/data traffic 
 components. 4.33 also starts an **Iceberg REST catalog on 8181**, left **unexposed** in this
 chart (`seaweedfs.s3.icebergPort: null`).
 
-Source: `charts/in-falcone/charts/seaweedfs/values.yaml`,
-`charts/in-falcone/values.yaml` (wrapper overrides), and the per-component
+Source: `../falcone-charts/charts/in-falcone/charts/seaweedfs/values.yaml`,
+`../falcone-charts/charts/in-falcone/values.yaml` (wrapper overrides), and the per-component
 `templates/{master,volume,filer,s3}/` manifests.
 
 ## Filer on PostgreSQL
@@ -64,7 +64,7 @@ The filer uses the SeaweedFS-native **`postgres2`** backend pointed at the in-cl
 PostgreSQL, in a **dedicated database `seaweedfs_filer`** (never Falcone's application DB).
 
 ```toml
-# rendered into the filer's filer.toml (charts/in-falcone/templates/seaweedfs-db-init-configmap.yaml)
+# rendered into the filer's filer.toml (../falcone-charts/charts/in-falcone/templates/seaweedfs-db-init-configmap.yaml)
 [postgres2]
 enabled  = true
 hostname = "<release>-postgresql"
@@ -100,7 +100,7 @@ Key operational facts:
   63-byte identifier limit.
 - **Credentials** come from the existing PostgreSQL secret (`<release>-postgresql`, keys
   `username` / `password`) injected as `WEED_POSTGRES2_USERNAME` / `WEED_POSTGRES2_PASSWORD`
-  (`charts/in-falcone/values.yaml` `secretExtraEnvironmentVars`).
+  (`../falcone-charts/charts/in-falcone/values.yaml` `secretExtraEnvironmentVars`).
 - **Bootstrap.** An init step runs `pg_isready` and idempotently creates the database
   (`SELECT 1 FROM pg_database WHERE datname='seaweedfs_filer'` guard, then `CREATE DATABASE`),
   since PostgreSQL has no `CREATE DATABASE IF NOT EXISTS`.
@@ -118,7 +118,7 @@ two tiers on top:
    (actions `Admin, Read, Write, List, Tagging`) from a static config secret
    (`in-falcone-seaweedfs-s3-config`, key `seaweedfs_s3_config`). Its access/secret keys are
    generated once and kept stable across re-installs (`helm.sh/resource-policy: keep`,
-   `charts/in-falcone/templates/seaweedfs-s3-creds.yaml`). This identity is **never** rewritten
+   `../falcone-charts/charts/in-falcone/templates/seaweedfs-s3-creds.yaml`). This identity is **never** rewritten
    or deleted by the runtime — it is the admin used to manage all other identities.
 
 2. **Per-workspace identities** — provisioned **live** at workspace storage activation, one
@@ -164,7 +164,7 @@ SeaweedFS replication notation is `<cross-datacenter><cross-rack><same-rack>`.
 
 **To change replication:** scale volume servers first, then set the profile's
 `defaultReplication`. Higher tiers (`100`+) require datacenter topology annotations not present
-on the kind/CI cluster. Source: `charts/in-falcone/values.yaml` (replication block + rationale
+on the kind/CI cluster. Source: `../falcone-charts/charts/in-falcone/values.yaml` (replication block + rationale
 comments).
 
 ## PVC Sizing
@@ -178,14 +178,14 @@ comments).
 
 The filer PVC holds only transient local state — the durable namespace/metadata lives in the
 `seaweedfs_filer` PostgreSQL database, so filer PVC sizing is not driven by object count.
-Source: `charts/in-falcone/values.yaml` (per-component `data`/`persistence` blocks).
+Source: `../falcone-charts/charts/in-falcone/values.yaml` (per-component `data`/`persistence` blocks).
 
 ## TLS and Networking
 
 - **Internal-only.** Every SeaweedFS service is **ClusterIP** (master/volume/filer are
   headless). There is no Ingress/Route for the data path; the S3 endpoint
   (`http://<release>-seaweedfs-s3:8333`) is reachable only from inside the cluster.
-- **NetworkPolicy** (`charts/in-falcone/templates/seaweedfs-networkpolicy.yaml`) restricts:
+- **NetworkPolicy** (`../falcone-charts/charts/in-falcone/templates/seaweedfs-networkpolicy.yaml`) restricts:
   - ingress to **S3:8333** to Falcone app pods (`control-plane`, `control-plane-executor`,
     `workflow-worker`) and other SeaweedFS pods;
   - ingress to **master (9333/19333)**, **volume (8080/18080)**, **filer (8888/18888)** to
@@ -196,7 +196,7 @@ Source: `charts/in-falcone/values.yaml` (per-component `data`/`persistence` bloc
   > (Calico / Cilium / OVN-Kubernetes). On kind (`kindnet`) the manifest renders but is **not
   > enforced** — isolation there rests on ClusterIP + gateway-only ingress. Production/CI must run
   > a policy-enforcing CNI.
-- **TLS / mTLS** (`charts/in-falcone/templates/seaweedfs-tls-bootstrap.yaml` + the sub-chart
+- **TLS / mTLS** (`../falcone-charts/charts/in-falcone/templates/seaweedfs-tls-bootstrap.yaml` + the sub-chart
   `cert/` templates). A pre-install/pre-upgrade hook Job generates a self-signed CA and
   per-component certs (`<release>-seaweedfs-{ca,master,volume,filer,client}-cert`); where
   cert-manager is present, the sub-chart's Issuer/Certificate path is used instead. Inter-component
@@ -222,7 +222,7 @@ historical migration record.
    servers; the master rebalances assignments.
 
 **Resize volume storage.** The chart ships an optional volume-resize hook
-(`charts/in-falcone/charts/seaweedfs/templates/volume/volume-resize-hook.yaml`,
+(`../falcone-charts/charts/in-falcone/charts/seaweedfs/templates/volume/volume-resize-hook.yaml`,
 `volume.resizeHook.enabled`) that patches the PVCs for storage-class–driven expansion.
 
 **Health checks.** `helm upgrade --install` gates on rollout completion; after install:
@@ -269,7 +269,7 @@ per-component `app.kubernetes.io/component` label. **Log label scheme:**
 aggregation pipeline.
 
 **Dashboard.** A Grafana dashboard (gnetId **10423**) ships at
-`charts/in-falcone/charts/seaweedfs/dashboards/seaweedfs-grafana-dashboard.json` and is
+`../falcone-charts/charts/in-falcone/charts/seaweedfs/dashboards/seaweedfs-grafana-dashboard.json` and is
 auto-provisioned via a ConfigMap labelled `grafana_dashboard: "1"`
 (`templates/shared/seaweedfs-grafana-dashboard.yaml`). Datasource: Prometheus.
 

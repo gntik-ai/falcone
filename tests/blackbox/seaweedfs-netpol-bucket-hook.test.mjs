@@ -23,7 +23,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CHART = resolve(REPO_ROOT, 'charts', 'in-falcone');
+const CHART = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
 const NETPOL_TPL = resolve(CHART, 'templates', 'seaweedfs-networkpolicy.yaml');
 
 function helmAvailable() {

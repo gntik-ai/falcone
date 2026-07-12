@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
 
 function helmAvailable() {
   return spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;
@@ -66,11 +66,11 @@ function assertMongoUserFromSecret(stream, label) {
 
 // -------------------------------------------------------------------------
 test('bbx-f2-01: kind overlay wires MONGO_USER from the documentdb secret', SKIP, () => {
-  assertMongoUserFromSecret(render('deploy/kind/values-kind.yaml'), 'kind');
+  assertMongoUserFromSecret(render('../falcone-charts/deploy/kind/values-kind.yaml'), 'kind');
 });
 
 test('bbx-f2-02: openshift overlay wires MONGO_USER from the documentdb secret', SKIP, () => {
-  assertMongoUserFromSecret(render('deploy/openshift/values-openshift.yaml'), 'openshift');
+  assertMongoUserFromSecret(render('../falcone-charts/deploy/openshift/values-openshift.yaml'), 'openshift');
 });
 
 // -------------------------------------------------------------------------

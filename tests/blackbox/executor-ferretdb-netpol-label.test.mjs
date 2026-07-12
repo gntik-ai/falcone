@@ -15,8 +15,9 @@ import YAML, { parseAllDocuments } from 'yaml';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
-const KIND_VALUES = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
+const CHARTS_ROOT = resolve(REPO_ROOT, '..', 'falcone-charts');
+const CHART_PATH = resolve(CHARTS_ROOT, 'charts', 'in-falcone');
+const KIND_VALUES = resolve(CHARTS_ROOT, 'deploy', 'kind', 'values-kind.yaml');
 const NETPOL_COMPONENT = 'control-plane-executor';
 
 function helmAvailable() {
@@ -35,7 +36,7 @@ function renderDocs() {
 }
 
 function chartValues() {
-  return YAML.parse(readFileSync(resolve(REPO_ROOT, 'charts/in-falcone/values.yaml'), 'utf8'));
+  return YAML.parse(readFileSync(resolve(REPO_ROOT, '../falcone-charts/charts/in-falcone/values.yaml'), 'utf8'));
 }
 
 function executorDeployment() {

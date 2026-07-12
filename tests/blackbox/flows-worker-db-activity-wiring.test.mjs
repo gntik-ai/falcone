@@ -12,7 +12,7 @@
 //      wireActivityDeps({ registry? }) → { deps, close } and buildDataDsn(env) → DSN string.
 //   2. services/workflow-worker/src/worker.ts — calls wireActivityDeps() on startup and
 //      feeds the returned deps into activities.setActivityDeps().
-//   3. deploy/kind/values-kind-advanced.yaml — adds PGHOST/PGUSER/PGPASSWORD/PGDATABASE
+//   3. ../falcone-charts/deploy/kind/values-kind-advanced.yaml — adds PGHOST/PGUSER/PGPASSWORD/PGDATABASE
 //      to workflowWorker.config.inline so the worker can build its DSN.
 //   4. services/workflow-worker/Dockerfile — copies the control-plane runtime .mjs files.
 //   5. services/workflow-worker/package.json — adds pg as a production dependency.

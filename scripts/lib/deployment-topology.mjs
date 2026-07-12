@@ -4,16 +4,16 @@ import { OPENAPI_PATH, readJson, readYaml, resolveParameters } from './quality-g
 
 export const DEPLOYMENT_TOPOLOGY_PATH = 'services/internal-contracts/src/deployment-topology.json';
 export const DEPLOYMENT_SMOKE_MATRIX_PATH = 'tests/reference/deployment-smoke-matrix.yaml';
-export const BASE_VALUES_PATH = 'charts/in-falcone/values.yaml';
+export const BASE_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
 export const ENVIRONMENT_VALUES = {
-  dev: 'charts/in-falcone/values/dev.yaml',
-  sandbox: 'charts/in-falcone/values/sandbox.yaml',
-  staging: 'charts/in-falcone/values/staging.yaml',
-  prod: 'charts/in-falcone/values/prod.yaml'
+  dev: '../falcone-charts/charts/in-falcone/values/dev.yaml',
+  sandbox: '../falcone-charts/charts/in-falcone/values/sandbox.yaml',
+  staging: '../falcone-charts/charts/in-falcone/values/staging.yaml',
+  prod: '../falcone-charts/charts/in-falcone/values/prod.yaml'
 };
 export const PLATFORM_VALUES = {
-  kubernetes: 'charts/in-falcone/values/platform-kubernetes.yaml',
-  openshift: 'charts/in-falcone/values/platform-openshift.yaml'
+  kubernetes: '../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml',
+  openshift: '../falcone-charts/charts/in-falcone/values/platform-openshift.yaml'
 };
 
 const REQUIRED_ENVIRONMENTS = ['dev', 'sandbox', 'staging', 'prod'];
@@ -207,13 +207,13 @@ function collectTopologyContractViolations(topology) {
     violations.push('Deployment topology configuration_policy.secret_rules must document bootstrap credential resolution.');
   }
 
-  if (topology?.packaging_guidance?.umbrella_chart !== 'charts/in-falcone') {
-    violations.push('Deployment topology packaging_guidance.umbrella_chart must be charts/in-falcone.');
+  if (topology?.packaging_guidance?.umbrella_chart !== '../falcone-charts/charts/in-falcone') {
+    violations.push('Deployment topology packaging_guidance.umbrella_chart must be ../falcone-charts/charts/in-falcone.');
   }
 
-  if (topology?.packaging_guidance?.component_wrapper_chart !== 'charts/in-falcone/charts/component-wrapper') {
+  if (topology?.packaging_guidance?.component_wrapper_chart !== '../falcone-charts/charts/in-falcone/charts/component-wrapper') {
     violations.push(
-      'Deployment topology packaging_guidance.component_wrapper_chart must be charts/in-falcone/charts/component-wrapper.'
+      'Deployment topology packaging_guidance.component_wrapper_chart must be ../falcone-charts/charts/in-falcone/charts/component-wrapper.'
     );
   }
 
@@ -225,8 +225,8 @@ function collectTopologyContractViolations(topology) {
     violations.push('Deployment topology packaging_guidance.deployment_profiles must match the recommended deployment profiles.');
   }
 
-  if (topology?.packaging_guidance?.profile_values_path !== 'charts/in-falcone/values/profiles/{profile}.yaml') {
-    violations.push('Deployment topology packaging_guidance.profile_values_path must point to charts/in-falcone/values/profiles/{profile}.yaml.');
+  if (topology?.packaging_guidance?.profile_values_path !== '../falcone-charts/charts/in-falcone/values/profiles/{profile}.yaml') {
+    violations.push('Deployment topology packaging_guidance.profile_values_path must point to ../falcone-charts/charts/in-falcone/values/profiles/{profile}.yaml.');
   }
 
   const supportedInstallModes = topology?.packaging_guidance?.supported_install_modes ?? [];
@@ -329,9 +329,9 @@ function collectValuesViolations(topology) {
   }
 
   for (const filePath of [
-    'charts/in-falcone/values/customer-reference.yaml',
-    'charts/in-falcone/values/airgap.yaml',
-    'charts/in-falcone/values/local.example.yaml'
+    '../falcone-charts/charts/in-falcone/values/customer-reference.yaml',
+    '../falcone-charts/charts/in-falcone/values/airgap.yaml',
+    '../falcone-charts/charts/in-falcone/values/local.example.yaml'
   ]) {
     if (!existsSync(filePath)) {
       violations.push(`Missing deployment values layer ${filePath}.`);

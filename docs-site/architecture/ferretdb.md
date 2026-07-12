@@ -29,7 +29,7 @@ replacing the storage engine:
 
 Both layers are **ClusterIP only** — there is no tenant-facing exposure; tenant document traffic
 reaches the gateway through Falcone's data plane, never directly. Source:
-`charts/in-falcone/values.yaml` (`documentdb:` / `ferretdb:` stanzas) and
+`../falcone-charts/charts/in-falcone/values.yaml` (`documentdb:` / `ferretdb:` stanzas) and
 `tests/env/docker-compose.yml` (the validated dev equivalent).
 
 ## Two-Layer Design
@@ -47,7 +47,7 @@ the engine's PostgreSQL volume.
 - **Gateway readiness** is gated on backend connectivity: the kubelet probes `GET /debug/readyz` on
   `:8088`, which returns 200 only once the DocumentDB connection is established (NOT `/debug/healthz`,
   which 200s from the debug index without checking the backend). The `:8088` server is bound on all
-  interfaces via `FERRETDB_DEBUG_ADDR=:8088`. Source: `charts/in-falcone/values.yaml` (`ferretdb.readinessProbe`).
+  interfaces via `FERRETDB_DEBUG_ADDR=:8088`. Source: `../falcone-charts/charts/in-falcone/values.yaml` (`ferretdb.readinessProbe`).
 - The dev/test equivalent (`tests/env/docker-compose.yml`) maps the gateway to host port **57017**;
   the in-cluster wire port is **27017**.
 
@@ -88,7 +88,7 @@ version via its `-ferretdb-2.7.0` suffix:
 > Verify compatibility by reading the engine tag suffix (`…-ferretdb-<X.Y.Z>`) and confirming it equals
 > the gateway tag (`<X.Y.Z>`). Every downstream change is coded to **2.7.0 / 0.107**; any upgrade must
 > re-run the ADR-14 compatibility matrix (aggregation, indexes, transactions, change streams) before
-> adoption. Source: `charts/in-falcone/values.yaml` (both image stanzas, pinned by tag + digest).
+> adoption. Source: `../falcone-charts/charts/in-falcone/values.yaml` (both image stanzas, pinned by tag + digest).
 
 ## PostgreSQL Extension Prerequisites
 
@@ -114,8 +114,8 @@ wal_level                 = logical
   on the default `replica`.
 - The engine image has **no server TLS** in dev; the gateway connects with `sslmode=disable`.
 
-Source: `charts/in-falcone/values.yaml` (`documentdb.config.inline`) and
-`charts/in-falcone/templates/documentdb-configmap.yaml`.
+Source: `../falcone-charts/charts/in-falcone/values.yaml` (`documentdb.config.inline`) and
+`../falcone-charts/charts/in-falcone/templates/documentdb-configmap.yaml`.
 
 ## Tenancy Model
 

@@ -38,9 +38,9 @@ import { createFlowTriggerRegistry, wireFlowTriggers } from '../../apps/control-
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
-const KIND_BASE = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
-const KIND_ADVANCED = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind-advanced.yaml');
+const CHART_PATH = resolve(REPO_ROOT, '..', 'falcone-charts', 'charts', 'in-falcone');
+const KIND_BASE = resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'kind', 'values-kind.yaml');
+const KIND_ADVANCED = resolve(REPO_ROOT, '..', 'falcone-charts', 'deploy', 'kind', 'values-kind-advanced.yaml');
 
 const TEN = 'ten_evt_int';
 const WS = 'ws_evt_int';

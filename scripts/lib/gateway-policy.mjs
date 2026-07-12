@@ -3,7 +3,7 @@ import { readDomainModel } from './domain-model.mjs';
 import { readGatewayRouting, readPublicRouteCatalog } from './public-api.mjs';
 import { readYaml } from './quality-gates.mjs';
 
-export const ROOT_VALUES_PATH = 'charts/in-falcone/values.yaml';
+export const ROOT_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
 export const ENVIRONMENTS = ['dev', 'sandbox', 'staging', 'prod'];
 export const PASSTHROUGH_MODES = ['enabled', 'limited', 'disabled'];
 export const REQUIRED_PROPAGATED_HEADER_KEYS = ['subject', 'username', 'tenantId', 'workspaceId', 'planId', 'scopes', 'roles'];

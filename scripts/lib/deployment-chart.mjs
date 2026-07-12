@@ -4,12 +4,12 @@ import { deepMerge, readDeploymentTopology } from './deployment-topology.mjs';
 import { readDomainModel } from './domain-model.mjs';
 import { readYaml } from './quality-gates.mjs';
 
-export const ROOT_CHART_PATH = 'charts/in-falcone/Chart.yaml';
-export const ROOT_VALUES_PATH = 'charts/in-falcone/values.yaml';
-export const ROOT_SCHEMA_PATH = 'charts/in-falcone/values.schema.json';
-export const WRAPPER_CHART_PATH = 'charts/in-falcone/charts/component-wrapper/Chart.yaml';
-export const WRAPPER_SCHEMA_PATH = 'charts/in-falcone/charts/component-wrapper/values.schema.json';
-export const OPTIONAL_LOADBALANCER_VALUES_PATH = 'charts/in-falcone/values/platform-kubernetes-loadbalancer.yaml';
+export const ROOT_CHART_PATH = '../falcone-charts/charts/in-falcone/Chart.yaml';
+export const ROOT_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
+export const ROOT_SCHEMA_PATH = '../falcone-charts/charts/in-falcone/values.schema.json';
+export const WRAPPER_CHART_PATH = '../falcone-charts/charts/in-falcone/charts/component-wrapper/Chart.yaml';
+export const WRAPPER_SCHEMA_PATH = '../falcone-charts/charts/in-falcone/charts/component-wrapper/values.schema.json';
+export const OPTIONAL_LOADBALANCER_VALUES_PATH = '../falcone-charts/charts/in-falcone/values/platform-kubernetes-loadbalancer.yaml';
 export const REQUIRED_COMPONENT_ALIASES = [
   'apisix',
   'keycloak',
@@ -51,11 +51,11 @@ export const SUPPORTED_TLS_MODES = ['clusterManaged', 'external'];
 export const SUPPORTED_LOADBALANCER_PORT_KEYS = ['api', 'console', 'identity', 'realtime'];
 export const EXPECTED_SUPPORTED_PREVIOUS_VERSIONS = ['0.2.0'];
 export const REQUIRED_BOOTSTRAP_TEMPLATES = [
-  'charts/in-falcone/templates/bootstrap-rbac.yaml',
-  'charts/in-falcone/templates/bootstrap-payload-configmap.yaml',
-  'charts/in-falcone/templates/bootstrap-script-configmap.yaml',
-  'charts/in-falcone/templates/bootstrap-job.yaml',
-  'charts/in-falcone/templates/bootstrap-apisix-admin-service.yaml'
+  '../falcone-charts/charts/in-falcone/templates/bootstrap-rbac.yaml',
+  '../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml',
+  '../falcone-charts/charts/in-falcone/templates/bootstrap-script-configmap.yaml',
+  '../falcone-charts/charts/in-falcone/templates/bootstrap-job.yaml',
+  '../falcone-charts/charts/in-falcone/templates/bootstrap-apisix-admin-service.yaml'
 ];
 const REQUIRED_BOOTSTRAP_SECRET_STRATEGIES = ['kubernetesSecret', 'env', 'externalRef'];
 const REQUIRED_BOOTSTRAP_ONE_SHOT_RESOURCES = ['superadmin', 'platform_realm', 'governance_catalog', 'internal_namespaces'];
@@ -95,7 +95,7 @@ export function readWrapperChart() {
 }
 
 export function readProfileValues(profileId) {
-  return readYaml(`charts/in-falcone/values/profiles/${profileId}.yaml`);
+  return readYaml(`../falcone-charts/charts/in-falcone/values/profiles/${profileId}.yaml`);
 }
 
 function readText(filePath) {
@@ -120,7 +120,7 @@ function expectedLayerFile(layerName) {
 }
 
 function profilePath(profileId) {
-  return `charts/in-falcone/values/profiles/${profileId}.yaml`;
+  return `../falcone-charts/charts/in-falcone/values/profiles/${profileId}.yaml`;
 }
 
 export function resolveImageRepository(repository, globalRegistry = '') {
@@ -456,11 +456,11 @@ function collectBootstrapTemplateViolations(violations) {
     return;
   }
 
-  const jobTemplate = readText('charts/in-falcone/templates/bootstrap-job.yaml');
-  const scriptTemplate = readText('charts/in-falcone/templates/bootstrap-script-configmap.yaml');
-  const payloadTemplate = readText('charts/in-falcone/templates/bootstrap-payload-configmap.yaml');
-  const rbacTemplate = readText('charts/in-falcone/templates/bootstrap-rbac.yaml');
-  const adminServiceTemplate = readText('charts/in-falcone/templates/bootstrap-apisix-admin-service.yaml');
+  const jobTemplate = readText('../falcone-charts/charts/in-falcone/templates/bootstrap-job.yaml');
+  const scriptTemplate = readText('../falcone-charts/charts/in-falcone/templates/bootstrap-script-configmap.yaml');
+  const payloadTemplate = readText('../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml');
+  const rbacTemplate = readText('../falcone-charts/charts/in-falcone/templates/bootstrap-rbac.yaml');
+  const adminServiceTemplate = readText('../falcone-charts/charts/in-falcone/templates/bootstrap-apisix-admin-service.yaml');
 
   if (!jobTemplate.includes('helm.sh/hook: post-install,post-upgrade')) {
     violations.push('bootstrap job template must run as a post-install/post-upgrade Helm hook.');
@@ -634,7 +634,7 @@ export function collectDeploymentChartViolations(
       violations.push(`deployment.valuesLayers.${layer} must point to ${expected}.`);
     }
 
-    const absolutePath = `charts/in-falcone/${layerMap[layer]}`;
+    const absolutePath = `../falcone-charts/charts/in-falcone/${layerMap[layer]}`;
     if (!existsSync(absolutePath)) {
       violations.push(`Referenced values layer file ${absolutePath} does not exist.`);
     }
@@ -761,8 +761,8 @@ export function collectDeploymentChartViolations(
     violations.push('Deployment topology packaging_guidance.deployment_profiles must align with the chart deployment profiles.');
   }
 
-  if (topology?.packaging_guidance?.profile_values_path !== 'charts/in-falcone/values/profiles/{profile}.yaml') {
-    violations.push('Deployment topology packaging_guidance.profile_values_path must point to charts/in-falcone/values/profiles/{profile}.yaml.');
+  if (topology?.packaging_guidance?.profile_values_path !== '../falcone-charts/charts/in-falcone/values/profiles/{profile}.yaml') {
+    violations.push('Deployment topology packaging_guidance.profile_values_path must point to ../falcone-charts/charts/in-falcone/values/profiles/{profile}.yaml.');
   }
 
   if (JSON.stringify(topology?.configuration_policy?.optional_helm_value_layers ?? []) !== JSON.stringify(['profile'])) {

@@ -64,7 +64,7 @@ The significant architectural decisions visible in the codebase, captured as sho
 
 **Why.** One artifact serves dev, Kubernetes, OpenShift and air-gapped installs; layering keeps environment/customer/platform concerns separable and reviewable.
 
-**Evidence.** `charts/in-falcone/Chart.yaml`, `values/`, `templates/NOTES.txt`.
+**Evidence.** `../falcone-charts/charts/in-falcone/Chart.yaml`, `values/`, `templates/NOTES.txt`.
 
 ## ADR-9 — Secrets via OpenBao + External Secrets Operator
 
