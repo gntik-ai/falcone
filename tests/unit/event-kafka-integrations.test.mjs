@@ -110,6 +110,35 @@ test('event-bridge validation rejects cross-workspace sources and unsupported ev
   );
 });
 
+test('event-bridge validation rejects non-string partition key templates', () => {
+  const context = {
+    tenantId: 'ten_01growthalpha',
+    workspaceId: 'wrk_01alphadev',
+    workspaceEnvironment: 'dev',
+    planId: 'pln_01growth'
+  };
+  const topic = { resourceId: 'res_01billing', replayWindowHours: 24 };
+
+  for (const partitionKeyTemplate of [42, {}, [], { length: 0 }]) {
+    const validation = validateEventBridgeDefinition({
+      context,
+      topic,
+      bridge: {
+        sourceType: 'postgresql',
+        sourceRef: 'pg://tenant_alpha/orders',
+        topicRef: 'res_01billing',
+        partitionKeyTemplate
+      }
+    });
+
+    assert.equal(validation.ok, false);
+    assert.equal(
+      validation.violations.includes('partitionKeyTemplate must use stable field placeholders or safe separators only.'),
+      true
+    );
+  }
+});
+
 test('Kafka function-trigger builders normalize OpenWhisk execution policy and dead-letter routing', () => {
   const context = {
     tenantId: 'ten_01enterprisealpha',

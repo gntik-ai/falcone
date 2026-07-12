@@ -207,6 +207,6 @@ test('decision and mutation audit events are frozen and sanitized', () => {
   assert.equal(Object.isFrozen(decisionEvent), true);
   assert.equal(Object.isFrozen(mutationEvent), true);
   assert.equal(JSON.stringify(decisionEvent).includes('https://'), false);
-  assert.equal(JSON.stringify(mutationEvent).includes('https://internal.example'), false);
+  assert.doesNotMatch(JSON.stringify(mutationEvent), /https?:\/\//);
   assert.equal(JSON.stringify(mutationEvent).includes('secret://tenants/'), false);
 });

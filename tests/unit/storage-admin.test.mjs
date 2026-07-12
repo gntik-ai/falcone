@@ -576,7 +576,7 @@ test('storage error previews normalize provider failures without leaking provide
   assert.equal(normalized.code, STORAGE_NORMALIZED_ERROR_CATALOG.BUCKET_NOT_FOUND);
   assert.equal(normalized.httpStatus, 404);
   assert.equal(envelope.error.code, STORAGE_NORMALIZED_ERROR_CATALOG.STORAGE_ACCESS_DENIED);
-  assert.equal(JSON.stringify(envelope).includes('https://garage.internal'), false);
+  assert.doesNotMatch(JSON.stringify(envelope), /https?:\/\//);
   assert.equal(JSON.stringify(envelope).includes('accessKey=abc123'), false);
   assert.equal(internal.code, STORAGE_NORMALIZED_ERROR_CATALOG.STORAGE_PROVIDER_TIMEOUT);
   assert.equal(internal.diagnostics.providerMessage.includes('[redacted-url]'), true);

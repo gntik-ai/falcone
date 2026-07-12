@@ -8,7 +8,7 @@
 // with a NON-RETRYABLE Temporal ApplicationFailure (the failure is deterministic — retrying cannot
 // heal it).
 //
-// This module is SELF-CONTAINED: it re-implements the SAME HMAC verification the control-plane
+// This module is SELF-CONTAINED: it re-implements the SAME token verification the control-plane
 // minting side uses, deriving the workspace-scoped signing key from the shared platform secret
 // (FLOW_EXECUTION_TOKEN_SECRET). It does NOT import from `apps/control-plane-executor`, so the worker dist
 // artifact stays decoupled from the control-plane package (consistent with how the other
@@ -16,12 +16,14 @@
 // The token wire format and key derivation MUST stay byte-for-byte identical to the control-plane
 // helper; both are exercised by the same black-box round-trip test.
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, scryptSync, timingSafeEqual } from 'node:crypto';
 import { toNonRetryable } from './errors.mjs';
 
 export const EXECUTION_TOKEN_EXPIRED = 'EXECUTION_TOKEN_EXPIRED';
 export const EXECUTION_TOKEN_TENANT_MISMATCH = 'EXECUTION_TOKEN_TENANT_MISMATCH';
 export const EXECUTION_TOKEN_INVALID = 'EXECUTION_TOKEN_INVALID';
+
+const EXECUTION_TOKEN_KEY_DERIVATION = 'scrypt-v1';
 
 // MUST match apps/control-plane-executor/src/runtime/execution-token.mjs::DEV_SECRET.
 const DEV_SECRET = 'falcone-dev-flow-execution-token-secret';
@@ -30,9 +32,9 @@ function platformSecret() {
   return process.env.FLOW_EXECUTION_TOKEN_SECRET || DEV_SECRET;
 }
 
-// Workspace-scoped signing key = HMAC(platformSecret, `${tenantId}\n${workspaceId}`).
+// Workspace-scoped signing key derived from the platform secret and tenant identity.
 function signingKey(tenantId, workspaceId, secret) {
-  return createHmac('sha256', secret).update(`${tenantId}\n${workspaceId}`).digest();
+  return scryptSync(secret, `${tenantId}\n${workspaceId}`, 32);
 }
 
 function expectedSignature(payloadJson, tenantId, workspaceId, secret) {
@@ -72,6 +74,9 @@ export function assertExecutionToken(token, expectedTenantId, expectedWorkspaceI
   const { obj, payloadJson, sig } = decoded;
   if (!obj.tenantId || !obj.workspaceId || typeof obj.expiresAt !== 'number') {
     throw toNonRetryable(EXECUTION_TOKEN_INVALID, 'execution token payload is incomplete');
+  }
+  if (obj.keyDerivation !== EXECUTION_TOKEN_KEY_DERIVATION) {
+    throw toNonRetryable(EXECUTION_TOKEN_INVALID, 'execution token key derivation is unsupported');
   }
   // Verify the signature using the key derived from the TOKEN's own claimed identity so a
   // forged-identity token never validates. Constant-time compare.

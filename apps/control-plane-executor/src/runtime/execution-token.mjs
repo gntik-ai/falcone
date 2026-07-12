@@ -18,7 +18,7 @@
 // back to a fixed dev key so the round-trip is exercisable without infra (the same backend split
 // api-keys.mjs uses).
 
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
 // Default maximum flow run duration the token must not outlast. Mirrors the conservative
 // Temporal workflowExecutionTimeout the interpreter uses; tokens expire WITH the run, never after.
@@ -28,6 +28,7 @@ export const DEFAULT_MAX_RUN_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
 export const EXECUTION_TOKEN_EXPIRED = 'EXECUTION_TOKEN_EXPIRED';
 export const EXECUTION_TOKEN_TENANT_MISMATCH = 'EXECUTION_TOKEN_TENANT_MISMATCH';
 export const EXECUTION_TOKEN_INVALID = 'EXECUTION_TOKEN_INVALID';
+export const EXECUTION_TOKEN_KEY_DERIVATION = 'scrypt-v1';
 
 const DEV_SECRET = 'falcone-dev-flow-execution-token-secret';
 
@@ -35,11 +36,10 @@ function platformSecret() {
   return process.env.FLOW_EXECUTION_TOKEN_SECRET || DEV_SECRET;
 }
 
-// Derive a workspace-scoped signing key from the single platform secret. HMAC over the workspace
-// identity so a leaked per-workspace key never reveals the platform secret or another workspace.
+// Derive a workspace-scoped signing key from the platform secret and workspace identity. The
+// password-based derivation prevents fast offline guessing if a derived key is exposed.
 function signingKey(tenantId, workspaceId, secret = platformSecret()) {
-  // lgtm[js/insufficient-password-hash]
-  return createHmac('sha256', secret).update(`${tenantId}\n${workspaceId}`).digest();
+  return scryptSync(secret, `${tenantId}\n${workspaceId}`, 32);
 }
 
 function b64url(buf) {
@@ -47,7 +47,6 @@ function b64url(buf) {
 }
 
 function sign(payloadJson, tenantId, workspaceId, secret) {
-  // lgtm[js/insufficient-password-hash]
   return createHmac('sha256', signingKey(tenantId, workspaceId, secret)).update(payloadJson).digest();
 }
 
@@ -66,7 +65,13 @@ export function mintExecutionToken(tenantId, workspaceId, maxRunDurationMs = DEF
     throw Object.assign(new Error('mintExecutionToken requires tenantId and workspaceId'), { code: 'TOKEN_MINT_INVALID' });
   }
   const ttl = Math.max(0, Math.min(Number(maxRunDurationMs) || 0, DEFAULT_MAX_RUN_DURATION_MS));
-  const payload = { tenantId, workspaceId, expiresAt: now + ttl, jti };
+  const payload = {
+    tenantId,
+    workspaceId,
+    expiresAt: now + ttl,
+    jti,
+    keyDerivation: EXECUTION_TOKEN_KEY_DERIVATION
+  };
   const payloadJson = JSON.stringify(payload);
   const sig = sign(payloadJson, tenantId, workspaceId, secret);
   return `${b64url(payloadJson)}.${b64url(sig)}`;
@@ -105,6 +110,9 @@ export function validateExecutionToken(token, expectedTenantId, expectedWorkspac
   const { obj, payloadJson, sig } = decoded;
   if (!obj.tenantId || !obj.workspaceId || typeof obj.expiresAt !== 'number') {
     throw Object.assign(new Error('Execution token payload is incomplete'), { code: EXECUTION_TOKEN_INVALID });
+  }
+  if (obj.keyDerivation !== EXECUTION_TOKEN_KEY_DERIVATION) {
+    throw Object.assign(new Error('Execution token key derivation is unsupported'), { code: EXECUTION_TOKEN_INVALID });
   }
   // Verify the signature with the key derived from the TOKEN's own claimed identity first so a
   // forged-identity token never validates. Constant-time compare.

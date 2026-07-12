@@ -299,7 +299,7 @@ test('provider catalog exposes normalized storage errors and internal-safe diagn
   assert.equal(normalized.httpStatus, 404);
   assert.equal(normalized.retryability, storageErrorRetryabilityModes.NOT_RETRYABLE);
   assert.equal(normalized.operationContext.objectKey, 'missing/file.txt');
-  assert.equal(JSON.stringify(envelope).includes('https://ceph.local'), false);
+  assert.doesNotMatch(JSON.stringify(envelope), /https?:\/\//);
   assert.equal(JSON.stringify(envelope).includes('secret://tenants/'), false);
   assert.equal(envelope.error.code, storageNormalizedErrorCodes.STORAGE_ACCESS_DENIED);
   assert.equal(internal.code, storageNormalizedErrorCodes.STORAGE_PROVIDER_TIMEOUT);

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { buildStorageObjectRecord } from './storage-bucket-object-ops.mjs';
 import { isStorageReservedPrefix } from './storage-logical-organization.mjs';
 import { DEFAULT_STORAGE_PROVIDER_TYPE } from './storage-provider-profile.mjs';
@@ -160,8 +162,7 @@ function buildPaginationInfo(page = {}, size = DEFAULT_PAGE_SIZE) {
 
 function buildSessionId(now) {
   const timestamp = asDate(now).getTime();
-  const entropy = Math.random().toString(36).slice(2, 10);
-  return `mp_${timestamp}_${entropy}`;
+  return `mp_${timestamp}_${randomUUID()}`;
 }
 
 function buildOpaqueReference(prefix, seed) {

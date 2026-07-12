@@ -504,7 +504,7 @@ test('storage contracts preserve route discoverability, taxonomy, service-map co
 
   assert.equal(normalizedError.code, 'OBJECT_NOT_FOUND');
   assert.equal(errorEnvelope.error.code, 'STORAGE_ACCESS_DENIED');
-  assert.equal(JSON.stringify(errorEnvelope).includes('https://garage.internal'), false);
+  assert.doesNotMatch(JSON.stringify(errorEnvelope), /https?:\/\//);
   assert.equal(errorEvent.errorCode, 'STORAGE_QUOTA_EXCEEDED');
 
   assert.ok(bucketObjectTaxonomy);

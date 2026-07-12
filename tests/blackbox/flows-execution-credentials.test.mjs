@@ -28,6 +28,7 @@ import {
   EXECUTION_TOKEN_EXPIRED,
   EXECUTION_TOKEN_TENANT_MISMATCH,
   EXECUTION_TOKEN_INVALID,
+  EXECUTION_TOKEN_KEY_DERIVATION,
 } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 import { assertExecutionToken } from '../../apps/workflow-worker/src/activities/execution-token.mjs';
 
@@ -56,6 +57,7 @@ test('bbx-flows-ten-cred-03: minted token carries exactly the execution tenant +
   const payload = validateExecutionToken(token, 'tenant_A', 'ws_A');
   assert.equal(payload.tenantId, 'tenant_A');
   assert.equal(payload.workspaceId, 'ws_A');
+  assert.equal(payload.keyDerivation, EXECUTION_TOKEN_KEY_DERIVATION);
   assert.ok(!JSON.stringify(payload).includes('tenant_B'));
 });
 
@@ -105,6 +107,23 @@ test('bbx-flows-ten-cred-08: token expiry never outlasts the max run duration', 
   const token = mintExecutionToken('tenant_A', 'ws_A', DEFAULT_MAX_RUN_DURATION_MS * 10, { now });
   const payload = validateExecutionToken(token, 'tenant_A', 'ws_A', { now });
   assert.ok(payload.expiresAt <= now + DEFAULT_MAX_RUN_DURATION_MS);
+});
+
+test('bbx-flows-ten-cred-08b: prior key-derivation tokens fail closed after the coordinated upgrade', () => {
+  const token = mintExecutionToken('tenant_A', 'ws_A', 60_000, { now: 1000 });
+  const [payload, signature] = token.split('.');
+  const legacyPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  delete legacyPayload.keyDerivation;
+  const legacyToken = `${Buffer.from(JSON.stringify(legacyPayload)).toString('base64url')}.${signature}`;
+
+  assert.throws(
+    () => validateExecutionToken(legacyToken, 'tenant_A', 'ws_A', { now: 2000 }),
+    (err) => err.code === EXECUTION_TOKEN_INVALID && err.message.includes('key derivation')
+  );
+  assert.throws(
+    () => assertExecutionToken(legacyToken, 'tenant_A', 'ws_A', { now: 2000 }),
+    (err) => err.type === EXECUTION_TOKEN_INVALID && err.nonRetryable === true
+  );
 });
 
 test('bbx-flows-ten-cred-09: activity-side assertExecutionToken throws a NON-RETRYABLE failure', () => {

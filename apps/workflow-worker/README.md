@@ -91,6 +91,15 @@ Without this, a flow author who controls a task node's `input` could inject
 workspace B's provider/key/quota/data while authenticated as workspace A — cross-workspace
 resource theft. Asserted by `tests/blackbox/flow-activity-workspace-binding.test.mjs`.
 
+### Execution-token key derivation rollout
+
+Execution tokens use the `scrypt-v1` key derivation and are accepted only when the signed payload
+declares that derivation. This deliberately fails closed for earlier HMAC-derived token formats.
+Because a token can remain valid for up to 24 hours, an upgrade that changes this derivation must
+be coordinated: pause new flow starts and schedules, wait 24 hours after the last token was minted,
+roll out the control-plane executor and workflow worker together using the same release image set,
+then resume flow starts. Do not use independent rolling updates of either component for this change.
+
 ## DSL → Temporal mapping (flow-definition-mapping.json)
 
 | DSL node    | Temporal primitive                                           |

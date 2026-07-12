@@ -197,7 +197,11 @@ export function validateEventBridgeDefinition({ context = {}, topic = {}, bridge
     }
   }
 
-  if (bridge.partitionKeyTemplate && !/^([a-zA-Z0-9_./-]+|\{[a-zA-Z0-9_.-]+\})+$/.test(bridge.partitionKeyTemplate)) {
+  if (
+    bridge.partitionKeyTemplate !== undefined
+    && bridge.partitionKeyTemplate !== null
+    && (typeof bridge.partitionKeyTemplate !== 'string' || !isSafePartitionKeyTemplate(bridge.partitionKeyTemplate))
+  ) {
     violations.push('partitionKeyTemplate must use stable field placeholders or safe separators only.');
   }
 
@@ -237,6 +241,23 @@ export function validateEventBridgeDefinition({ context = {}, topic = {}, bridge
       updatedAt: normalizeTimestamp(bridge.updatedAt)
     })
   };
+}
+
+function isSafePartitionKeyTemplate(template) {
+  for (let index = 0; index < template.length;) {
+    const character = template[index];
+    if (/^[a-zA-Z0-9_./-]$/.test(character)) {
+      index += 1;
+      continue;
+    }
+    if (character !== '{') return false;
+
+    const fieldStart = ++index;
+    while (index < template.length && /^[a-zA-Z0-9_.-]$/.test(template[index])) index += 1;
+    if (fieldStart === index || template[index] !== '}') return false;
+    index += 1;
+  }
+  return true;
 }
 
 export function buildEventBridgeDefinition({ context = {}, topic = {}, bridge = {} }) {
