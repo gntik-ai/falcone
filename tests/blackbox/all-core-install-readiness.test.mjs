@@ -20,6 +20,8 @@ const REPO_ROOT = resolve(__dirname, '..', '..');
 const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
 const KIND_VALUES = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
 const OPENSHIFT_VALUES = resolve(REPO_ROOT, 'deploy', 'openshift', 'values-openshift.yaml');
+const E2E_FLOWS_VALUES = resolve(REPO_ROOT, 'tests', 'e2e', 'values-flows-e2e.yaml');
+const E2E_FERRETDB_VALUES = resolve(REPO_ROOT, 'tests', 'e2e', 'values-ferretdb-realtime-e2e.yaml');
 const CUTOVER_SCRIPTS = resolve(REPO_ROOT, 'scripts', 'system-changes', 'make-all-services-core');
 
 function helmAvailable() {
@@ -55,6 +57,12 @@ function escapeRe(value) {
 }
 function renderDocs(args = []) {
   return parseAllDocuments(assertRender(args)).map((doc) => doc.toJSON()).filter(Boolean);
+}
+function parseValuesFile(path) {
+  const docs = parseAllDocuments(readFileSync(path, 'utf8'));
+  assert.deepEqual(docs.flatMap((doc) => doc.errors), [], `${path} must parse as YAML`);
+  assert.equal(docs.length, 1, `${path} must contain one YAML document`);
+  return docs[0].toJSON() ?? {};
 }
 function findDoc(docs, kind, name) {
   return docs.find((doc) => doc.kind === kind && doc.metadata?.name === name);
@@ -758,6 +766,44 @@ test('all-core-006e: OpenShift Harbor documentation mirrors stay synchronized', 
   const installation = readFileSync(resolve(REPO_ROOT, 'docs', 'installation', 'openshift-airgapped-harbor.md'), 'utf8');
   const site = readFileSync(resolve(REPO_ROOT, 'docs-site', 'operations', 'openshift-airgapped-harbor.md'), 'utf8');
   assert.equal(site, installation, 'docs-site OpenShift Harbor guide must mirror docs/installation');
+});
+
+test('all-core-006i: E2E Helm overlays render without obsolete service lifecycle toggles', SKIP, () => {
+  const forbiddenLifecycleAliases = [
+    'bootstrap',
+    'apisix',
+    'mongodb',
+    'openwhisk',
+    'storage',
+    'observability',
+    'eso',
+    'openbao',
+    'controlPlane',
+    'controlPlaneExecutor',
+    'workflowWorker',
+    'temporal',
+    'postgresql',
+    'webConsole',
+    'keycloak',
+    'kafka',
+    'documentdb',
+    'ferretdb',
+    'seaweedfs',
+  ];
+  for (const valuesPath of [E2E_FLOWS_VALUES, E2E_FERRETDB_VALUES]) {
+    const values = parseValuesFile(valuesPath);
+    for (const alias of forbiddenLifecycleAliases) {
+      assert.notEqual(
+        typeof values[alias]?.enabled,
+        'boolean',
+        `${valuesPath} must not set obsolete top-level ${alias}.enabled`,
+      );
+    }
+  }
+
+  assertRender(['--skip-schema-validation', '-f', E2E_FLOWS_VALUES]);
+  assertRender(['--skip-schema-validation', '-f', E2E_FERRETDB_VALUES]);
+  assertRender(['--skip-schema-validation', '-f', KIND_VALUES, '-f', E2E_FERRETDB_VALUES]);
 });
 
 test('all-core-008: ESO cluster-scoped ownership preflight renders', SKIP, () => {

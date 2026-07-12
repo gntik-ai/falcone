@@ -35,7 +35,7 @@ Key `temporal.*` values (`charts/in-falcone/values.yaml`):
 | --- | --- | --- |
 | `temporal.image` | `temporalio/server:1.31.1` | server (PostgreSQL SQL visibility build) |
 | `temporal.schemaTool.image` / `adminTools.image` | `temporalio/admin-tools:1.31.1` | schema + bootstrap Jobs |
-| `temporal.ui.{enabled,image}` | `true`, `temporalio/ui:2.51.0` | Web UI — ClusterIP-only, port-forward access |
+| `temporal.ui.image` | `temporalio/ui:2.51.0` | Web UI is core and ClusterIP-only; access by port-forward |
 | `temporal.persistence.{host,port,user,password,database,visibilityDatabase}` | platform PostgreSQL, `temporal` / `temporal_visibility` | **dedicated databases**, kept separate from `in_falcone` to avoid migration coupling; production sets `existingSecret` + `passwordSecretKey` |
 | `temporal.bootstrap.namespace` | `falcone-flows` | the single shared namespace (ADR-11) |
 | `temporal.bootstrap.retentionDays` | `7` | run-history retention |
@@ -52,8 +52,8 @@ history — so it has no persistence and no inbound business traffic.
 
 ### OpenShift overlay
 
-`deploy/openshift/values-openshift.yaml` carries a Temporal stanza (commented `enabled: true`).
-It nulls `podSecurityContext.{runAsUser,runAsGroup,fsGroup}` so restricted-v2 injects the
+`deploy/openshift/values-openshift.yaml` carries Temporal security-context tuning for the core
+server roles. It nulls `podSecurityContext.{runAsUser,runAsGroup,fsGroup}` so restricted-v2 injects the
 namespace-range UID/GID; it asserts `runAsNonRoot` + `seccompProfile`. The chart default pins
 `runAsUser/runAsGroup: 1000` (for plain-Kubernetes / kind non-root verification, since the
 Temporal image declares a non-numeric `temporal` user); the overlay removes those pins. The
@@ -217,8 +217,9 @@ them up **alongside** the platform PostgreSQL with the same infrastructure tooli
 ## E2E suite
 
 The end-to-end Playwright suite for flows lives under `tests/e2e/specs/flows/` with the minimal
-stack values `tests/e2e/values-flows-e2e.yaml` (Temporal + control plane + worker + console on the
-kind cluster; gateway is bypassed by the specs proxying `/v1/*` directly to the control plane).
+stack values `tests/e2e/values-flows-e2e.yaml` (all-core chart, with Temporal + control plane +
+worker + console tuned for the kind cluster; gateway is bypassed by the specs proxying `/v1/*`
+directly to the control plane).
 Covered flows: design+publish, run+observe, version pinning, failure+retry, human approval,
 triggers, worker-kill durability, and cross-tenant isolation. Run per the e2e entrypoints
 (`bash tests/e2e/run.sh`, `bash tests/e2e/run-issue.sh <change-id>`), which always tear down the
