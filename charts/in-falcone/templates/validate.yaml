@@ -67,6 +67,9 @@
     {{- fail (printf "%s.serviceAccount.name is required when %s.serviceAccount.create=false; core ServiceAccounts must not implicitly fall back to the default ServiceAccount" . .) -}}
   {{- end -}}
 {{- end -}}
+{{- if and (kindIs "map" .Values.documentdb.initJob) (hasKey .Values.documentdb.initJob "enabled") (not .Values.documentdb.initJob.enabled) -}}
+  {{- fail "documentdb.initJob.enabled=false is no longer supported: DocumentDB extension initialization is core" -}}
+{{- end -}}
 {{- if and (hasKey .Values.bootstrap.serviceAccount "create") (eq .Values.bootstrap.serviceAccount.create false) (eq (.Values.bootstrap.serviceAccount.name | default "") "") -}}
   {{- fail "bootstrap.serviceAccount.name is required when bootstrap.serviceAccount.create=false; core ServiceAccounts must not implicitly fall back to the default ServiceAccount" -}}
 {{- end -}}

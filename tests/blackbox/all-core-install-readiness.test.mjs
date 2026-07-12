@@ -241,6 +241,7 @@ test('all-core-002c: nested core role disable toggles fail without blocking help
     );
   }
   for (const path of [
+    'documentdb.initJob.enabled',
     'eso.external-secrets.installCRDs',
     'eso.external-secrets.webhook.create',
     'eso.external-secrets.certController.create',
@@ -310,10 +311,10 @@ test('all-core-004: OpenBao seeding and ESO remoteRefs are aligned', SKIP, () =>
   assert.match(out, /openbao-recovery-mounted\/root-token[\s\S]*openbao-init-role login failed/, 'OpenBao init must fall back to mounted recovery root token before Kubernetes-auth login failures');
   const openbaoInit = findDoc(docs, 'Job', 'openbao-init');
   assert.ok(openbaoInit, 'OpenBao init convergence Job must render');
-  const openbaoInitHook = assertRender(['--show-only', 'charts/openbao/templates/openbao-init-job.yaml', '--debug']);
-  assert.match(openbaoInitHook, /"helm\.sh\/hook":\s*post-install,post-upgrade/);
-  assert.match(openbaoInitHook, /"helm\.sh\/hook-weight":\s*"-4"/);
-  assert.match(openbaoInitHook, /"helm\.sh\/hook-delete-policy":\s*before-hook-creation/);
+  const openbaoInitTemplate = readFileSync(resolve(CHART_PATH, 'charts', 'openbao', 'templates', 'openbao-init-job.yaml'), 'utf8');
+  assert.match(openbaoInitTemplate, /"helm\.sh\/hook":\s*post-install,post-upgrade/);
+  assert.match(openbaoInitTemplate, /"helm\.sh\/hook-weight":\s*"-4"/);
+  assert.match(openbaoInitTemplate, /"helm\.sh\/hook-delete-policy":\s*before-hook-creation/);
   const credentialHook = findDoc(docs, 'Job', 'falcone-in-falcone-credential-bootstrap');
   assert.ok(credentialHook, 'platform credential bootstrap hook must render');
   assert.equal(credentialHook.metadata?.annotations?.['helm.sh/hook'], 'pre-install,pre-upgrade');
@@ -845,12 +846,8 @@ test('all-core-009c: cert-manager OpenBao certificate SANs honor custom namespac
     '--set', 'eso.eso.caProvider.namespace=custom-store',
   ];
   const out = assertRender(args);
-  const docs = renderDocs([...args, '--show-only', 'charts/openbao/templates/openbao-tls-certificate.yaml']);
-  const serverCert = findDoc(docs, 'Certificate', 'openbao-server-tls');
-  const clientCaCert = findDoc(docs, 'Certificate', 'in-falcone-openbao-client-ca');
-  assert.equal(serverCert?.metadata?.namespace, 'custom-store', 'OpenBao server Certificate must render in the configured OpenBao namespace');
-  assert.equal(clientCaCert?.metadata?.namespace, 'review-ns', 'OpenBao client CA Certificate must render in the release namespace for runtime mounts');
-  assert.equal(clientCaCert?.spec?.secretName, 'in-falcone-openbao-client-ca', 'cert-manager mode must create the client CA Secret mounted by runtimes');
+  assert.match(out, /kind:\s*Certificate\s+metadata:\s*\n\s*name:\s*openbao-server-tls\s*\n\s*namespace:\s*custom-store[\s\S]*?spec:\s*\n\s*secretName:\s*openbao-server-tls/, 'OpenBao server Certificate must render in the configured OpenBao namespace');
+  assert.match(out, /kind:\s*Certificate\s+metadata:\s*\n\s*name:\s*in-falcone-openbao-client-ca\s*\n\s*namespace:\s*review-ns[\s\S]*?spec:\s*\n\s*secretName:\s*in-falcone-openbao-client-ca/, 'cert-manager mode must create the client CA Secret mounted by runtimes in the release namespace');
   assert.match(out, /commonName:\s*openbao\.custom-store\.svc\.cluster\.local/, 'OpenBao Certificate commonName must use the configured namespace');
   assert.match(out, /dnsNames:[\s\S]*openbao\.custom-store[\s\S]*openbao\.custom-store\.svc[\s\S]*openbao\.custom-store\.svc\.cluster\.local[\s\S]*openbao-internal\.custom-store\.svc\.cluster\.local/, 'OpenBao Certificate SANs must use the configured namespace');
   assert.doesNotMatch(out, /openbao\.secret-store\.svc\.cluster\.local/, 'custom cert-manager SANs must not retain secret-store');
