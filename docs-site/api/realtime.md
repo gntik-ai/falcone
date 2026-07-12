@@ -1,63 +1,81 @@
-# API Reference — Realtime Subscriptions
+# API Reference: Realtime Subscriptions
 
-Realtime delivers live data changes over **Server-Sent Events (SSE)**. It is tenant-scoped **at the source** — matching happens inside the logical-replication consumer / notify channel — so a subscriber can only ever receive its own tenant's changes.
+Realtime subscriptions are Server-Sent Events (SSE) served by the control-plane executor.
 
-## Subscribe (SSE)
+Current runtime routes are workspace-addressed:
 
-```
-GET /v1/events/subscribe
-```
+| Backend | SSE route |
+| --- | --- |
+| Mongo/FerretDB documents | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes` |
+| PostgreSQL rows | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes` |
 
-Because a browser `EventSource` cannot set headers, SSE routes accept the (low-privilege, read-only) anon key as a query parameter:
+The older `/v1/events/subscribe` route is not used in the current developer docs.
 
-```js
-const url = new URL('https://api.example.test/v1/events/subscribe')
-url.searchParams.set('collection', 'todos')
-url.searchParams.set('apikey', 'flc_anon_…')   // header still wins if both are present
-const es = new EventSource(url)
-es.onmessage = (e) => console.log(JSON.parse(e.data))
-```
-
-From a server (where you can set headers), use the `apikey` header instead:
+## Subscribe to document changes
 
 ```bash
-curl -sN "$API/v1/events/subscribe?collection=todos" -H "apikey: $KEY"
+export API=https://api.example.com
+export WORKSPACE_ID=<workspace-id>
+export TOKEN=<bearer-token-or-service-account-token>
+
+curl -sN \
+  "$API/v1/realtime/workspaces/$WORKSPACE_ID/data/app/collections/profiles/changes" \
+  -H "authorization: Bearer $TOKEN"
 ```
 
-A subscribe **without tenant identity returns `401`** (fails closed).
+Browser `EventSource` cannot set headers. SSE routes accept `?apikey=` for low-privilege workspace
+API keys when your deployment has issued one:
+
+```js
+const url = new URL(`${API}/v1/realtime/workspaces/${workspaceId}/data/app/collections/profiles/changes`)
+url.searchParams.set('apikey', anonKey)
+const events = new EventSource(url)
+events.onmessage = (event) => console.log(JSON.parse(event.data))
+```
+
+Header credentials win if both a header and query key are present.
+
+## Subscribe to PostgreSQL row changes
+
+```bash
+curl -sN \
+  "$API/v1/realtime/workspaces/$WORKSPACE_ID/data/app/schemas/public/tables/orders/changes" \
+  -H "authorization: Bearer $TOKEN"
+```
 
 ## Event shape
 
-Each change is delivered as a JSON event:
-
-```json
-{ "type": "insert | update | replace | delete",
-  "documentId": "…",
-  "document": { "...": "the full document (or the prior document for a delete)" } }
-```
-
-- `insert` / `update` / `replace` carry the full current document. For the document store, a logical-replication `UPDATE` carries the full new image, so updates surface as `replace`.
-- `delete` carries the **prior** document, which is also how the delete is kept tenant-scoped.
+Realtime frames are JSON SSE messages. The exact payload fields depend on the backend executor and
+operation, but the stream represents insert, update/replace, and delete events for the requested
+tenant/workspace resource.
 
 ## Sources
 
-| Backend | Mechanism | Notes |
+| Backend | Mechanism |
+| --- | --- |
+| Mongo/FerretDB documents | PostgreSQL logical replication on the DocumentDB engine, because FerretDB v2 does not provide MongoDB change streams for this path. |
+| PostgreSQL rows | PostgreSQL trigger and `LISTEN`/`NOTIFY` pipeline scoped to the tenant/workspace table stream. |
+
+Document-store deletes require prior-row information to keep delete events tenant-scoped. See the
+[FerretDB Document-Store Runbook](/architecture/ferretdb) for the logical-replication details.
+
+## Application event streams
+
+The generated OpenAPI also includes event-topic routes:
+
+| Method | Path | Purpose |
 | --- | --- | --- |
-| FerretDB / DocumentDB (document store) | Postgres **`pgoutput`** logical-replication slot on the DocumentDB engine's `documentdb_data` tables, with consumer-side `tenantId` filtering | FerretDB v2 has **no MongoDB change streams**; **no replica set** is involved. Requires `wal_level=logical`; deletes use `REPLICA IDENTITY FULL` pre-images. See the [FerretDB Document-Store Runbook](/architecture/ferretdb#change-stream-remediation) |
-| PostgreSQL | trigger → `NOTIFY` on a per-tenant channel + `LISTEN` | Channel `flc_rt_<md5(schema.table:tenant_id)>`; deletes via `OLD.tenant_id`; payloads above ~8000 bytes are guarded |
+| `POST` | `/v1/events/topics` | Create an event topic. |
+| `GET` | `/v1/events/topics/{resourceId}` | Read one topic. |
+| `POST` | `/v1/events/topics/{resourceId}/publish` | Publish to a topic. |
+| `GET` | `/v1/events/topics/{resourceId}/stream` | Stream one topic. |
 
-## Events (publish/subscribe)
+The runtime executor also exposes workspace-addressed event routes:
 
-The same prefix also serves a tenant-scoped event bus for application events:
-
-```bash
-curl -sX POST $API/v1/events/publish -H "apikey: $KEY" \
-  -H 'content-type: application/json' \
-  -d '{"topic":"order.created","data":{"id":123}}'
+```text
+/v1/events/workspaces/{workspaceId}/topics
+/v1/events/workspaces/{workspaceId}/topics/{topic}/publish
+/v1/events/workspaces/{workspaceId}/topics/{topic}/messages
 ```
 
-## Isolation guarantees
-
-- Tenant matching is **server-side, inside the logical-replication consumer / channel** — not a client filter.
-- Document-store deletes are scoped via the WAL pre-image's `tenantId` (`REPLICA IDENTITY FULL`); a row that does not match the verified tenant is simply **not delivered** (never leaked).
-- Postgres subscribers `LISTEN` only on their own tenant's channel.
+Use the route family exposed by your gateway/catalog for the deployment you are testing.

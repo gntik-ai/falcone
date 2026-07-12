@@ -1,55 +1,115 @@
-# API Reference — MongoDB Data API
+# API Reference: MongoDB / FerretDB Data API
 
-REST CRUD and querying over document collections, with **cursor pagination**. The document store is **FerretDB v2 over DocumentDB-on-PostgreSQL**, which speaks the **MongoDB wire protocol**, so the data API and its Mongo-style filters are unchanged (see the [FerretDB Document-Store Runbook](/architecture/ferretdb)). Tenant isolation is enforced by an adapter-injected `tenantId` predicate on every read and stamped on every write (see [Security](/architecture/security)).
+Falcone's document API is backed by FerretDB v2 over DocumentDB-on-PostgreSQL. The HTTP data API is
+workspace-addressed and served by the control-plane executor.
 
-Authenticate with an `apikey` header.
+Base route:
 
-## Endpoints
+```text
+/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}
+```
+
+Examples use:
+
+```bash
+export API=https://api.example.com
+export WORKSPACE_ID=<workspace-id>
+export TOKEN=<bearer-token-or-service-account-token>
+export DOCS="$API/v1/mongo/workspaces/$WORKSPACE_ID/data/app/collections/profiles/documents"
+```
+
+Use `Authorization: Bearer <token>` or a workspace API key where your deployment has issued one.
+
+## Document endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/v1/collections/{name}/documents` | List / filter documents |
-| POST | `/v1/collections/{name}/documents` | Insert a document (document as JSON body) |
-| PUT | `/v1/collections/{name}/documents/{id}` | Replace/update a document |
-| DELETE | `/v1/collections/{name}/documents/{id}` | Delete a document |
-| POST | `/v1/collections/{name}/query` | Structured find/aggregate |
+| `GET` | `/documents` | List documents with optional JSON filter, sort, and cursor page. |
+| `POST` | `/documents` | Insert one document. |
+| `GET` | `/documents/{documentId}` | Read one document. |
+| `PATCH` | `/documents/{documentId}` | Update one document. |
+| `PUT` | `/documents/{documentId}` | Replace one document. |
+| `DELETE` | `/documents/{documentId}` | Delete one document. |
+| `POST` | `/bulk/write` | Bulk write. |
+| `POST` | `/aggregations` | Aggregation request. |
+| `POST` | `/imports` | Import documents. |
+| `POST` | `/exports` | Export documents. |
 
 ## Insert
 
-The request body **is** the document:
+The runtime accepts either a raw document body or `{ "document": ... }`.
 
 ```bash
-curl -sX POST $API/v1/collections/profiles/documents \
-  -H "apikey: $KEY" -H 'content-type: application/json' \
+curl -sS -X POST "$DOCS" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
   -d '{"handle":"neo","tags":["red","blue"],"active":true}'
 ```
 
-## Read & query
+## List and filter
 
-Simple reads use the documents endpoint; richer queries use the query endpoint with a Mongo-style filter:
-
-```bash
-curl -sX POST $API/v1/collections/profiles/query \
-  -H "apikey: $KEY" -H 'content-type: application/json' \
-  -d '{"filter":{"tags":"red"},"sort":{"handle":1},"limit":50}'
-```
-
-## Cursor pagination
-
-List responses are paginated with an opaque cursor (`encodeMongoDataCursor`). Pass the cursor from the previous page to fetch the next; cursor paging is stable across inserts.
-
-## Update & delete
+`filter` and `sort` query parameters are JSON values:
 
 ```bash
-curl -sX PUT    $API/v1/collections/profiles/documents/<id> -H "apikey: $KEY" \
-  -H 'content-type: application/json' -d '{"active":false}'
-curl -sX DELETE $API/v1/collections/profiles/documents/<id> -H "apikey: $KEY"
+curl -sS "$DOCS?filter={\"tags\":\"red\"}&sort={\"handle\":1}&page[size]=50" \
+  -H "authorization: Bearer $TOKEN"
 ```
+
+When shell quoting becomes awkward, build the URL with `jq` or your HTTP client rather than typing
+raw JSON into the query string.
+
+Expected response shape:
+
+```json
+{
+  "items": [],
+  "page": {
+    "size": 50
+  }
+}
+```
+
+## Update, replace, and delete
+
+```bash
+curl -sS -X PATCH "$DOCS/<document-id>" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"active":false}'
+
+curl -sS -X PUT "$DOCS/<document-id>" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"handle":"neo","tags":["blue"],"active":false}'
+
+curl -sS -X DELETE "$DOCS/<document-id>" \
+  -H "authorization: Bearer $TOKEN"
+```
+
+## Collection management
+
+Structural document-store routes are separate from data routes:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` / `POST` | `/v1/mongo/databases` | List or create databases. |
+| `GET` / `DELETE` | `/v1/mongo/databases/{databaseName}` | Read or delete one database. |
+| `GET` / `POST` | `/v1/mongo/databases/{databaseName}/collections` | List or create collections. |
+| `GET` / `PUT` / `DELETE` | `/v1/mongo/databases/{databaseName}/collections/{collectionName}` | Read, update, or delete a collection. |
+| `GET` / `POST` | `/v1/mongo/databases/{databaseName}/collections/{collectionName}/indexes` | List or create indexes. |
+| `GET` | `/v1/mongo/workspaces/{workspaceId}/inventory` | Workspace document-store inventory. |
 
 ## Realtime
 
-Document changes can be streamed live — see [Realtime Subscriptions](/api/realtime). FerretDB v2 has no MongoDB change streams, so document realtime is sourced from **Postgres logical replication** (a `pgoutput` slot on the DocumentDB engine): no replica set is involved, and tenant-scoped deletes use `REPLICA IDENTITY FULL` pre-images on the WAL stream (see the [FerretDB Document-Store Runbook](/architecture/ferretdb#change-stream-remediation)).
+Document changes stream from:
 
-## Isolation
+```text
+/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes
+```
 
-The adapter never issues an unscoped query: the `tenantId` filter is injected into reads and stamped onto writes, and the realtime pipeline applies a consumer-side `tenantId` filter to the verified tenant. There is no client-controllable path to another tenant's documents.
+FerretDB v2 does not provide MongoDB change streams for this path. The repo's realtime implementation
+uses PostgreSQL logical replication on the DocumentDB engine and tenant/workspace filtering in the
+server-side pipeline.
+
+See [Realtime Subscriptions](/api/realtime) and the
+[FerretDB Document-Store Runbook](/architecture/ferretdb).

@@ -1,75 +1,150 @@
-# API Reference — PostgreSQL Data API
+# API Reference: PostgreSQL Data API
 
-REST CRUD and querying over SQL-backed collections, with PostgREST-style filtering, projection, ordering and **keyset pagination**. Every request is scoped to the caller's tenant by Row-Level Security (see [Security](/architecture/security)).
+The current PostgreSQL data API is workspace-addressed. It is served by the control-plane executor
+and backed by PostgreSQL with tenant/workspace scoping.
 
-Authenticate with an `apikey` header. Examples use `$API` (gateway host) and `$KEY`.
+Base route:
 
-## Endpoints
+```text
+/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}
+```
+
+Examples use:
+
+```bash
+export API=https://api.example.com
+export WORKSPACE_ID=<workspace-id>
+export TOKEN=<bearer-token-or-service-account-token>
+```
+
+Use `Authorization: Bearer <token>` or a workspace API key where your deployment has issued one.
+
+## Row endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/v1/collections/{name}/documents` | List / filter rows |
-| POST | `/v1/collections/{name}/documents` | Create a row (document as JSON body) |
-| PUT | `/v1/collections/{name}/documents/{id}` | Update a row |
-| DELETE | `/v1/collections/{name}/documents/{id}` | Delete a row |
-| POST | `/v1/collections/{name}/query` | Structured query |
+| `GET` | `/rows` | List, filter, project, order, and page rows. |
+| `POST` | `/rows` | Insert one row. |
+| `GET` | `/rows/by-primary-key?...` | Get one row by primary-key query parameters. |
+| `PATCH` | `/rows/by-primary-key?...` | Update one row by primary-key query parameters. |
+| `DELETE` | `/rows/by-primary-key?...` | Delete one row by primary-key query parameters. |
+| `POST` | `/bulk/insert` | Insert multiple rows. |
+| `POST` | `/bulk/update` | Update multiple rows. |
+| `POST` | `/bulk/delete` | Delete multiple rows. |
+| `POST` | `/search` | Vector search over a configured vector column. |
 
-## Create
+Full rows URL example:
 
 ```bash
-curl -sX POST $API/v1/collections/orders/documents \
-  -H "apikey: $KEY" -H 'content-type: application/json' \
+export ROWS="$API/v1/postgres/workspaces/$WORKSPACE_ID/data/app/schemas/public/tables/orders/rows"
+```
+
+## Insert
+
+```bash
+curl -sS -X POST "$ROWS" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
   -d '{"customer":"acme","total":42.5,"status":"open"}'
 ```
 
-## Filtering
+Expected response shape:
 
-Query params are PostgREST-style `column=operator.value`; a bare `column=value` defaults to `eq`:
+```json
+{
+  "item": { "...": "inserted row" },
+  "affected": 1,
+  "access": { "...": "effective access metadata" }
+}
+```
+
+## List, filter, project, and order
+
+Filters are query parameters. A bare `column=value` is equality; `column=operator.value` supports
+the operator set used by the runtime:
 
 | Operator | Example |
 | --- | --- |
-| `eq`, `neq` | `?status=eq.open` |
-| `gt`, `gte`, `lt`, `lte` | `?total=gte.100` |
-| `in` | `?id=in.(1,2,3)` |
-| `like`, `ilike` | `?name=ilike.%ac%` |
-| `json_path_eq` | `?meta=json_path_eq.…` |
+| `eq`, `neq` | `status=eq.open` |
+| `gt`, `gte`, `lt`, `lte` | `total=gte.100` |
+| `in` | `id=in.(1,2,3)` |
+| `like`, `ilike` | `customer=ilike.%ac%` |
+| `json_path_eq` | `metadata=json_path_eq.<path-and-value>` |
 
-Scalars are coerced: `?age=gte.18` compares as a number, `?active=eq.true` as a boolean.
-
-## Projection & ordering
+Projection and ordering:
 
 ```bash
-curl -s "$API/v1/collections/orders/documents?select=id,total&order=total.desc" -H "apikey: $KEY"
+curl -sS "$ROWS?select=id,customer,total&status=eq.open&order=total.desc" \
+  -H "authorization: Bearer $TOKEN"
 ```
 
-- `select=col1,col2` — restrict returned columns.
-- `order=col.asc|desc` — sort.
+Expected response shape:
 
-## Keyset (cursor) pagination
+```json
+{
+  "items": [],
+  "page": {
+    "size": 0,
+    "returned": 0
+  },
+  "access": { "...": "effective access metadata" }
+}
+```
+
+## Keyset pagination
 
 ```bash
-# first page
-curl -s "$API/v1/collections/orders/documents?page[size]=20" -H "apikey: $KEY"
-# next page — pass the opaque cursor returned by the previous page
-curl -s "$API/v1/collections/orders/documents?page[size]=20&page[after]=<cursor>" -H "apikey: $KEY"
+curl -sS "$ROWS?page[size]=20&order=id.asc" \
+  -H "authorization: Bearer $TOKEN" \
+  | tee /tmp/orders-page-1.json
+
+export AFTER="$(jq -r '.page.after // empty' /tmp/orders-page-1.json)"
+
+curl -sS "$ROWS?page[size]=20&page[after]=$AFTER&order=id.asc" \
+  -H "authorization: Bearer $TOKEN"
 ```
 
-Keyset pagination (not OFFSET) keeps paging stable and fast on large tables. The cursor is opaque (`serializePostgresDataApiCursor`); pass it back verbatim in `page[after]`.
+The cursor is opaque. Pass it back verbatim as `page[after]`.
 
-## Structured query
+## Primary-key operations
 
-For more complex reads use the query endpoint:
+Primary-key values are query parameters on `/rows/by-primary-key`.
 
 ```bash
-curl -sX POST $API/v1/collections/orders/query \
-  -H "apikey: $KEY" -H 'content-type: application/json' \
-  -d '{"filter":{"status":"open"},"order":[["total","desc"]],"limit":50}'
+curl -sS "$ROWS/by-primary-key?id=ord_1001" \
+  -H "authorization: Bearer $TOKEN"
+
+curl -sS -X PATCH "$ROWS/by-primary-key?id=ord_1001" \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"status":"closed"}'
+
+curl -sS -X DELETE "$ROWS/by-primary-key?id=ord_1001" \
+  -H "authorization: Bearer $TOKEN"
 ```
 
-## Schema (DDL)
+Composite keys use multiple query parameters.
 
-Defining collections/tables, columns and indexes is a `structural_admin` operation — create them from the console or via `POST /v1/schemas` (see [Control Plane](/api/control-plane)). The executor backs DDL with `postgres-ddl-executor.mjs` (schema/table/column/index).
+## DDL and inventory
 
-## Isolation
+The executor also exposes structural PostgreSQL routes. These are management routes, not the old
+`/v1/schemas` API.
 
-Reads and writes run under a **non-`BYPASSRLS` role** with the tenant set per request, so RLS filters every statement — you only ever see your tenant's rows, even via a misformed query.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` / `POST` | `/v1/postgres/databases` | List or create databases. |
+| `GET` / `POST` | `/v1/postgres/databases/{databaseName}/schemas` | List or create schemas. |
+| `GET` / `POST` | `/v1/postgres/databases/{databaseName}/schemas/{schemaName}/tables` | List or create tables. |
+| `GET` / `POST` | `/v1/postgres/databases/{databaseName}/schemas/{schemaName}/tables/{tableName}/columns` | List or create columns. |
+| `GET` / `POST` | `/v1/postgres/databases/{databaseName}/schemas/{schemaName}/tables/{tableName}/indexes` | List or create indexes. |
+| `GET` | `/v1/postgres/workspaces/{workspaceId}/inventory` | Workspace PostgreSQL inventory. |
+
+## Realtime
+
+PostgreSQL table changes stream from:
+
+```text
+/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes
+```
+
+See [Realtime Subscriptions](/api/realtime).

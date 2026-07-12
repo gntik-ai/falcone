@@ -4,70 +4,68 @@ layout: home
 hero:
   name: In Falcone
   text: Multi-tenant Backend-as-a-Service
-  tagline: Postgres & FerretDB document data APIs, object storage, events, serverless functions and realtime — behind one gateway, isolated per tenant, deployable to Kubernetes, OpenShift or air-gapped clusters.
+  tagline: Postgres, FerretDB-backed document data, object storage, events, serverless functions, realtime, Flows, and MCP behind one gateway with tenant-scoped identity.
   image:
     src: /img/logo-wide.png
     alt: In Falcone
   actions:
     - theme: brand
-      text: What is In Falcone?
-      link: /guide/what-is-falcone
+      text: Start as a user
+      link: /personas/non-expert
     - theme: alt
-      text: Quickstart (TODO app)
-      link: /guide/quickstart
+      text: Install as an operator
+      link: /personas/operator
     - theme: alt
-      text: Architecture
-      link: /architecture/overview
+      text: Build as a developer
+      link: /personas/developer
 
 features:
-  - icon: 🏢
-    title: Tenant isolation by construction
-    details: Every data path is scoped by tenant. PostgreSQL Row-Level Security + a non-BYPASSRLS application role, FerretDB/DocumentDB adapter-injected tenant filters, and per-tenant realtime channels. Cross-tenant access fails closed.
-    link: /architecture/security
-    linkText: Security model
-  - icon: 🗄️
-    title: Postgres & FerretDB document data APIs
-    details: REST data access over both engines (relational + MongoDB-wire document store) with keyset pagination, filtering and DDL. One control plane, two storage shapes.
-    link: /api/postgresql
-    linkText: Data API
-  - icon: 🔑
-    title: Anon & service API keys
-    details: Supabase-style flc_anon_… and flc_service_… keys routed at the gateway, plus per-tenant JWT issuance. Embed read-only access in a frontend safely.
-    link: /api/gateway
-    linkText: Gateway & keys
-  - icon: ⚡
-    title: Realtime subscriptions
-    details: Server-Sent Events backed by Postgres logical replication (FerretDB/DocumentDB) and PostgreSQL trigger-based CDC, tenant-scoped inside the pipeline.
-    link: /api/realtime
-    linkText: Realtime
-  - icon: 📦
-    title: Storage, events & functions
-    details: S3-compatible object storage (SeaweedFS), an event bus (Kafka/Redpanda) and serverless functions round out the BaaS surface.
-    link: /architecture/services
-    linkText: Components
-  - icon: 🚀
-    title: Deploy anywhere
-    details: A single umbrella Helm chart with layered values for Kubernetes (Ingress), OpenShift (Routes, restricted-v2) and air-gapped private registries — plus a docker-compose stack for local development.
-    link: /guide/installation
-    linkText: Installation
-  - icon: 🤖
-    title: Built for AI — a BaAIS
-    details: A backend designed to be natively consumable by AI agents — MCP server hosting (Preview, served live under /v1/mcp) and the Temporal-based Flows workflow engine (Preview) — all under the same per-tenant isolation, auth and quotas.
-    link: /guide/mcp
-    linkText: MCP &amp; Flows
+  - title: Non-expert user path
+    details: Start with what the platform gives you, how tenants and workspaces fit together, and the shortest kind-based route to a running console.
+    link: /personas/non-expert
+    linkText: User path
+  - title: DevOps and operator path
+    details: Install the full umbrella Helm chart on Kubernetes or OpenShift, choose Ingress or Route exposure, verify readiness, and plan scaling and backups.
+    link: /personas/operator
+    linkText: Operator path
+  - title: Developer path
+    details: Use the current runtime and contracts for tenants, workspace environments, service accounts, functions, data APIs, events, realtime, Flows, and MCP.
+    link: /personas/developer
+    linkText: Developer path
+  - title: Kubernetes and OpenShift
+    details: The chart renders Ingress on Kubernetes and OpenShift Routes with restricted-v2-compatible values on OpenShift.
+    link: /operations/openshift-install
+    linkText: OpenShift install
+  - title: Public API surface
+    details: Public HTTP routes are grounded in the generated OpenAPI, gateway route catalog, and runtime route tables.
+    link: /api/control-plane
+    linkText: API reference
+  - title: Backup and restore
+    details: Tenant-level restore workflows are documented alongside platform backup scripts for Helm, Secrets, OpenBao/ESO, and rollback evidence.
+    link: /operations/backup-restore
+    linkText: Backup guide
 ---
 
 ::: danger Not production-ready
 **In Falcone is in early, active development.** Public APIs, data schemas and runtime behavior
 may change at any time, without notice or a migration path; there are no stability, security or
 support guarantees; and the project has not undergone a security audit. **Do not use it for
-production workloads or sensitive data** — evaluation, experimentation and development only. See
+production workloads or sensitive data** - evaluation, experimentation and development only. See
 the [Roadmap](/guide/roadmap).
 :::
 
+## Choose your path
+
+| Persona | Start here | You will get |
+| --- | --- | --- |
+| I want to try Falcone without becoming a platform expert. | [Non-expert user](/personas/non-expert) | A kind cluster, a running platform, console access, and a first tenant/workspace. |
+| I operate Kubernetes or OpenShift. | [DevOps / operator](/personas/operator) | Helm values layering, Kubernetes install, OpenShift Route/SCC guidance, Harbor/air-gap notes, readiness, scaling, and backups. |
+| I build on the API. | [Developer](/personas/developer) | Current API shape for tenants, workspace environments, service accounts, functions, data APIs, events, realtime, Flows, and MCP. |
+
 ## A first look
 
-In Falcone ships with a web console for tenant administration and data exploration. The screenshots below are from a **real deployment** running on a Kubernetes cluster.
+In Falcone ships with a web console for tenant administration and data exploration. The screenshots
+below are from a real Kubernetes deployment.
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1.5rem">
 
@@ -81,4 +79,5 @@ In Falcone ships with a web console for tenant administration and data explorati
 
 </div>
 
-> See the full tour in [What is In Falcone?](/guide/what-is-falcone) and build something in the [Quickstart](/guide/quickstart).
+Continue with the [kind quickstart](/guide/quickstart), the [Kubernetes install](/operations/kubernetes-install),
+or the [OpenShift install](/operations/openshift-install).

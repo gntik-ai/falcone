@@ -60,7 +60,7 @@ openssl rand -hex 24 | tr -d '\n' | \
 
 ## Air-gapped registries
 
-Air-gapped installs add a registry pull secret and CA bundle (`global.imagePullSecrets`, `global.privateRegistry.caBundleConfigMap`) — create these in the namespace before installing. See [Installation → Air-gapped](/guide/installation#air-gapped).
+Air-gapped installs add a registry pull secret and CA bundle (`global.imagePullSecrets`, `global.privateRegistry.caBundleConfigMap`) — create these in the namespace before installing. See [OpenShift Install: Harbor or air-gap](/operations/openshift-install#openshift-with-harbor-or-air-gap).
 
 ## TLS
 

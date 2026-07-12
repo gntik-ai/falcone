@@ -1,91 +1,227 @@
 # Helm Configuration
 
-In Falcone is configured through the umbrella chart `../falcone-charts/charts/in-falcone`. This page covers the structure of `values.yaml` and how to compose it. For full install walkthroughs see [Installation](/guide/installation).
+Falcone is configured through the umbrella chart:
+
+```text
+../falcone-charts/charts/in-falcone
+```
+
+For install walkthroughs, see [Installation](/guide/installation),
+[Kubernetes Install](/operations/kubernetes-install), and
+[OpenShift Install](/operations/openshift-install).
+
+## Chart identity
+
+The chart version and application version in `Chart.yaml` are `0.3.0`. The chart is published as:
+
+```text
+oci://ghcr.io/gntik-ai/charts/in-falcone
+```
+
+The local development convention is a sibling checkout:
+
+```bash
+test -d ../falcone-charts || git clone https://github.com/gntik-ai/falcone-charts.git ../falcone-charts
+helm dependency build ../falcone-charts/charts/in-falcone
+```
 
 ## Top-level value sections
 
 | Key | Controls |
 | --- | --- |
-| `global` | Cross-cutting: environment, namespace, airgap, private registry, image pull secrets |
-| `publicSurface` | Hostnames, bindings, ingress/route exposure, TLS mode |
-| `environmentProfile` | Named environment defaults |
-| `deployment` | Active sizing `profile` + `valuesLayers` ordering |
-| `platform` | `target` (kubernetes/openshift), `network.exposureKind`, `securityProfile` |
-| `config` | ConfigMap names + `secretRefs` (existing-secret references) + inheritance order |
-| `bootstrap` | Reconcile payload (gateway routes, realm), lock/marker ConfigMaps |
-| `apisix`, `keycloak`, `postgresql`, `postgresqlVector`, `ferretdb`, `documentdb`, `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`, `workflowWorker`, `temporal`, `mcp` | Core component config. Fresh installs always render the complete platform; legacy `<component>.enabled=false` disables are rejected by chart validation. `ferretdb` + `documentdb` are the document store ([ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)); `seaweedfs` is the object store ([ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs)). The former `mongodb` and `storage` (MinIO) components have been removed; functions run on Knative (provisioned by the control-plane executor — no datastore component). |
-| `gatewayPolicy` | Gateway routing/scope/rate-limit policy |
-| `eso`, `openbao` | Core secret management (External Secrets Operator + OpenBao). Fresh installs provision both and wire workload Secrets through the `openbao-backend` `ClusterSecretStore`. |
+| `global` | Namespace, environment, air-gap state, private registry, image pull secrets, default storage class, and pod security defaults. |
+| `publicSurface` | Public hostnames, route prefixes, Ingress/Route/LoadBalancer settings, and TLS mode. |
+| `deployment` | Active sizing profile and values-layer metadata. |
+| `platform` | Target platform, exposure kind, OpenShift flag, and security profile. |
+| `config` | ConfigMap names, Secret references, and inheritance order. |
+| `bootstrap` | Post-install/post-upgrade reconciliation for gateway routes, Keycloak realm/client/superadmin setup, credentials, lock, and marker ConfigMaps. |
+| `gatewayPolicy` | APISIX route, scope, OIDC, and rate-limit policy. |
+| `apisix`, `keycloak`, `postgresql`, `postgresqlVector`, `documentdb`, `ferretdb`, `kafka`, `seaweedfs`, `observability`, `controlPlane`, `controlPlaneExecutor`, `webConsole`, `workflowWorker`, `temporal`, `mcp`, `eso`, `openbao` | Core components and support systems. |
 
-## Composing values
+Fresh installs render the full core platform. The chart validation rejects legacy service removal
+patterns such as `<component>.enabled=false` for core services and zero-replica core overrides.
 
-Layer files in the order the chart recommends (later wins):
+## Values layering
 
+Layer values left to right; later files win:
+
+```text
+common -> environment -> customer -> platform -> airgap -> localOverride -> secretRefs
 ```
-common → environment → customer → platform → airgap → localOverride → secretRefs
-```
+
+Shell command without inline comments after continuation characters:
 
 ```bash
-git clone https://github.com/gntik-ai/falcone-charts.git ../falcone-charts
-helm dependency build ../falcone-charts/charts/in-falcone
-
 helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
-  -n falcone --create-namespace \
-  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \              # environment
-  -f ../falcone-charts/charts/in-falcone/values/customer-reference.yaml \ # customer
-  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \# platform
-  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml    # sizing
+  --namespace falcone --create-namespace \
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/customer-reference.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml \
+  --set global.createNamespace=true
 ```
 
-Helm creates the release namespace before pre-install hooks run. By default the chart renders Namespace resources for the ESO/OpenBao support namespaces (`global.createNamespace=true`). For externally managed namespaces, omit Helm namespace auto-creation, set `global.createNamespace=false`, and pre-create/adopt the required namespaces in the platform layer.
+By default, Helm creates the release namespace with `--create-namespace`, and the chart's namespace
+resources are controlled by `global.createNamespace=true`.
 
-`config.inheritanceOrder` records this layering; `deployment.profile` selects the sizing profile.
+For externally managed namespaces, pre-create the namespace, omit `--create-namespace`, and set
+`global.createNamespace=false`:
+
+```bash
+kubectl create namespace falcone --dry-run=client -o yaml | kubectl apply -f -
+
+helm upgrade --install falcone ../falcone-charts/charts/in-falcone \
+  --namespace falcone \
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/standard.yaml \
+  --set global.createNamespace=false
+```
+
+## Platform values
+
+| File | Effect |
+| --- | --- |
+| `values/platform-kubernetes.yaml` | `platform.target: kubernetes`, `platform.network.exposureKind: Ingress`. |
+| `values/platform-kubernetes-loadbalancer.yaml` | `platform.network.exposureKind: LoadBalancer`. |
+| `values/platform-openshift.yaml` | `platform.target: openshift`, `platform.network.exposureKind: Route`, `platform.securityProfile: restricted-v2`, `platform.openshift.enabled: true`. |
+| `values/airgap.yaml` | Enables `global.airgap`, `global.privateRegistry`, image pull secrets, registry CA, and private image repositories. |
+| `deploy/openshift/values-openshift.yaml` | OpenShift + Harbor skeleton with placeholder registry, storage class, hostnames, pull secret, CA ConfigMap, and restricted-v2 security context overrides. |
+
+## Profiles
+
+Profiles are under `values/profiles/`:
+
+| File | Use |
+| --- | --- |
+| `all-in-one.yaml` | Local or single-node evaluation. |
+| `standard.yaml` | Normal cluster sizing. |
+| `ha.yaml` | Higher-availability sizing for charted services. |
+
+Profile files are the source of truth for replica and persistence choices. Inspect a rendered
+upgrade before applying it:
+
+```bash
+helm template falcone ../falcone-charts/charts/in-falcone \
+  --namespace falcone \
+  -f ../falcone-charts/charts/in-falcone/values/prod.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/platform-kubernetes.yaml \
+  -f ../falcone-charts/charts/in-falcone/values/profiles/ha.yaml > /tmp/falcone-render.yaml
+```
 
 ## Component defaults
 
-Falcone's supported fresh-install shape is the complete core platform. The chart rejects
-`<component>.enabled=false` for core components, including datastores, OpenBao/ESO, Temporal,
-workflow worker, MCP wiring, pgvector, the control-plane executor, web console, bootstrap, and
-observability. Component values now tune sizing, images, storage, networking, and security settings;
-they do not opt core services out of the baseline.
+Core component aliases include:
 
-External managed-service integrations must preserve the same application contracts and supply the
-required `config.secretRefs`. Do not remove a core component by setting `enabled=false`; add or use
-a documented managed-service path that keeps the chart validation and runtime wiring coherent.
+```text
+apisix
+keycloak
+postgresql
+postgresqlVector
+documentdb
+ferretdb
+kafka
+seaweedfs
+observability
+controlPlane
+controlPlaneExecutor
+webConsole
+workflowWorker
+temporal
+mcp
+eso
+openbao
+```
 
-Object storage is the `seaweedfs` component (**SeaweedFS**, S3-compatible, Apache-2.0;
-[ADR-13](/architecture/adrs#adr-13-migrate-object-store-from-minio-to-seaweedfs), which replaced the
-former MinIO `storage` component). The document API is served by the **FerretDB + DocumentDB**
-two-layer stack — the `ferretdb` gateway (MongoDB-wire-compatible) over the `documentdb` engine
-(DocumentDB-on-PostgreSQL; [ADR-14](/architecture/adrs#adr-14-migrate-document-store-from-mongodb-to-ferretdb-v2-documentdb)).
-Both **are implemented in the chart** and enabled by default; the former `mongodb` server component
-has been removed. See the [FerretDB Document-Store Runbook](/architecture/ferretdb).
+The document store is FerretDB over DocumentDB-on-PostgreSQL. Object storage is SeaweedFS. Functions
+run as runtime-created Knative Services using the `FN_RUNTIME_IMAGE` value wired into the
+control-plane. There is no old MongoDB, MinIO, or OpenWhisk component to enable.
 
-## Exposure & TLS
+## Public surface
+
+Kubernetes Ingress example:
 
 ```yaml
 platform:
-  target: kubernetes          # or openshift
+  target: kubernetes
   network:
-    exposureKind: Ingress     # or Route
+    exposureKind: Ingress
 publicSurface:
   hostnames:
-    api: api.example.test
-    identity: id.example.test
-    realtime: rt.example.test
-    console: console.example.test
+    api: api.example.com
+    console: console.example.com
+    identity: iam.example.com
+    realtime: realtime.example.com
   tls:
-    mode: <your-tls-mode>
+    mode: clusterManaged
 ```
+
+OpenShift Route example:
+
+```yaml
+platform:
+  target: openshift
+  network:
+    exposureKind: Route
+  securityProfile: restricted-v2
+  openshift:
+    enabled: true
+publicSurface:
+  route:
+    annotations:
+      haproxy.router.openshift.io/timeout: 30s
+```
+
+For release `falcone`, rendered public-surface names include:
+
+```text
+Ingress: falcone-in-falcone-public
+Routes:  falcone-in-falcone-api
+         falcone-in-falcone-console
+         falcone-in-falcone-identity
+         falcone-in-falcone-realtime
+```
+
+## Bootstrap
+
+The post-install/post-upgrade bootstrap job is named:
+
+```text
+falcone-in-falcone-bootstrap
+```
+
+It reconciles APISIX routes, the Keycloak platform realm, clients, superadmin user, credentials, and
+the chart's bootstrap lock/marker state. Verify it with:
+
+```bash
+kubectl -n falcone wait --for=condition=complete job/falcone-in-falcone-bootstrap --timeout=15m
+```
+
+## Air-gap and private registry
+
+`values/airgap.yaml` enables these global settings:
+
+```yaml
+global:
+  airgap:
+    enabled: true
+  privateRegistry:
+    enabled: true
+    registry: registry.airgap.in-falcone.local
+    pullSecretNames:
+      - in-falcone-registry
+    caBundleConfigMap: in-falcone-registry-ca
+  imagePullSecrets:
+    - name: in-falcone-registry
+  imageRegistry: registry.airgap.in-falcone.local
+```
+
+For OpenShift + Harbor, use [OpenShift Install](/operations/openshift-install#openshift-with-harbor-or-air-gap).
+For the no-Helm-at-apply-time runbook, use
+[OpenShift Air-gapped (Harbor)](/operations/openshift-airgapped-harbor).
 
 ## Schema validation
 
-The chart ships a strict `values.schema.json`, validated on `helm install/upgrade`. When iterating on a partial values set, bypass it with `--skip-schema-validation`.
-
-## Inspecting a render
-
-```bash
-helm template falcone ../falcone-charts/charts/in-falcone -f <your values> | less
-```
-
-This is the fastest way to confirm exposure objects, bootstrap payload and image references before applying.
+The chart ships a strict `values.schema.json`. `helm install` and `helm upgrade` validate values by
+default. Use `--skip-schema-validation` only when intentionally rendering a partial or experimental
+values set for inspection.

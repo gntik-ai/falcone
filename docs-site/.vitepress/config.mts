@@ -24,6 +24,7 @@ export default defineConfig({
     siteTitle: 'In Falcone',
 
     nav: [
+      { text: 'Start Here', link: '/personas/non-expert' },
       { text: 'Guide', link: '/guide/what-is-falcone' },
       { text: 'Architecture', link: '/architecture/overview' },
       { text: 'API Reference', link: '/api/control-plane' },
@@ -32,6 +33,16 @@ export default defineConfig({
     ],
 
     sidebar: {
+      '/personas/': [
+        {
+          text: 'Choose Your Path',
+          items: [
+            { text: 'Non-expert User', link: '/personas/non-expert' },
+            { text: 'DevOps / Operator', link: '/personas/operator' },
+            { text: 'Developer', link: '/personas/developer' },
+          ],
+        },
+      ],
       '/guide/': [
         {
           text: 'Getting Started',
@@ -39,6 +50,7 @@ export default defineConfig({
             { text: 'What is In Falcone?', link: '/guide/what-is-falcone' },
             { text: 'Installation', link: '/guide/installation' },
             { text: 'Quickstart', link: '/guide/quickstart' },
+            { text: 'Developer End-to-End', link: '/guide/developer-end-to-end' },
             { text: 'Usage Examples', link: '/guide/examples' },
             { text: 'Flows (Workflows)', link: '/guide/flows' },
             { text: 'MCP Server Hosting', link: '/guide/mcp' },
@@ -94,6 +106,8 @@ export default defineConfig({
           text: 'Operations',
           items: [
             { text: 'Helm Configuration', link: '/operations/helm-configuration' },
+            { text: 'Kubernetes Install', link: '/operations/kubernetes-install' },
+            { text: 'OpenShift Install', link: '/operations/openshift-install' },
             { text: 'OpenShift Air-gapped (Harbor)', link: '/operations/openshift-airgapped-harbor' },
             { text: 'Environment Variables', link: '/operations/environment-variables' },
             { text: 'Secret Management', link: '/operations/secret-management' },

@@ -1,5 +1,10 @@
 # Falcone on OpenShift — Air‑gapped (Harbor‑only) Installation Guide
 
+> **Primary path.** Use [OpenShift Install](/operations/openshift-install) for the supported Helm
+> install path, including the OpenShift + Harbor values overlay. This page is the specialized
+> plain-manifest path for environments where Falcone manifests must be applied with `oc apply -f`
+> and Helm must not run at apply time.
+
 > **Scope.** This is a single authoritative runbook for deploying the **entire Falcone
 > multitenant BaaS platform** on **OpenShift 4.14+** inside a locked‑down enterprise
 > network, using **plain declarative manifests applied with `oc apply -f` only** — no
