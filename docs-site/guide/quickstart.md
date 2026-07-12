@@ -9,6 +9,12 @@ This quickstart uses the real umbrella Helm chart from the sibling `falcone-char
 does not use the repo's `deploy/kind/values-kind.yaml` overlay, which is specific to the internal
 test cluster and local registry workflow.
 
+> [!IMPORTANT]
+> Use a new, clean kind cluster for this path. The current all-core chart installs and owns the
+> External Secrets Operator CRDs and validating webhooks; it does not support sharing them with a
+> different Helm release. Do not run this quickstart in a cluster that already has External Secrets
+> installed by another release.
+
 ## Prerequisites
 
 Install:

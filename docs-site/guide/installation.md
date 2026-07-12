@@ -64,6 +64,22 @@ Layer values left to right; later files win:
 common -> environment -> customer -> platform -> airgap -> localOverride -> secretRefs
 ```
 
+## External Secrets ownership
+
+The supported all-core install owns the External Secrets Operator, its CRDs, and its validating
+webhooks. It is a fresh-cluster path: do not install it into a cluster where those External Secrets
+resources are already owned by another Helm release. The current chart requires
+`eso.external-secrets.installCRDs=true` and has no supported reuse or adoption values path.
+
+For a quick check before applying the chart:
+
+```bash
+if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+  echo "External Secrets is already installed; use a clean cluster for this all-core chart."
+  exit 1
+fi
+```
+
 Typical Kubernetes install:
 
 ```bash

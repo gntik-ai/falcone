@@ -36,6 +36,8 @@ kind/local-registry overlay.
 - OpenShift Serverless installed if you will deploy functions or hosted MCP servers.
 - For Harbor/air-gap: all charted images mirrored to Harbor, a pull secret, and a CA ConfigMap when
   Harbor uses a private CA.
+- A clean External Secrets ownership boundary. The all-core chart owns External Secrets CRDs and
+  validating webhooks, and cannot currently reuse an operator installed by a different Helm release.
 
 Check cluster prerequisites:
 
@@ -48,6 +50,18 @@ oc api-resources | grep serving.knative.dev || true
 
 If `serving.knative.dev` resources are absent, the core platform can still render and install, but
 runtime-created functions and hosted MCP servers will fail until OpenShift Serverless is installed.
+
+Check External Secrets ownership before creating the Project or applying Helm:
+
+```bash
+if oc get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+  echo "External Secrets is already installed; this all-core chart needs a clean cluster."
+  exit 1
+fi
+```
+
+Do not use Helm `--take-ownership` to override another release's CRDs or validating webhooks. The
+current chart requires `eso.external-secrets.installCRDs=true` and has no supported reuse path.
 
 Build chart dependencies:
 

@@ -14,6 +14,9 @@ and Harbor/private-registry overlays.
 - An Ingress controller exists if you use `values/platform-kubernetes.yaml`.
 - You have Helm 3 installed.
 - The chart repository is cloned as `../falcone-charts`.
+- The cluster is clean with respect to External Secrets Operator CRDs and validating webhooks. The
+  current all-core chart owns those cluster-scoped resources and cannot reuse an External Secrets
+  installation owned by another Helm release.
 
 Build chart dependencies:
 
@@ -22,7 +25,22 @@ test -d ../falcone-charts || git clone https://github.com/gntik-ai/falcone-chart
 helm dependency build ../falcone-charts/charts/in-falcone
 ```
 
-## 1. Set install variables
+## 1. Check External Secrets ownership
+
+Run this before creating a namespace or installing the chart:
+
+```bash
+if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+  echo "External Secrets is already installed; this all-core chart needs a clean cluster."
+  exit 1
+fi
+```
+
+Expected result: no output and exit status `0`. A message and exit status `1` mean a different
+Helm release already owns External Secrets CRDs or webhooks; the current chart has no supported
+reuse or adoption mode. Do not use `--take-ownership` to bypass that protection.
+
+## 2. Set install variables
 
 ```bash
 export RELEASE=falcone
@@ -36,7 +54,7 @@ export REALTIME_HOST=realtime.example.com
 
 Replace the hostnames with DNS names that route to your Ingress controller.
 
-## 2. Install
+## 3. Install
 
 This command lets Helm create the namespace. It keeps both namespace controls explicit:
 `--create-namespace` and `global.createNamespace=true`.
@@ -81,7 +99,7 @@ helm upgrade --install "$RELEASE" "$CHART" \
   --wait --wait-for-jobs --timeout 30m
 ```
 
-## 3. Verify rendered public surface
+## 4. Verify rendered public surface
 
 For release `falcone`, the Kubernetes public surface renders as one Ingress named
 `falcone-in-falcone-public`.
@@ -93,7 +111,7 @@ kubectl -n "$NS" describe ingress falcone-in-falcone-public
 
 Expected result: rules for the API, console, identity, and realtime hostnames.
 
-## 4. Verify readiness
+## 5. Verify readiness
 
 ```bash
 kubectl -n "$NS" wait --for=condition=complete job/falcone-in-falcone-bootstrap --timeout=15m
@@ -124,7 +142,7 @@ kubectl -n "$NS" rollout status statefulset/falcone-kafka --timeout=10m
 kubectl -n "$NS" rollout status statefulset/openbao --timeout=10m
 ```
 
-## 5. Get console credentials
+## 6. Get console credentials
 
 The bootstrap job creates the platform realm and a `superadmin` user. The password is stored in the
 `in-falcone-superadmin` Secret:
@@ -142,7 +160,7 @@ https://<console hostname>/
 
 The platform realm is `in-falcone-platform`, and the console client is `in-falcone-console`.
 
-## 6. Scaling profiles
+## 7. Scaling profiles
 
 Profiles live under:
 
@@ -174,7 +192,7 @@ helm upgrade "$RELEASE" "$CHART" \
 
 Do not set core service replicas to zero. The chart validation rejects disabling core services.
 
-## 7. Backups
+## 8. Backups
 
 Use both layers:
 
@@ -190,7 +208,7 @@ scripts/system-changes/make-all-services-core/backup-kv.sh \
   --output /secure/path/falcone-kv-backup.tgz
 ```
 
-## 8. Teardown
+## 9. Teardown
 
 ```bash
 helm uninstall "$RELEASE" --namespace "$NS"
