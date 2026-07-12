@@ -23,7 +23,6 @@ done
 
 require_base_tools
 require_helm
-require_bao
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -44,7 +43,28 @@ if kv_tree_is_captured "$backup_dir/kv"; then
 else
   echo "OpenBao KV restore candidates: target KV was not captured"
 fi
-[ "$MODE" = "--apply" ] && restore_kv_tree_exact "$backup_dir/kv" "$tmp"
+
+restore_target_kv_tree_if_available() {
+  local kv_dir="$1"
+  local work_dir="$2"
+  kv_tree_is_captured "$kv_dir" || {
+    echo "backup has no target OpenBao KV tree; skipping OpenBao KV restore"
+    return 0
+  }
+  if [ -z "${BAO_ADDR:-}" ] || [ -z "${BAO_TOKEN:-}" ]; then
+    echo "target OpenBao KV was captured, but BAO_ADDR/BAO_TOKEN are not both set; skipping OpenBao KV restore after Kubernetes/Helm recovery" >&2
+    return 0
+  fi
+  if ! command -v bao >/dev/null 2>&1; then
+    echo "target OpenBao KV was captured, but bao CLI is unavailable; skipping OpenBao KV restore after Kubernetes/Helm recovery" >&2
+    return 0
+  fi
+  if ! bao status >/dev/null 2>&1; then
+    echo "target OpenBao KV was captured, but target OpenBao is not reachable; skipping OpenBao KV restore after Kubernetes/Helm recovery" >&2
+    return 0
+  fi
+  restore_kv_tree_exact "$kv_dir" "$work_dir"
+}
 
 if [ "$MODE" = "--apply" ]; then
   echo "restoring Kubernetes Secrets"
@@ -70,10 +90,15 @@ if [ "$HELM_ROLLBACK" -eq 1 ]; then
   fi
   [ -n "$revision" ] || { echo "no Helm revision in backup; pass --revision N" >&2; exit 1; }
   if [ "$MODE" = "--apply" ]; then
+    echo "rolling Helm release $RELEASE in namespace $NS back to revision $revision"
     helm -n "$NS" rollback "$RELEASE" "$revision" --wait --timeout "${HELM_ROLLBACK_TIMEOUT:-15m}"
   else
     echo "dry-run: would run helm -n $NS rollback $RELEASE $revision --wait --timeout ${HELM_ROLLBACK_TIMEOUT:-15m}"
   fi
+fi
+
+if [ "$MODE" = "--apply" ]; then
+  restore_target_kv_tree_if_available "$backup_dir/kv" "$tmp"
 fi
 
 [ "$MODE" = "--apply" ] && echo "restore applied; run parity-check.sh --strict before rolling workloads" || echo "dry-run only: no OpenBao, Kubernetes Secret, ESO, or Helm rollback changes performed"

@@ -951,6 +951,9 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
   assert.match(common, /merge_kv_tree_into_target/, 'common helpers must merge backed-up external source KV trees');
   assert.match(common, /restore_kv_tree_exact/, 'common helpers must restore the captured target KV tree exactly');
   assert.match(common, /write_kv_json_exact/, 'common helpers must write backup JSON without preserving post-backup properties');
+  assert.match(common, /capture_optional_kubectl_json/, 'Kubernetes capture helpers must separate optional explicit NotFound from other kubectl failures');
+  assert.match(common, /refusing to record resource as absent/, 'Kubernetes capture helpers must fail closed on kubectl errors');
+  assert.match(common, /reason:"NotFound"/, 'optional absent Kubernetes resources must record an explicit NotFound reason');
   assert.match(openbaoInit, /kv_merge\(\)[\s\S]*bao kv get "\$path"[\s\S]*bao kv patch "\$path"[\s\S]*bao kv put "\$path"/, 'OpenBao init must patch existing KV paths and only put on first creation');
 
   assert.match(migrate, /--apply requires --backup/, 'migration apply must require a verified backup');
@@ -969,6 +972,8 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
   assert.match(restore, /helm -n "\$NS" rollback "\$RELEASE" "\$revision"/, 'restore must provide executable Helm rollback for the configured release');
   assert.match(restore, /kubectl -n "\$NS" apply -f "\$backup_dir\/kubernetes\/secrets\.apply\.json"/, 'restore must restore Kubernetes Secrets from the backup');
   assert.match(restore, /restore_kv_tree_exact/, 'restore must restore the captured target OpenBao KV tree exactly');
+  assert.match(restore, /restore_target_kv_tree_if_available/, 'restore must make target OpenBao KV recovery conditional after Kubernetes and Helm recovery');
+  assert.doesNotMatch(restore, /require_bao/, 'restore must not require target OpenBao before Kubernetes Secret, ESO, or Helm rollback recovery');
   assert.match(restore, /\[ "\$MODE" = "--apply" \][\s\S]*require_test_cluster_write_guard/, 'restore apply/helm rollback path must pass the test-cluster guard before writes');
 
   assert.match(health, /kubectl get clustersecretstore openbao-backend -o json > "\$cluster_store_json"/, 'health check must inspect the exact ClusterSecretStore object');

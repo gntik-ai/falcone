@@ -136,10 +136,13 @@ controlled rollout:
 The backup command refuses to overwrite an existing archive. It always captures source Kubernetes
 Secrets, Helm metadata, ESO objects, PVC references, the full external Vault/OpenBao KV-v2 tree when
 configured, and the full target OpenBao KV-v2 tree when target `BAO_ADDR`/`BAO_TOKEN` are supplied.
-KV enumeration and object reads fail closed: authentication, network, or inconsistent listed-object
-failures abort the backup, and the final archive is published atomically only after verification.
-Only an explicit not-found response can represent an empty KV tree, so a partial capture is never
-marked `verified=true` or `targetKvCaptured=true`. Target OpenBao KV is marked absent when target
+Kubernetes API, RBAC, discovery, or kube-context failures abort the backup instead of being recorded
+as absent; only an explicit not-found response for the optional
+`ClusterSecretStore/openbao-backend` object can be captured as absent. KV enumeration and object
+reads also fail closed: authentication, network, or inconsistent listed-object failures abort the
+backup, and the final archive is published atomically only after verification. Only an explicit
+not-found response can represent an empty KV tree, so a partial capture is never marked
+`verified=true` or `targetKvCaptured=true`. Target OpenBao KV is marked absent when target
 credentials are not supplied. Migration and
 initialization use merge semantics for KV paths, so unmapped properties already present at a path are
 preserved instead of being replaced by the mapped platform credential set. Before any write, migration
@@ -150,11 +153,13 @@ safe; any differing target property fails the entire apply before the first writ
 and refuses to run unless the verified backup has `targetKvCaptured=true`, ensuring every overwritten
 target path/property can be restored.
 
-Rollback restores the captured target OpenBao KV tree exactly, restores Kubernetes Secrets and ESO
-resources, and then returns the Helm release to the previous revision. Exact KV restore can remove
-KV paths created after the backup so the secret mount matches the captured target state; it does not
-delete OpenBao, Temporal, pgvector, or any existing service PVC. Keep those PVCs until the failed
-rollout is understood and a separate decommission step is approved.
+Rollback restores Kubernetes Secrets and ESO resources and can return the Helm release to the
+previous revision without depending on target OpenBao availability. If the backup captured target
+OpenBao KV and target `BAO_ADDR`/`BAO_TOKEN` reach OpenBao, rollback also restores that KV tree
+exactly. Exact KV restore can remove KV paths created after the backup so the secret mount matches
+the captured target state; it does not delete OpenBao, Temporal, pgvector, or any existing service
+PVC. Keep those PVCs until the failed rollout is understood and a separate decommission step is
+approved.
 
 ## Image Publication Status
 

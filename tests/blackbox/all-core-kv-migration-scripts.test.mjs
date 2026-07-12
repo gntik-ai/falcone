@@ -187,6 +187,14 @@ function kvDelete(ref) {
   delete storeFor(mount)[path];
   save();
 }
+if (args[0] === 'status') {
+  if (process.env.BAO_FAKE_STATUS_FAIL_CONTEXT === context) {
+    console.error('target OpenBao unavailable');
+    process.exit(3);
+  }
+  console.log(JSON.stringify({ initialized: true, sealed: false }));
+  process.exit(0);
+}
 if (args[0] !== 'kv') process.exit(2);
 if (args[1] === 'list') kvList(args[args.length - 1]);
 else if (args[1] === 'get') kvGet(args[args.length - 1]);
@@ -222,7 +230,13 @@ if (args.includes('apply')) {
     const items = Array.isArray(parsed.items) ? parsed.items : [parsed];
     state.applied ??= {};
     state.applied.clusterSecretStores ??= [];
+    state.applied.kinds ??= [];
+    state.applied.secrets ??= [];
     for (const item of items) {
+      if (item?.kind) state.applied.kinds.push(item.kind);
+      if (item?.kind === 'Secret' && item?.metadata?.name) {
+        state.applied.secrets.push(item.metadata.name);
+      }
       if (item?.kind === 'ClusterSecretStore' && item?.metadata?.name) {
         state.applied.clusterSecretStores.push(item.metadata.name);
       }
@@ -235,6 +249,11 @@ const getIndex = args.indexOf('get');
 if (getIndex === -1) process.exit(2);
 const resource = args[getIndex + 1];
 const name = args[getIndex + 2] && !args[getIndex + 2].startsWith('-') ? args[getIndex + 2] : '';
+const failureResource = process.env.KUBECTL_FAKE_GET_FAIL_RESOURCE || '';
+if (failureResource === resource || (name && failureResource === resource + '/' + name)) {
+  console.error(process.env.KUBECTL_FAKE_GET_FAIL_STDERR || 'Error from server (Forbidden): denied');
+  process.exit(Number(process.env.KUBECTL_FAKE_GET_FAIL_CODE || 1));
+}
 if (resource === 'secret' && name) {
   print(secretObject(name, state.kubernetes?.[name]));
   process.exit(0);
@@ -281,7 +300,13 @@ print({ apiVersion: 'v1', kind: 'List', items: [] });
 `);
 
   writeExecutable(join(bin, 'helm'), `#!/usr/bin/env node
+const fs = require('fs');
+const stateFile = process.env.BAO_FAKE_STATE;
+const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : {};
 const args = process.argv.slice(2);
+function save() {
+  if (stateFile) fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+}
 const getIndex = args.indexOf('get');
 if (getIndex !== -1) {
   const kind = args[getIndex + 1];
@@ -298,7 +323,16 @@ if (args.includes('status')) {
   console.log(JSON.stringify({ version: 6 }));
   process.exit(0);
 }
-if (args.includes('rollback')) process.exit(0);
+if (args.includes('rollback')) {
+  const rollbackIndex = args.indexOf('rollback');
+  state.helmRollbacks ??= [];
+  state.helmRollbacks.push({
+    release: args[rollbackIndex + 1],
+    revision: args[rollbackIndex + 2],
+  });
+  save();
+  process.exit(0);
+}
 process.exit(2);
 `);
 
@@ -664,6 +698,96 @@ test('all-core KV migration refuses overwrite when backup did not capture target
   assert.notEqual(applyRun.status, 0, 'overwrite apply must fail without targetKvCaptured=true');
   assert.match(`${applyRun.stdout}\n${applyRun.stderr}`, /targetKvCaptured=true required/, 'failure must explain the target backup requirement');
   assert.deepEqual(h.state().target, before, 'failed overwrite must not write target KV data');
+});
+
+test('all-core KV backup fails closed on Kubernetes capture errors', async (t) => {
+  const cases = [
+    {
+      name: 'ExternalSecret RBAC denial',
+      resource: 'externalsecret.external-secrets.io',
+      stderr: 'Error from server (Forbidden): externalsecrets.external-secrets.io is forbidden',
+    },
+    {
+      name: 'PVC API unavailable',
+      resource: 'pvc',
+      stderr: 'Unable to connect to the server: dial tcp 127.0.0.1:6443: connect: connection refused',
+    },
+    {
+      name: 'ClusterSecretStore CRD discovery failure',
+      resource: 'clustersecretstore.external-secrets.io/openbao-backend',
+      stderr: 'Error from server (NotFound): the server could not find the requested resource (get clustersecretstores.external-secrets.io openbao-backend)',
+    },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.name, (st) => {
+      const h = makeHarness(st, {
+        target: { secret: {} },
+        source: { secret: {} },
+        kubernetes: makeKubernetesSecrets(),
+      });
+      const backup = join(h.root, `${testCase.name.replaceAll(' ', '-')}.tgz`);
+
+      const result = h.run('backup-kv.sh', ['--output', backup], {
+        KUBECTL_FAKE_GET_FAIL_RESOURCE: testCase.resource,
+        KUBECTL_FAKE_GET_FAIL_STDERR: testCase.stderr,
+      });
+
+      assert.notEqual(result.status, 0, `${testCase.name} must abort backup creation`);
+      assert.match(`${result.stdout}\n${result.stderr}`, /refusing to record resource as absent/);
+      assert.equal(existsSync(backup), false, `${testCase.name} must not publish a final backup archive`);
+    });
+  }
+});
+
+test('all-core KV restore rolls back Kubernetes and Helm without target OpenBao', (t) => {
+  const h = makeHarness(t, {
+    target: { secret: {} },
+    source: { secret: {} },
+    kubernetes: makeKubernetesSecrets(),
+  });
+  const backup = join(h.root, 'no-target-restore-backup.tgz');
+
+  const backupRun = h.run('backup-kv.sh', ['--output', backup]);
+  assert.equal(backupRun.status, 0, `backup without target OpenBao must succeed\nstdout: ${backupRun.stdout}\nstderr: ${backupRun.stderr}`);
+  const archivedStore = spawnSync('tar', ['-xOf', backup, 'eso/clustersecretstores.apply.json'], { encoding: 'utf8' });
+  assert.equal(archivedStore.status, 0, `cluster store absence marker must be extractable\nstderr: ${archivedStore.stderr}`);
+  assert.deepEqual(
+    JSON.parse(archivedStore.stdout),
+    { absent: true, reason: 'NotFound', command: 'kubectl get clustersecretstore.external-secrets.io openbao-backend', stderr: 'NotFound\n' },
+    'optional missing ClusterSecretStore must be the only Kubernetes absent marker',
+  );
+
+  const restoreRun = h.run('restore-kv.sh', ['--backup', backup, '--apply', '--helm-rollback']);
+  assert.equal(restoreRun.status, 0, `restore must not require target OpenBao\nstdout: ${restoreRun.stdout}\nstderr: ${restoreRun.stderr}`);
+  assert.match(`${restoreRun.stdout}\n${restoreRun.stderr}`, /backup has no target OpenBao KV tree; skipping OpenBao KV restore/);
+  assert.ok(h.state().applied?.secrets?.includes('in-falcone-postgresql'), 'restore must still apply backed-up Kubernetes Secrets');
+  assert.deepEqual(h.state().helmRollbacks, [{ release: 'falcone', revision: '6' }], 'restore must still execute Helm rollback');
+});
+
+test('all-core KV restore skips captured target KV when OpenBao is unreachable after independent rollback', (t) => {
+  const h = makeHarness(t, {
+    target: { secret: { 'target/path': { token: 'TARGET_BACKUP_SECRET' } } },
+    source: { secret: {} },
+    kubernetes: makeKubernetesSecrets(),
+  });
+  const backup = join(h.root, 'unreachable-target-restore-backup.tgz');
+  const baoEnv = {
+    BAO_ADDR: 'https://target-openbao.test',
+    BAO_TOKEN: 'target-token',
+  };
+
+  const backupRun = h.run('backup-kv.sh', ['--output', backup], baoEnv);
+  assert.equal(backupRun.status, 0, `target KV backup must succeed\nstdout: ${backupRun.stdout}\nstderr: ${backupRun.stderr}`);
+
+  const restoreRun = h.run('restore-kv.sh', ['--backup', backup, '--apply', '--helm-rollback'], {
+    ...baoEnv,
+    BAO_FAKE_STATUS_FAIL_CONTEXT: 'target',
+  });
+  assert.equal(restoreRun.status, 0, `restore must skip unreachable target KV after independent recovery\nstdout: ${restoreRun.stdout}\nstderr: ${restoreRun.stderr}`);
+  assert.match(`${restoreRun.stdout}\n${restoreRun.stderr}`, /target OpenBao is not reachable; skipping OpenBao KV restore after Kubernetes\/Helm recovery/);
+  assert.ok(h.state().applied?.secrets?.includes('in-falcone-postgresql'), 'restore must apply backed-up Kubernetes Secrets before target KV restore');
+  assert.deepEqual(h.state().helmRollbacks, [{ release: 'falcone', revision: '6' }], 'restore must execute Helm rollback even when target OpenBao is unreachable');
 });
 
 test('all-core KV backup fails closed on target and source list/get errors', async (t) => {

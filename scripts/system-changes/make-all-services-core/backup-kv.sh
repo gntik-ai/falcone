@@ -44,7 +44,7 @@ chmod 0400 "$tmp/helm/"*
 echo "backing up ESO resources"
 capture_kubectl_json "$tmp/eso/externalsecrets.json" -n "$NS" get externalsecret.external-secrets.io
 capture_kubectl_json "$tmp/eso/secretstores.json" -n "$NS" get secretstore.external-secrets.io
-capture_kubectl_json "$tmp/eso/clustersecretstores.json" get clustersecretstore.external-secrets.io openbao-backend
+capture_optional_kubectl_json "$tmp/eso/clustersecretstores.json" get clustersecretstore.external-secrets.io openbao-backend
 sanitize_kubernetes_list < "$tmp/eso/externalsecrets.json" > "$tmp/eso/externalsecrets.apply.json" || cp "$tmp/eso/externalsecrets.json" "$tmp/eso/externalsecrets.apply.json"
 sanitize_kubernetes_list < "$tmp/eso/secretstores.json" > "$tmp/eso/secretstores.apply.json" || cp "$tmp/eso/secretstores.json" "$tmp/eso/secretstores.apply.json"
 if jq -e '.absent == true' "$tmp/eso/clustersecretstores.json" >/dev/null 2>&1; then

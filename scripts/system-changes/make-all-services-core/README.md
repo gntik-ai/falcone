@@ -14,9 +14,9 @@ Principles:
   (`targetKvCaptured=true`), so every overwritten target path/property is recoverable.
 - Backup captures recursive KV-v2 trees, not only the mapped platform paths. External source
   Vault/OpenBao trees are imported losslessly before mapped Kubernetes Secret values are overlaid.
-- Rollback restores the captured target OpenBao KV tree exactly, restores Kubernetes Secrets and ESO
-  resources, and can execute a Helm rollback to the backed-up release revision before parity is
-  rechecked.
+- Rollback restores Kubernetes Secrets, ESO resources, and the backed-up Helm revision without
+  depending on target OpenBao availability. If the backup captured target OpenBao KV and target
+  `BAO_ADDR`/`BAO_TOKEN` reach it, rollback restores that KV tree exactly before parity is rechecked.
 
 Required environment:
 
@@ -25,7 +25,7 @@ Required environment:
 - `RELEASE` for the Helm release, default `falcone`.
 - `OPENBAO_NAMESPACE`, default `secret-store`.
 - `BAO_ADDR`, `BAO_TOKEN`, and optionally `BAO_CACERT` for the target OpenBao instance when
-  running parity, migration, restore, or when capturing target KV that already exists. `backup-kv.sh`
+  running parity, migration, exact target KV restore, or when capturing target KV that already exists. `backup-kv.sh`
   can run without these before target OpenBao has been provisioned; the archive records target KV as
   absent. If migration will use `--allow-overwrite`, these target credentials must be supplied to
   the backup step so the archive records `targetKvCaptured=true`.
@@ -56,7 +56,9 @@ Rollback:
 4. `./health-check.sh` after workloads settle.
 
 The backup archive contains secret material, rendered Helm manifests, release values, and recovery
-material. `backup-kv.sh` refuses to overwrite an existing archive. Exact KV rollback can delete KV
-paths created after the backup so the target mount returns to the captured state; it does not delete
-OpenBao or PVCs. Store the archive as a restricted operator artifact. The scripts never echo archive
-contents.
+material. `backup-kv.sh` refuses to overwrite an existing archive and fails closed on Kubernetes API,
+RBAC, discovery, or kube-context errors; only an explicit not-found response for the optional
+`ClusterSecretStore/openbao-backend` object is recorded as absent. Exact KV rollback can delete KV
+paths created after the backup so the target mount returns to the captured state; it runs only when
+target KV was captured and target OpenBao is reachable. It does not delete OpenBao or PVCs. Store the
+archive as a restricted operator artifact. The scripts never echo archive contents.
