@@ -123,8 +123,15 @@ function splitCopyArgs(line) {
   return args.slice(0, -1);
 }
 
-function sourceExistsInContext(source, context) {
+export function isGeneratedBuildArtifact(source, context, entry) {
+  return entry?.build_spa === 'true'
+    && context === '.'
+    && source === `${dockerfileParent(entry.dockerfile)}/dist`;
+}
+
+function sourceExistsInContext(source, context, entry) {
   if (source.startsWith('/') || source.includes('*') || source.includes('$')) return true;
+  if (isGeneratedBuildArtifact(source, context, entry)) return true;
   return existsSync(normalize(join(context, source)));
 }
 
@@ -193,7 +200,7 @@ export function collectServiceCatalogViolations(catalog = readServiceCatalog(), 
     if (!existsSync(dockerfile)) continue;
     for (const line of normalizeCopyLines(readFileSync(dockerfile, 'utf8'))) {
       for (const source of splitCopyArgs(line)) {
-        if (!sourceExistsInContext(source, context)) {
+        if (!sourceExistsInContext(source, context, entry)) {
           violations.push(`${dockerfile} COPY source does not exist in context ${context}: ${source}`);
         }
       }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   collectServiceCatalogViolations,
+  isGeneratedBuildArtifact,
   readServiceCatalog,
   REQUIRED_NON_RELEASE_CANDIDATES,
   REQUIRED_RELEASE_IMAGES
@@ -36,4 +37,16 @@ test('repository layout catalog encodes the issue 900 release and non-release se
     assert.equal(service?.imageIdentity, undefined);
     assert.equal(service?.chart, undefined);
   }
+});
+
+test('catalog validation recognizes only the CI-declared SPA build artifact before release-image build', () => {
+  const webConsoleRelease = {
+    build_spa: 'true',
+    dockerfile: 'apps/web-console/Dockerfile'
+  };
+
+  assert.equal(isGeneratedBuildArtifact('apps/web-console/dist', '.', webConsoleRelease), true);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console/src', '.', webConsoleRelease), false);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console/dist', '.', { dockerfile: webConsoleRelease.dockerfile }), false);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console/dist', 'apps/web-console', webConsoleRelease), false);
 });
