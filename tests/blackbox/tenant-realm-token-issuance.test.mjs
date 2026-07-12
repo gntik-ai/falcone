@@ -2,7 +2,7 @@
  * Black-box regression suite for spec change fix-tenant-realm-token-issuance (finding A3),
  * executor multi-realm JWKS verification half.
  *
- * Drives the executor's public JWT verifier (apps/control-plane/src/runtime/jwt-verify.mjs).
+ * Drives the executor's public JWT verifier (apps/control-plane-executor/src/runtime/jwt-verify.mjs).
  * Mints RSA-signed tokens for two realms — the platform realm and a per-tenant realm whose NAME
  * equals the tenant id — each served by its own JWKS, and asserts the multi-realm trust model.
  *
@@ -23,7 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { createJwtVerifier } from '../../apps/control-plane/src/runtime/jwt-verify.mjs';
+import { createJwtVerifier } from '../../apps/control-plane-executor/src/runtime/jwt-verify.mjs';
 
 const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 const NOW = 1_900_000_000_000;

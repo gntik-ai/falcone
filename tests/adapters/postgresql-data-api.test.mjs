@@ -5,7 +5,7 @@ import {
   buildPostgresDataApiPlan,
   parsePostgresDataApiCursor,
   serializePostgresDataApiCursor
-} from '../../services/adapters/src/postgresql-data-api.mjs';
+} from '../../packages/adapters/src/postgresql-data-api.mjs';
 
 function buildAccessContext(overrides = {}) {
   return {

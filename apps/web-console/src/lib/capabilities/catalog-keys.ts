@@ -4,10 +4,10 @@
 // These MUST stay in lockstep with the platform boolean-capability catalog
 // (`boolean_capability_catalog.capability_key`), which is seeded by exactly two
 // provisioning-orchestrator migrations:
-//   - services/provisioning-orchestrator/src/migrations/104-plan-boolean-capabilities.sql
+//   - packages/provisioning-orchestrator/src/migrations/104-plan-boolean-capabilities.sql
 //       sql_admin_api, passthrough_admin, realtime, webhooks, public_functions,
 //       custom_domains, scheduled_functions
-//   - services/provisioning-orchestrator/src/migrations/114-backup-scope-deployment-profiles.sql
+//   - packages/provisioning-orchestrator/src/migrations/114-backup-scope-deployment-profiles.sql
 //       backup_scope_access
 //
 // The effective-capabilities endpoint (GET /v1/tenant/effective-capabilities) only ever

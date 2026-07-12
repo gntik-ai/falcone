@@ -30,8 +30,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS as HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
+import { LOCAL_HANDLERS as HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
 
 const WS_A = { id: 'ws-a', tenant_id: 'tenant-a', slug: 'app-staging', display_name: 'App Staging', status: 'active', environment: 'staging' };
 const WS_B = { id: 'ws-b', tenant_id: 'tenant-b', slug: 'other-app', display_name: 'Other App', status: 'active', environment: 'dev' };

@@ -19,8 +19,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createFunctionsExecutor } from '../../apps/control-plane/src/runtime/functions-executor.mjs';
-import { invocationInput as kindInvocationInput } from '../../deploy/kind/control-plane/fn-handlers.mjs';
+import { createFunctionsExecutor } from '../../apps/control-plane-executor/src/runtime/functions-executor.mjs';
+import { invocationInput as kindInvocationInput } from '../../apps/control-plane/fn-handlers.mjs';
 
 const IDENT = { tenantId: 'ten_fn', workspaceId: 'ws_fn' };
 const SRC = 'function main(p){ return { doubled: (p.n||0)*2 }; }';

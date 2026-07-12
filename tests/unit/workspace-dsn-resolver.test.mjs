@@ -3,7 +3,7 @@
 // resolver: DSN rewriting, registry lookup, fallback, and caching (stub pool — no real Postgres).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dsnWithDatabase, createWorkspaceDsnResolver } from '../../apps/control-plane/src/runtime/workspace-dsn-resolver.mjs';
+import { dsnWithDatabase, createWorkspaceDsnResolver } from '../../apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs';
 
 const BASE = 'postgres://falcone:s3cr3t@falcone-postgresql:5432/in_falcone';
 

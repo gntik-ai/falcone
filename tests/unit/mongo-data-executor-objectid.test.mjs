@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ObjectId } from 'mongodb';
-import { coerceDocumentIdFilter } from '../../apps/control-plane/src/runtime/mongo-data-executor.mjs';
+import { coerceDocumentIdFilter } from '../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs';
 
 const HEX = 'a1b2c3d4e5f6a1b2c3d4e5f6'; // 24-char hex → valid ObjectId
 

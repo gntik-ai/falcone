@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getConfig, isSchedulingEnabled, getActiveJobsToSuspend } from '../../services/scheduling-engine/src/config-model.mjs';
+import { getConfig, isSchedulingEnabled, getActiveJobsToSuspend } from '../../packages/scheduling-engine/src/config-model.mjs';
 
 function makePg(workspaceRow, tenantRow, activeRows = []) {
   return {

@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createTriggerStore } from '../../apps/control-plane/src/runtime/flow-trigger-registry.mjs';
+import { createTriggerStore } from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -34,7 +34,7 @@ test('bbx-flow-trig-01: trigger-store ensureSchema creates BOTH trigger tables',
 test('bbx-flow-trig-02: the executor boot chain invokes the trigger-store ensureSchema', () => {
   // The bug was a missing call: the tables were defined but ensureSchema was never run at
   // boot, so the first publish-with-trigger 502'd. Assert the boot wiring runs it.
-  const main = readFileSync(resolve(REPO_ROOT, 'apps/control-plane/src/runtime/main.mjs'), 'utf8');
+  const main = readFileSync(resolve(REPO_ROOT, 'apps/control-plane-executor/src/runtime/main.mjs'), 'utf8');
   assert.match(main, /triggerStore\s*=\s*createTriggerStore\(/, 'a shared trigger store must be created at boot');
   assert.match(main, /triggerStore\.ensureSchema\(\)/, 'the boot ensureSchema chain must invoke triggerStore.ensureSchema()');
 });

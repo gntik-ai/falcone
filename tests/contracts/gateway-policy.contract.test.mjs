@@ -12,7 +12,7 @@ import {
   listConsoleRoutesByTier,
   listConsoleWorkflowRoutes,
   summarizeConsoleEndpointSeparation
-} from '../../apps/control-plane/src/public-api-catalog.mjs';
+} from '../../apps/control-plane-executor/src/public-api-catalog.mjs';
 
 test('gateway contract publishes APISIX policy for every public family and passthrough route', () => {
   const values = readGatewayPolicyValues();

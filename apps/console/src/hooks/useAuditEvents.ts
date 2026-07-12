@@ -4,7 +4,7 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { fetchAuditEvents } from '../lib/api/backup-audit.api.js'
-import type { AuditQueryFilters } from '../../../../services/backup-status/src/audit/audit-trail.types.js'
+import type { AuditQueryFilters } from '../../../../packages/backup-status/src/audit/audit-trail.types.js'
 
 interface UseAuditEventsOptions {
   filters: AuditQueryFilters

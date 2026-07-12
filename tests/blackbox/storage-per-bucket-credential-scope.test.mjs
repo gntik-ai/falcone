@@ -40,8 +40,8 @@ import {
   isInCluster,
   LEGACY_WS_IDENTITY_PREFIX,
   LEGACY_WS_IDENTITY_RE,
-} from '../../deploy/kind/control-plane/seaweedfs-identity.mjs';
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+} from '../../apps/control-plane/seaweedfs-identity.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 
 const { storageRotateCredential, storageRevokeCredential } = STORAGE_HANDLERS;
 

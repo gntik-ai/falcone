@@ -2,7 +2,7 @@
 // #464, task 1.2). Mirrors tests/e2e/helpers/storage/storage-api-client.ts: a Playwright
 // APIRequestContext, gateway-bypass identity headers (honoured by an e2e-profile control-plane),
 // and a { status, body } response shape. Routes confirmed in
-// services/gateway-config/public-route-catalog.json:
+// deploy/gateway-config/public-route-catalog.json:
 //   POST   /v1/collections/{name}/documents
 //   GET    /v1/collections/{name}/documents
 //   PUT    /v1/collections/{name}/documents/{id}

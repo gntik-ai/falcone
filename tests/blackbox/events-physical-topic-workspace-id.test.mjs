@@ -20,8 +20,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { physicalTopicName } from '../../deploy/kind/control-plane/kafka-handlers.mjs';
-import { insertTopic } from '../../deploy/kind/control-plane/tenant-store.mjs';
+import { physicalTopicName } from '../../apps/control-plane/kafka-handlers.mjs';
+import { insertTopic } from '../../apps/control-plane/tenant-store.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const TENANT_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';

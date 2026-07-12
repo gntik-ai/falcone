@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadMappingCache, classifyByErrorCode } from '../../services/provisioning-orchestrator/src/models/failure-classification.mjs';
+import { loadMappingCache, classifyByErrorCode } from '../../packages/provisioning-orchestrator/src/models/failure-classification.mjs';
 
 test('classification mapping covers specific, generic, unknown and priority', () => {
   const cache = loadMappingCache([

@@ -1,14 +1,14 @@
 # Web console static asset delivery
 
-Falcone serves the built web-console SPA through several bundled runtime paths:
+Falcone serves the built web-console SPA through the co-located release runtime under
+`apps/web-console`:
 
-- `apps/web-console/nginx.conf` is the production nginx template used by
-  `apps/web-console/Dockerfile`.
-- `deploy/kind/web-console/static-server.mjs` is the restricted-profile Node server used by the
-  kind and release static-server images. It also proxies same-origin `/v1/*` requests to
+- `apps/web-console/Dockerfile` is the release Dockerfile for `in-falcone-web-console`.
+- `apps/web-console/static-server.mjs` is the restricted-profile Node server used by the release
+  image and local compatibility images. It also proxies same-origin `/v1/*` requests to
   `GATEWAY_UPSTREAM` before the SPA fallback.
-- `apps/web-console/static-server.mjs` is the app-local test/deploy Node static server.
-- `deploy/kind/web-console/nginx.conf` is the kind nginx static-serving config.
+- `apps/web-console/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
+  configs only; they are not the release image runtime.
 
 ## Header policy
 
@@ -31,8 +31,7 @@ Cache-Control: no-store
 for `index.html`. The Node static servers also apply the same `no-store` policy to SPA fallback
 responses that return `index.html` for client-side routes.
 
-Every static-serving path also sends the baseline browser security headers for the console shell and
-assets:
+The Node static server sends the baseline browser security headers for the console shell and assets:
 
 ```http
 Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self' blob:; form-action 'self'
@@ -50,10 +49,9 @@ serving constrains script execution to same-origin bundle files, omits `unsafe-i
 `frame-ancestors 'none'` and `X-Frame-Options: DENY`. `style-src 'unsafe-inline'` is intentionally
 limited to styles because several existing React components use inline style attributes.
 
-For nginx, remember that a `location` block with its own `add_header` does not inherit headers from
-the parent server block. Static locations repeat the security headers so direct `/index.html`,
-`/assets/*`, and SPA fallback responses stay protected. The production template keeps these headers
-out of the `/v1/` proxy location so API response headers are not changed by static-serving hardening.
+The legacy nginx configs repeat these headers in static locations because a `location` block with its
+own `add_header` does not inherit headers from the parent server block. The release Node static
+server applies the headers directly and leaves proxied `/v1/` API response headers unchanged.
 
 ## Icon asset policy
 
@@ -64,21 +62,19 @@ as `favicon.png` as separate small files.
 
 ## Compression policy
 
-Compressible bundle assets are JavaScript, CSS, JSON, and SVG. The Node static servers use only
-Node built-ins and do not write precompressed files to disk. They inspect `Accept-Encoding` and:
+Compressible bundle assets are JavaScript, CSS, JSON, and SVG. The Node static server uses only Node
+built-ins and does not write precompressed files to disk. It inspects `Accept-Encoding` and:
 
 - return Brotli (`content-encoding: br`) when the client accepts `br`;
 - otherwise return gzip (`content-encoding: gzip`) when the client accepts `gzip`;
 - leave non-compressible assets such as PNG, ICO, and WOFF2 uncompressed.
 
-The Node static servers set `Vary: Accept-Encoding` on compressible asset responses so caches do not
-serve a compressed variant to a client that did not request it. The nginx paths enable gzip and
-`gzip_vary on` for the same reason. Stock nginx images do not include Brotli, so nginx paths provide
-gzip compression.
+The Node static server sets `Vary: Accept-Encoding` on compressible asset responses so caches do not
+serve a compressed variant to a client that did not request it.
 
 ## Test and runtime overrides
 
-The Node static servers keep their container defaults:
+The Node static server keeps its container defaults:
 
 - `WEB_CONSOLE_STATIC_ROOT=/app/dist`
 - `PORT=3000`

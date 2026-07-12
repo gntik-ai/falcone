@@ -20,7 +20,7 @@ import {
   previewStorageObjectDownload,
   previewStorageObjectDeletion,
   STORAGE_BUCKET_OBJECT_ERROR_CODES
-} from '../../services/adapters/src/storage-bucket-object-ops.mjs';
+} from '../../packages/adapters/src/storage-bucket-object-ops.mjs';
 
 // Minimal valid bucket fixture (no real I/O — purely in-memory object graph).
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';

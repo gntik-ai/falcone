@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readAuthorizationModel } from '../../scripts/lib/authorization-model.mjs';
-import { validateConsoleBackendInvocationRequest } from '../../services/adapters/src/openwhisk-admin.mjs';
-import { buildConsoleBackendWorkflowInvocation } from '../../apps/control-plane/src/console-backend-functions.mjs';
+import { validateConsoleBackendInvocationRequest } from '../../packages/adapters/src/openwhisk-admin.mjs';
+import { buildConsoleBackendWorkflowInvocation } from '../../apps/control-plane-executor/src/console-backend-functions.mjs';
 
 test('console backend resilience coverage includes the new negative scenarios', () => {
   const model = readAuthorizationModel();
@@ -82,7 +82,7 @@ test('console backend allowed path preserves public API denial parity metadata a
 });
 
 test('console workflow status-query routes remain tenant/workspace bound in the route catalog', async () => {
-  const { getPublicRoute } = await import('../../services/internal-contracts/src/index.mjs');
+  const { getPublicRoute } = await import('../../packages/internal-contracts/src/index.mjs');
   const tenantStatusRoute = getPublicRoute('getTenantWorkflowJobStatus');
   const workspaceStatusRoute = getPublicRoute('getWorkspaceWorkflowJobStatus');
 

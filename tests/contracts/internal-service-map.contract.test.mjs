@@ -1,29 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { controlApiBoundary, controlApiCommandContract } from '../../apps/control-plane/src/internal-service-map.mjs';
+import { controlApiBoundary, controlApiCommandContract } from '../../apps/control-plane-executor/src/internal-service-map.mjs';
 import {
   controlApiAuthorizationDecisionContract,
   controlApiAuthorizationSurface,
   controlApiCommandContextProjection
-} from '../../apps/control-plane/src/authorization-model.mjs';
+} from '../../apps/control-plane-executor/src/authorization-model.mjs';
 import {
   AUTHORIZATION_MODEL_VERSION,
   INTERNAL_CONTRACT_VERSION,
   getContract,
   getService,
   listInteractionFlows
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   provisioningAdapterPorts,
   provisioningOrchestratorBoundary,
   provisioningRequestContract,
   provisioningResultContract
-} from '../../services/provisioning-orchestrator/src/contract-boundary.mjs';
+} from '../../packages/provisioning-orchestrator/src/contract-boundary.mjs';
 import {
   provisioningAdapterAuthorizationProjection,
   provisioningAuthorizationContextProjection
-} from '../../services/provisioning-orchestrator/src/authorization-context.mjs';
+} from '../../packages/provisioning-orchestrator/src/authorization-context.mjs';
 import {
   auditModuleBoundary,
   iamLifecycleEventContract as auditLifecycleEventContract,
@@ -31,8 +31,8 @@ import {
   kafkaAdminEventContract as auditKafkaAdminEventContract,
   auditPersistenceAdapters,
   auditRecordContract
-} from '../../services/audit/src/contract-boundary.mjs';
-import { auditContextProjection } from '../../services/audit/src/authorization-context.mjs';
+} from '../../packages/audit/src/contract-boundary.mjs';
+import { auditContextProjection } from '../../packages/audit/src/authorization-context.mjs';
 import {
   eventGatewayBoundary,
   iamLifecycleEventContract as eventGatewayLifecycleEventContract,
@@ -42,7 +42,7 @@ import {
   eventGatewayPublishResultContract,
   eventGatewaySubscriptionRequestContract,
   eventGatewaySubscriptionStatusContract
-} from '../../services/event-gateway/src/contract-boundary.mjs';
+} from '../../packages/event-gateway/src/contract-boundary.mjs';
 
 test('internal contract baseline preserves versioning and dependency expectations', () => {
   assert.equal(INTERNAL_CONTRACT_VERSION, '2026-03-25');
@@ -278,7 +278,7 @@ test('consumer scaffolding exposes the expected provider and flow slices', () =>
   assert.ok(interactionFlowIds.has('iam_lifecycle_traceability'));
   assert.ok(interactionFlowIds.has('event_publish_gateway'));
   assert.ok(interactionFlowIds.has('realtime_subscription_gateway'));
-  assert.equal(getService('event_gateway').package, 'services/event-gateway');
-  assert.equal(getContract('adapter_call').owner, 'services/adapters');
+  assert.equal(getService('event_gateway').package, 'packages/event-gateway');
+  assert.equal(getContract('adapter_call').owner, 'packages/adapters');
   assert.equal(getContract('identity_blueprint').owner, 'provisioning_orchestrator');
 });

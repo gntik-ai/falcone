@@ -17,7 +17,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyWebhookSchema, WEBHOOK_MIGRATIONS } from '../../deploy/kind/control-plane/webhook-schema.mjs';
+import { applyWebhookSchema, WEBHOOK_MIGRATIONS } from '../../apps/control-plane/webhook-schema.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

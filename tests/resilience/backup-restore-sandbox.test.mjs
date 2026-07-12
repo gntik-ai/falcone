@@ -17,7 +17,7 @@ function makeOperation(id = 'op-sim-resilience') {
 }
 
 test('unsafe simulation profiles are rejected deterministically', async () => {
-  const { runRestoreSimulation, RestoreSimulationError } = await import('../../services/backup-status/src/operations/restore-simulation.service.js')
+  const { runRestoreSimulation, RestoreSimulationError } = await import('../../packages/backup-status/src/operations/restore-simulation.service.js')
 
   const attempt = () => runRestoreSimulation({
     operation: makeOperation(),
@@ -30,7 +30,7 @@ test('unsafe simulation profiles are rejected deterministically', async () => {
 })
 
 test('operation metadata patch is merged instead of replaced during persistence', async () => {
-  const { setClient, updateStatus } = await import('../../services/backup-status/src/operations/operations.repository.js')
+  const { setClient, updateStatus } = await import('../../packages/backup-status/src/operations/operations.repository.js')
 
   const queries = []
   const store = new Map([

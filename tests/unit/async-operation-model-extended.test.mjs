@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyTransition, createOperation } from '../../services/provisioning-orchestrator/src/models/async-operation.mjs';
+import { applyTransition, createOperation } from '../../packages/provisioning-orchestrator/src/models/async-operation.mjs';
 
 test('applyTransition sets timeout reason for timed_out', () => {
   const updated = applyTransition({ status: 'running' }, { new_status: 'timed_out' });

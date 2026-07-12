@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateCronExpression, nextRunAt, assertAboveFloor, minimumIntervalSeconds } from '../../services/scheduling-engine/src/cron-validator.mjs';
+import { validateCronExpression, nextRunAt, assertAboveFloor, minimumIntervalSeconds } from '../../packages/scheduling-engine/src/cron-validator.mjs';
 
 test('validates 5-field cron expressions', () => {
   assert.equal(validateCronExpression('*/5 * * * *').valid, true);

@@ -9,12 +9,12 @@ import {
   emitStorageAuditEvent,
   normalizeStorageAuditEvent,
   queryStorageAuditTrail
-} from '../../services/adapters/src/storage-audit-ops.mjs';
-import { buildStorageBucketRecord, buildStorageMutationEvent, buildStorageObjectRecord } from '../../services/adapters/src/storage-bucket-object-ops.mjs';
-import { buildStorageErrorAuditEvent } from '../../services/adapters/src/storage-error-taxonomy.mjs';
-import { buildStorageEventNotificationAuditEvent, buildStorageEventNotificationRule, STORAGE_EVENT_NOTIFICATION_AUDIT_ACTIONS, STORAGE_EVENT_NOTIFICATION_DESTINATION_TYPES, STORAGE_EVENT_NOTIFICATION_EVENT_TYPES } from '../../services/adapters/src/storage-event-notifications.mjs';
-import { buildStorageUsageAuditEvent } from '../../services/adapters/src/storage-usage-reporting.mjs';
-import { buildStorageImportExportAuditEvent } from '../../services/adapters/src/storage-import-export.mjs';
+} from '../../packages/adapters/src/storage-audit-ops.mjs';
+import { buildStorageBucketRecord, buildStorageMutationEvent, buildStorageObjectRecord } from '../../packages/adapters/src/storage-bucket-object-ops.mjs';
+import { buildStorageErrorAuditEvent } from '../../packages/adapters/src/storage-error-taxonomy.mjs';
+import { buildStorageEventNotificationAuditEvent, buildStorageEventNotificationRule, STORAGE_EVENT_NOTIFICATION_AUDIT_ACTIONS, STORAGE_EVENT_NOTIFICATION_DESTINATION_TYPES, STORAGE_EVENT_NOTIFICATION_EVENT_TYPES } from '../../packages/adapters/src/storage-event-notifications.mjs';
+import { buildStorageUsageAuditEvent } from '../../packages/adapters/src/storage-usage-reporting.mjs';
+import { buildStorageImportExportAuditEvent } from '../../packages/adapters/src/storage-import-export.mjs';
 
 function assertNoUndefinedDeep(value) {
   if (Array.isArray(value)) {

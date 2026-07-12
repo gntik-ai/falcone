@@ -28,7 +28,7 @@ tenant-facing guide is [MCP Server Hosting](/guide/mcp); operator procedures are
 
 Each MCP server is a **Knative Service (ksvc)** in the tenant's namespace, carrying
 `in-falcone.io/component: mcp-server` and `in-falcone.io/tenant: <tenantId>`. The deploy spec is a
-pure builder (`apps/control-plane/src/mcp-custom-hosting.mjs` → `buildCustomServerDeployment`):
+pure builder (`apps/control-plane-executor/src/mcp-custom-hosting.mjs` → `buildCustomServerDeployment`):
 non-root, `min-scale: 0` (scale-to-zero), OpenShift-safe `securityContext`. The chart component
 (`../falcone-charts/charts/in-falcone/templates/mcp/`) ships RBAC + the NetworkPolicy as part of the core install.
 Supply-chain: custom hosted server images must be **digest-pinned**, from an allow-listed registry,
@@ -36,14 +36,14 @@ and signature-verified before deploy.
 
 ## Gateway — reuse APISIX (ADR-3)
 
-Inbound MCP traffic terminates at APISIX (`services/gateway-config/routes/mcp-routes.yaml`, route
+Inbound MCP traffic terminates at APISIX (`deploy/gateway-config/routes/mcp-routes.yaml`, route
 `/v1/mcp/workspaces/*/servers/*`): `keycloak-openid-connect` validates the OAuth token and
 `scope-enforcement` (path-derived) enforces the per-tool scope; SSE is supported for streaming.
 The runtime and operator are **internal-only** — MCP-server pods are never directly reachable.
 
 ## OAuth 2.1 Authorization Server — extend Keycloak (ADR-12)
 
-The realm-per-tenant Keycloak is the OAuth 2.1 AS. `apps/control-plane/src/mcp-oauth.mjs` derives
+The realm-per-tenant Keycloak is the OAuth 2.1 AS. `apps/control-plane-executor/src/mcp-oauth.mjs` derives
 **per-tool scopes** (a tool's scope = a Keycloak client scope) and builds the curated **dynamic
 client registration** plan (`buildMcpOAuthProvisioningPlan`, an ADR-4 adapter plan over
 `keycloak-admin`) — the control-plane curates DCR; raw Keycloak admin is never exposed. Grants:
@@ -98,7 +98,7 @@ Temporal dev server.
 ## Runtime wiring
 
 The control-plane runtime **serves the MCP management API** under
-`/v1/mcp/workspaces/{workspaceId}/servers/…` (`apps/control-plane/src/runtime/server.mjs`), gated on
+`/v1/mcp/workspaces/{workspaceId}/servers/…` (`apps/control-plane-executor/src/runtime/server.mjs`), gated on
 an injected `mcpEngine` exactly like the flows executor. `runtime/mcp-engine.mjs` is the integration
 seam: it **composes** the pure modules — `mcp-instant-generator` / `mcp-official-catalog` →
 `mcp-curation` → `mcp-registry` → `mcp-quota` → `mcp-observability` → `mcp-official-server` — and

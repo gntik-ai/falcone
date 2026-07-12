@@ -2,14 +2,14 @@
  * Black-box tests for add-data-residency-pinning (issue #272).
  *
  * Drives the public interface only:
- *   - apps/control-plane/src/tenant-data-residency.mjs
+ *   - apps/control-plane-executor/src/tenant-data-residency.mjs
  *       validateResidencyRegion(input)            — pure provisioning-input validation
  *       applyResidencyToTenantRecord(...)         — persist data_residency_region via injected db
  *       readTenantResidency(...)                  — read data_residency_region via injected db
  *       listSupportedRegions(params, overrides)   — GET /v1/platform/topology/regions handler
  *       enforceResidency({ tenant, requestedRegion, auditEmitter })
  *                                                 — control-plane cross-region enforcement
- *   - services/internal-contracts/src/deployment-topology.mjs
+ *   - packages/internal-contracts/src/deployment-topology.mjs
  *       getSupportedRegions()                     — catalog derived from deployment-topology.json
  *   - the six provisioning appliers (iam/postgres/mongo/kafka/storage/functions)
  *       apply(tenantId, domainData, { regionRef })
@@ -39,16 +39,16 @@ import {
   readTenantResidency,
   listSupportedRegions,
   enforceResidency,
-} from '../../apps/control-plane/src/tenant-data-residency.mjs';
+} from '../../apps/control-plane-executor/src/tenant-data-residency.mjs';
 
-import { getSupportedRegions } from '../../services/internal-contracts/src/deployment-topology.mjs';
+import { getSupportedRegions } from '../../packages/internal-contracts/src/deployment-topology.mjs';
 
-import { apply as applyIam } from '../../services/provisioning-orchestrator/src/appliers/iam-applier.mjs';
-import { apply as applyPostgres } from '../../services/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
-import { apply as applyMongo } from '../../services/provisioning-orchestrator/src/appliers/mongo-applier.mjs';
-import { apply as applyKafka } from '../../services/provisioning-orchestrator/src/appliers/kafka-applier.mjs';
-import { apply as applyStorage } from '../../services/provisioning-orchestrator/src/appliers/storage-applier.mjs';
-import { apply as applyFunctions } from '../../services/provisioning-orchestrator/src/appliers/functions-applier.mjs';
+import { apply as applyIam } from '../../packages/provisioning-orchestrator/src/appliers/iam-applier.mjs';
+import { apply as applyPostgres } from '../../packages/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
+import { apply as applyMongo } from '../../packages/provisioning-orchestrator/src/appliers/mongo-applier.mjs';
+import { apply as applyKafka } from '../../packages/provisioning-orchestrator/src/appliers/kafka-applier.mjs';
+import { apply as applyStorage } from '../../packages/provisioning-orchestrator/src/appliers/storage-applier.mjs';
+import { apply as applyFunctions } from '../../packages/provisioning-orchestrator/src/appliers/functions-applier.mjs';
 
 // ---------------------------------------------------------------------------
 // Fixtures

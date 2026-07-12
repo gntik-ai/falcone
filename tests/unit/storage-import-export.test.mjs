@@ -15,13 +15,13 @@ import {
   previewImportQuotaAdmission,
   validateImportManifest,
   validateImportManifestEntry
-} from '../../services/adapters/src/storage-import-export.mjs';
+} from '../../packages/adapters/src/storage-import-export.mjs';
 import {
   STORAGE_IMPORT_EXPORT_ERROR_CODES,
   STORAGE_NORMALIZED_ERROR_CODES,
   STORAGE_USAGE_ERROR_CODES
-} from '../../services/adapters/src/storage-error-taxonomy.mjs';
-import { buildStorageQuotaProfile } from '../../services/adapters/src/storage-capacity-quotas.mjs';
+} from '../../packages/adapters/src/storage-error-taxonomy.mjs';
+import { buildStorageQuotaProfile } from '../../packages/adapters/src/storage-capacity-quotas.mjs';
 
 test('import/export catalogs are frozen and non-empty', () => {
   for (const catalog of [STORAGE_IMPORT_CONFLICT_POLICIES, STORAGE_IMPORT_ENTRY_STATUSES, STORAGE_IMPORT_EXPORT_OPERATION_DEFAULTS, STORAGE_IMPORT_EXPORT_ERROR_CODES]) {

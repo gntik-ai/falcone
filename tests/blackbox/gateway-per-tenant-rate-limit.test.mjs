@@ -24,7 +24,7 @@ import { readGatewayPolicyValues, listEnabledApisixRoutes } from '../../scripts/
 import {
   resolveTenantEffectiveCapabilities,
   resolveTenantRateLimit
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 const RATE_METRIC_KEY = 'tenant.api_requests_per_minute.max';
 

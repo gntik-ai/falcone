@@ -77,7 +77,7 @@ SeaweedFS identity entry → Falcone source of truth:
 
 | SeaweedFS field | Falcone source | Status |
 |---|---|---|
-| `credentials[].accessKey` | `deriveAccessKeyId()` → `AKST…` (`services/adapters/src/storage-programmatic-credentials.mjs`) | **maps directly** |
+| `credentials[].accessKey` | `deriveAccessKeyId()` → `AKST…` (`packages/adapters/src/storage-programmatic-credentials.mjs`) | **maps directly** |
 | `credentials[].secretKey` | `deriveSecretAccessKey()` → `sk_…` (same file) | **maps directly** |
 | `buckets` | tenant/workspace bucket names processed by `storage-applier.mjs` (`domainData.buckets[].name`) | **maps directly** |
 | `actions` (`Read:bkt`/`Write:bkt`/`List:bkt`/`Tagging:bkt`) | Falcone *scopes* (`normalizeScope`) — **no SeaweedFS-action translation exists today** | **GAP → shim** |

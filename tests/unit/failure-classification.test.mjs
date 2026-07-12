@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyByErrorCode, loadMappingCache, FailureCategory } from '../../services/provisioning-orchestrator/src/models/failure-classification.mjs';
+import { classifyByErrorCode, loadMappingCache, FailureCategory } from '../../packages/provisioning-orchestrator/src/models/failure-classification.mjs';
 
 const cache = loadMappingCache([
   { error_code: 'E1', operation_type: null, failure_category: 'permanent', description: 'generic', suggested_actions: ['fix'], priority: 20 },

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as tenantProfileGet } from '../../../services/provisioning-orchestrator/src/actions/plan-limits-tenant-get.mjs';
-import { main as profileGet } from '../../../services/provisioning-orchestrator/src/actions/plan-limits-profile-get.mjs';
+import { main as tenantProfileGet } from '../../../packages/provisioning-orchestrator/src/actions/plan-limits-tenant-get.mjs';
+import { main as profileGet } from '../../../packages/provisioning-orchestrator/src/actions/plan-limits-profile-get.mjs';
 import { ensureCatalogSeeded } from './fixtures/seed-catalog.mjs';
 import { createFakeDb, seedPlans } from './fixtures/seed-plans.mjs';
 

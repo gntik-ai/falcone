@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 
 import {
   KafkaChangePublisher,
-} from '../../services/pg-cdc-bridge/src/KafkaChangePublisher.mjs';
+} from '../../packages/pg-cdc-bridge/src/KafkaChangePublisher.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -141,21 +141,21 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: control-plane-openapi-contract
-          path: apps/control-plane/openapi/control-plane.openapi.json
+          path: apps/control-plane-executor/openapi/control-plane.openapi.json
           if-no-files-found: error
 
       - name: Upload deployment topology artifact
         uses: actions/upload-artifact@v4
         with:
           name: deployment-topology-contract
-          path: services/internal-contracts/src/deployment-topology.json
+          path: packages/internal-contracts/src/deployment-topology.json
           if-no-files-found: error
 
       - name: Upload domain model artifact
         uses: actions/upload-artifact@v4
         with:
           name: domain-model-contract
-          path: services/internal-contracts/src/domain-model.json
+          path: packages/internal-contracts/src/domain-model.json
           if-no-files-found: error
 
   web-console:

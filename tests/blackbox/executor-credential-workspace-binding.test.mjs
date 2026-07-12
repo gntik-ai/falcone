@@ -17,8 +17,8 @@
 // bbx-cred-ws-08: JWT with no workspace_id claim (tenant-only token) + path A → NOT 403 (admin token)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 
 // ---------------------------------------------------------------------------
 // Fixtures

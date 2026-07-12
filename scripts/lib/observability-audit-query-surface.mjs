@@ -1,11 +1,11 @@
 import { readJson } from './quality-gates.mjs';
 
-export const OBSERVABILITY_AUDIT_QUERY_SURFACE_PATH = 'services/internal-contracts/src/observability-audit-query-surface.json';
-export const OBSERVABILITY_AUDIT_PIPELINE_PATH = 'services/internal-contracts/src/observability-audit-pipeline.json';
-export const OBSERVABILITY_AUDIT_EVENT_SCHEMA_PATH = 'services/internal-contracts/src/observability-audit-event-schema.json';
-export const AUTHORIZATION_MODEL_PATH = 'services/internal-contracts/src/authorization-model.json';
-export const PUBLIC_ROUTE_CATALOG_PATH = 'services/internal-contracts/src/public-route-catalog.json';
-export const PUBLIC_API_TAXONOMY_PATH = 'services/internal-contracts/src/public-api-taxonomy.json';
+export const OBSERVABILITY_AUDIT_QUERY_SURFACE_PATH = 'packages/internal-contracts/src/observability-audit-query-surface.json';
+export const OBSERVABILITY_AUDIT_PIPELINE_PATH = 'packages/internal-contracts/src/observability-audit-pipeline.json';
+export const OBSERVABILITY_AUDIT_EVENT_SCHEMA_PATH = 'packages/internal-contracts/src/observability-audit-event-schema.json';
+export const AUTHORIZATION_MODEL_PATH = 'packages/internal-contracts/src/authorization-model.json';
+export const PUBLIC_ROUTE_CATALOG_PATH = 'packages/internal-contracts/src/public-route-catalog.json';
+export const PUBLIC_API_TAXONOMY_PATH = 'packages/internal-contracts/src/public-api-taxonomy.json';
 export const ARCHITECTURE_AUDIT_QUERY_SURFACE_DOC_PATH = 'docs/reference/architecture/observability-audit-query-surface.md';
 export const ARCHITECTURE_README_PATH = 'docs/reference/architecture/README.md';
 export const OBS_TASK_DOC_PATH = 'docs/tasks/us-obs-02.md';

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AuthError, createTokenValidator } from '../../../services/realtime-gateway/src/auth/token-validator.mjs';
-import { loadEnv } from '../../../services/realtime-gateway/src/config/env.mjs';
+import { AuthError, createTokenValidator } from '../../../packages/realtime-gateway/src/auth/token-validator.mjs';
+import { loadEnv } from '../../../packages/realtime-gateway/src/config/env.mjs';
 
 const env = () => ({
   KEYCLOAK_JWKS_URL: 'https://keycloak.example/certs',

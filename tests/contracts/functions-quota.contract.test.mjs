@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
+import { getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 
 test('functions quota contract exposes tenant and workspace quota routes and expanded scope-aware schemas', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);

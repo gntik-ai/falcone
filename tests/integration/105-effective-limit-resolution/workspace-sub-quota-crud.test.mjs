@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as setSubQuota } from '../../../services/provisioning-orchestrator/src/actions/workspace-sub-quota-set.mjs';
-import { main as removeSubQuota } from '../../../services/provisioning-orchestrator/src/actions/workspace-sub-quota-remove.mjs';
+import { main as setSubQuota } from '../../../packages/provisioning-orchestrator/src/actions/workspace-sub-quota-set.mjs';
+import { main as removeSubQuota } from '../../../packages/provisioning-orchestrator/src/actions/workspace-sub-quota-remove.mjs';
 import { createFakeDb, createFakeProducer, seedPlans, seedAssignments } from './fixtures/seed-plans-with-quotas-and-capabilities.mjs';
 import { seedSubQuotas } from './fixtures/seed-sub-quotas.mjs';
 

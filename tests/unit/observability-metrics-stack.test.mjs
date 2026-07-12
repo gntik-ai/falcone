@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildObservabilityQueryScope,
   summarizeObservabilityPlane
-} from '../../apps/control-plane/src/observability-admin.mjs';
+} from '../../apps/control-plane-executor/src/observability-admin.mjs';
 import {
   collectObservabilityMetricsStackViolations,
   readObservabilityMetricsStack,

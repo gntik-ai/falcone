@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkJobCreationQuota, checkResumeQuota, assertCronFloor, readDefaultLimits } from '../../services/scheduling-engine/src/quota.mjs';
+import { checkJobCreationQuota, checkResumeQuota, assertCronFloor, readDefaultLimits } from '../../packages/scheduling-engine/src/quota.mjs';
 
 test('quota checks enforce limits', () => {
   assert.equal(checkJobCreationQuota(10, 10).allowed, false);

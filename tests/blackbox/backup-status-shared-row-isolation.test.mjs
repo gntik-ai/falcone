@@ -25,8 +25,8 @@ import assert from 'node:assert/strict';
 
 // ---- Shared module imports (NO cache-busting — must match the specifiers in action.js) ----
 // action.js imports '../db/repository.js' — from the test file that resolves to the same path.
-import { setClient } from '../../services/backup-status/src/db/repository.js';
-import { main } from '../../services/backup-status/src/api/backup-status.action.js';
+import { setClient } from '../../packages/backup-status/src/db/repository.js';
+import { main } from '../../packages/backup-status/src/api/backup-status.action.js';
 
 // ---- Token builder (TEST_MODE) ------------------------------------------------
 function makeToken(payload) {

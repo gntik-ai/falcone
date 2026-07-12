@@ -11,11 +11,11 @@ import {
   buildPostgresStructuralSqlPlan,
   validatePostgresStructuralRequest,
   buildAllowedPostgresTypeCatalog,
-} from '../../services/adapters/src/postgresql-structural-admin.mjs';
+} from '../../packages/adapters/src/postgresql-structural-admin.mjs';
 import {
   validatePostgresGovernanceRequest,
   buildPostgresGovernanceSqlPlan,
-} from '../../services/adapters/src/postgresql-governance-admin.mjs';
+} from '../../packages/adapters/src/postgresql-governance-admin.mjs';
 
 // A type catalog with pgvector enabled (mirrors a dedicated-DB tenant that enabled it).
 const VECTOR_CATALOG = buildAllowedPostgresTypeCatalog({

@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main } from '../../services/provisioning-orchestrator/src/actions/tenant-purge-sweep.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/tenant-purge-sweep.mjs';
 
 const PAST = '2026-03-20T00:00:00Z';
 const NOW = '2026-03-24T00:00:00Z';

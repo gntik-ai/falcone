@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRealtimeSubscriptions } from '../../../services/provisioning-orchestrator/src/actions/realtime/realtime-subscription-resolver.mjs';
+import { resolveRealtimeSubscriptions } from '../../../packages/provisioning-orchestrator/src/actions/realtime/realtime-subscription-resolver.mjs';
 
 test('resolver matches by workspace, channel and filter semantics', async () => {
   const rows = [

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/async-operation-orphan-sweep.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/async-operation-orphan-sweep.mjs';
 
 test('orphan sweep recovers running/pending and forces stale cancelling', async () => {
   const published = { recovered: 0, cancelled: 0 };

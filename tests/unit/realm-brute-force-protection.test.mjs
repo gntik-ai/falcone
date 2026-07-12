@@ -7,7 +7,7 @@
  * even counting). Confirmed live: 35 wrong ROPC attempts → 35×401, then the correct password → 200
  * (no lockout); `attack-detection numFailures:0`.
  *
- * These tests drive the REAL `kcAdmin.createRealm` (deploy/kind/control-plane/kc-admin.mjs) against
+ * These tests drive the REAL `kcAdmin.createRealm` (apps/control-plane/kc-admin.mjs) against
  * a FAKE Keycloak injected through `globalThis.fetch` (mirrors the fetch-seam harness used by
  * oidc-app-client-redirect-allowlist / sa-revocation unit tests). No live Keycloak / no network.
  *
@@ -29,7 +29,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { kcAdmin, bruteForceRealmConfig } from '../../deploy/kind/control-plane/kc-admin.mjs';
+import { kcAdmin, bruteForceRealmConfig } from '../../apps/control-plane/kc-admin.mjs';
 
 const REALM = 'ten-acme';
 

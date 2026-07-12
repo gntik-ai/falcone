@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findByOperationType, findDefault, upsert } from '../../services/provisioning-orchestrator/src/repositories/retry-semantics-profile-repo.mjs';
+import { findByOperationType, findDefault, upsert } from '../../packages/provisioning-orchestrator/src/repositories/retry-semantics-profile-repo.mjs';
 
 function createClient() {
   const rows = [{ operation_type: '__default__', max_retries: 5, backoff_strategy: 'exponential', backoff_base_seconds: 30, intervention_conditions: [], failure_categories: {}, is_default: true }];

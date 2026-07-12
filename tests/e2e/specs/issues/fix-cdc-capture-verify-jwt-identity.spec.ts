@@ -35,9 +35,9 @@ import pg from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { main as pgCaptureEnable } from '../../../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-enable.mjs';
-import { main as pgCaptureList } from '../../../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-list.mjs';
-import { main as pgCaptureTenantSummary } from '../../../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-tenant-summary.mjs';
+import { main as pgCaptureEnable } from '../../../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-enable.mjs';
+import { main as pgCaptureList } from '../../../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-list.mjs';
+import { main as pgCaptureTenantSummary } from '../../../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-tenant-summary.mjs';
 
 // deps.db must be a Pool: CaptureConfigRepository.create() calls pool.connect()
 // to run the quota check + insert inside an advisory-locked transaction (exactly
@@ -76,7 +76,7 @@ test.beforeAll(async () => {
   // Read ONLY the "-- up" section; never execute the "-- down" DROP section.
   const migrationPath = path.resolve(
     fileURLToPath(import.meta.url),
-    '../../../../../services/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql',
+    '../../../../../packages/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql',
   );
   const migrationSrc = fs.readFileSync(migrationPath, 'utf8');
   // Split on the first line that contains the "-- down" marker.

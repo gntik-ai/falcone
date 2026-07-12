@@ -60,7 +60,7 @@ These remain covered by the Helm chart / real-stack E2E (`tests/e2e`).
 ### Keycloak model (matches production)
 
 In Falcone the **Keycloak realm name equals the `tenantId`** (see
-`services/provisioning-orchestrator/src/reprovision/identifier-map.mjs::deriveIamRealm`),
+`packages/provisioning-orchestrator/src/reprovision/identifier-map.mjs::deriveIamRealm`),
 and a realm's **`displayName`** is the authoritative human-readable tenant name.
 
 `up.sh` provisions a master-realm **admin service account** (`falcone-admin`,
@@ -97,7 +97,7 @@ const RUN = process.env.FALCONE_TESTENV === '1' && !!process.env.KEYCLOAK_BASE_U
 describe.skipIf(!RUN)('... vs REAL Keycloak', () => { /* uses real fetch, no mocks */ })
 ```
 
-Reference: `services/backup-status/test/integration/tenant-name-resolver.keycloak.test.ts`
+Reference: `packages/backup-status/test/integration/tenant-name-resolver.keycloak.test.ts`
 drives the actual `createKeycloakTenantNameResolver` against the live Keycloak
 (real client-credentials flow + admin API) and asserts the fail-closed contract.
 

@@ -8,9 +8,9 @@ import {
 import {
   AUDIT_CORRELATION_ERROR_CODES,
   traceWorkspaceAuditCorrelation
-} from '../../apps/control-plane/src/observability-audit-correlation.mjs';
-import { exportWorkspaceAuditRecordsPreview } from '../../apps/control-plane/src/observability-audit-export.mjs';
-import { queryWorkspaceAuditRecords } from '../../apps/control-plane/src/observability-audit-query.mjs';
+} from '../../apps/control-plane-executor/src/observability-audit-correlation.mjs';
+import { exportWorkspaceAuditRecordsPreview } from '../../apps/control-plane-executor/src/observability-audit-export.mjs';
+import { queryWorkspaceAuditRecords } from '../../apps/control-plane-executor/src/observability-audit-query.mjs';
 
 function buildAuditRecord(overrides = {}) {
   return {

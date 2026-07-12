@@ -80,7 +80,7 @@ import {
   issueStorageProgrammaticCredentialPreview,
   listStorageProgrammaticCredentialsPreview,
   uploadStorageObjectPreviewResult
-} from '../../apps/control-plane/src/storage-admin.mjs';
+} from '../../apps/control-plane-executor/src/storage-admin.mjs';
 
 test('storage admin helper exposes bucket/object routes and provider introspection routes', () => {
   const routes = listStorageAdminRoutes();

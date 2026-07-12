@@ -5,7 +5,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { MongoClient } from 'mongodb'
-import { createMongoExecutor } from '../../../apps/control-plane/src/runtime/mongo-data-executor.mjs'
+import { createMongoExecutor } from '../../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs'
 
 // FerretDB cutover (#459): default to the FerretDB gateway URI (no replica set). run-mongo.sh
 // sets MONGO_URI + MONGO_BACKEND=ferretdb and brings up the FerretDB+DocumentDB stack.

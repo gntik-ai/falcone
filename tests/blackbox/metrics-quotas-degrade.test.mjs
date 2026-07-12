@@ -3,7 +3,7 @@
  * (live E2E campaign 2026-06-17, finding F4).
  *
  * Drives the control-plane runtime schema setup and the console metrics handlers
- * (deploy/kind/control-plane/{tenant-store,metrics-handlers}.mjs) through their public interface.
+ * (apps/control-plane/{tenant-store,metrics-handlers}.mjs) through their public interface.
  * Deterministic: a recording fake pool captures the DDL and a fake pool drives the handler; no
  * live database is required.
  *
@@ -27,8 +27,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ensureSchema } from '../../deploy/kind/control-plane/tenant-store.mjs';
-import { METRICS_HANDLERS } from '../../deploy/kind/control-plane/metrics-handlers.mjs';
+import { ensureSchema } from '../../apps/control-plane/tenant-store.mjs';
+import { METRICS_HANDLERS } from '../../apps/control-plane/metrics-handlers.mjs';
 
 /** Fake pool that records every SQL string. ensureSchema issues only DDL/UPDATE (reads no rows). */
 function recordingPool() {

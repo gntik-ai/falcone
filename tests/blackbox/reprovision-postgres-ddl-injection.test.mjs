@@ -4,7 +4,7 @@
 // Tests: bbx-pg-ddl-01 through bbx-pg-ddl-06
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { apply } from '../../services/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
+import { apply } from '../../packages/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
 
 const TENANT_ID = 'tenant-test-01';
 

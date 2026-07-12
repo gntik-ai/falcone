@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleRealtimeSubscriptionCrud } from '../../../services/provisioning-orchestrator/src/actions/realtime/realtime-subscription-crud.mjs';
+import { handleRealtimeSubscriptionCrud } from '../../../packages/provisioning-orchestrator/src/actions/realtime/realtime-subscription-crud.mjs';
 
 function createDeps() {
   const channels = [{ id: 'ch-1', tenant_id: 'tenant-1', workspace_id: 'ws-1', channel_type: 'postgresql-changes', data_source_kind: 'postgresql', data_source_ref: 'mydb', status: 'available' }];

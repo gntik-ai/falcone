@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/async-operation-intervention-notify.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/async-operation-intervention-notify.mjs';
 
 const flag = { flag_id: 'flag', operation_id: 'op', tenant_id: 't', actor_id: 'actor', last_error_summary: 'boom' };
 

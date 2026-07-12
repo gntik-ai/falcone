@@ -14,7 +14,7 @@ import {
   atomicTransitionSystem,
   findOrphanCandidates,
   findStaleCancellingCandidates
-} from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+} from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
 
 maybeTest('orphan candidate queries return stale operations and system transition is safe', async () => {
   const client = new Client({ connectionString: databaseUrl });

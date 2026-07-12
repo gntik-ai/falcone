@@ -9,11 +9,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runReconcileBuckets } from '../../services/provisioning-orchestrator/src/commands/reconcile-buckets.mjs';
+import { runReconcileBuckets } from '../../packages/provisioning-orchestrator/src/commands/reconcile-buckets.mjs';
 import {
   verifyIsolation,
   IsolationViolationError,
-} from '../../services/provisioning-orchestrator/src/reconcilers/bucket-reconciler.mjs';
+} from '../../packages/provisioning-orchestrator/src/reconcilers/bucket-reconciler.mjs';
 
 // --- in-memory SeaweedFS backend that enforces per-bucket policy isolation ----
 function principalIdentities(policy) {

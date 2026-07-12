@@ -313,11 +313,11 @@ function collectQosViolations(values, gatewayRouting, violations) {
   }
 
   if (JSON.stringify(values?.gatewayPolicy?.qos?.timeoutProfiles ?? {}) !== JSON.stringify(gatewayRouting?.spec?.timeoutProfiles ?? {})) {
-    violations.push('gatewayPolicy.qos.timeoutProfiles must align with services/gateway-config/base/public-api-routing.yaml.');
+    violations.push('gatewayPolicy.qos.timeoutProfiles must align with deploy/gateway-config/base/public-api-routing.yaml.');
   }
 
   if (JSON.stringify(values?.gatewayPolicy?.qos?.retryProfiles ?? {}) !== JSON.stringify(gatewayRouting?.spec?.retryProfiles ?? {})) {
-    violations.push('gatewayPolicy.qos.retryProfiles must align with services/gateway-config/base/public-api-routing.yaml.');
+    violations.push('gatewayPolicy.qos.retryProfiles must align with deploy/gateway-config/base/public-api-routing.yaml.');
   }
 }
 
@@ -331,7 +331,7 @@ function collectRoutingAlignmentViolations(values, gatewayRouting, routeCatalog,
   for (const [familyId, policy] of Object.entries(familyPolicies)) {
     const routing = routingById.get(familyId);
     if (!routing) {
-      violations.push(`services/gateway-config/base/public-api-routing.yaml must define family ${familyId}.`);
+      violations.push(`deploy/gateway-config/base/public-api-routing.yaml must define family ${familyId}.`);
       continue;
     }
 

@@ -2,7 +2,7 @@
 
 The complete reference for the **Flow Definition DSL** — the versioned document a tenant authors
 (YAML in the console editor, JSON over the API) to define a [Flow](/guide/flows). The contract is
-the JSON Schema `services/internal-contracts/src/flow-definition.json` (`apiVersion: v1.0`), shared
+the JSON Schema `packages/internal-contracts/src/flow-definition.json` (`apiVersion: v1.0`), shared
 by the console editors, the control-plane validate endpoint, and the Temporal interpreter worker.
 Structural rules are enforced by the schema; semantic rules carry stable `FLW-E…` codes from the
 companion validator (`flow-definition-validator.mjs`).
@@ -179,7 +179,7 @@ Runs another **published** flow as a child, then `next`.
 ## Task-type catalog
 
 `taskType` must be one of the first-party catalog
-(`services/workflow-worker/src/activities/catalog-names.mjs`; membership enforced by `FLW-E006`).
+(`apps/workflow-worker/src/activities/catalog-names.mjs`; membership enforced by `FLW-E006`).
 Each activity's serialized input **and** output are capped at **2 MiB** (`PAYLOAD_TOO_LARGE`,
 non-retryable).
 

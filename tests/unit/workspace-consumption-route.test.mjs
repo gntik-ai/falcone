@@ -6,9 +6,9 @@ import { matchRoute as matchActionRunnerRoute } from '../env/action-runner/route
 
 const SELF_PATH = '/v1/workspaces/{workspaceId}/consumption';
 const ADMIN_PATH = '/v1/tenants/{tenantId}/workspaces/{workspaceId}/consumption';
-const HANDLER = '/repo/services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs';
+const HANDLER = '/repo/packages/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs';
 
-const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../deploy/kind/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
+const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
 
 function compilePath(tmpl) {
   const rx = tmpl

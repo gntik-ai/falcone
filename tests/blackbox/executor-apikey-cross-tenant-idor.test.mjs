@@ -15,8 +15,8 @@
 // bbx-xt-idor-04: tenant-A admin token, POST api-keys on an UNKNOWN workspace   → 404 WORKSPACE_NOT_FOUND (no phantom key)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 
 const TEN_A = 'tenant_xt_a';
 const WS_A = 'ws_xt_a';

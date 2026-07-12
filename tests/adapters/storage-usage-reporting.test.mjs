@@ -7,7 +7,7 @@ import {
   buildStorageUsageSnapshot,
   buildStorageWorkspaceUsageEntry,
   detectStorageUsageThresholdBreaches
-} from '../../services/adapters/src/storage-usage-reporting.mjs';
+} from '../../packages/adapters/src/storage-usage-reporting.mjs';
 
 test('workspace usage composition stays additively consistent end to end', () => {
   const buckets = [

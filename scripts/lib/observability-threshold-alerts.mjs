@@ -1,11 +1,11 @@
 import { readJson } from './quality-gates.mjs';
 
-export const OBSERVABILITY_THRESHOLD_ALERTS_PATH = 'services/internal-contracts/src/observability-threshold-alerts.json';
-export const OBSERVABILITY_USAGE_CONSUMPTION_PATH = 'services/internal-contracts/src/observability-usage-consumption.json';
-export const OBSERVABILITY_QUOTA_POLICIES_PATH = 'services/internal-contracts/src/observability-quota-policies.json';
-export const OBSERVABILITY_AUDIT_EVENT_SCHEMA_PATH = 'services/internal-contracts/src/observability-audit-event-schema.json';
-export const AUTHORIZATION_MODEL_PATH = 'services/internal-contracts/src/authorization-model.json';
-export const PUBLIC_API_TAXONOMY_PATH = 'services/internal-contracts/src/public-api-taxonomy.json';
+export const OBSERVABILITY_THRESHOLD_ALERTS_PATH = 'packages/internal-contracts/src/observability-threshold-alerts.json';
+export const OBSERVABILITY_USAGE_CONSUMPTION_PATH = 'packages/internal-contracts/src/observability-usage-consumption.json';
+export const OBSERVABILITY_QUOTA_POLICIES_PATH = 'packages/internal-contracts/src/observability-quota-policies.json';
+export const OBSERVABILITY_AUDIT_EVENT_SCHEMA_PATH = 'packages/internal-contracts/src/observability-audit-event-schema.json';
+export const AUTHORIZATION_MODEL_PATH = 'packages/internal-contracts/src/authorization-model.json';
+export const PUBLIC_API_TAXONOMY_PATH = 'packages/internal-contracts/src/public-api-taxonomy.json';
 
 const REQUIRED_EVENT_TYPES = [
   'quota.threshold.warning_reached',

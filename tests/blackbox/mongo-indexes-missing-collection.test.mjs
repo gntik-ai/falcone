@@ -20,7 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { MONGO_HANDLERS } from '../../deploy/kind/control-plane/mongo-handlers.mjs';
+import { MONGO_HANDLERS } from '../../apps/control-plane/mongo-handlers.mjs';
 
 const EXISTING = new Set(['records']);
 const DOCS = [

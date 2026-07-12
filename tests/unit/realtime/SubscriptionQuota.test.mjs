@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SubscriptionQuota, checkAllowed } from '../../../services/provisioning-orchestrator/src/models/realtime/SubscriptionQuota.mjs';
+import { SubscriptionQuota, checkAllowed } from '../../../packages/provisioning-orchestrator/src/models/realtime/SubscriptionQuota.mjs';
 
 test('under-limit allows and at-limit blocks', () => {
   assert.equal(checkAllowed(1, 2), true);

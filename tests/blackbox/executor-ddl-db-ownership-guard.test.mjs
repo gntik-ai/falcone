@@ -22,9 +22,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { executePostgresDdl } from '../../apps/control-plane/src/runtime/postgres-ddl-executor.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { executePostgresDdl } from '../../apps/control-plane-executor/src/runtime/postgres-ddl-executor.mjs';
 
 const TEN_A = 'tenant_ddl_a';
 const TEN_B = 'tenant_ddl_b';

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import schema from '../../services/internal-contracts/src/failure-classified-event.json' with { type: 'json' };
-import { buildFailureClassifiedEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import schema from '../../packages/internal-contracts/src/failure-classified-event.json' with { type: 'json' };
+import { buildFailureClassifiedEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
 
 function validate(event, schemaDef) { for (const key of schemaDef.required) assert.notEqual(event[key], undefined); }
 for (const category of ['transient', 'permanent', 'requires_intervention', 'unknown']) {

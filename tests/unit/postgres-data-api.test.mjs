@@ -13,13 +13,13 @@ import {
   buildPostgresSavedQueryExecutionPlan,
   serializePostgresDataApiCursor,
   summarizePostgresDataApiCapabilityMatrix
-} from '../../services/adapters/src/postgresql-data-api.mjs';
+} from '../../packages/adapters/src/postgresql-data-api.mjs';
 import {
   getPostgresDataApiRoute,
   listPostgresDataApiRoutes,
   postgresDataApiFamily,
   summarizePostgresDataApiSurface
-} from '../../apps/control-plane/src/postgres-data-api.mjs';
+} from '../../apps/control-plane-executor/src/postgres-data-api.mjs';
 
 const baseTable = {
   schemaName: 'alpha_prod_app',

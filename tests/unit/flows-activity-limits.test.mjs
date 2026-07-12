@@ -7,20 +7,20 @@ import {
   assertPayloadSize,
   serializedByteLength,
   MAX_INPUT_BYTES,
-} from '../../services/workflow-worker/src/activities/limits.mjs';
+} from '../../apps/workflow-worker/src/activities/limits.mjs';
 import {
   toNonRetryable,
   toRetryable,
   classifyExecutorError,
   isTransientNetworkError,
-} from '../../services/workflow-worker/src/activities/errors.mjs';
+} from '../../apps/workflow-worker/src/activities/errors.mjs';
 import {
   registerActivity,
   resolveActivity,
   hasTaskType,
   taskTypeNames,
-} from '../../services/workflow-worker/src/activities/registry.mjs';
-import '../../services/workflow-worker/src/activities/catalog.mjs'; // populate registry
+} from '../../apps/workflow-worker/src/activities/registry.mjs';
+import '../../apps/workflow-worker/src/activities/catalog.mjs'; // populate registry
 
 // -- assertPayloadSize -------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 // Black-box test suite for change add-flows-control-plane-api (#361) — public route catalog gate.
 //
-// The flat allow-list at services/gateway-config/public-route-catalog.json is the AUTHORITATIVE
+// The flat allow-list at deploy/gateway-config/public-route-catalog.json is the AUTHORITATIVE
 // gateway allow-list: a path not present there is rejected (404-before-route) at the gateway.
 // These tests assert the flows routes are present with the correct privilege_domain — the
 // spec's gatewayRouteClass split (control vs data-control) maps 1:1 onto
@@ -16,7 +16,7 @@ import { dirname, resolve } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const catalog = JSON.parse(readFileSync(resolve(REPO, 'services/gateway-config/public-route-catalog.json'), 'utf8'));
+const catalog = JSON.parse(readFileSync(resolve(REPO, 'deploy/gateway-config/public-route-catalog.json'), 'utf8'));
 
 function entry(method, path) {
   return catalog.find((r) => r.method === method && r.path === path);

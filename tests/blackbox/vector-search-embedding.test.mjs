@@ -1,6 +1,6 @@
 // Black-box test suite for change add-vector-search — pluggable embedding-provider
 // backend + per-workspace provider store. Drives the PUBLIC runtime surface only:
-//   apps/control-plane/src/runtime/embedding-executor.mjs
+//   apps/control-plane-executor/src/runtime/embedding-executor.mjs
 //
 // Tests: bbx-vec-emb-01 .. bbx-vec-emb-09
 import test from 'node:test';
@@ -10,7 +10,7 @@ import {
   localMockEmbeddingBackend,
   httpEmbeddingBackend,
   createEmbeddingProviderStore,
-} from '../../apps/control-plane/src/runtime/embedding-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 // A clearly non-provider placeholder (GitHub push protection rejects sk_live_ etc.).
 const FAKE_SECRET = 'placeholder-not-a-real-key';

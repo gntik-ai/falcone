@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { AUTH_HANDLERS } from '../../deploy/kind/control-plane/auth-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { AUTH_HANDLERS } from '../../apps/control-plane/auth-handlers.mjs';
 
 const ROUTE_PATH = '/v1/auth/status-views/{statusViewId}';
 const HANDLER = 'getConsoleAccountStatusView';
 
-const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../deploy/kind/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
-const fullRouteMap = JSON.parse(readFileSync(new URL('../../deploy/kind/control-plane/route-map.json', import.meta.url), 'utf8'));
-const authOpenApi = JSON.parse(readFileSync(new URL('../../apps/control-plane/openapi/families/auth.openapi.json', import.meta.url), 'utf8'));
+const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
+const fullRouteMap = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-map.json', import.meta.url), 'utf8'));
+const authOpenApi = JSON.parse(readFileSync(new URL('../../apps/control-plane-executor/openapi/families/auth.openapi.json', import.meta.url), 'utf8'));
 
 function compilePath(tmpl) {
   const rx = tmpl
@@ -79,7 +79,7 @@ test('fix-728-01: public route-map catalog marks the status-view route as a loca
   assert.equal(route.method, 'GET');
   assert.equal(route.path, ROUTE_PATH);
   assert.equal(route.invoke, 'localHandler');
-  assert.equal(route.module, 'deploy/kind/control-plane/auth-handlers.mjs');
+  assert.equal(route.module, 'apps/control-plane/auth-handlers.mjs');
   assert.equal(route.export, HANDLER);
   assert.equal(route.auth, 'public');
   assert.doesNotMatch(route.notes, /\bGAP\b/);

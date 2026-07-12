@@ -12,7 +12,7 @@ import {
   POSTGRES_DATA_API_OPERATIONS,
   POSTGRES_DATA_API_CAPABILITIES,
   POSTGRES_DATA_FILTER_OPERATORS,
-} from '../../services/adapters/src/postgresql-data-api.mjs';
+} from '../../packages/adapters/src/postgresql-data-api.mjs';
 
 // A collection schema with a tenant column + a vector(3) column. Mirrors the
 // executor's introspection shape: columns:[{columnName,dataType}], primaryKey:[...].

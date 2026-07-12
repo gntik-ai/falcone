@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Capture raw ListBuckets / ListObjectsV2 XML from SeaweedFS and run the EXACT regex
-patterns from deploy/kind/control-plane/storage-handlers.mjs:76-97 against them (tasks 4.1-4.3).
+patterns from apps/control-plane/storage-handlers.mjs:76-97 against them (tasks 4.1-4.3).
 
 The live control-plane runtime parses S3 list responses with hand-rolled regexes, not an XML
 parser. This proves whether SeaweedFS's XML envelope is byte-compatible with those regexes.

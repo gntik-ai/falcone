@@ -15,8 +15,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchTask } from '../../services/workflow-worker/src/activities/index.mjs';
-import { mintExecutionToken } from '../../apps/control-plane/src/runtime/execution-token.mjs';
+import { dispatchTask } from '../../apps/workflow-worker/src/activities/index.mjs';
+import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 function dbQueryInput(token, { tenantId = 'tenant_A', workspaceId = 'ws_A' } = {}) {
   return {

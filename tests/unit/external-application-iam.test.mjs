@@ -6,7 +6,7 @@ import {
   listStarterTemplates,
   listSupportedAuthenticationFlows,
   validateExternalApplicationConfiguration
-} from '../../apps/control-plane/src/external-application-iam.mjs';
+} from '../../apps/control-plane-executor/src/external-application-iam.mjs';
 
 test('external application IAM helper exposes starter templates and plan-filtered flow catalogs', () => {
   const supportMatrix = getExternalApplicationSupportMatrix();

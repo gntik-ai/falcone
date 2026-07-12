@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConsoleTenantPlanPage } from './ConsoleTenantPlanPage'
 
 // getEffectiveEntitlements returns the REAL effective-entitlements API shape
-// (services/provisioning-orchestrator EffectiveEntitlementProfile): quota limits
+// (packages/provisioning-orchestrator EffectiveEntitlementProfile): quota limits
 // live under `quantitativeLimits` with a per-item `currentUsage` — NOT under
 // `quotaDimensions`/`observedUsage`. On main the component reads
 // `summary.quotaDimensions` (undefined here) and `.map` throws, so render fails and

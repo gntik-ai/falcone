@@ -17,14 +17,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
-import { MONGO_HANDLERS } from '../../deploy/kind/control-plane/mongo-handlers.mjs';
-import { PG_HANDLERS, quoteIdent } from '../../deploy/kind/control-plane/pg-handlers.mjs';
-import { FN_HANDLERS } from '../../deploy/kind/control-plane/fn-handlers.mjs';
-import { METRICS_HANDLERS } from '../../deploy/kind/control-plane/metrics-handlers.mjs';
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { buildTenantConfigExport, stripSensitive } from '../../deploy/kind/control-plane/tenant-config-export.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
+import { MONGO_HANDLERS } from '../../apps/control-plane/mongo-handlers.mjs';
+import { PG_HANDLERS, quoteIdent } from '../../apps/control-plane/pg-handlers.mjs';
+import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
+import { METRICS_HANDLERS } from '../../apps/control-plane/metrics-handlers.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { buildTenantConfigExport, stripSensitive } from '../../apps/control-plane/tenant-config-export.mjs';
 
 // ---------------------------------------------------------------------------
 // Fixtures: two tenants A/B with one workspace each + one owned bucket each.
@@ -168,7 +168,7 @@ test('bbx-683-wiring: all 15 advertised export/import/clone routes are registere
 });
 
 test('bbx-683-catalog: the published catalog advertises all 15 operations (the contract was already there)', () => {
-  const cat = JSON.parse(readFileSync(fileURLToPath(new URL('../../services/internal-contracts/src/public-route-catalog.json', import.meta.url)), 'utf8'));
+  const cat = JSON.parse(readFileSync(fileURLToPath(new URL('../../packages/internal-contracts/src/public-route-catalog.json', import.meta.url)), 'utf8'));
   const routesArr = Array.isArray(cat) ? cat : (cat.routes ?? cat.operations ?? []);
   const ids = ['exportFunctionDefinition', 'importFunctionDefinition', 'importFunctionPackageDefinition', 'exportFunctionPackageDefinition',
     'exportTenantAuditRecords', 'exportWorkspaceAuditRecords', 'exportMongoDataDocuments', 'importMongoDataDocuments',

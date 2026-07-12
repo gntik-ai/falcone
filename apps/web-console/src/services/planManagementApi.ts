@@ -184,7 +184,7 @@ export interface CurrentEffectiveEntitlementSummary {
   planId?: string
   planSlug?: string
   planStatus?: PlanStatus
-  // The effective-entitlements API (services/provisioning-orchestrator
+  // The effective-entitlements API (packages/provisioning-orchestrator
   // EffectiveEntitlementProfile) returns per-tenant quota limits under
   // `quantitativeLimits` with a per-item `currentUsage`. This is the real backend
   // field and is what ConsoleTenantPlanPage and ConsoleTenantPlanOverviewPage read.

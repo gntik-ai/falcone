@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { getContextPropagationTarget, getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
+import { getContextPropagationTarget, getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH, resolveParameters } from '../../scripts/lib/quality-gates.mjs';
 
 test('functions import-export OpenAPI contract exposes bounded export and import routes', async () => {

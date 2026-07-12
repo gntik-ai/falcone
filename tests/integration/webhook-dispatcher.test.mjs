@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as dispatcherMain } from '../../services/webhook-engine/actions/webhook-dispatcher.mjs';
+import { main as dispatcherMain } from '../../packages/webhook-engine/actions/webhook-dispatcher.mjs';
 
 function makeDb() {
   const subscriptions = [

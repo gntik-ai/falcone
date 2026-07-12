@@ -2,9 +2,9 @@
  * Black-box tests for fix-660-worker-image-module-completeness (P1, cap:workflows +
  * deployment; verifier-reproduced 2026-06-21 BUG-WORKER-IMAGE-MODULE-COMPLETENESS / #660).
  *
- * Defect: services/workflow-worker/src/worker-deps.mjs::wireActivityDeps() dynamic-imports
- * a set of apps/control-plane runtime modules + services/internal-contracts at boot, but
- * services/workflow-worker/Dockerfile only COPYs a by-name allow-list of those modules.
+ * Defect: apps/workflow-worker/src/worker-deps.mjs::wireActivityDeps() dynamic-imports
+ * a set of apps/control-plane-executor runtime modules + packages/internal-contracts at boot, but
+ * apps/workflow-worker/Dockerfile only COPYs a by-name allow-list of those modules.
  * That allow-list drifted from worker-deps.mjs (the llm.complete activity #640, the BYOK
  * confinement #659, and the transport-security helper #645 each added an import that was
  * never COPYed), so a worker image built from origin/main crash-loops at boot with
@@ -29,7 +29,7 @@ const workerDeps = readFileSync(resolve(WORKER_DIR, 'src', 'worker-deps.mjs'), '
 const dockerfile = readFileSync(resolve(WORKER_DIR, 'Dockerfile'), 'utf8');
 
 // worker-deps.mjs is copied verbatim into dist/ by scripts/copy-activity-catalog.mjs, so at
-// runtime it lives at /app/services/workflow-worker/dist/worker-deps.mjs. Its relative
+// runtime it lives at /app/apps/workflow-worker/dist/worker-deps.mjs. Its relative
 // dynamicImport() specifiers therefore resolve against the dist dir, i.e. repo root maps to
 // /app and `../../../<x>` from dist == `<x>` from the repo root.
 const DIST_REL = ['services', 'workflow-worker', 'dist']; // worker-deps.mjs's dir, repo-relative
@@ -48,9 +48,9 @@ function specToRepoPath(spec) {
 // Repo-relative module paths the Dockerfile COPYs into the runtime image. The worker
 // Dockerfile COPYs control-plane runtime modules and internal-contracts modules by listing
 // the source path(s) on their own continued lines, e.g.:
-//   COPY apps/control-plane/src/runtime/llm-executor.mjs \
-//        apps/control-plane/src/runtime/byok-provider-guard.mjs \
-//        /app/apps/control-plane/src/runtime/
+//   COPY apps/control-plane-executor/src/runtime/llm-executor.mjs \
+//        apps/control-plane-executor/src/runtime/byok-provider-guard.mjs \
+//        /app/apps/control-plane-executor/src/runtime/
 // We collect every `<repo path>.mjs` token that appears as a COPY source in the file.
 const copiedModules = new Set(
   [...dockerfile.matchAll(/(?:^|\s)((?:apps|services)\/[^\s\\]+\.mjs)\b/g)].map((m) => m[1]),
@@ -70,9 +70,9 @@ test('bbx-flows-worker-dockerfile-01: every module worker-deps.mjs dynamic-impor
 
 test('bbx-flows-worker-dockerfile-02: llm-executor, byok-provider-guard and transport-security are COPYed (the named regression)', () => {
   const required = [
-    'apps/control-plane/src/runtime/llm-executor.mjs',
-    'apps/control-plane/src/runtime/byok-provider-guard.mjs',
-    'services/internal-contracts/src/transport-security.mjs',
+    'apps/control-plane-executor/src/runtime/llm-executor.mjs',
+    'apps/control-plane-executor/src/runtime/byok-provider-guard.mjs',
+    'packages/internal-contracts/src/transport-security.mjs',
   ];
   for (const mod of required) {
     // It must actually be imported by worker-deps.mjs ...

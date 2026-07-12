@@ -14,7 +14,7 @@ import {
   storagePolicyNormalizedErrorCodes,
   storagePolicyPrincipalTypes,
   storagePolicySources
-} from '../../services/adapters/src/provider-catalog.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
 
 test('provider catalog exposes additive storage policy exports', () => {
   assert.equal(storagePolicyEffects.ALLOW, 'allow');

@@ -63,11 +63,11 @@ status code, or success shape changes.
 
 ## Implementation
 
-- `deploy/kind/control-plane/storage-quota.mjs` — pure, injectable quota-decision helpers
+- `apps/control-plane/storage-quota.mjs` — pure, injectable quota-decision helpers
   (`checkBucketQuota`, `checkByteQuota`, `usageLimits`, `dimensionStatus`). The kind-runtime image
-  cannot statically import the product `services/adapters` package, so the trivial admission math
+  cannot statically import the product `packages/adapters` package, so the trivial admission math
   (`used + delta > limit`) is inlined here while reusing the product's canonical error code
   `STORAGE_QUOTA_EXCEEDED` and default bucket limit `8`.
-- `deploy/kind/control-plane/storage-handlers.mjs` — `storageProvisionBucket` (bucket admission),
+- `apps/control-plane/storage-handlers.mjs` — `storageProvisionBucket` (bucket admission),
   `storagePutObject` (byte admission), and `storageWorkspaceUsage` (limit/remaining/utilization
   reporting) consume those helpers.

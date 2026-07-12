@@ -8,10 +8,10 @@ import {
   validateFlowDefinition,
   FLOW_VALIDATION_ERROR_CODES,
   defaultExpressionEngine
-} from '../../services/internal-contracts/src/flow-definition-validator.mjs';
+} from '../../packages/internal-contracts/src/flow-definition-validator.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const INVALID_DIR = resolve(__dirname, '../../services/internal-contracts/src/fixtures/flows/invalid');
+const INVALID_DIR = resolve(__dirname, '../../packages/internal-contracts/src/fixtures/flows/invalid');
 
 function loadInvalid(name) {
   return JSON.parse(readFileSync(resolve(INVALID_DIR, name), 'utf8'));
@@ -331,7 +331,7 @@ test('a fully well-formed flow returns ok:true and an empty error list', () => {
 });
 
 test('all five canonical fixtures pass the semantic validator with the proper seams', () => {
-  const FIXTURE_DIR = resolve(__dirname, '../../services/internal-contracts/src/fixtures/flows');
+  const FIXTURE_DIR = resolve(__dirname, '../../packages/internal-contracts/src/fixtures/flows');
   const taskTypeCatalog = [
     'fetch-record', 'transform-record', 'persist-record',
     'manual-review', 'auto-approve',

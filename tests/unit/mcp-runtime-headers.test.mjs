@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { BASE_SCOPE } from '../../apps/control-plane/src/mcp-official-catalog.mjs';
+import { BASE_SCOPE } from '../../apps/control-plane-executor/src/mcp-official-catalog.mjs';
 
 function listen(server) {
   return new Promise((resolve) => {

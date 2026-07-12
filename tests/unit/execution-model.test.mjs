@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildExecutionRecord, buildMissedExecutionRecord, resolveOutcome, finalizeExecution } from '../../services/scheduling-engine/src/execution-model.mjs';
+import { buildExecutionRecord, buildMissedExecutionRecord, resolveOutcome, finalizeExecution } from '../../packages/scheduling-engine/src/execution-model.mjs';
 
 const job = { id: 'j1', tenant_id: 't1', workspace_id: 'w1' };
 

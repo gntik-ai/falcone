@@ -5,8 +5,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { createConnectionRegistry } from '../../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { executePostgresDdl } from '../../../apps/control-plane/src/runtime/postgres-ddl-executor.mjs';
+import { createConnectionRegistry } from '../../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { executePostgresDdl } from '../../../apps/control-plane-executor/src/runtime/postgres-ddl-executor.mjs';
 import { ensureDataApiRoles } from './data-api-roles.mjs';
 
 const { Pool } = pg;

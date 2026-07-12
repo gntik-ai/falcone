@@ -11,10 +11,10 @@ import {
 import { readAuthorizationModel } from './authorization-model.mjs';
 import { readDomainModel } from './domain-model.mjs';
 
-export const PUBLIC_API_TAXONOMY_PATH = 'services/internal-contracts/src/public-api-taxonomy.json';
-export const PUBLIC_ROUTE_CATALOG_PATH = 'services/internal-contracts/src/public-route-catalog.json';
-export const PUBLIC_API_FAMILY_DIR = 'apps/control-plane/openapi/families';
-export const GATEWAY_ROUTING_PATH = 'services/gateway-config/base/public-api-routing.yaml';
+export const PUBLIC_API_TAXONOMY_PATH = 'packages/internal-contracts/src/public-api-taxonomy.json';
+export const PUBLIC_ROUTE_CATALOG_PATH = 'packages/internal-contracts/src/public-route-catalog.json';
+export const PUBLIC_API_FAMILY_DIR = 'apps/control-plane-executor/openapi/families';
+export const GATEWAY_ROUTING_PATH = 'deploy/gateway-config/base/public-api-routing.yaml';
 export const PUBLIC_API_DOCS_PATH = 'docs/reference/architecture/public-api-surface.md';
 
 export function readPublicApiTaxonomy() {

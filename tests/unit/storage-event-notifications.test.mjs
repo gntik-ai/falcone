@@ -14,9 +14,9 @@ import {
   evaluateStorageEventNotifications,
   matchStorageEventNotificationRule,
   validateStorageEventNotificationRule
-} from '../../services/adapters/src/storage-event-notifications.mjs';
-import { STORAGE_NORMALIZED_ERROR_CODES } from '../../services/adapters/src/storage-error-taxonomy.mjs';
-import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
+} from '../../packages/adapters/src/storage-event-notifications.mjs';
+import { STORAGE_NORMALIZED_ERROR_CODES } from '../../packages/adapters/src/storage-error-taxonomy.mjs';
+import { buildStorageProviderProfile } from '../../packages/adapters/src/storage-provider-profile.mjs';
 
 function makeSupportedProfile() {
   const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });

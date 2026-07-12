@@ -11,7 +11,7 @@ import {
   readObservabilityAuditPipeline,
   readObservabilityHealthChecks,
   readObservabilityMetricsStack
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { collectAuditPipelineViolations } from '../../scripts/lib/observability-audit-pipeline.mjs';
 
 test('observability audit pipeline contract is exposed through shared readers', () => {

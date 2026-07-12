@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import Ajv from 'ajv';
 
-const doc = JSON.parse(fs.readFileSync(new URL('../../apps/control-plane/openapi/families/workspaces.openapi.json', import.meta.url), 'utf8'));
+const doc = JSON.parse(fs.readFileSync(new URL('../../apps/control-plane-executor/openapi/families/workspaces.openapi.json', import.meta.url), 'utf8'));
 const ajv = new Ajv({ strict: false });
 
 function compile(schemaName) {

@@ -21,18 +21,18 @@ import {
   assertSecretRefAllowed,
   assertEndpointAllowed,
   DEFAULT_SECRET_PREFIX,
-} from '../../apps/control-plane/src/runtime/byok-provider-guard.mjs';
+} from '../../apps/control-plane-executor/src/runtime/byok-provider-guard.mjs';
 import {
   createLlmExecutor,
   createLlmProviderStore,
   createLlmUsageStore,
   localMockLlmBackend,
-} from '../../apps/control-plane/src/runtime/llm-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 import {
   createEmbeddingExecutor,
   createEmbeddingProviderStore,
   localMockEmbeddingBackend,
-} from '../../apps/control-plane/src/runtime/embedding-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 // A clearly non-provider placeholder (GitHub push protection rejects sk_live_ etc.).
 const FAKE_KEY = 'placeholder-not-a-real-key';

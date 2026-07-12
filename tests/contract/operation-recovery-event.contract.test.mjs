@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRecoveredEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
-import { operationRecoveryEventSchema } from '../../services/internal-contracts/src/index.mjs';
+import { buildRecoveredEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import { operationRecoveryEventSchema } from '../../packages/internal-contracts/src/index.mjs';
 
 function validateAgainstRequiredSchema(event, schema) {
   for (const field of schema.required ?? []) {

@@ -7,7 +7,7 @@
 //   1. Data write: mongoInsert/mongoUpdate/mongoDelete (data-injector) → FerretDB gateway
 //      (WS_MONGO_CONN_STR) → DocumentDB engine (postgres-documentdb) WAL.
 //
-//   2. WAL → SSE: apps/control-plane/src/runtime/realtime-executor.mjs (createRealtimeExecutor)
+//   2. WAL → SSE: apps/control-plane-executor/src/runtime/realtime-executor.mjs (createRealtimeExecutor)
 //      owns a pgoutput logical replication slot on the DocumentDB engine
 //      (REALTIME_DOCUMENTDB_URL). WalReplicationClient decodes BSON rows; tenant isolation is
 //      enforced consumer-side: only changes whose fullDocument.tenantId (or
@@ -15,7 +15,7 @@
 //      delivered. A WAL UPDATE is surfaced as operationType 'replace' (not 'update') because
 //      logical replication carries the full new image without a $set diff.
 //
-//   3. SSE → WS: apps/control-plane/src/runtime/server.mjs exposes
+//   3. SSE → WS: apps/control-plane-executor/src/runtime/server.mjs exposes
 //      GET /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes
 //      (route alias `rt`) wired to runRealtimeSse(realtimeExecutor). The WS gateway in the
 //      realtime suite (helpers/client.mjs) forwards `subscribe` messages to this SSE endpoint
@@ -43,7 +43,7 @@
 //   in-falcone-documentdb-replication Secret (optional:true in the kind values; required here).
 //   The DocumentDB engine's wal_level must be logical and the publication falcone_cdc_pub must
 //   exist — both are provisioned by the chart on install
-//   (services/mongo-cdc-bridge/src/provisionLogicalReplication.mjs called at startup).
+//   (packages/mongo-cdc-bridge/src/provisionLogicalReplication.mjs called at startup).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,6 +1,6 @@
 # API Reference — Gateway & Routing
 
-The APISIX gateway is the single entry point. It classifies each request by credential, enforces the route's privilege domain, rate-limits per key, and injects verified identity headers before forwarding. Route definitions are catalogued in `services/gateway-config/public-route-catalog.json`; policy is built in `scripts/lib/gateway-policy.mjs`.
+The APISIX gateway is the single entry point. It classifies each request by credential, enforces the route's privilege domain, rate-limits per key, and injects verified identity headers before forwarding. Route definitions are catalogued in `deploy/gateway-config/public-route-catalog.json`; policy is built in `scripts/lib/gateway-policy.mjs`.
 
 ## Credential classification
 
@@ -33,7 +33,7 @@ Downstream services trust these only when no stronger credential (API key / veri
 
 ## Scope enforcement
 
-Each route declares a `privilege_domain` (`structural_admin` | `data_access`); function routes add a `function_deployment` sub-domain. A custom plugin rejects callers whose verified scope doesn't permit the route's domain (`403`). Specs: `services/gateway-config/tests/plugins/scope-enforcement-*`.
+Each route declares a `privilege_domain` (`structural_admin` | `data_access`); function routes add a `function_deployment` sub-domain. A custom plugin rejects callers whose verified scope doesn't permit the route's domain (`403`). Specs: `deploy/gateway-config/tests/plugins/scope-enforcement-*`.
 
 ## Rate limiting
 

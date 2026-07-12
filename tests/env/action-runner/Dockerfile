@@ -25,7 +25,7 @@ COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 
 # Expose the installed deps at the filesystem ROOT (/node_modules) so the ESM
-# resolver, walking up from /repo/services/backup-status/src/api/, resolves
+# resolver, walking up from /repo/packages/backup-status/src/api/, resolves
 # `jose` / `jwks-rsa` (its final candidate is /node_modules). A symlink suffices.
 RUN ln -sfn /app/node_modules /node_modules
 

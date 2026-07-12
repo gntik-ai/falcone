@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createWorkspaceCapabilityCatalogAction } from '../../services/provisioning-orchestrator/src/actions/workspace-capability-catalog.mjs';
+import { createWorkspaceCapabilityCatalogAction } from '../../packages/provisioning-orchestrator/src/actions/workspace-capability-catalog.mjs';
 
 const baseClaims = {
   workspaceId: 'ws-123',
@@ -70,7 +70,7 @@ test('audit event is emitted to the expected topic payload surface', async () =>
 });
 
 test('migration file contains idempotent DDL markers', () => {
-  const sql = readFileSync(new URL('../../services/provisioning-orchestrator/src/migrations/090-workspace-capability-catalog.sql', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../../packages/provisioning-orchestrator/src/migrations/090-workspace-capability-catalog.sql', import.meta.url), 'utf8');
   assert.match(sql, /CREATE TABLE IF NOT EXISTS capability_catalog_metadata/);
   assert.match(sql, /ON CONFLICT \(capability_key\) DO NOTHING/);
 });

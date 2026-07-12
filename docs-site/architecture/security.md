@@ -10,7 +10,7 @@ Security in a multi-tenant BaaS reduces to one question: **can tenant A ever rea
 | **Service API key** | `apikey: flc_service_…` | Server-side / CI; elevated within the tenant; never exposed to clients |
 | **Bearer JWT** | `Authorization: Bearer <jwt>` | Operator/user calls; issued by Keycloak (OIDC) |
 
-Keys are verified by `apps/control-plane/src/runtime/api-keys.mjs`; JWTs by `jwt-verify.mjs`. Keys are matched at the gateway by the `apikey` header (route `vars` on `^flc_`).
+Keys are verified by `apps/control-plane-executor/src/runtime/api-keys.mjs`; JWTs by `jwt-verify.mjs`. Keys are matched at the gateway by the `apikey` header (route `vars` on `^flc_`).
 
 ## Authorization: identity resolution & precedence
 
@@ -30,7 +30,7 @@ The gateway tags every public route with a `privilege_domain` and enforces it be
 - **`structural_admin`** — lifecycle/management (tenants, workspaces, schemas, functions, api-keys, quotas, service config).
 - **`data_access`** — the data plane (documents, queries, objects, function invocation, events, analytics).
 
-A `data_access` credential cannot reach `structural_admin` routes. Function routes additionally carry a `function_deployment` sub-domain. The scope-enforcement plugin lives in `services/gateway-config/` with Lua specs under `tests/plugins/`.
+A `data_access` credential cannot reach `structural_admin` routes. Function routes additionally carry a `function_deployment` sub-domain. The scope-enforcement plugin lives in `deploy/gateway-config/` with Lua specs under `tests/plugins/`.
 
 ## Tenant isolation in the data layer
 

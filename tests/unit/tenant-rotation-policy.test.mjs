@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { enforceRotationPolicy } from '../../services/provisioning-orchestrator/src/models/tenant-rotation-policy.mjs';
+import { enforceRotationPolicy } from '../../packages/provisioning-orchestrator/src/models/tenant-rotation-policy.mjs';
 
 test('enforceRotationPolicy rejects values above the configured max', () => {
   assert.throws(() => enforceRotationPolicy({ max_grace_period_seconds: 60 }, 61), /exceeds policy limit/);

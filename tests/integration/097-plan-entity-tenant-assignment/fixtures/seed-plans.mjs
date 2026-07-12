@@ -1,4 +1,4 @@
-import * as planRepository from '../../../../services/provisioning-orchestrator/src/repositories/plan-repository.mjs';
+import * as planRepository from '../../../../packages/provisioning-orchestrator/src/repositories/plan-repository.mjs';
 
 export async function setup(pgClient, actorId = 'seed-superadmin') {
   const created = [];

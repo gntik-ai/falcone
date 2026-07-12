@@ -15,8 +15,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { routes as seedRoutes } from '../../deploy/kind/control-plane/routes.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { routes as seedRoutes } from '../../apps/control-plane/routes.mjs';
 
 test('bbx-console-session-01: returns the verified principal for an operator (200)', async () => {
   const res = await LOCAL_HANDLERS.consoleSession({

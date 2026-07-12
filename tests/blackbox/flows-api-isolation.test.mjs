@@ -9,9 +9,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { createFlowExecutor } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 
 const DEF = {
   apiVersion: 'v1.0',

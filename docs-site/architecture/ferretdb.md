@@ -21,8 +21,8 @@ replacing the storage engine:
 1. **FerretDB gateway** (`ghcr.io/ferretdb/ferretdb:2.7.0`) — a stateless process that speaks the
    MongoDB wire protocol (reports `maxWireVersion:21` / MongoDB 7.0 wire level) and translates it
    to SQL against the engine below. Falcone's existing MongoDB driver, the data-API executor
-   (`apps/control-plane/src/runtime/mongo-data-executor.mjs`), and the adapter plan builder
-   (`services/adapters/src/mongodb-data-api.mjs`) connect to it unchanged via `MONGO_URI`.
+   (`apps/control-plane-executor/src/runtime/mongo-data-executor.mjs`), and the adapter plan builder
+   (`packages/adapters/src/mongodb-data-api.mjs`) connect to it unchanged via `MONGO_URI`.
 2. **DocumentDB engine** (`ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`) — a
    PostgreSQL 17 instance with the `pg_documentdb` / `pg_documentdb_core` extensions, storing each
    logical document as a row in the `documentdb_data` schema.
@@ -125,7 +125,7 @@ Source: `../falcone-charts/charts/in-falcone/values.yaml` (`documentdb.config.in
 - A Mongo "database" is a **logical namespace inside one shared backing Postgres DB** (`documentdb_data`,
   keyed by database/collection) — NOT a database-per-tenant. Tenants coexist in shared collections,
   distinguished by a `tenantId` field on every document.
-- **Authoritative isolation** is enforced in `services/adapters/src/mongodb-data-api.mjs`:
+- **Authoritative isolation** is enforced in `packages/adapters/src/mongodb-data-api.mjs`:
   `applyTenantScopeToFilter` injects the verified `tenantId` predicate into every read filter, and
   `injectTenantIntoDocument` stamps it onto every write (a forged `tenantId` in a payload or filter is
   rejected with HTTP 403). A forgotten filter cannot cross tenants and a write cannot forge another
@@ -133,7 +133,7 @@ Source: `../falcone-charts/charts/in-falcone/values.yaml` (`documentdb.config.in
 - **Per-database role scoping does NOT isolate.** DocumentDB 0.107 does not enforce per-database role
   scoping: a credential scoped to one tenant's namespace can read another tenant's data at the backend
   layer (live-verified by the [migration-validation](#day-2-operations) isolation-gap probe, #462). The
-  go/no-go gate does **not** assume a backend security boundary exists. Note: `apps/control-plane/src/
+  go/no-go gate does **not** assume a backend security boundary exists. Note: `apps/control-plane-executor/src/
   postgres-applier.mjs` manages schemas/tables/views/extensions/grants only — it provisions **no**
   per-tenant DocumentDB identity.
 - **RLS coexists as hardening**, not as the document-store isolation boundary (RLS protects the
@@ -168,8 +168,8 @@ change-stream `$match`). A WAL `UPDATE` surfaces as `operationType: 'replace'` (
 carries the full new image, not a `$set` diff). `wal_level=logical` (see
 [PostgreSQL Extension Prerequisites](#postgresql-extension-prerequisites)) is the enabling GUC. The
 full design and implementation are owned by **`add-ferretdb-realtime-cdc-remediation` (#460)**;
-`apps/control-plane/src/runtime/realtime-executor.mjs` and
-`services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` consume the slot (they no longer call
+`apps/control-plane-executor/src/runtime/realtime-executor.mjs` and
+`packages/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` consume the slot (they no longer call
 `collection.watch()`).
 
 ## Observability

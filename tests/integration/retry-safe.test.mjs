@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createOperation as createOperationModel } from '../../services/provisioning-orchestrator/src/models/async-operation.mjs';
-import { createOperation, findByIdAnyTenant } from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
-import { create as createRetryAttempt, findByOperationId } from '../../services/provisioning-orchestrator/src/repositories/retry-attempt-repo.mjs';
-import { main as retryAction } from '../../services/provisioning-orchestrator/src/actions/async-operation-retry.mjs';
+import { createOperation as createOperationModel } from '../../packages/provisioning-orchestrator/src/models/async-operation.mjs';
+import { createOperation, findByIdAnyTenant } from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+import { create as createRetryAttempt, findByOperationId } from '../../packages/provisioning-orchestrator/src/repositories/retry-attempt-repo.mjs';
+import { main as retryAction } from '../../packages/provisioning-orchestrator/src/actions/async-operation-retry.mjs';
 
 function createRetryStore() {
   const state = {

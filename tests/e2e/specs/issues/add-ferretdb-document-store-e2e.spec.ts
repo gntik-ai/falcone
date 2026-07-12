@@ -13,7 +13,7 @@
  *
  * OUT OF SCOPE — Realtime/CDC suite (`tests/e2e/realtime/`): this is a SEPARATE, pgoutput-based
  * suite owned by add-ferretdb-realtime-cdc-remediation (#460, MERGED). That change re-architected
- * realtime onto a Postgres pgoutput logical-replication slot — `apps/control-plane/src/runtime/
+ * realtime onto a Postgres pgoutput logical-replication slot — `apps/control-plane-executor/src/runtime/
  * realtime-executor.mjs` no longer calls `collection.watch()` (it consumes a WalReplicationClient).
  * This document-store change neither runs nor modifies those specs.
  *

@@ -18,9 +18,9 @@
 //   bbx-639-rt-02       backward compatible: a single-arg main(params) still succeeds
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildInvokeHeaders } from '../../deploy/kind/control-plane/function-executor.mjs';
+import { buildInvokeHeaders } from '../../apps/control-plane/function-executor.mjs';
 
-const FN = '../../deploy/kind/fn-runtime/server.mjs';
+const FN = '../../apps/fn-runtime/server.mjs';
 
 test('bbx-639-hdr-01: buildInvokeHeaders injects X-Falcone-* from the verified caller', () => {
   const h = buildInvokeHeaders('{"n":1}', { tenantId: 'ten-a', workspaceId: 'ws-a', principal: 'user-a', actorType: 'tenant_owner', roles: ['admin', 'dev'] });

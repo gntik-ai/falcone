@@ -3,12 +3,12 @@
  * BUG-SCHEDULING-DOCKERFILE).
  *
  * Defect: the route map dispatched `/v1/scheduling/*` to
- * `/repo/services/scheduling-engine/actions/scheduling-management.mjs`, but the kind
- * control-plane Dockerfile only COPYed services/provisioning-orchestrator (+ internal-
- * contracts + apps/control-plane). At runtime the dynamic import failed →
+ * `/repo/packages/scheduling-engine/actions/scheduling-management.mjs`, but the kind
+ * control-plane Dockerfile only COPYed packages/provisioning-orchestrator (+ internal-
+ * contracts + apps/control-plane-executor). At runtime the dynamic import failed →
  * ERR_MODULE_NOT_FOUND → 500 on every scheduling request.
  *
- * Fix: COPY services/scheduling-engine into the image, and add a build-time check that
+ * Fix: COPY packages/scheduling-engine into the image, and add a build-time check that
  * every route-map handler module resolves so a missing COPY fails the build (not a 500).
  *
  * Hermetic: parses the route map + Dockerfile + repo tree (no running stack), mirroring
@@ -52,7 +52,7 @@ test('bbx-sched-dockerfile-01: every route-map services tree is COPYed by the Do
 
 test('bbx-sched-dockerfile-02: scheduling-engine specifically is COPYed (the regression)', () => {
   assert.ok(referencedTrees.includes('scheduling-engine'), 'route map should dispatch to scheduling-engine');
-  assert.ok(copiedTrees.includes('scheduling-engine'), 'Dockerfile must COPY services/scheduling-engine');
+  assert.ok(copiedTrees.includes('scheduling-engine'), 'Dockerfile must COPY packages/scheduling-engine');
 });
 
 test('bbx-sched-dockerfile-03: the scheduling handler module exists in the repo', () => {

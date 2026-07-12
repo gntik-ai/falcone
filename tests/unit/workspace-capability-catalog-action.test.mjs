@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkspaceCapabilityCatalogAction } from '../../services/provisioning-orchestrator/src/actions/workspace-capability-catalog.mjs';
+import { createWorkspaceCapabilityCatalogAction } from '../../packages/provisioning-orchestrator/src/actions/workspace-capability-catalog.mjs';
 
 const baseClaims = {
   workspaceId: 'ws-123',

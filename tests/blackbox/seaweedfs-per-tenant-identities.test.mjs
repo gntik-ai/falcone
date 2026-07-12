@@ -34,7 +34,7 @@ import {
   buildSeaweedFSIdentitiesConfig,
   PLATFORM_RESERVED_BUCKET_PREFIX,
   SEAWEEDFS_IDENTITIES_CONFIG_ERROR_CODES,
-} from '../../services/adapters/src/seaweedfs-s3-identities-config.mjs';
+} from '../../packages/adapters/src/seaweedfs-s3-identities-config.mjs';
 
 // Non-provider placeholder admin keys (AWS docs EXAMPLE shape).
 const ADMIN_AK = 'AKIAIOSFODNN7EXAMPLE';

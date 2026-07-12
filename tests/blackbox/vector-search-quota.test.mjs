@@ -1,7 +1,7 @@
 // Black-box test suite for change add-vector-search — vector quota dimensions:
 // snapshot calculation + insert (429) / DDL (422) enforcement. Drives the PUBLIC
 // metering surface only:
-//   services/provisioning-orchestrator/src/repositories/vector-consumption-repository.mjs
+//   packages/provisioning-orchestrator/src/repositories/vector-consumption-repository.mjs
 //
 // Tests: bbx-vec-quota-01 .. bbx-vec-quota-08
 import test from 'node:test';
@@ -12,7 +12,7 @@ import {
   computeVectorConsumption,
   enforceVectorInsertQuota,
   enforceVectorDimensionQuota,
-} from '../../services/provisioning-orchestrator/src/repositories/vector-consumption-repository.mjs';
+} from '../../packages/provisioning-orchestrator/src/repositories/vector-consumption-repository.mjs';
 
 // bbx-vec-quota-01: the three vector quota dimensions are declared.
 test('bbx-vec-quota-01: vector quota dimension keys are declared', () => {

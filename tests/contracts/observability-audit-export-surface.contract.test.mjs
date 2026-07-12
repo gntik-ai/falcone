@@ -14,9 +14,9 @@ import {
   getPublicRoute,
   readAuthorizationModel,
   readObservabilityAuditExportSurface
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { buildAuditExportConsoleView, listAuditExportRoutes } from '../../apps/control-plane/src/observability-audit-export.mjs';
+import { buildAuditExportConsoleView, listAuditExportRoutes } from '../../apps/control-plane-executor/src/observability-audit-export.mjs';
 
 test('observability audit export surface contract is exposed through shared readers', () => {
   const contract = readObservabilityAuditExportSurface();

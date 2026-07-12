@@ -6,7 +6,7 @@ import {
   listInitialTenantBootstrapTemplates,
   resolveInitialTenantBootstrap,
   resolveTenantEffectiveCapabilities
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('initial tenant bootstrap templates distinguish always-created and capability-gated resources', () => {
   const templates = listInitialTenantBootstrapTemplates();

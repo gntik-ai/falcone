@@ -31,7 +31,7 @@ async function main() {
   if (!URI) { console.error('FATAL: set ROLLBACK_MONGO_URI (the MongoDB endpoint to validate the rollback against)'); process.exit(2); }
 
   const { MongoClient } = await import('mongodb');
-  const { createMongoExecutor } = await import('../../../apps/control-plane/src/runtime/mongo-data-executor.mjs');
+  const { createMongoExecutor } = await import('../../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs');
 
   const DB = process.env.ROLLBACK_VALIDATION_DB ?? 'rollback_validation';
   const COLL = 'rb_notes';

@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { applyGovernanceSchema } from '../../deploy/kind/control-plane/governance-schema.mjs';
+import { applyGovernanceSchema } from '../../apps/control-plane/governance-schema.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

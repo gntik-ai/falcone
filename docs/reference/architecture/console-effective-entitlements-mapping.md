@@ -10,7 +10,7 @@ The effective-entitlements endpoint
 (`GET /v1/tenants/{tenantId}/plan/effective-entitlements` for superadmins, or
 `GET /v1/tenant/plan/effective-entitlements` for a tenant operator's own tenant) returns the
 `EffectiveEntitlementProfile` model
-(`services/provisioning-orchestrator/src/models/effective-entitlements.mjs`):
+(`packages/provisioning-orchestrator/src/models/effective-entitlements.mjs`):
 
 ```text
 EffectiveEntitlementProfile {
@@ -35,7 +35,7 @@ QuantitativeLimitEntry {
 }
 ```
 
-The kind control-plane serves this verbatim — `deploy/kind/control-plane/b-handlers.mjs`
+The kind control-plane serves this verbatim — `apps/control-plane/b-handlers.mjs`
 routes the request to `tenant-effective-entitlements-get.mjs`, which spreads `...profile`
 with no field renaming. The console requests the consumption-enriched form via
 `getEffectiveEntitlements(tenantId, { includeConsumption: true })`

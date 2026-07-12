@@ -4,13 +4,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dbQuery } from '../../services/workflow-worker/src/activities/db-query.mjs';
-import { storagePut } from '../../services/workflow-worker/src/activities/storage-put.mjs';
-import { storageGet } from '../../services/workflow-worker/src/activities/storage-get.mjs';
-import { functionsInvoke } from '../../services/workflow-worker/src/activities/functions-invoke.mjs';
-import { eventsPublish } from '../../services/workflow-worker/src/activities/events-publish.mjs';
-import { httpRequest } from '../../services/workflow-worker/src/activities/http-request.mjs';
-import { emailSend } from '../../services/workflow-worker/src/activities/email-send.mjs';
+import { dbQuery } from '../../apps/workflow-worker/src/activities/db-query.mjs';
+import { storagePut } from '../../apps/workflow-worker/src/activities/storage-put.mjs';
+import { storageGet } from '../../apps/workflow-worker/src/activities/storage-get.mjs';
+import { functionsInvoke } from '../../apps/workflow-worker/src/activities/functions-invoke.mjs';
+import { eventsPublish } from '../../apps/workflow-worker/src/activities/events-publish.mjs';
+import { httpRequest } from '../../apps/workflow-worker/src/activities/http-request.mjs';
+import { emailSend } from '../../apps/workflow-worker/src/activities/email-send.mjs';
 
 const tenant = { tenantId: 't-A', workspaceId: 'w-A' };
 

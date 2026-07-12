@@ -267,15 +267,16 @@ cd tests/env
 ## Repository layout
 
 ```text
-apps/            control-plane (REST API surface) · web-console (React UI) ·
-                 cli (falcone CLI: mcp init/dev/deploy) · mcp-server-sdk (tenant-scoped MCP tool SDK)
-services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
-                 scheduling-engine, provisioning-orchestrator, backup-status,
-                 workflow-worker (Flows DSL interpreter), audit, adapters,
-                 internal-contracts, …
+apps/            release services: control-plane · control-plane-executor · web-console ·
+                 fn-runtime · workflow-worker · mcp-runtime
+packages/        shared/action code: adapters · audit · realtime-gateway · webhook-engine ·
+                 cdc bridges · scheduling-engine · provisioning-orchestrator · backup-status ·
+                 mcp-server-sdk · internal-contracts · …
+tools/           falcone-cli (mcp init/dev/deploy)
+deploy/          APISIX/Keycloak config, kind/OpenShift bootstrap and test infrastructure
+service-catalog.json  Canonical release/non-release service catalog
 ../falcone-charts/  Companion repository for Kubernetes / Helm deployment (incl. temporal,
                     workflowWorker, mcp components)
-deploy/          APISIX routes, kind/OpenShift bootstrap
 tests/           blackbox (contract) · e2e (Playwright, incl. mcp specs) · env (Compose stack)
 ```
 
@@ -302,7 +303,6 @@ see the compatibility note that follows.
 | Knative Serving + Kourier | Serverless functions runtime | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
 | Kubernetes + Helm | Deployment & orchestration | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Service runtime | `MIT` | [nodejs](https://github.com/nodejs/node) |
-| nginx | Static serving of the web-console image | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
 
 ### Principal application frameworks & libraries (npm)
 

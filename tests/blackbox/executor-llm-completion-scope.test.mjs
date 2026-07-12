@@ -17,8 +17,8 @@
 // bbx-662-03: write-capable service api-key (data:write)    -> 200 (executor.complete WAS called)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 
 const TEN = 'tenant_llm';
 const WS = 'ws_llm';

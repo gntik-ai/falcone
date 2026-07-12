@@ -14,7 +14,7 @@ other value — including an **absent** key — it returns `{ enabled: false, re
 badge, so the surface is visible but inert.
 
 The `capabilities` map comes from the effective-capabilities action
-(`services/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs`). When the
+(`packages/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs`). When the
 console has an active tenant context, it calls `GET /v1/tenants/{tenantId}/effective-capabilities`
 with that tenant id. It does **not** call the self-tenant route
 `GET /v1/tenant/effective-capabilities` for tenant-less platform principals such as `superadmin`;
@@ -53,8 +53,8 @@ The Flows feature (visual designer, run history, run view, flow designer) is **n
 boolean capability and **must not** be wrapped in `CapabilityGate`. There is no `workflows` key in the
 catalog, and the flow control-plane API is open to every tenant regardless of plan — there is no
 `/v1/flows/...` entry in the gateway capability-gated route map
-(`services/gateway-config/routes/capability-gated-routes.yaml`) and no flows `planCapabilityAnyOf`
-block in `services/gateway-config/base/public-api-routing.yaml`. The four Flows pages
+(`deploy/gateway-config/routes/capability-gated-routes.yaml`) and no flows `planCapabilityAnyOf`
+block in `deploy/gateway-config/base/public-api-routing.yaml`. The four Flows pages
 (`apps/web-console/src/pages/ConsoleFlows*Page.tsx`) render their content directly. (#790)
 
 The Functions **publish wizard** (`apps/web-console/src/pages/ConsoleFunctionsPage.tsx`) is genuinely

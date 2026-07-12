@@ -5,7 +5,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { Kafka, logLevel } from 'kafkajs'
-import { createEventsExecutor } from '../../../apps/control-plane/src/runtime/events-executor.mjs'
+import { createEventsExecutor } from '../../../apps/control-plane-executor/src/runtime/events-executor.mjs'
 
 const BROKERS = process.env.KAFKA_BROKERS ?? 'localhost:19092'
 const WS_A = 'wsevta'

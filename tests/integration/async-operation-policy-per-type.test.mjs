@@ -10,7 +10,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const shouldRun = Boolean(Client && databaseUrl);
 const maybeTest = shouldRun ? test : test.skip;
 
-import { findTimedOutCandidates } from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+import { findTimedOutCandidates } from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
 
 maybeTest('specific operation policies are honored over fallback', async () => {
   const client = new Client({ connectionString: databaseUrl });

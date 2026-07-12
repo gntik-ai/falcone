@@ -19,14 +19,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
 
 const BY_ID_PATH = '/v1/functions/actions/{actionId}';
 
 // ---- faithful copy of the kind-CP route matcher --------------------------------------------
 // Importing `server.mjs` has import-time side effects (it builds a runtime, reads env, etc.),
 // so we mirror the two relevant functions verbatim from
-// deploy/kind/control-plane/server.mjs (compilePath: lines 96-103, matchRoute: lines 117-124)
+// apps/control-plane/server.mjs (compilePath: lines 96-103, matchRoute: lines 117-124)
 // to prove the console's PATCH request resolves through the real matching logic.
 function compilePath(tmpl) {
   const rx = tmpl
@@ -49,11 +49,11 @@ function matchRoute(compiledRoutes, method, path) {
 const COMPILED = routes.map((r) => ({ ...r, _rx: compilePath(r.path) }));
 
 // ---- contract source of truth (avoid hardcoding the expected method) -----------------------
-// services/internal-contracts/src/public-route-catalog.json declares the canonical method for
+// packages/internal-contracts/src/public-route-catalog.json declares the canonical method for
 // the `updateFunctions` operation on the by-id actions path.
 function contractUpdateFunctionsMethod() {
   const catalogUrl = new URL(
-    '../../services/internal-contracts/src/public-route-catalog.json',
+    '../../packages/internal-contracts/src/public-route-catalog.json',
     import.meta.url,
   );
   const catalog = JSON.parse(readFileSync(fileURLToPath(catalogUrl), 'utf8'));

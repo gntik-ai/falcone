@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { secretInventory } from '../../../services/provisioning-orchestrator/src/actions/secret-inventory.mjs';
+import { secretInventory } from '../../../packages/provisioning-orchestrator/src/actions/secret-inventory.mjs';
 
 test('inventory API returns metadata without values for authorized operator', async () => {
   const result = await secretInventory(

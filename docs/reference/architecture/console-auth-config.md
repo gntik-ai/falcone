@@ -3,7 +3,7 @@
 Every tenant is provisioned with its own Keycloak realm, and that realm's **login behavior**
 (registration, email login, password reset, remember-me, email verification, and configured social
 identity providers) has always been fully manageable server-side via
-`GET`/`PUT /v1/tenants/{tenantId}/auth-config` (`deploy/kind/control-plane/b-handlers.mjs::getAuthConfig`
+`GET`/`PUT /v1/tenants/{tenantId}/auth-config` (`apps/control-plane/b-handlers.mjs::getAuthConfig`
 / `setAuthConfig`, `authorizeAuthConfig`). Until this change, however, no console screen called it — a
 tenant owner had no way to change their own realm's login settings without raw API access (#782).
 
@@ -67,8 +67,8 @@ read-only, correctly-populated list now is preferred over a partial/broken creat
 ## The wire
 
 `/v1/tenants/{tenantId}/auth-config` (and its `/identity-providers/{alias}` sub-resource) is a
-**kind-CP runtime-only route family** (`deploy/kind/control-plane/routes.mjs`) — it is **not** present
-in the public OpenAPI (`apps/control-plane/openapi/control-plane.openapi.json`) or the generated
+**kind-CP runtime-only route family** (`apps/control-plane/routes.mjs`) — it is **not** present
+in the public OpenAPI (`apps/control-plane-executor/openapi/control-plane.openapi.json`) or the generated
 console SDK (`apps/web-console/src/lib/console-openapi-sdk.ts`), the same pattern as the other
 `/v1/tenants/*` runtime-only surfaces. There is therefore no OpenAPI/SDK contract artifact to update
 for this change; `apps/web-console/src/services/authConfigApi.ts` **is** the console-side contract for

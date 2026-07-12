@@ -13,22 +13,22 @@ import {
   readObservabilityAuditExportSurface,
   readObservabilityAuditPipeline,
   readObservabilityAuditQuerySurface
-} from '../../../services/internal-contracts/src/index.mjs';
+} from '../../../packages/internal-contracts/src/index.mjs';
 import {
   AUDIT_CORRELATION_ERROR_CODES,
   traceTenantAuditCorrelation,
   traceWorkspaceAuditCorrelation
-} from '../../../apps/control-plane/src/observability-audit-correlation.mjs';
+} from '../../../apps/control-plane-executor/src/observability-audit-correlation.mjs';
 import {
   AUDIT_EXPORT_ERROR_CODES,
   exportTenantAuditRecordsPreview,
   exportWorkspaceAuditRecordsPreview
-} from '../../../apps/control-plane/src/observability-audit-export.mjs';
+} from '../../../apps/control-plane-executor/src/observability-audit-export.mjs';
 import {
   AUDIT_QUERY_ERROR_CODES,
   queryTenantAuditRecords,
   queryWorkspaceAuditRecords
-} from '../../../apps/control-plane/src/observability-audit-query.mjs';
+} from '../../../apps/control-plane-executor/src/observability-audit-query.mjs';
 
 const traceabilityMatrix = readAuditTraceabilityMatrix();
 

@@ -11,7 +11,7 @@ import {
   buildStorageProgrammaticCredentialSecretEnvelope,
   revokeStorageProgrammaticCredential,
   rotateStorageProgrammaticCredential
-} from '../../services/adapters/src/storage-programmatic-credentials.mjs';
+} from '../../packages/adapters/src/storage-programmatic-credentials.mjs';
 
 test('storage programmatic credential helpers normalize records and one-time secret envelopes', () => {
   const envelope = buildStorageProgrammaticCredentialSecretEnvelope({

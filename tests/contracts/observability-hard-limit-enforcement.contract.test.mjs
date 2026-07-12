@@ -11,7 +11,7 @@ import {
   listHardLimitDimensions,
   listHardLimitSurfaceMappings,
   readObservabilityHardLimitEnforcement
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('observability hard-limit enforcement contract is exposed through shared readers', () => {
   const contract = readObservabilityHardLimitEnforcement();

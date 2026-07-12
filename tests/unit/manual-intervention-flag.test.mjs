@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFlag, shouldDebounceNotification, ManualInterventionFlag } from '../../services/provisioning-orchestrator/src/models/manual-intervention-flag.mjs';
+import { createFlag, shouldDebounceNotification, ManualInterventionFlag } from '../../packages/provisioning-orchestrator/src/models/manual-intervention-flag.mjs';
 
 test('createFlag builds valid flag', () => {
   const flag = createFlag({ operationId: 'op', tenantId: 't', actorId: 'a', reason: 'needs help', attemptCountAtFlag: 5 });

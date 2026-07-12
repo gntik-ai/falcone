@@ -10,7 +10,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import net from 'node:net';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 
 // Dummy registry: the proxied (unmatched) path never touches it; createControlPlaneServer
 // only requires it to be truthy.

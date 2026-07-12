@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
-import { validatePostgresAdminSqlRequest } from '../../services/adapters/src/postgresql-admin.mjs';
+import { getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
+import { validatePostgresAdminSqlRequest } from '../../packages/adapters/src/postgresql-admin.mjs';
 
 test('restricted admin SQL requests are blocked from public data-api style origins and service-account contexts', () => {
   const decision = validatePostgresAdminSqlRequest({

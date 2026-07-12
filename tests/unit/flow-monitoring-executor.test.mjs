@@ -12,8 +12,8 @@ import {
   nodeIdFromActivityId,
   createFlowMonitoringExecutor,
   isTerminalStatus,
-} from '../../apps/control-plane/src/runtime/flow-monitoring-executor.mjs';
-import { buildWorkflowId } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/flow-monitoring-executor.mjs';
+import { buildWorkflowId } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 
 // ---- node-ID convention (#359) -------------------------------------------------------------
 

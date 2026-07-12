@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildStorageProgrammaticCredentialRecord } from '../../services/adapters/src/storage-programmatic-credentials.mjs';
+import { buildStorageProgrammaticCredentialRecord } from '../../packages/adapters/src/storage-programmatic-credentials.mjs';
 import {
   rotateStorageCredentialIdentity,
   cleanupRotatedCredentialIdentity,
   revokeStorageCredentialIdentity,
   cascadeRevokeWorkspaceIdentities,
   syncStorageIdentityActions,
-} from '../../services/provisioning-orchestrator/src/actions/storage-identity-runtime.mjs';
+} from '../../packages/provisioning-orchestrator/src/actions/storage-identity-runtime.mjs';
 
 // In-memory SeaweedFS backend with the real identity model: per-bucket-scoped
 // action strings ("Read:bucket") gate signed S3 ops.

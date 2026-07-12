@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as profileGet } from '../../../services/provisioning-orchestrator/src/actions/plan-capability-profile-get.mjs';
+import { main as profileGet } from '../../../packages/provisioning-orchestrator/src/actions/plan-capability-profile-get.mjs';
 import { createFakeDb } from './fixtures/seed-capability-catalog.mjs';
 import { seedPlans } from './fixtures/seed-plans-with-capabilities.mjs';
 

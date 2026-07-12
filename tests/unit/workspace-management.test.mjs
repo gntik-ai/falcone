@@ -5,12 +5,12 @@ import {
   buildWorkspaceCloneDraft,
   resolveWorkspaceApiSurface,
   resolveWorkspaceResourceInheritance
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   getWorkspaceRoute,
   summarizeWorkspaceManagementSurface,
   workspaceLifecycleStateMachine
-} from '../../apps/control-plane/src/workspace-management.mjs';
+} from '../../apps/control-plane-executor/src/workspace-management.mjs';
 import {
   buildWorkspaceCloneFormDefaults,
   buildWorkspaceEndpointCards,

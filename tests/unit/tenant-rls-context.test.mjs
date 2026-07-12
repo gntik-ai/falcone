@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {
   withTenantRlsContext,
   setTenantRlsContext,
-} from '../../services/adapters/src/tenant-rls-context.mjs';
+} from '../../packages/adapters/src/tenant-rls-context.mjs';
 
 function fakeClient() {
   const calls = [];

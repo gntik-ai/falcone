@@ -14,9 +14,9 @@ import {
   listAuditQueryFilters,
   readAuthorizationModel,
   readObservabilityAuditQuerySurface
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { buildAuditExplorerView, listAuditQueryRoutes } from '../../apps/control-plane/src/observability-audit-query.mjs';
+import { buildAuditExplorerView, listAuditQueryRoutes } from '../../apps/control-plane-executor/src/observability-audit-query.mjs';
 
 test('observability audit query surface contract is exposed through shared readers', () => {
   const contract = readObservabilityAuditQuerySurface();

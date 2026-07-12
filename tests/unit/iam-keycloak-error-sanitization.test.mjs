@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 import {
   KEYCLOAK_ADMIN_SAFE_MESSAGE,
   KeycloakAdminError,
   safeKeycloakAdminMessage,
-} from '../../deploy/kind/control-plane/kc-admin.mjs';
+} from '../../apps/control-plane/kc-admin.mjs';
 
 const RAW_BODY_TEXT = 'verbatim upstream body should stay server-side';
 

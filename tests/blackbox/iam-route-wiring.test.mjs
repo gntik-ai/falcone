@@ -12,8 +12,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { LOCAL_HANDLERS as HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { LOCAL_HANDLERS as HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 
 const REALM = 'acme29833';
 const ACME = 'acme-78848e21';

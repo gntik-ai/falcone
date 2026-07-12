@@ -29,7 +29,7 @@
  * @module scripts/backfill-ferretdb-tenant-identities
  */
 
-import { provisionTenantIdentity } from '../services/provisioning-orchestrator/src/appliers/documentdb-identity-applier.mjs';
+import { provisionTenantIdentity } from '../packages/provisioning-orchestrator/src/appliers/documentdb-identity-applier.mjs';
 
 export function parseBackfillArgs(argv = []) {
   const flags = { dryRun: true, forceRotate: false };

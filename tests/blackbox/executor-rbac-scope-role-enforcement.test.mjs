@@ -16,8 +16,8 @@
 // bbx-624-07: JWT with EMPTY roles issuing api-keys       -> 403 (#773 structural positive role)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 
 const TEN = 'tenant_rbac';
 const WS = 'ws_rbac';

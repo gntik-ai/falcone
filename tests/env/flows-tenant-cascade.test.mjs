@@ -14,7 +14,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { teardown as workflowsTeardown } from '../../services/provisioning-orchestrator/src/appliers/workflows-applier.mjs';
+import { teardown as workflowsTeardown } from '../../packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs';
 
 const { Pool } = pg;
 

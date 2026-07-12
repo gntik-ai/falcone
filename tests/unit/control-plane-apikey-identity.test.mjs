@@ -5,7 +5,7 @@
 // store — exercised through the api-key management routes, so no registry/DB is touched.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 
 const registry = { withWorkspaceClient() { throw new Error('registry must not be reached'); } };
 

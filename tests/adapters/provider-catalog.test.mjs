@@ -50,7 +50,7 @@ import {
   storageProviderCapabilityManifestVersion,
   supportedStorageProviderTypes,
   uploadStorageObjectPreview
-} from '../../services/adapters/src/provider-catalog.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
 
 const CAPABILITY_ENTRY_KEYS = ['capabilityId', 'required', 'state', 'summary', 'constraints'];
 const MANIFEST_CAPABILITY_MAP = Object.freeze({
@@ -79,7 +79,7 @@ import {
   adapterContextTargets,
   adapterEnforcementSurfaces,
   workspaceOwnedResourceSemantics
-} from '../../services/adapters/src/authorization-policy.mjs';
+} from '../../packages/adapters/src/authorization-policy.mjs';
 
 test('provider adapter catalog covers all baseline providers', () => {
   const providerIds = new Set(providerAdapterCatalog.map((adapter) => adapter.id));
@@ -88,8 +88,8 @@ test('provider adapter catalog covers all baseline providers', () => {
     assert.ok(providerIds.has(providerId), `missing provider adapter ${providerId}`);
   }
 
-  assert.equal(adapterCallContract.owner, 'services/adapters');
-  assert.equal(adapterResultContract.owner, 'services/adapters');
+  assert.equal(adapterCallContract.owner, 'packages/adapters');
+  assert.equal(adapterResultContract.owner, 'packages/adapters');
 });
 
 test('consumer-specific adapter views remain separated', () => {

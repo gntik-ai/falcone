@@ -5,7 +5,7 @@ import {
   getOperationLogs,
   getOperationResult,
   listOperations
-} from '../../services/provisioning-orchestrator/src/repositories/async-operation-query-repo.mjs';
+} from '../../packages/provisioning-orchestrator/src/repositories/async-operation-query-repo.mjs';
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? null;
 const hasDatabase = Boolean(connectionString);

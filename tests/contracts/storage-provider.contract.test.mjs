@@ -6,7 +6,7 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import {
   getAdapterPort,
   getPublicRoute
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
 import {
   buildStorageErrorEvent,
@@ -24,7 +24,7 @@ import {
   summarizeStorageProgrammaticCredential,
   summarizeStorageProviderIntrospection,
   summarizeTenantStorageContext
-} from '../../apps/control-plane/src/storage-admin.mjs';
+} from '../../apps/control-plane-executor/src/storage-admin.mjs';
 import {
   buildStorageBucketPolicy,
   buildStorageEventGovernanceProfile,
@@ -57,12 +57,12 @@ import {
   storageProviderCapabilityIds,
   storageQuotaGuardrailErrorCodes,
   supportedStorageProviderTypes
-} from '../../services/adapters/src/provider-catalog.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
 import {
   VERIFICATION_VERDICT,
   buildVerificationReport,
   buildVerificationRun
-} from '../../services/adapters/src/storage-provider-verification.mjs';
+} from '../../packages/adapters/src/storage-provider-verification.mjs';
 
 test('seaweedfs is a supported storage provider with a baseline-eligible capability profile', () => {
   assert.equal(supportedStorageProviderTypes.includes('seaweedfs'), true);
@@ -383,7 +383,7 @@ test('storage contracts preserve route discoverability, taxonomy, service-map co
   const listedCredentials = listStorageProgrammaticCredentialsPreview({
     items: [issuedCredential.envelope.credential]
   });
-  const taxonomy = JSON.parse(fs.readFileSync(new URL('../../services/internal-contracts/src/public-api-taxonomy.json', import.meta.url), 'utf8'));
+  const taxonomy = JSON.parse(fs.readFileSync(new URL('../../packages/internal-contracts/src/public-api-taxonomy.json', import.meta.url), 'utf8'));
   const bucketObjectTaxonomy = taxonomy.resource_taxonomy.find((entry) => entry.resource_type === 'bucket_object');
   const storageCredentialTaxonomy = taxonomy.resource_taxonomy.find((entry) => entry.resource_type === 'storage_credential');
 

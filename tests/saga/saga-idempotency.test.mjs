@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkIdempotencyKey, recordIdempotencyResult } from '../../apps/control-plane/src/saga/saga-idempotency.mjs';
+import { checkIdempotencyKey, recordIdempotencyResult } from '../../apps/control-plane-executor/src/saga/saga-idempotency.mjs';
 
 test('unknown idempotency keys return null when adapter has no rows', async () => {
   assert.equal(await checkIdempotencyKey('unknown', 't1'), null);

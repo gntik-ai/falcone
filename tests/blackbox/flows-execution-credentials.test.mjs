@@ -2,9 +2,9 @@
 //
 // Per-execution short-lived credential + workflow-ID helpers for change
 // add-flows-tenancy-isolation-limits. Drives the PUBLIC exported helpers only (no infra):
-//   - apps/control-plane/src/runtime/execution-token.mjs  (mint / validate)
-//   - apps/control-plane/src/runtime/flow-executor.mjs     (buildWorkflowId / parseWorkflowId / sanitizeClientQuery)
-//   - services/workflow-worker/src/activities/execution-token.mjs (assertExecutionToken → non-retryable)
+//   - apps/control-plane-executor/src/runtime/execution-token.mjs  (mint / validate)
+//   - apps/control-plane-executor/src/runtime/flow-executor.mjs     (buildWorkflowId / parseWorkflowId / sanitizeClientQuery)
+//   - apps/workflow-worker/src/activities/execution-token.mjs (assertExecutionToken → non-retryable)
 //
 // Scenarios:
 //   bbx-flows-ten-cred-01: workflow id is {tenantId}:{workspaceId}:{flowId}:{uuid}, server-generated
@@ -20,7 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildWorkflowId, parseWorkflowId, sanitizeClientQuery } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
+import { buildWorkflowId, parseWorkflowId, sanitizeClientQuery } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 import {
   mintExecutionToken,
   validateExecutionToken,
@@ -28,8 +28,8 @@ import {
   EXECUTION_TOKEN_EXPIRED,
   EXECUTION_TOKEN_TENANT_MISMATCH,
   EXECUTION_TOKEN_INVALID,
-} from '../../apps/control-plane/src/runtime/execution-token.mjs';
-import { assertExecutionToken } from '../../services/workflow-worker/src/activities/execution-token.mjs';
+} from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
+import { assertExecutionToken } from '../../apps/workflow-worker/src/activities/execution-token.mjs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

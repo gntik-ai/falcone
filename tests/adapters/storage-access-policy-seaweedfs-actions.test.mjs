@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { toSeaweedFSActions } from '../../services/adapters/src/storage-access-policy.mjs';
+import { toSeaweedFSActions } from '../../packages/adapters/src/storage-access-policy.mjs';
 
 test('toSeaweedFSActions maps each granted permission to its SeaweedFS action in canonical order', () => {
   assert.deepEqual(toSeaweedFSActions({ read: true, write: true, list: true, admin: true }), ['Read', 'Write', 'List', 'Admin']);

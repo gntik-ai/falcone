@@ -13,7 +13,7 @@ import {
   apply,
   teardown,
   DOCUMENTDB_IDENTITY_PROVISION_FAILED,
-} from '../../services/provisioning-orchestrator/src/appliers/documentdb-identity-applier.mjs';
+} from '../../packages/provisioning-orchestrator/src/appliers/documentdb-identity-applier.mjs';
 
 // Fake wire-protocol client: { existingUsers, failOn } -> records commands, simulates engine.
 function fakeWire({ existingUsers = [], failOn = null } = {}) {

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFilter } from '../../../services/realtime-gateway/src/filters/filter-parser.mjs';
-import { evaluateFilter } from '../../../services/realtime-gateway/src/filters/filter-evaluator.mjs';
-import { guardEvent } from '../../../services/realtime-gateway/src/isolation/tenant-workspace-guard.mjs';
+import { parseFilter } from '../../../packages/realtime-gateway/src/filters/filter-parser.mjs';
+import { evaluateFilter } from '../../../packages/realtime-gateway/src/filters/filter-evaluator.mjs';
+import { guardEvent } from '../../../packages/realtime-gateway/src/isolation/tenant-workspace-guard.mjs';
 
 test('filtered subscriptions only receive matching permitted events and reduce delivery volume by at least 50%', () => {
   const sessionContext = { tenantId: 'tenant-1', workspaceId: 'workspace-1' };

@@ -24,9 +24,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as entitlementsGet from '../../services/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs';
-import * as capabilitiesGet from '../../services/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs';
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
+import * as entitlementsGet from '../../packages/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs';
+import * as capabilitiesGet from '../../packages/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
 
 // Minimal fake db: resolveUnifiedEntitlements + resolveEffectiveCapabilities need
 // a live DB but here we only test that the authz layer resolves the tenantId

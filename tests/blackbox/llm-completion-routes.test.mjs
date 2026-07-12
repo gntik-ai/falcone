@@ -6,14 +6,14 @@
 // metering + rollup, streaming SSE, and cross-tenant isolation of BOTH config and usage.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import {
   createLlmExecutor,
   createLlmProviderStore,
   createLlmUsageStore,
   localMockLlmBackend,
-} from '../../apps/control-plane/src/runtime/llm-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 
 const WS = 'ws_llm';
 const FAKE_KEY = 'placeholder-not-a-real-key'; // clearly non-provider placeholder (push protection)

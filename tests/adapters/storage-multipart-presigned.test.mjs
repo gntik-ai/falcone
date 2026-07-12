@@ -24,8 +24,8 @@ import {
   validateStorageMultipartObjectKey,
   validateStoragePresignedTtl,
   getStorageBucketRecord
-} from '../../services/adapters/src/provider-catalog.mjs';
-import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
+import { buildStorageProviderProfile } from '../../packages/adapters/src/storage-provider-profile.mjs';
 
 function makeUnsatisfiedProfile(capabilityId) {
   const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });

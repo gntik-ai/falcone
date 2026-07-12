@@ -5,7 +5,7 @@ import {
   buildComponentHealthProbeSummary,
   buildObservabilityPlatformProbeRollup,
   summarizeObservabilityHealthChecks
-} from '../../apps/control-plane/src/observability-admin.mjs';
+} from '../../apps/control-plane-executor/src/observability-admin.mjs';
 import {
   collectObservabilityHealthCheckViolations,
   readObservabilityHealthChecks

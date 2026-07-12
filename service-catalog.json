@@ -1,0 +1,209 @@
+{
+  "version": "2026-07-12",
+  "description": "Canonical repository catalog for Falcone product services after the service-code layout restructure. Release entries are the only images published by .github/workflows/release-images.yml; non-release entries document evidence roots without claiming chart or image release status.",
+  "services": [
+    {
+      "id": "control-plane",
+      "release": true,
+      "language": "Node.js ESM",
+      "imageIdentity": "in-falcone-control-plane",
+      "chart": {
+        "alias": "controlPlane",
+        "valueKey": "controlPlane.image"
+      },
+      "source": "apps/control-plane",
+      "dockerfile": "apps/control-plane/Dockerfile",
+      "directDependencies": [
+        "apps/control-plane-executor",
+        "packages/internal-contracts",
+        "packages/provisioning-orchestrator",
+        "packages/scheduling-engine",
+        "packages/webhook-engine",
+        "packages/workspace-docs-service"
+      ],
+      "interServiceCalls": [
+        "dispatches selected route-map entries to packages/provisioning-orchestrator actions",
+        "dispatches scheduling routes to packages/scheduling-engine actions",
+        "dispatches webhook routes to packages/webhook-engine actions",
+        "loads console/helper modules from apps/control-plane-executor",
+        "calls Keycloak, PostgreSQL, Kafka, OpenBao/Vault, SeaweedFS S3, and Knative through runtime handlers"
+      ]
+    },
+    {
+      "id": "control-plane-executor",
+      "release": true,
+      "language": "Node.js ESM",
+      "imageIdentity": "in-falcone-control-plane-executor",
+      "chart": {
+        "alias": "controlPlaneExecutor",
+        "valueKey": "controlPlaneExecutor.image"
+      },
+      "source": "apps/control-plane-executor",
+      "dockerfile": "apps/control-plane-executor/Dockerfile",
+      "directDependencies": [
+        "apps/workflow-worker",
+        "packages/adapters",
+        "packages/audit",
+        "packages/internal-contracts",
+        "packages/mongo-cdc-bridge",
+        "packages/webhook-engine",
+        "packages/workspace-docs-service"
+      ],
+      "interServiceCalls": [
+        "serves data-plane HTTP routes through apps/control-plane-executor/src/runtime/server.mjs",
+        "executes PostgreSQL, Mongo/FerretDB, Kafka, functions, flows, MCP, embedding, and LLM operations through runtime executors",
+        "uses packages/adapters for provider-specific request planning",
+        "uses packages/internal-contracts for transport security and public route contracts",
+        "uses Temporal when flow execution is configured"
+      ]
+    },
+    {
+      "id": "web-console",
+      "release": true,
+      "language": "TypeScript React SPA plus Node.js static server",
+      "imageIdentity": "in-falcone-web-console",
+      "chart": {
+        "alias": "webConsole",
+        "valueKey": "webConsole.image"
+      },
+      "source": "apps/web-console",
+      "dockerfile": "apps/web-console/Dockerfile",
+      "directDependencies": [
+        "packages/internal-contracts"
+      ],
+      "interServiceCalls": [
+        "serves the built SPA from apps/web-console/dist",
+        "reverse-proxies same-origin /v1 requests to the APISIX gateway via GATEWAY_UPSTREAM",
+        "the SPA consumes the control-plane public API through apps/web-console/src/services"
+      ]
+    },
+    {
+      "id": "fn-runtime",
+      "release": true,
+      "language": "Node.js ESM",
+      "imageIdentity": "in-falcone-fn-runtime",
+      "chart": {
+        "alias": "controlPlane",
+        "valueKey": "controlPlane.env.FN_RUNTIME_IMAGE"
+      },
+      "source": "apps/fn-runtime",
+      "dockerfile": "apps/fn-runtime/Dockerfile",
+      "directDependencies": [],
+      "interServiceCalls": [
+        "receives function source through FN_SRC for Knative-created function services",
+        "passes trusted tenant/workspace/function context from control-plane headers to user code"
+      ]
+    },
+    {
+      "id": "workflow-worker",
+      "release": true,
+      "language": "TypeScript compiled to CommonJS for Temporal worker runtime",
+      "imageIdentity": "in-falcone-workflow-worker",
+      "chart": {
+        "alias": "workflowWorker",
+        "valueKey": "workflowWorker.image"
+      },
+      "source": "apps/workflow-worker",
+      "dockerfile": "apps/workflow-worker/Dockerfile",
+      "directDependencies": [
+        "apps/control-plane-executor",
+        "packages/adapters",
+        "packages/internal-contracts",
+        "packages/webhook-engine"
+      ],
+      "interServiceCalls": [
+        "connects to Temporal using TEMPORAL_ADDRESS",
+        "loads selected control-plane executor runtime modules for data and LLM activities",
+        "uses packages/webhook-engine SSRF guards for HTTP activities",
+        "uses PostgreSQL for workspace data and flow definition loading"
+      ]
+    },
+    {
+      "id": "mcp-runtime",
+      "release": true,
+      "language": "Node.js ESM",
+      "imageIdentity": "in-falcone-mcp-runtime",
+      "chart": {
+        "alias": "mcp",
+        "valueKey": "mcp.runtime.image"
+      },
+      "source": "apps/mcp-runtime",
+      "dockerfile": "apps/mcp-runtime/Dockerfile",
+      "directDependencies": [
+        "apps/control-plane-executor"
+      ],
+      "interServiceCalls": [
+        "serves first-party MCP JSON-RPC over HTTP",
+        "delegates MCP message handling to apps/control-plane-executor MCP modules",
+        "calls the Falcone control-plane API through FALCONE_API_BASE_URL when tools need REST parity"
+      ]
+    },
+    {
+      "id": "mongo-cdc-bridge",
+      "release": false,
+      "status": "non_release_candidate",
+      "language": "Node.js ESM",
+      "source": "packages/mongo-cdc-bridge",
+      "dockerfile": "packages/mongo-cdc-bridge/Dockerfile",
+      "evidenceOnly": true,
+      "reason": "Contains reusable CDC bridge code and a candidate Dockerfile, but it is not in the published release-image matrix and has no release chart image value."
+    },
+    {
+      "id": "pg-cdc-bridge",
+      "release": false,
+      "status": "non_release_candidate",
+      "language": "Node.js ESM",
+      "source": "packages/pg-cdc-bridge",
+      "dockerfile": null,
+      "evidenceOnly": true,
+      "reason": "Reusable CDC bridge package; not in the release-image matrix and not represented as a released chart component."
+    },
+    {
+      "id": "realtime-gateway",
+      "release": false,
+      "status": "non_release_candidate",
+      "language": "Node.js ESM",
+      "source": "packages/realtime-gateway",
+      "dockerfile": null,
+      "evidenceOnly": true,
+      "reason": "Realtime gateway package and tests exist, but the current release set does not publish a realtime-gateway image."
+    },
+    {
+      "id": "workspace-docs-service",
+      "release": false,
+      "status": "non_release_candidate",
+      "language": "Node.js ESM",
+      "source": "packages/workspace-docs-service",
+      "dockerfile": null,
+      "evidenceOnly": true,
+      "reason": "Workspace docs actions are packaged for control-plane consumption; they are not a standalone released image."
+    }
+  ],
+  "deployConfigRoots": [
+    {
+      "id": "gateway-config",
+      "source": "deploy/gateway-config",
+      "status": "deploy_config"
+    },
+    {
+      "id": "keycloak-config",
+      "source": "deploy/keycloak-config",
+      "status": "deploy_config"
+    }
+  ],
+  "tools": [
+    {
+      "id": "falcone-cli",
+      "source": "tools/falcone-cli",
+      "status": "developer_tool"
+    }
+  ],
+  "legacyNonDeployable": [
+    {
+      "id": "console",
+      "source": "apps/console",
+      "status": "legacy_non_deployable",
+      "reason": "Legacy console package retained for source compatibility only; it is not in the release-image matrix and must not be treated as a deployed service."
+    }
+  ]
+}

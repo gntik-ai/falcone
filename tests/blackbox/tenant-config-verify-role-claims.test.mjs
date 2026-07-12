@@ -27,14 +27,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main as migrate } from '../../services/provisioning-orchestrator/src/actions/tenant-config-migrate.mjs';
-import { main as validate } from '../../services/provisioning-orchestrator/src/actions/tenant-config-validate.mjs';
-import { main as exportAction } from '../../services/provisioning-orchestrator/src/actions/tenant-config-export.mjs';
-import { main as exportDomains } from '../../services/provisioning-orchestrator/src/actions/tenant-config-export-domains.mjs';
-import { main as formatVersions } from '../../services/provisioning-orchestrator/src/actions/tenant-config-format-versions.mjs';
-import { main as preflight } from '../../services/provisioning-orchestrator/src/actions/tenant-config-preflight.mjs';
-import { main as reprovision } from '../../services/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs';
-import { main as identifierMap } from '../../services/provisioning-orchestrator/src/actions/tenant-config-identifier-map.mjs';
+import { main as migrate } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-migrate.mjs';
+import { main as validate } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-validate.mjs';
+import { main as exportAction } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-export.mjs';
+import { main as exportDomains } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-export-domains.mjs';
+import { main as formatVersions } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-format-versions.mjs';
+import { main as preflight } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-preflight.mjs';
+import { main as reprovision } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs';
+import { main as identifierMap } from '../../packages/provisioning-orchestrator/src/actions/tenant-config-identifier-map.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers

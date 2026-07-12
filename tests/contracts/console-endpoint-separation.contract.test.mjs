@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
+import { getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 
 const EXPECTED_CONSOLE_ROUTE_METADATA = {
   createTenant: {

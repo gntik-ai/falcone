@@ -17,7 +17,7 @@ import {
   validateEventPublicationRequest,
   buildEventGatewayPublishRequest,
   normalizeEventGatewayError
-} from '../../services/event-gateway/src/runtime.mjs';
+} from '../../packages/event-gateway/src/runtime.mjs';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures — only the tenant/workspace alignment changes between cases

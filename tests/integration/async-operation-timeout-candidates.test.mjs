@@ -13,7 +13,7 @@ const maybeTest = shouldRun ? test : test.skip;
 import {
   atomicTransitionSystem,
   findTimedOutCandidates
-} from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+} from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
 
 maybeTest('findTimedOutCandidates returns expired running operations and atomic transition resolves race', async () => {
   const client = new Client({ connectionString: databaseUrl });

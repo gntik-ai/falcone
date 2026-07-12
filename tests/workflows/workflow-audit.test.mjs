@@ -7,7 +7,7 @@ import {
   emitWorkflowTerminal,
   maskAuditDetail,
   validateAuditRecord
-} from '../../apps/control-plane/src/workflows/workflow-audit.mjs';
+} from '../../apps/control-plane-executor/src/workflows/workflow-audit.mjs';
 
 const baseSagaCtx = Object.freeze({
   sagaId: 'saga-1',

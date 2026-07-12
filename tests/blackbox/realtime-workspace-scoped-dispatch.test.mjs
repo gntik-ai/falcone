@@ -14,7 +14,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 
-import { createRealtimeExecutor } from '../../apps/control-plane/src/runtime/realtime-executor.mjs'
+import { createRealtimeExecutor } from '../../apps/control-plane-executor/src/runtime/realtime-executor.mjs'
 
 // Fake pg pool: answers the executor's provisioning reads (publication exists, no documents_* tables)
 // and resolves slot create/drop, so ensureStarted() completes without a real engine.

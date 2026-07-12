@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import consoleWorkflowAuditPolicy from '../../services/internal-contracts/src/console-workflow-audit-policy.json' with { type: 'json' };
-import { sagaDefinitions } from '../../apps/control-plane/src/saga/saga-definitions.mjs';
+import consoleWorkflowAuditPolicy from '../../packages/internal-contracts/src/console-workflow-audit-policy.json' with { type: 'json' };
+import { sagaDefinitions } from '../../apps/control-plane-executor/src/saga/saga-definitions.mjs';
 import {
   __setWorkflowAuditHooksForTesting,
   emitStepMilestone,
   emitWorkflowStarted,
   emitWorkflowTerminal
-} from '../../apps/control-plane/src/workflows/workflow-audit.mjs';
+} from '../../apps/control-plane-executor/src/workflows/workflow-audit.mjs';
 import {
   getAuditEventRequiredFields,
   readObservabilityAuditEventSchema
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 const baseSagaCtx = Object.freeze({
   sagaId: 'saga-1',

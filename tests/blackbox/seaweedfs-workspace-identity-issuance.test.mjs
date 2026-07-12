@@ -33,7 +33,7 @@ import {
   seedJobManifest,
   issueBucketIdentity,
   issueWorkspaceIdentity,
-} from '../../deploy/kind/control-plane/seaweedfs-identity.mjs';
+} from '../../apps/control-plane/seaweedfs-identity.mjs';
 
 test('bbx-553-01: identity name is bucket-derived + DNS-safe', () => {
   const n = bucketIdentityName('ws-abc123def456-assets');

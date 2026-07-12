@@ -13,7 +13,7 @@ import {
   getAuditScopeEnvelope,
   readObservabilityAuditEventSchema,
   readObservabilityAuditPipeline
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { collectAuditEventSchemaViolations } from '../../scripts/lib/observability-audit-event-schema.mjs';
 
 test('observability audit event schema contract is exposed through shared readers', () => {

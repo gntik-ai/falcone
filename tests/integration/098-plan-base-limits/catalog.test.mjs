@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { main as catalogList } from '../../../services/provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs';
-import { main as setLimit } from '../../../services/provisioning-orchestrator/src/actions/plan-limits-set.mjs';
+import { main as catalogList } from '../../../packages/provisioning-orchestrator/src/actions/quota-dimension-catalog-list.mjs';
+import { main as setLimit } from '../../../packages/provisioning-orchestrator/src/actions/plan-limits-set.mjs';
 import { ensureCatalogSeeded, SEEDED_DIMENSIONS } from './fixtures/seed-catalog.mjs';
 import { createFakeDb } from './fixtures/seed-plans.mjs';
 
@@ -34,7 +34,7 @@ test('catalog action requires superadmin auth', async () => {
 });
 
 test('migration file contains quota dimension DDL and seed markers', () => {
-  const sql = readFileSync(new URL('../../../services/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../../../packages/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql', import.meta.url), 'utf8');
   assert.match(sql, /CREATE TABLE IF NOT EXISTS quota_dimension_catalog/);
   assert.match(sql, /ON CONFLICT \(dimension_key\) DO NOTHING/);
 });

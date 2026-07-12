@@ -272,14 +272,15 @@ cd tests/env
 ## Estructura del repositorio
 
 ```text
-apps/            control-plane (superficie API REST) · web-console (UI React) ·
-                 cli (CLI falcone: mcp init/dev/deploy) · mcp-server-sdk (SDK de tools MCP por tenant)
-services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
-                 scheduling-engine, provisioning-orchestrator, backup-status,
-                 workflow-worker (intérprete del DSL de Flows), audit, adapters,
-                 internal-contracts, …
-charts/ helm/    Despliegue Kubernetes / Helm (incl. componentes temporal, workflowWorker, mcp)
-deploy/          Rutas APISIX, bootstrap kind/OpenShift
+apps/            servicios publicados: control-plane · control-plane-executor · web-console ·
+                 fn-runtime · workflow-worker · mcp-runtime
+packages/        código compartido/acciones: adapters · audit · realtime-gateway · webhook-engine ·
+                 cdc bridges · scheduling-engine · provisioning-orchestrator · backup-status ·
+                 mcp-server-sdk · internal-contracts · …
+tools/           falcone-cli (mcp init/dev/deploy)
+deploy/          Configuración APISIX/Keycloak, bootstrap kind/OpenShift e infraestructura de test
+service-catalog.json  Catálogo canónico de servicios publicados y no publicados
+../falcone-charts/  Repositorio compañero para despliegue Kubernetes / Helm
 tests/           blackbox (contrato) · e2e (Playwright, incl. specs mcp) · env (stack Compose)
 ```
 
@@ -306,7 +307,6 @@ disponible** (no son open source según la OSI) — véase la nota de compatibil
 | Knative Serving + Kourier | Runtime de funciones serverless | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
 | Kubernetes + Helm | Despliegue y orquestación | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Runtime de los servicios | `MIT` | [nodejs](https://github.com/nodejs/node) |
-| nginx | Servido estático de la imagen de la consola web | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
 
 ### Principales frameworks y librerías de aplicación (npm)
 

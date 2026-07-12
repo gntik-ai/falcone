@@ -17,7 +17,7 @@
  * pre-check emits, instead of the raw-leaking 502. The generic 502 path is preserved for every other
  * failure (we did not over-broaden).
  *
- * This suite drives the REAL handler (deploy/kind/control-plane/b-handlers.mjs::createTenant)
+ * This suite drives the REAL handler (apps/control-plane/b-handlers.mjs::createTenant)
  * deterministically by injecting store/kcAdmin/startSaga via ctx (the same `ctx.store ?? store`
  * seam issueCredential/rotateCredential already use) — no DB, no Keycloak. It encodes the
  * POST-TOCTOU mechanism the live race triggers (slugTaken returns false, then insert throws 23505):
@@ -31,7 +31,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 
 // A pg-shaped unique-violation, exactly as node-postgres surfaces it for the slug constraint.
 function pgUniqueViolation(constraint = 'tenants_slug_key') {

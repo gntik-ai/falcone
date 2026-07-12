@@ -6,12 +6,12 @@ import {
   getContract,
   getPublicRoute,
   getService
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   POSTGRES_ADMIN_CAPABILITY_MATRIX,
   SUPPORTED_POSTGRES_VERSION_RANGES,
   postgresqlAdminAdapterPort
-} from '../../services/adapters/src/postgresql-admin.mjs';
+} from '../../packages/adapters/src/postgresql-admin.mjs';
 
 test('postgres admin service contracts and adapter capability baseline cover the expanded PostgreSQL admin surface', () => {
   const postgresAdminRequest = getContract('postgres_admin_request');

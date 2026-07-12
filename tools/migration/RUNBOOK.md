@@ -57,7 +57,7 @@ the maintenance-window path unless you have implemented the dual-write bridge.
 ### Option A — Maintenance window / write-freeze (DEFAULT, simpler)
 
 Brief, bounded downtime: writes to object storage are frozen for the duration of the
-final delta + validation. The live `deploy/kind/control-plane/routes.mjs` has no
+final delta + validation. The live `apps/control-plane/routes.mjs` has no
 object-upload route wired, so in practice the blast radius is small.
 
 **Action**

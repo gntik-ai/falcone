@@ -8,7 +8,7 @@ import {
   buildReconnectResumePlan,
   resolveEventGatewayProfile,
   summarizeRelativeOrdering
-} from '../../services/event-gateway/src/runtime.mjs';
+} from '../../packages/event-gateway/src/runtime.mjs';
 
 function tokenBucket({ ratePerSecond, burst, seconds, attemptsPerSecond }) {
   const capacity = ratePerSecond + burst;

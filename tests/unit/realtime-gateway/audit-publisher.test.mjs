@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAuditPublisher } from '../../../services/realtime-gateway/src/audit/audit-publisher.mjs';
-import { insertAuthRecord } from '../../../services/realtime-gateway/src/repositories/auth-record-repository.mjs';
+import { createAuditPublisher } from '../../../packages/realtime-gateway/src/audit/audit-publisher.mjs';
+import { insertAuthRecord } from '../../../packages/realtime-gateway/src/repositories/auth-record-repository.mjs';
 
 const env = () => ({
   KEYCLOAK_JWKS_URL: 'https://keycloak.example/certs',

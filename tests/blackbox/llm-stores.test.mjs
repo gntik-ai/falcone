@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createLlmProviderStore, createLlmUsageStore } from '../../apps/control-plane/src/runtime/llm-executor.mjs';
+import { createLlmProviderStore, createLlmUsageStore } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 
 const WS = 'ws_shared';
 

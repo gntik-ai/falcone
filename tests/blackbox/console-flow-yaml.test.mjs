@@ -34,7 +34,7 @@ import { dirname, resolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
 const WEB_CONSOLE = resolve(REPO_ROOT, 'apps/web-console');
-const FIXTURE_DIR = resolve(REPO_ROOT, 'services/internal-contracts/src/fixtures/flows');
+const FIXTURE_DIR = resolve(REPO_ROOT, 'packages/internal-contracts/src/fixtures/flows');
 
 // The serialiser deliberately uses no `@/` aliases or React imports so it loads under
 // plain node. Import it via a file URL to the real source.

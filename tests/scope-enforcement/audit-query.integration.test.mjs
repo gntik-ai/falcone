@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as queryMain } from '../../services/provisioning-orchestrator/src/actions/scope-enforcement-audit-query.mjs';
+import { main as queryMain } from '../../packages/provisioning-orchestrator/src/actions/scope-enforcement-audit-query.mjs';
 
 const denials = [
   { id: '00000000-0000-0000-0000-000000000001', tenant_id: 'tenant-a', actor_id: 'actor-1', actor_type: 'user', denial_type: 'SCOPE_INSUFFICIENT', http_method: 'POST', request_path: '/v1/functions/1/deploy', correlation_id: 'corr-1', denied_at: '2026-03-31T10:00:00.000Z' },

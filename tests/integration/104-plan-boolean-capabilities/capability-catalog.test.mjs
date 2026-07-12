@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as catalogList } from '../../../services/provisioning-orchestrator/src/actions/capability-catalog-list.mjs';
+import { main as catalogList } from '../../../packages/provisioning-orchestrator/src/actions/capability-catalog-list.mjs';
 import { createFakeDb } from './fixtures/seed-capability-catalog.mjs';
 
 const admin = { callerContext: { actor: { id: 'admin-1', type: 'superadmin' } } };

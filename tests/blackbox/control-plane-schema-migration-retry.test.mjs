@@ -3,7 +3,7 @@
  * (live E2E campaign 2026-06-17, finding D5).
  *
  * Drives the control-plane boot retry helper through its public interface
- * (deploy/kind/control-plane/schema-retry.mjs). Deterministic: the clock and sleep are injected,
+ * (apps/control-plane/schema-retry.mjs). Deterministic: the clock and sleep are injected,
  * so no real timers or database are involved.
  *
  * Defect: the control-plane ran ensureSchema -> ensureSagaSchema -> recoverSagas exactly once on
@@ -21,7 +21,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runWithRetry, migrationRetryConfig } from '../../deploy/kind/control-plane/schema-retry.mjs';
+import { runWithRetry, migrationRetryConfig } from '../../apps/control-plane/schema-retry.mjs';
 
 const SILENT = { log() {}, error() {} };
 

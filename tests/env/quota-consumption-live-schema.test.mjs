@@ -7,7 +7,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { resolveDimensionCounts } from '../../services/provisioning-orchestrator/src/repositories/consumption-repository.mjs';
+import { resolveDimensionCounts } from '../../packages/provisioning-orchestrator/src/repositories/consumption-repository.mjs';
 
 const { Pool } = pg;
 const ADMIN_URL =

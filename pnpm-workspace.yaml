@@ -1,8 +1,7 @@
 packages:
   - apps/*
-  - services/*
-  - services/realtime-gateway
-  - services/scheduling-engine
+  - packages/*
+  - tools/*
   - tests/*
   - tests/hardening
   - docs-site

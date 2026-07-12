@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   createRetryAttempt,
   validateAttemptNumber
-} from '../../services/provisioning-orchestrator/src/models/retry-attempt.mjs';
+} from '../../packages/provisioning-orchestrator/src/models/retry-attempt.mjs';
 
 test('createRetryAttempt builds a pending retry attempt with a new correlation id', () => {
   const first = createRetryAttempt({

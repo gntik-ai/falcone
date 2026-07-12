@@ -1,10 +1,10 @@
 import { readJson } from './quality-gates.mjs';
 
-export const OBSERVABILITY_HARD_LIMIT_ENFORCEMENT_PATH = 'services/internal-contracts/src/observability-hard-limit-enforcement.json';
-export const OBSERVABILITY_USAGE_CONSUMPTION_PATH = 'services/internal-contracts/src/observability-usage-consumption.json';
-export const OBSERVABILITY_QUOTA_POLICIES_PATH = 'services/internal-contracts/src/observability-quota-policies.json';
-export const OBSERVABILITY_THRESHOLD_ALERTS_PATH = 'services/internal-contracts/src/observability-threshold-alerts.json';
-export const PUBLIC_API_TAXONOMY_PATH = 'services/internal-contracts/src/public-api-taxonomy.json';
+export const OBSERVABILITY_HARD_LIMIT_ENFORCEMENT_PATH = 'packages/internal-contracts/src/observability-hard-limit-enforcement.json';
+export const OBSERVABILITY_USAGE_CONSUMPTION_PATH = 'packages/internal-contracts/src/observability-usage-consumption.json';
+export const OBSERVABILITY_QUOTA_POLICIES_PATH = 'packages/internal-contracts/src/observability-quota-policies.json';
+export const OBSERVABILITY_THRESHOLD_ALERTS_PATH = 'packages/internal-contracts/src/observability-threshold-alerts.json';
+export const PUBLIC_API_TAXONOMY_PATH = 'packages/internal-contracts/src/public-api-taxonomy.json';
 
 const REQUIRED_DIMENSIONS = [
   'api_requests',

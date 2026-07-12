@@ -244,14 +244,15 @@ cd tests/env
 ## 仓库结构
 
 ```text
-apps/            control-plane（REST API 面）· web-console（React UI）·
-                 cli（falcone CLI：mcp init/dev/deploy）· mcp-server-sdk（按租户隔离的 MCP 工具 SDK）
-services/        gateway-config、realtime-gateway、webhook-engine、cdc-bridges、
-                 scheduling-engine、provisioning-orchestrator、backup-status、
-                 workflow-worker（Flows DSL 解释器）、audit、adapters、
-                 internal-contracts ……
-charts/ helm/    Kubernetes / Helm 部署（含 temporal、workflowWorker、mcp 组件）
-deploy/          APISIX 路由、kind/OpenShift 引导
+apps/            发布服务：control-plane · control-plane-executor · web-console ·
+                 fn-runtime · workflow-worker · mcp-runtime
+packages/        共享代码/动作：adapters · audit · realtime-gateway · webhook-engine ·
+                 cdc bridges · scheduling-engine · provisioning-orchestrator · backup-status ·
+                 mcp-server-sdk · internal-contracts ……
+tools/           falcone-cli（mcp init/dev/deploy）
+deploy/          APISIX/Keycloak 配置、kind/OpenShift 引导与测试基础设施
+service-catalog.json  发布/非发布服务的规范目录
+../falcone-charts/  Kubernetes / Helm 部署的配套仓库
 tests/           blackbox（契约）· e2e（Playwright，含 mcp 规格）· env（Compose 栈）
 ```
 
@@ -278,7 +279,6 @@ Falcone 自身采用 **MIT 许可证**（参见 [LICENSE](./LICENSE)）。它构
 | Knative Serving + Kourier | 无服务器函数运行时 | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
 | Kubernetes + Helm | 部署与编排 | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | 服务运行时 | `MIT` | [nodejs](https://github.com/nodejs/node) |
-| nginx | Web 控制台镜像的静态资源服务 | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
 
 ### 主要应用框架与库（npm）
 

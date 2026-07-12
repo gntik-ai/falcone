@@ -3,7 +3,7 @@
 // Black-box coverage of the load-by-reference resolver behind the `sub-flow` DSL node
 // (change: fix-679-subflow-load-referenced-definition / #679).
 //
-// The defect: services/workflow-worker/src/activities/index.ts::loadFlowDefinition was a
+// The defect: apps/workflow-worker/src/activities/index.ts::loadFlowDefinition was a
 // hardcoded stub that returned `{ nodes: [{ id: 'loaded-step', type: 'task', taskType: 'noop' }] }`
 // for ANY flowId/version/tenant. The `sub-flow` node is the only caller (the child workflow
 // resolves its definition by reference), so a sub-flow ALWAYS ran a fabricated noop child and
@@ -11,16 +11,16 @@
 // and even when the referenced flow did not exist or belonged to another tenant.
 //
 // The fix:
-//   1. services/workflow-worker/src/worker-deps.mjs — exports createFlowDefinitionLoader({ pool })
+//   1. apps/workflow-worker/src/worker-deps.mjs — exports createFlowDefinitionLoader({ pool })
 //      that reads the published flow_versions snapshot under the tenant RLS context, and wires
 //      it into the activity deps as deps.loadFlowDefinition.
-//   2. services/workflow-worker/src/activities/index.ts — loadFlowDefinition reads
+//   2. apps/workflow-worker/src/activities/index.ts — loadFlowDefinition reads
 //      activityDeps.loadFlowDefinition (no placeholder fallback), validates the version, scopes
 //      by input.tenant, and fails the run when the reference is unresolvable.
 //
 // This suite drives ONLY public surfaces:
-//   - services/workflow-worker/dist/activities/index.js (loadFlowDefinition + setActivityDeps)
-//   - services/workflow-worker/src/worker-deps.mjs       (createFlowDefinitionLoader)
+//   - apps/workflow-worker/dist/activities/index.js (loadFlowDefinition + setActivityDeps)
+//   - apps/workflow-worker/src/worker-deps.mjs       (createFlowDefinitionLoader)
 //   No live Temporal connection or Postgres connection required (the store read is mocked).
 //
 // Scenarios:
@@ -40,7 +40,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { createFlowDefinitionLoader } from '../../services/workflow-worker/src/worker-deps.mjs';
+import { createFlowDefinitionLoader } from '../../apps/workflow-worker/src/worker-deps.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(__dirname, '..', '..', 'services', 'workflow-worker', 'dist');

@@ -13,8 +13,8 @@
 //   S6: getSdkPackage with mismatched tenant returns no row; markStaleSdkPackages SQL includes tenant predicate
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/openapi-sdk-service/actions/sdk-generate.mjs';
-import { getSdkPackage, markStaleSdkPackages } from '../../services/openapi-sdk-service/src/sdk-package-repo.mjs';
+import { main } from '../../packages/openapi-sdk-service/actions/sdk-generate.mjs';
+import { getSdkPackage, markStaleSdkPackages } from '../../packages/openapi-sdk-service/src/sdk-package-repo.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const TENANT_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';

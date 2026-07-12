@@ -23,10 +23,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main as pgEnable } from '../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-enable.mjs';
-import { main as pgDisable } from '../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-disable.mjs';
-import { main as pgList } from '../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-list.mjs';
-import { main as mongoEnable } from '../../services/provisioning-orchestrator/src/actions/realtime/mongo-capture-enable.mjs';
+import { main as pgEnable } from '../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-enable.mjs';
+import { main as pgDisable } from '../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-disable.mjs';
+import { main as pgList } from '../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-list.mjs';
+import { main as mongoEnable } from '../../packages/provisioning-orchestrator/src/actions/realtime/mongo-capture-enable.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers

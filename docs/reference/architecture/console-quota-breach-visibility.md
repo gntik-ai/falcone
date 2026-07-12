@@ -81,7 +81,7 @@ Whether a dimension's value should be humanized as bytes is decided by
 `isByteUnitDimension(unit, dimensionId)`:
 
 1. If the wire's `unit` field (`'count' | 'bytes'` — see
-   `services/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql`'s
+   `packages/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql`'s
    `quota_dimension_catalog.unit CHECK (unit IN ('count', 'bytes'))`, and the
    `QuotaDimensionPosture`/usage-view OpenAPI schemas) is present, it is authoritative.
 2. If `unit` is absent (some deploy runtimes' handlers do not populate it on every response),

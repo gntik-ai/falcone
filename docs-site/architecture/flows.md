@@ -21,7 +21,7 @@ The tenant-facing guide is
                             execution-token.mjs                       (SQL, no Elasticsearch)    events/http/email)
 ```
 
-- **Control plane.** `apps/control-plane/src/runtime/flow-executor.mjs` is the **only** module in
+- **Control plane.** `apps/control-plane-executor/src/runtime/flow-executor.mjs` is the **only** module in
   the control-plane process that holds a Temporal client — the single place a workflow is
   started, described, signalled, cancelled, listed (mirroring how `mongo-data-executor.mjs` owns
   the Mongo connection). It is constructed only when `TEMPORAL_ADDRESS` is set; otherwise the
@@ -29,7 +29,7 @@ The tenant-facing guide is
 - **Temporal.** The durable execution engine: frontend (gRPC), history, matching, and an internal
   worker service, with **PostgreSQL** for both persistence and **SQL advanced visibility** (no
   Elasticsearch). Temporal is **internal-only**; its Web UI is **operator-only**.
-- **Worker.** `services/workflow-worker/` polls the task queue and hosts the generic
+- **Worker.** `apps/workflow-worker/` polls the task queue and hosts the generic
   `DslInterpreterWorkflow` plus the activity catalog.
 
 ## Draft definitions and canvas projection
@@ -46,9 +46,9 @@ enforce the executable DSL shape; an empty or nodes-less definition cannot be pu
 
 ## DSL → Temporal mapping
 
-The DSL is the contract boundary (`services/internal-contracts/src/flow-definition.json` +
+The DSL is the contract boundary (`packages/internal-contracts/src/flow-definition.json` +
 `flow-definition-mapping.json`). The interpreter
-(`services/workflow-worker/src/workflows/DslInterpreterWorkflow.ts`) maps each construct to a
+(`apps/workflow-worker/src/workflows/DslInterpreterWorkflow.ts`) maps each construct to a
 Temporal primitive:
 
 | DSL construct | Temporal primitive |
@@ -155,7 +155,7 @@ mintExecutionToken(tenantId, workspaceId)           dispatchTask(input)
 - The signing key is **derived per workspace** from a single platform secret
   (`FLOW_EXECUTION_TOKEN_SECRET`), so the control plane (minting) and worker (validating) share it
   without distributing per-workspace material. The worker re-implements the *same* HMAC scheme
-  (`services/workflow-worker/src/activities/execution-token.mjs`) and does **not** import from the
+  (`apps/workflow-worker/src/activities/execution-token.mjs`) and does **not** import from the
   control plane — both sides are byte-for-byte identical and round-trip-tested.
 - Token expiry **never outlasts the run** (clamped to the max run duration). A missing, expired,
   or cross-tenant token fails the activity non-retryably (`EXECUTION_TOKEN_INVALID` /
@@ -183,7 +183,7 @@ Inbound webhooks are signed with `X-Platform-Webhook-Signature: sha256=<hex>` ov
 and an idempotency key `X-Platform-Webhook-Id`. An invalid/missing signature is `401` with **no
 run started**; a replayed delivery id reuses a deterministic workflow id, so Temporal's id
 uniqueness makes the second start a no-op (`202`, no second run). Flows use Temporal Schedules
-**natively** — the standalone `services/scheduling-engine` job table is never touched, so a cron
+**natively** — the standalone `packages/scheduling-engine` job table is never touched, so a cron
 expression never fires from both subsystems.
 
 ## SSE monitoring path
@@ -212,11 +212,11 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
   **before** any engine work. A `hard_blocked` / `soft_grace_exhausted` decision becomes `429`
   with `{ code: 'QUOTA_EXCEEDED', dimension }`. It reuses the platform quota decision model and
   **fails closed**: an evaluator error denies rather than allowing unbounded use.
-- **Audit** (`services/audit/src/flow-lifecycle-events.mjs`) emits a tenant-scoped event for each
+- **Audit** (`packages/audit/src/flow-lifecycle-events.mjs`) emits a tenant-scoped event for each
   of the eight lifecycle actions (`definition_created/updated`, `version_published`,
   `definition_deleted`, `execution_started/cancelled/retry`, `signal_sent`) into the existing
   audit pipeline, carrying `triggerType` on starts so autonomous runs are attributable.
-- **Teardown** (`services/provisioning-orchestrator/src/appliers/workflows-applier.mjs`): a tenant
+- **Teardown** (`packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs`): a tenant
   purge cascades to the `workflows` domain with the same partial-failure semantics as the other
   domains — it terminates every running execution whose `tenantId` matches (paginated
   ListWorkflows + Terminate) and deletes `flow_versions`, `flow_schedules`,

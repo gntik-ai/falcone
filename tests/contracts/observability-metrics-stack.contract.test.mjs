@@ -9,7 +9,7 @@ import {
   listObservabilityMetricFamilies,
   listObservedSubsystems,
   readObservabilityMetricsStack
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { readBaseValues, readObservabilityStackValues } from '../../scripts/lib/observability-metrics-stack.mjs';
 
 test('observability metrics stack contract is exposed through shared readers', () => {

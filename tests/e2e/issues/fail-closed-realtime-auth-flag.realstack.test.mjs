@@ -54,16 +54,16 @@ import { createRequire } from 'node:module';
 // CJS packages (kafkajs, pg) loaded via createRequire — both are CommonJS
 // modules without named ESM exports.
 const require = createRequire(import.meta.url);
-const { Pool } = require('../../../services/realtime-gateway/node_modules/pg/lib/index.js');
+const { Pool } = require('pg');
 const { Kafka, logLevel } = require('kafkajs');
 
 // Pure-ESM realtime-gateway modules imported directly by absolute-style relative path.
-import { loadEnv } from '../../../services/realtime-gateway/src/config/env.mjs';
-import { createValidateSubscriptionAuthAction } from '../../../services/realtime-gateway/src/actions/validate-subscription-auth.mjs';
-import { createAuditPublisher } from '../../../services/realtime-gateway/src/audit/audit-publisher.mjs';
-import { createTokenValidator } from '../../../services/realtime-gateway/src/auth/token-validator.mjs';
-import { createScopeChecker } from '../../../services/realtime-gateway/src/auth/scope-checker.mjs';
-import { upsertScopeMapping } from '../../../services/realtime-gateway/src/repositories/scope-mapping-repository.mjs';
+import { loadEnv } from '../../../packages/realtime-gateway/src/config/env.mjs';
+import { createValidateSubscriptionAuthAction } from '../../../packages/realtime-gateway/src/actions/validate-subscription-auth.mjs';
+import { createAuditPublisher } from '../../../packages/realtime-gateway/src/audit/audit-publisher.mjs';
+import { createTokenValidator } from '../../../packages/realtime-gateway/src/auth/token-validator.mjs';
+import { createScopeChecker } from '../../../packages/realtime-gateway/src/auth/scope-checker.mjs';
+import { upsertScopeMapping } from '../../../packages/realtime-gateway/src/repositories/scope-mapping-repository.mjs';
 
 // ---------------------------------------------------------------------------
 // Gate: skip the whole suite if the test environment is not running.
@@ -84,7 +84,7 @@ const REALTIME_CLIENT_ID = 'falcone-realtime';
 const WS_A = `ws-a-${RUN_ID}`; // workspace owned by tenant A
 const WS_B = `ws-b-${RUN_ID}`; // workspace owned by tenant B (not in tenant-A token)
 
-const MIG_DIR = new URL('../../../services/realtime-gateway/src/migrations/', import.meta.url).pathname;
+const MIG_DIR = new URL('../../../packages/realtime-gateway/src/migrations/', import.meta.url).pathname;
 
 // ---------------------------------------------------------------------------
 // Helpers

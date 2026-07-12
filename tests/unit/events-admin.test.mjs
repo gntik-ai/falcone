@@ -11,7 +11,7 @@ import {
   summarizeEventsAuditCoverage,
   summarizeTopicMetadataSupport,
   summarizeWorkspaceEventDashboard
-} from '../../apps/control-plane/src/events-admin.mjs';
+} from '../../apps/control-plane-executor/src/events-admin.mjs';
 
 test('events admin control-plane helper exposes Kafka topic governance, bridges, metadata, inventory, and runtime routes', () => {
   const routes = listEventsAdminRoutes();

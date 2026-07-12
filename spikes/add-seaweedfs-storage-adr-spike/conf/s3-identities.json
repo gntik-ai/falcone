@@ -1,5 +1,5 @@
 {
-  "_comment": "SPIKE-ONLY throwaway credentials. Not real secrets. The tenant-a entry mirrors the field shape Falcone derives in services/adapters/src/storage-programmatic-credentials.mjs (accessKey=AKST..., secretKey=sk_...), scoped to a single bucket to prove per-tenant isolation.",
+  "_comment": "SPIKE-ONLY throwaway credentials. Not real secrets. The tenant-a entry mirrors the field shape Falcone derives in packages/adapters/src/storage-programmatic-credentials.mjs (accessKey=AKST..., secretKey=sk_...), scoped to a single bucket to prove per-tenant isolation.",
   "identities": [
     {
       "name": "falcone-spike-admin",

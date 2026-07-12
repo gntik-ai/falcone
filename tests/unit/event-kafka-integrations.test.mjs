@@ -14,12 +14,12 @@ import {
   resolveEventBridgeProfile,
   validateEventBridgeDefinition,
   validateKafkaFunctionTrigger
-} from '../../services/event-gateway/src/kafka-integrations.mjs';
+} from '../../packages/event-gateway/src/kafka-integrations.mjs';
 import {
   summarizeEventBridgeSupport,
   summarizeTopicMetadataSupport,
   summarizeWorkspaceEventDashboard
-} from '../../apps/control-plane/src/events-admin.mjs';
+} from '../../apps/control-plane-executor/src/events-admin.mjs';
 
 test('event-bridge profiles and builders normalize multi-source Kafka bridge definitions', () => {
   const context = {

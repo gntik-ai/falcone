@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import handleUserApproval from '../../apps/control-plane/src/workflows/wf-con-001-user-approval.mjs';
-import handleTenantProvisioning from '../../apps/control-plane/src/workflows/wf-con-002-tenant-provisioning.mjs';
-import handleWorkspaceCreation from '../../apps/control-plane/src/workflows/wf-con-003-workspace-creation.mjs';
-import handleCredentialGeneration from '../../apps/control-plane/src/workflows/wf-con-004-credential-generation.mjs';
-import handleServiceAccountLifecycle from '../../apps/control-plane/src/workflows/wf-con-006-service-account.mjs';
-import { resolveWorkflowHandler, WorkflowNotFoundError } from '../../apps/control-plane/src/workflows/index.mjs';
-import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane/src/workflows/idempotency-store.mjs';
-import { _resetForTest as resetJobStatus } from '../../apps/control-plane/src/workflows/job-status.mjs';
+import handleUserApproval from '../../apps/control-plane-executor/src/workflows/wf-con-001-user-approval.mjs';
+import handleTenantProvisioning from '../../apps/control-plane-executor/src/workflows/wf-con-002-tenant-provisioning.mjs';
+import handleWorkspaceCreation from '../../apps/control-plane-executor/src/workflows/wf-con-003-workspace-creation.mjs';
+import handleCredentialGeneration from '../../apps/control-plane-executor/src/workflows/wf-con-004-credential-generation.mjs';
+import handleServiceAccountLifecycle from '../../apps/control-plane-executor/src/workflows/wf-con-006-service-account.mjs';
+import { resolveWorkflowHandler, WorkflowNotFoundError } from '../../apps/control-plane-executor/src/workflows/index.mjs';
+import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
+import { _resetForTest as resetJobStatus } from '../../apps/control-plane-executor/src/workflows/job-status.mjs';
 
 function baseRequest(workflowId, actorType = 'workspace_admin') {
   return {

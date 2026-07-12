@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Ajv2020 from 'ajv/dist/2020.js';
-import responseSchema from '../../services/internal-contracts/src/workspace-capability-catalog-response.json' with { type: 'json' };
-import eventSchema from '../../services/internal-contracts/src/workspace-capability-catalog-accessed-event.json' with { type: 'json' };
-import { buildCatalog } from '../../services/workspace-docs-service/src/capability-catalog-builder.mjs';
+import responseSchema from '../../packages/internal-contracts/src/workspace-capability-catalog-response.json' with { type: 'json' };
+import eventSchema from '../../packages/internal-contracts/src/workspace-capability-catalog-accessed-event.json' with { type: 'json' };
+import { buildCatalog } from '../../packages/workspace-docs-service/src/capability-catalog-builder.mjs';
 
 const ajv = new Ajv2020({ allErrors: true, strict: false, validateFormats: false });
 

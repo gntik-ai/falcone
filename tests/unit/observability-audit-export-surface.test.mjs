@@ -16,7 +16,7 @@ import {
   AUDIT_EXPORT_ERROR_CODES,
   exportWorkspaceAuditRecordsPreview,
   normalizeAuditExportRequest
-} from '../../apps/control-plane/src/observability-audit-export.mjs';
+} from '../../apps/control-plane-executor/src/observability-audit-export.mjs';
 
 test('observability audit export surface contract remains internally consistent', () => {
   const violations = collectAuditExportSurfaceViolations();

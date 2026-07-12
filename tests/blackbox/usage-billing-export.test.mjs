@@ -31,8 +31,8 @@ import {
   createBillingAdapter,
   processCycleCompletion,
   BILLING_USAGE_TOPIC
-} from '../../services/billing-export/src/emitter.mjs';
-import { main as queryUsageRecords } from '../../services/billing-export/src/query-handler.mjs';
+} from '../../packages/billing-export/src/emitter.mjs';
+import { main as queryUsageRecords } from '../../packages/billing-export/src/query-handler.mjs';
 
 // ---------------------------------------------------------------------------
 // Fakes

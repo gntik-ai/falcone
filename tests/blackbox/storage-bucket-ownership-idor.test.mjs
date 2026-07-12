@@ -1,6 +1,6 @@
 // Black-box test suite for change fix-storage-bucket-ownership-and-identity.
 // Drives the PUBLIC STORAGE_HANDLERS export from
-// deploy/kind/control-plane/storage-handlers.mjs only.
+// apps/control-plane/storage-handlers.mjs only.
 // Reproduces BUG-STOR-1, BUG-STOR-2 (IDOR: cross-tenant access to another
 // tenant's bucket/workspace/objects/metadata/usage is currently 200; must be 404).
 //
@@ -19,7 +19,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 
 const { storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket } = STORAGE_HANDLERS;
 

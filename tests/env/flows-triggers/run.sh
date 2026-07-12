@@ -34,7 +34,7 @@ export TEMPORAL_NAMESPACE="${TEMPORAL_NAMESPACE:-default}"
 export KAFKA_BROKERS="${KAFKA_BROKERS:-localhost:19092}"
 
 echo "==> building the workflow-worker (tsc → dist/)"
-( cd "$ROOT/services/workflow-worker" && (pnpm build || npm run build) )
+( cd "$ROOT/apps/workflow-worker" && (pnpm build || npm run build) )
 
 echo "==> running flows-triggers real-stack suite against Temporal at $TEMPORAL_ADDRESS / Kafka at $KAFKA_BROKERS"
 node --test "$HERE"/trigger-lifecycle.test.mjs

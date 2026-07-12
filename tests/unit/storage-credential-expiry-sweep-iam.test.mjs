@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   main as storageCredentialExpirySweep,
   cleanupGraceExpiredIdentities,
-} from '../../services/provisioning-orchestrator/src/actions/storage-credential-expiry-sweep.mjs';
+} from '../../packages/provisioning-orchestrator/src/actions/storage-credential-expiry-sweep.mjs';
 
 function expiredRow(overrides = {}) {
   const workspaceId = overrides.workspaceId ?? 'ws-alpha';

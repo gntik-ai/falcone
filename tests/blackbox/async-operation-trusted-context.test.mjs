@@ -25,10 +25,10 @@ import assert from 'node:assert/strict';
 import {
   main as queryMain,
   buildQueryActionDependencies
-} from '../../services/provisioning-orchestrator/src/actions/async-operation-query.mjs';
+} from '../../packages/provisioning-orchestrator/src/actions/async-operation-query.mjs';
 import {
   main as createMain
-} from '../../services/provisioning-orchestrator/src/actions/async-operation-create.mjs';
+} from '../../packages/provisioning-orchestrator/src/actions/async-operation-create.mjs';
 
 const TENANT_VICTIM = 'ten_VICTIM';
 const TENANT_A = 'ten_A';

@@ -8,7 +8,7 @@ import {
   markFailed,
   markPending,
   markSucceeded
-} from '../../apps/control-plane/src/workflows/idempotency-store.mjs';
+} from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
 
 test.afterEach(() => {
   _resetForTest();

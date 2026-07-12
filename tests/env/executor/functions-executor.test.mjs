@@ -1,10 +1,10 @@
 // Proof for change add-functions-execute. Functions need a runtime; this exercises the LOCAL
 // worker_threads backend (real isolated code execution + timeout), tenant-scoped. Pure node — no
 // external service — so it runs directly: node --test (or via run-functions.sh). Production swaps
-// the backend for Knative (deploy/kind/control-plane/function-executor.mjs).
+// the backend for Knative (apps/control-plane/function-executor.mjs).
 import { test, before, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { createFunctionsExecutor } from '../../../apps/control-plane/src/runtime/functions-executor.mjs'
+import { createFunctionsExecutor } from '../../../apps/control-plane-executor/src/runtime/functions-executor.mjs'
 
 const WS_A = 'wsfna'
 const WS_B = 'wsfnb'

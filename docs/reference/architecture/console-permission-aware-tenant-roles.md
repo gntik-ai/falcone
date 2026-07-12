@@ -13,7 +13,7 @@ authoritative decision.
 `apps/web-console/src/lib/console-permissions.ts` exports `useConsolePermissions()` (and the pure
 `getConsolePermissions(roles)` for non-hook call sites). It reads `platformRoles` off the persisted
 console session (`ConsoleSessionPrincipal.platformRoles` — no new backend call) and mirrors
-`services/internal-contracts/src/authorization-model.json`'s `permission_matrix.tenant` at the
+`packages/internal-contracts/src/authorization-model.json`'s `permission_matrix.tenant` at the
 granularity the console's affordances need:
 
 ```ts
@@ -60,7 +60,7 @@ write-capable role.
 - `apps/web-console/src/lib/structural-write-access.ts::canPerformStructuralWrites` delegates to the
   dedicated, exported `STRUCTURAL_WRITE_ADMIN_ROLES` set (not the broader
   `WORKSPACE_WRITE_CAPABLE_ROLES`) — a backend-parity set that mirrors
-  `apps/control-plane/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES` exactly, so it excludes
+  `apps/control-plane-executor/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES` exactly, so it excludes
   `platform_operator`/`platform_team` (the two roles `WORKSPACE_WRITE_CAPABLE_ROLES` treats as a
   console-wide bypass but the backend does not authorize for a structural write).
 - `ConsoleQuotasPage.tsx` sources its `platformRoles` array from `useConsolePermissions()` instead of

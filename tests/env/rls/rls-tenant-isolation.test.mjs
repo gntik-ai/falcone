@@ -58,7 +58,7 @@ before(async () => {
 
   await admin.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
   // Base schema (the real shipped migration) — RLS not yet applied.
-  await admin.query(sql('services/scheduling-engine/migrations/001-scheduling-tables.sql'));
+  await admin.query(sql('packages/scheduling-engine/migrations/001-scheduling-tables.sql'));
 
   // A non-superuser LOGIN role to act as the application. Drop first for idempotency.
   await admin.query(`DROP ROLE IF EXISTS ${APP_LOGIN}`);
@@ -121,7 +121,7 @@ test('baseline (no RLS): unscoped query as app role LEAKS both tenants', async (
 
 // --- Apply the shipped RLS migration -----------------------------------------
 test('apply RLS migration (ENABLE + FORCE + policies)', async () => {
-  await admin.query(sql('services/scheduling-engine/migrations/002-rls-scheduling-tables.sql'));
+  await admin.query(sql('packages/scheduling-engine/migrations/002-rls-scheduling-tables.sql'));
   const pol = await admin.query(
     "SELECT policyname FROM pg_policies WHERE schemaname='public' AND tablename='scheduled_jobs'",
   );
@@ -214,19 +214,19 @@ test('all four service RLS migrations apply cleanly and FORCE RLS with policies'
 
     const groups = [
       {
-        base: ['services/webhook-engine/migrations/001-webhook-subscriptions.sql',
-               'services/webhook-engine/migrations/002-signing-secret-tenant-scope.sql'],
-        rls: 'services/webhook-engine/migrations/003-rls-webhook-tables.sql',
+        base: ['packages/webhook-engine/migrations/001-webhook-subscriptions.sql',
+               'packages/webhook-engine/migrations/002-signing-secret-tenant-scope.sql'],
+        rls: 'packages/webhook-engine/migrations/003-rls-webhook-tables.sql',
         tables: ['webhook_subscriptions', 'webhook_signing_secrets', 'webhook_deliveries', 'webhook_delivery_attempts'],
       },
       {
-        base: ['services/realtime-gateway/src/migrations/003-create-realtime-sessions.sql'],
-        rls: 'services/realtime-gateway/src/migrations/004-rls-realtime-sessions.sql',
+        base: ['packages/realtime-gateway/src/migrations/003-create-realtime-sessions.sql'],
+        rls: 'packages/realtime-gateway/src/migrations/004-rls-realtime-sessions.sql',
         tables: ['realtime_sessions'],
       },
       {
-        base: ['services/provisioning-orchestrator/src/migrations/089-api-key-rotation.sql'],
-        rls: 'services/provisioning-orchestrator/src/migrations/090-rls-rotation-tables.sql',
+        base: ['packages/provisioning-orchestrator/src/migrations/089-api-key-rotation.sql'],
+        rls: 'packages/provisioning-orchestrator/src/migrations/090-rls-rotation-tables.sql',
         tables: ['service_account_rotation_states', 'service_account_rotation_history', 'tenant_rotation_policies'],
       },
     ];

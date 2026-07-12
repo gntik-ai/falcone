@@ -6,7 +6,7 @@ import {
   getOperationLogs,
   getOperationResult,
   listOperations
-} from '../../services/provisioning-orchestrator/src/repositories/async-operation-query-repo.mjs';
+} from '../../packages/provisioning-orchestrator/src/repositories/async-operation-query-repo.mjs';
 
 function createMockDb(responses) {
   const queue = [...responses];

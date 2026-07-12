@@ -39,7 +39,7 @@ test('bbx-bkp-jwt-forge-01: TEST_MODE parses forged payload and returns claims',
 
   // Re-import fresh module so env picks up
   const { validateToken } = await import(
-    '../../services/backup-status/src/api/backup-status.auth.js?s1'
+    '../../packages/backup-status/src/api/backup-status.auth.js?s1'
   );
 
   const payload = {
@@ -69,7 +69,7 @@ test('bbx-bkp-jwt-forge-01: non-TEST_MODE forged token must be rejected (401)', 
   process.env.KEYCLOAK_AUDIENCE = 'backup-status';
 
   const { validateToken, AuthError } = await import(
-    '../../services/backup-status/src/api/backup-status.auth.js?s2'
+    '../../packages/backup-status/src/api/backup-status.auth.js?s2'
   );
 
   const payload = {
@@ -106,7 +106,7 @@ test('bbx-bkp-jwt-forge-01: TEST_MODE must be refused in NODE_ENV=production', a
   delete process.env.KEYCLOAK_JWKS_URL;
 
   const { validateToken } = await import(
-    '../../services/backup-status/src/api/backup-status.auth.js?s3'
+    '../../packages/backup-status/src/api/backup-status.auth.js?s3'
   );
 
   const token = makeForgedToken({ sub: 'attacker', tenant_id: 'victim', scopes: [] });

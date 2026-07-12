@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { getContextPropagationTarget, getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
+import { getContextPropagationTarget, getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { summarizeFunctionsAdminSurface } from '../../apps/control-plane/src/functions-admin.mjs';
+import { summarizeFunctionsAdminSurface } from '../../apps/control-plane-executor/src/functions-admin.mjs';
 import { readDomainModel } from '../../scripts/lib/domain-model.mjs';
-import { queryAuditRecords } from '../../apps/control-plane/src/functions-audit.mjs';
+import { queryAuditRecords } from '../../apps/control-plane-executor/src/functions-audit.mjs';
 
 test('functions audit OpenAPI contract exposes additive audit query surfaces and schemas', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);

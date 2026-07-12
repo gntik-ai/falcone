@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validate, matches } from '../../../services/provisioning-orchestrator/src/models/realtime/EventFilter.mjs';
+import { validate, matches } from '../../../packages/provisioning-orchestrator/src/models/realtime/EventFilter.mjs';
 
 test('null filter matches all events', () => {
   assert.equal(matches(null, { operation: 'INSERT' }), true);

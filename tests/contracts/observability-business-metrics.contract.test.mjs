@@ -15,7 +15,7 @@ import {
   readObservabilityDashboards,
   readObservabilityHealthChecks,
   readObservabilityMetricsStack
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { collectObservabilityBusinessMetricViolations } from '../../scripts/lib/observability-business-metrics.mjs';
 
 test('observability business metrics contract is exposed through shared readers', () => {

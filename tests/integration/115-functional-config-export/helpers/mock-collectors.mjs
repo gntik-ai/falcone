@@ -9,7 +9,7 @@
  * @param {string} status
  * @param {object|null} [data]
  * @param {number} [itemsCount]
- * @returns {(tenantId: string) => Promise<import('../../../../services/provisioning-orchestrator/src/collectors/types.mjs').CollectorResult>}
+ * @returns {(tenantId: string) => Promise<import('../../../../packages/provisioning-orchestrator/src/collectors/types.mjs').CollectorResult>}
  */
 export function stubCollector(domainKey, status, data = null, itemsCount = 0) {
   return async (tenantId) => ({
@@ -27,7 +27,7 @@ export function stubCollector(domainKey, status, data = null, itemsCount = 0) {
  * Returns a collector that resolves after a delay (for timeout tests).
  * @param {string} domainKey
  * @param {number} delayMs
- * @returns {(tenantId: string) => Promise<import('../../../../services/provisioning-orchestrator/src/collectors/types.mjs').CollectorResult>}
+ * @returns {(tenantId: string) => Promise<import('../../../../packages/provisioning-orchestrator/src/collectors/types.mjs').CollectorResult>}
  */
 export function timeoutCollector(domainKey, delayMs) {
   return (tenantId) => new Promise((resolve) => {

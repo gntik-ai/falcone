@@ -13,9 +13,9 @@ Every row was produced against the running instance from `docker-compose.yml`; r
 
 | # | Operation | Falcone caller | Class | HTTP | Evidence | Recommendation |
 |---|-----------|----------------|-------|------|----------|----------------|
-| 1 | Path-style addressing | `services/openapi-sdk-service/src/sdk-storage.mjs` (`forcePathStyle:true`) | **SUPPORTED** | 200 | `07-pathstyle-presigned.txt` | **use** — no change |
+| 1 | Path-style addressing | `packages/openapi-sdk-service/src/sdk-storage.mjs` (`forcePathStyle:true`) | **SUPPORTED** | 200 | `07-pathstyle-presigned.txt` | **use** — no change |
 | 2 | SigV4 presigned GET | `sdk-storage.mjs` (`getSignedUrl`) | **SUPPORTED** | 200 | `07-pathstyle-presigned.txt` | **use** — works with `region:auto` and `us-east-1`; region irrelevant |
-| 3 | ListBuckets (XML envelope) | `deploy/kind/control-plane/storage-handlers.mjs:76-97` regex parser | **SUPPORTED** | 200 | `03-listbuckets.xml`, `04b-regex-parser-result.txt` | **use** — regex parser MATCHES; no shim |
+| 3 | ListBuckets (XML envelope) | `apps/control-plane/storage-handlers.mjs:76-97` regex parser | **SUPPORTED** | 200 | `03-listbuckets.xml`, `04b-regex-parser-result.txt` | **use** — regex parser MATCHES; no shim |
 | 4 | ListObjectsV2 (XML envelope) | `storage-handlers.mjs:76-97` regex parser | **SUPPORTED** | 200 | `04-listobjectsv2.xml`, `04b`, `04c-pagination-truncation.txt` | **use** — regex MATCHES incl. pagination; ETag uses `&#34;` which the parser already strips |
 | 5 | createBucket | `storage-applier.mjs` (`createBucket`) | **SUPPORTED** | 200 | `05-bucket-management-matrix.json` | **use** |
 | 6 | putObject + getObject (round-trip) | data plane | **SUPPORTED** | 200 | `05-…matrix.json` | **use** — content integrity verified |

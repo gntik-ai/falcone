@@ -20,7 +20,7 @@ import {
   summarizeFunctionRuntimeCoverage,
   summarizeFunctionsAdminSurface,
   validateImportBundle
-} from '../../apps/control-plane/src/functions-admin.mjs';
+} from '../../apps/control-plane-executor/src/functions-admin.mjs';
 
 test('functions admin control-plane helper exposes CRUD, lifecycle versioning, rollback, invocation, activation, HTTP exposure, and trigger routes', () => {
   const routes = listFunctionsAdminRoutes();

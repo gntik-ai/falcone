@@ -1,7 +1,7 @@
 /**
  * Black-box tests for add-platform-mcp-http-route (#607).
  *
- * The platform (first-party) MCP server (`apps/control-plane/src/mcp-official-server.mjs`) exposes
+ * The platform (first-party) MCP server (`apps/control-plane-executor/src/mcp-official-server.mjs`) exposes
  * ~9 Falcone management tools as JSON-RPC but previously had NO HTTP route, so an MCP client could
  * not reach it. This wires `POST /v1/mcp/rpc` on the executor: it dispatches the JSON-RPC message to
  * the official handler with a control-plane client bound to the caller's own credential.
@@ -19,7 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 
 const TENANT_A = 'ten_acme';
 

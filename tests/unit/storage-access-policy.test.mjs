@@ -24,7 +24,7 @@ import {
   matchStoragePolicyStatement,
   validateStoragePolicyDocument,
   validateStoragePolicyStatement
-} from '../../services/adapters/src/storage-access-policy.mjs';
+} from '../../packages/adapters/src/storage-access-policy.mjs';
 
 test('policy catalogs and nested error definitions are frozen and additive', () => {
   assert.equal(Object.isFrozen(STORAGE_POLICY_EFFECTS), true);

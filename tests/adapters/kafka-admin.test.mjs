@@ -14,7 +14,7 @@ import {
   normalizeKafkaAdminResource,
   resolveKafkaAdminProfile,
   validateKafkaAdminRequest
-} from '../../services/adapters/src/kafka-admin.mjs';
+} from '../../packages/adapters/src/kafka-admin.mjs';
 
 test('kafka admin adapter exports KRaft capability and quota governance baselines', () => {
   const growthProfile = resolveKafkaAdminProfile({

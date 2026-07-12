@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as managementMain } from '../../services/webhook-engine/actions/webhook-management.mjs';
+import { main as managementMain } from '../../packages/webhook-engine/actions/webhook-management.mjs';
 
 const db = {
   async getWorkspaceSubscriptionCount() { return 0; },

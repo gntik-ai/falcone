@@ -15,8 +15,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { teardown as workflowsTeardown } from '../../services/provisioning-orchestrator/src/appliers/workflows-applier.mjs';
-import { main as purgeSweep } from '../../services/provisioning-orchestrator/src/actions/tenant-purge-sweep.mjs';
+import { teardown as workflowsTeardown } from '../../packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs';
+import { main as purgeSweep } from '../../packages/provisioning-orchestrator/src/actions/tenant-purge-sweep.mjs';
 
 // A fake DB that records DELETEs against named tables; rows is a per-table count.
 function makeFakeDb(rows = {}) {

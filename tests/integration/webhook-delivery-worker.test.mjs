@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as deliveryMain } from '../../services/webhook-engine/actions/webhook-delivery-worker.mjs';
-import { main as retryMain } from '../../services/webhook-engine/actions/webhook-retry-scheduler.mjs';
+import { main as deliveryMain } from '../../packages/webhook-engine/actions/webhook-delivery-worker.mjs';
+import { main as retryMain } from '../../packages/webhook-engine/actions/webhook-retry-scheduler.mjs';
 
 function makeDb() {
   const state = {
@@ -24,7 +24,7 @@ function makeDb() {
   };
 }
 
-import { encryptSecret } from '../../services/webhook-engine/src/webhook-signing.mjs';
+import { encryptSecret } from '../../packages/webhook-engine/src/webhook-signing.mjs';
 
 function seededDb() {
   const db = makeDb();

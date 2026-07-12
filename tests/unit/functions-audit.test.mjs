@@ -12,7 +12,7 @@ import {
   queryAuditRecords,
   queryQuotaEnforcement,
   queryRollbackEvidence
-} from '../../apps/control-plane/src/functions-audit.mjs';
+} from '../../apps/control-plane-executor/src/functions-audit.mjs';
 
 test('functions audit emitters publish typed deployment, admin, rollback, and quota events', () => {
   const published = [];

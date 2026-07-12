@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildRetryEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
-import { operationRetryEventSchema } from '../../services/internal-contracts/src/index.mjs';
+import { buildRetryEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import { operationRetryEventSchema } from '../../packages/internal-contracts/src/index.mjs';
 
 function assertMatchesSchema(schema, payload) {
   for (const field of schema.required ?? []) {

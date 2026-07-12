@@ -12,7 +12,7 @@
 // the hand-rolled race with Temporal's built-in `condition(predicate, timeout)`, which manages
 // the timer itself and lets an external CancelledFailure propagate so the run ends Cancelled.
 //
-// This suite drives the PRODUCTION compiled worker (services/workflow-worker/dist) against a
+// This suite drives the PRODUCTION compiled worker (apps/workflow-worker/dist) against a
 // live Temporal server and self-skips when Temporal/Docker is unavailable.
 //
 //   bash tests/env/workflow-worker/run.sh

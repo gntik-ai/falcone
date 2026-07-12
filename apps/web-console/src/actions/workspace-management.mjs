@@ -2,7 +2,7 @@ import {
   buildWorkspaceCloneDraft,
   resolveWorkspaceApiSurface,
   resolveWorkspaceResourceInheritance
-} from '../../../../services/internal-contracts/src/index.mjs';
+} from '../../../../packages/internal-contracts/src/index.mjs';
 
 export function buildWorkspaceEndpointCards({ workspace, applications = [] }) {
   const surface = resolveWorkspaceApiSurface({

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildScopeValidatedImportRequest, validateImportBundle } from '../../apps/control-plane/src/functions-admin.mjs';
+import { buildScopeValidatedImportRequest, validateImportBundle } from '../../apps/control-plane-executor/src/functions-admin.mjs';
 
 test('definition import resilience blocks cross-scope bundles before dispatch', () => {
   assert.throws(

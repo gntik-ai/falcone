@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Subscription } from '../../../services/provisioning-orchestrator/src/models/realtime/Subscription.mjs';
+import { Subscription } from '../../../packages/provisioning-orchestrator/src/models/realtime/Subscription.mjs';
 
 const base = { id: 'sub-1', tenant_id: 'tenant-1', workspace_id: 'ws-1', channel_id: 'ch-1', channel_type: 'postgresql-changes', owner_identity: 'user-1' };
 

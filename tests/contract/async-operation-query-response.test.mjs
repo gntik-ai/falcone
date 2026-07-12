@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Ajv from 'ajv';
 
-import schema from '../../services/internal-contracts/src/async-operation-query-response.json' with { type: 'json' };
+import schema from '../../packages/internal-contracts/src/async-operation-query-response.json' with { type: 'json' };
 
 const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false });
 const validate = ajv.compile(schema);

@@ -13,7 +13,7 @@ import {
   physicalTopicForTrigger,
   triggerIdFor,
   TRIGGER_TYPES,
-} from '../../apps/control-plane/src/runtime/flow-trigger-registry.mjs';
+} from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 
 function makeFakeSchedule() {
   const schedules = new Map();
@@ -121,7 +121,7 @@ test('webhook secret is verifiable and tenant-scoped (cross-tenant lookup return
   const reg = createFlowTriggerRegistry({ temporalClient: fake, logger: { error() {} } });
   const { webhooks } = await reg.registerTriggers('flow1', 1, [{ kind: 'webhook', path: 'orders' }], IDENTITY_A);
   const { triggerId, secret } = webhooks[0];
-  const { computeSignature } = await import('../../services/webhook-engine/src/webhook-signing.mjs');
+  const { computeSignature } = await import('../../packages/webhook-engine/src/webhook-signing.mjs');
   const body = JSON.stringify({ a: 1 });
   const sig = computeSignature(body, secret);
   // Same tenant + valid signature → accepted.

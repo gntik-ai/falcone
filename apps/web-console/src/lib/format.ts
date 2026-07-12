@@ -30,7 +30,7 @@ export function formatBytes(bytes?: number | null): string {
 
 /**
  * The quota/metric dimension wire contract carries a `unit` field of `'count' | 'bytes'` (see
- * `services/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql`'s
+ * `packages/provisioning-orchestrator/src/migrations/098-plan-base-limits.sql`'s
  * `quota_dimension_catalog.unit CHECK (unit IN ('count', 'bytes'))`, and the
  * `QuotaDimensionPosture`/usage-view OpenAPI schemas, both of which the "real" control-plane
  * API populates). Some deploy runtimes omit `unit` from the response entirely, so fall back to

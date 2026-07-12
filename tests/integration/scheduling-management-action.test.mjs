@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import main from '../../services/scheduling-engine/actions/scheduling-management.mjs';
+import main from '../../packages/scheduling-engine/actions/scheduling-management.mjs';
 
 function createPg() {
   const state = { jobs: [], configs: [], executions: [] };

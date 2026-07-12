@@ -2,7 +2,7 @@ import { readAuthorizationModel } from './authorization-model.mjs';
 import { readDeploymentTopology } from './deployment-topology.mjs';
 import { readJson } from './quality-gates.mjs';
 
-export const DOMAIN_MODEL_PATH = 'services/internal-contracts/src/domain-model.json';
+export const DOMAIN_MODEL_PATH = 'packages/internal-contracts/src/domain-model.json';
 export const DOMAIN_SEED_FIXTURES_PATH = 'tests/reference/domain-seed-fixtures.json';
 export const REQUIRED_DOMAIN_CONTRACT_IDS = [
   'entity_read_model',

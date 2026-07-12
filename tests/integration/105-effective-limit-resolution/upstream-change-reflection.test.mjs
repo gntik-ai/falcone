@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as tenantEntitlements } from '../../../services/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs';
+import { main as tenantEntitlements } from '../../../packages/provisioning-orchestrator/src/actions/tenant-effective-entitlements-get.mjs';
 import { createFakeDb, seedPlans, seedAssignments } from './fixtures/seed-plans-with-quotas-and-capabilities.mjs';
 import { seedOverrides } from './fixtures/seed-overrides.mjs';
 

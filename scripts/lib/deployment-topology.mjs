@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { OPENAPI_PATH, readJson, readYaml, resolveParameters } from './quality-gates.mjs';
 
-export const DEPLOYMENT_TOPOLOGY_PATH = 'services/internal-contracts/src/deployment-topology.json';
+export const DEPLOYMENT_TOPOLOGY_PATH = 'packages/internal-contracts/src/deployment-topology.json';
 export const DEPLOYMENT_SMOKE_MATRIX_PATH = 'tests/reference/deployment-smoke-matrix.yaml';
 export const BASE_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
 export const ENVIRONMENT_VALUES = {

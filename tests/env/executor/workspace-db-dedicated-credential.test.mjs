@@ -23,7 +23,7 @@ import {
   provisionWorkspaceDatabase,
   rotateWorkspaceDatabaseCredential,
   dropWorkspaceDatabase,
-} from '../../../deploy/kind/control-plane/dataplane.mjs';
+} from '../../../apps/control-plane/dataplane.mjs';
 
 const { Pool } = pg;
 

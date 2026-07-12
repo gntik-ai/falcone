@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as workspaceLimits } from '../../../services/provisioning-orchestrator/src/actions/workspace-effective-limits-get.mjs';
+import { main as workspaceLimits } from '../../../packages/provisioning-orchestrator/src/actions/workspace-effective-limits-get.mjs';
 import { createFakeDb, createFakeProducer, seedPlans, seedAssignments } from './fixtures/seed-plans-with-quotas-and-capabilities.mjs';
 import { seedSubQuotas } from './fixtures/seed-sub-quotas.mjs';
 

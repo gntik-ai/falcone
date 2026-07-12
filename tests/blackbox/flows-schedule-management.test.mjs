@@ -16,10 +16,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { createFlowExecutor } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
-import { createFlowTriggerRegistry } from '../../apps/control-plane/src/runtime/flow-trigger-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowTriggerRegistry } from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 
 const TEN_A = 'ten_sched_a';
 const WS_A = 'ws_sched_a';

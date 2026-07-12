@@ -2,7 +2,7 @@
  * Black-box test suite for spec change add-flows-dsl-schema.
  *
  * Drives the PUBLIC surface ONLY: the schema artifact and validator API exported from
- * `@in-falcone/internal-contracts` (services/internal-contracts/src/index.mjs). No
+ * `@in-falcone/internal-contracts` (packages/internal-contracts/src/index.mjs). No
  * internal module paths, no private helpers — exactly what the sibling consumers
  * (interpreter worker, control-plane API, console editors) will import.
  *
@@ -41,10 +41,10 @@ import {
   FLOW_DEFINITION_SCHEMA_URL,
   validateFlowDefinition,
   FLOW_VALIDATION_ERROR_CODES
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE_DIR = resolve(__dirname, '../../services/internal-contracts/src/fixtures/flows');
+const FIXTURE_DIR = resolve(__dirname, '../../packages/internal-contracts/src/fixtures/flows');
 
 function compile() {
   const ajv = new Ajv({ strict: false, allErrors: true });

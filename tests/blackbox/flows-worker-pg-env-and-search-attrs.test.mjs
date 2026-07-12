@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildDataDsn } from '../../services/workflow-worker/src/worker-deps.mjs';
+import { buildDataDsn } from '../../apps/workflow-worker/src/worker-deps.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const advancedCaps = readFileSync(resolve(REPO_ROOT, 'tests/live-campaign/advanced-caps.sh'), 'utf8');

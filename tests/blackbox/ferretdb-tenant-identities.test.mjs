@@ -27,8 +27,8 @@ import {
   rotateTenantIdentityCredential,
   revokeTenantIdentity,
   DOCUMENTDB_IDENTITY_PROVISION_FAILED,
-} from '../../services/provisioning-orchestrator/src/appliers/documentdb-identity-applier.mjs';
-import { applyTenantScopeToFilter } from '../../services/adapters/src/mongodb-data-api.mjs';
+} from '../../packages/provisioning-orchestrator/src/appliers/documentdb-identity-applier.mjs';
+import { applyTenantScopeToFilter } from '../../packages/adapters/src/mongodb-data-api.mjs';
 
 const TENANT_A = 'ten_AAAA_aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const TENANT_B = 'ten_BBBB_bbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';

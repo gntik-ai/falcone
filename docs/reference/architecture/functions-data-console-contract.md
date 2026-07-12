@@ -2,7 +2,7 @@
 
 The Data: Functions console (`/console/functions/data`) is a thin UI over the published functions
 API. It does not own a separate workspace-scoped write surface. The console must keep the route and
-field mapping below in sync with `apps/control-plane/openapi/control-plane.openapi.json` and the
+field mapping below in sync with `apps/control-plane-executor/openapi/control-plane.openapi.json` and the
 kind control-plane route table.
 
 | Console action | API route | Contract notes |

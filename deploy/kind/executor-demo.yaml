@@ -1,4 +1,4 @@
-# Live demo of the BaaS data-API executor (apps/control-plane) on kind.
+# Live demo of the BaaS data-API executor (apps/control-plane-executor) on kind.
 # Standalone Deployment in the `falcone` namespace — does NOT touch the existing
 # control-plane/SPA. Credentials come from the existing in-falcone-postgresql secret
 # via secretKeyRef (no plaintext, no probing).
@@ -142,7 +142,7 @@ spec:
             - name: MONGO_PASSWORD
               valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } }
             # Realtime CDC/SSE: replication-privileged DocumentDB URL. createRealtimeExecutor
-            # (apps/control-plane/src/runtime/main.mjs) activates the realtime executor ONLY when
+            # (apps/control-plane-executor/src/runtime/main.mjs) activates the realtime executor ONLY when
             # this is set; without it /v1/realtime/* returns 501 REALTIME_DISABLED even though the
             # replication secret holds the value (#621). Sourced from the documentdb replication
             # secret and `optional: true` so the executor still starts (realtime stays disabled)

@@ -4,7 +4,7 @@
 // returning the child's REAL result. It MUST NOT substitute a hardcoded placeholder, and an
 // unresolvable reference MUST FAIL the parent (not silently complete a noop).
 //
-// Root cause (fixed): services/workflow-worker/src/activities/index.ts::loadFlowDefinition was
+// Root cause (fixed): apps/workflow-worker/src/activities/index.ts::loadFlowDefinition was
 // a hardcoded stub returning { nodes: [{ id: 'loaded-step', type: 'task', taskType: 'noop' }] }
 // for any flowId/version/tenant. The sub-flow path is its ONLY caller (runSubFlow starts the
 // child by reference; the child resolves its own definition via loadFlowDefinition), so every
@@ -12,7 +12,7 @@
 // published flow_versions row under the tenant RLS context (worker-deps.mjs::
 // createFlowDefinitionLoader, wired into deps.loadFlowDefinition by wireActivityDeps).
 //
-// This suite drives the PRODUCTION compiled interpreter (services/workflow-worker/dist, via the
+// This suite drives the PRODUCTION compiled interpreter (apps/workflow-worker/dist, via the
 // in-process createWorker harness used by approval-cancel/version-pinning) against the LIVE
 // tests/env Temporal AND a LIVE tests/env Postgres probe DB seeded with a real child version in
 // flow_versions. The DB-backed loader is wired via setActivityDeps using a pg pool bound to the

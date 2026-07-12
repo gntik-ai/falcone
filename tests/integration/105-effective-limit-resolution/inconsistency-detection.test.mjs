@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as workspaceLimits } from '../../../services/provisioning-orchestrator/src/actions/workspace-effective-limits-get.mjs';
-import { isInconsistentSubQuota } from '../../../services/provisioning-orchestrator/src/models/effective-entitlements.mjs';
+import { main as workspaceLimits } from '../../../packages/provisioning-orchestrator/src/actions/workspace-effective-limits-get.mjs';
+import { isInconsistentSubQuota } from '../../../packages/provisioning-orchestrator/src/models/effective-entitlements.mjs';
 import { createFakeDb, createFakeProducer, seedPlans, seedAssignments } from './fixtures/seed-plans-with-quotas-and-capabilities.mjs';
 
 const admin = { callerContext: { actor: { id: 'admin-1', type: 'superadmin' } } };

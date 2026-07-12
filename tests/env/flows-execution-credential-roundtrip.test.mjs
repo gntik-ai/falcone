@@ -13,10 +13,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { executePostgresData } from '../../apps/control-plane/src/runtime/postgres-data-executor.mjs';
-import { dispatchTask } from '../../services/workflow-worker/src/activities/index.mjs';
-import { mintExecutionToken } from '../../apps/control-plane/src/runtime/execution-token.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { executePostgresData } from '../../apps/control-plane-executor/src/runtime/postgres-data-executor.mjs';
+import { dispatchTask } from '../../apps/workflow-worker/src/activities/index.mjs';
+import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 const { Pool } = pg;
 

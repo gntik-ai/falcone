@@ -1,4 +1,4 @@
-import { executeSaga } from '../../../../apps/control-plane/src/saga/saga-engine.mjs';
+import { executeSaga } from '../../../../apps/control-plane-executor/src/saga/saga-engine.mjs';
 
 const defaultContext = {
   tenantId: 'test-tenant-a',

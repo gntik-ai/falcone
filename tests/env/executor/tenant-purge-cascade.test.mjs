@@ -5,7 +5,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import * as store from '../../../deploy/kind/control-plane/tenant-store.mjs';
+import * as store from '../../../apps/control-plane/tenant-store.mjs';
 
 const { Pool } = pg;
 const ADMIN_URL =

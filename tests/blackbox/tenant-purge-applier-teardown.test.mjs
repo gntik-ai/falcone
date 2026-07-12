@@ -6,12 +6,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { teardown as pgTeardown } from '../../services/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
-import { teardown as iamTeardown } from '../../services/provisioning-orchestrator/src/appliers/iam-applier.mjs';
-import { teardown as kafkaTeardown } from '../../services/provisioning-orchestrator/src/appliers/kafka-applier.mjs';
-import { teardown as mongoTeardown } from '../../services/provisioning-orchestrator/src/appliers/mongo-applier.mjs';
-import { teardown as storageTeardown } from '../../services/provisioning-orchestrator/src/appliers/storage-applier.mjs';
-import { teardown as functionsTeardown } from '../../services/provisioning-orchestrator/src/appliers/functions-applier.mjs';
+import { teardown as pgTeardown } from '../../packages/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
+import { teardown as iamTeardown } from '../../packages/provisioning-orchestrator/src/appliers/iam-applier.mjs';
+import { teardown as kafkaTeardown } from '../../packages/provisioning-orchestrator/src/appliers/kafka-applier.mjs';
+import { teardown as mongoTeardown } from '../../packages/provisioning-orchestrator/src/appliers/mongo-applier.mjs';
+import { teardown as storageTeardown } from '../../packages/provisioning-orchestrator/src/appliers/storage-applier.mjs';
+import { teardown as functionsTeardown } from '../../packages/provisioning-orchestrator/src/appliers/functions-applier.mjs';
 
 const TENANT_A = 'tenant-aaa-01';
 

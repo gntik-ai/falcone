@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { QuotaRepository } from '../../../services/provisioning-orchestrator/src/repositories/realtime/QuotaRepository.mjs';
+import { QuotaRepository } from '../../../packages/provisioning-orchestrator/src/repositories/realtime/QuotaRepository.mjs';
 
 test('quota fallback and atomic insert behavior are enforced', async () => {
   const inserted = [];

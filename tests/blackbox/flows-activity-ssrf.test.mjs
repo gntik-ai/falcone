@@ -18,8 +18,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveSsrfSafe } from '../../services/workflow-worker/src/activities/ssrf.mjs';
-import { httpRequest } from '../../services/workflow-worker/src/activities/http-request.mjs';
+import { resolveSsrfSafe } from '../../apps/workflow-worker/src/activities/ssrf.mjs';
+import { httpRequest } from '../../apps/workflow-worker/src/activities/http-request.mjs';
 
 const tenant = { tenantId: 't1', workspaceId: 'w1' };
 

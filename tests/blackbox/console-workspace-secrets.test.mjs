@@ -41,10 +41,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { FN_HANDLERS } from '../../deploy/kind/control-plane/fn-handlers.mjs';
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { createVaultKvClient, createWorkspaceSecretStore, workspaceSecretPath } from '../../deploy/kind/control-plane/vault-secrets.mjs';
-import catalog from '../../services/internal-contracts/src/public-route-catalog.json' with { type: 'json' };
+import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { createVaultKvClient, createWorkspaceSecretStore, workspaceSecretPath } from '../../apps/control-plane/vault-secrets.mjs';
+import catalog from '../../packages/internal-contracts/src/public-route-catalog.json' with { type: 'json' };
 
 // ---- a faithful OpenBao KV-v2 fake (data + metadata wire shapes) -------------------------------
 function startFakeVault() {

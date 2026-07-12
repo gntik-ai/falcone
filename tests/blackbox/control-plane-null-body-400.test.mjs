@@ -10,7 +10,7 @@
  * b-handlers.mjs::createTenant -> `body.displayName`) that derefs a field on `null` -> TypeError ->
  * caught by the top-level catch -> 500. The same happens for a top-level array / scalar.
  *
- * Fix: the parse seam now delegates to deploy/kind/control-plane/request-body.mjs::normalizeJsonBody,
+ * Fix: the parse seam now delegates to apps/control-plane/request-body.mjs::normalizeJsonBody,
  * which — after a successful JSON.parse — rejects any body that is NOT a plain object (`null`, array,
  * scalar) with a structured 400 VALIDATION_ERROR, BEFORE handler dispatch. This is uniform across both
  * dispatch paths (local handlers + the /repo action loader) and ALL mutating routes, because every
@@ -44,7 +44,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeJsonBody } from '../../deploy/kind/control-plane/request-body.mjs';
+import { normalizeJsonBody } from '../../apps/control-plane/request-body.mjs';
 
 // The exact raw bytes an HTTP client sends as the request body, as the server reads them (a Buffer).
 const raw = (s) => Buffer.from(s, 'utf8');

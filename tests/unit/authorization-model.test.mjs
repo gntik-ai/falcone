@@ -9,7 +9,7 @@ import {
   AUTHORIZATION_MODEL_VERSION,
   listEnforcementSurfaces,
   listPermissionMatrix
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('authorization model remains internally consistent', () => {
   const model = readAuthorizationModel();

@@ -2,7 +2,7 @@
 // Per-tenant storage-API smoke + cross-tenant negative probe against SeaweedFS
 // (change add-seaweedfs-migration-validation, tasks 3.1-3.5).
 //
-// Drives the five live-wired storage routes (deploy/kind/control-plane/routes.mjs)
+// Drives the five live-wired storage routes (apps/control-plane/routes.mjs)
 // IN-PROCESS via their handlers (the tests/env model: import the service module,
 // hit live Postgres + live S3), pointing the runtime at SeaweedFS by setting
 // STORAGE_S3_* before importing the handler module. For tenants A and B it asserts
@@ -83,8 +83,8 @@ async function main() {
   process.env.STORAGE_S3_REGION = process.env.S3_REGION ?? 'us-east-1';
 
   const { default: pg } = await import('pg');
-  const store = await import('../../../deploy/kind/control-plane/tenant-store.mjs');
-  const { STORAGE_HANDLERS, putObject } = await import('../../../deploy/kind/control-plane/storage-handlers.mjs');
+  const store = await import('../../../apps/control-plane/tenant-store.mjs');
+  const { STORAGE_HANDLERS, putObject } = await import('../../../apps/control-plane/storage-handlers.mjs');
 
   const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? process.env.PG_URL });
   await store.ensureSchema(pool);

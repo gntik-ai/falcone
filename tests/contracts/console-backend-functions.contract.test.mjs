@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getContextPropagationTarget, getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
+import { getContextPropagationTarget, getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 import {
   buildConsoleBackendActivationAnnotation,
   validateConsoleBackendInvocationRequest
-} from '../../services/adapters/src/openwhisk-admin.mjs';
+} from '../../packages/adapters/src/openwhisk-admin.mjs';
 import {
   buildConsoleBackendWorkflowInvocation,
   getConsoleWorkflowRouteClassification,
   listConsoleWorkflowRouteClassifications
-} from '../../apps/control-plane/src/console-backend-functions.mjs';
+} from '../../apps/control-plane-executor/src/console-backend-functions.mjs';
 
 test('console backend invocation envelope stays aligned with the governed invocation contract shape', () => {
   const envelope = buildConsoleBackendWorkflowInvocation({

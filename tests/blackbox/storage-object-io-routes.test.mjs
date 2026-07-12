@@ -6,8 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 
 const OBJECT_PATH = '/v1/storage/buckets/{bucketId}/objects/{objectKey}';
 
@@ -21,7 +21,7 @@ test('object I/O (PUT/GET/DELETE) is wired to storage handlers', () => {
 });
 
 test('the published catalog advertises the real (wired) object I/O path, not the unwired /v1/objects', () => {
-  const catalog = JSON.parse(readFileSync(fileURLToPath(new URL('../../services/gateway-config/public-route-catalog.json', import.meta.url)), 'utf8'));
+  const catalog = JSON.parse(readFileSync(fileURLToPath(new URL('../../deploy/gateway-config/public-route-catalog.json', import.meta.url)), 'utf8'));
   const paths = new Set(catalog.map((r) => r.path));
   assert.ok(paths.has(OBJECT_PATH), 'catalog advertises the wired storage object path');
   assert.ok(!paths.has('/v1/objects/{bucket}/{key}'), 'the old unwired generic object path is gone');

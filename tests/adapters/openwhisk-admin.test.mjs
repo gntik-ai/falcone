@@ -45,7 +45,7 @@ import {
   validateFunctionWorkspaceSecretRequest,
   validateOpenWhiskAdminRequest,
   validateOpenWhiskFunctionRollback
-} from '../../services/adapters/src/openwhisk-admin.mjs';
+} from '../../packages/adapters/src/openwhisk-admin.mjs';
 
 test('openwhisk admin adapter exports governed serverless capability, runtime, and logical context baselines', () => {
   const growthProfile = resolveOpenWhiskAdminProfile({

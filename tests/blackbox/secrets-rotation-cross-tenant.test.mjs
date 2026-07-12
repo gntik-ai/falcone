@@ -7,8 +7,8 @@
 // Vault side effect. A same-tenant rotation MUST still succeed.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as initiate } from '../../services/provisioning-orchestrator/src/actions/secret-rotation-initiate.mjs';
-import { main as revoke } from '../../services/provisioning-orchestrator/src/actions/secret-rotation-revoke.mjs';
+import { main as initiate } from '../../packages/provisioning-orchestrator/src/actions/secret-rotation-initiate.mjs';
+import { main as revoke } from '../../packages/provisioning-orchestrator/src/actions/secret-rotation-revoke.mjs';
 
 const ownerA = { sub: 'user:a', roles: ['tenant-owner'], tenantId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' };
 const TENANT_A = ownerA.tenantId;

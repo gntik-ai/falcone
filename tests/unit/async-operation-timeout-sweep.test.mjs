@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/async-operation-timeout-sweep.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/async-operation-timeout-sweep.mjs';
 
 test('timeout sweep processes candidates and continues on invalid transition', async () => {
   const calls = { published: 0, nowIso: null };

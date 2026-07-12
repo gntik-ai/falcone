@@ -1,6 +1,6 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
-import { main as enforce } from '../../../services/provisioning-orchestrator/src/actions/quota-enforce.mjs';
-import { main as createOverride } from '../../../services/provisioning-orchestrator/src/actions/quota-override-create.mjs';
+import { main as enforce } from '../../../packages/provisioning-orchestrator/src/actions/quota-enforce.mjs';
+import { main as createOverride } from '../../../packages/provisioning-orchestrator/src/actions/quota-override-create.mjs';
 import { createFakeDb, createFakeProducer, seedPlans } from './fixtures/seed-plans-with-quota-types.mjs';
 import { collectors } from './fixtures/seed-usage.mjs';
 const admin={ callerContext:{ actor:{ id:'admin-1', type:'superadmin' } } };

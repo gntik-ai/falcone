@@ -16,7 +16,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { tenantIdentitiesEnabled } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { tenantIdentitiesEnabled } from '../../apps/control-plane/storage-handlers.mjs';
 
 test('bbx-swfs-id-default-01: enabled by default when the env is ABSENT (overlay drop is harmless)', () => {
   assert.equal(tenantIdentitiesEnabled({}), true);

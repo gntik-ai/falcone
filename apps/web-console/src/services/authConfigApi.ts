@@ -2,7 +2,7 @@
 // #782). A tenant owner's realm login behavior (registration, email login, password reset,
 // remember-me, email verification, and the configured social identity providers) is fully
 // manageable server-side via `GET`/`PUT /v1/tenants/{tenantId}/auth-config` (owner/admin/superadmin
-// authorized via `authorizeAuthConfig` — `deploy/kind/control-plane/b-handlers.mjs`), but until now
+// authorized via `authorizeAuthConfig` — `apps/control-plane/b-handlers.mjs`), but until now
 // no console page called it. This client is built on `requestConsoleSessionJson` (mirroring
 // `secretsApi.ts`) so every call inherits the session bearer, the 401-refresh-retry,
 // `X-API-Version`, and (for the mutating calls) a fresh `Idempotency-Key` — no per-call header
@@ -10,9 +10,9 @@
 //
 // This is a kind-CP RUNTIME-ONLY route family: `/v1/tenants/{tenantId}/auth-config` (and its
 // `/identity-providers/{alias}` sub-resource) is NOT present in the public OpenAPI
-// (`apps/control-plane/openapi/control-plane.openapi.json`) or the generated console SDK
+// (`apps/control-plane-executor/openapi/control-plane.openapi.json`) or the generated console SDK
 // (`lib/console-openapi-sdk.ts`) — same pattern as the other `/v1/tenants/*` runtime surfaces (see
-// `deploy/kind/control-plane/routes.mjs`). There is therefore no contract artifact to keep in sync;
+// `apps/control-plane/routes.mjs`). There is therefore no contract artifact to keep in sync;
 // this module IS the console-side contract for this surface.
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { JsonValue } from '@/lib/http'

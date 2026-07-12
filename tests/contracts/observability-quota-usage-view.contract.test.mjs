@@ -15,7 +15,7 @@ import {
   listQuotaUsageVisualStates,
   readPublicApiTaxonomy,
   readPublicRouteCatalog
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   collectObservabilityQuotaUsageViewViolations,
   readObservabilityQuotaPolicies,

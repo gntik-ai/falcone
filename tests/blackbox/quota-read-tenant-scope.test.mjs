@@ -19,8 +19,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main as effectiveLimits } from '../../services/provisioning-orchestrator/src/actions/quota-effective-limits-get.mjs';
-import { main as auditQuery } from '../../services/provisioning-orchestrator/src/actions/quota-audit-query.mjs';
+import { main as effectiveLimits } from '../../packages/provisioning-orchestrator/src/actions/quota-effective-limits-get.mjs';
+import { main as auditQuery } from '../../packages/provisioning-orchestrator/src/actions/quota-audit-query.mjs';
 
 const fakeDb = { query: async () => ({ rows: [] }) };
 const actor = (type, tenantId) => ({ callerContext: { actor: { id: 'op', type, tenantId } } });

@@ -14,9 +14,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createMcpEngine } from '../../apps/control-plane/src/runtime/mcp-engine.mjs';
-import { generateFromFlows } from '../../apps/control-plane/src/mcp-instant-generator.mjs';
-import { BASE_SCOPE } from '../../apps/control-plane/src/mcp-official-catalog.mjs';
+import { createMcpEngine } from '../../apps/control-plane-executor/src/runtime/mcp-engine.mjs';
+import { generateFromFlows } from '../../apps/control-plane-executor/src/mcp-instant-generator.mjs';
+import { BASE_SCOPE } from '../../apps/control-plane-executor/src/mcp-official-catalog.mjs';
 
 const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app', scopes: [BASE_SCOPE] };
 const SELF = 'http://exec.local';

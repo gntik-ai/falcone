@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { evaluatePostgresDataApiAccess } from '../../services/adapters/src/postgresql-admin.mjs';
+import { evaluatePostgresDataApiAccess } from '../../packages/adapters/src/postgresql-admin.mjs';
 import {
   buildPostgresDataApiPlan,
   buildPostgresDataScopedCredential
-} from '../../services/adapters/src/postgresql-data-api.mjs';
+} from '../../packages/adapters/src/postgresql-data-api.mjs';
 
 test('data API access evaluation requires both schema/table grants and a matching tenant RLS predicate', () => {
   const allowed = evaluatePostgresDataApiAccess({

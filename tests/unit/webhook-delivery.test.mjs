@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDeliveryAttemptRecord, buildDeliveryRecord, buildPayloadEnvelope, enforcePayloadSizeLimit, isTerminal, shouldAutoDisable } from '../../services/webhook-engine/src/webhook-delivery.mjs';
+import { buildDeliveryAttemptRecord, buildDeliveryRecord, buildPayloadEnvelope, enforcePayloadSizeLimit, isTerminal, shouldAutoDisable } from '../../packages/webhook-engine/src/webhook-delivery.mjs';
 
 test('delivery helpers cover payloads and terminal state', () => {
   const subscription = { id: 's1', tenant_id: 't1', workspace_id: 'w1' };

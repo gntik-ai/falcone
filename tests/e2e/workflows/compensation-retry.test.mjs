@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sagaDefinitions } from '../../../apps/control-plane/src/saga/saga-definitions.mjs';
+import { sagaDefinitions } from '../../../apps/control-plane-executor/src/saga/saga-definitions.mjs';
 import { runWorkflow } from './helpers/workflow-runner.mjs';
 import { injectSagaStepFailure } from './helpers/fault-injector.mjs';
 import { makeIdempotencyKey } from './helpers/idempotency-tracker.mjs';

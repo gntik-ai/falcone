@@ -25,7 +25,7 @@ import {
   listPlanChangeScenarios,
   resolveTenantEffectiveCapabilities,
   resolveWorkspaceEffectiveCapabilities
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('domain model remains internally consistent', () => {
   const domainModel = readDomainModel();

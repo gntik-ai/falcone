@@ -1,5 +1,5 @@
 import React from 'react'
-import type { AuditEventAdmin, AuditEventPublic } from '../../../../../services/backup-status/src/audit/audit-trail.types.js'
+import type { AuditEventAdmin, AuditEventPublic } from '../../../../../packages/backup-status/src/audit/audit-trail.types.js'
 
 interface Props {
   event: AuditEventAdmin | AuditEventPublic

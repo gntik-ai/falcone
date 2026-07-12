@@ -2,12 +2,12 @@
  * Flow DSL fixtures for the E2E flows suite (GitHub issue #367 / epic #355).
  *
  * These are Playwright-importable TypeScript constants that mirror the JSON fixtures
- * in services/internal-contracts/src/fixtures/flows/ without importing Node.js fs.
+ * in packages/internal-contracts/src/fixtures/flows/ without importing Node.js fs.
  *
  * All taskType values MUST be from the first-party catalog:
  *   db.query, storage.put, storage.get, functions.invoke,
  *   events.publish, http.request, email.send
- * (source: services/workflow-worker/src/activities/catalog-names.mjs)
+ * (source: apps/workflow-worker/src/activities/catalog-names.mjs)
  */
 
 export interface FlowNode {

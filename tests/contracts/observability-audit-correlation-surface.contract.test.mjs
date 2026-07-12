@@ -14,9 +14,9 @@ import {
   getPublicRoute,
   readAuthorizationModel,
   readObservabilityAuditCorrelationSurface
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { buildAuditCorrelationConsoleView, listAuditCorrelationRoutes } from '../../apps/control-plane/src/observability-audit-correlation.mjs';
+import { buildAuditCorrelationConsoleView, listAuditCorrelationRoutes } from '../../apps/control-plane-executor/src/observability-audit-correlation.mjs';
 
 test('observability audit correlation surface contract is exposed through shared readers', () => {
   const contract = readObservabilityAuditCorrelationSurface();

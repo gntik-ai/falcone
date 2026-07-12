@@ -14,10 +14,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { createConnectionRegistry } from '../../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { executePostgresData } from '../../../apps/control-plane/src/runtime/postgres-data-executor.mjs';
-import { executePostgresDdl } from '../../../apps/control-plane/src/runtime/postgres-ddl-executor.mjs';
-import { createEmbeddingExecutor, localMockEmbeddingBackend } from '../../../apps/control-plane/src/runtime/embedding-executor.mjs';
+import { createConnectionRegistry } from '../../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { executePostgresData } from '../../../apps/control-plane-executor/src/runtime/postgres-data-executor.mjs';
+import { executePostgresDdl } from '../../../apps/control-plane-executor/src/runtime/postgres-ddl-executor.mjs';
+import { createEmbeddingExecutor, localMockEmbeddingBackend } from '../../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 const { Pool } = pg;
 

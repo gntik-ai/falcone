@@ -10,7 +10,7 @@ import {
   iamGovernanceApiFamily,
   listIamTraceabilityRoutes,
   summarizeIamAuditCoverage
-} from '../../apps/control-plane/src/iam-governance.mjs';
+} from '../../apps/control-plane-executor/src/iam-governance.mjs';
 
 test('iam governance helpers expose traceability routes and actor-rich audit coverage', () => {
   const routes = listIamTraceabilityRoutes();

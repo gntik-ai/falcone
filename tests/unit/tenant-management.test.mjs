@@ -6,7 +6,7 @@ import {
   buildTenantPurgeDraft,
   buildTenantResourceInventory,
   evaluateTenantLifecycleMutation
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   buildTenantPurgeRequestDraft,
   getTenantRoute,
@@ -15,7 +15,7 @@ import {
   previewTenantLifecycleMutation,
   summarizeTenantManagementSurface,
   tenantLifecycleStateMachine
-} from '../../apps/control-plane/src/tenant-management.mjs';
+} from '../../apps/control-plane-executor/src/tenant-management.mjs';
 import {
   buildTenantActionChecklist,
   buildTenantExportSummary,

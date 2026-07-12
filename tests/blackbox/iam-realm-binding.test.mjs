@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import {
   buildIamAdminAdapterCall,
   validateIamAdminRequest
-} from '../../services/adapters/src/keycloak-admin.mjs';
+} from '../../packages/adapters/src/keycloak-admin.mjs';
 
 // ─── bbx-iam-cross-realm-01 ──────────────────────────────────────────────────
 // Non-platform caller where context.realmId != tenantId must fail validation

@@ -2,7 +2,7 @@
  * Black-box regression suite for spec change fix-console-create-tenant-plan.
  *
  * Drives the control-plane tenant-create plan-resolution contract through its public helpers
- * (deploy/kind/control-plane/b-handlers.mjs). Deterministic: loaders are injected, no DB / no /repo.
+ * (apps/control-plane/b-handlers.mjs). Deterministic: loaders are injected, no DB / no /repo.
  *
  * Defect (surfaced by the live console E2E): the CreateTenantWizard submits a plan SLUG ("starter"),
  * but createTenant's assignPlan step passed it to the real plan-assign action, which casts it to a
@@ -22,7 +22,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isPlanUuid, assignPlanBestEffort } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { isPlanUuid, assignPlanBestEffort } from '../../apps/control-plane/b-handlers.mjs';
 
 const UUID = '0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9';
 const POOL = {}; // unused by the injected loaders

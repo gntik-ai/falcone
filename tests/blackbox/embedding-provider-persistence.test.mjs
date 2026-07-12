@@ -19,13 +19,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import {
   createEmbeddingExecutor,
   createEmbeddingProviderStore,
   localMockEmbeddingBackend,
-} from '../../apps/control-plane/src/runtime/embedding-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 // A clearly non-provider placeholder (GitHub push protection rejects sk_live_ etc.).
 const FAKE_KEY = 'placeholder-not-a-real-key';

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main } from '../../services/provisioning-orchestrator/src/actions/async-operation-retry.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/async-operation-retry.mjs';
 
 function buildDbStub() {
   return {

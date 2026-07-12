@@ -24,12 +24,12 @@ import {
   isServiceAccountClientId,
   clientIdFromClaims,
   realmFromIssuer,
-} from '../../deploy/kind/control-plane/sa-revocation.mjs';
+} from '../../apps/control-plane/sa-revocation.mjs';
 import {
   createSaRevocationCheck as createSaRevocationCheckExecutor,
   isTokenRevokedForRow as isTokenRevokedForRowExecutor,
   realmFromIssuer as realmFromIssuerExecutor,
-} from '../../apps/control-plane/src/runtime/sa-revocation.mjs';
+} from '../../apps/control-plane-executor/src/runtime/sa-revocation.mjs';
 
 const SA_CLIENT = 'sa-acme-repro';
 const USER_AZP = 'app-client';

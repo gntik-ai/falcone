@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { __setWorkflowAuditHooksForTesting } from '../../../../apps/control-plane/src/workflows/workflow-audit.mjs';
+import { __setWorkflowAuditHooksForTesting } from '../../../../apps/control-plane-executor/src/workflows/workflow-audit.mjs';
 
 function sortByOrdinalDescending(records = []) {
   return [...records].sort((a, b) => (b?.detail?.ordinal ?? -1) - (a?.detail?.ordinal ?? -1));

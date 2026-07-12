@@ -9,7 +9,7 @@ import {
   listPostgresAdminSqlRoutes,
   postgresApiFamily,
   summarizePostgresAdminSurface
-} from '../../apps/control-plane/src/postgres-admin.mjs';
+} from '../../apps/control-plane-executor/src/postgres-admin.mjs';
 import {
   buildPostgresAdminQueryConsole,
   buildPostgresAdminQueryHistory,

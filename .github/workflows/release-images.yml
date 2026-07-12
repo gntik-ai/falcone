@@ -7,14 +7,14 @@ name: release-images
 # required. After a release, deploy by pinning each component image tag to the release version.
 #
 # IMPORTANT — which runtime each image builds (the proven, deployable runtimes):
-#   in-falcone-control-plane           deploy/kind/control-plane/Dockerfile  (server.mjs: validates the
+#   in-falcone-control-plane           apps/control-plane/Dockerfile  (server.mjs: validates the
 #                                       Keycloak JWT and dispatches /v1/* to the real action modules)
-#   in-falcone-control-plane-executor  apps/control-plane/Dockerfile         (main.mjs: the data-plane
+#   in-falcone-control-plane-executor  apps/control-plane-executor/Dockerfile         (main.mjs: the data-plane
 #                                       executor that fronts the control-plane)
-#   in-falcone-web-console             deploy/release/web-console.Dockerfile (static-server, numeric UID,
+#   in-falcone-web-console             apps/web-console/Dockerfile (static-server, numeric UID,
 #                                       zero-write — compatible with the restricted security profile)
-#   in-falcone-fn-runtime              deploy/kind/fn-runtime/Dockerfile     (nodejs function runtime)
-#   in-falcone-workflow-worker         services/workflow-worker/Dockerfile   (Temporal DSL worker)
+#   in-falcone-fn-runtime              apps/fn-runtime/Dockerfile     (nodejs function runtime)
+#   in-falcone-workflow-worker         apps/workflow-worker/Dockerfile   (Temporal DSL worker)
 #   in-falcone-mcp-runtime             apps/mcp-runtime/Dockerfile           (first-party MCP JSON-RPC runtime)
 on:
   release:
@@ -49,17 +49,17 @@ jobs:
       matrix:
         include:
           - image: in-falcone-control-plane
-            dockerfile: deploy/kind/control-plane/Dockerfile
-          - image: in-falcone-control-plane-executor
             dockerfile: apps/control-plane/Dockerfile
+          - image: in-falcone-control-plane-executor
+            dockerfile: apps/control-plane-executor/Dockerfile
           - image: in-falcone-web-console
-            dockerfile: deploy/release/web-console.Dockerfile
+            dockerfile: apps/web-console/Dockerfile
             build_spa: 'true'
           - image: in-falcone-fn-runtime
-            dockerfile: deploy/kind/fn-runtime/Dockerfile
-            context: deploy/kind/fn-runtime
+            dockerfile: apps/fn-runtime/Dockerfile
+            context: apps/fn-runtime
           - image: in-falcone-workflow-worker
-            dockerfile: services/workflow-worker/Dockerfile
+            dockerfile: apps/workflow-worker/Dockerfile
           - image: in-falcone-mcp-runtime
             dockerfile: apps/mcp-runtime/Dockerfile
     steps:
@@ -89,8 +89,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Publishing ${{ matrix.image }}:$version to ghcr.io/${owner_lc}"
 
-      # The web-console SPA is built here (vite) so the thin nginx release image just copies
-      # the dist. Other images build straight from their Dockerfile (repo-root context).
+      # The web-console SPA is built here (vite) so the thin Node static-server release image
+      # just copies the dist. Other images build straight from their Dockerfile (repo-root context).
       - name: Setup pnpm
         if: matrix.build_spa == 'true'
         uses: pnpm/action-setup@v4

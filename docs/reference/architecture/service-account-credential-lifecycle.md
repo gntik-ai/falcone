@@ -33,8 +33,8 @@ to retire a previously disclosed value.
 
 ## Token validation
 
-The control-plane (`deploy/kind/control-plane/server.mjs`) and the executor
-(`apps/control-plane/src/runtime/server.mjs`) verify each Bearer token **offline**: RSA signature
+The control-plane (`apps/control-plane/server.mjs`) and the executor
+(`apps/control-plane-executor/src/runtime/server.mjs`) verify each Bearer token **offline**: RSA signature
 against the realm JWKS, `exp`/`nbf` (with a clock tolerance), trusted issuer (the platform realm or a
 per-tenant realm under the same Keycloak base), and audience for the platform realm. A token that
 fails any of these is rejected with `401 INVALID_TOKEN`.

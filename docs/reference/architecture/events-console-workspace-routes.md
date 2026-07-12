@@ -14,8 +14,8 @@ workspace and a human-readable topic name.
 | `POST` | `/v1/events/workspaces/{workspaceId}/topics/{topic}/publish` | `eventsWorkspaceTopicPublish` | Publish one console message to a logical workspace topic. |
 | `GET` | `/v1/events/workspaces/{workspaceId}/topics/{topic}/messages` | `eventsWorkspaceTopicMessages` | Poll a bounded batch of messages from a logical workspace topic. |
 
-The route table lives in `deploy/kind/control-plane/routes.mjs`. The same entries are recorded in
-`deploy/kind/control-plane/route-map.runtime.json` and `deploy/kind/control-plane/route-map.json` so
+The route table lives in `apps/control-plane/routes.mjs`. The same entries are recorded in
+`apps/control-plane/route-map.runtime.json` and `apps/control-plane/route-map.json` so
 the kind image metadata and console-route audit stay in sync.
 
 ## Request and response shape

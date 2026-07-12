@@ -23,9 +23,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { createMultiRealmVerifier, deriveRealmTopology } from '../../deploy/kind/control-plane/jwt-verify.mjs';
-import { createSaRevocationCheck } from '../../deploy/kind/control-plane/sa-revocation.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { createMultiRealmVerifier, deriveRealmTopology } from '../../apps/control-plane/jwt-verify.mjs';
+import { createSaRevocationCheck } from '../../apps/control-plane/sa-revocation.mjs';
 
 // ---- handler harness: inject store + kcAdmin via ctx ----------------------
 function handlerCtx(overrides = {}) {

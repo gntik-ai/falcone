@@ -22,10 +22,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseVaultEntry } from '../../services/secret-audit-handler/src/vault-log-reader.mjs';
-import { validateAuditEvent } from '../../services/secret-audit-handler/src/event-schema.mjs';
-import { resolveAuditTopic } from '../../services/secret-audit-handler/src/topic-router.mjs';
-import { createPublisher } from '../../services/secret-audit-handler/src/kafka-publisher.mjs';
+import { parseVaultEntry } from '../../packages/secret-audit-handler/src/vault-log-reader.mjs';
+import { validateAuditEvent } from '../../packages/secret-audit-handler/src/event-schema.mjs';
+import { resolveAuditTopic } from '../../packages/secret-audit-handler/src/topic-router.mjs';
+import { createPublisher } from '../../packages/secret-audit-handler/src/kafka-publisher.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers

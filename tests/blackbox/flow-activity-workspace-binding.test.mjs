@@ -23,7 +23,7 @@ import {
   eventsPublish,
   functionsInvoke,
   resolveActivityWorkspaceId,
-} from '../../services/workflow-worker/src/activities/index.mjs';
+} from '../../apps/workflow-worker/src/activities/index.mjs';
 
 const WS_A = 'ws_a_token_bound';
 const WS_B = 'ws_b_sibling_victim';

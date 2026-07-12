@@ -6,8 +6,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { ensureSchema, insertWorkspace, insertFunction, listFunctions } from '../../../deploy/kind/control-plane/tenant-store.mjs';
-import { LOCAL_HANDLERS } from '../../../deploy/kind/control-plane/b-handlers.mjs';
+import { ensureSchema, insertWorkspace, insertFunction, listFunctions } from '../../../apps/control-plane/tenant-store.mjs';
+import { LOCAL_HANDLERS } from '../../../apps/control-plane/b-handlers.mjs';
 import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;

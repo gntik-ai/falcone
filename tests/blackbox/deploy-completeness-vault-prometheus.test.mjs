@@ -9,7 +9,7 @@
  *     namespace, with the metrics-exposing wrappers (control-plane, executor)
  *     carrying that annotation. workflow-worker is DELIBERATELY skipped: its HTTP
  *     server serves only /livez + /readyz (NO /metrics) — verified from
- *     services/workflow-worker/src/worker.ts.
+ *     apps/workflow-worker/src/worker.ts.
  *
  * Self-skips when `helm` is absent (repo precedent: vault-secrets-backend-kind).
  *

@@ -40,10 +40,10 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { createConnectionRegistry } from '../../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { createControlPlaneServer } from '../../../apps/control-plane/src/runtime/server.mjs';
-import { createApiKeyStore } from '../../../apps/control-plane/src/runtime/api-keys.mjs';
-import { createWorkspaceTenantResolver } from '../../../apps/control-plane/src/runtime/workspace-dsn-resolver.mjs';
+import { createConnectionRegistry } from '../../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { createControlPlaneServer } from '../../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createApiKeyStore } from '../../../apps/control-plane-executor/src/runtime/api-keys.mjs';
+import { createWorkspaceTenantResolver } from '../../../apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs';
 
 const { Pool } = pg;
 

@@ -8,7 +8,7 @@ immediately.
 
 Because the resolved key is sent as `Authorization: Bearer <value>` to the configured endpoint, two
 properties are enforced as a single fail-closed chokepoint
-(`apps/control-plane/src/runtime/byok-provider-guard.mjs`), shared by the LLM executor, the embedding
+(`apps/control-plane-executor/src/runtime/byok-provider-guard.mjs`), shared by the LLM executor, the embedding
 executor, and the workflow worker's `llm.complete` activity:
 
 1. **Secret confinement** — the key is resolvable only from a secret whose env-var name carries an
@@ -66,7 +66,7 @@ To onboard a BYOK key, mount it under a `BYOK_`-prefixed env var (e.g. `BYOK_OPE
 The BYOK provider/key is resolved per `(tenant_id, workspace_id)`, so *which workspace* a
 completion runs as decides which key, model allow-list, endpoint, and token-usage meter apply.
 When the completion is driven by a flow's `llm.complete` task
-(`services/workflow-worker/src/activities/llm-complete.mjs`), the workspace is taken from the
+(`apps/workflow-worker/src/activities/llm-complete.mjs`), the workspace is taken from the
 **per-execution token** (`TenantContext.workspaceId`, validated by the worker's
 `catalog.mjs::dispatchTask` before the activity runs) — **not** from the flow author's task input.
 
@@ -76,7 +76,7 @@ differs from the token workspace the activity fails closed with a non-retryable 
 A from injecting `workspaceId: <sibling-workspace-B>` to spend workspace B's BYOK key/quota — the
 workflow-side analog of the request body never being trusted for `tenantId`. The same binding
 applies to the other workspace-scoped flow activities (`db.query`, `events.publish`,
-`functions.invoke`); see `services/workflow-worker/README.md` ("Workspace binding").
+`functions.invoke`); see `apps/workflow-worker/README.md` ("Workspace binding").
 
 ## Endpoint SSRF policy
 
@@ -84,7 +84,7 @@ The provider `endpoint` is validated both at config time (reject **HTTP 400
 `BYOK_ENDPOINT_BLOCKED`**, no row persisted) and again immediately before the outbound request
 (DNS-rebinding defense; a pre-existing malicious row fails closed and **no request is sent**). The
 guard reuses the shared blocklist `isBlockedIp`
-(`services/webhook-engine/src/webhook-subscription.mjs`).
+(`packages/webhook-engine/src/webhook-subscription.mjs`).
 
 Rejected:
 

@@ -17,7 +17,7 @@
 // Credentials: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY (or S3_ACCESS_KEY/
 // S3_SECRET_KEY) for the destination; SRC_* for the source in live-diff mode.
 // Self-contained SigV4 (node:crypto + fetch, no SDK), mirroring the kind runtime
-// signer in deploy/kind/control-plane/storage-handlers.mjs.
+// signer in apps/control-plane/storage-handlers.mjs.
 
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';

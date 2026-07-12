@@ -9,7 +9,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionManager } from '../../services/realtime-gateway/src/auth/session-manager.mjs';
+import { createSessionManager } from '../../packages/realtime-gateway/src/auth/session-manager.mjs';
 
 // ---------------------------------------------------------------------------
 // Shared claim factories
