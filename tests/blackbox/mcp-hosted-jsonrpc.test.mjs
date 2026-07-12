@@ -71,7 +71,7 @@ function rpc(message, { tenantId = A.tenantId, workspaceId = A.workspaceId, sid 
     headers['x-tenant-id'] = tenantId;
     headers['x-workspace-id'] = workspaceId;
     headers['x-auth-subject'] = 'user:agent';
-    headers['x-actor-scopes'] = scopes.join(' ');
+    headers['x-auth-scopes'] = scopes.join(' ');
   }
   return fetch(`${baseUrl}/v1/mcp/workspaces/${workspaceId}/servers/${sid}/rpc`, {
     method: 'POST', headers, body: JSON.stringify(message),

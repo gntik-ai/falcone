@@ -503,6 +503,11 @@ test('all-core-007: ESO operator, webhook, cert-controller, CRDs, and auxiliary 
   assert.equal(findDoc(docs, 'Deployment', 'eso-external-secrets-cert-controller')?.metadata?.namespace, 'eso-system', 'ESO cert-controller Deployment must run in the configured ESO namespace');
   assert.ok(findDoc(docs, 'CustomResourceDefinition', 'externalsecrets.external-secrets.io'), 'ExternalSecret CRD must render from the vendored dependency');
   assert.ok(findDoc(docs, 'CustomResourceDefinition', 'clustersecretstores.external-secrets.io'), 'ClusterSecretStore CRD must render from the vendored dependency');
+  const clusterStore = findDoc(docs, 'ClusterSecretStore', 'openbao-backend');
+  assert.equal(clusterStore?.metadata?.labels?.['app.kubernetes.io/instance'], 'falcone', 'ClusterSecretStore must carry release ownership labels for scoped rollback');
+  assert.equal(clusterStore?.metadata?.labels?.['app.kubernetes.io/part-of'], 'in-falcone', 'ClusterSecretStore must be labeled as Falcone-owned');
+  assert.equal(clusterStore?.metadata?.annotations?.['meta.helm.sh/release-name'], 'falcone', 'ClusterSecretStore must carry Helm ownership metadata');
+  assert.equal(clusterStore?.metadata?.annotations?.['meta.helm.sh/release-namespace'], 'review-ns', 'ClusterSecretStore must carry Helm release namespace metadata');
   const out = assertRender();
   assert.doesNotMatch(out, /eso-crd-extract-external-secrets-webhook/, 'stale extracted CRD webhook names must not render');
   assert.doesNotMatch(out, /namespace:\s*default\b/, 'CRD conversion webhooks must not point at the default namespace');

@@ -55,6 +55,37 @@ function makeKubernetesSecrets(overrides = {}) {
   return secrets;
 }
 
+function clusterSecretStore(name, { owned = true, openbaoNamespace = 'secret-store' } = {}) {
+  return {
+    apiVersion: 'external-secrets.io/v1beta1',
+    kind: 'ClusterSecretStore',
+    metadata: {
+      name,
+      labels: owned ? {
+        'app.kubernetes.io/instance': 'falcone',
+        'app.kubernetes.io/part-of': 'in-falcone',
+      } : {
+        'app.kubernetes.io/instance': 'other-release',
+        'app.kubernetes.io/part-of': 'other-platform',
+      },
+      annotations: owned ? {
+        'meta.helm.sh/release-name': 'falcone',
+        'meta.helm.sh/release-namespace': 'falcone',
+      } : {
+        'meta.helm.sh/release-name': 'other-release',
+        'meta.helm.sh/release-namespace': 'other-ns',
+      },
+    },
+    spec: {
+      provider: {
+        vault: {
+          server: `https://openbao.${openbaoNamespace}.svc.cluster.local:8200`,
+        },
+      },
+    },
+  };
+}
+
 function writeExecutable(path, source) {
   writeFileSync(path, source);
   chmodSync(path, 0o755);
@@ -161,6 +192,7 @@ else process.exit(2);
 const fs = require('fs');
 const state = JSON.parse(fs.readFileSync(process.env.BAO_FAKE_STATE, 'utf8'));
 const args = process.argv.slice(2);
+function save() { fs.writeFileSync(process.env.BAO_FAKE_STATE, JSON.stringify(state, null, 2)); }
 function b64(value) { return Buffer.from(String(value)).toString('base64'); }
 function secretObject(name, data) {
   const encoded = {};
@@ -172,7 +204,23 @@ if (args[0] === 'config' && args[1] === 'current-context') {
   console.log(process.env.KUBECTL_CONTEXT || 'test-context');
   process.exit(0);
 }
-if (args.includes('apply')) process.exit(0);
+if (args.includes('apply')) {
+  const fileIndex = args.indexOf('-f');
+  const file = fileIndex >= 0 ? args[fileIndex + 1] : '';
+  if (file && file !== '-') {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const items = Array.isArray(parsed.items) ? parsed.items : [parsed];
+    state.applied ??= {};
+    state.applied.clusterSecretStores ??= [];
+    for (const item of items) {
+      if (item?.kind === 'ClusterSecretStore' && item?.metadata?.name) {
+        state.applied.clusterSecretStores.push(item.metadata.name);
+      }
+    }
+    save();
+  }
+  process.exit(0);
+}
 const getIndex = args.indexOf('get');
 if (getIndex === -1) process.exit(2);
 const resource = args[getIndex + 1];
@@ -183,6 +231,19 @@ if (resource === 'secret' && name) {
 }
 if (resource === 'secrets') {
   print({ apiVersion: 'v1', kind: 'SecretList', items: Object.entries(state.kubernetes || {}).map(([n, d]) => secretObject(n, d)) });
+  process.exit(0);
+}
+if (resource.startsWith('clustersecretstore')) {
+  const stores = state.clusterSecretStores || {};
+  if (name) {
+    if (!stores[name]) {
+      console.error('NotFound');
+      process.exit(1);
+    }
+    print(stores[name]);
+    process.exit(0);
+  }
+  print({ apiVersion: 'external-secrets.io/v1beta1', kind: 'ClusterSecretStoreList', items: Object.values(stores) });
   process.exit(0);
 }
 print({ apiVersion: 'v1', kind: 'List', items: [] });
@@ -239,6 +300,62 @@ process.exit(2);
     },
   };
 }
+
+test('all-core KV backup and restore scope ClusterSecretStores to Falcone openbao-backend', (t) => {
+  const h = makeHarness(t, {
+    target: { secret: {} },
+    source: { secret: {} },
+    kubernetes: makeKubernetesSecrets(),
+    clusterSecretStores: {
+      'openbao-backend': clusterSecretStore('openbao-backend'),
+      'unrelated-store': clusterSecretStore('unrelated-store', { owned: false, openbaoNamespace: 'other-store' }),
+    },
+  });
+  const backup = join(h.root, 'scoped-css-backup.tgz');
+  const baoEnv = {
+    BAO_ADDR: 'https://target-openbao.test',
+    BAO_TOKEN: 'target-token',
+  };
+
+  const backupRun = h.run('backup-kv.sh', ['--output', backup], baoEnv);
+  assert.equal(backupRun.status, 0, `backup must succeed\nstdout: ${backupRun.stdout}\nstderr: ${backupRun.stderr}`);
+  const archived = spawnSync('tar', ['-xOf', backup, 'eso/clustersecretstores.apply.json'], { encoding: 'utf8' });
+  assert.equal(archived.status, 0, `cluster store backup must be extractable\nstderr: ${archived.stderr}`);
+  const archivedStores = JSON.parse(archived.stdout);
+  assert.deepEqual(
+    (archivedStores.items ?? []).map((item) => item.metadata.name),
+    ['openbao-backend'],
+    'backup archive must not include unrelated cluster-scoped ESO stores',
+  );
+
+  const restoreRun = h.run('restore-kv.sh', ['--backup', backup, '--apply'], baoEnv);
+  assert.equal(restoreRun.status, 0, `restore must succeed\nstdout: ${restoreRun.stdout}\nstderr: ${restoreRun.stderr}`);
+  assert.deepEqual(
+    h.state().applied?.clusterSecretStores,
+    ['openbao-backend'],
+    'restore must apply only the Falcone-owned OpenBao ClusterSecretStore',
+  );
+});
+
+test('all-core KV backup refuses unowned openbao-backend ClusterSecretStore', (t) => {
+  const h = makeHarness(t, {
+    target: { secret: {} },
+    source: { secret: {} },
+    kubernetes: makeKubernetesSecrets(),
+    clusterSecretStores: {
+      'openbao-backend': clusterSecretStore('openbao-backend', { owned: false }),
+    },
+  });
+  const backup = join(h.root, 'unowned-css-backup.tgz');
+
+  const backupRun = h.run('backup-kv.sh', ['--output', backup]);
+  assert.notEqual(backupRun.status, 0, 'backup must fail closed for an unowned cluster-scoped openbao-backend store');
+  assert.match(
+    `${backupRun.stdout}\n${backupRun.stderr}`,
+    /refusing ClusterSecretStore backup\/restore outside Falcone-owned openbao-backend/,
+  );
+  assert.equal(existsSync(backup), false, 'failed ClusterSecretStore ownership check must not publish a backup archive');
+});
 
 test('all-core KV migration scripts recursively migrate source KV and restore target exactly', (t) => {
   const initialTarget = {

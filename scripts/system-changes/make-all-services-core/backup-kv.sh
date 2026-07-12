@@ -44,10 +44,17 @@ chmod 0400 "$tmp/helm/"*
 echo "backing up ESO resources"
 capture_kubectl_json "$tmp/eso/externalsecrets.json" -n "$NS" get externalsecret.external-secrets.io
 capture_kubectl_json "$tmp/eso/secretstores.json" -n "$NS" get secretstore.external-secrets.io
-capture_kubectl_json "$tmp/eso/clustersecretstores.json" get clustersecretstore.external-secrets.io
+capture_kubectl_json "$tmp/eso/clustersecretstores.json" get clustersecretstore.external-secrets.io openbao-backend
 sanitize_kubernetes_list < "$tmp/eso/externalsecrets.json" > "$tmp/eso/externalsecrets.apply.json" || cp "$tmp/eso/externalsecrets.json" "$tmp/eso/externalsecrets.apply.json"
 sanitize_kubernetes_list < "$tmp/eso/secretstores.json" > "$tmp/eso/secretstores.apply.json" || cp "$tmp/eso/secretstores.json" "$tmp/eso/secretstores.apply.json"
-sanitize_kubernetes_list < "$tmp/eso/clustersecretstores.json" > "$tmp/eso/clustersecretstores.apply.json" || cp "$tmp/eso/clustersecretstores.json" "$tmp/eso/clustersecretstores.apply.json"
+if jq -e '.absent == true' "$tmp/eso/clustersecretstores.json" >/dev/null 2>&1; then
+  cp "$tmp/eso/clustersecretstores.json" "$tmp/eso/clustersecretstores.apply.json"
+else
+  verify_scoped_clustersecretstores "$tmp/eso/clustersecretstores.json"
+  jq '{apiVersion:"external-secrets.io/v1beta1",kind:"ClusterSecretStoreList",items:[.]}' \
+    "$tmp/eso/clustersecretstores.json" > "$tmp/eso/clustersecretstores.filtered.json"
+  sanitize_kubernetes_list < "$tmp/eso/clustersecretstores.filtered.json" > "$tmp/eso/clustersecretstores.apply.json"
+fi
 chmod 0400 "$tmp/eso/"*
 
 echo "backing up PVC inventory"

@@ -29,6 +29,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 extract_verified_backup "$BACKUP" "$tmp/backup"
 backup_dir="$tmp/backup"
+verify_scoped_clustersecretstores "$backup_dir/eso/clustersecretstores.apply.json"
 
 if [ "$MODE" = "--apply" ]; then
   require_test_cluster_write_guard

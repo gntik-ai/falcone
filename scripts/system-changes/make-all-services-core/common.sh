@@ -98,6 +98,41 @@ sanitize_kubernetes_list() {
   '
 }
 
+verify_scoped_clustersecretstores() {
+  local input="$1"
+  jq -e \
+    --arg release "$RELEASE" \
+    --arg namespace "$NS" \
+    --arg openbao_namespace "$OPENBAO_NAMESPACE" '
+      def store_items:
+        if .absent == true then []
+        elif (.items | type) == "array" then .items
+        else [.]
+        end;
+      .absent == true or (
+        (store_items | length) <= 1
+        and all(store_items[]; (
+          .kind == "ClusterSecretStore"
+          and .metadata.name == "openbao-backend"
+          and (
+            (
+              .metadata.annotations["meta.helm.sh/release-name"] == $release
+              and .metadata.annotations["meta.helm.sh/release-namespace"] == $namespace
+            )
+            or (
+              .metadata.labels["app.kubernetes.io/instance"] == $release
+              and .metadata.labels["app.kubernetes.io/part-of"] == "in-falcone"
+            )
+          )
+          and ((.spec.provider.vault.server // "") | startswith("https://openbao." + $openbao_namespace + ".svc"))
+        ))
+      )
+    ' "$input" >/dev/null || {
+      echo "refusing ClusterSecretStore backup/restore outside Falcone-owned openbao-backend for release=$RELEASE namespace=$NS openbaoNamespace=$OPENBAO_NAMESPACE" >&2
+      return 1
+    }
+}
+
 capture_kubectl_json() {
   local output="$1"
   shift
