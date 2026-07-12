@@ -75,27 +75,42 @@ spec:
               release={{ .Release.Name | quote }}
               namespace={{ .Release.Namespace | quote }}
               eso_namespace={{ .Values.eso.namespace | quote }}
-              if kubectl get clustersecretstore openbao-backend >/dev/null 2>&1; then
-                owner="$(kubectl get clustersecretstore openbao-backend -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-name}' 2>/dev/null || true)"
-                owner_ns="$(kubectl get clustersecretstore openbao-backend -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-namespace}' 2>/dev/null || true)"
-                if [ -n "$owner" ] && { [ "$owner" != "$release" ] || [ "$owner_ns" != "$namespace" ]; }; then
-                  if [ "$adopt" != "true" ]; then
-                    echo "ClusterSecretStore/openbao-backend is owned by ${owner}/${owner_ns}; set eso.eso.clusterOwnership.adoptExisting=true only during an explicit adoption rollout" >&2
-                    exit 1
-                  fi
+              openbao_namespace={{ .Values.eso.caProvider.namespace | default "secret-store" | quote }}
+              require_adoption() {
+                if [ "$adopt" != "true" ]; then
+                  echo "$1; set eso.eso.clusterOwnership.adoptExisting=true only during an explicit adoption rollout" >&2
+                  exit 1
+                fi
+              }
+              if store_json="$(kubectl get clustersecretstore openbao-backend -o json 2>/dev/null)"; then
+                if ! printf '%s' "$store_json" | jq -e \
+                  --arg release "$release" \
+                  --arg namespace "$namespace" \
+                  --arg openbao_namespace "$openbao_namespace" '
+                    .metadata.annotations["meta.helm.sh/release-name"] == $release
+                    and .metadata.annotations["meta.helm.sh/release-namespace"] == $namespace
+                    and .metadata.labels["app.kubernetes.io/instance"] == $release
+                    and .metadata.labels["app.kubernetes.io/part-of"] == "in-falcone"
+                    and ((.spec.provider.vault.server // "") | startswith("https://openbao." + $openbao_namespace + ".svc"))
+                  ' >/dev/null; then
+                  owner="$(printf '%s' "$store_json" | jq -r '.metadata.annotations["meta.helm.sh/release-name"] // "<missing>"')"
+                  owner_ns="$(printf '%s' "$store_json" | jq -r '.metadata.annotations["meta.helm.sh/release-namespace"] // "<missing>"')"
+                  require_adoption "ClusterSecretStore/openbao-backend is not owned by ${release}/${namespace} (found ${owner}/${owner_ns})"
                 fi
               fi
-              conflicts="$(kubectl get deploy -A -l app.kubernetes.io/name=external-secrets -o go-template='{{ "{{" }} range .items {{ "}}" }}{{ "{{" }} .metadata.namespace {{ "}}" }}/{{ "{{" }} .metadata.name {{ "}}" }} {{ "{{" }} end {{ "}}" }}' 2>/dev/null || true)"
-              for item in $conflicts; do
-                case "$item" in
-                  ${namespace}/*) ;;
-                  ${eso_namespace}/*) ;;
-                  *)
-                    if [ "$adopt" != "true" ]; then
-                      echo "external-secrets controller already exists outside ${eso_namespace}: ${item}; coordinate ownership or set eso.eso.clusterOwnership.adoptExisting=true for an adoption rollout" >&2
-                      exit 1
-                    fi
-                    ;;
-                esac
-              done
+              deployments_json="$(kubectl get deploy -A -l app.kubernetes.io/name=external-secrets -o json)"
+              conflict="$(printf '%s' "$deployments_json" \
+                | jq -r --arg release "$release" --arg namespace "$namespace" '
+                  .items[]?
+                  | select(
+                      .metadata.annotations["meta.helm.sh/release-name"] != $release
+                      or .metadata.annotations["meta.helm.sh/release-namespace"] != $namespace
+                      or .metadata.labels["app.kubernetes.io/managed-by"] != "Helm"
+                      or .metadata.labels["app.kubernetes.io/instance"] != $release
+                    )
+                  | "\(.metadata.namespace)/\(.metadata.name)"
+                ' | head -n1)"
+              if [ -n "$conflict" ]; then
+                require_adoption "external-secrets controller is not owned by ${release}/${namespace}: ${conflict}"
+              fi
               echo "ESO ownership preflight passed"

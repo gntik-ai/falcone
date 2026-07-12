@@ -57,7 +57,7 @@ function makeKubernetesSecrets(overrides = {}) {
 
 function clusterSecretStore(
   name,
-  { owned = true, openbaoNamespace = 'secret-store', releaseName, releaseNamespace } = {},
+  { owned = true, openbaoNamespace = 'secret-store', releaseName, releaseNamespace, ready = true } = {},
 ) {
   const helmReleaseName = releaseName ?? (owned ? 'falcone' : 'other-release');
   const helmReleaseNamespace = releaseNamespace ?? (owned ? 'falcone' : 'other-ns');
@@ -87,6 +87,9 @@ function clusterSecretStore(
           server: `https://openbao.${openbaoNamespace}.svc.cluster.local:8200`,
         },
       },
+    },
+    status: {
+      conditions: [{ type: 'Ready', status: ready ? 'True' : 'False' }],
     },
   };
 }
@@ -209,6 +212,8 @@ if (args[0] === 'config' && args[1] === 'current-context') {
   console.log(process.env.KUBECTL_CONTEXT || 'test-context');
   process.exit(0);
 }
+if (args.includes('rollout') && args.includes('status')) process.exit(0);
+if (args.includes('exec')) process.exit(0);
 if (args.includes('apply')) {
   const fileIndex = args.indexOf('-f');
   const file = fileIndex >= 0 ? args[fileIndex + 1] : '';
@@ -236,6 +241,27 @@ if (resource === 'secret' && name) {
 }
 if (resource === 'secrets') {
   print({ apiVersion: 'v1', kind: 'SecretList', items: Object.entries(state.kubernetes || {}).map(([n, d]) => secretObject(n, d)) });
+  process.exit(0);
+}
+if (resource === 'externalsecret') {
+  const externalSecrets = state.externalSecrets || [];
+  print({
+    apiVersion: 'external-secrets.io/v1beta1',
+    kind: 'ExternalSecretList',
+    items: externalSecrets.map((item) => ({
+      metadata: { name: item.name },
+      status: { conditions: [{ type: 'Ready', status: item.status || 'True' }] },
+    })),
+  });
+  process.exit(0);
+}
+if (resource === 'deploy,statefulset') {
+  const workloads = state.workloads || ['deployment/falcone-control-plane'];
+  if (args.includes('-o') && args[args.indexOf('-o') + 1] === 'name') {
+    console.log(workloads.join('\\n'));
+    process.exit(0);
+  }
+  print({ apiVersion: 'v1', kind: 'List', items: [] });
   process.exit(0);
 }
 if (resource.startsWith('clustersecretstore')) {
@@ -384,6 +410,30 @@ test('all-core KV backup refuses same-release-name ClusterSecretStore from anoth
     /refusing ClusterSecretStore backup\/restore outside Falcone-owned openbao-backend/,
   );
   assert.equal(existsSync(backup), false, 'failed ClusterSecretStore namespace check must not publish a backup archive');
+});
+
+test('all-core health check refuses same-release-name ClusterSecretStore from another namespace', (t) => {
+  const h = makeHarness(t, {
+    target: { secret: {} },
+    source: { secret: {} },
+    kubernetes: makeKubernetesSecrets(),
+    externalSecrets: [{ name: 'platform-postgresql-credentials' }],
+    workloads: ['deployment/falcone-control-plane'],
+    clusterSecretStores: {
+      'openbao-backend': clusterSecretStore('openbao-backend', { releaseNamespace: 'other-ns' }),
+    },
+  });
+
+  const healthRun = h.run('health-check.sh');
+  assert.notEqual(
+    healthRun.status,
+    0,
+    'health check must fail closed when openbao-backend belongs to the same release name in another namespace',
+  );
+  assert.match(
+    `${healthRun.stdout}\n${healthRun.stderr}`,
+    /refusing ClusterSecretStore backup\/restore outside Falcone-owned openbao-backend/,
+  );
 });
 
 test('all-core KV migration scripts recursively migrate source KV and restore target exactly', (t) => {

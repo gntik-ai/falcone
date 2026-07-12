@@ -17,8 +17,11 @@ kubectl -n "$NS" get externalsecret -o json \
     done
 
 echo "checking ClusterSecretStore readiness"
-kubectl get clustersecretstore openbao-backend -o json \
-  | jq -e '((.status.conditions // [])[]? | select(.type=="Ready") | .status) == "True"' >/dev/null
+cluster_store_json="$(mktemp)"
+trap 'rm -f "$cluster_store_json"' EXIT
+kubectl get clustersecretstore openbao-backend -o json > "$cluster_store_json"
+verify_scoped_clustersecretstores "$cluster_store_json"
+jq -e '((.status.conditions // [])[]? | select(.type=="Ready") | .status) == "True"' "$cluster_store_json" >/dev/null
 
 echo "checking release-owned workload rollouts for release $RELEASE"
 mapfile -t workloads < <(kubectl -n "$NS" get deploy,statefulset -l "app.kubernetes.io/instance=$RELEASE" -o name | sort)

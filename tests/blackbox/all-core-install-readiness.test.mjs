@@ -764,11 +764,17 @@ test('all-core-008: ESO cluster-scoped ownership preflight renders', SKIP, () =>
   const out = assertRender();
   const docs = parseAllDocuments(out).map((doc) => doc.toJSON()).filter(Boolean);
   const esoPreflight = findDoc(docs, 'Job', 'eso-preflight');
+  const preflightScript = commandText(esoPreflight);
   assert.match(out, /kind:\s*Job[\s\S]*name:\s*eso-preflight/, 'ESO ownership preflight Job must render');
   assert.match(out, /resources:\s*\["clustersecretstores"\]/, 'preflight must inspect ClusterSecretStore ownership');
   assert.match(out, /resources:\s*\["deployments"\]/, 'preflight must inspect cluster ESO deployments');
   assert.match(out, /adoptExisting/, 'preflight must expose the explicit adoptExisting override');
-  assert.match(commandText(esoPreflight), /namespace="review-ns"[\s\S]*\$\{namespace\}\/\*\) ;;/, 'preflight must allow the release-owned ESO operator deployment');
+  assert.match(preflightScript, /meta\.helm\.sh\/release-name/, 'preflight must check Helm release-name ownership');
+  assert.match(preflightScript, /meta\.helm\.sh\/release-namespace/, 'preflight must check Helm release-namespace ownership');
+  assert.match(preflightScript, /app\.kubernetes\.io\/part-of"\] == "in-falcone"/, 'preflight must require Falcone ownership labels on ClusterSecretStore');
+  assert.match(preflightScript, /startswith\("https:\/\/openbao\." \+ \$openbao_namespace \+ "\.svc"\)/, 'preflight must verify the ClusterSecretStore points at the configured OpenBao namespace');
+  assert.match(preflightScript, /external-secrets controller is not owned by \$\{release\}\/\$\{namespace\}/, 'preflight must reject same-namespace ESO deployments without Helm ownership');
+  assert.doesNotMatch(preflightScript, /\$\{eso_namespace\}\/\*\) ;;/, 'preflight must not whitelist ESO controllers by namespace alone');
   assert.match(out, /set eso\.eso\.clusterOwnership\.adoptExisting=true/, 'preflight must fail closed on unowned cluster-scoped stores');
 });
 
@@ -919,6 +925,8 @@ test('all-core-011: existing-install cutover scripts fail closed, merge KV data,
   assert.match(restore, /restore_kv_tree_exact/, 'restore must restore the captured target OpenBao KV tree exactly');
   assert.match(restore, /\[ "\$MODE" = "--apply" \][\s\S]*require_test_cluster_write_guard/, 'restore apply/helm rollback path must pass the test-cluster guard before writes');
 
+  assert.match(health, /kubectl get clustersecretstore openbao-backend -o json > "\$cluster_store_json"/, 'health check must inspect the exact ClusterSecretStore object');
+  assert.match(health, /verify_scoped_clustersecretstores "\$cluster_store_json"/, 'health check must reject ClusterSecretStore ownership or OpenBao namespace drift');
   assert.match(health, /app\.kubernetes\.io\/instance=\$RELEASE/, 'health check must select workloads by release label');
   assert.doesNotMatch(health, /deploy\/falcone-|statefulset\/falcone-/, 'health check must not hard-code the falcone release name');
 
