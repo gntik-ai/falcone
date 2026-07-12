@@ -1,8 +1,8 @@
 // Per-execution short-lived credential (change: add-flows-tenancy-isolation-limits).
 //
 // design.md D5 — a tenant-scoped service token is minted at flow start, scoped to exactly
-// `{ tenantId, workspaceId }` of the triggering identity, and carried via the Temporal workflow
-// memo (NOT a search attribute — memo is not queryable). Activities validate the token before
+// `{ tenantId, workspaceId }` of the triggering identity, and carried in the workflow argument's
+// tenant envelope (not a Temporal memo or search attribute). Activities validate the token before
 // touching tenant data; an expired or cross-tenant token fails the activity with a
 // non-retryable error.
 //
@@ -18,7 +18,7 @@
 // back to a fixed dev key so the round-trip is exercisable without infra (the same backend split
 // api-keys.mjs uses).
 
-import { createHmac, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomUUID, scryptSync, timingSafeEqual, webcrypto } from 'node:crypto';
 
 // Default maximum flow run duration the token must not outlast. Mirrors the conservative
 // Temporal workflowExecutionTimeout the interpreter uses; tokens expire WITH the run, never after.
@@ -46,17 +46,24 @@ function b64url(buf) {
   return Buffer.from(buf).toString('base64url');
 }
 
-function sign(payloadJson, tenantId, workspaceId, secret) {
-  return createHmac('sha256', signingKey(tenantId, workspaceId, secret)).update(payloadJson).digest();
+async function sign(payloadJson, tenantId, workspaceId, secret) {
+  const key = await webcrypto.subtle.importKey(
+    'raw',
+    signingKey(tenantId, workspaceId, secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return Buffer.from(await webcrypto.subtle.sign('HMAC', key, Buffer.from(payloadJson)));
 }
 
 /**
  * Mint a per-execution token scoped to `{ tenantId, workspaceId }`. `expiresAt` (epoch ms) is
  * clamped so it never outlasts `maxRunDurationMs` from `now`.
  *
- * @returns {string} compact `<payload>.<sig>` token
+ * @returns {Promise<string>} compact `<payload>.<sig>` token
  */
-export function mintExecutionToken(tenantId, workspaceId, maxRunDurationMs = DEFAULT_MAX_RUN_DURATION_MS, {
+export async function mintExecutionToken(tenantId, workspaceId, maxRunDurationMs = DEFAULT_MAX_RUN_DURATION_MS, {
   now = Date.now(),
   secret = platformSecret(),
   jti = randomUUID(),
@@ -73,7 +80,7 @@ export function mintExecutionToken(tenantId, workspaceId, maxRunDurationMs = DEF
     keyDerivation: EXECUTION_TOKEN_KEY_DERIVATION
   };
   const payloadJson = JSON.stringify(payload);
-  const sig = sign(payloadJson, tenantId, workspaceId, secret);
+  const sig = await sign(payloadJson, tenantId, workspaceId, secret);
   return `${b64url(payloadJson)}.${b64url(sig)}`;
 }
 
@@ -101,8 +108,9 @@ function decodePayload(token) {
  * @param {string} expectedTenantId
  * @param {string} expectedWorkspaceId
  * @param {{ now?: number, secret?: string }} [opts]
+ * @returns {Promise<object>}
  */
-export function validateExecutionToken(token, expectedTenantId, expectedWorkspaceId, { now = Date.now(), secret = platformSecret() } = {}) {
+export async function validateExecutionToken(token, expectedTenantId, expectedWorkspaceId, { now = Date.now(), secret = platformSecret() } = {}) {
   const decoded = decodePayload(token);
   if (!decoded) {
     throw Object.assign(new Error('Execution token is missing or malformed'), { code: EXECUTION_TOKEN_INVALID });
@@ -116,7 +124,7 @@ export function validateExecutionToken(token, expectedTenantId, expectedWorkspac
   }
   // Verify the signature with the key derived from the TOKEN's own claimed identity first so a
   // forged-identity token never validates. Constant-time compare.
-  const expectedSig = sign(payloadJson, obj.tenantId, obj.workspaceId, secret);
+  const expectedSig = await sign(payloadJson, obj.tenantId, obj.workspaceId, secret);
   let providedSig;
   try {
     providedSig = Buffer.from(sig, 'base64url');

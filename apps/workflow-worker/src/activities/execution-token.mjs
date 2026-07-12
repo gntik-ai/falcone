@@ -1,8 +1,8 @@
 // Per-execution credential validation, worker side (change:
 // add-flows-tenancy-isolation-limits).
 //
-// The control-plane mints a short-lived token at flow start and carries it in the Temporal
-// workflow memo / tenant envelope (apps/control-plane-executor/src/runtime/execution-token.mjs). Before an
+// The control-plane mints a short-lived token at flow start and carries it in the workflow
+// argument's tenant envelope (apps/control-plane-executor/src/runtime/execution-token.mjs). Before an
 // activity touches any tenant data store it MUST validate that token against the tenant +
 // workspace stamped on the execution. A missing, expired, or cross-tenant token fails the activity
 // with a NON-RETRYABLE Temporal ApplicationFailure (the failure is deterministic — retrying cannot
@@ -60,7 +60,7 @@ function decodePayload(token) {
  * Returns the decoded payload on success; throws a NON-RETRYABLE Temporal ApplicationFailure
  * (type === the token error code) on any failure. Fail-closed: a missing token is invalid.
  *
- * @param {string} token            the token carried in the Temporal memo / tenant envelope
+ * @param {string} token            the token carried in the workflow argument's tenant envelope
  * @param {string} expectedTenantId tenant the workflow execution belongs to
  * @param {string} expectedWorkspaceId workspace the workflow execution belongs to
  * @param {{ now?: number }} [opts]

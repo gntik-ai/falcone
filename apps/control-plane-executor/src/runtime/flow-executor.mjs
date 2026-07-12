@@ -783,7 +783,7 @@ export function createFlowExecutor({
       ? buildWorkflowId(identity.tenantId, identity.workspaceId, flowId, workflowIdOverride)
       : buildWorkflowId(identity.tenantId, identity.workspaceId, flowId);
     // Mint the short-lived, tenant+workspace-scoped token; expiry never outlasts the run.
-    const executionToken = mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
+    const executionToken = await mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
     let handle;
     try {
       handle = await client.workflow.start(WORKFLOW_TYPE, {
@@ -980,7 +980,7 @@ export function createFlowExecutor({
     const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
     const workflowId = buildWorkflowId(identity.tenantId, identity.workspaceId, flowId);
     // A retry is a fresh run → mint a fresh per-execution token scoped to the caller.
-    const executionToken = mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
+    const executionToken = await mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
     const handle = await client.workflow.start(WORKFLOW_TYPE, {
       workflowId,
       taskQueue: temporal.taskQueue,

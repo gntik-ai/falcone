@@ -9,7 +9,7 @@ export function sanitise(content) {
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')
 
-  const cleaned = decoded.replace(TAGS_REGEX, '').replace(/[<>]/g, '').replace(CONTROL_CHARS_REGEX, '').trim()
+  const cleaned = decoded.replace(TAGS_REGEX, '').replace(/<|>/g, '').replace(CONTROL_CHARS_REGEX, '').trim()
 
   if (!cleaned || cleaned.length > WORKSPACE_DOCS_NOTE_MAX_LENGTH) {
     const error = new Error('Invalid note content')

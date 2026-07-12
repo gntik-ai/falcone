@@ -89,8 +89,8 @@ export async function dispatchTask(input, deps = {}) {
   // (first-party) activity touches a tenant data store, so before it runs the short-lived token
   // the control-plane minted at execution start MUST validate against the execution's tenant +
   // workspace. A missing / expired / cross-tenant token fails the activity NON-RETRYABLY and no
-  // tenant data is accessed. The token is carried in the tenant envelope's `executionToken`
-  // (mirrored into the Temporal memo). When no token is configured AT ALL (legacy interpreter
+  // tenant data is accessed. The token is carried in the workflow argument's tenant envelope as
+  // `executionToken`. When no token is configured AT ALL (legacy interpreter
   // harness with token enforcement off) the gate is a no-op — production always stamps one.
   const token = input.tenant?.executionToken;
   if (token !== undefined && token !== null) {

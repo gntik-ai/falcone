@@ -107,7 +107,7 @@ const deps = () => ({ pgRegistry: registry, executePostgresData, credential: { d
 
 test('env-flows-ten-cred-01: valid minted token → activity reads ONLY its tenant rows', async (t) => {
   if (!available) return t.skip('Postgres not reachable');
-  const token = mintExecutionToken(TEN_A, WS_A);
+  const token = await mintExecutionToken(TEN_A, WS_A);
   const out = await dispatchTask(input(token), deps());
   const items = out.output.result.items ?? out.output.result.rows ?? [];
   assert.ok(items.length > 0 && items.every((r) => r.tenant_id === TEN_A), 'tenant A token reads only tenant A rows');
@@ -117,7 +117,7 @@ test('env-flows-ten-cred-01: valid minted token → activity reads ONLY its tena
 test('env-flows-ten-cred-02: expired token → non-retryable EXECUTION_TOKEN_EXPIRED, NO DB read', async (t) => {
   if (!available) return t.skip('Postgres not reachable');
   let dbHit = false;
-  const expired = mintExecutionToken(TEN_A, WS_A, 1, { now: 0 });
+  const expired = await mintExecutionToken(TEN_A, WS_A, 1, { now: 0 });
   await assert.rejects(
     () => dispatchTask(input(expired), { pgRegistry: registry, executePostgresData: async () => { dbHit = true; return {}; }, credential: {} }),
     (err) => err.type === 'EXECUTION_TOKEN_EXPIRED' && err.nonRetryable === true,
@@ -129,7 +129,7 @@ test('env-flows-ten-cred-03: cross-tenant token → non-retryable TENANT_MISMATC
   if (!available) return t.skip('Postgres not reachable');
   let dbHit = false;
   // Token minted for tenant B but the execution claims tenant A.
-  const foreign = mintExecutionToken(TEN_B, WS_A);
+  const foreign = await mintExecutionToken(TEN_B, WS_A);
   await assert.rejects(
     () => dispatchTask(input(foreign, { tenantId: TEN_A, workspaceId: WS_A }), { pgRegistry: registry, executePostgresData: async () => { dbHit = true; return {}; }, credential: {} }),
     (err) => err.type === 'EXECUTION_TOKEN_TENANT_MISMATCH' && err.nonRetryable === true,

@@ -138,15 +138,16 @@ tenant data is touched.
 ```
 control plane (start)                               worker / activity (use)
 ─────────────────────                               ───────────────────────
-mintExecutionToken(tenantId, workspaceId)           dispatchTask(input)
-  payload = { tenantId, workspaceId, expiresAt, jti }   └─ for a REGISTERED activity:
-  key  = HMAC(platformSecret, tenantId"\n"workspaceId)       assertExecutionToken(token,
-  sig  = HMAC(key, payload)                                     input.tenant.tenantId,
-  token = base64url(payload) "." base64url(sig)                 input.tenant.workspaceId)
+await mintExecutionToken(tenantId, workspaceId)     dispatchTask(input)
+  payload = { tenantId, workspaceId, expiresAt, jti,     └─ for a REGISTERED activity:
+              keyDerivation: "scrypt-v1" }                   assertExecutionToken(token,
+  key  = scrypt(platformSecret, tenantId"\n"workspaceId)        input.tenant.tenantId,
+  sig  = HMAC-SHA256(key, payload) via Web Crypto                 input.tenant.workspaceId)
+  token = base64url(payload) "." base64url(sig)
         │                                                         ├─ verify sig (constant-time)
-        ├─ Temporal memo  ── falconeExecutionToken ──────────────┤  using the TOKEN's own claimed
-        │  (not queryable, encrypted at rest)                    │  identity (forged identity fails)
-        └─ tenant envelope ── tenant.executionToken ─────────────┤  ├─ tenant/workspace must match
+        └─ tenant envelope ── tenant.executionToken ─────────────┤  using the TOKEN's own claimed
+                                                                  │  identity (forged identity fails)
+                                                                  │  ├─ tenant/workspace must match
                                                                   │  └─ expiry must not have passed
                                                                   └─ else NON-RETRYABLE failure,
                                                                      no tenant data accessed
@@ -154,14 +155,18 @@ mintExecutionToken(tenantId, workspaceId)           dispatchTask(input)
 
 - The signing key is **derived per workspace** from a single platform secret
   (`FLOW_EXECUTION_TOKEN_SECRET`), so the control plane (minting) and worker (validating) share it
-  without distributing per-workspace material. The worker re-implements the *same* HMAC scheme
-  (`apps/workflow-worker/src/activities/execution-token.mjs`) and does **not** import from the
-  control plane — both sides are byte-for-byte identical and round-trip-tested.
+  without distributing per-workspace material. The worker independently derives the same
+  `scrypt-v1` key and validates the same HMAC-SHA256 wire signature
+  (`apps/workflow-worker/src/activities/execution-token.mjs`), without importing the control
+  plane; the cross-runtime round trip is tested.
 - Token expiry **never outlasts the run** (clamped to the max run duration). A missing, expired,
   or cross-tenant token fails the activity non-retryably (`EXECUTION_TOKEN_INVALID` /
   `EXECUTION_TOKEN_EXPIRED` / `EXECUTION_TOKEN_TENANT_MISMATCH`) — fail-closed.
-- The token is carried in the **Temporal memo** (not a search attribute — memo is not queryable)
-  and mirrored into the tenant envelope the interpreter passes to activities.
+- The token is carried in the workflow-start argument's tenant envelope, then passed to activities.
+  It is not written to a Temporal memo or search attribute, reducing the visibility and memo
+  exposure surface. Workflow arguments are still persisted in Temporal history; without a payload
+  codec, authorized history readers can inspect the token, so deployments that grant history access
+  must use a payload codec or replace this bearer credential with a server-side lookup.
 
 The actual store call uses a tenant-scoped `flc_service_…` credential with the `falcone_service`
 DB role, so Postgres RLS / Mongo workspace scoping restricts every query to the tenant's own data.

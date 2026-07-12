@@ -6,6 +6,10 @@ test('sanitise strips tags and keeps text', () => {
   assert.equal(sanitise('<script>alert(1)</script> hola'), 'alert(1) hola')
   assert.equal(sanitise('<img onerror="x" />texto'), 'texto')
   assert.equal(sanitise('<script alerta'), 'script alerta')
+  const nestedMarkup = sanitise('<scrip<script>ta>alert(1)</script>')
+  assert.equal(nestedMarkup.includes('<'), false)
+  assert.equal(nestedMarkup.includes('>'), false)
+  assert.equal(nestedMarkup.includes('<script'), false)
   assert.equal(sanitise('texto limpio'), 'texto limpio')
 })
 

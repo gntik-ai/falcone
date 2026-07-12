@@ -52,71 +52,71 @@ test('bbx-flows-ten-cred-02: parseWorkflowId round-trips and rejects malformed i
   assert.equal(parseWorkflowId(42), null);
 });
 
-test('bbx-flows-ten-cred-03: minted token carries exactly the execution tenant + workspace', () => {
-  const token = mintExecutionToken('tenant_A', 'ws_A');
-  const payload = validateExecutionToken(token, 'tenant_A', 'ws_A');
+test('bbx-flows-ten-cred-03: minted token carries exactly the execution tenant + workspace', async () => {
+  const token = await mintExecutionToken('tenant_A', 'ws_A');
+  const payload = await validateExecutionToken(token, 'tenant_A', 'ws_A');
   assert.equal(payload.tenantId, 'tenant_A');
   assert.equal(payload.workspaceId, 'ws_A');
   assert.equal(payload.keyDerivation, EXECUTION_TOKEN_KEY_DERIVATION);
   assert.ok(!JSON.stringify(payload).includes('tenant_B'));
 });
 
-test('bbx-flows-ten-cred-04: valid token validates against the matching identity', () => {
-  const token = mintExecutionToken('tenant_A', 'ws_A', 60_000, { now: 1000 });
-  const payload = validateExecutionToken(token, 'tenant_A', 'ws_A', { now: 2000 });
+test('bbx-flows-ten-cred-04: valid token validates against the matching identity', async () => {
+  const token = await mintExecutionToken('tenant_A', 'ws_A', 60_000, { now: 1000 });
+  const payload = await validateExecutionToken(token, 'tenant_A', 'ws_A', { now: 2000 });
   assert.equal(payload.tenantId, 'tenant_A');
 });
 
-test('bbx-flows-ten-cred-05: expired token → EXECUTION_TOKEN_EXPIRED', () => {
-  const token = mintExecutionToken('tenant_A', 'ws_A', 1000, { now: 0 });
-  assert.throws(
+test('bbx-flows-ten-cred-05: expired token → EXECUTION_TOKEN_EXPIRED', async () => {
+  const token = await mintExecutionToken('tenant_A', 'ws_A', 1000, { now: 0 });
+  await assert.rejects(
     () => validateExecutionToken(token, 'tenant_A', 'ws_A', { now: 5000 }),
     (err) => err.code === EXECUTION_TOKEN_EXPIRED,
   );
 });
 
-test('bbx-flows-ten-cred-06: cross-tenant token → EXECUTION_TOKEN_TENANT_MISMATCH', () => {
-  const token = mintExecutionToken('tenant_A', 'ws_A');
-  assert.throws(
+test('bbx-flows-ten-cred-06: cross-tenant token → EXECUTION_TOKEN_TENANT_MISMATCH', async () => {
+  const token = await mintExecutionToken('tenant_A', 'ws_A');
+  await assert.rejects(
     () => validateExecutionToken(token, 'tenant_B', 'ws_A'),
     (err) => err.code === EXECUTION_TOKEN_TENANT_MISMATCH,
   );
-  assert.throws(
+  await assert.rejects(
     () => validateExecutionToken(token, 'tenant_A', 'ws_B'),
     (err) => err.code === EXECUTION_TOKEN_TENANT_MISMATCH,
   );
 });
 
-test('bbx-flows-ten-cred-07: tampered token → EXECUTION_TOKEN_INVALID (signature fails)', () => {
-  const token = mintExecutionToken('tenant_A', 'ws_A');
+test('bbx-flows-ten-cred-07: tampered token → EXECUTION_TOKEN_INVALID (signature fails)', async () => {
+  const token = await mintExecutionToken('tenant_A', 'ws_A');
   // Tamper with the payload portion (claim tenant_B) but keep the original signature.
   const [, sig] = token.split('.');
   const forgedPayload = Buffer.from(JSON.stringify({ tenantId: 'tenant_B', workspaceId: 'ws_A', expiresAt: Date.now() + 99999, jti: 'x' })).toString('base64url');
   const forged = `${forgedPayload}.${sig}`;
-  assert.throws(
+  await assert.rejects(
     () => validateExecutionToken(forged, 'tenant_B', 'ws_A'),
     (err) => err.code === EXECUTION_TOKEN_INVALID,
   );
   // A garbage token is also invalid (fail-closed, missing token).
-  assert.throws(() => validateExecutionToken(undefined, 'tenant_A', 'ws_A'), (err) => err.code === EXECUTION_TOKEN_INVALID);
+  await assert.rejects(() => validateExecutionToken(undefined, 'tenant_A', 'ws_A'), (err) => err.code === EXECUTION_TOKEN_INVALID);
 });
 
-test('bbx-flows-ten-cred-08: token expiry never outlasts the max run duration', () => {
+test('bbx-flows-ten-cred-08: token expiry never outlasts the max run duration', async () => {
   // Request a TTL far larger than the cap; the minted expiry is clamped to DEFAULT_MAX_RUN_DURATION_MS.
   const now = 1_000_000;
-  const token = mintExecutionToken('tenant_A', 'ws_A', DEFAULT_MAX_RUN_DURATION_MS * 10, { now });
-  const payload = validateExecutionToken(token, 'tenant_A', 'ws_A', { now });
+  const token = await mintExecutionToken('tenant_A', 'ws_A', DEFAULT_MAX_RUN_DURATION_MS * 10, { now });
+  const payload = await validateExecutionToken(token, 'tenant_A', 'ws_A', { now });
   assert.ok(payload.expiresAt <= now + DEFAULT_MAX_RUN_DURATION_MS);
 });
 
-test('bbx-flows-ten-cred-08b: prior key-derivation tokens fail closed after the coordinated upgrade', () => {
-  const token = mintExecutionToken('tenant_A', 'ws_A', 60_000, { now: 1000 });
+test('bbx-flows-ten-cred-08b: prior key-derivation tokens fail closed after the coordinated upgrade', async () => {
+  const token = await mintExecutionToken('tenant_A', 'ws_A', 60_000, { now: 1000 });
   const [payload, signature] = token.split('.');
   const legacyPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   delete legacyPayload.keyDerivation;
   const legacyToken = `${Buffer.from(JSON.stringify(legacyPayload)).toString('base64url')}.${signature}`;
 
-  assert.throws(
+  await assert.rejects(
     () => validateExecutionToken(legacyToken, 'tenant_A', 'ws_A', { now: 2000 }),
     (err) => err.code === EXECUTION_TOKEN_INVALID && err.message.includes('key derivation')
   );
@@ -126,8 +126,8 @@ test('bbx-flows-ten-cred-08b: prior key-derivation tokens fail closed after the 
   );
 });
 
-test('bbx-flows-ten-cred-09: activity-side assertExecutionToken throws a NON-RETRYABLE failure', () => {
-  const expired = mintExecutionToken('tenant_A', 'ws_A', 1, { now: 0 });
+test('bbx-flows-ten-cred-09: activity-side assertExecutionToken throws a NON-RETRYABLE failure', async () => {
+  const expired = await mintExecutionToken('tenant_A', 'ws_A', 1, { now: 0 });
   try {
     assertExecutionToken(expired, 'tenant_A', 'ws_A', { now: 10_000 });
     assert.fail('expected throw');
@@ -136,7 +136,7 @@ test('bbx-flows-ten-cred-09: activity-side assertExecutionToken throws a NON-RET
     assert.equal(err.nonRetryable, true);
   }
   // Cross-tenant token also non-retryable.
-  const good = mintExecutionToken('tenant_A', 'ws_A');
+  const good = await mintExecutionToken('tenant_A', 'ws_A');
   try {
     assertExecutionToken(good, 'tenant_B', 'ws_A');
     assert.fail('expected throw');
