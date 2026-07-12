@@ -16,9 +16,11 @@ import assert from 'node:assert/strict';
 
 import { createMcpEngine } from '../../apps/control-plane/src/runtime/mcp-engine.mjs';
 import { generateFromFlows } from '../../apps/control-plane/src/mcp-instant-generator.mjs';
+import { BASE_SCOPE } from '../../apps/control-plane/src/mcp-official-catalog.mjs';
 
-const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
+const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app', scopes: [BASE_SCOPE] };
 const SELF = 'http://exec.local';
+const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 
 function captureFetch() {
   const calls = [];
@@ -36,7 +38,7 @@ function captureFetch() {
 
 function enginePair() {
   const fetchImpl = captureFetch();
-  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl });
+  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl, runtimeImageDigest: TEST_DIGEST });
   return { e, fetchImpl };
 }
 
@@ -46,6 +48,13 @@ async function publish(e, source, resources) {
   await e.executeMcp({ operation: 'curate_server', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { decisions: {} } });
   await e.executeMcp({ operation: 'publish_version', identity: A, workspaceId: A.workspaceId, serverId: sid, version: 'v1', body: { version: 'v1' } });
   return sid;
+}
+
+async function identityForTool(e, sid, toolName) {
+  const view = await e.executeMcp({ operation: 'get_server', identity: A, workspaceId: A.workspaceId, serverId: sid });
+  const tool = view.tools.find((t) => t.name === toolName);
+  assert.ok(tool, `expected published tool ${toolName}`);
+  return { ...A, scopes: [BASE_SCOPE, tool.scope].filter(Boolean) };
 }
 
 test('bbx-mcp-flow-01: the flow generator is wired into the engine (published flow → MCP tool)', async () => {
@@ -60,7 +69,8 @@ test('bbx-mcp-flow-01: the flow generator is wired into the engine (published fl
 test('bbx-mcp-flow-02: invoking a flow tool self-calls the real flows executions route + {input}', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publish(e, 'instant', { flows: [{ id: 'flw_1', name: 'Nightly Report' }] });
-  const call = await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'run_flow_nightly-report', arguments: { date: '2026-06-18' } } });
+  const identity = await identityForTool(e, sid, 'run_flow_nightly-report');
+  const call = await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'run_flow_nightly-report', arguments: { date: '2026-06-18' } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
   assert.equal(c.path, '/v1/flows/workspaces/ws-a/flows/flw_1/executions');
@@ -74,7 +84,8 @@ test('bbx-mcp-flow-02: invoking a flow tool self-calls the real flows executions
 test('bbx-mcp-flow-03: a flow tool ignores any smuggled tenant/workspace in args', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publish(e, 'instant', { flows: [{ id: 'flw_1', name: 'Nightly Report' }] });
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'run_flow_nightly-report', arguments: { date: 'd', tenantId: 'EVIL', workspaceId: 'EVIL_WS' } } });
+  const identity = await identityForTool(e, sid, 'run_flow_nightly-report');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'run_flow_nightly-report', arguments: { date: 'd', tenantId: 'EVIL', workspaceId: 'EVIL_WS' } } });
   const c = fetchImpl.calls.at(-1);
   assert.ok(!c.path.includes('EVIL'));
   assert.equal(c.path, '/v1/flows/workspaces/ws-a/flows/flw_1/executions');
@@ -97,7 +108,8 @@ test('bbx-mcp-platform-02: a platform mutating tool self-calls the control-plane
   const sid = await publish(e, 'official');
   // create_workspace targets the served tenant-scoped route; {tenantId} is filled from the
   // credential-bound server context (ten-a), NEVER from a smuggled arg.
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_workspace', arguments: { slug: 'reporting', tenantId: 'EVIL' } } });
+  const identity = await identityForTool(e, sid, 'create_workspace');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_workspace', arguments: { slug: 'reporting', tenantId: 'EVIL' } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
   assert.equal(c.path, '/v1/tenants/ten-a/workspaces');

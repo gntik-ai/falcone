@@ -123,7 +123,7 @@ test('registry rewriting preserves repository paths while swapping the registry 
   const values = readRootValues();
   const mirroredValues = structuredClone(values);
   mirroredValues.global.imageRegistry = 'registry.airgap.in-falcone.local';
-  assert.equal(resolveComponentImage(mirroredValues, 'apisix'), 'registry.airgap.in-falcone.local/apache/apisix:3.10.0');
+  assert.equal(resolveComponentImage(mirroredValues, 'apisix'), 'registry.airgap.in-falcone.local/apache/apisix:3.10.0-debian');
 });
 
 test('upgrade validation requires an approved currentVersion during in-place upgrades', () => {

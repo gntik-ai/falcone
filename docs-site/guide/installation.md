@@ -11,7 +11,7 @@ In Falcone is packaged as a single **umbrella Helm chart** (`charts/in-falcone`)
 > For a **fully air-gapped OpenShift install using only plain `oc apply` manifests (no Helm, Operators, or templating)** — every image (including build bases, init containers and sidecars) pulled from a private **Harbor** — see the dedicated, end-to-end [OpenShift Air-gapped (Harbor) guide](/operations/openshift-airgapped-harbor). It includes the full image-mirror table, every manifest, an ordered runbook, and OpenShift `restricted-v2` SCC fixes.
 
 > [!NOTE]
-> The chart is an **umbrella**: each platform component (gateway, identity, databases, storage, events, functions, control plane, console, observability) is a dependency wrapped by a shared `component-wrapper` subchart and toggled with `<component>.enabled`. You can run everything in one cluster or point a component at an external managed service.
+> The chart is an **umbrella**: the supported fresh-install shape renders the complete core platform (gateway, identity, databases, storage, events, functions runtime wiring, control plane, console, observability, secrets, Temporal, and MCP). Legacy `<component>.enabled=false` service disables and zero-replica core overrides are rejected; use values for sizing, storage, networking, security posture, and managed-service-compatible endpoints/Secrets instead.
 
 ## Prerequisites
 
@@ -98,6 +98,8 @@ helm upgrade --install falcone charts/in-falcone \
   -f charts/in-falcone/values/profiles/standard.yaml
 ```
 
+Helm creates the release namespace before pre-install hooks run. The chart then owns the ESO/OpenBao support namespaces by default (`global.createNamespace=true`). If your cluster team pre-creates all namespaces, omit `--create-namespace`, set `global.createNamespace=false`, and keep the required labels/ownership in that platform layer.
+
 The `platform-kubernetes.yaml` profile sets:
 
 ```yaml
@@ -144,6 +146,8 @@ helm upgrade --install falcone charts/in-falcone \
   -f charts/in-falcone/values/platform-openshift.yaml \
   -f charts/in-falcone/values/profiles/standard.yaml
 ```
+
+As with Kubernetes, Helm creates the release Project first and the chart creates the ESO/OpenBao support Projects. OpenShift/GitOps environments that require pre-created Projects should disable chart namespace creation with `global.createNamespace=false` and provide the Projects, pull secrets, SCC bindings, and namespace labels outside Helm.
 
 The OpenShift profile sets:
 

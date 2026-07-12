@@ -1389,7 +1389,7 @@ async function rotateDatabaseCredential(ctx) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'ROTATE_DB_FAILED', String(e.message ?? e));
   }
 }
-// ---- data plane: function registry (execution pends OpenWhisk) -------------
+// ---- data plane: function registry (execution pends executor/Knative) -------
 // POST /v1/workspaces/{workspaceId}/functions — register a function.
 async function registerFunction(ctx) {
   const { body, pool, identity } = ctx;
@@ -1402,9 +1402,9 @@ async function registerFunction(ctx) {
     runtime: body.runtime ?? 'nodejs:20', handler: body.handler ?? 'main', sourceRef: body.sourceRef ?? null, createdBy: identity.sub });
   return ok(201, {
     function: rec,
-    // Honest: registered, but execution needs the OpenWhisk data plane (stubbed here).
+    // Honest: registered, but execution needs the executor/Knative data plane.
     runtimeStatus: 'pending_data_plane',
-    message: 'Function registered. Execution activates when the OpenWhisk data plane is deployed.'
+    message: 'Function registered. Execution activates when the executor/Knative data plane is available.'
   });
 }
 // GET /v1/workspaces/{workspaceId}/functions — list registered functions.

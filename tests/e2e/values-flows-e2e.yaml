@@ -11,12 +11,11 @@
 # in-falcone-web-console nginx container (port 3000). Both are port-forwarded by stack.sh.
 #
 # Chart validation notes:
-#   - bootstrap.enabled=false: the validate.yaml requires apisix.enabled=true for bootstrap.
-#     We skip bootstrap for the e2e namespace; the test runner provisions identities via API headers.
-#   - publicSurface.bindings: explicit serviceName values silence the validate.yaml binding check
-#     for disabled components.
-#   - APISIX: disabled (we proxy directly to control-plane). The binding check is satisfied by
-#     serviceName overrides below.
+#   - Falcone platform services are core. This overlay tunes replicas, images,
+#     resources, env, and public-surface bindings only; it does not disable
+#     bootstrap, APISIX, ESO, OpenBao, or any other core service.
+#   - The specs still proxy /v1/* directly to the control-plane; APISIX may run
+#     unused in the namespace.
 #   - Temporal images: pulled from docker.io (public). The first pull requires internet access.
 
 global:
@@ -52,7 +51,6 @@ environmentProfile:
 # ---- Core services needed by the flows loop ----
 
 controlPlane:
-  enabled: true
   replicas: 1
   image:
     repository: localhost:30500/in-falcone-control-plane
@@ -97,7 +95,6 @@ controlPlane:
     app.kubernetes.io/component: flows-api
 
 workflowWorker:
-  enabled: true
   replicas: 1
   image:
     repository: localhost:30500/in-falcone-workflow-worker
@@ -122,7 +119,6 @@ workflowWorker:
       value: "8080"
 
 temporal:
-  enabled: true
   persistence:
     host: falcone-postgresql
     port: 5432
@@ -142,8 +138,6 @@ temporal:
   bootstrap:
     namespace: falcone-flows
     retentionDays: 1
-  ui:
-    enabled: false   # not needed for e2e
   # Increase CPU for Temporal worker service: it runs an embedded SDK client that
   # initializes synchronously in the fx start hook. Under CPU pressure the Go runtime
   # can starve the gRPC health check loop, causing the SDK client to time out.
@@ -166,7 +160,6 @@ temporal:
         memory: 1Gi
 
 postgresql:
-  enabled: true
   image:
     # bitnami purged public tags; use bitnamilegacy mirror (same as deploy/kind/values-kind.yaml)
     repository: docker.io/bitnamilegacy/postgresql
@@ -175,7 +168,6 @@ postgresql:
 
 # Web console: serves the SPA on port 3000. Port-forwarded by stack.sh.
 webConsole:
-  enabled: true
   replicas: 1
   image:
     repository: localhost:30500/in-falcone-web-console
@@ -184,7 +176,6 @@ webConsole:
 
 # Keycloak: needed for console auth (/v1/auth/* login flows).
 keycloak:
-  enabled: true
   image:
     repository: quay.io/keycloak/keycloak
     tag: "26.1.0"
@@ -197,17 +188,8 @@ keycloak:
       cpu: 1000m
       memory: 2Gi
 
-# APISIX gateway: disabled for e2e (flows specs proxy directly to control-plane).
-apisix:
-  enabled: false
-
-# Not needed for the flows scenarios.
-mongodb:
-  enabled: false
-
 # Kafka: needed for the platform-event trigger scenario (scenario 3).
 kafka:
-  enabled: true
   # Single-broker KRaft (same as deploy/kind/values-kind.yaml). >1 replica requires a
   # proper quorum configuration that is not worth setting up in ephemeral e2e.
   replicas: 1
@@ -217,28 +199,8 @@ kafka:
     tag: "3.9.0"
     pullPolicy: IfNotPresent
 
-openwhisk:
-  enabled: false
-storage:
-  enabled: false
-observability:
-  enabled: false
-eso:
-  enabled: false
-openbao:
-  enabled: false
-controlPlaneExecutor:
-  enabled: false
-
-# Bootstrap is disabled: the validate.yaml requires apisix.enabled=true for bootstrap.
-# The e2e test runner uses gateway-bypass identity headers (x-tenant-id, etc.) directly
-# against the control-plane — no Keycloak session is needed for the API-level specs.
-# Console login is tested with E2E_CONSOLE_USER / E2E_CONSOLE_PASSWORD against Keycloak.
-bootstrap:
-  enabled: false
-
-# Public surface: provide explicit serviceName so the validate.yaml binding checks pass
-# even though APISIX is disabled.
+# Public surface: route API/realtime bindings directly to the control plane for
+# the gateway-bypass E2E path while APISIX remains part of the all-core render.
 publicSurface:
   bindings:
     api:

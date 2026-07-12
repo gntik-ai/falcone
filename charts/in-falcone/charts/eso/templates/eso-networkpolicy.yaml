@@ -1,5 +1,6 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
+{{ $openbaoNamespace := .Values.eso.caProvider.namespace | default "secret-store" }}
 metadata:
   name: eso-to-openbao
   namespace: {{ .Values.eso.namespace }}
@@ -28,7 +29,7 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: secret-store
+              kubernetes.io/metadata.name: {{ $openbaoNamespace | quote }}
       ports:
         - protocol: TCP
           port: 8200

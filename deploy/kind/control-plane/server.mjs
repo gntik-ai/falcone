@@ -1,8 +1,8 @@
 // Falcone control-plane HTTP server (kind deploy).
 //
-// The repo ships the control-plane as serverless ACTION MODULES (main(params,
-// overrides) -> {statusCode, body}) meant to run on OpenWhisk behind APISIX; it
-// has no runnable API server. This server is that missing runtime: it
+// The repo ships many control-plane capabilities as action-style modules
+// (main(params, overrides) -> {statusCode, body}) behind APISIX. This server is
+// the runnable kind runtime for those modules: it
 //   1) validates the incoming Bearer JWT against the Keycloak realm JWKS,
 //   2) derives a TRUSTED identity (callerContext + x-* headers) from the verified
 //      claims (so the request body can never spoof identity),

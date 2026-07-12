@@ -9,89 +9,71 @@ dependencies:
     alias: apisix
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: apisix.enabled
   - name: component-wrapper
     alias: keycloak
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: keycloak.enabled
   - name: component-wrapper
     alias: postgresql
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: postgresql.enabled
-  # Dedicated pgvector Postgres (add-pgvector-image-for-vector-search, #602) — an OPT-IN dedicated
-  # Postgres StatefulSet on the pgvector/pgvector image, for the dedicated-DB tenants that enable the
-  # `vector` extension for KNN search. The shared `postgresql` (bitnami) instance deliberately lacks
-  # pgvector (postgres-applier rejects CREATE EXTENSION vector with an actionable message), so vector
-  # is a dedicated-DB capability by design. Disabled by default (operator/eval profiles opt in).
+  # Dedicated pgvector Postgres (add-pgvector-image-for-vector-search, #602) — core dedicated
+  # Postgres StatefulSet on the pgvector/pgvector image.
   - name: component-wrapper
     alias: postgresqlVector
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: postgresqlVector.enabled
   # DocumentDB engine (FerretDB document-store backend) — dedicated Postgres 17
-  # StatefulSet rendered by the generic component-wrapper, gated by documentdb.enabled.
+  # StatefulSet rendered by the generic component-wrapper.
   # See add-ferretdb-documentdb-engine. The document store; the legacy MongoDB server was removed.
   - name: component-wrapper
     alias: documentdb
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: documentdb.enabled
   # FerretDB gateway — stateless MongoDB-wire-protocol proxy in front of the
   # documentdb engine, rendered by the generic component-wrapper (Deployment),
-  # gated by ferretdb.enabled (default false). See add-ferretdb-gateway. DEPENDS ON
-  # documentdb (engine must be initialised before the gateway connects).
+  # always installed as part of the core baseline. See add-ferretdb-gateway.
+  # DEPENDS ON documentdb (engine must be initialised before the gateway connects).
   - name: component-wrapper
     alias: ferretdb
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: ferretdb.enabled
   - name: component-wrapper
     alias: kafka
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: kafka.enabled
   - name: component-wrapper
     alias: observability
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: observability.enabled
   - name: component-wrapper
     alias: controlPlane
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: controlPlane.enabled
   - name: component-wrapper
     alias: controlPlaneExecutor
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: controlPlaneExecutor.enabled
   - name: component-wrapper
     alias: webConsole
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: webConsole.enabled
   - name: component-wrapper
     alias: workflowWorker
     version: 0.2.0
     repository: file://./charts/component-wrapper
-    condition: workflowWorker.enabled
   - name: eso
     version: 0.1.0
     repository: file://./charts/eso
-    condition: eso.enabled
   - name: openbao
     version: 0.1.0
     repository: file://./charts/openbao
-    condition: openbao.enabled
   # SeaweedFS HA object-storage tier (master/volume/filer/S3 gateway) — the
   # default-active object store (the bundled MinIO storage component was removed
   # in the MinIO -> SeaweedFS migration, ADR-13). First remote sub-chart dependency
-  # in this umbrella; gated by seaweedfs.enabled. Version pinned to the chart that
-  # ships SeaweedFS appVersion 4.33 (validated by the add-seaweedfs-storage-adr-spike
-  # #431 evidence). See add-seaweedfs-deployment.
+  # in this umbrella. Version pinned to the chart that ships SeaweedFS appVersion
+  # 4.33 (validated by the add-seaweedfs-storage-adr-spike #431 evidence). See
+  # add-seaweedfs-deployment.
   - name: seaweedfs
     version: 4.33.0
     repository: https://seaweedfs.github.io/seaweedfs/helm
-    condition: seaweedfs.enabled

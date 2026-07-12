@@ -1,4 +1,3 @@
-{{- if .Values.observability.enabled }}
 {{- /*
   RBAC for the Prometheus Kubernetes pod service-discovery scrape job
   (add-deploy-completeness-cluster, #562). The widened scrape config
@@ -9,12 +8,12 @@
   a ClusterRole) — discovery is restricted to this release's namespace, so Prometheus
   never sees pods in other namespaces/tenants. Bound to the observability SA.
 */ -}}
-{{- $saName := default (printf "%s-observability" .Release.Name) .Values.observability.serviceAccount.name -}}
+{{- $saName := include "in-falcone.componentServiceAccountName" (dict "root" . "component" "observability") -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ .Release.Name }}-prometheus-pod-discovery
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
     in-falcone.io/component: observability
@@ -28,7 +27,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ .Release.Name }}-prometheus-pod-discovery
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
     in-falcone.io/component: observability
@@ -39,5 +38,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ $saName }}
-    namespace: {{ .Values.global.namespace }}
-{{- end }}
+    namespace: {{ .Release.Namespace }}

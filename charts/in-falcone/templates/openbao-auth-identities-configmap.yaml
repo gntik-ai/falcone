@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "in-falcone.openbaoAuthIdentitiesConfigMapName" . }}
+  namespace: {{ include "in-falcone.openbaoNamespace" . }}
+  labels:
+    {{- include "in-falcone.labels" . | nindent 4 }}
+    in-falcone.io/component: openbao
+data:
+  platform-service-account-names: {{ list (include "in-falcone.componentServiceAccountName" (dict "root" . "component" "controlPlane")) (include "in-falcone.componentServiceAccountName" (dict "root" . "component" "controlPlaneExecutor")) (include "in-falcone.componentServiceAccountName" (dict "root" . "component" "workflowWorker")) (include "in-falcone.bootstrapServiceAccountName" .) | join "," | quote }}
+  workspace-secrets-service-account-names: {{ list (include "in-falcone.componentServiceAccountName" (dict "root" . "component" "controlPlane")) (include "in-falcone.componentServiceAccountName" (dict "root" . "component" "controlPlaneExecutor")) | join "," | quote }}
+  gateway-service-account-name: {{ include "in-falcone.componentServiceAccountName" (dict "root" . "component" "apisix") | quote }}
+  iam-service-account-name: {{ include "in-falcone.componentServiceAccountName" (dict "root" . "component" "keycloak") | quote }}

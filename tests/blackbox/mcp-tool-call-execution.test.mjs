@@ -20,9 +20,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createMcpEngine } from '../../apps/control-plane/src/runtime/mcp-engine.mjs';
+import { BASE_SCOPE } from '../../apps/control-plane/src/mcp-official-catalog.mjs';
 
-const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app' };
+const A = { tenantId: 'ten-a', workspaceId: 'ws-a', actorId: 'actor-a', roleName: 'falcone_app', scopes: [BASE_SCOPE] };
 const SELF = 'http://exec.local';
+const TEST_DIGEST = `sha256:${'b'.repeat(64)}`;
 
 // A capturing fake runtime self-call that mirrors the real executor: the root `/` returns the
 // executor INDEX (`{"service":"in-falcone-control-plane"}`) — the exact symptom of the bug — while a
@@ -42,7 +44,7 @@ function captureFetch() {
 
 function enginePair() {
   const fetchImpl = captureFetch();
-  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl });
+  const e = createMcpEngine({ selfBaseUrl: SELF, gatewayBaseUrl: 'https://gw.local', fetchImpl, runtimeImageDigest: TEST_DIGEST });
   return { e, fetchImpl };
 }
 
@@ -53,6 +55,13 @@ async function publishInstant(e, resources) {
   await e.executeMcp({ operation: 'curate_server', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { decisions: {} } });
   await e.executeMcp({ operation: 'publish_version', identity: A, workspaceId: A.workspaceId, serverId: sid, version: 'v1', body: { version: 'v1' } });
   return sid;
+}
+
+async function identityForTool(e, sid, toolName) {
+  const view = await e.executeMcp({ operation: 'get_server', identity: A, workspaceId: A.workspaceId, serverId: sid });
+  const tool = view.tools.find((t) => t.name === toolName);
+  assert.ok(tool, `expected published tool ${toolName}`);
+  return { ...A, scopes: [BASE_SCOPE, tool.scope].filter(Boolean) };
 }
 
 const PG = { database: 'app', name: 'public', tables: [{ name: 'orders', columns: [{ name: 'id', type: 'bigint' }, { name: 'total', type: 'numeric' }] }] };
@@ -79,7 +88,8 @@ test('bbx-mcp-call-02: query_<table> self-calls GET …/tables/<t>/rows', async 
 test('bbx-mcp-call-03: insert_<table> self-calls POST …/rows with body {row:{...}}', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publishInstant(e, { postgres: PG });
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'insert_orders', arguments: { workspaceId: A.workspaceId, row: { total: 9 } } } });
+  const identity = await identityForTool(e, sid, 'insert_orders');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'insert_orders', arguments: { workspaceId: A.workspaceId, row: { total: 9 } } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
   assert.equal(c.path, '/v1/postgres/workspaces/ws-a/data/app/schemas/public/tables/orders/rows');
@@ -89,7 +99,8 @@ test('bbx-mcp-call-03: insert_<table> self-calls POST …/rows with body {row:{.
 test('bbx-mcp-call-04: invoke_<fn> self-calls POST …/actions/<name>/invocations', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publishInstant(e, { functions: [{ id: 'fn1', name: 'resize' }] });
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'invoke_resize', arguments: { payload: { w: 32 } } } });
+  const identity = await identityForTool(e, sid, 'invoke_resize');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'invoke_resize', arguments: { payload: { w: 32 } } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
   assert.equal(c.path, '/v1/functions/workspaces/ws-a/actions/resize/invocations');
@@ -99,7 +110,8 @@ test('bbx-mcp-call-04: invoke_<fn> self-calls POST …/actions/<name>/invocation
 test('bbx-mcp-call-05: storage put self-calls PUT /v1/storage/buckets/<id>/objects/<key>', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publishInstant(e, { storage: [{ name: 'media', id: 'bkt-media' }] });
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'put_object_media', arguments: { key: 'a/b.txt', content: 'hi' } } });
+  const identity = await identityForTool(e, sid, 'put_object_media');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'put_object_media', arguments: { key: 'a/b.txt', content: 'hi' } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'PUT');
   assert.equal(c.path, '/v1/storage/buckets/bkt-media/objects/a%2Fb.txt');
@@ -109,7 +121,8 @@ test('bbx-mcp-call-05: storage put self-calls PUT /v1/storage/buckets/<id>/objec
 test('bbx-mcp-call-06: publish_event self-calls POST …/topics/<topic>/publish (topic from args)', async () => {
   const { e, fetchImpl } = enginePair();
   const sid = await publishInstant(e, { events: [{ name: 'orders.created' }] });
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'publish_event', arguments: { topic: 'orders.created', payload: { id: 1 } } } });
+  const identity = await identityForTool(e, sid, 'publish_event');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'publish_event', arguments: { topic: 'orders.created', payload: { id: 1 } } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
   assert.equal(c.path, '/v1/events/workspaces/ws-a/topics/orders.created/publish');
@@ -120,10 +133,11 @@ test('bbx-mcp-call-07: official create_workspace self-calls the real control-pla
   const { e, fetchImpl } = enginePair();
   const created = await e.executeMcp({ operation: 'create_server', identity: A, workspaceId: A.workspaceId, body: { name: 'plat', source: 'official' } });
   const sid = created.serverId;
-  // Grant the mutating scope so the publish gate accepts the official tools.
+  // Invocation grants are caller-scoped; publication only makes the hosted server connectable.
   await e.executeMcp({ operation: 'curate_server', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { decisions: {} } });
   await e.executeMcp({ operation: 'publish_version', identity: A, workspaceId: A.workspaceId, serverId: sid, version: 'v1', body: { version: 'v1' } });
-  await e.executeMcp({ operation: 'call_tool', identity: A, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_workspace', arguments: { slug: 'new-ws' } } });
+  const identity = await identityForTool(e, sid, 'create_workspace');
+  await e.executeMcp({ operation: 'call_tool', identity, workspaceId: A.workspaceId, serverId: sid, body: { name: 'create_workspace', arguments: { slug: 'new-ws' } } });
   const c = fetchImpl.calls.at(-1);
   assert.equal(c.method, 'POST');
   // The served route is tenant-scoped (#642 retarget); {tenantId} is filled from the credential.

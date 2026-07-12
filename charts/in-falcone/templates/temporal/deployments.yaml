@@ -1,4 +1,3 @@
-{{- if .Values.temporal.enabled }}
 {{- $root := . -}}
 {{- $t := .Values.temporal -}}
 {{- /*
@@ -152,5 +151,4 @@ spec:
             name: {{ include "in-falcone.temporal.fullname" $root }}-config
         - name: runtime
           emptyDir: {}
-{{- end }}
 {{- end }}

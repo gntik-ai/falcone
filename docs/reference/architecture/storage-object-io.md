@@ -65,8 +65,9 @@ secret never appears** in the URL or the response (only the derived HMAC signatu
 ### `STORAGE_S3_PUBLIC_ENDPOINT` (important operator caveat)
 
 The control plane reaches the S3 gateway over the **in-cluster** ClusterIP (`STORAGE_S3_ENDPOINT`,
-e.g. `http://falcone-storage:8333`), which is **not resolvable from outside the cluster**. A presigned
-URL signed against that internal host would be useless to an external client.
+e.g. `http://<release>-seaweedfs-s3:8333`; the default release renders
+`http://falcone-seaweedfs-s3:8333`), which is **not resolvable from outside the cluster**.
+A presigned URL signed against that internal host would be useless to an external client.
 
 Set **`STORAGE_S3_PUBLIC_ENDPOINT`** to the externally-routable S3 gateway address; presigned URLs are
 then signed and built against that host while the control plane keeps using the internal endpoint for

@@ -1,4 +1,8 @@
-{{- if .Values.bootstrap.enabled }}
+{{- $containerSecurityContext := deepCopy (default (dict) .Values.bootstrap.job.securityContext) -}}
+{{- if (.Values.global.podSecurity.openshiftRestricted | default false) -}}
+  {{- $_ := unset $containerSecurityContext "runAsUser" -}}
+  {{- $_ := unset $containerSecurityContext "runAsGroup" -}}
+{{- end -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -90,7 +94,7 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.bootstrap.job.securityContext }}
+          {{- with $containerSecurityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -133,7 +137,7 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.bootstrap.job.securityContext }}
+          {{- with $containerSecurityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -159,4 +163,3 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-{{- end }}

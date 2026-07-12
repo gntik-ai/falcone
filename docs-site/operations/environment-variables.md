@@ -63,11 +63,13 @@ The Flows API is registered **only when `TEMPORAL_ADDRESS` is set** (the executo
 
 ## MCP server hosting *(Preview)*
 
-The MCP management API (`/v1/mcp`) is registered **only when `MCP_ENABLED=true`**.
+The MCP management API (`/v1/mcp`) is part of the core install; the chart sets
+`MCP_ENABLED=true`. Setting it to `false` is a local diagnostic override, not a supported
+fresh-install baseline.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MCP_ENABLED` | — | Set to `true` to serve the MCP management API |
+| `MCP_ENABLED` | `true` in Helm values | Runtime gate for the MCP management API |
 | `MCP_SELF_BASE_URL` | `http://127.0.0.1:$PORT` | Base URL the engine self-calls to mediate tool calls |
 | `MCP_GATEWAY_BASE_URL` | (self URL) | Public base URL used to compute a server's endpoint |
 | `MCP_RUNTIME_IMAGE` | — | Platform MCP runtime image (digest-pinned for the registry) |
@@ -85,14 +87,16 @@ When these are set, Bearer JWTs are verified locally and their claims become the
 
 ## Where values come from in a chart install
 
-`values.yaml → config.secretRefs` maps existing Kubernetes Secrets to the credentials above:
+`values.yaml → config.secretRefs` maps Kubernetes Secrets to the credentials above. On fresh installs
+the pre-install credential bootstrap hook creates/adopts these Secrets inside the cluster, and OpenBao
+plus ESO reconcile the same keys after the secret backend is ready:
 
 | `secretRefs` entry | Keys | Feeds |
 | --- | --- | --- |
-| `postgresCredentials` | `username`, `password`, `database` | `PG*` |
-| `mongoCredentials` | `username`, `password`, `database` | `MONGO_*` |
-| `kafkaCredentials` | `username`, `password` | Kafka |
-| `objectStorageCredentials` | `access-key`, `secret-key` | Storage |
+| `postgresCredentials` | `POSTGRESQL_USERNAME`, `POSTGRESQL_PASSWORD`, `POSTGRESQL_POSTGRES_PASSWORD` | `PG*` |
+| `mongoCredentials` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | `MONGO_*` |
+| `kafkaCredentials` | `KAFKA_CFG_NODE_ID`, `KAFKA_CFG_PROCESS_ROLES`, `KAFKA_CFG_CONTROLLER_LISTENER_NAMES`, `KAFKA_CFG_CONTROLLER_QUORUM_VOTERS`, `KAFKA_CFG_LISTENERS`, `KAFKA_CFG_ADVERTISED_LISTENERS`, `KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP` | Kafka |
+| `objectStorageCredentials` | `s3_access_key`, `s3_secret_key` | Storage |
 | `identityClient` | `client-id`, `client-secret` | Keycloak client |
 | `gatewayTls` | `tls.crt`, `tls.key` | Gateway TLS |
 

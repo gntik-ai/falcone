@@ -1,14 +1,77 @@
 {{- define "in-falcone.validate" -}}
-{{- $components := list "apisix" "keycloak" "postgresql" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "webConsole" -}}
+{{- $components := list "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker" -}}
+{{- $coreServiceAliases := list "bootstrap" "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "seaweedfs" "grafana" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker" "eso" "openbao" "temporal" "mcp" -}}
 {{- $supportedExposureKinds := list "Ingress" "LoadBalancer" "Route" -}}
+{{- range $alias := $coreServiceAliases }}
+  {{- $block := index $.Values $alias -}}
+  {{- if and (kindIs "map" $block) (hasKey $block "enabled") -}}
+    {{- fail (printf "%s.enabled is no longer supported: Falcone platform services are core and cannot be disabled individually" $alias) -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (kindIs "map" .Values.controlPlane.functionExecutor) (hasKey .Values.controlPlane.functionExecutor "enabled") -}}
+  {{- fail "controlPlane.functionExecutor.enabled is no longer supported: function executor RBAC is core" -}}
+{{- end -}}
+{{- if and (kindIs "map" .Values.temporal.ui) (hasKey .Values.temporal.ui "enabled") -}}
+  {{- fail "temporal.ui.enabled is no longer supported: Temporal web is a core operator surface" -}}
+{{- end -}}
+{{- range $role := list "frontend" "history" "matching" "worker" }}
+  {{- $cfg := index $.Values.temporal $role | default dict -}}
+  {{- if not (kindIs "map" $cfg) -}}
+    {{- fail (printf "temporal.%s must be an object with replicas >= 1" $role) -}}
+  {{- end -}}
+  {{- if and (kindIs "map" $cfg) (hasKey $cfg "enabled") -}}
+    {{- fail (printf "temporal.%s.enabled is no longer supported: Temporal server roles are core" $role) -}}
+  {{- end -}}
+  {{- if lt (int ($cfg.replicas | default 0)) 1 -}}
+    {{- fail (printf "temporal.%s.replicas must be at least 1: Temporal server roles are core" $role) -}}
+  {{- end -}}
+{{- end -}}
+{{- $openbaoCore := .Values.openbao.openbao | default dict -}}
+{{- if not (kindIs "map" $openbaoCore) -}}
+  {{- fail "openbao.openbao must be an object with replicas >= 1" -}}
+{{- end -}}
+{{- if and (kindIs "map" $openbaoCore) (hasKey $openbaoCore "enabled") -}}
+  {{- fail "openbao.openbao.enabled is no longer supported: the OpenBao StatefulSet is core" -}}
+{{- end -}}
+{{- if lt (int ($openbaoCore.replicas | default 0)) 1 -}}
+  {{- fail "openbao.openbao.replicas must be at least 1: OpenBao is a core secrets workload" -}}
+{{- end -}}
+{{- range $role := list "master" "volume" "filer" "s3" }}
+  {{- $cfg := index $.Values.seaweedfs $role | default dict -}}
+  {{- if not (kindIs "map" $cfg) -}}
+    {{- fail (printf "seaweedfs.%s must be an object with enabled=true and replicas >= 1" $role) -}}
+  {{- end -}}
+  {{- if not ($cfg.enabled | default true) -}}
+    {{- fail (printf "seaweedfs.%s.enabled=false is no longer supported: SeaweedFS %s is a core storage role" $role $role) -}}
+  {{- end -}}
+  {{- if lt (int ($cfg.replicas | default 0)) 1 -}}
+    {{- fail (printf "seaweedfs.%s.replicas must be at least 1: SeaweedFS %s is a core storage role" $role $role) -}}
+  {{- end -}}
+{{- end -}}
 {{- range $components }}
   {{- $component := index $.Values . -}}
-  {{- if and $component.enabled (not $component.image.repository) -}}
-    {{- fail (printf "%s.image.repository is required when the component is enabled" .) -}}
+  {{- if not $component.image.repository -}}
+    {{- fail (printf "%s.image.repository is required for core platform services" .) -}}
   {{- end -}}
-  {{- if and $component.enabled $component.persistence.enabled (not $component.persistence.existingClaim) (not $component.persistence.size) -}}
+  {{- if lt (int ($component.replicas | default 0)) 1 -}}
+    {{- fail (printf "%s.replicas must be at least 1: Falcone platform services are core and must render a running workload" .) -}}
+  {{- end -}}
+  {{- if and $component.persistence.enabled (not $component.persistence.existingClaim) (not $component.persistence.size) -}}
     {{- fail (printf "%s.persistence.size is required when persistence is enabled without existingClaim" .) -}}
   {{- end -}}
+  {{- if and (not $component.service.enabled) (has . (list "apisix" "keycloak" "postgresql" "postgresqlVector" "documentdb" "ferretdb" "kafka" "observability" "controlPlane" "controlPlaneExecutor" "webConsole" "workflowWorker")) -}}
+    {{- fail (printf "%s.service.enabled=false would make a core platform service unreachable" .) -}}
+  {{- end -}}
+  {{- $sa := $component.serviceAccount | default dict -}}
+  {{- if and (hasKey $sa "create") (eq $sa.create false) (eq ($sa.name | default "") "") -}}
+    {{- fail (printf "%s.serviceAccount.name is required when %s.serviceAccount.create=false; core ServiceAccounts must not implicitly fall back to the default ServiceAccount" . .) -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (kindIs "map" .Values.documentdb.initJob) (hasKey .Values.documentdb.initJob "enabled") (not .Values.documentdb.initJob.enabled) -}}
+  {{- fail "documentdb.initJob.enabled=false is no longer supported: DocumentDB extension initialization is core" -}}
+{{- end -}}
+{{- if and (hasKey .Values.bootstrap.serviceAccount "create") (eq .Values.bootstrap.serviceAccount.create false) (eq (.Values.bootstrap.serviceAccount.name | default "") "") -}}
+  {{- fail "bootstrap.serviceAccount.name is required when bootstrap.serviceAccount.create=false; core ServiceAccounts must not implicitly fall back to the default ServiceAccount" -}}
 {{- end -}}
 {{- /* finding D8/C.7: refuse to render any legacy migration-era component. FerretDB superseded
    MongoDB, SeaweedFS superseded MinIO, and Knative superseded OpenWhisk; a values stanza for any
@@ -42,8 +105,8 @@
 {{- end -}}
 {{- range $surface, $binding := .Values.publicSurface.bindings -}}
   {{- $component := index $.Values $binding.component -}}
-  {{- if and (not $binding.serviceName) (not $component.enabled) -}}
-    {{- fail (printf "publicSurface.bindings.%s needs either an enabled component or an explicit serviceName" $surface) -}}
+  {{- if and (not $binding.serviceName) (not $component) -}}
+    {{- fail (printf "publicSurface.bindings.%s references missing component %s" $surface $binding.component) -}}
   {{- end -}}
   {{- if and (eq $.Values.platform.network.exposureKind "LoadBalancer") $binding.serviceName -}}
     {{- fail (printf "publicSurface.bindings.%s cannot use explicit serviceName when exposureKind=LoadBalancer" $surface) -}}
@@ -79,19 +142,49 @@
 {{- if eq (len (.Values.gatewayPolicy.internalRequests.requiredHeaders | default (list))) 0 -}}
   {{- fail "gatewayPolicy.internalRequests.requiredHeaders must declare the hardened downstream trust headers" -}}
 {{- end -}}
-{{- if .Values.bootstrap.enabled -}}
-  {{- if eq .Values.bootstrap.lock.name .Values.bootstrap.markers.name -}}
-    {{- fail "bootstrap.lock.name and bootstrap.markers.name must be different resources" -}}
+{{- if eq .Values.bootstrap.lock.name .Values.bootstrap.markers.name -}}
+  {{- fail "bootstrap.lock.name and bootstrap.markers.name must be different resources" -}}
+{{- end -}}
+{{- if eq (len .Values.bootstrap.secretResolution.sources) 0 -}}
+  {{- fail "bootstrap.secretResolution.sources must define the required credential inputs" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.namespace | default "eso-system") (.Values.openbao.eso.namespace | default "eso-system") -}}
+  {{- fail "eso.eso.namespace and openbao.eso.namespace must match; ESO/OpenBao namespace wiring is a single install contract" -}}
+{{- end -}}
+{{- $externalSecretsValues := index .Values.eso "external-secrets" | default (dict) -}}
+{{- if lt (int ($externalSecretsValues.replicaCount | default 0)) 1 -}}
+  {{- fail "eso.external-secrets.replicaCount must be at least 1: the ESO controller is core" -}}
+{{- end -}}
+{{- if not ($externalSecretsValues.installCRDs | default true) -}}
+  {{- fail "eso.external-secrets.installCRDs=false is no longer supported: fresh installs must provision ESO CRDs" -}}
+{{- end -}}
+{{- range $role := list "webhook" "certController" }}
+  {{- $cfg := index $externalSecretsValues $role | default dict -}}
+  {{- if not (kindIs "map" $cfg) -}}
+    {{- fail (printf "eso.external-secrets.%s must be an object with create=true and replicaCount >= 1" $role) -}}
   {{- end -}}
-  {{- if not .Values.keycloak.enabled -}}
-    {{- fail "bootstrap requires keycloak.enabled=true for the default realm/superadmin flow" -}}
+  {{- if not ($cfg.create | default true) -}}
+    {{- fail (printf "eso.external-secrets.%s.create=false is no longer supported: ESO %s is core" $role $role) -}}
   {{- end -}}
-  {{- if not .Values.apisix.enabled -}}
-    {{- fail "bootstrap requires apisix.enabled=true for the default APISIX route reconciliation flow" -}}
+  {{- if lt (int ($cfg.replicaCount | default 0)) 1 -}}
+    {{- fail (printf "eso.external-secrets.%s.replicaCount must be at least 1: ESO %s is core" $role $role) -}}
   {{- end -}}
-  {{- if eq (len .Values.bootstrap.secretResolution.sources) 0 -}}
-    {{- fail "bootstrap.secretResolution.sources must define the required credential inputs" -}}
-  {{- end -}}
+{{- end -}}
+{{- if ne ($externalSecretsValues.namespaceOverride | default .Release.Namespace) (.Values.eso.eso.namespace | default "eso-system") -}}
+  {{- fail "eso.external-secrets.namespaceOverride must match eso.eso.namespace so ESO pods run in the namespace protected by ESO NetworkPolicy and OpenBao auth" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.serviceAccountName | default "eso-openbao-auth") (.Values.openbao.eso.serviceAccountName | default "eso-openbao-auth") -}}
+  {{- fail "eso.eso.serviceAccountName and openbao.eso.serviceAccountName must match" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.tokenTTL | default "24h") (.Values.openbao.eso.tokenTTL | default "24h") -}}
+  {{- fail "eso.eso.tokenTTL and openbao.eso.tokenTTL must match" -}}
+{{- end -}}
+{{- if ne (.Values.eso.eso.caProvider.namespace | default "secret-store") (.Values.openbao.openbao.namespace | default "secret-store") -}}
+  {{- fail "eso.eso.caProvider.namespace must match openbao.openbao.namespace" -}}
+{{- end -}}
+{{- $expectedOpenBaoAddress := printf "https://openbao.%s.svc.cluster.local:8200" (.Values.openbao.openbao.namespace | default "secret-store") -}}
+{{- if ne (.Values.eso.eso.vaultAddress | default $expectedOpenBaoAddress) $expectedOpenBaoAddress -}}
+  {{- fail (printf "eso.eso.vaultAddress must point at the configured OpenBao namespace (%s)" $expectedOpenBaoAddress) -}}
 {{- end -}}
 {{- if and .Release.IsUpgrade .Values.deployment.upgrade.allowInPlace -}}
   {{- $currentVersion := .Values.deployment.upgrade.currentVersion | default "" -}}

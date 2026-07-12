@@ -18,8 +18,10 @@
 // function deploy resolves the actual value to inject as env.
 //
 // TLS: on kind, OpenBao uses a self-signed CA (the openbao-tls-bootstrap Job). The client trusts it
-// via NODE_EXTRA_CA_CERTS (mounted from the openbao-server-tls Secret) so the default global fetch
-// works — no in-code certificate handling. fetchImpl is injectable for tests (a plain-HTTP fake).
+// via NODE_EXTRA_CA_CERTS (mounted from the chart-synced client CA Secret) so the default global
+// fetch works — no in-code certificate handling. fetchImpl is injectable for tests (a plain-HTTP fake).
+
+import { readFileSync } from 'node:fs';
 
 const ENC = (s) => encodeURIComponent(String(s));
 const SECRET_ROOT = 'falcone/workspace-secrets';
@@ -49,21 +51,60 @@ function vaultError(op, path, status) {
  *   delete   → DELETE {mount}/metadata/{path}  (removes ALL versions)
  *   list     → GET    {mount}/metadata/{path}?list=true
  */
-export function createVaultKvClient({ addr, token, mount = 'secret', namespace, fetchImpl = globalThis.fetch } = {}) {
+export function createKubernetesAuthTokenProvider({
+  addr,
+  role,
+  authMount = 'kubernetes',
+  namespace,
+  serviceAccountJwtPath = '/var/run/secrets/kubernetes.io/serviceaccount/token',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (!addr) throw new TypeError('createKubernetesAuthTokenProvider requires a Vault addr');
+  if (!role) throw new TypeError('createKubernetesAuthTokenProvider requires a Kubernetes auth role');
+  const base = String(addr).replace(/\/+$/, '');
+  const mount = encodeURIComponent(String(authMount).replace(/^\/+|\/+$/g, '') || 'kubernetes');
+  let cachedToken = null;
+  let expiresAt = 0;
+
+  return async () => {
+    const now = Date.now();
+    if (cachedToken && now < expiresAt) return cachedToken;
+    const jwt = readFileSync(serviceAccountJwtPath, 'utf8').trim();
+    const res = await fetchImpl(`${base}/v1/auth/${mount}/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        ...(namespace ? { 'x-vault-namespace': namespace } : {}),
+      },
+      body: JSON.stringify({ role, jwt }),
+    });
+    if (!res.ok) throw vaultError('kubernetes-login', `auth/${authMount}/login`, res.status);
+    const json = await res.json();
+    const token = json?.auth?.client_token;
+    if (!token) throw vaultError('kubernetes-login', `auth/${authMount}/login`, 502);
+    const leaseSeconds = Number(json?.auth?.lease_duration ?? 3600);
+    cachedToken = token;
+    expiresAt = now + Math.max(60, leaseSeconds - 60) * 1000;
+    return cachedToken;
+  };
+}
+
+export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secret', namespace, fetchImpl = globalThis.fetch } = {}) {
   if (!addr) throw new TypeError('createVaultKvClient requires a Vault addr');
-  if (!token) throw new TypeError('createVaultKvClient requires a Vault token');
+  if (!token && typeof tokenProvider !== 'function') throw new TypeError('createVaultKvClient requires a Vault token or tokenProvider');
   const base = String(addr).replace(/\/+$/, '');
   const seg = (p) => String(p).split('/').filter(Boolean).map(ENC).join('/');
   const dataUrl = (p) => `${base}/v1/${ENC(mount)}/data/${seg(p)}`;
   const metaUrl = (p) => `${base}/v1/${ENC(mount)}/metadata/${seg(p)}`;
-  const headers = () => ({
-    'x-vault-token': token,
+  const headers = async () => ({
+    'x-vault-token': token || await tokenProvider(),
     ...(namespace ? { 'x-vault-namespace': namespace } : {}),
     'content-type': 'application/json',
     accept: 'application/json',
   });
-  const send = (method, u, body) => fetchImpl(u, {
-    method, headers: headers(), body: body !== undefined ? JSON.stringify(body) : undefined,
+  const send = async (method, u, body) => fetchImpl(u, {
+    method, headers: await headers(), body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   return {
@@ -239,8 +280,8 @@ export function createWorkspaceSecretStore(client) {
 
 /**
  * Build the workspace-secret store from the environment, or return null when the backend is not
- * configured — keeping the secrets feature off by default with zero behaviour change. The chart
- * injects these into the control-plane Deployment only when openbao.enabled.
+ * configured. The default chart configures BAO_ADDR plus BAO_KUBERNETES_AUTH_ROLE, so pods obtain
+ * scoped OpenBao tokens through Kubernetes auth. BAO_TOKEN remains a break-glass/test path.
  *
  * Reads the canonical OpenBao env (BAO_ADDR/BAO_TOKEN/BAO_KV_MOUNT/BAO_NAMESPACE) first, falling back
  * to the legacy Vault env (VAULT_ADDR/VAULT_TOKEN/VAULT_KV_MOUNT/VAULT_NAMESPACE) so existing
@@ -250,12 +291,22 @@ export function createWorkspaceSecretStore(client) {
 export function vaultStoreFromEnv(env = process.env, fetchImpl) {
   const addr = env.BAO_ADDR ?? env.VAULT_ADDR;
   const token = env.BAO_TOKEN ?? env.VAULT_TOKEN;
-  if (!addr || !token) return null;
+  const kubernetesRole = env.BAO_KUBERNETES_AUTH_ROLE ?? env.VAULT_KUBERNETES_AUTH_ROLE;
+  if (!addr || (!token && !kubernetesRole)) return null;
+  const namespace = env.BAO_NAMESPACE ?? env.VAULT_NAMESPACE ?? undefined;
   const client = createVaultKvClient({
     addr,
     token,
+    tokenProvider: token ? undefined : createKubernetesAuthTokenProvider({
+      addr,
+      role: kubernetesRole,
+      authMount: env.BAO_KUBERNETES_AUTH_MOUNT ?? env.VAULT_KUBERNETES_AUTH_MOUNT ?? 'kubernetes',
+      namespace,
+      serviceAccountJwtPath: env.BAO_SERVICEACCOUNT_JWT_PATH ?? env.VAULT_SERVICEACCOUNT_JWT_PATH,
+      fetchImpl,
+    }),
     mount: env.BAO_KV_MOUNT ?? env.VAULT_KV_MOUNT ?? 'secret',
-    namespace: env.BAO_NAMESPACE ?? env.VAULT_NAMESPACE ?? undefined,
+    namespace,
     fetchImpl,
   });
   return createWorkspaceSecretStore(client);

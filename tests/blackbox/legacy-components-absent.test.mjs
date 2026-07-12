@@ -23,10 +23,12 @@
  *   bbx-c7-02  no container image references a legacy component
  *   bbx-c7-03  no env value pins a legacy host; control-plane/executor point at FerretDB + SeaweedFS
  *   bbx-c7-04  the chart-level validate guard fails the render if a legacy values stanza is set
+ *   bbx-c7-05  shipped deploy/docs artifacts do not point at removed default services
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -110,4 +112,55 @@ test('bbx-c7-04: validate guard fails the render when a legacy values stanza is 
     assert.notEqual(r.status, 0, `setting a ${legacy} stanza must fail the render (guard)`);
     assert.match(r.stderr, new RegExp(`legacy component "${legacy}" must not be present`), `the guard must name the offending legacy component (${legacy})`);
   }
+});
+
+// -------------------------------------------------------------------------
+// bbx-c7-05: shipped deploy helpers/docs do not point at removed defaults
+// -------------------------------------------------------------------------
+test('bbx-c7-05: shipped deploy/docs artifacts do not reference removed default service endpoints', () => {
+  const files = [
+    'deploy/apisix/routes/scheduling.yaml',
+    'deploy/apisix/routes/webhooks.yaml',
+    'deploy/OPENSHIFT-HARBOR-REVIEW.md',
+    'deploy/kind/README.md',
+    'deploy/kind/control-plane/route-map.json',
+    'deploy/kind/control-plane/storage-handlers.mjs',
+    'deploy/kind/lan-forward.sh',
+    'deploy/kind/ui-verify-mongo.mjs',
+    'deploy/kind/ui-verify-storage.mjs',
+    'docs/reference/architecture/storage-object-io.md',
+    'docs-site/api/control-plane.md',
+    'docs-site/api/gateway.md',
+  ];
+  const forbidden = [
+    /falcone-mongodb/,
+    /in-falcone-mongodb/,
+    /falcone-storage(?:-0)?/,
+    /http:\/\/falcone-storage:8333/,
+    /minio-console/,
+    /scheduling-management\.openwhisk/,
+    /openwhisk-webhook-management/,
+    /openwhisk\.svc\.cluster\.local/,
+    /bitnamilegacy\/mongodb/,
+    /REAL MongoDB/,
+    /REAL MinIO/,
+    /Needs MinIO/,
+    /needs OpenWhisk/,
+    /mongodb,\s*kafka,\s*minio/i,
+    /Postgres\/Keycloak\/MinIO\/Mongo/,
+    /openwhisk\.enabled\s*:\s*false/i,
+    /chart still ships an?\s+[`*]*openwhisk/i,
+    /swap the OpenWhisk component/i,
+    /gateway public-surface registration in the route catalog is ongoing/i,
+    /registration in the route catalog is part of the ongoing work/i,
+  ];
+
+  const violations = [];
+  for (const rel of files) {
+    const text = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
+    for (const pattern of forbidden) {
+      if (pattern.test(text)) violations.push(`${rel}: ${pattern}`);
+    }
+  }
+  assert.deepEqual(violations, [], `removed default services must not survive in shipped deploy/docs artifacts:\n${violations.join('\n')}`);
 });

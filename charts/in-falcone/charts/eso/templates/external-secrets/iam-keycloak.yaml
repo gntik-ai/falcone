@@ -2,16 +2,54 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: iam-keycloak-credentials
-  namespace: keycloak
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
 spec:
   refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
   secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
-  target: { name: iam-keycloak-credentials, immutable: false }
+  target: { name: in-falcone-keycloak-admin, creationPolicy: Merge, immutable: false }
   data:
-    - secretKey: admin-password
+    - secretKey: username
+      remoteRef: { key: iam/keycloak, property: admin-username }
+    - secretKey: password
       remoteRef: { key: iam/keycloak, property: admin-password }
-    - secretKey: db-password
-      remoteRef: { key: iam/keycloak, property: db-password }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: iam-identity-client
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-identity-client, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: client-id
+      remoteRef: { key: iam/identity-client, property: client-id }
+    - secretKey: client-secret
+      remoteRef: { key: iam/identity-client, property: client-secret }
+    - secretKey: KC_BOOTSTRAP_ADMIN_USERNAME
+      remoteRef: { key: iam/keycloak, property: admin-username }
+    - secretKey: KC_BOOTSTRAP_ADMIN_PASSWORD
+      remoteRef: { key: iam/keycloak, property: admin-password }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: iam-superadmin
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-superadmin, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: password
+      remoteRef: { key: iam/superadmin, property: password }

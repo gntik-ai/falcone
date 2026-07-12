@@ -45,7 +45,7 @@ const SKIP = helmAvailable() ? false : { skip: 'helm binary not available on PAT
 function renderJob(extraArgs = []) {
   const r = spawnSync(
     'helm',
-    ['template', 'falcone', CHART_PATH, '-s', TEMPLATE, '--set', 'bootstrap.enabled=true', ...extraArgs],
+    ['template', 'falcone', CHART_PATH, '-s', TEMPLATE, ...extraArgs],
     { encoding: 'utf8', cwd: REPO_ROOT, maxBuffer: 64 * 1024 * 1024 },
   );
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);

@@ -1,4 +1,4 @@
-{{- if and .Values.keycloak.enabled .Values.keycloak.database.enabled }}
+{{- if .Values.keycloak.database.enabled }}
 {{- /*
   Keycloak persistent-store connection config (fix-keycloak-persistent-store).
 

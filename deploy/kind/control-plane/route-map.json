@@ -1361,7 +1361,7 @@
     "deps": ["pg"],
     "auth": "workspace_admin (publish_function)",
     "subroutes": "no",
-    "notes": "PublishFunctionWizard.tsx -> submitWizardRequest('/v1/workspaces/{ws}/functions'). functions-admin.mjs is metadata only; real function deploy needs OpenWhisk. GAP.",
+    "notes": "PublishFunctionWizard.tsx -> submitWizardRequest('/v1/workspaces/{ws}/functions'). functions-admin.mjs is metadata only; real function deploy needs the executor/Knative path. GAP.",
     "consoleUsed": true
   },
 
@@ -1759,7 +1759,7 @@
     "deps": [],
     "auth": "",
     "subroutes": "",
-    "notes": "Per the brief, only representative read endpoints listed. ALL data-plane *-admin / *-data-api control-plane modules are metadata/contract helpers with NO executable handler (handlerish:0). These families need live PG/Mongo/MinIO data sources + downstream adapters; they are GAPS for a control-plane-only server. Realtime captures DO have real provisioning-orchestrator/actions/realtime handlers (owhttp-overrides, deps.db).",
+    "notes": "Per the brief, only representative read endpoints listed. ALL data-plane *-admin / *-data-api control-plane modules are metadata/contract helpers with NO executable handler (handlerish:0). These families need live PG/FerretDB/SeaweedFS data sources + downstream adapters; they are GAPS for a control-plane-only server. Realtime captures DO have real provisioning-orchestrator/actions/realtime handlers (owhttp-overrides, deps.db).",
     "consoleUsed": false
   },
   {
@@ -1801,7 +1801,7 @@
     "deps": ["minio"],
     "auth": "workspace scope",
     "subroutes": "no",
-    "notes": "ConsoleStoragePage (25 routes). storage-admin.mjs metadata only. Needs MinIO/S3. GAP (representative).",
+    "notes": "ConsoleStoragePage (25 routes). storage-admin.mjs is metadata only. Needs SeaweedFS/S3. GAP (representative).",
     "consoleUsed": true
   },
   {
@@ -1815,7 +1815,7 @@
     "deps": ["pg"],
     "auth": "workspace scope",
     "subroutes": "no",
-    "notes": "ConsoleFunctionsPage (55 routes). functions-admin.mjs metadata only; real activations need OpenWhisk. This is the CONSOLE_BACKEND_WORKFLOW_ROUTE_ID. GAP (representative).",
+    "notes": "ConsoleFunctionsPage (55 routes). functions-admin.mjs metadata only; real activations need the executor/Knative path. This is the CONSOLE_BACKEND_WORKFLOW_ROUTE_ID. GAP (representative).",
     "consoleUsed": true
   },
   {

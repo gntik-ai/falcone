@@ -49,6 +49,28 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 {{- end -}}
 {{- end -}}
 
+{{- define "in-falcone.componentServiceAccountName" -}}
+{{- $root := .root -}}
+{{- $componentName := .component -}}
+{{- $component := index $root.Values $componentName -}}
+{{- $serviceAccount := $component.serviceAccount | default dict -}}
+{{- $create := true -}}
+{{- if hasKey $serviceAccount "create" -}}
+{{- $create = $serviceAccount.create -}}
+{{- end -}}
+{{- $componentId := $component.wrapper.componentId | default $componentName -}}
+{{- $defaultName := printf "%s-%s" $root.Release.Name $componentId | trunc 63 | trimSuffix "-" -}}
+{{- if $create -}}
+{{- default $defaultName $serviceAccount.name -}}
+{{- else -}}
+{{- default "default" $serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "in-falcone.openbaoAuthIdentitiesConfigMapName" -}}
+{{- .Values.openbao.openbao.authIdentitiesConfigMapName | default "openbao-auth-identities" -}}
+{{- end -}}
+
 {{- define "in-falcone.bootstrapPayloadConfigMapName" -}}
 {{- printf "%s-bootstrap-payload" (include "in-falcone.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -67,6 +89,22 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 
 {{- define "in-falcone.apisixAdminServiceName" -}}
 {{- printf "%s-apisix-admin" (include "in-falcone.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "in-falcone.openbaoNamespace" -}}
+{{- .Values.openbao.openbao.namespace | default "secret-store" -}}
+{{- end -}}
+
+{{- define "in-falcone.openbaoAddress" -}}
+{{- $port := 8200 -}}
+{{- with .Values.openbao.openbao.service -}}
+{{- $port = .port | default 8200 -}}
+{{- end -}}
+{{- printf "https://openbao.%s.svc.cluster.local:%v" (include "in-falcone.openbaoNamespace" .) $port -}}
+{{- end -}}
+
+{{- define "in-falcone.runtimeEnvConfigMapName" -}}
+{{- .Values.config.configMapNames.runtimeEnv | default "in-falcone-runtime-env" -}}
 {{- end -}}
 
 {{- define "in-falcone.bootstrapOneShotHash" -}}
@@ -107,6 +145,49 @@ temporal.io/role: {{ .role }}
 app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/name: temporal-{{ .role }}
 temporal.io/role: {{ .role }}
+{{- end -}}
+
+{{- define "in-falcone.normalizeRepository" -}}
+{{- $repository := .repository -}}
+{{- $globalRegistry := trimSuffix "/" (default "" .Values.global.imageRegistry) -}}
+{{- if or (eq $globalRegistry "") (eq $repository $globalRegistry) (hasPrefix (printf "%s/" $globalRegistry) $repository) -}}
+{{- $repository -}}
+{{- else -}}
+{{- $segments := splitList "/" $repository -}}
+{{- $first := first $segments -}}
+{{- $hasRegistry := or (contains "." $first) (contains ":" $first) (eq $first "localhost") -}}
+{{- if and $hasRegistry (gt (len $segments) 1) -}}
+{{- printf "%s/%s" $globalRegistry (join "/" (rest $segments)) -}}
+{{- else -}}
+{{- printf "%s/%s" $globalRegistry $repository -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "in-falcone.imageNameWithTag" -}}
+{{- $repo := include "in-falcone.normalizeRepository" (dict "Values" .root.Values "repository" .image.repository) -}}
+{{- if .image.tag -}}
+{{- printf "%s:%s" $repo .image.tag -}}
+{{- else -}}
+{{- $repo -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "in-falcone.imagePullSecrets" -}}
+{{- $secrets := list -}}
+{{- range (default (list) .Values.global.imagePullSecrets) -}}
+  {{- $secrets = append $secrets (.name | default .) -}}
+{{- end -}}
+{{- range (default (list) .Values.global.privateRegistry.pullSecretNames) -}}
+  {{- $secrets = append $secrets . -}}
+{{- end -}}
+{{- $secrets = $secrets | uniq -}}
+{{- if gt (len $secrets) 0 }}
+imagePullSecrets:
+{{- range $secrets }}
+  - name: {{ . }}
+{{- end }}
+{{- end -}}
 {{- end -}}
 
 {{- /* Registry rewrite — mirrors component-wrapper.normalizeRepository so
@@ -165,7 +246,7 @@ imagePullSecrets:
 - name: DB_PORT
   value: {{ $p.port | quote }}
 - name: POSTGRES_SEEDS
-  value: {{ $p.host | quote }}
+  value: {{ tpl $p.host . | quote }}
 - name: POSTGRES_USER
   value: {{ $p.user | quote }}
 - name: POSTGRES_PWD

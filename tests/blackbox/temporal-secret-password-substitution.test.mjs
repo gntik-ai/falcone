@@ -20,7 +20,7 @@
  *   bbx-623-01  existingSecret → ConfigMap renders the placeholder, not plaintext, not ${POSTGRES_PWD}
  *   bbx-623-02  the server start wrapper substitutes __TEMPORAL_DB_PASSWORD__ from POSTGRES_PWD
  *   bbx-623-03  POSTGRES_PWD on each role Deployment is sourced from the existingSecret via secretKeyRef
- *   bbx-623-04  default (no existingSecret) renders the inline password and NO placeholder (no regression)
+ *   bbx-623-04  default core install uses the canonical Secret and never renders plaintext
  *   bbx-623-05  helm lint exits 0 with existingSecret configured
  */
 import test from 'node:test';
@@ -45,8 +45,7 @@ function helm(args) {
   return spawnSync('helm', args, { encoding: 'utf8', cwd: REPO_ROOT, maxBuffer: 64 * 1024 * 1024 });
 }
 function showOnly(file, extra = []) {
-  const r = helm(['template', 'falcone', CHART_PATH, '--set', 'temporal.enabled=true',
-    ...extra, '--show-only', `templates/temporal/${file}`]);
+  const r = helm(['template', 'falcone', CHART_PATH, ...extra, '--show-only', `templates/temporal/${file}`]);
   assert.equal(r.status, 0, `helm template ${file} must exit 0.\nstderr: ${r.stderr}`);
   return r.stdout;
 }
@@ -84,14 +83,15 @@ test('bbx-623-03 POSTGRES_PWD is sourced from the existingSecret via secretKeyRe
   assert.match(dep, new RegExp(`key:\\s*"?${KEY}"?`), 'POSTGRES_PWD must use the configured passwordSecretKey');
 });
 
-test('bbx-623-04 default (no existingSecret) renders the inline password, no placeholder', SKIP, () => {
-  const cm = showOnly('config.yaml'); // no existingSecret
-  assert.match(cm, /password:\s*"temporal"/, 'the dev default renders the inline password');
-  assert.doesNotMatch(cm, /__TEMPORAL_DB_PASSWORD__/,
-    'no placeholder is emitted when existingSecret is not configured (no regression)');
+test('bbx-623-04 default core install uses the canonical Secret and never renders plaintext', SKIP, () => {
+  const cm = showOnly('config.yaml');
+  assert.match(cm, /password:\s*"__TEMPORAL_DB_PASSWORD__"/,
+    'the core default must use the placeholder backed by the canonical Secret');
+  assert.doesNotMatch(cm, /password:\s*"temporal"/,
+    'the default install must not leak the historical inline password into the ConfigMap');
 });
 
 test('bbx-623-05 helm lint exits 0 with existingSecret configured', SKIP, () => {
-  const r = helm(['lint', CHART_PATH, '--set', 'temporal.enabled=true', ...withSecret]);
+  const r = helm(['lint', CHART_PATH, ...withSecret]);
   assert.equal(r.status, 0, `helm lint must exit 0.\nstderr: ${r.stderr}\nstdout: ${r.stdout}`);
 });

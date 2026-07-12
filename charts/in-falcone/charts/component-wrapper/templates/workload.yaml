@@ -1,6 +1,12 @@
-{{- if .Values.enabled }}
 {{- $workloadKind := .Values.wrapper.workload.kind | default "Deployment" -}}
 {{- $podSecurityContext := mergeOverwrite (deepCopy (default (dict) .Values.global.podSecurity)) (default (dict) .Values.podSecurityContext) -}}
+{{- if (.Values.global.podSecurity.openshiftRestricted | default false) -}}
+  {{- $_ := unset $podSecurityContext "runAsUser" -}}
+  {{- $_ := unset $podSecurityContext "runAsGroup" -}}
+  {{- $_ := unset $podSecurityContext "fsGroup" -}}
+  {{- $_ := unset $podSecurityContext "fsGroupChangePolicy" -}}
+  {{- $_ := unset $podSecurityContext "openshiftRestricted" -}}
+{{- end -}}
 {{- /* Normalize pull secrets to a string list: global.imagePullSecrets items are
        {name: ...} maps; global.privateRegistry.pullSecretNames items are strings
        (per values.schema.json). The previous concat + `{{ .name | default . }}`
@@ -97,7 +103,7 @@ spec:
           {{- if or .Values.env (gt (len $tsEnv) 0) }}
           env:
             {{- with .Values.env }}
-            {{- toYaml . | nindent 12 }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
             {{- end }}
             {{- with $tsEnv }}
             {{- toYaml . | nindent 12 }}
@@ -184,4 +190,3 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-{{- end }}

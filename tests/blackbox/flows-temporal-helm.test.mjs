@@ -9,8 +9,8 @@
  * the `helm` binary is not on PATH (repo precedent: pgvector real-stack tests self-skip).
  *
  * Scenario coverage (capability: workflows / spec.md):
- *   bbx-flows-helm-001  Temporal disabled by default → zero Temporal resources
- *   bbx-flows-helm-002  Temporal enabled → four role Deployments (frontend/history/matching/worker)
+ *   bbx-flows-helm-001  Temporal is core by default → Temporal resources render
+ *   bbx-flows-helm-002  default render includes four role Deployments (frontend/history/matching/worker)
  *   bbx-flows-helm-003  ClusterIP-only Services (no LoadBalancer / NodePort)
  *   bbx-flows-helm-004  SQL visibility, no Elasticsearch pod/Service
  *   bbx-flows-helm-005  schema-tool Job (pre-install/pre-upgrade) renders
@@ -88,14 +88,13 @@ function isTemporalDoc(doc) {
 }
 
 function renderEnabled(extra = []) {
-  const r = helmTemplate(['--set', 'temporal.enabled=true', ...extra]);
-  return r;
+  return helmTemplate(extra);
 }
 
 // -------------------------------------------------------------------------
-// bbx-flows-helm-001: Temporal disabled by default → zero Temporal resources
+// bbx-flows-helm-001: Temporal is core by default → Temporal resources render
 // -------------------------------------------------------------------------
-test('bbx-flows-helm-001: default values render zero Temporal resources', SKIP, () => {
+test('bbx-flows-helm-001: default values render Temporal core resources', SKIP, () => {
   const r = helmTemplate();
   assert.equal(r.status, 0, `helm template (defaults) must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
@@ -104,17 +103,16 @@ test('bbx-flows-helm-001: default values render zero Temporal resources', SKIP, 
     /in-falcone\.io\/component:\s*temporal/.test(d) ||
     /-temporal-/.test(docName(d)) ||
     /-temporal\b/.test(docName(d)));
-  assert.equal(
-    temporalDocs.length,
-    0,
-    `expected no Temporal resources with default values, found:\n${temporalDocs.map(docName).join('\n')}`
+  assert.ok(
+    temporalDocs.length >= 8,
+    `expected Temporal core resources with default values, found:\n${temporalDocs.map(docName).join('\n')}`
   );
 });
 
 // -------------------------------------------------------------------------
-// bbx-flows-helm-002: enabled → four role Deployments
+// bbx-flows-helm-002: default → four role Deployments
 // -------------------------------------------------------------------------
-test('bbx-flows-helm-002: temporal.enabled=true renders four role Deployments', SKIP, () => {
+test('bbx-flows-helm-002: default values render four Temporal role Deployments', SKIP, () => {
   const r = renderEnabled();
   assert.equal(r.status, 0, `helm template (enabled) must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
@@ -177,19 +175,21 @@ test('bbx-flows-helm-004: no Elasticsearch resource is rendered for Temporal', S
 // -------------------------------------------------------------------------
 // bbx-flows-helm-005: schema-tool Job
 // -------------------------------------------------------------------------
-test('bbx-flows-helm-005: schema Job uses temporal-sql-tool as a helm hook', SKIP, () => {
+test('bbx-flows-helm-005: schema Job uses temporal-sql-tool with a fresh-install-safe lifecycle', SKIP, () => {
   const r = renderEnabled();
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
   const jobs = docs.filter((d) => docKind(d) === 'Job' && isTemporalDoc(d));
+  const dbBootstrap = jobs.find((d) => /db-bootstrap/.test(docName(d)));
+  assert.ok(dbBootstrap, `expected a Temporal DB bootstrap Job, jobs found: ${jobs.map(docName).join(', ')}`);
+  assert.match(dbBootstrap, /CREATE ROLE %I LOGIN CREATEDB PASSWORD %L/, 'DB bootstrap must create/alter the Temporal role idempotently');
+  assert.match(dbBootstrap, /CREATE DATABASE %I OWNER %I/, 'DB bootstrap must create Temporal databases idempotently');
+  assert.match(dbBootstrap, /name:\s*["']?in-falcone-temporal["']?/, 'DB bootstrap must read the generated Temporal Secret');
+  assert.match(dbBootstrap, /key:\s*["']?password["']?/, 'DB bootstrap must read the Temporal password key');
   const schemaJob = jobs.find((d) => /schema/.test(docName(d)) || /temporal-sql-tool/.test(d));
   assert.ok(schemaJob, `expected a Temporal schema Job, jobs found: ${jobs.map(docName).join(', ')}`);
   assert.match(schemaJob, /temporal-sql-tool/, 'schema Job must use the temporal-sql-tool image');
-  assert.match(
-    schemaJob,
-    /helm\.sh\/hook:\s*["']?[^"'\n]*pre-install[^"'\n]*pre-upgrade|helm\.sh\/hook:\s*["']?[^"'\n]*pre-upgrade[^"'\n]*pre-install/,
-    'schema Job must be a pre-install,pre-upgrade hook'
-  );
+  assert.doesNotMatch(schemaJob, /helm\.sh\/hook:/, 'fresh-install schema setup must be a normal Job so same-release PostgreSQL can start first');
   assert.match(schemaJob, /backoffLimit:\s*3/, 'schema Job must set backoffLimit: 3');
 });
 
@@ -201,7 +201,7 @@ test('bbx-flows-helm-006: bootstrap Job registers namespace + five Keyword searc
   assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
   const docs = splitDocs(r.stdout);
   const jobs = docs.filter((d) => docKind(d) === 'Job' && isTemporalDoc(d));
-  const bootstrapJob = jobs.find((d) => /bootstrap/.test(docName(d)));
+  const bootstrapJob = jobs.find((d) => /temporal-bootstrap$/.test(docName(d)));
   assert.ok(bootstrapJob, `expected a Temporal bootstrap Job, jobs: ${jobs.map(docName).join(', ')}`);
   assert.match(
     bootstrapJob,

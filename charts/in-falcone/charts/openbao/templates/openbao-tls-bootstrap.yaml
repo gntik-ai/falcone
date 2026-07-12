@@ -14,18 +14,21 @@
 */ -}}
 {{- if and .Values.openbao.tls.enabled (eq (.Values.openbao.tls.mode | default "cert-manager") "self-signed") }}
 {{- $ns := .Values.openbao.namespace -}}
+{{- $hookNs := .Release.Namespace -}}
 {{- $secret := .Values.openbao.tls.secretName -}}
 {{- $b := .Values.openbao.tls.bootstrap -}}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: openbao-tls-bootstrap
-  namespace: {{ $ns }}
+  name: openbao-client-ca-bootstrap
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create", "patch", "update"]
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "create", "patch", "update"]
@@ -34,35 +37,34 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: openbao-tls-bootstrap
-  namespace: {{ $ns }}
+  namespace: {{ $hookNs }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: openbao-tls-bootstrap
-  namespace: {{ $ns }}
+  name: openbao-client-ca-bootstrap
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: openbao-tls-bootstrap
+  kind: ClusterRole
+  name: openbao-client-ca-bootstrap
 subjects:
   - kind: ServiceAccount
     name: openbao-tls-bootstrap
-    namespace: {{ $ns }}
+    namespace: {{ $hookNs }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: openbao-tls-bootstrap
-  namespace: {{ $ns }}
+  namespace: {{ $hookNs }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "0"
@@ -77,13 +79,11 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: openbao-tls-bootstrap
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "openbao.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.openbao.jobPodSecurityContext | nindent 8 }}
       containers:
         - name: tls-bootstrap
-          image: {{ $b.image.repository }}:{{ $b.image.tag }}
+          image: {{ include "openbao.image" (dict "root" . "image" $b.image) | quote }}
           imagePullPolicy: {{ $b.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -95,6 +95,10 @@ spec:
               value: {{ $ns | quote }}
             - name: SECRET
               value: {{ $secret | quote }}
+            - name: CLIENT_NS
+              value: {{ .Release.Namespace | quote }}
+            - name: CLIENT_CA_SECRET
+              value: {{ (.Values.openbao.tls.clientCaSecretName | default "in-falcone-openbao-client-ca") | quote }}
             - name: DAYS
               value: {{ $b.days | quote }}
           command:
@@ -102,9 +106,30 @@ spec:
             - -ec
             - |
               command -v openssl >/dev/null || { echo "openssl required in the bootstrap image"; exit 1; }
-              # Idempotent: skip if the server cert Secret already carries a tls.crt.
+              ensure_namespace() {
+                target="$1"
+                if ! kubectl get namespace "$target" >/dev/null 2>&1; then
+                  kubectl create namespace "$target"
+                fi
+                kubectl label namespace "$target" \
+                  app.kubernetes.io/managed-by=Helm \
+                  kubernetes.io/metadata.name="$target" \
+                  --overwrite
+                kubectl annotate namespace "$target" \
+                  meta.helm.sh/release-name={{ .Release.Name | quote }} \
+                  meta.helm.sh/release-namespace={{ .Release.Namespace | quote }} \
+                  --overwrite
+              }
+              ensure_namespace "$NS"
+              # Idempotent: if the server cert Secret already exists, still ensure the client
+              # namespace has a CA-only copy for workloads that authenticate to OpenBao.
               if kubectl -n "$NS" get secret "$SECRET" -o jsonpath='{.data.tls\.crt}' 2>/dev/null | grep -q .; then
-                echo "$SECRET already present; skipping OpenBao TLS bootstrap"; exit 0
+                D=$(mktemp -d)
+                kubectl -n "$NS" get secret "$SECRET" -o jsonpath='{.data.ca\.crt}' | base64 -d > "$D/ca.crt"
+                kubectl -n "$CLIENT_NS" create secret generic "$CLIENT_CA_SECRET" \
+                  --from-file=ca.crt="$D/ca.crt" \
+                  --dry-run=client -o yaml | kubectl apply -f -
+                echo "$SECRET already present; ensured OpenBao client CA copy in $CLIENT_NS"; exit 0
               fi
               D=$(mktemp -d)
               # One self-signed cert carrying the OpenBao Service SANs (must match the ESO
@@ -120,6 +145,9 @@ spec:
               kubectl -n "$NS" create secret generic "$SECRET" \
                 --from-file=tls.crt="$D/tls.crt" \
                 --from-file=tls.key="$D/tls.key" \
+                --from-file=ca.crt="$D/ca.crt" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              kubectl -n "$CLIENT_NS" create secret generic "$CLIENT_CA_SECRET" \
                 --from-file=ca.crt="$D/ca.crt" \
                 --dry-run=client -o yaml | kubectl apply -f -
               echo "OpenBao server TLS secret $SECRET created (self-signed) in $NS"

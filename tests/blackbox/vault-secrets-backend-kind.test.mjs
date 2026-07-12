@@ -23,7 +23,7 @@
  * Self-skips when `helm` is absent (repo precedent: pgvector/temporal-helm).
  *
  * Scenario coverage (capability: deployment / secrets):
- *   bbx-c6-01  default (cert-manager) mode still renders the cert-manager Certificate (no bootstrap)
+ *   bbx-c6-01  default mode is self-signed and renders the bootstrap Job, not cert-manager
  *   bbx-c6-02  self-signed mode renders NO cert-manager Certificate + a pre-install bootstrap Job
  *   bbx-c6-03  OpenBao+ESO render the openbao-backend ClusterSecretStore + ≥1 ExternalSecret (e2e)
  *   bbx-c6-04  the kind overlay enables the self-signed path and the bootstrap script is valid bash
@@ -77,17 +77,17 @@ function bashSyntaxOk(script) {
   }
 }
 
-const VAULT_ON = ['--set', 'openbao.enabled=true', '--set', 'eso.enabled=true'];
+const VAULT_ON = [];
 const SELF_SIGNED = [...VAULT_ON, '--set', 'openbao.openbao.tls.mode=self-signed'];
 
 // -------------------------------------------------------------------------
-// bbx-c6-01: the cert-manager path is preserved by default
+// bbx-c6-01: default fresh installs do not require cert-manager
 // -------------------------------------------------------------------------
-test('bbx-c6-01: default mode renders the cert-manager Certificate and no bootstrap Job', SKIP, () => {
+test('bbx-c6-01: default mode renders self-signed bootstrap and no cert-manager Certificate', SKIP, () => {
   const out = helmTemplate(VAULT_ON);
-  const certs = docsOfKind(out, 'Certificate').filter((d) => /cert-manager\.io\/v1/.test(d) && /openbao-server-tls/.test(d));
-  assert.equal(certs.length, 1, 'cert-manager mode must still render the openbao-server-tls Certificate');
-  assert.doesNotMatch(out, /name:\s*openbao-tls-bootstrap/, 'the self-signed bootstrap must NOT render in cert-manager mode');
+  assert.doesNotMatch(out, /cert-manager\.io\/v1/, 'default core install must not require cert-manager CRDs');
+  const job = docsOfKind(out, 'Job').find((d) => /name:\s*openbao-tls-bootstrap/.test(d));
+  assert.ok(job, 'default mode must render the openbao-tls-bootstrap Job');
 });
 
 // -------------------------------------------------------------------------
@@ -169,6 +169,6 @@ test('bbx-c6-05: opt-in render uses the openbao/openbao image + bao init Job, ne
   assert.match(initJob, /bao operator init/, 'the init Job must initialize OpenBao with the bao CLI');
   assert.match(initJob, /bao secrets enable -path=secret kv-v2/, 'the init Job must enable the KV v2 mount');
   assert.match(initJob, /bao auth enable kubernetes/, 'the init Job must enable Kubernetes auth');
-  assert.match(initJob, /bao kv put secret\/platform\/postgresql/, 'the init Job must seed the platform secret paths');
+  assert.match(initJob, /kv_merge secret\/platform\/postgresql/, 'the init Job must seed the platform secret paths through the non-clobbering KV merge helper');
   assert.doesNotMatch(initJob, /(^|[^a-z])vault (operator|secrets|auth|kv|policy|audit) /, 'the init Job must use the bao CLI, not vault');
 });

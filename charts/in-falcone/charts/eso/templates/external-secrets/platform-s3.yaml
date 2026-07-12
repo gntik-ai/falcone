@@ -2,16 +2,16 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: platform-s3-credentials
-  namespace: s3-compat
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
 spec:
   refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
   secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
-  target: { name: platform-s3-credentials, immutable: false }
+  target: { name: in-falcone-storage, creationPolicy: Merge, immutable: false }
   data:
-    - secretKey: access-key
+    - secretKey: s3_access_key
       remoteRef: { key: platform/s3, property: access-key }
-    - secretKey: secret-key
+    - secretKey: s3_secret_key
       remoteRef: { key: platform/s3, property: secret-key }

@@ -1,4 +1,4 @@
-// Headless-Chromium verification of the Storage page, wired to REAL MinIO/S3.
+// Headless-Chromium verification of the Storage page, wired to REAL SeaweedFS/S3.
 import { chromium } from 'playwright';
 
 const GW = process.env.GW || 'http://192.168.1.132:31908';

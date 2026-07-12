@@ -111,9 +111,9 @@ function readRawBody(req) {
 }
 
 function identityFromHeaders(headers, pathWorkspaceId) {
-  // x-actor-scopes is injected by the gateway from the verified token (space- or comma-separated);
-  // surfaced so scope-gated handlers (e.g. the platform MCP) authorize on the trust-header path too.
-  const rawScopes = headers['x-actor-scopes'];
+  // x-auth-scopes is injected by the gateway from the verified token (space- or comma-separated).
+  // x-actor-scopes is accepted as a compatibility alias for direct tests/older route config.
+  const rawScopes = headers['x-auth-scopes'] || headers['x-actor-scopes'];
   const scopes = typeof rawScopes === 'string'
     ? rawScopes.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
     : undefined;

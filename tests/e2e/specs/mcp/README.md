@@ -10,17 +10,12 @@ Real-stack Playwright specs for the MCP capability, following the repo's kind/He
 - `mcp-version-pinning.spec.ts` — an unapproved tool-description change is held for review and not served; the prior version keeps serving.
 - `../issues/add-mcp-e2e.spec.ts` — per-issue smoke for `run-issue.sh add-mcp-e2e`.
 
-## Live capability gate (current state)
+## Live capability gate
 
-The control-plane runtime (`apps/control-plane/src/runtime/server.mjs`) serves
-`/v1/{postgres,mongo,events,functions,realtime,flows}` but **not** `/v1/mcp/...` — the MCP
-control-plane modules (#391–#399) are pure and **not yet wired into the live control-plane**. So
-every spec begins with `probeMcpManagement`: if the management API is not served, the spec
-**skips with a precise reason** (`MCP_MANAGEMENT_GATE_REASON`) instead of failing. The moment those
-routes are wired, the specs execute the full loop unchanged.
-
-This is verified: against an absent/unreachable control-plane the suite reports **12 skipped, 0 failed** —
-the harness is deploy-ready and honest, not a fabricated green.
+MCP is part of the all-core default install. The control-plane runtime serves `/v1/mcp/...` together
+with the other core management routes. Each spec still begins with `probeMcpManagement` so an absent
+or unreachable control plane skips with a precise reason (`MCP_MANAGEMENT_GATE_REASON`) instead of
+producing fabricated failures.
 
 ## Run
 
@@ -28,8 +23,7 @@ the harness is deploy-ready and honest, not a fabricated green.
 # Per-issue (deploys, runs the smoke, always tears down):
 bash tests/e2e/run-issue.sh add-mcp-e2e
 
-# Full MCP suite against a running stack (deploy the MCP runtime: mcp.enabled=true):
-#   helm ... --set mcp.enabled=true   (via E2E_HELM_VALUES or --set)
+# Full MCP suite against a running all-core stack:
 cd tests/e2e && npx playwright test specs/mcp
 ```
 

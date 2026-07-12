@@ -1,4 +1,3 @@
-{{- if .Values.temporal.enabled }}
 {{- $root := . -}}
 {{- $t := .Values.temporal -}}
 {{- /*
@@ -43,7 +42,7 @@ data:
           sql:
             pluginName: {{ $p.driver | quote }}
             databaseName: {{ $p.database | quote }}
-            connectAddr: "{{ $p.host }}:{{ $p.port }}"
+            connectAddr: "{{ tpl $p.host $root }}:{{ $p.port }}"
             connectProtocol: "tcp"
             user: {{ $p.user | quote }}
             password: {{ if $p.existingSecret }}"__TEMPORAL_DB_PASSWORD__"{{ else }}{{ $p.password | quote }}{{ end }}
@@ -54,7 +53,7 @@ data:
           sql:
             pluginName: {{ $p.driver | quote }}
             databaseName: {{ $p.visibilityDatabase | quote }}
-            connectAddr: "{{ $p.host }}:{{ $p.port }}"
+            connectAddr: "{{ tpl $p.host $root }}:{{ $p.port }}"
             connectProtocol: "tcp"
             user: {{ $p.user | quote }}
             password: {{ if $p.existingSecret }}"__TEMPORAL_DB_PASSWORD__"{{ else }}{{ $p.password | quote }}{{ end }}
@@ -133,4 +132,3 @@ data:
     limit.maxIDLength:
       - value: 255
         constraints: {}
-{{- end }}

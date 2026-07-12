@@ -7,16 +7,17 @@ Harbor, with restricted egress? This is a code-grounded assessment, not a guess.
 
 ## Verdict
 
-**The product chart is largely OpenShift/Harbor-ready by design** — it already has
-the right knobs. The blockers are a handful of **OpenShift SCC** issues (root
-init-containers, fixed UID/GID), the **OpenWhisk→Knative** swap (the chart still
-ships an `openwhisk` component), and the fact that the **runtime pieces I added on
-kind are NOT in the chart** (they live in `deploy/kind/values-kind.yaml` + standalone
-manifests). None are architectural dead-ends; all are concrete, bounded changes.
+**The product chart is OpenShift/Harbor-ready at render level** — the historical
+OpenShift blockers have been folded into `charts/in-falcone` and the OpenShift
+overlay. The default install now renders the all-core baseline with OpenBao, ESO,
+Temporal, DocumentDB/FerretDB, SeaweedFS, the control-plane executor, workflow worker,
+MCP runtime wiring, and Knative-backed function execution. Remaining production gates
+are clean-cluster evidence, exact Harbor mirror validation, and final digest pinning
+from the manifests actually installed.
 
 **Do NOT reuse `deploy/kind/values-kind.yaml` on OpenShift** — it is kind-only
 (`localhost:30500`, `bitnamilegacy/*`, hardcoded `runAsUser: 636/1000/65534`,
-NodePort, bootstrap disabled, `--skip-schema-validation`). It exists to work around
+NodePort, local-registry overrides). It exists to work around
 a kind cluster on a futuristic kernel; it would fail or be insecure on OpenShift.
 Use a new `values-openshift.yaml` driving the chart's existing `global.*` knobs
 (skeleton at the end of this doc).
@@ -31,19 +32,19 @@ now chart-managed and the control-plane + a live Knative function are unaffected
 
 - **Control-plane runtime folded into the chart.** `controlPlane.image` →
   `ghcr.io/gntik-ai/in-falcone-control-plane` (Harbor-rewritten via `global.imageRegistry`),
-  `serviceAccount.automountToken: true` by default, and a new
-  `controlPlane.functionExecutor.enabled` toggle. The full data-plane env
-  (`PG*`, `KEYCLOAK_*`, `MINIO_*`, `MONGO_*`, `KAFKA_BROKERS`, `FN_RUNTIME_IMAGE`,
-  `ROUTE_MAP_FILE`) lives in the overlay sourced from `secretKeyRef` (no literals).
+  `serviceAccount.automountToken: true` by default, and core function-executor RBAC.
+  The full data-plane env
+  (`PG*`, `KEYCLOAK_*`, `STORAGE_S3_*`, `MONGO_*` for the FerretDB gateway,
+  `KAFKA_BROKERS`, `FN_RUNTIME_IMAGE`, `ROUTE_MAP_FILE`) lives in chart values sourced
+  from generated or ESO-managed Secrets (no credential literals).
 - **Executor RBAC is now a chart template** (`templates/control-plane-rbac.yaml`),
-  gated on `controlPlane.functionExecutor.enabled`: a namespace-scoped Role/RoleBinding
-  granting `serving.knative.dev/services` + jobs + pods/log, bound to the control-plane SA.
-  This replaces the standalone `deploy/kind/control-plane/executor-rbac.yaml`.
-- **OpenWhisk disabled** (`openwhisk.enabled: false`) — zero openwhisk workload objects
-  render. (One inert APISIX *passthrough route* `native-openwhisk-admin` remains in the
-  route catalog ConfigMap — it produces no k8s Service/Route, only a dead `/_native/openwhisk/*`
-  entry pointing at the now-absent upstream; Knative invocation never uses this path.
-  Cosmetic cleanup, tracked under P2.)
+  a namespace-scoped Role/RoleBinding granting `serving.knative.dev/services` + jobs +
+  pods/log, bound to the Helm-owned control-plane ServiceAccount. This replaces the
+  standalone `deploy/kind/control-plane/executor-rbac.yaml`.
+- **Function execution is Knative-backed.** No legacy function-runtime controller
+  workload or service endpoint renders from the chart. The control-plane/executor path
+  owns function deployment and invocation, and OpenShift installs use OpenShift
+  Serverless for the Knative control plane.
 - **Bootstrap image now Harbor-rewritten.** `templates/bootstrap-job.yaml` routes its
   kubectl image through `component-wrapper.normalizeRepository` (closing the airgap leak)
   and normalizes pull secrets the same way the workload template does.
@@ -59,14 +60,16 @@ now chart-managed and the control-plane + a live Knative function are unaffected
 `helm lint` + `helm template` against the chart with `deploy/openshift/values-openshift.yaml`:
 - **Renders cleanly**: 58 objects, `helm lint` 0 failures.
 - **Harbor rewrite works**: every workload image resolves to `harbor.example.com/falcone/...`
-  (apisix, keycloak, postgresql, mongodb, kafka, minio, prometheus, control-plane,
-  web-console, bootstrap kubectl, fn-runtime) — **zero egress leaks** to
+  (apisix, keycloak, postgresql, documentdb, ferretdb, kafka, seaweedfs, prometheus,
+  control-plane, executor, web-console, workflow-worker, bootstrap helper, fn-runtime,
+  mcp-runtime, OpenBao, ESO, Temporal) — **zero egress leaks** to
   docker.io/quay.io/gcr.io after the fixes below.
 - **OpenShift Routes emit**: 4 Routes (api, console, identity, realtime) once
   `platform.openshift.enabled: true` + `platform.network.exposureKind: Route`.
 - **SCC-clean**: 0 fixed `fsGroup: 1001` and 0 fixed `runAsUser` in the render.
-- **Functions**: 0 openwhisk workload objects; executor Role+RoleBinding present and
-  bound to the control-plane SA (`automountServiceAccountToken: true`).
+- **Functions**: executor Role+RoleBinding present and bound to the control-plane SA
+  (`automountServiceAccountToken: true`); Knative Service creation is the supported
+  runtime path.
 
 I had to FIX one chart blocker to get there (committed to the chart copy):
 - **`privateRegistry.pullSecretNames` was unrenderable.** `values.schema.json` requires
@@ -76,8 +79,8 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   of a Harbor install) `validate.yaml` *requires* the field, so the chart could not
   render at all on the Harbor path. Fixed: the template now normalizes
   `imagePullSecrets` ({name} maps) + `pullSecretNames` (strings) into one string list.
-- **Bootstrap image bypasses the registry rewrite.** The bootstrap job's kubectl image
-  (`docker.io/bitnami/kubectl`) is referenced outside the component-wrapper helper, so
+- **Bootstrap image bypasses the registry rewrite.** The bootstrap job's helper image
+  (`docker.io/alpine/k8s:1.32.2`) is referenced outside the component-wrapper helper, so
   `global.imageRegistry` does NOT rewrite it → an egress leak in airgap. Worked around in
   the values by pinning `bootstrap.job.image.repository` to Harbor; the chart should
   route this (and any other top-level image) through the same image helper.
@@ -100,7 +103,7 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   RuntimeDefault) is applied pod-wide; container `securityContext` is templated.
 - **OpenShift Routes are first-class.** `publicSurface.route` (+ `.tls`) exists — no
   need for NodePort/Ingress hacks; the chart can emit Routes for the gateway/console.
-- **Secrets via operators.** `eso` (External Secrets) and `vault` subcharts ship with
+- **Secrets via operators.** `eso` (External Secrets) and `openbao` subcharts ship with
   the chart — the right pattern for restricted clusters (no plaintext secrets in git).
 
 ## Required changes (by severity)
@@ -118,7 +121,7 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   rejected. Fix: leave `fsGroup` UNSET on OpenShift (let the SCC inject it), or run
   under a custom SCC that allows it. Same for any `runAsUser` — drop fixed UIDs and
   rely on `runAsNonRoot: true` + SCC-assigned UID.
-- **Bitnami images & arbitrary UIDs.** Bitnami postgres/mongodb/kafka historically
+- **Bitnami images & arbitrary UIDs.** Bitnami postgres/kafka historically
   assume uid 1001. Under restricted-v2 (random uid) they can fail on
   `$HOME`/data-dir permissions. Options: (a) use Bitnami's OpenShift-compatible images
   or Red Hat-certified equivalents (Crunchy/CloudNativePG for Postgres, the Red Hat
@@ -127,10 +130,7 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   (c) run the stateful data plane via OpenShift Operators instead of in-chart Bitnami.
   This is the single biggest decision for the OpenShift target.
 
-### P0 — Functions: replace OpenWhisk with Knative / OpenShift Serverless
-- The chart still ships an **`openwhisk`** component (`docker.io/apache/openwhisk-controller`).
-  It is unused after the migration and (as proven on kind) its init tooling is fragile.
-  **Remove/disable the `openwhisk` component.**
+### P0 — Functions: run through Knative / OpenShift Serverless
 - On OpenShift, install **OpenShift Serverless** (the supported Knative) via its
   Operator + a `KnativeServing` CR (it ships Kourier). Do NOT hand-apply the upstream
   `serving-core.yaml`/`kourier.yaml` (that was the kind path). No
@@ -145,15 +145,15 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   is built `runAsNonRoot` with no fixed uid, so it is arbitrary-uid safe (verify the
   `/app` dir is group-readable; node:22-alpine is fine).
 
-### P1 — The runtime I added must become part of the chart (today it is kind-only)
-- **Real images for control-plane & web-console.** The chart points at
-  `ghcr.io/example/in-falcone-{control-plane,web-console}` placeholders. Build the real
-  images (`deploy/kind/control-plane/`, `deploy/kind/web-console/`) and push to Harbor;
-  set their repositories/tags (or rely on `global.imageRegistry` + a sane default path).
-- **Control-plane env + data-plane wiring.** All the env I added on kind
-  (`PG*`, `KEYCLOAK_*`, `MINIO_*`, `MONGO_*`, `KAFKA_BROKERS`, `FN_RUNTIME_IMAGE`,
-  `ROUTE_MAP_FILE`) must be templated into the chart's control-plane component (sourced
-  from ESO/Vault-provided secrets, not literals).
+### P1 — Runtime images and wiring must be mirrored exactly
+- **Real images for control-plane & web-console.** The chart defaults now point at the
+  published `ghcr.io/gntik-ai/in-falcone-*` `0.3.0` release set. Mirror those images to
+  Harbor before installation and keep the path convention used by the rendered
+  manifests.
+- **Control-plane env + data-plane wiring.** The chart owns the control-plane and
+  executor wiring for PostgreSQL, Keycloak, SeaweedFS S3, FerretDB/DocumentDB, Kafka,
+  Temporal, function runtime, and route-map configuration. Keep those values in chart
+  values and generated/ESO-managed Secrets, not ad hoc kind-only manifests.
 - **Schema/secret bootstrap.** The chart's `values.schema.json` rejects
   `bootstrap.oneShot.keycloak.realm.login: null` (I had to `--skip-schema-validation`
   on kind). For prod, fix the schema or the value so the install validates cleanly. The
@@ -173,17 +173,17 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   of kind's `standard`/local-path.
 - Pin all images by **digest** (Harbor supports it) for air-gapped reproducibility; the
   image helper already supports `image.digest`.
-- Add NetworkPolicies if the cluster enforces default-deny egress (control-plane →
-  Postgres/Keycloak/MinIO/Mongo/Kafka/k8s-API/ksvc).
+- Add or tune NetworkPolicies if the cluster enforces default-deny egress (control-plane →
+  Postgres/Keycloak/SeaweedFS/FerretDB/DocumentDB/Kafka/OpenBao/Temporal/k8s-API/ksvc).
 
 ## Image mirror list for Harbor (everything the install pulls)
 
 Product chart components:
 `docker.io/apache/apisix`, `quay.io/keycloak/keycloak`,
-`docker.io/bitnami/postgresql`, `docker.io/bitnami/mongodb`, `docker.io/bitnami/kafka`,
-`docker.io/minio/minio`, `docker.io/prom/prometheus`, `docker.io/bitnami/kubectl`,
-`docker.io/library/busybox`, and the two app images (control-plane, web-console).
-(Drop `docker.io/apache/openwhisk-controller` after the Knative swap.)
+`docker.io/bitnamilegacy/postgresql`, `docker.io/bitnamilegacy/kafka`,
+`docker.io/alpine/k8s`, `docker.io/prom/prometheus`, `docker.io/library/busybox`,
+and the Falcone app images (control-plane, executor, web-console, workflow-worker,
+function runtime, MCP runtime).
 
 Functions / Knative (if self-managing rather than the Operator):
 `gcr.io/knative-releases/knative.dev/serving/cmd/{controller,autoscaler,activator,webhook,queue}`,
@@ -201,7 +201,7 @@ registry via the Operator — only `fn-runtime` is yours to mirror.
 Migrating functions to Knative is **done and proven on kind**, and it is the *better*
 fit for OpenShift (OpenShift Serverless is the supported, Operator-managed Knative).
 The chart's image/registry/secret/route architecture is sound for Harbor + restricted
-networking. The work to productionize is well-scoped: an OpenShift values file, the SCC
-fixes (disable root volumePermissions, drop fixed UID/GID), swap the OpenWhisk component
-for OpenShift Serverless, fold the new runtime (images + env + executor RBAC) into the
-chart, and mirror the image set into Harbor.
+networking. The remaining productionization work is operational evidence: install the
+branch on a clean OpenShift test namespace, confirm all all-core services reach Ready or
+Complete, mirror the exact six first-party images plus third-party support images into
+Harbor, and pin the final deployment by digest.

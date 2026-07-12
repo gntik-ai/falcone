@@ -36,7 +36,7 @@ test('deployment smoke scaffold keeps bootstrap create-only and reconcile inputs
   for (const environment of topology.environment_profiles.map((profile) => profile.id)) {
     const values = resolveValues(environment, 'kubernetes');
 
-    assert.equal(values.bootstrap.enabled, true);
+    assert.equal(Object.hasOwn(values.bootstrap, 'enabled'), false);
     assert.deepEqual(values.bootstrap.secretResolution.supportedStrategies, ['kubernetesSecret', 'env', 'externalRef']);
     assert.equal(values.bootstrap.oneShot.governanceCatalog.plans.length >= 4, true);
     assert.deepEqual(

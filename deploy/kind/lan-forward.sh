@@ -13,7 +13,7 @@ declare -A FW=(
   [apisix-gateway]="svc/falcone-apisix 31908:9080"
   [keycloak]="svc/falcone-keycloak 31808:8080"
   [control-plane]="svc/falcone-control-plane 31818:8080"
-  [minio-console]="pod/falcone-storage-0 31901:9001"  # console port is not on the Service; forward the pod
+  [seaweedfs-s3]="svc/falcone-seaweedfs-s3 31901:8333"
   [prometheus]="svc/falcone-observability 31909:9090"
 )
 for name in "${!FW[@]}"; do

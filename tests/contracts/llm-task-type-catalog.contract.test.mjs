@@ -33,5 +33,5 @@ test('ctr-llm-cat-03: APISIX routes the LLM subpaths to the executor', () => {
   assert.ok(idx > -1, 'a dedicated 2003-llm route exists in apisix.yaml');
   const block = src.slice(idx, idx + 800);
   assert.match(block, /llm-provider\|llm\/completions\|llm-usage/, 'route matches the three LLM subpaths');
-  assert.match(block, /falcone-cp-executor/, 'route forwards to the executor, not the control-plane');
+  assert.match(block, /falcone-control-plane-executor/, 'route forwards to the executor, not the control-plane');
 });

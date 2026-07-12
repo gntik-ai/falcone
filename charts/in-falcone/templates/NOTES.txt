@@ -2,7 +2,7 @@ In Falcone umbrella chart
 =========================
 
 Environment: {{ .Values.global.environment }}
-Namespace: {{ .Values.global.namespace }}
+Namespace: {{ .Release.Namespace }}
 Deployment profile: {{ .Values.deployment.profile }}
 Exposure kind: {{ .Values.platform.network.exposureKind }}
 TLS mode: {{ .Values.publicSurface.tls.mode }}

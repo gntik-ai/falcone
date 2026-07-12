@@ -1,4 +1,3 @@
-enabled: true
 wrapper:
   componentId: component
   workload:

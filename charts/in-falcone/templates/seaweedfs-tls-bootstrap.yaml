@@ -1,4 +1,4 @@
-{{- if and .Values.seaweedfs.enabled .Values.seaweedfsTls.bootstrap.enabled }}
+{{- if .Values.seaweedfsTls.bootstrap.enabled }}
 {{- /*
   SeaweedFS inter-component TLS bootstrap (add-seaweedfs-deployment, task 8.2 / OQ-3).
 
@@ -20,7 +20,7 @@
 */ -}}
 {{- $b := .Values.seaweedfsTls.bootstrap -}}
 {{- $prefix := printf "%s-seaweedfs" .Release.Name -}}
-{{- $ns := .Values.global.namespace -}}
+{{- $ns := .Release.Namespace -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -95,10 +95,8 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ .Release.Name }}-seaweedfs-tls-bootstrap
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "in-falcone.imagePullSecrets" . | nindent 6 }}
+      securityContext: {{- toYaml .Values.seaweedfsTls.bootstrap.podSecurityContext | nindent 8 }}
       containers:
         - name: tls-bootstrap
           image: {{ .Values.seaweedfsTls.bootstrap.image.repository }}:{{ .Values.seaweedfsTls.bootstrap.image.tag }}

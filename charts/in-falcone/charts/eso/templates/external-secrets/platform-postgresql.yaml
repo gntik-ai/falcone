@@ -2,7 +2,7 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: platform-postgresql-credentials
-  namespace: postgresql
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
@@ -12,10 +12,33 @@ spec:
     name: openbao-backend
     kind: ClusterSecretStore
   target:
-    name: platform-postgresql-credentials
-    immutable: true
+    name: in-falcone-postgresql
+    creationPolicy: Merge
+    immutable: false
   data:
-    - secretKey: root-password
+    - secretKey: POSTGRESQL_POSTGRES_PASSWORD
       remoteRef: { key: platform/postgresql, property: root-password }
-    - secretKey: app-password
+    - secretKey: POSTGRESQL_USERNAME
+      remoteRef: { key: platform/postgresql, property: username }
+    - secretKey: POSTGRESQL_PASSWORD
       remoteRef: { key: platform/postgresql, property: app-password }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: platform-postgresql-vector-credentials
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+spec:
+  refreshInterval: {{ $.Values.eso.refreshInterval | quote }}
+  secretStoreRef: { name: openbao-backend, kind: ClusterSecretStore }
+  target: { name: in-falcone-postgresql-vector, creationPolicy: Merge, immutable: false }
+  data:
+    - secretKey: POSTGRES_USER
+      remoteRef: { key: platform/postgresql-vector, property: username }
+    - secretKey: POSTGRES_PASSWORD
+      remoteRef: { key: platform/postgresql-vector, property: password }
+    - secretKey: POSTGRES_DB
+      remoteRef: { key: platform/postgresql-vector, property: database }

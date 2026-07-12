@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const APISIX = resolve(REPO_ROOT, 'deploy', 'kind', 'apisix', 'apisix.yaml');
-const EXECUTOR_UPSTREAM = 'falcone-cp-executor.falcone.svc.cluster.local:8080';
+const EXECUTOR_UPSTREAM = 'falcone-control-plane-executor.falcone.svc.cluster.local:8080';
 
 const yaml = readFileSync(APISIX, 'utf8');
 
@@ -72,7 +72,7 @@ function priorityOf(block) {
 // -------------------------------------------------------------------------
 test('bbx-560-01: apisix.yaml routes /v1/flows/* to the executor upstream', () => {
   const block = executorRouteFor('/v1/flows/');
-  assert.ok(block, '/v1/flows/* must route to the falcone-cp-executor upstream');
+  assert.ok(block, '/v1/flows/* must route to the falcone-control-plane-executor upstream');
 });
 
 // -------------------------------------------------------------------------
@@ -80,7 +80,7 @@ test('bbx-560-01: apisix.yaml routes /v1/flows/* to the executor upstream', () =
 // -------------------------------------------------------------------------
 test('bbx-560-02: apisix.yaml routes /v1/mcp/* to the executor upstream', () => {
   const block = executorRouteFor('/v1/mcp/');
-  assert.ok(block, '/v1/mcp/* must route to the falcone-cp-executor upstream');
+  assert.ok(block, '/v1/mcp/* must route to the falcone-control-plane-executor upstream');
 });
 
 // -------------------------------------------------------------------------

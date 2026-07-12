@@ -3,9 +3,10 @@
 > **Scope.** This is a single authoritative runbook for deploying the **entire Falcone
 > multitenant BaaS platform** on **OpenShift 4.14+** inside a locked‑down enterprise
 > network, using **plain declarative manifests applied with `oc apply -f` only** — no
-> Helm, Kustomize, Operators/OLM, or templating tools. Every image (including build
-> base images, init containers and sidecars) is pulled **exclusively from a private
-> Harbor registry**.
+> Helm, Kustomize, or templating tools for the Falcone manifests. OpenShift Serverless
+> is a prerequisite for the runtime-created Functions and MCP Knative Services. Every
+> image (including build base images, init containers and sidecars) is pulled
+> **exclusively from a private Harbor registry**.
 >
 > **How this guide was produced.** The manifests below were derived from the project's
 > own deployment source of truth — the umbrella Helm chart `charts/in-falcone` (its
@@ -26,9 +27,9 @@
 | `${OCP_STORAGECLASS}` | Default RWO CSI StorageClass on the cluster | `ocs-storagecluster-ceph-rbd` |
 
 - **Namespace:** the whole platform installs into a single Project named **`falcone`**.
-  (The chart spreads optional add‑ons across `secret-store` / `default` / `eso-system`;
-  this guide consolidates everything into `falcone` for a plain‑manifest install and
-  notes the adjustments.)
+  (The Helm chart uses separate namespaces for OpenBao and ESO ownership; this guide
+  consolidates everything into `falcone` for a plain‑manifest install and notes the
+  adjustments.)
 - **Labels:** every object carries `app.kubernetes.io/part-of: falcone`,
   `app.kubernetes.io/name: <component>`, and `app.kubernetes.io/component: <component>`.
   NetworkPolicies select on `app.kubernetes.io/name`, so keep these labels intact.
@@ -49,7 +50,7 @@
 Falcone is a modular, multitenant Backend‑as‑a‑Service. The platform decomposes into a
 **stateless application tier** (API control plane, data‑plane executor, gateway, auth,
 web console), a **stateful data plane** (relational DB, document store, object storage,
-message bus), and **operational add‑ons** (observability, secrets manager, flows engine).
+message bus), and **operational core services** (observability, secrets manager, flows engine).
 
 ### 1.1 Component inventory (what gets deployed)
 
@@ -71,7 +72,7 @@ message bus), and **operational add‑ons** (observability, secrets manager, flo
 | `grafana` | Deployment | Dashboards over Prometheus. |
 | Bootstrap / init Jobs | Job | Keycloak realm + APISIX routes; DocumentDB extension + logical replication; SeaweedFS bucket + admin identity. |
 
-**Optional add‑ons** (each section clearly marked; install only if the capability is needed)
+**Core platform services and runtime-managed capabilities**
 
 | Component | Kind | Purpose |
 |---|---|---|
@@ -81,13 +82,11 @@ message bus), and **operational add‑ons** (observability, secrets manager, flo
 | MCP runtime RBAC + NetworkPolicy | Role/RoleBinding/NetworkPolicy | Hosting of per‑tenant MCP servers as Knative Services. |
 | Functions runtime (`fn-runtime`) | (Knative, created at runtime) | The executor templates a Knative Service per function; image referenced via `FN_RUNTIME_IMAGE`. **Requires OpenShift Serverless.** |
 
-> **[VERIFY] Functions & MCP require OpenShift Serverless (Knative).** Functions and
-> hosted MCP servers are not static manifests — the executor creates a Knative `Service`
-> per function/server at runtime. This needs the **OpenShift Serverless Operator** + a
-> `KnativeServing` CR present on the cluster. That operator is the *one* OLM dependency
-> Falcone assumes; if your environment forbids Operators entirely, functions/MCP must be
-> disabled and the platform runs without the serverless capability. Everything else in
-> this guide is plain manifests.
+> **[VERIFY] Runtime-created Functions & MCP workloads require OpenShift Serverless
+> (Knative).** The core install includes the executor, MCP routes/RBAC, and function
+> runtime image references. The executor creates a Knative `Service` per function/server
+> at runtime, which needs the **OpenShift Serverless Operator** + a `KnativeServing` CR
+> present on the cluster before all-core verification.
 
 ### 1.2 Dependency / startup order (mermaid)
 
@@ -153,8 +152,8 @@ graph TD
 `kafka`, `seaweedfs`) → init Jobs (`documentdb-init`, SeaweedFS seed/bucket) →
 `keycloak` → `ferretdb` → `control-plane` → `control-plane-executor` → `apisix` →
 `web-console` → bootstrap Job (realm + routes) → `prometheus`/`grafana` → Routes.
-Optional add‑ons (`openbao`, `temporal`, `postgresql-vector`, MCP) slot in after the
-data plane is healthy.
+OpenBao, Temporal, `postgresql-vector`, and MCP RBAC/routes are baseline services and
+slot in after the data plane is healthy.
 
 ---
 
@@ -169,7 +168,7 @@ data plane is healthy.
 
 2. **Privileges.**
    - *Namespace‑scoped* operator can apply everything in §4–§7 **except** the
-     ClusterRole/ClusterRoleBinding (OpenBao Kubernetes‑auth, optional) and the SCC
+     ClusterRole/ClusterRoleBinding (OpenBao Kubernetes‑auth) and the SCC
      binding, which need **cluster‑admin** (or a one‑time grant by cluster‑admin).
    - Creating the `Project`/`Namespace` needs the `self-provisioner` role or
      cluster‑admin.
@@ -195,7 +194,8 @@ data plane is healthy.
    is required for the core. The few upstream images that pin a uid/fsGroup have those
    pins **removed** in this guide (see the per‑component notes) so `restricted-v2`
    admits them.
-6. **(Optional) OpenShift Serverless** for functions/MCP (see §1.1).
+6. **OpenShift Serverless** installed with a `KnativeServing` CR for functions/MCP
+   runtime creation (see §1.1).
 
 ---
 
@@ -216,46 +216,56 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 
 | Component | Original image:tag (or digest) | Source registry | Harbor target path | Notes |
 |---|---|---|---|---|
-| PostgreSQL (shared) | `bitnami/postgresql:17.2.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/postgresql:17.2.0` | also the Keycloak DB‑init initContainer image |
+| PostgreSQL (shared) | `bitnamilegacy/postgresql:17.2.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0` | also the Keycloak DB‑init initContainer image |
 | PostgreSQL (filer DB init) | `bitnamilegacy/postgresql:17.2.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0` | SeaweedFS filer init container (the `bitnami`→`bitnamilegacy` purge) — **[VERIFY]** you may standardize on one tag if you patch the manifest |
-| PostgreSQL + pgvector (opt) | `pgvector/pgvector:pg17` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17` | optional vector search |
+| PostgreSQL + pgvector | `pgvector/pgvector:pg17` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17` | core vector search datastore |
 | DocumentDB engine | `ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7` | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0` | digest‑pinned; reused by `documentdb-init` Job + `ferretdb` init container |
 | FerretDB gateway | `ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985` (v2.7.0) | ghcr.io | `${HARBOR}/${HARBOR_PROJECT}/ferretdb/ferretdb:2.7.0` | distroless |
-| Kafka | `bitnami/kafka:3.9.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kafka:3.9.0` | KRaft |
+| Kafka | `bitnamilegacy/kafka:3.9.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0` | KRaft |
 | SeaweedFS | `chrislusf/seaweedfs:4.33` (`@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495`) | docker.io | `${HARBOR}/${HARBOR_PROJECT}/chrislusf/seaweedfs:4.33` | master/volume/filer/s3 + seed/bucket Jobs. **Pin the digest.** |
-| Prometheus | `prom/prometheus:3.2.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1` | observability |
+| Prometheus | `prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:v3.2.1` | observability; pin the mirrored digest |
 | Grafana | `grafana/grafana:11.4.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0` | dashboards |
 | Keycloak | `quay.io/keycloak/keycloak:26.1.0` | quay.io | `${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0` | IdP |
-| APISIX | `apache/apisix:3.10.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0` | gateway |
-| kubectl (bootstrap) | `bitnami/kubectl:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2` | bootstrap + TLS‑bootstrap Jobs |
-| OpenBao (opt) | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
+| APISIX | `apache/apisix:3.10.0-debian` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian` | gateway |
+| bootstrap helper | `alpine/k8s:1.32.2` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2` | bootstrap + TLS‑bootstrap Jobs; includes bash, curl, jq, kubectl, and openssl |
+| OpenBao | `openbao/openbao:2.3.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1` | core secrets manager (OpenBao; CLI `bao`). Chart + `tests/env` both pin `2.3.1`. |
 | Node (OpenBao audit sidecar) | `node:20-alpine` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine` | `secret-audit-handler` sidecar |
-| Temporal server (opt) | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
-| Temporal admin‑tools (opt) | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
-| Temporal UI (opt) | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
+| Temporal server | `temporalio/server:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1` | flows frontend/history/matching/worker |
+| Temporal admin‑tools | `temporalio/admin-tools:1.31.1` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/admin-tools:1.31.1` | schema/bootstrap Jobs |
+| Temporal UI | `temporalio/ui:2.51.0` | docker.io | `${HARBOR}/${HARBOR_PROJECT}/temporalio/ui:2.51.0` | flows web UI |
 
 #### Falcone images built from source (push to Harbor; see Appendix B for BuildConfig)
 
 | Component | Image:tag (chart) | Dockerfile | Build base image(s) (also mirror) | Notes |
 |---|---|---|---|---|
-| control-plane (API) | `in-falcone-control-plane:0.6.2` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/server.mjs` — **[VERIFY]** exact API entrypoint vs executor |
-| control-plane-executor | `in-falcone-control-plane-executor:0.9.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | entrypoint `src/runtime/main.mjs`; built from **repo root** |
-| web-console | `in-falcone-web-console:0.2.11` | `apps/web-console/Dockerfile` | build `node:22-alpine`, runtime `nginx:1.27-alpine` | **[VERIFY]** chart default tag is the placeholder `ghcr.io/example/in-falcone-web-console:0.1.0`; the real tag (`0.2.11`) comes from the OpenShift overlay — pin a real published tag |
-| workflow-worker (opt) | `in-falcone-workflow-worker:0.1.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc — Temporal core‑bridge) | built from repo root |
-| fn-runtime (opt) | `in-falcone-fn-runtime:0.1.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| control-plane (API) | `in-falcone-control-plane:0.3.0` | `deploy/kind/control-plane/Dockerfile` | `node:22-alpine` | release workflow build; validates JWT and dispatches `/v1/*` to real action modules |
+| control-plane-executor | `in-falcone-control-plane-executor:0.3.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | data-plane executor; built from repo root |
+| web-console | `in-falcone-web-console:0.3.0` | `deploy/release/web-console.Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
+| workflow-worker | `in-falcone-workflow-worker:0.3.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc - Temporal core-bridge) | core worker, built from repo root |
+| fn-runtime | `in-falcone-fn-runtime:0.3.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| mcp-runtime | `in-falcone-mcp-runtime:0.3.0` | `apps/mcp-runtime/Dockerfile` | `node:22-alpine` | first-party MCP JSON-RPC runtime |
 
 Harbor targets for the built images:
-`${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.6.2`,
-`…/in-falcone-control-plane-executor:0.9.0`, `…/in-falcone-web-console:0.2.11`,
-`…/in-falcone-workflow-worker:0.1.0`, `…/in-falcone-fn-runtime:0.1.0`.
+`${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.3.0`,
+`.../in-falcone-control-plane-executor:0.3.0`, `.../in-falcone-web-console:0.3.0`,
+`.../in-falcone-workflow-worker:0.3.0`, `.../in-falcone-fn-runtime:0.3.0`,
+`.../in-falcone-mcp-runtime:0.3.0`.
 
-Build bases to mirror (for BuildConfig): `node:22-alpine`, `node:22-slim`,
-`nginx:1.27-alpine` (→ `${HARBOR}/${HARBOR_PROJECT}/library/...`).
+The shipped Helm OpenShift overlay preserves the GHCR organization path when
+`global.imageRegistry` rewrites first-party images, so that render expects
+`${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-*:0.3.0`. The plain manifests in
+this guide use the flat paths above. Mirror the six images to the exact path your
+manifests reference and do not mix both conventions in one install.
 
-> **Unpinned/placeholder versions flagged (do not silently pick a tag):**
+Build bases to mirror (for BuildConfig): `node:22-alpine` and `node:22-slim`
+(to `${HARBOR}/${HARBOR_PROJECT}/library/...`).
+
+> **Release image notes (do not silently pick a tag):**
 > - `seaweedfs:4.33` is a mutable tag in the chart — **pin to the digest above**.
-> - `web-console` chart default `ghcr.io/example/in-falcone-web-console:0.1.0` is a
->   placeholder — use the real `0.2.11` (or your published) tag.
+> - The Falcone-built release set is six images at `0.3.0`: control-plane,
+>   control-plane-executor, web-console, workflow-worker, fn-runtime, and mcp-runtime.
+>   GitHub Actions run `29152340476` published all six GHCR manifests, including
+>   `fn-runtime:0.3.0`. Mirror all six exact tags into Harbor before install.
 > - `openbao` is pinned to `2.3.1` in both the chart and `tests/env` (the Vault→OpenBao swap standardized the tag).
 > - All other `:tag` refs are mutable; for production, mirror **by digest** and
 >   reference the digest in the manifests.
@@ -273,23 +283,23 @@ skopeo login ghcr.io
 skopeo login ${HARBOR}
 
 # Third-party (digest pins shown where the chart pins them)
-skopeo copy docker://docker.io/bitnami/postgresql:17.2.0          docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/postgresql:17.2.0
 skopeo copy docker://docker.io/bitnamilegacy/postgresql:17.2.0    docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0
 skopeo copy docker://docker.io/pgvector/pgvector:pg17             docker://${HARBOR}/${HARBOR_PROJECT}/pgvector/pgvector:pg17
 skopeo copy docker://ghcr.io/ferretdb/postgres-documentdb@sha256:2386795ec2aa7ae559304361979f1dc5708d383ee9020ae63dadc2940dfe58f7 \
             docker://${HARBOR}/${HARBOR_PROJECT}/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
 skopeo copy docker://ghcr.io/ferretdb/ferretdb@sha256:5706414241eb84f0515512c37b46db0f1b1eac9e5ceb7e4c2523211c184b1985 \
             docker://${HARBOR}/${HARBOR_PROJECT}/ferretdb/ferretdb:2.7.0
-skopeo copy docker://docker.io/bitnami/kafka:3.9.0                docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/kafka:3.9.0
+skopeo copy docker://docker.io/bitnamilegacy/kafka:3.9.0                docker://${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0
 skopeo copy docker://docker.io/chrislusf/seaweedfs@sha256:f0b358973e81f884304737645dd3b278c590c2c9d47d60089729d46324f70495 \
             docker://${HARBOR}/${HARBOR_PROJECT}/chrislusf/seaweedfs:4.33
-skopeo copy docker://docker.io/prom/prometheus:3.2.1             docker://${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1
+skopeo copy docker://docker.io/prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62 \
+            docker://${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:v3.2.1
 skopeo copy docker://docker.io/grafana/grafana:11.4.0           docker://${HARBOR}/${HARBOR_PROJECT}/grafana/grafana:11.4.0
 skopeo copy docker://quay.io/keycloak/keycloak:26.1.0          docker://${HARBOR}/${HARBOR_PROJECT}/keycloak/keycloak:26.1.0
-skopeo copy docker://docker.io/apache/apisix:3.10.0            docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0
-skopeo copy docker://docker.io/bitnami/kubectl:1.32.2          docker://${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
+skopeo copy docker://docker.io/apache/apisix:3.10.0-debian     docker://${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian
+skopeo copy docker://docker.io/alpine/k8s:1.32.2                    docker://${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
 
-# Optional add-ons
+# Core service support images
 skopeo copy docker://docker.io/openbao/openbao:2.3.1           docker://${HARBOR}/${HARBOR_PROJECT}/openbao/openbao:2.3.1
 skopeo copy docker://docker.io/library/node:20-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:20-alpine
 skopeo copy docker://docker.io/temporalio/server:1.31.1        docker://${HARBOR}/${HARBOR_PROJECT}/temporalio/server:1.31.1
@@ -299,13 +309,21 @@ skopeo copy docker://docker.io/temporalio/ui:2.51.0            docker://${HARBOR
 # Build bases (only needed if you build in-cluster via BuildConfig — Appendix B)
 skopeo copy docker://docker.io/library/node:22-alpine          docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine
 skopeo copy docker://docker.io/library/node:22-slim            docker://${HARBOR}/${HARBOR_PROJECT}/library/node:22-slim
-skopeo copy docker://docker.io/library/nginx:1.27-alpine       docker://${HARBOR}/${HARBOR_PROJECT}/library/nginx:1.27-alpine
+
+# Falcone-built release images. If a GHCR tag is not available yet, build it from
+# the listed Dockerfile on a connected CI/DMZ host and push the same 0.3.0 target tag.
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-control-plane:0.3.0          docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-control-plane:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-control-plane-executor:0.3.0 docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-control-plane-executor:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-web-console:0.3.0           docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-web-console:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-workflow-worker:0.3.0       docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-workflow-worker:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-fn-runtime:0.3.0            docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-fn-runtime:0.3.0
+skopeo copy docker://ghcr.io/gntik-ai/in-falcone-mcp-runtime:0.3.0           docker://${HARBOR}/${HARBOR_PROJECT}/gntik-ai/in-falcone-mcp-runtime:0.3.0
 ```
 
 > **Build‑from‑source images in air‑gap.** Building Falcone's own images in‑cluster
 > (BuildConfig) requires both the base images in Harbor **and the repo source**.
 > Cloning from `github.com/gntik-ai/falcone` is typically **blocked** in air‑gap.
-> **Recommended:** build the five Falcone images on a connected/DMZ host (or your CI),
+> **Recommended:** build the six Falcone images on a connected/DMZ host (or your CI),
 > `skopeo copy` them into Harbor, and use only the `Deployment` manifests in §7 — no
 > BuildConfig on the cluster. Appendix B documents the BuildConfig alternative (needs an
 > internal Git mirror of the repo).
@@ -578,9 +596,9 @@ for sa in falcone-control-plane falcone-control-plane-executor falcone-apisix \
 done
 ```
 
-> **[VERIFY] Optional add‑ons that pin a uid.** Upstream `grafana` (uid 472) and
+> **[VERIFY] Core images that pin a uid.** Upstream `grafana` (uid 472) and
 > `openbao` (uid 100) images pin a non‑root uid that is **outside** the namespace range
-> and therefore **rejected by `restricted-v2`**. In §7/§ add‑ons these pins are removed
+> and therefore **rejected by `restricted-v2`**. In the core manifests these pins are removed
 > (let the SCC inject the uid). If a specific image truly needs a fixed uid, create a
 > dedicated SCC with `runAsUser: MustRunAs <uid>` and bind it to that SA only — do not
 > use `anyuid` broadly.
@@ -967,7 +985,7 @@ data:
         static_configs:
           - targets: ['falcone-control-plane.falcone.svc.cluster.local:8080']
             labels: { component: control-plane }
-      - job_name: falcone-cp-executor
+      - job_name: falcone-control-plane-executor
         metrics_path: /metrics
         static_configs:
           - targets: ['falcone-control-plane-executor.falcone.svc.cluster.local:8080']
@@ -1203,8 +1221,8 @@ spec:
   resources: { requests: { storage: 20Gi } }
 ```
 
-> The optional `postgresql-vector` (10Gi) and `openbao` (data 10Gi + audit 2Gi) PVCs are
-> included in their respective add‑on sections (§8).
+> The `postgresql-vector` (10Gi) and `openbao` (data 10Gi + audit 2Gi) PVCs are part of the
+> core baseline and are included in their respective sections (§8).
 
 ---
 
@@ -1247,7 +1265,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: postgresql
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/postgresql:17.2.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: tcp-postgresql, containerPort: 5432, protocol: TCP }]
           env:
@@ -1384,6 +1402,18 @@ spec:
 
 Run **after** the engine is Ready (creates the `documentdb` extension and the CDC
 publication/role). Idempotent.
+
+This Job runs `provision-logical-replication.sql` as the engine **superuser** (`PGUSER=postgres`),
+which is the owner‑privileged role responsible for setting `REPLICA IDENTITY FULL` on every
+`documentdb_data.documents_*` table — both the existing tables (step 4) and any created later (the
+`falcone_documents_ri_full` event trigger, step 5). The live realtime CDC consumer role
+`falcone_cdc_repl` is a non‑owner `LOGIN REPLICATION` role and does **not** own those tables (the
+DocumentDB extension owns them as `documentdb_admin_role`). The realtime executor therefore does not
+depend on owning the tables: on first subscribe it **skips** the `ALTER … REPLICA IDENTITY FULL`
+for tables already FULL and **tolerates** a `42501 (must be owner)` for any not‑yet‑FULL table
+rather than aborting the WAL consumer — that ALTER is this Job's responsibility. Realtime delivery
+is scoped per **tenant and workspace** (two workspaces of one tenant sharing a database+collection
+name do not cross‑receive change events).
 
 ```yaml
 apiVersion: batch/v1
@@ -1587,7 +1617,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: kafka
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/kafka:3.9.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/kafka:3.9.0
           imagePullPolicy: IfNotPresent
           ports:
             - { name: tcp-kafka, containerPort: 9092, protocol: TCP }
@@ -2184,7 +2214,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       initContainers:
         - name: keycloak-db-init
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/postgresql:17.2.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/bitnamilegacy/postgresql:17.2.0
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -2300,7 +2330,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.6.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 8080, protocol: TCP }]
           env:
@@ -2323,7 +2353,7 @@ spec:
             - { name: MONGO_USER, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_USER } } }
             - { name: MONGO_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-documentdb, key: POSTGRES_PASSWORD } } }
             - { name: KAFKA_BROKERS, value: "falcone-kafka:9092" }
-            - { name: FN_RUNTIME_IMAGE, value: "${HARBOR}/${HARBOR_PROJECT}/in-falcone-fn-runtime:0.1.0" }
+            - { name: FN_RUNTIME_IMAGE, value: "${HARBOR}/${HARBOR_PROJECT}/in-falcone-fn-runtime:0.3.0" }
           envFrom:
             - configMapRef: { name: falcone-control-plane-config }
             - configMapRef: { name: in-falcone-control-plane-config }
@@ -2390,7 +2420,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-plane-executor
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane-executor:0.9.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-control-plane-executor:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 8080 }]
           env:
@@ -2468,7 +2498,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: apisix
-          image: ${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/apache/apisix:3.10.0-debian
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 9080, protocol: TCP }
@@ -2526,7 +2556,7 @@ spec:
 
 ### 7.10 Web console — Deployment + Service
 
-nginx serving the built SPA; same‑origin `/v1` proxies to the gateway via the
+Node static server serving the built SPA; same-origin `/v1` proxies to the gateway via the
 `GATEWAY_UPSTREAM` env baked into the image (default `falcone-apisix:9080`).
 
 ```yaml
@@ -2553,7 +2583,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web-console
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-web-console:0.2.11
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-web-console:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 3000, protocol: TCP }]
           env:
@@ -2587,10 +2617,9 @@ spec:
   ports: [{ name: http, port: 3000, targetPort: 3000, protocol: TCP }]
 ```
 
-> **[VERIFY] nginx port under `restricted-v2`.** The image's `nginx.conf` listens on
-> `3000` (non‑privileged) — good for arbitrary‑uid. The stock `nginx:1.27-alpine` base
-> writes to `/var/cache/nginx` and `/var/run`; if you enable `readOnlyRootFilesystem`,
-> add `emptyDir` mounts for those paths. `readOnlyRootFilesystem` is left **off** here.
+> **[VERIFY] web-console port under `restricted-v2`.** The release image serves on
+> `3000` (non-privileged) with the repository static server and does not require nginx cache or
+> pid-file write paths.
 
 ### 7.11 Observability — Prometheus — Deployment + Service
 
@@ -2618,7 +2647,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: observability
-          image: ${HARBOR}/${HARBOR_PROJECT}/prom/prometheus:3.2.1
+          image: ${HARBOR}/${HARBOR_PROJECT}/prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62
           imagePullPolicy: IfNotPresent
           args:
             - --config.file=/etc/prometheus/prometheus.yml
@@ -2734,7 +2763,7 @@ spec:
 ### 7.13 Bootstrap Job (Keycloak realm + APISIX routes)
 
 Runs **last**, after Keycloak and APISIX are Ready. It imports the realm and pushes the
-gateway routes. Uses the `bitnami/kubectl` image + the two large ConfigMaps from §5.2.
+gateway routes. Uses the `alpine/k8s` helper image + the two large ConfigMaps from §5.2.
 
 ```yaml
 apiVersion: batch/v1
@@ -2757,7 +2786,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       initContainers:
         - name: wait-for-keycloak
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
@@ -2777,7 +2806,7 @@ spec:
             runAsNonRoot: true
       containers:
         - name: bootstrap
-          image: ${HARBOR}/${HARBOR_PROJECT}/bitnami/kubectl:1.32.2
+          image: ${HARBOR}/${HARBOR_PROJECT}/alpine/k8s:1.32.2
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "/bootstrap/script/bootstrap.sh"]
           env:
@@ -2883,10 +2912,10 @@ spec:
 
 ---
 
-## 8. Optional add‑ons
+## 8. Core service manifests
 
-Install only the capabilities you need. Each is self‑contained and slots in after the
-core data plane is healthy.
+These services are part of the baseline. Each is self-contained and slots in after the
+core data plane is healthy in this plain-manifest install.
 
 ### 8.1 OpenBao (secrets manager)
 
@@ -3317,7 +3346,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: workflow-worker
-          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-workflow-worker:0.1.0
+          image: ${HARBOR}/${HARBOR_PROJECT}/in-falcone-workflow-worker:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{ name: http, containerPort: 8080 }]
           env:
@@ -3416,7 +3445,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata: { name: falcone-mcp-runtime, namespace: falcone, labels: { app.kubernetes.io/part-of: falcone } }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: falcone-mcp-runtime }
-subjects: [{ kind: ServiceAccount, name: falcone-control-plane, namespace: falcone }]
+subjects: [{ kind: ServiceAccount, name: falcone-control-plane-executor, namespace: falcone }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -3461,7 +3490,7 @@ manifests/
   34-observability.yaml       # §7.11 + §7.12 grafana
   40-bootstrap.yaml           # §7.13
   50-routes.yaml              # §7.14
-  90-optional-*.yaml          # §8 add-ons
+  90-core-*.yaml              # §8 core service supplements
 ```
 
 ```bash
@@ -3514,12 +3543,12 @@ oc wait --for=condition=complete job/falcone-bootstrap --timeout=900s  # CHECKPO
 oc apply -f manifests/34-observability.yaml
 oc apply -f manifests/50-routes.yaml
 
-# 5. Optional add-ons (§8) — apply only what you need.
+# 5. Core service manifests (§8) — apply as part of the baseline.
 # Temporal: schema Job -> servers -> bootstrap Job -> worker
-#   oc apply -f manifests/90-optional-temporal.yaml
-#   oc wait --for=condition=complete job/falcone-temporal-schema --timeout=600s
-#   oc rollout status deployment/falcone-temporal-frontend --timeout=300s
-#   oc wait --for=condition=complete job/falcone-temporal-bootstrap --timeout=600s
+oc apply -f manifests/90-core-temporal.yaml
+oc wait --for=condition=complete job/falcone-temporal-schema --timeout=600s
+oc rollout status deployment/falcone-temporal-frontend --timeout=300s
+oc wait --for=condition=complete job/falcone-temporal-bootstrap --timeout=600s
 ```
 
 > **Why this order:** PostgreSQL must be Ready before Keycloak (DB init), DocumentDB (CDC
@@ -3578,14 +3607,14 @@ returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
 | Pod rejected: `unable to validate against any security context constraint` / `runAsUser: Invalid value` | A pinned uid/fsGroup outside the namespace range under `restricted-v2` | Remove the pin (this guide already nulls them for grafana/openbao/documentdb/pgvector); or bind a dedicated SCC to that SA only. |
 | `hostPath` volume denied | restricted SCC forbids hostPath (upstream SeaweedFS s3 default) | Already fixed here (s3 logs use `emptyDir`); ensure you used the §7.5 s3 manifest, not the upstream one. |
 | PVC stuck `Pending` | StorageClass missing/!dynamic, or no RWO capacity | `oc get pvc -n falcone`; set `${OCP_STORAGECLASS}` to a valid dynamic RWO class; check quota. |
-| Build base image not found (BuildConfig) | `FROM` points at a public registry / base not mirrored | Mirror `node:22-alpine`, `node:22-slim`, `nginx:1.27-alpine` to Harbor and set the BuildConfig `strategy.dockerStrategy.from` to the Harbor path (Appendix B). |
+| Build base image not found (BuildConfig) | `FROM` points at a public registry / base not mirrored | Mirror `node:22-alpine` and `node:22-slim` to Harbor and set the BuildConfig `strategy.dockerStrategy.from` to the Harbor path (Appendix B). |
 | `documentdb-init` fails `documentdb absent from pg_available_extensions` | Wrong/mismatched DocumentDB image mirrored | Mirror the **digest‑pinned** `ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`. |
 | FerretDB CrashLoop / `logical decoding requires wal_level >= logical` | DocumentDB started without `wal_level=logical` | Ensure the `args` (command‑line `-c wal_level=logical`) in §7.2 are present (a `conf.d` GUC is ignored by this image). |
 | Keycloak 404 on `/auth/...` or OIDC issuer mismatch | `KC_HTTP_RELATIVE_PATH`/`KC_HOSTNAME` inconsistent with the Route + gateway config | Keep `/auth` consistent across Keycloak env, `in-falcone-gateway-config`, and the identity Route (§7.6 [VERIFY]). |
 | Kafka CrashLoop / quorum errors | Multi‑broker on one StatefulSet with shared config/PVC | Use the single‑node config in §7.4, or deploy Strimzi for HA. |
 | Bootstrap Job times out at `wait-for-keycloak` | Keycloak not serving, or wrong internal URL/path | Confirm `falcone-keycloak` Ready and the script targets `…:8080/auth`; check the bootstrap script's namespace/DNS (§7.13 [VERIFY]). |
 | SeaweedFS install hangs at the bucket Job | NetworkPolicy dropped the Job's traffic to master/filer | Ensure the §4.2 SeaweedFS policy admits `batch.kubernetes.io/job-name: falcone-seaweedfs-bucket`. |
-| Functions/MCP fail to deploy | OpenShift Serverless (Knative) absent | Install the Serverless Operator + `KnativeServing`, or disable functions/MCP. |
+| Functions/MCP fail to deploy | OpenShift Serverless (Knative) absent | Install the Serverless Operator + `KnativeServing`, then retry the runtime-created workload. |
 | ImageStream trigger didn't roll out a Deployment | Deployments don't auto‑follow ImageStreams | Use direct Harbor image refs (default here), or add the `image.openshift.io/triggers` annotation (Appendix B). |
 | OpenBao pod CrashLoop `mlock` / `cannot allocate memory` | `IPC_LOCK` dropped under restricted SCC | `disable_mlock = true` is set in `openbao.hcl` (§8.1) — confirm it's applied. |
 
@@ -3609,7 +3638,8 @@ Changes made versus the raw chart render to achieve a clean air‑gap/OpenShift 
 2. **SeaweedFS s3 `hostPath` → `emptyDir`** for logs (restricted SCC forbids hostPath).
 3. **Removed pinned uid/fsGroup** on grafana (472), openbao (100/1000), documentdb (999),
    pgvector (999) so `restricted-v2` injects them from the namespace range.
-4. **web‑console tag** `ghcr.io/example/…:0.1.0` (placeholder) → real `…:0.2.11`.
+4. **Falcone-built images** must come from your Harbor project; do not deploy old
+   placeholders or unverified public first-party runtime tags.
 5. **SeaweedFS** mutable tag `4.33` → recommend the digest pin in §3.1.
 6. **Removed** the stray `kubernetes.io/ingress.class: nginx` annotation from Routes.
 7. **Namespace consolidation** — OpenBao (`secret-store`), SeaweedFS (`default`), ESO
@@ -3662,7 +3692,7 @@ spec:
         kind: DockerImage
         name: ${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine   # base from Harbor
   output:
-    to: { kind: ImageStreamTag, name: "in-falcone-control-plane:0.6.2" }
+    to: { kind: ImageStreamTag, name: "in-falcone-control-plane:0.3.0" }
   # Builds pull the base via the 'builder' SA — ensure harbor-pull is linked (§3.3).
 ```
 
@@ -3675,14 +3705,14 @@ resolves:
 metadata:
   annotations:
     image.openshift.io/triggers: |
-      [{"from":{"kind":"ImageStreamTag","name":"in-falcone-control-plane:0.6.2","namespace":"falcone"},
+      [{"from":{"kind":"ImageStreamTag","name":"in-falcone-control-plane:0.3.0","namespace":"falcone"},
         "fieldPath":"spec.template.spec.containers[?(@.name==\"control-plane\")].image"}]
 ```
 
 Repeat the ImageStream/BuildConfig per build‑from‑source image
 (`in-falcone-control-plane-executor`, `in-falcone-web-console`,
-`in-falcone-workflow-worker`, `in-falcone-fn-runtime`) with the right
-`dockerfilePath` and Harbor base (`node:22-alpine`, `node:22-slim`, `nginx:1.27-alpine`).
+`in-falcone-workflow-worker`, `in-falcone-fn-runtime`, `in-falcone-mcp-runtime`) with the right
+`dockerfilePath` and Harbor base (`node:22-alpine`, `node:22-slim`).
 
 ---
 
@@ -3691,16 +3721,17 @@ Repeat the ImageStream/BuildConfig per build‑from‑source image
 1. **Node‑level Harbor trust** (CA + any `ImageDigestMirrorSet`) is a cluster‑admin
    prerequisite — pull secrets alone don't establish registry TLS trust. *(§2)*
 2. **OpenShift Serverless (Knative)** must be present for the **functions** and **MCP**
-   capabilities; without it the platform runs but those features are disabled. This is
-   the only OLM/Operator dependency. *(§1.1)*
+   capabilities. This is the only OLM/Operator prerequisite for the all-core OpenShift
+   installation. *(§1.1)*
 3. **The three large generated ConfigMaps** (`realm.json`, `bootstrap.sh`,
    `gateway-policy.json`) are not inlined — generate them from the chart on a connected
    host and apply (§5.2). The realm export is **required** for bootstrap.
 4. **Build‑from‑source images** (`control-plane`, `control-plane-executor`,
-   `web-console`, `workflow-worker`, `fn-runtime`) must be pre‑built and pushed to Harbor
-   (recommended) or built via BuildConfig against an internal Git mirror. *(§3.1, App. B)*
-5. **Version pins to finalize:** SeaweedFS (use the digest, not `:4.33`), web‑console
-   real tag (`0.2.11` vs the `:0.1.0` placeholder), OpenBao (`2.3.1`). Mirror
+   `web-console`, `workflow-worker`, `fn-runtime`, `mcp-runtime`) must be pre‑built and
+   pushed to Harbor (recommended) or built via BuildConfig against an internal Git mirror.
+   *(§3.1, App. B)*
+5. **Production digest pins:** SeaweedFS should use the recorded digest rather than the
+   mutable `:4.33` tag; mirror the six first-party `0.3.0` images and OpenBao `2.3.1`
    by digest for production. *(§3.1)*
 6. **Executor backend env** (`PG*/MONGO*/STORAGE_S3*/KAFKA_BROKERS`,
    `CONTROL_PLANE_UPSTREAM`) and the **control‑plane `/healthz`** probe path are marked

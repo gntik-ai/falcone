@@ -16,7 +16,13 @@ import { createEmbeddingExecutor, createEmbeddingProviderStore } from '../../app
 
 const TEN = 'ten_emb_get';
 const WS = 'ws_emb_get';
-const authHeaders = { 'content-type': 'application/json', 'x-tenant-id': TEN, 'x-workspace-id': WS, 'x-auth-subject': 'admin' };
+const authHeaders = {
+  'content-type': 'application/json',
+  'x-tenant-id': TEN,
+  'x-workspace-id': WS,
+  'x-auth-subject': 'admin',
+  'x-actor-roles': 'tenant_owner',
+};
 const FAKE_KEY = 'placeholder-not-a-real-key'; // a clearly non-provider placeholder (push protection)
 
 function makeRegistry() {
@@ -73,5 +79,5 @@ test('bbx-emb-get-03: APISIX routes /v1/workspaces/{id}/embedding-provider to th
   assert.ok(idx > -1, 'a dedicated 2003-embedding route exists in apisix.yaml');
   const block = src.slice(idx, idx + 700);
   assert.match(block, /embedding-provider/, 'route matches the embedding-provider subpath');
-  assert.match(block, /falcone-cp-executor/, 'route forwards to the executor, not the control-plane');
+  assert.match(block, /falcone-control-plane-executor/, 'route forwards to the executor, not the control-plane');
 });

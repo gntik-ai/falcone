@@ -181,8 +181,8 @@ export function collectObservabilityMetricsStackViolations(
     }
   }
 
-  if (values?.observability?.enabled !== true) {
-    violations.push('Helm values must keep observability.enabled=true.');
+  if (Object.prototype.hasOwnProperty.call(values?.observability ?? {}, 'enabled')) {
+    violations.push('Helm values must not expose observability.enabled; observability is core.');
   }
 
   const stackValues = values?.observability?.config?.inline?.metricsStack ?? {};

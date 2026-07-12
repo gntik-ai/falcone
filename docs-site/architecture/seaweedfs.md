@@ -18,7 +18,7 @@ the cutover and rollback procedures see the migration runbooks linked under
 
 SeaweedFS is a multi-process distributed object store. Falcone deploys four components by
 default — **master**, **volume**, **filer**, and the **S3 gateway** — as a sub-chart of the
-umbrella chart (`charts/in-falcone/Chart.yaml`, condition `seaweedfs.enabled`). The filer's
+umbrella chart (`charts/in-falcone/Chart.yaml`). The filer's
 metadata is stored in the existing in-cluster **PostgreSQL** tier (the SeaweedFS `postgres2`
 backend) rather than in a new stateful dependency. All services are **ClusterIP only** — no
 tenant-facing exposure; tenant object traffic reaches the S3 gateway through Falcone's data
@@ -209,9 +209,11 @@ Source: `charts/in-falcone/values.yaml` (per-component `data`/`persistence` bloc
 
 ## Day-2 Operations
 
-**Enable / disable.** SeaweedFS is a chart component toggled by `seaweedfs.enabled` (on by
-default). It is the sole object store; the former MinIO `storage` component has been removed.
-The cutover and rollback runbooks below remain as the historical migration record.
+**Core service contract.** SeaweedFS master, volume, filer, and S3 gateway are always rendered by the
+umbrella chart and cannot be disabled with `seaweedfs.enabled=false`, role-level
+`seaweedfs.<role>.enabled=false`, or zero-replica overrides. It is the sole object store; the former
+MinIO `storage` component has been removed. The cutover and rollback runbooks below remain as the
+historical migration record.
 
 **Add a volume server (scale out / enable replication).**
 1. Increase the volume StatefulSet replica count (HA profile runs 3).
@@ -240,16 +242,17 @@ duplicated, to avoid drift):
   ordered checklist to copy buckets/objects MinIO → SeaweedFS, capture integrity, and flip the
   backend.
 - **Rollback / decommission** — [`tools/migration/ROLLBACK.md`](../../tools/migration/ROLLBACK.md):
-  the Helm-toggle rollback (MinIO stays live during the retention window), the READ-ONLY window,
-  and the final MinIO decommission steps.
+  the historical MinIO rollback/decommission process, the READ-ONLY window, and the final MinIO
+  decommission steps.
 
-PVCs are retained by default, so a `seaweedfs.enabled=false` rollback never destroys object data.
+SeaweedFS PVCs are retained by default. Rollbacks use the release rollback and backup/restore runbooks;
+they do not remove the core object-store workload from the chart.
 
 ## Observability
 
 SeaweedFS plugs into Falcone's existing Prometheus-based stack
-([Observability](/operations/observability)). Metrics are **off by default**
-(`global.seaweedfs.monitoring.enabled: false`); enabling it renders a **ServiceMonitor per
+([Observability](/operations/observability)). The all-core install renders the Prometheus-based
+observability stack; when SeaweedFS monitoring is enabled in values it renders a **ServiceMonitor per
 component**:
 
 | Component | ServiceMonitor | Metrics port | Path |

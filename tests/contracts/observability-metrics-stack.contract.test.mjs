@@ -36,7 +36,7 @@ test('helm observability values mirror the internal observability contract', () 
   const stackValues = readObservabilityStackValues();
   const stack = readObservabilityMetricsStack();
 
-  assert.equal(values.observability.enabled, true);
+  assert.equal(Object.hasOwn(values.observability, 'enabled'), false);
   assert.equal(stackValues.version, stack.version);
   assert.equal(stackValues.model, stack.operating_targets.collection_model);
   assert.equal(stackValues.collectionHealth.metricName, stack.collection_health.metric_name);

@@ -1,4 +1,3 @@
-{{- if .Values.temporal.enabled }}
 {{- $root := . -}}
 {{- $t := .Values.temporal -}}
 {{- /*
@@ -35,7 +34,6 @@ spec:
       targetPort: {{ $s.membership }}
       protocol: TCP
 {{- end }}
-{{- if $t.ui.enabled }}
 ---
 apiVersion: v1
 kind: Service
@@ -53,5 +51,3 @@ spec:
       port: {{ $t.ui.service.port }}
       targetPort: {{ $t.ui.service.targetPort }}
       protocol: TCP
-{{- end }}
-{{- end }}

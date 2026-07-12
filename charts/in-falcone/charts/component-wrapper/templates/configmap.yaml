@@ -1,4 +1,4 @@
-{{- if and .Values.enabled .Values.config.inline }}
+{{- if .Values.config.inline }}
 {{- if gt (len .Values.config.inline) 0 }}
 apiVersion: v1
 kind: ConfigMap

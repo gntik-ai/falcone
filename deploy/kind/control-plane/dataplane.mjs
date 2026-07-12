@@ -9,9 +9,10 @@
 // and no superuser is exposed) we degrade gracefully to the shared connection and
 // report `mode: 'shared'` so the caller/UI knows the isolation level it got.
 //
-// Functions need the OpenWhisk data plane, which is a stub in this deploy, so the
-// function "provisioning" is an honest metadata REGISTRY: it records the function
-// and reports runtimeStatus 'pending_data_plane' (no fake "deployed" claim).
+// Functions run on the Knative path in the core chart. In this lightweight kind
+// control-plane shim, function "provisioning" is an honest metadata REGISTRY: it
+// records the function and reports runtimeStatus 'pending_data_plane' unless the
+// executor path is available (no fake "deployed" claim).
 import { randomBytes } from 'node:crypto';
 
 const PGHOST = process.env.PGHOST || 'falcone-postgresql';

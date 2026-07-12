@@ -1,55 +1,52 @@
 /**
- * Black-box manifest-contract suite for spec change
- * fix-executor-ferretdb-netpol-labels (live E2E campaign 2026-06-18, #559 / BUG-MONGO-NP).
+ * Black-box manifest-contract suite for the Helm-owned executor NetworkPolicy label contract.
  *
- * Defect: the kind executor Deployment (deploy/kind/executor-demo.yaml) labelled the pod
- * ONLY `app: falcone-cp-executor`, but the FerretDB (and SeaweedFS / Kafka) NetworkPolicies'
- * ingress allowlists match on `app.kubernetes.io/name: <component>` where component is in
- * `<datastore>.networkPolicy.allowedAppComponents` (control-plane / control-plane-executor /
- * workflow-worker). With no matching label, kindnet dropped the executor->FerretDB TCP and
- * every executor mongo CRUD timed out (500). Confirmed live: insert 500 (timeout) until the
- * `app.kubernetes.io/name: control-plane-executor` pod label was added -> 201.
- *
- * Fix: the executor pod template carries `app.kubernetes.io/name: control-plane-executor`,
- * which MUST be an allowed component on every datastore NetworkPolicy the executor depends on.
- * These two sides of the contract are asserted against the public deploy artifacts (the plain
- * kind manifest + the chart values), so a regression on either side fails deterministically
- * without needing a live cluster or helm.
- *
- * Scenario coverage (capability: control-plane-runtime):
- *   bbx-559-01  executor pod template carries app.kubernetes.io/name: control-plane-executor
- *   bbx-559-02  that component is allowed by the FerretDB NetworkPolicy ingress (values)
- *   bbx-559-03  ... and by the SeaweedFS NetworkPolicy ingress (executor also reaches S3)
- *   bbx-559-04  the Service selector (`app`) is preserved so the executor stays addressable
+ * The executor pod must carry `app.kubernetes.io/name: control-plane-executor`, and datastore
+ * NetworkPolicies must allow that component. The test renders the actual kind install path rather
+ * than the legacy executor-demo manifest.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
-import YAML from 'yaml';
+import { spawnSync } from 'node:child_process';
+import YAML, { parseAllDocuments } from 'yaml';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-
+const CHART_PATH = resolve(REPO_ROOT, 'charts', 'in-falcone');
+const KIND_VALUES = resolve(REPO_ROOT, 'deploy', 'kind', 'values-kind.yaml');
 const NETPOL_COMPONENT = 'control-plane-executor';
 
-function manifestDocs() {
-  const txt = readFileSync(resolve(REPO_ROOT, 'deploy/kind/executor-demo.yaml'), 'utf8');
-  return YAML.parseAllDocuments(txt).map((d) => d.toJS());
+function helmAvailable() {
+  return spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;
 }
+const SKIP = helmAvailable() ? false : { skip: 'helm binary not available on PATH' };
+
+function renderDocs() {
+  const r = spawnSync('helm', ['template', 'falcone', CHART_PATH, '-f', KIND_VALUES], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  assert.equal(r.status, 0, `helm template must exit 0.\nstderr: ${r.stderr}`);
+  return parseAllDocuments(r.stdout).map((d) => d.toJS()).filter(Boolean);
+}
+
 function chartValues() {
   return YAML.parse(readFileSync(resolve(REPO_ROOT, 'charts/in-falcone/values.yaml'), 'utf8'));
 }
+
 function executorDeployment() {
-  const dep = manifestDocs().find(
-    (d) => d && d.kind === 'Deployment' && d.metadata?.name === 'falcone-cp-executor',
+  const dep = renderDocs().find(
+    (d) => d && d.kind === 'Deployment' && d.metadata?.name === 'falcone-control-plane-executor',
   );
-  assert.ok(dep, 'deploy/kind/executor-demo.yaml must define the falcone-cp-executor Deployment');
+  assert.ok(dep, 'Helm must render the falcone-control-plane-executor Deployment');
   return dep;
 }
 
-test('bbx-559-01: executor pod template carries the NetworkPolicy component label', () => {
+test('bbx-559-01: executor pod template carries the NetworkPolicy component label', SKIP, () => {
   const labels = executorDeployment().spec.template.metadata.labels ?? {};
   assert.equal(
     labels['app.kubernetes.io/name'],
@@ -74,11 +71,10 @@ test('bbx-559-03: SeaweedFS NetworkPolicy admits the executor component', () => 
   );
 });
 
-test('bbx-559-04: executor Service selector label is preserved (still addressable)', () => {
+test('bbx-559-04: executor Service selector label is preserved', SKIP, () => {
+  const docs = renderDocs();
   const labels = executorDeployment().spec.template.metadata.labels ?? {};
-  const svc = manifestDocs().find(
-    (d) => d && d.kind === 'Service' && d.metadata?.name === 'falcone-cp-executor',
-  );
+  const svc = docs.find((d) => d && d.kind === 'Service' && d.metadata?.name === 'falcone-control-plane-executor');
   assert.ok(svc, 'executor Service must exist');
   for (const [k, v] of Object.entries(svc.spec.selector)) {
     assert.equal(labels[k], v, `pod must still carry the Service selector label ${k}=${v}`);

@@ -8,7 +8,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}
-  namespace: eso-system
+  namespace: {{ .Values.eso.namespace | default "eso-system" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -32,8 +32,61 @@ subjects:
     namespace: {{ .Values.openbao.namespace }}
   - kind: ServiceAccount
     name: {{ .Values.eso.serviceAccountName | default "eso-openbao-auth" }}
-    namespace: eso-system
+    namespace: {{ .Values.eso.namespace | default "eso-system" }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: openbao-kubernetes-auth
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-platform-secret-reader
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openbao-platform-secret-reader
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: openbao
+    namespace: {{ .Values.openbao.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openbao-platform-secret-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-recovery-secret-writer
+  namespace: {{ .Values.openbao.namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ .Values.openbao.recovery.secretName }}
+    verbs: ["get", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openbao-recovery-secret-writer
+  namespace: {{ .Values.openbao.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: openbao
+    namespace: {{ .Values.openbao.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openbao-recovery-secret-writer

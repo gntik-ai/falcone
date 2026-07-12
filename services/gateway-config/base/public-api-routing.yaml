@@ -358,6 +358,36 @@ spec:
         - data.openwhisk.actions
       qosProfile: provisioning
       requestValidationProfile: provisioning
+    - id: flows
+      pathPrefix: /v1/flows
+      upstreamService: control_api
+      routeClass: data-control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: required
+      workspaceBinding: required
+      propagatedHeaders: *a1
+      planCapabilityAnyOf:
+        - workflows.temporal
+      qosProfile: provisioning
+      requestValidationProfile: provisioning
+    - id: mcp
+      pathPrefix: /v1/mcp
+      upstreamService: control_api
+      routeClass: data-control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: required
+      workspaceBinding: required
+      propagatedHeaders: *a1
+      planCapabilityAnyOf:
+        - mcp.hosting
+      qosProfile: provisioning
+      requestValidationProfile: provisioning
     - id: storage
       pathPrefix: /v1/storage
       upstreamService: control_api

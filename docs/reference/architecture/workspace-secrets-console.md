@@ -112,14 +112,16 @@ own-tenant-vs-other-tenant existence. **Reads are not role-gated** — listing s
 (`GET` list) and reading a secret's metadata (`GET` by name) remain available to any member of the
 owning tenant (values are write-only regardless, per *Write-only values, end to end* above).
 
-## Default-off backend (`501`)
+## Core OpenBao backend
 
-The OpenBao backend is **optional and off by default**. When it is not configured
-(`BAO_ADDR`/`BAO_TOKEN`, or the legacy `VAULT_ADDR`/`VAULT_TOKEN`, unset) every secret op returns
-**`501 SECRETS_BACKEND_DISABLED`** and function deploys ignore secret references, so the default
-install is unchanged. The console renders this as a **first-class "secrets backend unavailable"
-state** (a single informational panel, not a repeating error toast). The kind profile enables the
-backend via the self-signed TLS path (`deploy/kind/values-kind-vault.yaml`).
+OpenBao is part of the core platform baseline. Fresh installs configure `BAO_ADDR`, Kubernetes-auth
+roles, and the OpenBao CA mount for the control-plane and executor, so workspace-secret operations
+use OpenBao by default. `BAO_TOKEN` remains a break-glass/test path; normal workloads authenticate
+with their ServiceAccount through OpenBao Kubernetes auth.
+
+`501 SECRETS_BACKEND_DISABLED` is now a misconfiguration signal rather than the expected default
+state. The console still renders it as a first-class "secrets backend unavailable" panel so an
+operator sees a clear degraded-state message instead of repeating error toasts.
 
 ## Pre-delete confirmation and reference-safety
 

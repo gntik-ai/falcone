@@ -1,4 +1,3 @@
-{{- if .Values.bootstrap.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -522,8 +521,7 @@ data:
 {{- else }}
 {{- $mode := .Values.gatewayPolicy.passthrough.mode }}
 {{- range .Values.bootstrap.reconcile.apisix.routes }}
-{{- /* requiresExecutor routes (api-key auth) only exist when the executor is enabled. */ -}}
-{{- if and (or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes)) (or (not .upstream.requiresExecutor) ($.Values.controlPlaneExecutor).enabled) }}
+{{- if or (not (hasKey . "enabledInModes")) (has $mode .enabledInModes) }}
       ensure_apisix_route "{{ .routeId }}" "$PAYLOAD_DIR/route-{{ .routeId }}.json"
 {{- end }}
 {{- end }}
@@ -590,4 +588,3 @@ data:
     }
 
     main "$@"
-{{- end }}

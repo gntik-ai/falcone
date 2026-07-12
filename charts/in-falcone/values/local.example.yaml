@@ -13,11 +13,10 @@ deployment:
 controlPlane:
   image:
     tag: 0.3.0-dev1
-  env:
-    - name: NODE_ENV
-      value: development
-    - name: DEPLOYMENT_PROFILE
-      value: dev-local
+  config:
+    inline:
+      NODE_ENV: development
+      DEPLOYMENT_PROFILE: dev-local
 
 webConsole:
   image:
@@ -29,4 +28,5 @@ webConsole:
       value: /
 
 observability:
-  enabled: false
+  persistence:
+    enabled: false

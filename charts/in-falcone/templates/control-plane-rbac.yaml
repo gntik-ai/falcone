@@ -1,4 +1,3 @@
-{{- if and .Values.controlPlane.enabled .Values.controlPlane.functionExecutor.enabled }}
 {{- /*
   RBAC for the control-plane function executor: it manages a Knative Service per
   function (deploy = create/patch ksvc, invoke = HTTP) and reads execution logs.
@@ -6,12 +5,12 @@
   the standalone deploy/kind/control-plane/executor-rbac.yaml so the chart is
   self-contained. Bound to the control-plane ServiceAccount.
 */ -}}
-{{- $saName := default (printf "%s-control-plane" .Release.Name) .Values.controlPlane.serviceAccount.name -}}
+{{- $saName := include "in-falcone.componentServiceAccountName" (dict "root" . "component" "controlPlane") -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ .Release.Name }}-function-executor
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
 rules:
@@ -34,7 +33,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ .Release.Name }}-function-executor
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "in-falcone.labels" . | nindent 4 }}
 roleRef:
@@ -44,5 +43,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ $saName }}
-    namespace: {{ .Values.global.namespace }}
-{{- end }}
+    namespace: {{ .Release.Namespace }}
