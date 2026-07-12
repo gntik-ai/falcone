@@ -55,25 +55,30 @@ function makeKubernetesSecrets(overrides = {}) {
   return secrets;
 }
 
-function clusterSecretStore(name, { owned = true, openbaoNamespace = 'secret-store' } = {}) {
+function clusterSecretStore(
+  name,
+  { owned = true, openbaoNamespace = 'secret-store', releaseName, releaseNamespace } = {},
+) {
+  const helmReleaseName = releaseName ?? (owned ? 'falcone' : 'other-release');
+  const helmReleaseNamespace = releaseNamespace ?? (owned ? 'falcone' : 'other-ns');
   return {
     apiVersion: 'external-secrets.io/v1beta1',
     kind: 'ClusterSecretStore',
     metadata: {
       name,
       labels: owned ? {
-        'app.kubernetes.io/instance': 'falcone',
+        'app.kubernetes.io/instance': helmReleaseName,
         'app.kubernetes.io/part-of': 'in-falcone',
       } : {
-        'app.kubernetes.io/instance': 'other-release',
+        'app.kubernetes.io/instance': helmReleaseName,
         'app.kubernetes.io/part-of': 'other-platform',
       },
       annotations: owned ? {
-        'meta.helm.sh/release-name': 'falcone',
-        'meta.helm.sh/release-namespace': 'falcone',
+        'meta.helm.sh/release-name': helmReleaseName,
+        'meta.helm.sh/release-namespace': helmReleaseNamespace,
       } : {
-        'meta.helm.sh/release-name': 'other-release',
-        'meta.helm.sh/release-namespace': 'other-ns',
+        'meta.helm.sh/release-name': helmReleaseName,
+        'meta.helm.sh/release-namespace': helmReleaseNamespace,
       },
     },
     spec: {
@@ -355,6 +360,30 @@ test('all-core KV backup refuses unowned openbao-backend ClusterSecretStore', (t
     /refusing ClusterSecretStore backup\/restore outside Falcone-owned openbao-backend/,
   );
   assert.equal(existsSync(backup), false, 'failed ClusterSecretStore ownership check must not publish a backup archive');
+});
+
+test('all-core KV backup refuses same-release-name ClusterSecretStore from another namespace', (t) => {
+  const h = makeHarness(t, {
+    target: { secret: {} },
+    source: { secret: {} },
+    kubernetes: makeKubernetesSecrets(),
+    clusterSecretStores: {
+      'openbao-backend': clusterSecretStore('openbao-backend', { releaseNamespace: 'other-ns' }),
+    },
+  });
+  const backup = join(h.root, 'wrong-namespace-css-backup.tgz');
+
+  const backupRun = h.run('backup-kv.sh', ['--output', backup]);
+  assert.notEqual(
+    backupRun.status,
+    0,
+    'backup must fail closed when openbao-backend belongs to the same release name in another namespace',
+  );
+  assert.match(
+    `${backupRun.stdout}\n${backupRun.stderr}`,
+    /refusing ClusterSecretStore backup\/restore outside Falcone-owned openbao-backend/,
+  );
+  assert.equal(existsSync(backup), false, 'failed ClusterSecretStore namespace check must not publish a backup archive');
 });
 
 test('all-core KV migration scripts recursively migrate source KV and restore target exactly', (t) => {

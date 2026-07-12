@@ -114,16 +114,10 @@ verify_scoped_clustersecretstores() {
         and all(store_items[]; (
           .kind == "ClusterSecretStore"
           and .metadata.name == "openbao-backend"
-          and (
-            (
-              .metadata.annotations["meta.helm.sh/release-name"] == $release
-              and .metadata.annotations["meta.helm.sh/release-namespace"] == $namespace
-            )
-            or (
-              .metadata.labels["app.kubernetes.io/instance"] == $release
-              and .metadata.labels["app.kubernetes.io/part-of"] == "in-falcone"
-            )
-          )
+          and .metadata.annotations["meta.helm.sh/release-name"] == $release
+          and .metadata.annotations["meta.helm.sh/release-namespace"] == $namespace
+          and .metadata.labels["app.kubernetes.io/instance"] == $release
+          and .metadata.labels["app.kubernetes.io/part-of"] == "in-falcone"
           and ((.spec.provider.vault.server // "") | startswith("https://openbao." + $openbao_namespace + ".svc"))
         ))
       )
